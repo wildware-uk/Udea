@@ -19,13 +19,13 @@ A Kotlin+LibGDX+Fleks game engine for 2D games.
 
 Contributions are welcome! Please follow these steps:
 
--Fork the repository.
+- Fork the repository.
 
--Create a new branch for your feature or bugfix.
+- Create a new branch for your feature or bugfix.
 
--Commit your changes and push the branch.
+- Commit your changes and push the branch.
 
--Open a pull request.
+- Open a pull request.
 
 ## License
 This project is licensed under the MIT License. See the LICENSE file for details.

@@ -1,4 +1,4 @@
-package dev.wildware.udea
+package dev.wildware.udea.assets
 
 import com.github.quillraven.fleks.Snapshot
 
@@ -29,11 +29,5 @@ class Blueprint(
      */
     companion object : AssetType<Blueprint>() {
         override val id: String = "blueprint"
-    }
-}
-
-class TestAsset() {
-    companion object : AssetType<TestAsset>() {
-        override val id: String = "test_asset"
     }
 }

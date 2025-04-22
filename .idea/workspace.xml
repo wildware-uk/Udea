@@ -5,7 +5,20 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Update README">
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/dev/wildware/udea/assets/AssetFileEditor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/common/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/levels.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/levels.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/blueprints.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/json.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/json.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/LevelEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/LevelEditor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/dev/wildware/udea/AssetFileEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/dev/wildware/udea/UdeaAssetAction.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/dev/wildware/udea/editors/AssetBuilderEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/dev/wildware/udea/fileTypes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/dev/wildware/udea/fileTypes.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/dev/wildware/udea/util.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/dev/wildware/udea/util.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/META-INF/plugin.xml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/META-INF/plugin.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -91,9 +104,10 @@
       <list>
         <option value="Fleks Component" />
         <option value="Kotlin Data Class" />
-        <option value="Kotlin Class" />
-        <option value="Kotlin File" />
         <option value="Kotlin Object" />
+        <option value="Kotlin Interface" />
+        <option value="Kotlin File" />
+        <option value="Kotlin Class" />
       </list>
     </option>
   </component>
@@ -129,6 +143,9 @@
   &quot;associatedIndex&quot;: 4
 }</component>
   <component name="ProjectId" id="2vQ9DnKHR4i2jb2jtRKmZB6sbPN" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="1" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
@@ -149,6 +166,7 @@
     "Gradle.udea:plugin [setupDependencies].executor": "Run",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "master",
     "jdk.selected.JAVA_MODULE": "21",
@@ -163,7 +181,7 @@
     "project.structure.last.edited": "Modules",
     "project.structure.proportion": "0.17",
     "project.structure.side.proportion": "0.2",
-    "settings.editor.selected.configurable": "fileTemplates",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
     "vue.rearranger.settings.migration": "true"
   },
   "keyToStringList": {
@@ -188,6 +206,7 @@
       <recent name="dev.wildware.udea.ecs.physics" />
     </key>
     <key name="K2MoveDeclarationsDialog.RECENT_PACKAGE_KEY">
+      <recent name="dev.wildware.udea.assets" />
       <recent name="dev.wildware.udea" />
       <recent name="dev.wildware.dev.wildware.network" />
     </key>
@@ -305,7 +324,10 @@
       <workItem from="1745093414419" duration="742000" />
       <workItem from="1745099429050" duration="6219000" />
       <workItem from="1745134181278" duration="43316000" />
-      <workItem from="1745216995586" duration="10881000" />
+      <workItem from="1745216995586" duration="31196000" />
+      <workItem from="1745259684274" duration="10687000" />
+      <workItem from="1745306141419" duration="11438000" />
+      <workItem from="1745343905359" duration="1011000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -335,20 +357,6 @@
     <option name="LAST_COMMIT_MESSAGE" value="Update README" />
   </component>
   <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/src/main/kotlin/dev/wildware/udea/UdeaAssetAction.kt</url>
-          <line>76</line>
-          <option name="timeStamp" value="35" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/src/main/kotlin/dev/wildware/udea/UdeaAssetAction.kt</url>
-          <line>71</line>
-          <option name="timeStamp" value="36" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
     <pin-to-top-manager>
       <pinned-members>
         <PinnedItemInfo parentTag="org.reflections.Reflections" memberName="store" />

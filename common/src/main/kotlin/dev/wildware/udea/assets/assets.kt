@@ -1,15 +1,14 @@
-package dev.wildware.udea
+package dev.wildware.udea.assets
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.JsonSerializer
-import com.fasterxml.jackson.databind.SerializerProvider
+import com.fasterxml.jackson.databind.*
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.annotation.JsonSerialize
+import dev.wildware.udea.Json
+import dev.wildware.udea.KProvided
+import dev.wildware.udea.KReference
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -19,11 +18,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.io.File
 import java.net.URL
+import kotlin.reflect.jvm.jvmName
 
 @Serializable(with = AssetReferenceSerializer::class)
 @JsonSerialize(using = AssetJacksonSerializer::class)
 @JsonDeserialize(using = AssetJacksonDeserializer::class)
+@KReference
 data class Asset<T>(
+    @KProvided
     val id: String,
 
     @JsonTypeInfo(
@@ -87,8 +89,9 @@ class AssetSet<T>(
 class AssetJacksonSerializer : JsonSerializer<Asset<*>>() {
     override fun serialize(value: Asset<*>, gen: JsonGenerator, serializers: SerializerProvider) {
         gen.writeStartObject()
-        gen.writeStringField("type", value.type::class.qualifiedName)
+        gen.writeStringField("type", value.type::class.jvmName)
         gen.writeStringField("id", value.id)
+        gen.writeStringField("@class", value.value!!::class.jvmName)
         gen.writeObjectField("value", value.value)
         gen.writeEndObject()
     }
@@ -97,14 +100,18 @@ class AssetJacksonSerializer : JsonSerializer<Asset<*>>() {
 class AssetJacksonDeserializer : JsonDeserializer<Asset<*>>() {
     override fun deserialize(p: JsonParser, ctxt: DeserializationContext): Asset<*> {
         val node = p.codec.readTree<JsonNode>(p)
-        val typeClass = Class.forName(node.get("type").asText()).kotlin
+        val typeClass = ctxt.typeFactory.classLoader.loadClass((node.get("type").asText())).kotlin
         val type = typeClass.objectInstance as AssetType<out Any>
         val id = node.get("id").asText()
-        val value = p.codec.treeToValue(node.get("value"), Any::class.java)
+        val valueNode = node.get("value")
+        val valueClass = ctxt.typeFactory.classLoader.loadClass(node.get("@class").asText())
+        val value = p.codec.treeToValue(valueNode, valueClass)
+
         return Asset(id, value, type)
     }
 }
 
+@KProvided
 abstract class AssetType<T> {
     abstract val id: String
     override fun toString() = id

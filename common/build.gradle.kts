@@ -22,6 +22,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.8.0")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.0")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
+    api("com.badlogicgames.gdx:gdx:1.13.1")
 
 }
 

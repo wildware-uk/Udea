@@ -51,9 +51,14 @@ class UdeaFileNode(
         super.update(presentation)
         val contents = Json.fromJson<JsonNode>(psiFile.virtualFile.inputStream)
         val assetType = contents.get("type")
-        presentation.locationString = assetType?.asText() ?: ""
-        presentation.presentableText = psiFile.name.removeSuffix(".udea")
-        presentation.setIcon(UdeaIcons.Blueprint)
+        try {
+            presentation.presentableText = psiFile.name.removeSuffix(".udea")
+            presentation.locationString = ProjectClassLoaderManager.getInstance(project).classLoader
+                .loadClass(assetType.asText())
+                .enclosingClass.simpleName
+            presentation.setIcon(UdeaIcons.Blueprint)
+        } catch (e: Exception) {
+        }
     }
 }
 

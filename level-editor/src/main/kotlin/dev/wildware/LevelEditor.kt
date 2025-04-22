@@ -1,8 +1,8 @@
 package dev.wildware
 
 import com.badlogic.gdx.backends.lwjgl.LwjglAWTCanvas
-import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.configureWorld
+import dev.wildware.udea.assets.Level
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import ktx.app.KtxGame
@@ -56,7 +56,7 @@ class LevelEditorScreen(
     private var playing = false
 
     init {
-        resetWorld()
+//        resetWorld()
     }
 
     override fun render(delta: Float) {
@@ -71,44 +71,44 @@ class LevelEditorScreen(
 
     fun play() {
         playing = true
-        resetWorld()
+//        resetWorld()
     }
 
     fun stop() {
         playing = false
-        resetWorld()
+//        resetWorld()
     }
 
     fun onEntityAdded() {
         world.entity()
     }
 
-    fun addToEntity(entityInstance: EntityInstance, component: Component<*>) {
-        entityInstance.snapshot.components
-//        with(world) {
-//            entity.configure {
-//                it += listOf(component)
+//    fun addToEntity(entityInstance: EntityInstance, component: Component<*>) {
+//        entityInstance.snapshot.components
+////        with(world) {
+////            entity.configure {
+////                it += listOf(component)
+////            }
+////        }
+//    }
+
+//    suspend fun save() {
+//        level = Level(
+//            world.systems.map { it::class },
+//            world.snapshot().map {
+//                EntityInstance(it.value)
+//            }
+//        )
+//
+//        _latestSnapshot.emit(level)
+//        println("Saving $level")
+//    }
+
+//    private fun resetWorld() {
+//        level.entities.forEach {
+//            world.entity().apply {
+//                world.loadSnapshotOf(this, it.snapshot)
 //            }
 //        }
-    }
-
-    suspend fun save() {
-        level = Level(
-            world.systems.map { it::class },
-            world.snapshot().map {
-                EntityInstance(it.value)
-            }
-        )
-
-        _latestSnapshot.emit(level)
-        println("Saving $level")
-    }
-
-    private fun resetWorld() {
-        level.entities.forEach {
-            world.entity().apply {
-                world.loadSnapshotOf(this, it.snapshot)
-            }
-        }
-    }
+//    }
 }

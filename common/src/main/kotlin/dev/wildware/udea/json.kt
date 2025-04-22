@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.core.util.DefaultIndenter
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter
 import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.io.InputStream
@@ -24,13 +23,16 @@ object Json {
         })
     }
 
-    fun withClassLoader(classLoader: ClassLoader): Json {
+
+    /**
+     * Sets the class loader for the ObjectMapper's type factory.
+     *
+     * @param classLoader The ClassLoader to use for type resolution, defaults to current thread's context class loader
+     * @return The [Json] object instance for method chaining
+     */
+    fun withClassLoader(classLoader: ClassLoader = Thread.currentThread().contextClassLoader): Json {
         objectMapper.typeFactory = objectMapper.typeFactory.withClassLoader(classLoader)
         return this
-    }
-
-    fun configure(mapperBlock: ObjectMapper.() -> Unit) {
-        objectMapper.mapperBlock()
     }
 
     /**
@@ -42,6 +44,7 @@ object Json {
      */
     inline fun <reified T> fromJson(json: String): T {
         return objectMapper.readValue(json, object : TypeReference<T>() {})
+            .also { withClassLoader() }
     }
 
     /**
@@ -52,6 +55,7 @@ object Json {
      */
     inline fun <reified T> fromJson(inputStream: InputStream): T {
         return objectMapper.readValue(inputStream, object : TypeReference<T>() {})
+            .also { withClassLoader() }
     }
 
     /**
@@ -62,5 +66,6 @@ object Json {
      */
     fun toJson(value: Any): String {
         return objectMapper.writeValueAsString(value)
+            .also { withClassLoader() }
     }
 }

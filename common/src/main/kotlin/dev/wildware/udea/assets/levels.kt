@@ -17,8 +17,4 @@ data class Level(
      * Component snapshots that will be placed on entities.
      * */
     val entities: List<Snapshot> = emptyList()
-) {
-    companion object : AssetType<Level>() {
-        override val id: String = "level"
-    }
-}
+): Asset()

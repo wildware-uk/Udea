@@ -15,7 +15,6 @@ repositories {
 dependencies {
     api("io.github.quillraven.fleks:Fleks:2.13-SNAPSHOT")
     implementation(kotlin("stdlib"))
-    implementation(kotlin("reflect"))
     implementation("org.reflections:reflections:0.10.2")
     testImplementation(kotlin("test"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")

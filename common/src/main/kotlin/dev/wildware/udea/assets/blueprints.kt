@@ -22,12 +22,5 @@ class Blueprint(
      * Optional parent blueprint that this blueprint inherits from.
      * Allows for blueprint hierarchies and component inheritance.
      */
-    val parent: Asset<Blueprint>? = null
-) {
-    /**
-     * Companion object defining the asset type for blueprints.
-     */
-    companion object : AssetType<Blueprint>() {
-        override val id: String = "blueprint"
-    }
-}
+    val parent: AssetRefence<Blueprint>? = null
+): Asset()

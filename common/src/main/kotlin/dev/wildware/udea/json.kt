@@ -1,12 +1,17 @@
 package dev.wildware.udea
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.core.util.DefaultIndenter
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter
 import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import dev.wildware.udea.assets.Asset
 import java.io.InputStream
+
 
 /**
  * Utility object for JSON serialization and deserialization using Jackson ObjectMapper.
@@ -67,5 +72,14 @@ object Json {
     fun toJson(value: Any): String {
         return objectMapper.writeValueAsString(value)
             .also { withClassLoader() }
+    }
+
+    /**
+     * Configures the ObjectMapper with a custom block.
+     *
+     * @param block A lambda function that takes an ObjectMapper as a parameter
+     */
+    fun configure(block: ObjectMapper.() -> Unit) {
+        objectMapper.block()
     }
 }

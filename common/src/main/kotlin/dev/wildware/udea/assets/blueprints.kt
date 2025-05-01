@@ -2,6 +2,8 @@ package dev.wildware.udea.assets
 
 import com.github.quillraven.fleks.Snapshot
 
+val EmptySnapshot = Snapshot(emptyList(), emptyList())
+
 /**
  * A blueprint represents a template for creating entities in the game world.
  * It contains essential information like name, state snapshot, and optional parent blueprint
@@ -9,14 +11,9 @@ import com.github.quillraven.fleks.Snapshot
  */
 class Blueprint(
     /**
-     * The unique identifier name for this blueprint.
-     */
-    val name: String,
-
-    /**
      * The snapshot containing the entity's component state and configuration.
      */
-    val snapshot: Snapshot,
+    val snapshot: Snapshot = EmptySnapshot,
 
     /**
      * Optional parent blueprint that this blueprint inherits from.

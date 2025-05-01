@@ -1,13 +1,10 @@
-package dev.wildware.udea.assets
+package dev.wildware.udea.editors
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposePanel
 import androidx.compose.ui.unit.dp
@@ -25,9 +22,11 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.findDocument
 import dev.wildware.udea.Json
 import dev.wildware.udea.ProjectClassLoaderManager
-import dev.wildware.udea.editors.Editors
+import dev.wildware.udea.assets.Asset
+import dev.wildware.udea.assets.Assets
 import io.kanro.compose.jetbrains.expui.control.Label
 import io.kanro.compose.jetbrains.expui.theme.DarkTheme
+import kotlinx.coroutines.delay
 import java.awt.BorderLayout
 import java.beans.PropertyChangeListener
 import javax.swing.JPanel
@@ -71,6 +70,19 @@ class AssetFileEditor(
     private val component = JPanel(BorderLayout()).apply {
         add(ComposePanel().apply {
             setContent {
+                var areAssetsLoaded by remember { mutableStateOf(Assets.ready) }
+
+                if (!areAssetsLoaded) {
+                    LaunchedEffect(Unit) {
+                        while (!Assets.ready) {
+                            delay(100)
+                            areAssetsLoaded = Assets.ready
+                        }
+                    }
+                    Label("Loading assets...")
+                    return@setContent
+                }
+
                 remember {
                     document.addDocumentListener(object : DocumentListener {
                         override fun documentChanged(event: DocumentEvent) {
@@ -89,7 +101,7 @@ class AssetFileEditor(
                             Spacer(Modifier.padding(8.dp))
 
                             Editors.getEditor(Any::class)
-                                ?.CreateEditor(project, assetValueClass, currentState) {
+                                ?.CreateEditor(project, EditorType(assetValueClass), currentState) {
                                     currentState = it as Asset
                                     modified = true
 

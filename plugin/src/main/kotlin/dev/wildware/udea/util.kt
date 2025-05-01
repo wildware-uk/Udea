@@ -7,6 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.*
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.ClassInheritorsSearch
+import dev.wildware.udea.editors.EditorType
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtParameter
 import kotlin.reflect.KClass
@@ -172,4 +173,59 @@ inline fun <reified T> KtClass.hasAnnotation(): Boolean {
 
 inline fun <reified T> KtParameter.hasAnnotation(): Boolean {
     return this.annotations.any { it.name == T::class.qualifiedName }
+}
+
+/**
+ * Converts a PsiClass to its JVM qualified name, handling nested classes with '$' notation.
+ *
+ * Example: "dev.wildware.udea.assets.Binding$BindingInput"
+ *
+ * @param psiClass The PsiClass to convert
+ * @return The JVM qualified name
+ */
+fun PsiClass.toJvmQualifiedName(): String {
+    val containingClass = this.containingClass
+    return if (containingClass != null) {
+        "${containingClass.toJvmQualifiedName()}$${this.name}"
+    } else {
+        this.qualifiedName ?: ""
+    }
+}
+
+/**
+ * Converts a PsiClassType to an EditorType, resolving the class and its generics.
+ *
+ * @param T The type of the EditorType
+ * @return The resolved EditorType
+ */
+fun <T : Any> PsiClassType.toEditorType(): EditorType<T> {
+    return ApplicationManager.getApplication().runReadAction<EditorType<T>> {
+        val psiClass = resolve() ?: error("Unresolved class type: $this")
+        val kClass = psiClass.toJvmQualifiedName().let {
+            Class.forName(it).kotlin
+        }
+
+        val generics = parameters.mapNotNull { param ->
+            when (param) {
+                is PsiClassType -> {
+                    param.resolve()?.toJvmQualifiedName()?.let { name ->
+                        Class.forName(name).kotlin
+                    }
+                }
+                is PsiWildcardType -> {
+                    // Handle wildcard type (out T or in T)
+                    val bound = param.bound
+                    if (bound is PsiClassType) {
+                        bound.resolve()?.toJvmQualifiedName()?.let { name ->
+                            Class.forName(name).kotlin
+                        }
+                    } else null
+                }
+                else -> null
+            }
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        EditorType(kClass, generics) as EditorType<T>
+    }
 }

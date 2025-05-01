@@ -1,4 +1,4 @@
-package dev.wildware.udea.assets
+package dev.wildware.udea.editors
 
 import androidx.compose.ui.awt.ComposePanel
 import com.intellij.icons.AllIcons
@@ -9,11 +9,16 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.InputValidatorEx
-import com.intellij.psi.*
-import dev.wildware.udea.*
-import dev.wildware.udea.editors.Editors
+import com.intellij.psi.PsiDirectory
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiFileFactory
+import dev.wildware.udea.Json
+import dev.wildware.udea.UdeaIcons
+import dev.wildware.udea.assets.Asset
+import dev.wildware.udea.camelCaseToTitle
+import dev.wildware.udea.findClassesOfType
 import io.kanro.compose.jetbrains.expui.theme.DarkTheme
-import kotlin.reflect.KClass
+import kotlin.reflect.full.primaryConstructor
 
 class UdeaAssetAction :
     CreateFromTemplateAction<PsiFile>("Udea Asset", "Create a new Udea asset", AllIcons.FileTypes.Json) {
@@ -47,30 +52,32 @@ class UdeaAssetAction :
 
             var asset: Asset? = null
 
-            val dialog = object : DialogWrapper(directory.project) {
+            if (canSkipEditor(templateName)) {
+                asset = Class.forName(templateName).kotlin.primaryConstructor!!.callBy(emptyMap()) as Asset?
+            } else {
+                val dialog = object : DialogWrapper(directory.project) {
+                    init {
+                        title = "Create $name Asset"
+                        init()
+                    }
 
-                init {
-                    title = "Create $name Asset"
-                    init()
-                }
-
-                override fun createCenterPanel() = ComposePanel().apply {
-                    setContent {
-                        DarkTheme {
-                            Editors.getEditor(Any::class)?.CreateEditor(
-                                directory.project,
-                                Class.forName(templateName).kotlin,
-                                null,
-                            ) { asset = it as Asset? }
+                    override fun createCenterPanel() = ComposePanel().apply {
+                        setContent {
+                            DarkTheme {
+                                Editors.getEditor(Any::class)?.CreateEditor(
+                                    directory.project,
+                                    EditorType(Class.forName(templateName).kotlin),
+                                    null,
+                                ) { asset = it as Asset? }
+                            }
                         }
                     }
                 }
-            }
 
-            if (!dialog.showAndGet()) {
-                throw IllegalStateException("Dialog cancelled")
+                if (!dialog.showAndGet()) {
+                    throw IllegalStateException("Dialog cancelled")
+                }
             }
-
 
             val json = Json.toJson(asset ?: error("No asset created"))
 
@@ -91,4 +98,7 @@ class UdeaAssetAction :
             throw IllegalStateException("Failed to create asset: $name", e)
         }
     }
+
+    private fun canSkipEditor(templateName: String): Boolean =
+        Class.forName(templateName).kotlin.primaryConstructor!!.parameters.let { it.all { it.isOptional } || it.isEmpty() }
 }

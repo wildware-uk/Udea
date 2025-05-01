@@ -1,8 +1,8 @@
 package dev.wildware.udea.editors
 
-import androidx.compose.runtime.Composable
-
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -10,12 +10,46 @@ import androidx.compose.ui.unit.dp
 import com.intellij.openapi.project.Project
 import dev.wildware.udea.math.Vector2
 import io.kanro.compose.jetbrains.expui.control.Label
+import io.kanro.compose.jetbrains.expui.control.OutlineButton
 import io.kanro.compose.jetbrains.expui.control.TextField
-import kotlin.reflect.KClass
+
+object ListEditor : ComposeEditor<List<Any?>> {
+    @Composable
+    override fun CreateEditor(
+        project: Project,
+        type: EditorType<List<Any?>>,
+        value: List<Any?>?,
+        onValueChange: (List<Any?>) -> Unit
+    ) {
+        val listType = remember { type.generics.first() }
+        var content by remember { mutableStateOf(value ?: emptyList<Any?>()) }
+        val editor = remember { Editors.getEditorRaw(listType)!! as ComposeEditor<Any> }
+
+        OutlineButton(onClick = {
+            content += null
+        }) {
+            Label("Add Item")
+        }
+
+        LazyColumn {
+            items(content) { item ->
+                editor.CreateEditor(project, EditorType(listType), item) {
+                        val index = content.indexOf(item)
+                        if (index != -1) {
+                            content = content.toMutableList().apply {
+                                this[index] = it
+                            }
+                            onValueChange(content)
+                        }
+                    }
+            }
+        }
+    }
+}
 
 object IntEditor : ComposeEditor<Int> {
     @Composable
-    override fun CreateEditor(project: Project, type: KClass<out Int>, value: Int?, onValueChange: (Int) -> Unit) {
+    override fun CreateEditor(project: Project, type: EditorType<Int>, value: Int?, onValueChange: (Int) -> Unit) {
         var text by remember { mutableStateOf(value?.toString() ?: "") }
 
         TextField(
@@ -32,7 +66,7 @@ object StringEditor : ComposeEditor<String> {
     @Composable
     override fun CreateEditor(
         project: Project,
-        type: KClass<out String>,
+        type: EditorType<String>,
         value: String?,
         onValueChange: (String) -> Unit
     ) {
@@ -50,7 +84,12 @@ object StringEditor : ComposeEditor<String> {
 
 object FloatEditor : ComposeEditor<Float> {
     @Composable
-    override fun CreateEditor(project: Project, type: KClass<out Float>, value: Float?, onValueChange: (Float) -> Unit) {
+    override fun CreateEditor(
+        project: Project,
+        type: EditorType<Float>,
+        value: Float?,
+        onValueChange: (Float) -> Unit
+    ) {
         var text by remember { mutableStateOf(value?.toString() ?: "") }
 
         TextField(
@@ -67,7 +106,7 @@ object BooleanEditor : ComposeEditor<Boolean> {
     @Composable
     override fun CreateEditor(
         project: Project,
-        type: KClass<out Boolean>,
+        type: EditorType<Boolean>,
         value: Boolean?,
         onValueChange: (Boolean) -> Unit
     ) {
@@ -87,7 +126,7 @@ object Vector2Editor : ComposeEditor<Vector2> {
     @Composable
     override fun CreateEditor(
         project: Project,
-        type: KClass<out Vector2>,
+        type: EditorType<Vector2>,
         value: Vector2?,
         onValueChange: (Vector2) -> Unit
     ) {

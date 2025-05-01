@@ -2,14 +2,18 @@ package dev.wildware.udea.editors
 
 import androidx.compose.runtime.Composable
 import com.intellij.openapi.project.Project
-import dev.wildware.udea.assets.Asset
 import dev.wildware.udea.assets.AssetRefence
 import dev.wildware.udea.math.Vector2
 import kotlin.reflect.KClass
 
+data class EditorType<T : Any>(
+    val type: KClass<out T>,
+    val generics: List<KClass<out Any>> = emptyList(),
+)
+
 interface ComposeEditor<T : Any> {
     @Composable
-    fun CreateEditor(project: Project, type: KClass<out T>, value: T?, onValueChange: (T) -> Unit)
+    fun CreateEditor(project: Project, type: EditorType<T>, value: T?, onValueChange: (T) -> Unit)
 }
 
 object Editors {
@@ -17,6 +21,7 @@ object Editors {
 
     init {
         // TODO BETTER APPROACH
+        registerEditor(List::class, ListEditor)
         registerEditor(Vector2::class, Vector2Editor)
         registerEditor(Int::class, IntEditor)
         registerEditor(String::class, StringEditor)

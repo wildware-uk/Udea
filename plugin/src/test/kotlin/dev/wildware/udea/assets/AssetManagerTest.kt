@@ -23,7 +23,7 @@ class AssetManagerTest : UdeaTestBase() {
         val assets = Assets.toList()
         assert(assets.isNotEmpty()) { "Assets should not be empty" }
 
-        val expectedControl = Control("Test Control")
+        val expectedControl = Control()
         val controlAsset: Control = Assets["/src/testAssets/testControl.udea"]
         assertEquals(expectedControl, controlAsset)
 
@@ -33,7 +33,7 @@ class AssetManagerTest : UdeaTestBase() {
     }
 
     fun testAssetSerialization() {
-        val control = Control("Test Control")
+        val control = Control()
         val serializedControl = Json.fromJson<Control>(Json.toJson(control))
 
         assertEquals(control, serializedControl)

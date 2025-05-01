@@ -10,7 +10,7 @@
     <depends>org.jetbrains.kotlin</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <fileEditorProvider implementation="dev.wildware.udea.assets.AssetFileEditorProvider"/>
+        <fileEditorProvider implementation="dev.wildware.udea.editors.AssetFileEditorProvider"/>
         <fileTemplateGroup implementation="dev.wildware.udea.AssetTemplateGroup"/>
         <treeStructureProvider implementation="dev.wildware.udea.UdeaFileStructureProvider"/>
         <postStartupActivity implementation="dev.wildware.udea.UdeaStartup"/>
@@ -22,7 +22,7 @@
 
     <actions>
         <action id="Udea.Asset"
-                class="dev.wildware.udea.assets.UdeaAssetAction"
+                class="dev.wildware.udea.editors.UdeaAssetAction"
                 text="Udea Asset"
                 description="Create a new Udea asset">
             <add-to-group group-id="NewGroup" anchor="first"/>

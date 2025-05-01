@@ -19,12 +19,12 @@ object AssetReferenceEditor : ComposeEditor<AssetRefence<out Asset>> {
     @Composable
     override fun CreateEditor(
         project: Project,
-        type: KClass<out AssetRefence<out Asset>>,
+        type: EditorType<AssetRefence<out Asset>>,
         value: AssetRefence<out Asset>?,
         onValueChange: (AssetRefence<out Asset>) -> Unit
     ) {
-        var selectedAsset by remember { mutableStateOf<Asset?>(null) }
-        val assets = remember { Assets.toList() }
+        var selectedAsset by remember { mutableStateOf(value?.value) }
+        val assets = remember { Assets.filterIsInstance(type.generics.first() as KClass<Asset>) }
 
         assets.forEach { asset ->
             Row(
@@ -41,7 +41,7 @@ object AssetReferenceEditor : ComposeEditor<AssetRefence<out Asset>> {
                         }
                     )
             ) {
-                Label(asset::class.simpleName?.camelCaseToTitle() ?: "Unknown")
+                Label("${asset.name} ${asset::class.simpleName?.let { "(${it.camelCaseToTitle()})" }}")
             }
         }
     }

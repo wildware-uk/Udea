@@ -10,6 +10,8 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.reflect.KClass
+import kotlin.reflect.full.isSubclassOf
 
 data class AssetRefence<T : Asset>(
     @JsonValue
@@ -32,22 +34,28 @@ data class AssetRefence<T : Asset>(
 )
 abstract class Asset {
     @JsonIgnore
-    lateinit var id: String
-        internal set
+    var path: String = ""
 
     @JsonIgnore
-    var path: String = ""
+    var name: String = ""
+
+    override fun equals(other: Any?): Boolean {
+        return other is Asset && other.path == path
+    }
 }
 
 object Assets {
     @PublishedApi
     internal val assets = mutableMapOf<String, Asset>()
 
+    val ready: Boolean
+        get() = assets.isNotEmpty()
+
     inline operator fun <reified T : Asset> get(path: String) = assets[path] as T?
         ?: error("Asset $path does not exist")
 
     fun <T : Asset> find(path: String) = assets[path] as T?
-        ?: error("Asset $path does not exist")
+        ?: error("Asset $path does not exist ${debugAssets()}")
 
     operator fun set(path: String, asset: Asset) {
         assets[path] = asset
@@ -60,6 +68,18 @@ object Assets {
     fun toList(): List<Asset> {
         return assets.values.toList()
     }
+
+    inline fun <reified T : Asset> filterIsInstance(): List<T> {
+        return assets.values.filterIsInstance<T>()
+    }
+
+    fun <T : Asset> filterIsInstance(type: KClass<out T>): List<T> {
+        return assets.values.filter { it::class.isSubclassOf(type) } as List<T>
+    }
+
+    private fun debugAssets() {
+        println(assets)
+    }
 }
 
 object AssetReferenceSerializer : KSerializer<Asset> {
@@ -67,12 +87,12 @@ object AssetReferenceSerializer : KSerializer<Asset> {
         PrimitiveSerialDescriptor("Asset", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: Asset) {
-        encoder.encodeString(value.id)
+        encoder.encodeString(value.path)
     }
 
     override fun deserialize(decoder: Decoder): Asset {
-        val (typeName, id) = decoder.decodeString().split("/", limit = 2)
-        return Assets[id]
+        val (typeName, path) = decoder.decodeString().split("/", limit = 2)
+        return Assets[path]
     }
 }
 

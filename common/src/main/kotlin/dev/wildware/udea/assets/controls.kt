@@ -4,9 +4,7 @@ import com.badlogic.gdx.Gdx
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 
-data class Control(
-    val name: String
-) : Asset() {
+class Control : Asset() {
     val controlId = ControlId++
 
     companion object {

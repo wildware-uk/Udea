@@ -12,6 +12,7 @@ import dev.wildware.udea.Json
 import dev.wildware.udea.ProjectClassLoaderManager
 
 
+// TODO make this iterative?
 @Service(Service.Level.PROJECT)
 class AssetManager(private val project: Project) {
     private var connection: MessageBusConnection = project.messageBus.connect()
@@ -24,8 +25,6 @@ class AssetManager(private val project: Project) {
                 }
             }
         })
-
-        reloadAssets()
     }
 
     fun reloadAssets() {
@@ -40,6 +39,7 @@ class AssetManager(private val project: Project) {
                             .fromJson<Asset>(file.inputStream)
 
                         asset.path = file.path
+                        asset.name = file.nameWithoutExtension
 
                         Assets[file.path] = asset
                     } catch (e: Exception) {
@@ -49,5 +49,7 @@ class AssetManager(private val project: Project) {
                 }
             }
         }
+
+        println("Reloaded assets")
     }
 }

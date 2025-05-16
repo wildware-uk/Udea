@@ -9,7 +9,7 @@ plugins {
     alias(libs.plugins.changelog) // Gradle Changelog Plugin
     alias(libs.plugins.qodana) // Gradle Qodana Plugin
     alias(libs.plugins.kover) // Gradle Kover Plugin
-    id("org.jetbrains.compose") version "1.7.0-alpha03"
+    id("org.jetbrains.compose") version "1.7.3"
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.20"
 }
 
@@ -41,6 +41,7 @@ configurations.runtimeClasspath {
 
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
+    implementation(project(":compose-ui"))
     testImplementation(libs.junit)
     testImplementation(libs.opentest4j)
     implementation(kotlin("reflect"))
@@ -49,6 +50,8 @@ dependencies {
     }
     implementation("com.bybutter.compose:compose-jetbrains-expui-theme:2.0.0")
     implementation("org.jetbrains.skiko:skiko-awt:0.8.11")
+    implementation("org.jetbrains.compose.components:components-splitpane:1.7.3")
+
     implementation(project(":level-editor"))
     implementation(project(":common"))
 

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.annotation.JsonValue
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -13,7 +14,7 @@ import kotlinx.serialization.encoding.Encoder
 import kotlin.reflect.KClass
 import kotlin.reflect.full.isSubclassOf
 
-data class AssetRefence<T : Asset>(
+data class AssetReference<T : Asset>(
     @JsonValue
     val path: String
 ) {
@@ -24,7 +25,7 @@ data class AssetRefence<T : Asset>(
     companion object {
         @JvmStatic
         @JsonCreator
-        fun createAssetReference(path: String): AssetRefence<*> = AssetRefence<Asset>(path)
+        fun createAssetReference(path: String): AssetReference<*> = AssetReference<Asset>(path)
     }
 }
 
@@ -32,6 +33,7 @@ data class AssetRefence<T : Asset>(
     use = JsonTypeInfo.Id.CLASS,
     include = JsonTypeInfo.As.PROPERTY,
 )
+@Serializable(with = AssetReferenceSerializer::class)
 abstract class Asset {
     @JsonIgnore
     var path: String = ""
@@ -95,4 +97,3 @@ object AssetReferenceSerializer : KSerializer<Asset> {
         return Assets[path]
     }
 }
-

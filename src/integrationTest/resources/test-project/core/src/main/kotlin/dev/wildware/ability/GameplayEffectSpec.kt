@@ -11,19 +11,20 @@ import kotlin.time.Duration
 fun gameplayEffect(
     name: String,
     target: KProperty<Attribute>,
-    modifierType: ModifierType,
+    modifierType: dev.wildware.udea.ability.ModifierType,
     source: ValueResolver,
-    effectDuration: GameplayEffectDuration,
+    effectDuration: dev.wildware.udea.ability.GameplayEffectDuration,
     period: Duration = Duration.ZERO,
     tags: List<GameplayTag> = emptyList(),
     cues: List<GameplayEffectCue> = emptyList(),
 ) {
-    Assets[GameplayEffect][name] = GameplayEffect(name, target, modifierType, source, effectDuration, period, tags, cues)
+    Assets[GameplayEffect][name] =
+        dev.wildware.udea.ability.GameplayEffect(name, target, modifierType, source, effectDuration, period, tags, cues)
 }
 
 @Serializable
 data class GameplayEffectSpec(
-    val gameplayEffect: Asset<@Contextual GameplayEffect>,
+    val gameplayEffect: Asset<@Contextual dev.wildware.udea.ability.GameplayEffect>,
     var stacks: Int = 1,
     var magnitude: Float = 1F,
 ) {
@@ -39,14 +40,14 @@ data class GameplayEffectSpec(
 data class GameplayEffect(
     val name: String,
     val target: KProperty<Attribute>,
-    val modifierType: ModifierType,
+    val modifierType: dev.wildware.udea.ability.ModifierType,
     val source: ValueResolver,
-    var effectDuration: GameplayEffectDuration,
+    var effectDuration: dev.wildware.udea.ability.GameplayEffectDuration,
     val period: Duration = Duration.ZERO,
     val tags: List<GameplayTag> = emptyList(),
     val cues: List<GameplayEffectCue> = emptyList()
 ) {
-    companion object : AssetType<GameplayEffect>() {
+    companion object : AssetType<dev.wildware.udea.ability.GameplayEffect>() {
         override val id: String = "gameplay_effect"
     }
 }
@@ -62,17 +63,17 @@ enum class ModifierType(
 sealed class GameplayEffectDuration {
     abstract fun hasExpired(currentDuration: Float): Boolean
 
-    data object Instant : GameplayEffectDuration() {
+    data object Instant : dev.wildware.udea.ability.GameplayEffectDuration() {
         override fun hasExpired(currentDuration: Float) = true
     }
 
-    data object Infinite : GameplayEffectDuration() {
+    data object Infinite : dev.wildware.udea.ability.GameplayEffectDuration() {
         override fun hasExpired(currentDuration: Float) = false
     }
 
     data class Duration(
         val duration: Float
-    ) : GameplayEffectDuration() {
+    ) : dev.wildware.udea.ability.GameplayEffectDuration() {
         override fun hasExpired(currentDuration: Float) =
             currentDuration > duration
     }

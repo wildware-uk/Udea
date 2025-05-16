@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposePanel
 import androidx.compose.ui.unit.dp
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
@@ -31,6 +32,14 @@ import java.awt.BorderLayout
 import java.beans.PropertyChangeListener
 import javax.swing.JPanel
 
+/**
+ * Contains a reference to an asset which may or may not exist.
+ * */
+data class AssetFile(
+    val type: String,
+    val asset: Asset?
+)
+
 class AssetFileEditorProvider : FileEditorProvider, DumbAware {
     override fun accept(project: Project, file: VirtualFile): Boolean {
         return file.extension == "udea"
@@ -44,7 +53,7 @@ class AssetFileEditorProvider : FileEditorProvider, DumbAware {
         val documentText = file.findDocument()!!.text
         val asset = Json
             .withClassLoader(classLoaderManager.classLoader)
-            .fromJson<Asset>(documentText)
+            .fromJson<AssetFile>(documentText)
         return AssetFileEditor(project, file, asset)
     }
 
@@ -56,12 +65,13 @@ class AssetFileEditorProvider : FileEditorProvider, DumbAware {
 class AssetFileEditor(
     val project: Project,
     private val file: VirtualFile,
-    asset: Asset,
+    val assetFile: AssetFile,
 ) : FileEditor {
 
-    val assetValueClass = asset::class
+    val assetValueClass = ProjectClassLoaderManager
+        .getInstance(project).classLoader.loadClass(assetFile.type).kotlin
 
-    var currentState: Asset by mutableStateOf(asset)
+    var currentState: Asset? by mutableStateOf(assetFile.asset)
 
     val document = file.findDocument()!!
 
@@ -88,7 +98,7 @@ class AssetFileEditor(
                         override fun documentChanged(event: DocumentEvent) {
                             currentState =
                                 Json.withClassLoader(ProjectClassLoaderManager.Companion.getInstance(project).classLoader)
-                                    .fromJson<Asset>(event.document.text)
+                                    .fromJson<AssetFile>(event.document.text).asset
                         }
                     })
                 }
@@ -100,13 +110,13 @@ class AssetFileEditor(
 
                             Spacer(Modifier.padding(8.dp))
 
-                            Editors.getEditor(Any::class)
-                                ?.CreateEditor(project, EditorType(assetValueClass), currentState) {
+                            (Editors.getEditor(assetValueClass) as ComposeEditor<Any>)
+                                .CreateEditor(project, EditorType(assetValueClass), currentState) {
                                     currentState = it as Asset
                                     modified = true
 
                                     WriteCommandAction.runWriteCommandAction(project) {
-                                        document.setText(Json.toJson(it))
+                                        document.setText(Json.toJson(assetFile.copy(asset = currentState)))
                                         modified = false
                                     }
                                 }

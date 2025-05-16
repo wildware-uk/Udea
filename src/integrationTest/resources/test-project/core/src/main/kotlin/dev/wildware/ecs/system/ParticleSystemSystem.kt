@@ -1,5 +1,4 @@
-package dev.wildware.ecs.system
-
+package dev.wildware.udea.ecs.system
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.github.quillraven.fleks.*
 import com.github.quillraven.fleks.World.Companion.family

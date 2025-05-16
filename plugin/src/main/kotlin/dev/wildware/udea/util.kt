@@ -10,9 +10,6 @@ import com.intellij.psi.search.searches.ClassInheritorsSearch
 import dev.wildware.udea.editors.EditorType
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtParameter
-import kotlin.reflect.KClass
-import java.lang.reflect.GenericArrayType
-import java.lang.reflect.ParameterizedType
 import kotlin.reflect.full.memberProperties
 
 /**
@@ -142,6 +139,18 @@ inline fun pooled(crossinline block: () -> Unit) =
     }
 
 /**
+ * Executes the given block on a pooled thread and returns the result.
+ */
+inline fun <T> pooledResult(crossinline block: () -> T): T {
+    var result: T? = null
+    ApplicationManager.getApplication().executeOnPooledThread {
+        result = block()
+    }.get()
+    return result!!
+}
+
+
+/**
  * Checks if the class has a specific annotation.
  *
  * @param T The annotation class to check for
@@ -183,9 +192,9 @@ inline fun <reified T> KtParameter.hasAnnotation(): Boolean {
  * @param psiClass The PsiClass to convert
  * @return The JVM qualified name
  */
-fun PsiClass.toJvmQualifiedName(): String {
+fun PsiClass.toJvmQualifiedName(): String = runReadAction {
     val containingClass = this.containingClass
-    return if (containingClass != null) {
+    if (containingClass != null) {
         "${containingClass.toJvmQualifiedName()}$${this.name}"
     } else {
         this.qualifiedName ?: ""
@@ -198,34 +207,60 @@ fun PsiClass.toJvmQualifiedName(): String {
  * @param T The type of the EditorType
  * @return The resolved EditorType
  */
-fun <T : Any> PsiClassType.toEditorType(): EditorType<T> {
-    return ApplicationManager.getApplication().runReadAction<EditorType<T>> {
-        val psiClass = resolve() ?: error("Unresolved class type: $this")
-        val kClass = psiClass.toJvmQualifiedName().let {
-            Class.forName(it).kotlin
-        }
+fun <T : Any> PsiType.toEditorType(): EditorType<T> {
+    var result: EditorType<T>? = null
+    pooled {
+        result = ApplicationManager.getApplication().runReadAction<EditorType<T>> {
+            when (this) {
+                is PsiPrimitiveType -> {
+                    @Suppress("UNCHECKED_CAST")
+                    when (this.name) {
+                        "boolean" -> EditorType(Boolean::class)
+                        "byte" -> EditorType(Byte::class)
+                        "short" -> EditorType(Short::class)
+                        "int" -> EditorType(Int::class)
+                        "long" -> EditorType(Long::class)
+                        "float" -> EditorType(Float::class)
+                        "double" -> EditorType(Double::class)
+                        "char" -> EditorType(Char::class)
+                        else -> error("Unsupported primitive type: $this")
+                    } as EditorType<T>
+                }
 
-        val generics = parameters.mapNotNull { param ->
-            when (param) {
                 is PsiClassType -> {
-                    param.resolve()?.toJvmQualifiedName()?.let { name ->
-                        Class.forName(name).kotlin
+                    val psiClass = resolve() ?: error("Unresolved class type: $this")
+                    val kClass = try {
+                        Class.forName(psiClass.toJvmQualifiedName()).kotlin
+                    } catch (e: ClassNotFoundException) {
+                        error("Failed to load class: ${psiClass.toJvmQualifiedName()}")
                     }
-                }
-                is PsiWildcardType -> {
-                    // Handle wildcard type (out T or in T)
-                    val bound = param.bound
-                    if (bound is PsiClassType) {
-                        bound.resolve()?.toJvmQualifiedName()?.let { name ->
-                            Class.forName(name).kotlin
+
+                    val generics = parameters.mapNotNull { param ->
+                        when (param) {
+                            is PsiClassType -> {
+                                // Recursively process nested generic types
+                                param.toEditorType<Any>()
+                            }
+
+                            is PsiWildcardType -> {
+                                // Handle wildcard type (out T or in T)
+                                val bound = param.bound
+                                if (bound is PsiClassType) {
+                                    bound.toEditorType<Any>()
+                                } else null
+                            }
+
+                            else -> null
                         }
-                    } else null
+                    }
+
+                    @Suppress("UNCHECKED_CAST")
+                    EditorType(kClass, generics) as EditorType<T>
                 }
-                else -> null
+
+                else -> error("Unsupported PsiType: $this")
             }
         }
-
-        @Suppress("UNCHECKED_CAST")
-        EditorType(kClass, generics) as EditorType<T>
-    }
+    }.get()
+    return result!!
 }

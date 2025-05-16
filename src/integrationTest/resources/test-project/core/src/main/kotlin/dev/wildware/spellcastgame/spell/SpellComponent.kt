@@ -6,7 +6,7 @@ import com.github.quillraven.fleks.Entity
 import dev.wildware.udea.assets.Asset
 import dev.wildware.math.Vector2
 import dev.wildware.network.NetworkComponent
-import dev.wildware.udea.network.Networked
+import dev.wildware.network.Networked
 import dev.wildware.network.SyncStrategy.Create
 import dev.wildware.spellcastgame.spell.modifiers.Rune
 import kotlinx.serialization.Contextual

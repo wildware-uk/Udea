@@ -20,7 +20,7 @@ import dev.wildware.spellcastgame.CharacterAttributeSet
 import dev.wildware.spellcastgame.gameScreen
 import dev.wildware.spellcastgame.spell.modifiers.ParamValue
 import dev.wildware.udea.assets.AssetReferenceSerializer
-import dev.wildware.udea.network.Networked
+import dev.wildware.network.Networked
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.cbor.Cbor

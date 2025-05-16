@@ -7,8 +7,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.badlogic.gdx.math.Vector2
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.Project
-import dev.wildware.udea.math.Vector2
+import dev.wildware.udea.assets.UClass
+import dev.wildware.udea.compose.SelectBox
+import dev.wildware.udea.findClassesOfType
+import dev.wildware.udea.qualifiedNameToTitle
+import dev.wildware.udea.toJvmQualifiedName
 import io.kanro.compose.jetbrains.expui.control.Label
 import io.kanro.compose.jetbrains.expui.control.OutlineButton
 import io.kanro.compose.jetbrains.expui.control.TextField
@@ -23,7 +29,7 @@ object ListEditor : ComposeEditor<List<Any?>> {
     ) {
         val listType = remember { type.generics.first() }
         var content by remember { mutableStateOf(value ?: emptyList<Any?>()) }
-        val editor = remember { Editors.getEditorRaw(listType)!! as ComposeEditor<Any> }
+        val editor = remember { Editors.getEditorRaw(listType.type)!! as ComposeEditor<Any> }
 
         OutlineButton(onClick = {
             content += null
@@ -31,17 +37,24 @@ object ListEditor : ComposeEditor<List<Any?>> {
             Label("Add Item")
         }
 
-        LazyColumn {
+        LazyColumn(
+            modifier = Modifier
+                .height(300.dp)
+        ) {
             items(content) { item ->
-                editor.CreateEditor(project, EditorType(listType), item) {
+                Box(modifier = Modifier.padding(8.dp)) {
+                    editor.CreateEditor(project, listType as EditorType<Any>, item) {
                         val index = content.indexOf(item)
+
                         if (index != -1) {
                             content = content.toMutableList().apply {
                                 this[index] = it
                             }
+
                             onValueChange(content)
                         }
                     }
+                }
             }
         }
     }
@@ -172,5 +185,41 @@ object Vector2Editor : ComposeEditor<Vector2> {
                 )
             }
         }
+    }
+}
+
+object UClassEditor : ComposeEditor<UClass<*>> {
+    @Composable
+    override fun CreateEditor(
+        project: Project,
+        type: EditorType<UClass<*>>,
+        value: UClass<*>?,
+        onValueChange: (UClass<*>) -> Unit
+    ) {
+        var subclasses by remember { mutableStateOf(emptyList<UClass<*>>()) }
+
+        LaunchedEffect(Unit) {
+            readAction {
+                subclasses =
+                    findClassesOfType(project, type.generics.first().type.qualifiedName!!)
+                        .map { UClass<Any>(it.toJvmQualifiedName()) }
+            }
+        }
+
+        var selectedClass by remember { mutableStateOf(value) }
+
+        var open by remember { mutableStateOf(false) }
+
+        SelectBox(
+            subclasses, selectedClass, open,
+            onOpenChange = { open = it },
+            onSelectChange = {
+                selectedClass = it
+                onValueChange(it)
+            },
+            itemContent = {
+                Label(it.className.qualifiedNameToTitle())
+            }
+        )
     }
 }

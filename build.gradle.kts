@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm") version "2.1.20"
     id("java")
-    id("org.jetbrains.compose") version "1.7.0-alpha03"
+    id("org.jetbrains.compose") version "1.7.3"
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.20"
 }
 
@@ -18,6 +18,7 @@ allprojects {
         maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
         maven("https://s01.oss.sonatype.org")
         maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+        maven("https://jitpack.io")
     }
 }
 

@@ -1,6 +1,6 @@
 package dev.wildware.spellcastgame.spell
 
-import dev.wildware.udea.network.Networked
+import dev.wildware.network.Networked
 import dev.wildware.spellcastgame.spell.modifiers.Rune
 import kotlinx.serialization.Serializable
 

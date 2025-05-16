@@ -35,9 +35,25 @@ class NetworkComponent<T : Component<T>>(
     }
 
     class NetworkComponentBuilder<T : Component<T>> {
-        var syncStrategy: SyncStrategy = SyncStrategy.All
+        /**
+         * Strategy for when to sync this component.
+         * */
+        var syncStrategy: SyncStrategy = All
+
+        /**
+         * Frequency in ticks to sync this component.
+         * */
         var syncTick: Int = 1
+
+        /**
+         * Who has authority over this component?
+         * */
         var networkAuthority: NetworkAuthority = NetworkAuthority.Server
+
+        /**
+         * Delegate serialization for this component.
+         * @see dev.wildware.udea.ecs.physics.Body for example.
+         * */
         var delegate: SerializerDelegate<T, *>? = null
 
         fun build() = NetworkComponent(

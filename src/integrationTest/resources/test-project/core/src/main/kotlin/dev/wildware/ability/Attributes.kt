@@ -9,10 +9,10 @@ data class Attribute(
     var currentValue: Float = baseValue
 ) {
     @Transient
-    var min: ValueResolver = ValueResolver.Min
+    var min: dev.wildware.udea.ability.ValueResolver = ValueResolver.Min
 
     @Transient
-    var max: ValueResolver = ValueResolver.Max
+    var max: dev.wildware.udea.ability.ValueResolver = ValueResolver.Max
 
     override fun toString(): String {
         return "Attribute(base=$baseValue, current=$currentValue)"
@@ -22,9 +22,9 @@ data class Attribute(
 sealed class ValueResolver {
     abstract val value: Float
 
-    class ConstantValue(override val value: Float) : ValueResolver()
+    class ConstantValue(override val value: Float) : dev.wildware.udea.ability.ValueResolver()
 
-    class AttributeValue(val attribute: Attribute) : ValueResolver() {
+    class AttributeValue(val attribute: dev.wildware.udea.ability.Attribute) : dev.wildware.udea.ability.ValueResolver() {
         override val value: Float
             get() = attribute.currentValue
     }

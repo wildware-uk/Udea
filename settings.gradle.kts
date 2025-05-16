@@ -13,3 +13,4 @@ rootProject.name = "udea"
 include("level-editor")
 include("common")
 include("plugin")
+include("compose-ui")

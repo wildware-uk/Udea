@@ -8,7 +8,7 @@ import dev.wildware.Control
 import dev.wildware.network.NetworkAuthority
 import dev.wildware.network.NetworkAuthority.Client
 import dev.wildware.network.NetworkComponent
-import dev.wildware.udea.network.Networked
+import dev.wildware.network.Networked
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 

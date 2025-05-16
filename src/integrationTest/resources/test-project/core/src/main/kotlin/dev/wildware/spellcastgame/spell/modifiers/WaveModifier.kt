@@ -4,7 +4,7 @@ import com.badlogic.gdx.math.Vector2
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
 import dev.wildware.ecs.component.RigidBodyComponent
-import dev.wildware.udea.network.Networked
+import dev.wildware.network.Networked
 import dev.wildware.spellcastgame.spell.SpellComponent
 import kotlinx.serialization.Serializable
 import kotlin.math.cos

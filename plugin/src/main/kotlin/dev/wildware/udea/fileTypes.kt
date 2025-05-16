@@ -10,6 +10,7 @@ import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
 import dev.wildware.udea.assets.Asset
+import dev.wildware.udea.editors.AssetFile
 import org.jetbrains.annotations.Unmodifiable
 import javax.swing.Icon
 
@@ -52,10 +53,10 @@ class UdeaFileNode(
         super.update(presentation)
         val contents = Json.withClassLoader(ProjectClassLoaderManager
             .getInstance(project).classLoader)
-            .fromJson<Asset>(psiFile.virtualFile.inputStream)
+            .fromJson<AssetFile>(psiFile.virtualFile.inputStream)
         try {
             presentation.presentableText = psiFile.name.removeSuffix(".udea")
-            presentation.locationString = contents::class.simpleName
+            presentation.locationString = contents.type.qualifiedNameToTitle()
             presentation.setIcon(UdeaIcons.Blueprint)
         } catch (e: Exception) {
         }

@@ -1,9 +1,9 @@
-package dev.wildware.udea.ecs.base
+package dev.wildware.udea.ecs.component.base
 
+import com.badlogic.gdx.math.Vector2
 import com.github.quillraven.fleks.Component
 import dev.wildware.udea.ecs.NetworkComponent.Companion.configureNetwork
-import dev.wildware.udea.ecs.UdeaComponentType
-import dev.wildware.udea.math.Vector2
+import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.network.Networked
 
 /**

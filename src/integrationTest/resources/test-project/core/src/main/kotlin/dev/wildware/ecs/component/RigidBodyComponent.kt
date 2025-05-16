@@ -10,7 +10,7 @@ import dev.wildware.ecs.system.Box2DSystem
 import dev.wildware.math.Vector2
 import dev.wildware.network.ComponentDelegate
 import dev.wildware.network.NetworkComponent
-import dev.wildware.udea.network.Networked
+import dev.wildware.network.Networked
 import dev.wildware.network.RawSerializerDelegate
 import dev.wildware.network.SerializerDelegate
 import kotlinx.serialization.Serializable

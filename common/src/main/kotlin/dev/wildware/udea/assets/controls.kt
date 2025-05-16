@@ -13,7 +13,7 @@ class Control : Asset() {
 }
 
 data class Binding(
-    val control: AssetRefence<Control>,
+    val control: AssetReference<Control>,
     val input: BindingInput
 ) : Asset() {
     @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS) // Use fully qualified class name for type info)

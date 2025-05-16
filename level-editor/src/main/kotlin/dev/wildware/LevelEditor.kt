@@ -2,6 +2,7 @@ package dev.wildware
 
 import com.badlogic.gdx.backends.lwjgl.LwjglAWTCanvas
 import com.github.quillraven.fleks.configureWorld
+import dev.wildware.systems.EditorSystem
 import dev.wildware.udea.assets.Level
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -10,9 +11,8 @@ import ktx.app.KtxScreen
 import ktx.app.clearScreen
 import java.awt.Canvas
 import java.awt.Dimension
-import kotlin.reflect.full.createInstance
 
-class LevelEditor(
+class LevelEditorCanvas(
     level: Level
 ) {
     val editor = Editor(level)
@@ -47,8 +47,10 @@ class LevelEditorScreen(
 
     var world = configureWorld(512) {
         systems {
+            EditorSystem()
+
             level.systems.forEach {
-                it.createInstance()
+//                it.toKClass()createInstance()
             }
         }
     }
@@ -56,11 +58,11 @@ class LevelEditorScreen(
     private var playing = false
 
     init {
-//        resetWorld()
+        resetWorld()
     }
 
     override fun render(delta: Float) {
-        clearScreen(red = 0.1f, green = 0.1f, blue = 0.3f)
+        clearScreen(red = 0.1f, green = 0.1f, blue = 0.1f)
 
         if (playing) {
             world.update(delta)
@@ -104,11 +106,13 @@ class LevelEditorScreen(
 //        println("Saving $level")
 //    }
 
-//    private fun resetWorld() {
-//        level.entities.forEach {
-//            world.entity().apply {
-//                world.loadSnapshotOf(this, it.snapshot)
-//            }
-//        }
-//    }
+    private fun resetWorld() {
+        world.asEntityBag().forEach { world -= it }
+
+        level.entities.forEach { components ->
+            world.entity {
+                world.loadSnapshotOf(it, components)
+            }
+        }
+    }
 }

@@ -5,7 +5,7 @@ import com.github.quillraven.fleks.ComponentType
 import dev.wildware.math.Affine2
 import dev.wildware.math.Vector2
 import dev.wildware.network.NetworkComponent
-import dev.wildware.udea.network.Networked
+import dev.wildware.network.Networked
 import kotlinx.serialization.Serializable
 
 @Networked

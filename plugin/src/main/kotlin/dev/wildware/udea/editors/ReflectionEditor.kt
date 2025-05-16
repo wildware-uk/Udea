@@ -1,6 +1,5 @@
 package dev.wildware.udea.editors
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,13 +7,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClassType
-import dev.wildware.udea.findClassByName
-import dev.wildware.udea.pooled
-import dev.wildware.udea.toEditorType
+import com.intellij.psi.PsiType
+import dev.wildware.udea.*
+import dev.wildware.udea.compose.SelectBox
 import io.kanro.compose.jetbrains.expui.control.Label
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
 import kotlin.reflect.full.memberProperties
@@ -28,24 +31,32 @@ object ReflectionEditor : ComposeEditor<Any> {
         value: Any?,
         onValueChange: (Any) -> Unit
     ) {
-        if (type.type.isSealed) {
+        if (type.type.isSealed || type.type.isAbstract) {
             var concreteClass by remember { mutableStateOf(value?.let { it::class }) }
-            val subclasses = type.type.sealedSubclasses
+            var subclasses by remember { mutableStateOf(emptyList<KClass<*>>()) }
+            var open by remember { mutableStateOf(false) }
 
-            Column {
-                subclasses.forEach { subclass ->
-                    Row(
-                        modifier = Modifier.padding(8.dp)
-                            .clickable {
-                                concreteClass = subclass
-                            }
-                    ) {
-                        Label(subclass.simpleName ?: "Unknown")
-                    }
+            LaunchedEffect(Unit) {
+                readAction {
+                    subclasses =
+                        findClassesOfType(project, type.type.qualifiedName!!)
+                            .map { project.service<ProjectClassLoaderManager>().classLoader.loadClass(it.toJvmQualifiedName()).kotlin }
                 }
-
-                concreteClass?.let { ConcreteEditor(project, EditorType(it), value, onValueChange) }
             }
+
+            SelectBox(
+                subclasses,
+                concreteClass,
+                open,
+                onOpenChange = { open = it },
+                onSelectChange = { selected ->
+                    concreteClass = selected
+                    onValueChange(selected)
+                },
+                itemContent = { Label(it.simpleName ?: "Unknown") }
+            )
+
+            concreteClass?.let { ConcreteEditor(project, EditorType(it), value, onValueChange) }
         } else {
             ConcreteEditor(project, type, value, onValueChange)
         }
@@ -63,12 +74,12 @@ object ReflectionEditor : ComposeEditor<Any> {
         }
 
         var constructorPsiMap by remember {
-            mutableStateOf<Map<KParameter, PsiClassType>>(emptyMap())
+            mutableStateOf<Map<KParameter, PsiType>>(emptyMap())
         }
 
-        remember {
-            pooled {
-                constructorPsiMap = calculateConstructParams(project, type.type)
+        LaunchedEffect(Unit) {
+            withContext(Dispatchers.IO) {
+                constructorPsiMap = runReadAction { calculateConstructParams(project, type.type) }
             }
         }
 
@@ -120,18 +131,16 @@ object ReflectionEditor : ComposeEditor<Any> {
     private fun calculateConstructParams(
         project: Project,
         kClass: KClass<*>
-    ): Map<KParameter, PsiClassType> {
-        return ApplicationManager.getApplication().runReadAction<Map<KParameter, PsiClassType>> {
-            val psiClass = findClassByName(project, kClass.qualifiedName!!)
-                ?: error("Class not found: ${kClass.qualifiedName}")
+    ): Map<KParameter, PsiType> {
+        val psiClass = findClassByName(project, kClass.qualifiedName!!)
+            ?: error("Class not found: ${kClass.qualifiedName}")
 
-            val parameters = kClass.primaryConstructor?.parameters
-                ?: error("No primary constructor found for $kClass")
+        val parameters = kClass.primaryConstructor?.parameters
+            ?: error("No primary constructor found for $kClass")
 
-            val psiParams = psiClass.constructors.firstOrNull()?.parameterList?.parameters
-                ?.map { it.type as PsiClassType }!!
+        val psiParams = psiClass.constructors.firstOrNull()?.parameterList?.parameters
+            ?.map { it.type }!!
 
-            parameters.zip(psiParams).toMap()
-        }
+        return parameters.zip(psiParams).toMap()
     }
 }

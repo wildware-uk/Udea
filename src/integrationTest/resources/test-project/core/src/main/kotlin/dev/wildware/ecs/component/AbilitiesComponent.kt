@@ -9,7 +9,7 @@ import dev.wildware.ability.Ability
 import dev.wildware.ability.AttributeSet
 import dev.wildware.ability.GameplayEffectSpec
 import dev.wildware.network.NetworkComponent
-import dev.wildware.udea.network.Networked
+import dev.wildware.network.Networked
 import kotlinx.serialization.Serializable
 
 @Networked

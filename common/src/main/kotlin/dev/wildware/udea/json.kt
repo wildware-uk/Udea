@@ -7,9 +7,8 @@ import com.fasterxml.jackson.core.util.DefaultPrettyPrinter
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import dev.wildware.udea.assets.Asset
+import com.github.quillraven.fleks.Component
 import java.io.InputStream
 
 
@@ -26,8 +25,9 @@ object Json {
             indentArraysWith(DefaultIndenter("  ", "\n"))
             indentObjectsWith(DefaultIndenter("  ", "\n"))
         })
-    }
 
+        addMixIn(Component::class.java, ComponentMixIn::class.java)
+    }
 
     /**
      * Sets the class loader for the ObjectMapper's type factory.
@@ -83,3 +83,9 @@ object Json {
         objectMapper.block()
     }
 }
+
+@JsonTypeInfo(
+    use = JsonTypeInfo.Id.CLASS,
+    include = JsonTypeInfo.As.PROPERTY,
+)
+interface ComponentMixIn

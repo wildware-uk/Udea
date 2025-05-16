@@ -1,5 +1,4 @@
-package dev.wildware.ecs.system
-
+package dev.wildware.udea.ecs.system
 import com.badlogic.gdx.math.Vector2
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.Serializer

@@ -1,5 +1,4 @@
-package dev.wildware.ecs.system
-
+package dev.wildware.udea.ecs.system
 import box2dLight.RayHandler
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.FamilyOnAdd

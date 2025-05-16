@@ -1,8 +1,11 @@
-package dev.wildware.udea.ecs
+package dev.wildware.udea.ecs.component
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
-import dev.wildware.udea.ecs.ComponentDependency.Companion.Empty
+import dev.wildware.udea.ecs.NetworkComponent
+import dev.wildware.udea.ecs.component.ComponentDependency.Companion.Empty
+import dev.wildware.udea.ecs.component.ComponentDependency.Companion.dependencies
 
 /**
  * Base component type for all UDEA components that supports dependency management.
@@ -10,6 +13,10 @@ import dev.wildware.udea.ecs.ComponentDependency.Companion.Empty
  * @param T The type of component this represents
  * @property dependsOn The dependencies required by this component
  */
+@JsonTypeInfo(
+    use = JsonTypeInfo.Id.CLASS,
+    include = JsonTypeInfo.As.PROPERTY,
+)
 abstract class UdeaComponentType<T : Component<T>>(
     val dependsOn: ComponentDependency = Empty,
     val networkComponent: NetworkComponent<T>? = null,

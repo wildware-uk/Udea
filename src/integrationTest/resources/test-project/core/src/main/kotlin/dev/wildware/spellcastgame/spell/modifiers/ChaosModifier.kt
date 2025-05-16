@@ -5,7 +5,7 @@ import com.github.quillraven.fleks.World
 import dev.wildware.ecs.component.RigidBodyComponent
 import dev.wildware.game
 import dev.wildware.math.Vector2
-import dev.wildware.udea.network.Networked
+import dev.wildware.network.Networked
 import dev.wildware.spellcastgame.spell.SpellComponent
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient

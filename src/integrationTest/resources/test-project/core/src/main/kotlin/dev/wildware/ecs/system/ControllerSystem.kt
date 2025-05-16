@@ -1,5 +1,4 @@
-package dev.wildware.ecs.system
-
+package dev.wildware.udea.ecs.system
 import com.badlogic.gdx.Gdx
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem

@@ -4,7 +4,7 @@ import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
 import dev.wildware.ecs.component.RigidBodyComponent
 import dev.wildware.ecs.component.Transform
-import dev.wildware.udea.network.Networked
+import dev.wildware.network.Networked
 import dev.wildware.perp
 import dev.wildware.spellcastgame.spell.RuneParameter
 import dev.wildware.spellcastgame.spell.SpellComponent

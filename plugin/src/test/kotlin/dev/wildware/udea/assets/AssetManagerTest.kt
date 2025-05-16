@@ -3,8 +3,6 @@ package dev.wildware.udea.assets
 import com.intellij.openapi.components.service
 import dev.wildware.udea.Json
 import dev.wildware.udea.UdeaTestBase
-import org.intellij.lang.annotations.Language
-import java.lang.Thread.sleep
 
 class AssetManagerTest : UdeaTestBase() {
 
@@ -24,10 +22,11 @@ class AssetManagerTest : UdeaTestBase() {
         assert(assets.isNotEmpty()) { "Assets should not be empty" }
 
         val expectedControl = Control()
+        expectedControl.path = "/src/testAssets/testControl.udea"
         val controlAsset: Control = Assets["/src/testAssets/testControl.udea"]
         assertEquals(expectedControl, controlAsset)
 
-        val expectedBinding = Binding(AssetRefence(controlAsset.path), Binding.BindingInput.Mouse(2))
+        val expectedBinding = Binding(AssetReference(controlAsset.path), Binding.BindingInput.Mouse(2))
         val bindingAsset: Binding = Assets["/src/testAssets/testBinding.udea"]
         assertEquals(expectedBinding, bindingAsset)
     }
@@ -38,7 +37,7 @@ class AssetManagerTest : UdeaTestBase() {
 
         assertEquals(control, serializedControl)
 
-        val binding = Binding(AssetRefence("control.udea"), Binding.BindingInput.Mouse(2))
+        val binding = Binding(AssetReference("control.udea"), Binding.BindingInput.Mouse(2))
         val serializedBinding = Json.fromJson<Binding>(Json.toJson(binding))
         assertEquals(binding, serializedBinding)
     }

@@ -7,7 +7,7 @@ import dev.wildware.udea.assets.Asset
 import dev.wildware.ability.Ability
 import dev.wildware.ecs.Blueprint
 import dev.wildware.math.Vector2
-import dev.wildware.udea.network.Networked
+import dev.wildware.network.Networked
 import kotlinx.serialization.*
 
 @Serializable
@@ -21,13 +21,13 @@ data class EntityCreate(
     val networkComponents: List<Component<out @Contextual Any>>,
     val tags: List<UniqueId<out @Contextual Any>>,
     val componentDelegates: List<ComponentDelegate>,
-) : NetworkPacket
+) : dev.wildware.udea.network.NetworkPacket
 
 @Serializable
 @Networked
 data class EntityDestroy(
     val id: Int,
-) : NetworkPacket
+) : dev.wildware.udea.network.NetworkPacket
 
 @OptIn(ExperimentalSerializationApi::class)
 @KeepGeneratedSerializer
@@ -40,7 +40,7 @@ data class EntityUpdate(
     val componentDelegates: List<ComponentDelegate>,
     @Transient
     var valid: Boolean = false
-) : NetworkPacket
+) : dev.wildware.udea.network.NetworkPacket
 
 @Serializable
 @Networked
@@ -49,4 +49,4 @@ data class AbilityPacket(
     val source: Entity,
     val targetPos: Vector2,
     val target: Entity?
-) : NetworkPacket
+) : dev.wildware.udea.network.NetworkPacket

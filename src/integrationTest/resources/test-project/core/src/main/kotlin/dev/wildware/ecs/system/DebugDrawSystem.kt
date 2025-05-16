@@ -1,5 +1,4 @@
-package dev.wildware.ecs.system
-
+package dev.wildware.udea.ecs.system
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
 import com.badlogic.gdx.math.Vector3

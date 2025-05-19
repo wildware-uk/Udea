@@ -4,86 +4,30 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Update README">
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Add ECS systems and components for abilities, rendering, and debug&#10;&#10;Introduced new systems and components to enhance game mechanics, including Ability and Attribute systems for gameplay effects, rendering systems for lights and camera tracking, and debugging capabilities. These changes also remove obsolete code, integrate with Compose UI, and expand core functionality.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/common/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/controls.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/controls.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/Mouse.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/Mouse.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/levels.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/levels.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/base/Transform.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/base/Transform.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/networkComponent.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/networkComponent.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/physics/Body.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Body.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/physics/Box.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Box.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/physics/Capsule.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Capsule.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/physics/Circle.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Circle.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/udeaComponent.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/udeaComponent.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/json.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/json.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/math/Vector2.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/serializers.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle/libs.versions.toml" beforeDir="false" afterPath="$PROJECT_DIR$/gradle/libs.versions.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/control/Controller.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/control/Controller.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/networkComponent.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/networkComponent.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Body.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Body.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Box.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Box.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Capsule.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Capsule.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Circle.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Circle.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/Camera.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/Camera.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/ParticleEffect.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/ParticleEffect.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DLightsSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DLightsSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CameraTrackSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CameraTrackSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/ControllerSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/ControllerSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/DebugDrawSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/DebugDrawSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/ParticleSystemSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/ParticleSystemSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/serializers.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/serializers.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/LevelEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/LevelEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/UdeaStartup.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/UdeaStartup.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/assets/AssetManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/assets/AssetManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/compose/components.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/AssetFileEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/AssetFileEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/AssetReferenceEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/AssetReferenceEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/ReflectionEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/ReflectionEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/UdeaAssetAction.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/UdeaAssetAction.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/LevelEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/LevelEditor.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/editor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/editor.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/primitiveEditors.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/primitiveEditors.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/fileTypes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/fileTypes.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/util.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/util.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/test/kotlin/dev/wildware/udea/UtilTest.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/test/kotlin/dev/wildware/udea/UtilTest.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/test/kotlin/dev/wildware/udea/assets/AssetManagerTest.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/test/kotlin/dev/wildware/udea/assets/AssetManagerTest.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ability/Ability.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ability/Ability.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ability/Attributes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ability/Attributes.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ability/GameplayEffectSpec.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ability/GameplayEffectSpec.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/AbilitiesComponent.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/AbilitiesComponent.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/BlueprintComp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/BlueprintComp.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/Controller.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/Controller.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/Dead.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/Dead.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/Networkable.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/Networkable.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/RigidBodyComponent.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/RigidBodyComponent.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/Transform.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/component/Transform.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/AbilitySystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/AbilitySystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/AttributeSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/AttributeSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/BackgroundDrawSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/BackgroundDrawSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/Box2DLightsSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/Box2DLightsSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/Box2DSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/Box2DSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/CameraTrackSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/CameraTrackSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/CleanupSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/CleanupSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/ControllerSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/ControllerSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/DebugDrawSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/DebugDrawSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/NetworkClientSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/NetworkClientSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/NetworkServerSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/NetworkServerSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/ParticleSystemSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/ParticleSystemSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/SpriteBatchSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/ecs/system/SpriteBatchSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/network/PacketUtil.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/network/PacketUtil.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/network/packets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/network/packets.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/Spell.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/Spell.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/SpellComponent.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/SpellComponent.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/SpellHolderComponent.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/SpellHolderComponent.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/AlternateModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/AlternateModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/ChaosModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/ChaosModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/ClusterModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/ClusterModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/CurlModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/CurlModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/CurveModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/CurveModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/DelayModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/DelayModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/ExplodeModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/ExplodeModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/OrbitModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/OrbitModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/RampingSizeModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/RampingSizeModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/RandomModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/RandomModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/ShotgunModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/ShotgunModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/SizeModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/SizeModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/TargetHomingModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/TargetHomingModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/TrailModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/TrailModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/TransmuteModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/TransmuteModifier.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/WaveModifier.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/integrationTest/resources/test-project/core/src/main/kotlin/dev/wildware/spellcastgame/spell/modifiers/WaveModifier.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -536,7 +480,8 @@
       <workItem from="1746987872182" duration="8122000" />
       <workItem from="1747241301673" duration="5704000" />
       <workItem from="1747340588844" duration="4104000" />
-      <workItem from="1747417899052" duration="2638000" />
+      <workItem from="1747417899052" duration="15506000" />
+      <workItem from="1747655427199" duration="771000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -554,7 +499,15 @@
       <option name="project" value="LOCAL" />
       <updated>1745232931844</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Add ECS systems and components for abilities, rendering, and debug&#10;&#10;Introduced new systems and components to enhance game mechanics, including Ability and Attribute systems for gameplay effects, rendering systems for lights and camera tracking, and debugging capabilities. These changes also remove obsolete code, integrate with Compose UI, and expand core functionality.">
+      <option name="closed" value="true" />
+      <created>1747422841641</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1747422841641</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -563,26 +516,10 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Initial commit" />
     <MESSAGE value="Update README" />
-    <option name="LAST_COMMIT_MESSAGE" value="Update README" />
+    <MESSAGE value="Add ECS systems and components for abilities, rendering, and debug&#10;&#10;Introduced new systems and components to enhance game mechanics, including Ability and Attribute systems for gameplay effects, rendering systems for lights and camera tracking, and debugging capabilities. These changes also remove obsolete code, integrate with Compose UI, and expand core functionality." />
+    <option name="LAST_COMMIT_MESSAGE" value="Add ECS systems and components for abilities, rendering, and debug&#10;&#10;Introduced new systems and components to enhance game mechanics, including Ability and Attribute systems for gameplay effects, rendering systems for lights and camera tracking, and debugging capabilities. These changes also remove obsolete code, integrate with Compose UI, and expand core functionality." />
   </component>
   <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/editor.kt</url>
-          <line>46</line>
-          <properties>
-            <option name="lambda-ordinal" value="0" />
-          </properties>
-          <option name="timeStamp" value="10" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/systems/EditorSystem.kt</url>
-          <line>22</line>
-          <option name="timeStamp" value="13" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
     <pin-to-top-manager>
       <pinned-members>
         <PinnedItemInfo parentTag="org.reflections.Reflections" memberName="store" />

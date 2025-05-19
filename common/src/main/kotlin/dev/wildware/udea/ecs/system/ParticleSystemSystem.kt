@@ -4,10 +4,9 @@ import com.github.quillraven.fleks.*
 import com.github.quillraven.fleks.World.Companion.family
 import com.github.quillraven.fleks.World.Companion.inject
 import dev.wildware.udea.ecs.component.base.Transform
-import dev.wildware.udea.ecs.render.ParticleEffect
+import dev.wildware.udea.ecs.component.render.ParticleEffect
 import dev.wildware.udea.game
 import dev.wildware.udea.use
-import ktx.graphics.use
 
 class ParticleSystemSystem(
     val spriteBatch: SpriteBatch = inject()

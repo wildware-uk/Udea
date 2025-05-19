@@ -1,4 +1,4 @@
-package dev.wildware.udea.ecs.render
+package dev.wildware.udea.ecs.component.render
 
 import com.badlogic.gdx.graphics.g2d.ParticleEffect as LibGDXParticleEffect
 import com.github.quillraven.fleks.Component

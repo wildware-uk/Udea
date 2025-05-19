@@ -11,7 +11,7 @@ import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
 import com.github.quillraven.fleks.World.Companion.inject
 import dev.wildware.udea.ecs.component.base.Transform
-import dev.wildware.udea.ecs.physics.Body
+import dev.wildware.udea.ecs.component.physics.Body
 import dev.wildware.udea.game
 
 

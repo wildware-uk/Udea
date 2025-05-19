@@ -10,7 +10,7 @@ import dev.wildware.udea.ecs.component.ability.Abilities
 import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.component.base.Transform
-import dev.wildware.udea.ecs.physics.Body
+import dev.wildware.udea.ecs.component.physics.Body
 import dev.wildware.udea.game
 import ktx.assets.toInternalFile
 import ktx.graphics.use

@@ -52,7 +52,7 @@ class NetworkComponent<T : Component<T>>(
 
         /**
          * Delegate serialization for this component.
-         * @see dev.wildware.udea.ecs.physics.Body for example.
+         * @see dev.wildware.udea.ecs.component.physics.Body for example.
          * */
         var delegate: SerializerDelegate<T, *>? = null
 

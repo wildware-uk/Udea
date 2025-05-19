@@ -1,4 +1,4 @@
-package dev.wildware.udea.ecs.control
+package dev.wildware.udea.ecs.component.control
 
 import com.github.quillraven.fleks.Component
 import dev.wildware.udea.assets.Assets

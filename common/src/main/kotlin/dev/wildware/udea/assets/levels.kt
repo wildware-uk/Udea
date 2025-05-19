@@ -10,7 +10,7 @@ data class Level(
     /**
      * The systems that will be used to update the entities in this level.
      * */
-    val systems: List<UClass<out IntervalSystem>> = emptyList(),
+    val systems: List<UClass<out IntervalSystem>> = listOf(UClass("dev.wildware.udea.ecs.system.Box2DSystem")),
 
     /**
      * Component snapshots that will be placed on entities.

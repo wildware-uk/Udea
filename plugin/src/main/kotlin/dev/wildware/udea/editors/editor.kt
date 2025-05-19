@@ -31,6 +31,7 @@ object Editors {
         registerEditor(Float::class, FloatEditor)
         registerEditor(Boolean::class, BooleanEditor)
         registerEditor(AssetReference::class, AssetReferenceEditor)
+        registerEditor(Enum::class, EnumEditor)
         registerEditor(UClass::class, UClassEditor)
         registerEditor(Any::class, ReflectionEditor)
     }

@@ -19,7 +19,7 @@ class Box2DLightsSystem(
 ) {
     override fun onTick() {
         super.onTick()
-        game.camera?.let {
+        game.camera.let {
             rayHandler.setCombinedMatrix(
                 it.combined,
                 it.position.x,

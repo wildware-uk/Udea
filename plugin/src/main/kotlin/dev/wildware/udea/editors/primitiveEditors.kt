@@ -11,6 +11,7 @@ import com.badlogic.gdx.math.Vector2
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.Project
 import dev.wildware.udea.assets.UClass
+import dev.wildware.udea.camelCaseToTitle
 import dev.wildware.udea.compose.SelectBox
 import dev.wildware.udea.findClassesOfType
 import dev.wildware.udea.qualifiedNameToTitle
@@ -219,6 +220,32 @@ object UClassEditor : ComposeEditor<UClass<*>> {
             },
             itemContent = {
                 Label(it.className.qualifiedNameToTitle())
+            }
+        )
+    }
+}
+
+object EnumEditor : ComposeEditor<Enum<*>> {
+    @Composable
+    override fun CreateEditor(
+        project: Project,
+        type: EditorType<Enum<*>>,
+        value: Enum<*>?,
+        onValueChange: (Enum<*>) -> Unit
+    ) {
+        val enums = type.type.java.enumConstants.toList()
+        var open by remember { mutableStateOf(false) }
+
+        SelectBox(
+            enums,
+            value,
+            open,
+            onOpenChange = { open = it },
+            onSelectChange = {
+                onValueChange(it)
+            },
+            itemContent = {
+                Label(it.toString().camelCaseToTitle())
             }
         )
     }

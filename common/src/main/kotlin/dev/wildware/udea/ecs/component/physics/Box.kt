@@ -1,4 +1,4 @@
-package dev.wildware.udea.ecs.physics
+package dev.wildware.udea.ecs.component.physics
 
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
@@ -21,12 +21,12 @@ data class Box(
     override fun type() = Box
 
     override fun World.onAdd(entity: Entity) {
-        entity[Body].body.box(width, height) {
+        entity[Body.Companion].body.box(width, height) {
             friction = this@Box.friction
         }
     }
 
     companion object : UdeaComponentType<Box>(
-        dependsOn = dependencies(Body)
+        dependsOn = dependencies(Body.Companion)
     )
 }

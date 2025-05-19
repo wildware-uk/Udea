@@ -19,12 +19,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.components.JBList
 import dev.wildware.LevelEditorCanvas
-import dev.wildware.udea.ProjectClassLoaderManager
+import dev.wildware.udea.*
 import dev.wildware.udea.assets.Level
-import dev.wildware.udea.findClassesOfType
-import dev.wildware.udea.pooledResult
-import dev.wildware.udea.qualifiedNameToTitle
-import dev.wildware.udea.toJvmQualifiedName
+import dev.wildware.udea.ecs.component.UdeaComponentType
 import io.kanro.compose.jetbrains.expui.control.Label
 import io.kanro.compose.jetbrains.expui.control.PrimaryButton
 import kotlinx.serialization.Contextual
@@ -34,6 +31,7 @@ import org.jetbrains.compose.splitpane.rememberSplitPaneState
 import javax.swing.DefaultListCellRenderer
 import javax.swing.ListSelectionModel
 import kotlin.reflect.KClass
+import kotlin.reflect.full.companionObjectInstance
 import kotlin.reflect.full.createInstance
 
 object LevelEditor : ComposeEditor<Level> {
@@ -138,7 +136,15 @@ object LevelEditor : ComposeEditor<Level> {
         Column {
             PrimaryButton(onClick = {
                 showComponentTypeMenu(project) { componentType ->
-                    onEntityUpdated(entity.copy(components = (entity.components + componentType.createInstance()) as List<Component<out @Contextual Any>>))
+                    val newComponent = componentType.createInstance()
+
+                    val dependencies = if (componentType.companionObjectInstance is UdeaComponentType<*>) {
+                        (componentType.companionObjectInstance as UdeaComponentType<*>).dependsOn.dependencies.map {
+                            it::class.java.enclosingClass.kotlin.createInstance()
+                        }.toTypedArray()
+                    } else emptyArray()
+
+                    onEntityUpdated(entity.copy(components = (entity.components + dependencies + newComponent) as List<Component<out @Contextual Any>>))
                 }
             }) {
                 Label("Add Component")

@@ -5,7 +5,7 @@ import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.component.base.Transform
-import dev.wildware.udea.ecs.render.Camera
+import dev.wildware.udea.ecs.component.render.Camera
 import dev.wildware.udea.game
 import dev.wildware.udea.hasAuthority
 
@@ -14,7 +14,7 @@ class CameraTrackSystem : IteratingSystem(
 ) {
     override fun onTickEntity(entity: Entity) {
         if (world.hasAuthority(entity)) {
-            val camera = game.camera ?: return
+            val camera = game.camera
 
             val position = entity[Camera].position
             position.set(

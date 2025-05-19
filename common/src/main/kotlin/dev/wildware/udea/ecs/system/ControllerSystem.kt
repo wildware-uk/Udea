@@ -7,7 +7,7 @@ import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.assets.Binding
 import dev.wildware.udea.assets.Control
 import dev.wildware.udea.ecs.component.base.Networkable
-import dev.wildware.udea.ecs.control.Controller
+import dev.wildware.udea.ecs.component.control.Controller
 import dev.wildware.udea.hasAuthority
 
 class ControllerSystem : IteratingSystem(

@@ -1,4 +1,4 @@
-package dev.wildware.udea.ecs.physics
+package dev.wildware.udea.ecs.component.physics
 
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity

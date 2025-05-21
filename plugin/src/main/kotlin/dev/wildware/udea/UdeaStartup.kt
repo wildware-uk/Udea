@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.module.SimpleModule
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.StartupActivity
-import dev.wildware.udea.assets.AssetManager
+import dev.wildware.udea.assets.GameAssetManager
+import dev.wildware.udea.assets.UdeaAssetManager
 import dev.wildware.udea.assets.KClassDeserializer
 import dev.wildware.udea.assets.KClassSerializer
 import kotlin.reflect.KClass
@@ -22,6 +23,7 @@ class UdeaStartup : StartupActivity {
             })
         }
 
-        project.service<AssetManager>().reloadAssets()
+        project.service<UdeaAssetManager>().reloadAssets()
+        project.service<GameAssetManager>().reloadAssets()
     }
 }

@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import dev.wildware.udea.Vector2
 import dev.wildware.udea.assets.AssetReference
 import dev.wildware.udea.assets.Level
+import dev.wildware.udea.assets.Sprite
 import dev.wildware.udea.assets.UClass
 import kotlin.reflect.KClass
 
@@ -30,6 +31,7 @@ object Editors {
         registerEditor(String::class, StringEditor)
         registerEditor(Float::class, FloatEditor)
         registerEditor(Boolean::class, BooleanEditor)
+        registerEditor(Sprite::class, SpriteSelector)
         registerEditor(AssetReference::class, AssetReferenceEditor)
         registerEditor(Enum::class, EnumEditor)
         registerEditor(UClass::class, UClassEditor)

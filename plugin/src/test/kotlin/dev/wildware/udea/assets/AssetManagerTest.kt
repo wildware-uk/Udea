@@ -6,11 +6,11 @@ import dev.wildware.udea.UdeaTestBase
 
 class AssetManagerTest : UdeaTestBase() {
 
-    lateinit var assetManager: AssetManager
+    lateinit var assetManager: UdeaAssetManager
 
     override fun setUp() {
         super.setUp()
-        assetManager = project.service<AssetManager>()
+        assetManager = project.service<UdeaAssetManager>()
     }
 
     fun testAssetManagerLoading() {

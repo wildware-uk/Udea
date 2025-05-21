@@ -15,7 +15,7 @@ import dev.wildware.udea.editors.AssetFile
 
 // TODO make this iterative?
 @Service(Service.Level.PROJECT)
-class AssetManager(private val project: Project) {
+class UdeaAssetManager(private val project: Project) {
     private var connection: MessageBusConnection = project.messageBus.connect()
 
     init {

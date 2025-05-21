@@ -1,23 +1,22 @@
 package dev.wildware.udea.ecs.system
 
-import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer
-import com.badlogic.gdx.physics.box2d.Contact
-import com.badlogic.gdx.physics.box2d.ContactImpulse
-import com.badlogic.gdx.physics.box2d.ContactListener
-import com.badlogic.gdx.physics.box2d.Manifold
-import com.badlogic.gdx.physics.box2d.World as Box2DWorld
+import com.badlogic.gdx.physics.box2d.*
 import com.github.quillraven.fleks.Entity
+import com.github.quillraven.fleks.FamilyOnAdd
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
 import com.github.quillraven.fleks.World.Companion.inject
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.component.physics.Body
+import dev.wildware.udea.ecs.component.physics.Box
+import dev.wildware.udea.ecs.component.physics.Capsule
+import dev.wildware.udea.ecs.component.physics.Circle
 import dev.wildware.udea.game
-
+import com.badlogic.gdx.physics.box2d.World as Box2DWorld
 
 class Box2DSystem(
     val box2DWorld: Box2DWorld = inject()
-) : IteratingSystem(family { all(Body, Transform) }) {
+) : IteratingSystem(family { all(Body, Transform).any(Box, Capsule, Circle) }), FamilyOnAdd {
     val box2dDebugRenderer = Box2DDebugRenderer()
 
     private val onCollideListeners = mutableListOf<(Entity, Entity) -> Unit>()
@@ -42,6 +41,17 @@ class Box2DSystem(
         })
     }
 
+    override fun onAddEntity(entity: Entity) {
+        val body = entity[Body].body
+
+        when {
+            Box in entity -> entity[Box].registerComponent(body)
+            Circle in entity -> entity[Circle].registerComponent(body)
+            Capsule in entity -> entity[Capsule].registerComponent(body)
+            else -> error("No physics component found for entity $entity")
+        }
+    }
+
     override fun onTick() {
         family.forEach {
             val transform = it[Transform]
@@ -53,7 +63,7 @@ class Box2DSystem(
         box2DWorld.step(1 / 60F, 2, 2)
 
         if (game.debug) {
-            box2dDebugRenderer.render(box2DWorld, game.camera?.combined)
+            box2dDebugRenderer.render(box2DWorld, game.camera.combined)
         }
 
         super.onTick()

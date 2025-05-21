@@ -12,6 +12,11 @@ import androidx.compose.ui.awt.SwingPanel
 import androidx.compose.ui.graphics.Color.Companion.Black
 import androidx.compose.ui.graphics.Color.Companion.Gray
 import androidx.compose.ui.unit.dp
+import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.assets.AssetManager
+import com.badlogic.gdx.assets.loaders.FileHandleResolver
+import com.badlogic.gdx.files.FileHandle
+import com.badlogic.gdx.graphics.Texture
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Snapshot
 import com.intellij.openapi.components.service
@@ -20,11 +25,14 @@ import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.components.JBList
 import dev.wildware.LevelEditorCanvas
 import dev.wildware.udea.*
+import dev.wildware.udea.assets.GameAssetManager
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.ecs.component.UdeaComponentType
+import dev.wildware.udea.ecs.component.base.Transform
 import io.kanro.compose.jetbrains.expui.control.Label
 import io.kanro.compose.jetbrains.expui.control.PrimaryButton
 import kotlinx.serialization.Contextual
+import ktx.assets.load
 import org.jetbrains.compose.splitpane.ExperimentalSplitPaneApi
 import org.jetbrains.compose.splitpane.HorizontalSplitPane
 import org.jetbrains.compose.splitpane.rememberSplitPaneState
@@ -33,6 +41,26 @@ import javax.swing.ListSelectionModel
 import kotlin.reflect.KClass
 import kotlin.reflect.full.companionObjectInstance
 import kotlin.reflect.full.createInstance
+
+class EditorAssetLoader(
+    val project: Project
+) : AssetLoader {
+    override fun load(manager: AssetManager) {
+        project.service<GameAssetManager>().assetFiles.forEach {
+            if (it.extension == "png") {
+                val assetPath = it.path.substringAfter("assets/")
+                println("Adding texture $assetPath")
+                manager.load<Texture>(assetPath)
+            }
+        }
+    }
+
+    override fun resolve(fileName: String): FileHandle? {
+        val assetsDir = project.baseDir.findChild("assets") ?: return null
+        val assetFile = assetsDir.findFileByRelativePath(fileName) ?: return null
+        return FileHandle(assetFile.path)
+    }
+}
 
 object LevelEditor : ComposeEditor<Level> {
     @OptIn(ExperimentalSplitPaneApi::class)
@@ -43,7 +71,8 @@ object LevelEditor : ComposeEditor<Level> {
         value: Level?,
         onValueChange: (Level) -> Unit
     ) {
-        val levelEditorCanvas = remember { LevelEditorCanvas(value!!) }
+        val editorAssetLoader = remember { EditorAssetLoader(project) }
+        val levelEditorCanvas = remember { LevelEditorCanvas(editorAssetLoader, value!!) }
         val splitPaneState = rememberSplitPaneState(0.8f)
         var systems by remember { mutableStateOf(value?.systems ?: emptyList()) }
         var entities by remember { mutableStateOf(value?.entities ?: emptyList()) }
@@ -68,7 +97,7 @@ object LevelEditor : ComposeEditor<Level> {
                             selectedEntity,
                             onEntitySelected = { selectedEntity = it },
                             onEntityAdded = {
-                                val newEntity = Snapshot(emptyList(), emptyList())
+                                val newEntity = Snapshot(listOf(Transform()), emptyList())
                                 entities = entities + newEntity
                                 selectedEntity = newEntity
                                 value?.let { onValueChange(it.copy(entities = entities)) }

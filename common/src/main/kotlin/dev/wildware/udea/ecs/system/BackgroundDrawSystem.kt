@@ -7,7 +7,7 @@ import ktx.graphics.use
 
 class BackgroundDrawSystem : IntervalSystem() {
 
-    val background by lazy { game.assetManager.get<Texture>("background.png") }
+    val background by lazy { game.gameManager.assetManager.get<Texture>("background.png") }
     val spriteBatch = SpriteBatch()
 
     override fun onTick() {

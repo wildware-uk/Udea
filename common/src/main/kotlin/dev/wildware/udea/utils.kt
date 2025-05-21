@@ -6,12 +6,15 @@ import com.badlogic.gdx.math.Vector2
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
+import dev.wildware.udea.assets.UClass
 import dev.wildware.udea.ecs.NetworkComponent
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.base.Blueprint
 import dev.wildware.udea.ecs.component.base.Networkable
+import dev.wildware.udea.ecs.system.BackgroundDrawSystem
 import ktx.graphics.use
 import kotlin.contracts.ExperimentalContracts
+import kotlin.reflect.KClass
 import dev.wildware.udea.assets.Blueprint as BlueprintAsset
 
 inline fun <T> MutableList<T>.processAndRemoveEach(onEach: (T) -> Unit) {
@@ -61,3 +64,6 @@ inline fun SpriteBatch.use(
         this.use(action = action)
     }
 }
+
+val <T : Any> KClass<T>.uClass: UClass<T>
+    get()= UClass(this.qualifiedName ?: error("Cannot get qualified name of class: $this"))

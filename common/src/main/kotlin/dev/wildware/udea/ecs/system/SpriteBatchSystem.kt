@@ -1,7 +1,5 @@
 package dev.wildware.udea.ecs.system
 
-import com.badlogic.gdx.graphics.Texture
-import com.badlogic.gdx.graphics.g2d.Sprite
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
@@ -9,10 +7,9 @@ import com.github.quillraven.fleks.World.Companion.family
 import com.github.quillraven.fleks.World.Companion.inject
 import com.github.quillraven.fleks.collection.compareEntity
 import dev.wildware.udea.ecs.component.base.Transform
-import dev.wildware.udea.ecs.component.render.Sprite as SpriteComponent
 import dev.wildware.udea.game
 import dev.wildware.udea.use
-import ktx.assets.getAsset
+import dev.wildware.udea.ecs.component.render.Sprite as SpriteComponent
 
 class SpriteBatchSystem(
     val spriteBatch: SpriteBatch = inject()
@@ -31,8 +28,7 @@ class SpriteBatchSystem(
         val transform = entity[Transform]
         val position = transform.position
 
-        val tex = game.assetManager.getAsset<Texture>(entity[SpriteComponent].sprite.spritePath)
-        val texture = Sprite(tex)
+        val texture = entity[SpriteComponent].gdxSprite ?: return
 
         spriteBatch.draw(
             texture,

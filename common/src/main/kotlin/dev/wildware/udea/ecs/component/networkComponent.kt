@@ -118,7 +118,7 @@ interface SerializerDelegate<COMP : Component<COMP>, out DELEGATE : ComponentDel
 }
 
 /**
- * A interface for data classes to delegate serialization of a component.
+ * An interface for data classes to delegate serialization of a component.
  * */
 interface ComponentDelegate {
     fun World.applyToEntity(entity: Entity)

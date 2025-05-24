@@ -1,6 +1,7 @@
 package dev.wildware.udea.ecs.component.physics
 
 import com.github.quillraven.fleks.Component
+import dev.wildware.udea.Vector2
 import dev.wildware.udea.ecs.component.ComponentDependency.Companion.dependencies
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import ktx.box2d.box
@@ -16,11 +17,13 @@ data class Box(
     val height: Float = 1.0F,
     /** The friction of the box */
     val friction: Float = 0.0F,
+    /** The offset of the box */
+    val offset: Vector2 = Vector2.Zero,
 ) : Component<Box>, PhysicsComponent {
     override fun type() = Box
 
     override fun registerComponent(body: Box2DBody) {
-        body.box(width, height) {
+        body.box(width, height, offset) {
             friction = this@Box.friction
         }
     }

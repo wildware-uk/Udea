@@ -157,29 +157,6 @@ object SerializableSerializer : Serializer<Any>() {
     }
 }
 
-interface RawSerializerDelegate {
-    fun createRaw(component: Component<*>): ComponentDelegate
-}
-
-/**
- * Allows a class to delegate its serialization to a simple object, and apply that data later.
- * */
-interface SerializerDelegate<COMP : Component<COMP>, out DELEGATE : ComponentDelegate> : RawSerializerDelegate {
-    fun create(component: COMP): DELEGATE
-
-    @Suppress("UNCHECKED_CAST")
-    override fun createRaw(component: Component<*>): ComponentDelegate {
-        return this.create(component as COMP)
-    }
-}
-
-/**
- * A interface for data classes to delegate serialization of a component.
- * */
-interface ComponentDelegate {
-    fun World.applyToEntity(entity: Entity)
-}
-
 object Vector2Serializer : KSerializer<Vector2> {
     override fun deserialize(decoder: Decoder): Vector2 {
         return Vector2(decoder.decodeFloat(), decoder.decodeFloat())

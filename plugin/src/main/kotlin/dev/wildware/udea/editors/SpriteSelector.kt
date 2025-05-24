@@ -7,7 +7,7 @@ import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 import dev.wildware.udea.assets.Sprite
 import dev.wildware.udea.compose.SelectBox
-import kotlin.text.substringAfter
+import dev.wildware.udea.pooledResult
 
 object SpriteSelector : ComposeEditor<Sprite> {
     @Composable
@@ -18,8 +18,10 @@ object SpriteSelector : ComposeEditor<Sprite> {
         onValueChange: (Sprite) -> Unit
     ) {
         val files = remember {
-            runReadAction {
-                getAllPngFiles(project)
+            pooledResult {
+                runReadAction {
+                    getAllPngFiles(project)
+                }
             }
         }
 

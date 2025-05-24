@@ -5,6 +5,9 @@ import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
 import com.github.quillraven.fleks.World.Companion.inject
+import dev.wildware.udea.ecs.UdeaSystem
+import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
+import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.component.lights.PointLight
 import dev.wildware.udea.ecs.component.lights.ConeLight
@@ -12,6 +15,7 @@ import dev.wildware.udea.ecs.component.lights.DirectionalLight
 import dev.wildware.udea.game
 import ktx.assets.disposeSafely
 
+@UdeaSystem(runIn = [Editor, Game])
 class Box2DLightsSystem(
     val rayHandler: RayHandler = inject()
 ) : IteratingSystem(

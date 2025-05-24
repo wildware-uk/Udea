@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import com.intellij.openapi.project.Project
 import dev.wildware.udea.Vector2
 import dev.wildware.udea.assets.AssetReference
+import dev.wildware.udea.assets.Blueprint
+import dev.wildware.udea.assets.EntityDefinition
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.Sprite
 import dev.wildware.udea.assets.UClass
@@ -35,6 +37,7 @@ object Editors {
         registerEditor(AssetReference::class, AssetReferenceEditor)
         registerEditor(Enum::class, EnumEditor)
         registerEditor(UClass::class, UClassEditor)
+        registerEditor(Blueprint::class, BlueprintEditor)
         registerEditor(Any::class, ReflectionEditor)
     }
 

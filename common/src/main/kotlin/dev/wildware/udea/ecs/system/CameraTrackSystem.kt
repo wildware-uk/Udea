@@ -10,7 +10,7 @@ import dev.wildware.udea.game
 import dev.wildware.udea.hasAuthority
 
 class CameraTrackSystem : IteratingSystem(
-    family { all(Transform, Camera, Networkable) }
+    family { all(Transform, Camera) }
 ) {
     override fun onTickEntity(entity: Entity) {
         if (world.hasAuthority(entity)) {

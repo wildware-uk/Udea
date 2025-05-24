@@ -11,8 +11,8 @@ data class UClass<T : Any>(
     val className: String
 ) {
     @Suppress("UNCHECKED_CAST")
-    fun toKClass(classLoader: ClassLoader = Thread.currentThread().contextClassLoader): KClass<T> {
-        return classLoader.loadClass(className).kotlin as KClass<T>
+    fun toKClass(): KClass<T> {
+        return Class.forName(className).kotlin as KClass<T>
     }
 
     @JsonValue

@@ -1,10 +1,14 @@
 package dev.wildware.udea.ecs.system
+
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.github.quillraven.fleks.IntervalSystem
+import dev.wildware.udea.ecs.UdeaSystem
+import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
+import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.game
-import ktx.graphics.use
 
+@UdeaSystem(runIn = [Editor, Game])
 class BackgroundDrawSystem : IntervalSystem() {
 
     val background by lazy { game.gameManager.assetManager.get<Texture>("background.png") }
@@ -19,6 +23,6 @@ class BackgroundDrawSystem : IntervalSystem() {
 //                viewPort.screenWidth.toFloat(),
 //                viewPort.screenHeight.toFloat(),
 //            )
-        }
+    }
 //    }
 }

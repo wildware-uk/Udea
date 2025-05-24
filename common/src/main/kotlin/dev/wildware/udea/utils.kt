@@ -36,7 +36,7 @@ fun World.getNetworkEntityOrNull(id: Int): Entity? = asEntityBag()
     .find { it.getOrNull(Networkable)?.remoteId == id }
 
 fun World.hasAuthority(entity: Entity) =
-    entity[Networkable].owner == game.clientId
+    (Networkable !in entity) || entity[Networkable].owner == game.clientId
 
 /**
  * @return [Vector2] perpendicular to this vector.

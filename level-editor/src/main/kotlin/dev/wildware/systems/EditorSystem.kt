@@ -1,43 +1,56 @@
 package dev.wildware.systems
 
+import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.Input
+import com.badlogic.gdx.InputAdapter
+import com.badlogic.gdx.InputProcessor
 import com.badlogic.gdx.graphics.Color
+import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType
-import com.badlogic.gdx.math.Vector2
 import com.github.quillraven.fleks.Entity
+import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.udea.InputSystem
+import dev.wildware.udea.ecs.UdeaSystem
+import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.game
 import ktx.graphics.use
+import kotlin.math.pow
 
-class EditorSystem : IteratingSystem(family = family {
-    all(Transform)
-}) {
+@UdeaSystem(runIn = [Editor])
+class EditorSystem : IntervalSystem(), InputSystem {
 
-    val shapeRenderer by lazy { ShapeRenderer() }
+     override fun onTick() {
+        if(Gdx.input.isKeyPressed(Input.Keys.A)) {
+            game.camera.translate(-10F * deltaTime, 0F, 0F)
+            game.camera.update()
+        }
 
-    override fun onTick() {
-        shapeRenderer.use(ShapeType.Line, game.camera) {
-            super.onTick()
+        if(Gdx.input.isKeyPressed(Input.Keys.D)) {
+            game.camera.translate(10F * deltaTime, 0F, 0F)
+            game.camera.update()
+        }
+
+        if(Gdx.input.isKeyPressed(Input.Keys.W)) {
+            game.camera.translate(0F, 10F * deltaTime, 0F)
+            game.camera.update()
+        }
+
+        if(Gdx.input.isKeyPressed(Input.Keys.S)) {
+            game.camera.translate(0F, -10F * deltaTime, 0F)
+            game.camera.update()
         }
     }
 
-    override fun onTickEntity(entity: Entity) {
-        val transform = entity[Transform]
-        shapeRenderer.color = Color.WHITE
+    override fun scrolled(amountX: Float, amountY: Float): Boolean {
+        (game.camera as? OrthographicCamera)?.let {
+            it.zoom *= 1.1F.pow(amountY)
+            it.update()
+        }
 
-        val position = transform.position
-        drawArrow(position, position.cpy().add(0f, 5f), 5f)
-        drawArrow(position, position.cpy().add(5f, 0f), 5f)
-    }
-
-    fun drawArrow(from: Vector2, to: Vector2, arrowSize: Float = 5f) {
-        val direction = Vector2(to).sub(from).nor()
-        val right = Vector2(-direction.y, direction.x).scl(arrowSize)
-        val length = from.dst(to)
-        val arrowEnd = Vector2(from).add(direction.scl(length))
-
-        shapeRenderer.line(from, arrowEnd)
+        return true
     }
 }

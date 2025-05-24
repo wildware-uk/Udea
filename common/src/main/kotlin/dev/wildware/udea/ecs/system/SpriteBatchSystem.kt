@@ -6,11 +6,15 @@ import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
 import com.github.quillraven.fleks.World.Companion.inject
 import com.github.quillraven.fleks.collection.compareEntity
+import dev.wildware.udea.ecs.UdeaSystem
+import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
+import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.game
 import dev.wildware.udea.use
 import dev.wildware.udea.ecs.component.render.Sprite as SpriteComponent
 
+@UdeaSystem(runIn = [Editor, Game])
 class SpriteBatchSystem(
     val spriteBatch: SpriteBatch = inject()
 ) : IteratingSystem(

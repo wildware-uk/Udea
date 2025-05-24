@@ -27,6 +27,7 @@ import dev.wildware.udea.assets.Assets
 import io.kanro.compose.jetbrains.expui.control.Label
 import io.kanro.compose.jetbrains.expui.theme.DarkTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.awt.BorderLayout
 import java.beans.PropertyChangeListener
 import javax.swing.JPanel
@@ -70,7 +71,7 @@ class AssetFileEditor(
     val assetValueClass = ProjectClassLoaderManager
         .getInstance(project).classLoader.loadClass(assetFile.type).kotlin
 
-    var currentState: Asset? by mutableStateOf(assetFile.asset)
+    val currentState = MutableStateFlow(assetFile.asset)
 
     val document = file.findDocument()!!
 
@@ -80,6 +81,7 @@ class AssetFileEditor(
         add(ComposePanel().apply {
             setContent {
                 var areAssetsLoaded by remember { mutableStateOf(Assets.ready) }
+                val state by currentState.collectAsState()
 
                 if (!areAssetsLoaded) {
                     LaunchedEffect(Unit) {
@@ -95,7 +97,7 @@ class AssetFileEditor(
                 remember {
                     document.addDocumentListener(object : DocumentListener {
                         override fun documentChanged(event: DocumentEvent) {
-                            currentState =
+                            currentState.value =
                                 Json.withClassLoader(ProjectClassLoaderManager.Companion.getInstance(project).classLoader)
                                     .fromJson<AssetFile>(event.document.text).asset
                         }
@@ -110,12 +112,12 @@ class AssetFileEditor(
                             Spacer(Modifier.padding(8.dp))
 
                             (Editors.getEditor(assetValueClass) as ComposeEditor<Any>)
-                                .CreateEditor(project, EditorType(assetValueClass), currentState) {
-                                    currentState = it as Asset
+                                .CreateEditor(project, EditorType(assetValueClass), state) { newState ->
+                                    currentState.value = newState as Asset
                                     modified = true
 
                                     WriteCommandAction.runWriteCommandAction(project) {
-                                        document.setText(Json.toJson(assetFile.copy(asset = currentState)))
+                                        document.setText(Json.toJson(assetFile.copy(asset = newState)))
                                         modified = false
                                     }
                                 }

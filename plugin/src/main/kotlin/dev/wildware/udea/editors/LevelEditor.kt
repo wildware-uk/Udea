@@ -12,26 +12,22 @@ import androidx.compose.ui.awt.SwingPanel
 import androidx.compose.ui.graphics.Color.Companion.Black
 import androidx.compose.ui.graphics.Color.Companion.Gray
 import androidx.compose.ui.unit.dp
-import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.assets.AssetManager
-import com.badlogic.gdx.assets.loaders.FileHandleResolver
 import com.badlogic.gdx.files.FileHandle
 import com.badlogic.gdx.graphics.Texture
 import com.github.quillraven.fleks.Component
-import com.github.quillraven.fleks.Snapshot
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.components.JBList
-import dev.wildware.LevelEditorCanvas
+import dev.wildware.GameEditorCanvas
+import dev.wildware.systems.EditorSystem
 import dev.wildware.udea.*
+import dev.wildware.udea.assets.EntityDefinition
 import dev.wildware.udea.assets.GameAssetManager
 import dev.wildware.udea.assets.Level
-import dev.wildware.udea.ecs.component.UdeaComponentType
-import dev.wildware.udea.ecs.component.base.Transform
 import io.kanro.compose.jetbrains.expui.control.Label
 import io.kanro.compose.jetbrains.expui.control.PrimaryButton
-import kotlinx.serialization.Contextual
 import ktx.assets.load
 import org.jetbrains.compose.splitpane.ExperimentalSplitPaneApi
 import org.jetbrains.compose.splitpane.HorizontalSplitPane
@@ -39,8 +35,6 @@ import org.jetbrains.compose.splitpane.rememberSplitPaneState
 import javax.swing.DefaultListCellRenderer
 import javax.swing.ListSelectionModel
 import kotlin.reflect.KClass
-import kotlin.reflect.full.companionObjectInstance
-import kotlin.reflect.full.createInstance
 
 class EditorAssetLoader(
     val project: Project
@@ -72,11 +66,15 @@ object LevelEditor : ComposeEditor<Level> {
         onValueChange: (Level) -> Unit
     ) {
         val editorAssetLoader = remember { EditorAssetLoader(project) }
-        val levelEditorCanvas = remember { LevelEditorCanvas(editorAssetLoader, value!!) }
+        val gameEditorCanvas = remember { GameEditorCanvas(editorAssetLoader) }
         val splitPaneState = rememberSplitPaneState(0.8f)
         var systems by remember { mutableStateOf(value?.systems ?: emptyList()) }
         var entities by remember { mutableStateOf(value?.entities ?: emptyList()) }
-        var selectedEntity by remember { mutableStateOf<Snapshot?>(null) }
+        var selectedEntity by remember { mutableStateOf<EntityDefinition?>(null) }
+
+        LaunchedEffect(value) {
+            gameEditorCanvas.gameManager.setLevel(value!!, listOf(EditorSystem::class.java))
+        }
 
         HorizontalSplitPane(
             splitPaneState = splitPaneState
@@ -84,7 +82,7 @@ object LevelEditor : ComposeEditor<Level> {
             first {
                 SwingPanel(
                     modifier = Modifier.fillMaxSize(),
-                    factory = { levelEditorCanvas.getCanvas() }
+                    factory = { gameEditorCanvas.getCanvas() }
                 )
             }
             second {
@@ -97,20 +95,27 @@ object LevelEditor : ComposeEditor<Level> {
                             selectedEntity,
                             onEntitySelected = { selectedEntity = it },
                             onEntityAdded = {
-                                val newEntity = Snapshot(listOf(Transform()), emptyList())
+                                val newEntity = EntityDefinition()
                                 entities = entities + newEntity
                                 selectedEntity = newEntity
-                                value?.let { onValueChange(it.copy(entities = entities)) }
+                                value?.let {
+                                    val newLevel = it.copy(entities = entities)
+//                                    gameEditorCanvas.gameManager.setLevel(newLevel, listOf(EditorSystem::class.java), true)
+                                    onValueChange(newLevel)
+                                }
                             })
                     }
 
                     Box {
                         selectedEntity?.let { selected ->
-                            EntityEditor(
+                            EntityDefinitionEditor.CreateEditor(
                                 project,
+                                EditorType(selected::class),
                                 selected,
-                                onEntityUpdated = {
-                                    onValueChange(value!!.copy(entities = (entities - selected) + it))
+                                onValueChange = {
+                                    val newValue =
+                                        value!!.copy(entities = entities.filter { it.id != selected.id } + it)
+                                    onValueChange(newValue)
                                     selectedEntity = it
                                 })
                         }
@@ -123,9 +128,9 @@ object LevelEditor : ComposeEditor<Level> {
     @Composable
     private fun EntityList(
         project: Project,
-        entities: List<Snapshot>,
-        selected: Snapshot?,
-        onEntitySelected: (Snapshot) -> Unit,
+        entities: List<EntityDefinition>,
+        selected: EntityDefinition?,
+        onEntitySelected: (EntityDefinition) -> Unit,
         onEntityAdded: () -> Unit
     ) {
         Column {
@@ -149,53 +154,7 @@ object LevelEditor : ComposeEditor<Level> {
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        Label("Entity")
-                    }
-                }
-            }
-        }
-    }
-
-    @Composable
-    private fun EntityEditor(
-        project: Project,
-        entity: Snapshot,
-        onEntityUpdated: (Snapshot) -> Unit
-    ) {
-        Column {
-            PrimaryButton(onClick = {
-                showComponentTypeMenu(project) { componentType ->
-                    val newComponent = componentType.createInstance()
-
-                    val dependencies = if (componentType.companionObjectInstance is UdeaComponentType<*>) {
-                        (componentType.companionObjectInstance as UdeaComponentType<*>).dependsOn.dependencies.map {
-                            it::class.java.enclosingClass.kotlin.createInstance()
-                        }.toTypedArray()
-                    } else emptyArray()
-
-                    onEntityUpdated(entity.copy(components = (entity.components + dependencies + newComponent) as List<Component<out @Contextual Any>>))
-                }
-            }) {
-                Label("Add Component")
-            }
-
-            Label("Components")
-
-            LazyColumn {
-                items(entity.components) { component ->
-                    Column(
-                        modifier = Modifier.padding(4.dp)
-                    ) {
-                        Label(component::class.simpleName!!.qualifiedNameToTitle())
-
-                        Editors.getEditor(Any::class)!!
-                            .CreateEditor(
-                                project,
-                                EditorType(component::class), component,
-                                onValueChange = {
-                                    val updatedEntity = (entity.components - component) + (it as Component<out Any>)
-                                    onEntityUpdated(entity.copy(components = updatedEntity))
-                                })
+                        Label(entity.name)
                     }
                 }
             }

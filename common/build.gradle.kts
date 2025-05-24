@@ -8,6 +8,7 @@ plugins {
 group = "dev.wildware.udea"
 version = "1.0-SNAPSHOT"
 
+val gdxVersion = "1.13.5"
 val ktxVersion = "1.13.1-rc1"
 
 dependencies {
@@ -31,6 +32,10 @@ dependencies {
     api("io.github.libktx:ktx-scene2d:$ktxVersion")
     api("com.github.crykn:kryonet:2.22.9")
     api("com.badlogicgames.box2dlights:box2dlights:1.5")
+
+    implementation("com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop")
+    implementation("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop")
+    implementation("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop")
 }
 
 tasks.test {

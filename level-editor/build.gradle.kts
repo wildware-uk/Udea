@@ -7,7 +7,7 @@ plugins {
 group = "dev.wildware.udea"
 version = "1.0-SNAPSHOT"
 
-val gdxVersion = "1.12.1"
+val gdxVersion = "1.13.5"
 val ktxVersion = "1.13.1-rc1"
 
 dependencies {

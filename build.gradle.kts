@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     kotlin("jvm") version "2.1.20"
     id("java")
@@ -9,6 +12,8 @@ group = "dev.wildware.udea"
 version = "1.0-SNAPSHOT"
 
 allprojects {
+    apply(plugin = "java")
+
     repositories {
         mavenCentral()
         mavenLocal()
@@ -19,6 +24,17 @@ allprojects {
         maven("https://s01.oss.sonatype.org")
         maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
         maven("https://jitpack.io")
+    }
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    tasks.withType<KotlinCompile>().configureEach {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
+        }
     }
 }
 

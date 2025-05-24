@@ -6,6 +6,9 @@ import com.badlogic.gdx.math.Vector3
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.udea.ecs.UdeaSystem
+import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
+import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.ability.Abilities
 import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.ecs.component.base.Networkable
@@ -15,7 +18,7 @@ import dev.wildware.udea.game
 import ktx.assets.toInternalFile
 import ktx.graphics.use
 
-
+@UdeaSystem(runIn = [Editor, Game])
 class DebugDrawSystem : IteratingSystem(
     family { all(Transform, Debug) }
 ) {

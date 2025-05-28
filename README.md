@@ -11,9 +11,10 @@ A Kotlin+LibGDX+Fleks game engine for 2D games.
 
 ## Modules
 
-- `comomon` - Common code for the engine and plugin.
-- `level-editor` - An embedded LibGDX level editor.
-- `plugin` - An IDE plugin for creating levels and assets.
+- **`comomon`** - Common code for the engine and plugin.
+- **`level-editor`** - An embedded LibGDX level editor.
+- **`plugin`** - An IDE plugin for creating levels and assets.
+- **`compose-ui`** - Reusable compose components used for the plugin.
 
 ## Contributing
 

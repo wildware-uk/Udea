@@ -1,28 +1,26 @@
-package dev.wildware
+package dev.wildware.udea.assets
 
 import com.badlogic.gdx.Gdx
-import dev.wildware.udea.assets.Asset
-import dev.wildware.udea.assets.AssetType
+import com.fasterxml.jackson.annotation.JsonSubTypes
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 
-data class Control(
-    val name: String
-) {
-    val id = ControlId++
+class Control : Asset() {
+    val controlId = ControlId++
 
-    companion object : AssetType<Control>() {
-        override val id: String = "control"
+    companion object {
         private var ControlId = 0
     }
 }
 
 data class Binding(
-    val control: Asset<Control>,
+    val control: AssetReference<Control>,
     val input: BindingInput
-) {
-    companion object : AssetType<Binding>() {
-        override val id = "binding"
-    }
-
+) : Asset() {
+    @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS) // Use fully qualified class name for type info)
+    @JsonSubTypes(
+        JsonSubTypes.Type(value = BindingInput.Key::class),
+        JsonSubTypes.Type(value = BindingInput.Mouse::class)
+    )
     sealed interface BindingInput {
         fun pressed(): Boolean
         fun justPressed(): Boolean

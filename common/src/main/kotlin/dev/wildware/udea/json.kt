@@ -1,12 +1,16 @@
 package dev.wildware.udea
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.core.util.DefaultIndenter
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter
 import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.github.quillraven.fleks.Component
 import java.io.InputStream
+
 
 /**
  * Utility object for JSON serialization and deserialization using Jackson ObjectMapper.
@@ -21,8 +25,9 @@ object Json {
             indentArraysWith(DefaultIndenter("  ", "\n"))
             indentObjectsWith(DefaultIndenter("  ", "\n"))
         })
-    }
 
+        addMixIn(Component::class.java, ComponentMixIn::class.java)
+    }
 
     /**
      * Sets the class loader for the ObjectMapper's type factory.
@@ -68,4 +73,19 @@ object Json {
         return objectMapper.writeValueAsString(value)
             .also { withClassLoader() }
     }
+
+    /**
+     * Configures the ObjectMapper with a custom block.
+     *
+     * @param block A lambda function that takes an ObjectMapper as a parameter
+     */
+    fun configure(block: ObjectMapper.() -> Unit) {
+        objectMapper.block()
+    }
 }
+
+@JsonTypeInfo(
+    use = JsonTypeInfo.Id.CLASS,
+    include = JsonTypeInfo.As.PROPERTY,
+)
+interface ComponentMixIn

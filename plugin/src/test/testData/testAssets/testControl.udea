@@ -1,0 +1,5 @@
+{
+    "@class": "dev.wildware.udea.assets.Control",
+    "name": "Test Control",
+    "controlId": 1
+}

@@ -7,14 +7,21 @@ import com.badlogic.gdx.InputMultiplexer
 import com.badlogic.gdx.InputProcessor
 import com.badlogic.gdx.assets.AssetManager
 import com.badlogic.gdx.assets.loaders.FileHandleResolver
+import com.badlogic.gdx.assets.loaders.resolvers.InternalFileHandleResolver
+import com.badlogic.gdx.files.FileHandle
 import com.badlogic.gdx.graphics.Camera
 import com.badlogic.gdx.graphics.OrthographicCamera
+import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.SystemConfiguration
 import com.github.quillraven.fleks.configureWorld
+import dev.wildware.udea.assets.Asset
+import dev.wildware.udea.assets.AssetFile
+import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.assets.Level
+import dev.wildware.udea.config.gameConfig
 import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
@@ -120,12 +127,13 @@ class Game(
     }
 
     private fun SystemConfiguration.addSystem(kClass: KClass<out IntervalSystem>) {
+        val gameRuntime = if(isEditor) Editor else Game
         val runtime = kClass.findAnnotation<UdeaSystem>()?.runIn ?: DefaultRuntime
 
-        if (isEditor && Editor in runtime) {
+        if (gameRuntime in runtime) {
             val system = kClass.createInstance() as IntervalSystem
 
-            if(system is InputProcessor) {
+            if (system is InputProcessor) {
                 gameManager.inputProcessor.addProcessor(system)
             }
 
@@ -139,7 +147,7 @@ class Game(
 }
 
 class UdeaGameManager(
-    val assetLoader: AssetLoader,
+    val assetLoader: AssetLoader = GameAssetLoader(),
     val isEditor: Boolean = false,
 ) : KtxGame<KtxScreen>() {
 
@@ -147,8 +155,6 @@ class UdeaGameManager(
     val assetManager = AssetManager(assetLoader)
 
     var onCreate: (() -> Unit)? = null
-
-//    private val defaultLevel = Assets.get<Level>(gameConfig.defaultLevel)
 
     fun setLevel(level: Level, extraSystems: List<Class<out IntervalSystem>> = emptyList()) {
         screens.clear()
@@ -160,6 +166,12 @@ class UdeaGameManager(
         Gdx.input.inputProcessor = inputProcessor
         assetLoader.load(assetManager)
         assetManager.finishLoading()
+
+        if(!isEditor) {
+            gameConfig.defaultLevel
+                ?.let { setLevel(it.value) }
+        }
+
         super.create()
         onCreate?.invoke()
     }
@@ -171,6 +183,9 @@ class UdeaGameManager(
 }
 
 interface AssetLoader : FileHandleResolver {
+    /**
+     * Loads all assets needed for the game into the [AssetManager].
+     * */
     fun load(manager: AssetManager)
 }
 
@@ -204,5 +219,47 @@ sealed interface WorldSource {
     companion object {
         const val DefaultTcpPort = 28855
         const val DefaultUdpPort = 28856
+    }
+}
+
+/**
+ * Default [GameAssetLoader] implementation.
+ * */
+class GameAssetLoader : AssetLoader {
+    private val internalFileLoader = InternalFileHandleResolver()
+
+    override fun load(manager: AssetManager) {
+        fun scanDirectory(directory: FileHandle) {
+            directory.list().forEach { file ->
+                if (file.isDirectory) {
+                    scanDirectory(file)
+                } else {
+                    var loaded = true
+
+                    val path = file.path().substringAfter("assets/")
+
+                    when (file.extension()) {
+                        "png" -> manager.load(path, Texture::class.java)
+                        "udea" -> Assets[path] = loadAsset(file)
+                        else -> loaded = false
+                    }
+
+                    if (loaded) {
+                        Gdx.app.log("GameAssetLoader", "Loaded asset: $path")
+                    }
+                }
+            }
+        }
+
+        scanDirectory(Gdx.files.internal("assets"))
+    }
+
+    override fun resolve(fileName: String): FileHandle {
+        return internalFileLoader.resolve(fileName)
+    }
+
+    private fun loadAsset(file: FileHandle): Asset {
+        val asset = Json.fromJson<AssetFile>(file.read())
+        return asset.asset ?: error("Asset file $file does not contain an asset")
     }
 }

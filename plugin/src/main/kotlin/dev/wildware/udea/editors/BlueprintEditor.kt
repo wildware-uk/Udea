@@ -32,6 +32,7 @@ object BlueprintEditor : ComposeEditor<Blueprint> {
         var entityDefinition by remember {
             mutableStateOf(
                 EntityDefinition(
+                    id = 0,
                     components = value!!.components,
                     tags = value.tags
                 )

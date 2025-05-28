@@ -42,21 +42,41 @@ tasks.test {
     useJUnitPlatform()
 }
 
+tasks.register<Jar>("sourcesJar") {
+    archiveClassifier.set("sources")
+    from(sourceSets.main.get().allSource)
+}
+
+
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
-            artifact(tasks.named("jar"))
+            from(components["java"]) // Main JAR from the Java/Kotlin component
+            artifact(tasks.named("sourcesJar")) // Add the sources JAR
+            
             pom {
                 name.set("UDEA Common")
                 description.set("Common utilities for UDEA")
-
+                url.set("https://example.com/udea-common") // Optional: adjust your project's URL
+                
                 developers {
                     developer {
+                        id.set("shaunwild")
                         name.set("Shaun Wild")
                         email.set("shaunwild97@gmail.com")
                     }
                 }
+                
+                licenses {
+                    license {
+                        name.set("Apache-2.0")
+                        url.set("https://opensource.org/licenses/Apache-2.0")
+                    }
+                }
             }
         }
+    }
+    repositories {
+        mavenLocal() // This ensures publishing to Maven Local.
     }
 }

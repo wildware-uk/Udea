@@ -2,8 +2,6 @@ package dev.wildware.udea.editors
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -46,25 +44,29 @@ object EntityDefinitionEditor : ComposeEditor<EntityDefinition> {
 
             Label("Components")
 
-            LazyColumn {
-                itemsIndexed(value!!.components) { index, component ->
-                    Column(
-                        modifier = Modifier.padding(4.dp)
-                    ) {
-                        Label(component::class.simpleName!!.qualifiedNameToTitle())
+            println("Creating editors for ${value!!.components}")
 
-                        Editors.getEditor(Any::class)!!
-                            .CreateEditor(
-                                project,
-                                EditorType(component::class), component,
-                                onValueChange = { newValue ->
-                                    val updatedComponents = value.components.toMutableList()
-                                    updatedComponents[index] = newValue as Component<out Any>
-                                    onValueChange(value.copy(components = updatedComponents))
-                                })
-                    }
+            Label("${value?.id}")
+
+            value!!.components.forEachIndexed { index, component ->
+                Column(
+                    modifier = Modifier.padding(4.dp)
+                ) {
+                    Label(component::class.simpleName!!.qualifiedNameToTitle())
+
+                    Editors.getEditor(Any::class)!!
+                        .CreateEditor(
+                            project,
+                            EditorType(component::class),
+                            component,
+                            onValueChange = { newValue ->
+                                val updatedComponents = value.components.toMutableList()
+                                updatedComponents[index] = newValue as Component<out Any>
+                                onValueChange(value.copy(components = updatedComponents))
+                            })
                 }
             }
+
         }
     }
 }

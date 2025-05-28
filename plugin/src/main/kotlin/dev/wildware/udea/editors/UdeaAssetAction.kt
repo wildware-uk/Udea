@@ -13,6 +13,7 @@ import com.intellij.psi.PsiFileFactory
 import dev.wildware.udea.Json
 import dev.wildware.udea.UdeaIcons
 import dev.wildware.udea.assets.Asset
+import dev.wildware.udea.assets.AssetFile
 import dev.wildware.udea.camelCaseToTitle
 import dev.wildware.udea.findClassesOfType
 import kotlin.reflect.full.primaryConstructor

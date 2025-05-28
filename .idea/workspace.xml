@@ -4,39 +4,24 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Refactor game asset management and ECS system handling&#10;&#10;Reorganized asset management and ECS system architecture for improved modularity and maintainability. Added `GameAssetManager` and updated components to standardize registration processes. Introduced additional refinements in rendering and debug systems, enabling better extensibility and functionality.">
+    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Add Blueprint and Entity Definition editors along with system upgrades&#10;&#10;Introduced new BlueprintEditor and EntityDefinitionEditor to enhance the editor's capabilities. Added input handling, updated systems for editor/runtime compatibility, and extended components like Sprite and Physics for advanced configuration. Refactored and improved asset handling, world setup, and system configurations.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.run/Run IDE with Plugin.run.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.run/Run IDE with Plugin.run.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/common/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/classes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/classes.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/levels.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/levels.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/base/Networkable.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/base/Networkable.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/config/GameConfig.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/config/GameConfig.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/networkComponent.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/networkComponent.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Body.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Body.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Box.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Box.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Capsule.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Capsule.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Circle.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Circle.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/Sprite.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/Sprite.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/udeaComponent.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/udeaComponent.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/BackgroundDrawSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/BackgroundDrawSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DLightsSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DLightsSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CameraTrackSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CameraTrackSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/DebugDrawSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/DebugDrawSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/ParticleSystemSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/ParticleSystemSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/SpriteBatchSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/SpriteBatchSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/serializers.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/serializers.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/utils.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/utils.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/level-editor/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/level-editor/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/LevelEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/LevelEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/systems/EditorSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/systems/EditorSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/PacketUtil.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/PacketUtil.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugin/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/assets/UdeaAssetManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/assets/UdeaAssetManager.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/AssetFileEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/AssetFileEditor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/BlueprintEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/BlueprintEditor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/EntityDefinitionEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/EntityDefinitionEditor.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/LevelEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/LevelEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/SpriteSelector.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/SpriteSelector.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/editor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/editor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/UdeaAssetAction.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/UdeaAssetAction.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/fileTypes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/fileTypes.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -128,10 +113,13 @@
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.1/12dc3ca46a914fec543f6186a9cf17fa4a93c1b/gdx-1.13.1-sources.jar!/com/badlogic/gdx/graphics/glutils/ShapeRenderer.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.1/12dc3ca46a914fec543f6186a9cf17fa4a93c1b/gdx-1.13.1-sources.jar!/com/badlogic/gdx/utils/ScreenUtils.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/Application.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/InputProcessor.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/input/RemoteSender.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-databind/2.17.0/4241e9bdb3e3c2fe8bdfad112b7794c44c40d1f2/jackson-databind-2.17.0-sources.jar!/com/fasterxml/jackson/databind/deser/DefaultDeserializationContext.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.github.libktx/ktx-app/1.13.1-rc1/3b09c7ab806006ec5d65507d297228918ef32e98/ktx-app-1.13.1-rc1-sources.jar!/ktx/app/game.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.github.libktx/ktx-app/1.13.1-rc1/3b09c7ab806006ec5d65507d297228918ef32e98/ktx-app-1.13.1-rc1-sources.jar!/ktx/app/graphics.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.jetbrains.intellij.platform/intellij-platform-gradle-plugin/2.5.0/b2110ce31623d91f9ccbf430b5c923375b7193d/intellij-platform-gradle-plugin-2.5.0.jar!/org/jetbrains/intellij/platform/gradle/extensions/IntelliJPlatformDependenciesExtension.class" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/2.1.20/a17d644acea6159970c25bbf99ff204b03c1c0b6/kotlin-stdlib-2.1.20-sources.jar!/commonMain/kotlin/annotation/Annotations.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$MAVEN_REPOSITORY$/io/github/quillraven/fleks/Fleks-jvm/2.13-SNAPSHOT/Fleks-jvm-2.13-SNAPSHOT-sources.jar!/commonMain/com/github/quillraven/fleks/component.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$MAVEN_REPOSITORY$/io/github/quillraven/fleks/Fleks-jvm/2.13-SNAPSHOT/Fleks-jvm-2.13-SNAPSHOT-sources.jar!/commonMain/com/github/quillraven/fleks/entity.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$MAVEN_REPOSITORY$/io/github/quillraven/fleks/Fleks-jvm/2.13-SNAPSHOT/Fleks-jvm-2.13-SNAPSHOT-sources.jar!/commonMain/com/github/quillraven/fleks/system.kt" root0="SKIP_INSPECTION" />
@@ -230,6 +218,7 @@
     &quot;jdk.selected.JAVA_MODULE&quot;: &quot;21&quot;,
     &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_directory_selection&quot;: &quot;C:/Users/shaun/Workspace/udea/common/src/main/kotlin/dev/wildware/udea&quot;,
     &quot;last_opened_file_path&quot;: &quot;C:/Users/shaun/Workspace/udea/common/src/main/kotlin/dev/wildware/udea/network&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
@@ -285,7 +274,7 @@
       <recent name="dev.wildware.udea.ecs.component" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.udea [build]">
+  <component name="RunManager" selected="Gradle.Run Plugin">
     <configuration default="true" type="lua.app" factoryName="Lua Application">
       <option name="program" value="lua.exe" />
       <option name="file" value="" />
@@ -507,7 +496,10 @@
       <workItem from="1747934962197" duration="9997000" />
       <workItem from="1747994203834" duration="3029000" />
       <workItem from="1748004915036" duration="4035000" />
-      <workItem from="1748118772940" duration="3381000" />
+      <workItem from="1748118772940" duration="4049000" />
+      <workItem from="1748179162420" duration="13549000" />
+      <workItem from="1748340454924" duration="11338000" />
+      <workItem from="1748365788681" duration="2948000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -549,7 +541,15 @@
       <option name="project" value="LOCAL" />
       <updated>1747821417902</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Add Blueprint and Entity Definition editors along with system upgrades&#10;&#10;Introduced new BlueprintEditor and EntityDefinitionEditor to enhance the editor's capabilities. Added input handling, updated systems for editor/runtime compatibility, and extended components like Sprite and Physics for advanced configuration. Refactored and improved asset handling, world setup, and system configurations.">
+      <option name="closed" value="true" />
+      <created>1748127511555</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1748127511555</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -561,7 +561,8 @@
     <MESSAGE value="Add ECS systems and components for abilities, rendering, and debug&#10;&#10;Introduced new systems and components to enhance game mechanics, including Ability and Attribute systems for gameplay effects, rendering systems for lights and camera tracking, and debugging capabilities. These changes also remove obsolete code, integrate with Compose UI, and expand core functionality." />
     <MESSAGE value="Refactor ECS components and systems for improved structure&#10;&#10;Updated package structure for ECS components and systems, ensuring better organization and alignment with their purposes. Removed obsolete code, standardized naming conventions, and integrated support for additional features including rendering, Box2D, and debugging. Additional changes enhance modularity and maintainability of the game framework." />
     <MESSAGE value="Refactor game asset management and ECS system handling&#10;&#10;Reorganized asset management and ECS system architecture for improved modularity and maintainability. Added `GameAssetManager` and updated components to standardize registration processes. Introduced additional refinements in rendering and debug systems, enabling better extensibility and functionality." />
-    <option name="LAST_COMMIT_MESSAGE" value="Refactor game asset management and ECS system handling&#10;&#10;Reorganized asset management and ECS system architecture for improved modularity and maintainability. Added `GameAssetManager` and updated components to standardize registration processes. Introduced additional refinements in rendering and debug systems, enabling better extensibility and functionality." />
+    <MESSAGE value="Add Blueprint and Entity Definition editors along with system upgrades&#10;&#10;Introduced new BlueprintEditor and EntityDefinitionEditor to enhance the editor's capabilities. Added input handling, updated systems for editor/runtime compatibility, and extended components like Sprite and Physics for advanced configuration. Refactored and improved asset handling, world setup, and system configurations." />
+    <option name="LAST_COMMIT_MESSAGE" value="Add Blueprint and Entity Definition editors along with system upgrades&#10;&#10;Introduced new BlueprintEditor and EntityDefinitionEditor to enhance the editor's capabilities. Added input handling, updated systems for editor/runtime compatibility, and extended components like Sprite and Physics for advanced configuration. Refactored and improved asset handling, world setup, and system configurations." />
   </component>
   <component name="XDebuggerManager">
     <pin-to-top-manager>

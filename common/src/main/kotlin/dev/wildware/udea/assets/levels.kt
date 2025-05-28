@@ -28,7 +28,6 @@ data class Level(
         Box2DSystem::class.uClass,
         CameraTrackSystem::class.uClass,
         AbilitySystem::class.uClass,
-        CameraTrackSystem::class.uClass,
         CleanupSystem::class.uClass,
         ControllerSystem::class.uClass,
         SpriteBatchSystem::class.uClass,
@@ -41,7 +40,11 @@ data class Level(
      * Component snapshots that will be placed on entities.
      * */
     val entities: List<EntityDefinition> = emptyList()
-) : Asset()
+) : Asset() {
+    fun nextEntityId(): Long {
+        return entities.maxOfOrNull { it.id }?.plus(1) ?: 0L
+    }
+}
 
 /**
  * Defines an entity and its components for use in a level.
@@ -51,7 +54,7 @@ data class EntityDefinition(
     /**
      * Unique identifier
      * */
-    val id: Long = nextId(),
+    val id: Long,
 
     /**
      * The name of this entity
@@ -74,28 +77,4 @@ data class EntityDefinition(
      * The parent blueprint for this entity.
      * */
     val blueprint: AssetReference<Blueprint>? = null,
-) {
-    init {
-        if (id > nextId) {
-            nextId = id + 1
-        }
-    }
-
-//    override fun equals(other: Any?): Boolean {
-//        return if (other is EntityDefinition) {
-//            this.id == other.id
-//        } else false
-//    }
-//
-//    override fun hashCode(): Int {
-//        return id.hashCode()
-//    }
-
-    companion object {
-        private var nextId: Long = 0L
-
-        fun nextId(): Long {
-            return nextId++
-        }
-    }
-}
+)

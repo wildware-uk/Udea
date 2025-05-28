@@ -1,6 +1,5 @@
 package dev.wildware.udea
 
-import com.fasterxml.jackson.databind.JsonNode
 import com.intellij.ide.projectView.PresentationData
 import com.intellij.ide.projectView.TreeStructureProvider
 import com.intellij.ide.projectView.ViewSettings
@@ -9,8 +8,7 @@ import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
-import dev.wildware.udea.assets.Asset
-import dev.wildware.udea.editors.AssetFile
+import dev.wildware.udea.assets.AssetFile
 import org.jetbrains.annotations.Unmodifiable
 import javax.swing.Icon
 
@@ -51,8 +49,10 @@ class UdeaFileNode(
 
     override fun update(presentation: PresentationData) {
         super.update(presentation)
-        val contents = Json.withClassLoader(ProjectClassLoaderManager
-            .getInstance(project).classLoader)
+        val contents = Json.withClassLoader(
+            ProjectClassLoaderManager
+                .getInstance(project).classLoader
+        )
             .fromJson<AssetFile>(psiFile.virtualFile.inputStream)
         try {
             presentation.presentableText = psiFile.name.removeSuffix(".udea")

@@ -73,6 +73,12 @@ class NetworkComponent<T : Component<T>>(
     }
 }
 
+/**
+ * Returns true if this component network data is delegated. (works on null)
+ * */
+val NetworkComponent<*>?.isDelegatedSafe: Boolean
+    get() = this?.isDelegated == true
+
 enum class SyncStrategy {
     /**
      * Syncs on entity create and update.

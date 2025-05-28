@@ -14,6 +14,14 @@ import kotlinx.serialization.encoding.Encoder
 import kotlin.reflect.KClass
 import kotlin.reflect.full.isSubclassOf
 
+/**
+ * Contains a reference to an asset which may or may not exist.
+ * */
+data class AssetFile(
+    val type: String,
+    val asset: Asset?
+)
+
 data class AssetReference<T : Asset>(
     @JsonValue
     val path: String
@@ -89,11 +97,11 @@ object AssetReferenceSerializer : KSerializer<Asset> {
         PrimitiveSerialDescriptor("Asset", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: Asset) {
-        encoder.encodeString(value.path)
+        encoder.encodeString(value.path.substringAfter("/assets"))
     }
 
     override fun deserialize(decoder: Decoder): Asset {
-        val (typeName, path) = decoder.decodeString().split("/", limit = 2)
+        val path = decoder.decodeString()
         return Assets[path]
     }
 }

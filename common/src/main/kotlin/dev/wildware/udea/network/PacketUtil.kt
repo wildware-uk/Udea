@@ -7,8 +7,10 @@ import dev.wildware.udea.assets.AssetReferenceSerializer
 import dev.wildware.udea.ecs.NetworkAuthority
 import dev.wildware.udea.ecs.NetworkComponent
 import dev.wildware.udea.ecs.SyncStrategy
+import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.component.base.Blueprint
+import dev.wildware.udea.ecs.isDelegatedSafe
 import dev.wildware.udea.ecs.system.AbilitySystem
 import dev.wildware.udea.game
 import dev.wildware.udea.getNetworkData
@@ -44,16 +46,18 @@ val cbor = Cbor {
 
 
 
-        polymorphic(Component::class) {
-            println(networkedComponents)
-            networkedComponents
-                .filterIsInstance<Class<Component<*>>>()
-                .filter { !(it.kotlin.companionObjectInstance as NetworkComponent<*>).isDelegated }
-                .forEach {
-                    println("Registering ${it.simpleName}")
-                    subclass(it.kotlin, it.kotlin.serializer())
-                }
-        }
+        //TODO register polymorphic types
+
+//        polymorphic(Component::class) {
+//            networkedComponents
+//                .map { it.kotlin.companionObjectInstance }
+//                .filterIsInstance<UdeaComponentType<*>>()
+//                .filter { it.networkComponent.isDelegatedSafe }
+//                .forEach {
+//                    println("Registering ${it.simpleName}")
+//                    subclass(it::class, it::class.serializer())
+//                }
+//        }
 
 
 

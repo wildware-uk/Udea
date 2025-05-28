@@ -10,7 +10,6 @@ import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.messages.MessageBusConnection
 import dev.wildware.udea.Json
 import dev.wildware.udea.ProjectClassLoaderManager
-import dev.wildware.udea.editors.AssetFile
 
 
 // TODO make this iterative?
@@ -39,10 +38,12 @@ class UdeaAssetManager(private val project: Project) {
                             .withClassLoader(ProjectClassLoaderManager.getInstance(project).classLoader)
                             .fromJson<AssetFile>(file.inputStream)
 
-                        asset.asset?.path = file.path
+                        val path = file.path.substringAfter("assets/")
+
+                        asset.asset?.path = path
                         asset.asset?.name = file.nameWithoutExtension
 
-                        Assets[file.path] = asset.asset!!
+                        Assets[path] = asset.asset!!
                     } catch (e: Exception) {
                         println("Failed to load asset file: ${file.path}")
                         e.printStackTrace()

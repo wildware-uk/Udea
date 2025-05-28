@@ -23,6 +23,7 @@ import com.intellij.openapi.vfs.findDocument
 import dev.wildware.udea.Json
 import dev.wildware.udea.ProjectClassLoaderManager
 import dev.wildware.udea.assets.Asset
+import dev.wildware.udea.assets.AssetFile
 import dev.wildware.udea.assets.Assets
 import io.kanro.compose.jetbrains.expui.control.Label
 import io.kanro.compose.jetbrains.expui.theme.DarkTheme
@@ -31,14 +32,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import java.awt.BorderLayout
 import java.beans.PropertyChangeListener
 import javax.swing.JPanel
-
-/**
- * Contains a reference to an asset which may or may not exist.
- * */
-data class AssetFile(
-    val type: String,
-    val asset: Asset?
-)
 
 class AssetFileEditorProvider : FileEditorProvider, DumbAware {
     override fun accept(project: Project, file: VirtualFile): Boolean {

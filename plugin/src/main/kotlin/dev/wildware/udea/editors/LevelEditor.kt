@@ -51,7 +51,7 @@ class EditorAssetLoader(
 
     override fun resolve(fileName: String): FileHandle? {
         val assetsDir = project.baseDir.findChild("assets") ?: return null
-        val assetFile = assetsDir.findFileByRelativePath(fileName) ?: return null
+        val assetFile = assetsDir.findFileByRelativePath("/$fileName") ?: return null
         return FileHandle(assetFile.path)
     }
 }
@@ -65,15 +65,16 @@ object LevelEditor : ComposeEditor<Level> {
         value: Level?,
         onValueChange: (Level) -> Unit
     ) {
+        requireNotNull(value) { "Level must not be null" }
+
         val editorAssetLoader = remember { EditorAssetLoader(project) }
         val gameEditorCanvas = remember { GameEditorCanvas(editorAssetLoader) }
         val splitPaneState = rememberSplitPaneState(0.8f)
-        var systems by remember { mutableStateOf(value?.systems ?: emptyList()) }
-        var entities by remember { mutableStateOf(value?.entities ?: emptyList()) }
         var selectedEntity by remember { mutableStateOf<EntityDefinition?>(null) }
+        var entities by remember { mutableStateOf(value.entities) }
 
         LaunchedEffect(value) {
-            gameEditorCanvas.gameManager.setLevel(value!!, listOf(EditorSystem::class.java))
+            gameEditorCanvas.gameManager.setLevel(value, listOf(EditorSystem::class.java))
         }
 
         HorizontalSplitPane(
@@ -93,28 +94,26 @@ object LevelEditor : ComposeEditor<Level> {
                         EntityList(
                             project, entities,
                             selectedEntity,
-                            onEntitySelected = { selectedEntity = it },
+                            onEntitySelected = { println("selected ${it.id}"); selectedEntity = it },
                             onEntityAdded = {
-                                val newEntity = EntityDefinition()
-                                entities = entities + newEntity
+                                val newEntity = EntityDefinition(value.nextEntityId())
                                 selectedEntity = newEntity
-                                value?.let {
-                                    val newLevel = it.copy(entities = entities)
+                                val newLevel = value.copy(entities = entities + newEntity)
 //                                    gameEditorCanvas.gameManager.setLevel(newLevel, listOf(EditorSystem::class.java), true)
-                                    onValueChange(newLevel)
-                                }
+                                onValueChange(newLevel)
                             })
                     }
 
                     Box {
-                        selectedEntity?.let { selected ->
+                        if (selectedEntity != null) {
+                            println("SELECTED ${selectedEntity?.id}")
                             EntityDefinitionEditor.CreateEditor(
                                 project,
-                                EditorType(selected::class),
-                                selected,
+                                EditorType(selectedEntity!!::class),
+                                selectedEntity,
                                 onValueChange = {
                                     val newValue =
-                                        value!!.copy(entities = entities.filter { it.id != selected.id } + it)
+                                        value.copy(entities = entities.filter { it.id != selectedEntity!!.id } + it)
                                     onValueChange(newValue)
                                     selectedEntity = it
                                 })

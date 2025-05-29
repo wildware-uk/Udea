@@ -7,11 +7,11 @@ import kotlin.reflect.KClass
 /**
  * A reference to a class in the game engine.
  **/
-data class UClass<T : Any>(
+data class UClass<out T : Any>(
     val className: String
 ) {
     @Suppress("UNCHECKED_CAST")
-    fun toKClass(): KClass<T> {
+    fun toKClass(): KClass<out T> {
         return Class.forName(className).kotlin as KClass<T>
     }
 

@@ -1,39 +1,32 @@
 package dev.wildware.udea.editors
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.awt.ComposePanel
-import androidx.compose.ui.unit.dp
-import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.editor.event.DocumentEvent
-import com.intellij.openapi.editor.event.DocumentListener
+import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorPolicy
 import com.intellij.openapi.fileEditor.FileEditorProvider
 import com.intellij.openapi.fileEditor.FileEditorState
-import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.findDocument
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.table.JBTable
 import dev.wildware.udea.Json
 import dev.wildware.udea.ProjectClassLoaderManager
-import dev.wildware.udea.assets.Asset
-import dev.wildware.udea.assets.AssetFile
-import dev.wildware.udea.assets.Assets
-import io.kanro.compose.jetbrains.expui.control.Label
-import io.kanro.compose.jetbrains.expui.theme.DarkTheme
-import kotlinx.coroutines.delay
+import dev.wildware.udea.assets.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.awt.BorderLayout
+import java.awt.Component
+import java.awt.Dimension
 import java.beans.PropertyChangeListener
-import javax.swing.JPanel
+import javax.swing.*
+import javax.swing.table.DefaultTableModel
+import javax.swing.table.TableCellEditor
+import javax.swing.table.TableCellRenderer
+import kotlin.reflect.KClass
 
-class AssetFileEditorProvider : FileEditorProvider, DumbAware {
+class AssetFileEditorProvider : FileEditorProvider {
     override fun accept(project: Project, file: VirtualFile): Boolean {
         return file.extension == "udea"
     }
@@ -70,55 +63,207 @@ class AssetFileEditor(
 
     var modified = false
 
-    private val component = JPanel(BorderLayout()).apply {
-        add(ComposePanel().apply {
-            setContent {
-                var areAssetsLoaded by remember { mutableStateOf(Assets.ready) }
-                val state by currentState.collectAsState()
+    // Custom table model for our data
+    private val tableModel = object : DefaultTableModel() {
+        // Map to store the type of each cell in the second column
+        val cellTypes = mutableMapOf<Int, KClass<*>>()
 
-                if (!areAssetsLoaded) {
-                    LaunchedEffect(Unit) {
-                        while (!Assets.ready) {
-                            delay(100)
-                            areAssetsLoaded = Assets.ready
-                        }
-                    }
-                    Label("Loading assets...")
-                    return@setContent
+        init {
+            addColumn("Property")
+            addColumn("Value")
+
+            // Add some test rows with different types
+            addRow(arrayOf("TestString", "Hello"))
+            addRow(arrayOf("TestInt", 42))
+            addRow(arrayOf("TestFloat", 3.14f))
+            addRow(arrayOf("TestBoolean", true))
+            addRow(arrayOf("TestBlueprint", null))
+
+            // Set the types for the test rows
+            cellTypes[0] = String::class
+            cellTypes[1] = Int::class
+            cellTypes[2] = Float::class
+            cellTypes[3] = Boolean::class
+            cellTypes[4] = AssetReference::class
+        }
+
+        override fun getColumnClass(columnIndex: Int): Class<*> {
+            return when (columnIndex) {
+                0 -> String::class.java
+                1 -> Any::class.java // Use Any as the base class for all values
+                else -> Any::class.java
+            }
+        }
+
+        override fun isCellEditable(row: Int, column: Int): Boolean {
+            return column == 1 // Only the value column is editable
+        }
+
+        // Get the type of a cell in the second column
+        fun getCellType(row: Int): KClass<*> {
+            return cellTypes[row] ?: Any::class
+        }
+
+        // Set the type of a cell in the second column
+        fun setCellType(row: Int, type: KClass<*>) {
+            cellTypes[row] = type
+        }
+    }
+
+    // Generic cell renderer that uses the appropriate renderer based on the type
+    private inner class GenericCellRenderer : TableCellRenderer {
+        override fun getTableCellRendererComponent(
+            table: JTable,
+            value: Any?,
+            isSelected: Boolean,
+            hasFocus: Boolean,
+            row: Int,
+            column: Int
+        ): Component {
+            // Get the type of the cell
+            val type = if (column == 1 && row >= 0 && row < tableModel.rowCount) {
+                tableModel.getCellType(row)
+            } else {
+                value?.let { v -> v::class } ?: Any::class
+            }
+
+            // Create a simple text representation for the renderer
+            val text = when {
+                value is AssetReference<*> && type == AssetReference::class -> {
+                    (value.value as? Blueprint)?.name ?: "None"
                 }
 
-                remember {
-                    document.addDocumentListener(object : DocumentListener {
-                        override fun documentChanged(event: DocumentEvent) {
-                            currentState.value =
-                                Json.withClassLoader(ProjectClassLoaderManager.Companion.getInstance(project).classLoader)
-                                    .fromJson<AssetFile>(event.document.text).asset
-                        }
-                    })
+                else -> value?.toString() ?: "null"
+            }
+
+            // Return a simple label for rendering
+            return JButton(text).apply {
+                isEnabled = false
+                horizontalAlignment = javax.swing.SwingConstants.LEFT
+            }
+        }
+    }
+
+    // Custom cell editor for Blueprint dropdown
+    private inner class BlueprintCellEditor : DefaultCellEditor(JComboBox<Blueprint>().apply {
+        val blueprints = Assets.filterIsInstance<Blueprint>()
+        blueprints.forEach { addItem(it) }
+    }) {
+        override fun getTableCellEditorComponent(
+            table: JTable,
+            value: Any?,
+            isSelected: Boolean,
+            row: Int,
+            column: Int
+        ): Component {
+            val comboBox = super.getTableCellEditorComponent(table, value, isSelected, row, column) as JComboBox<*>
+
+            // Set the selected item if value is an AssetReference
+            if (value is AssetReference<*>) {
+                val blueprint = value.value as? Blueprint
+                if (blueprint != null) {
+                    comboBox.selectedItem = blueprint
+                }
+            }
+
+            return comboBox
+        }
+
+        override fun getCellEditorValue(): Any {
+            val blueprint = (component as JComboBox<*>).selectedItem as? Blueprint
+            return if (blueprint != null) {
+                AssetReference<Blueprint>(blueprint.path)
+            } else {
+                // Return an empty string instead of null
+                ""
+            }
+        }
+    }
+
+    // Custom table class that overrides getCellEditor to choose the appropriate editor based on the type
+    private inner class TypedTable(model: DefaultTableModel) : JBTable(model) {
+        // Cache for cell editors to avoid creating new ones for each cell
+        private val editorCache = mutableMapOf<KClass<*>, TableCellEditor>()
+
+        override fun getCellEditor(row: Int, column: Int): TableCellEditor {
+            // Only apply custom editors to the value column
+            if (column == 1) {
+                val type = tableModel.getCellType(row)
+
+                // Return cached editor if available
+                editorCache[type]?.let { return it }
+
+                // Create and cache a new editor based on the type
+                val editor = when (type) {
+                    AssetReference::class -> BlueprintCellEditor()
+                    else -> super.getCellEditor(row, column)
                 }
 
-                DarkTheme {
-                    Box(Modifier.padding(8.dp)) {
-                        Column {
-                            Label("Asset Editor")
+                editorCache[type] = editor
+                return editor
+            }
+            return super.getCellEditor(row, column)
+        }
+    }
 
-                            Spacer(Modifier.padding(8.dp))
+    // Create the table
+    private val table = TypedTable(tableModel).apply {
+        setDefaultRenderer(Any::class.java, GenericCellRenderer())
 
-                            (Editors.getEditor(assetValueClass) as ComposeEditor<Any>)
-                                .CreateEditor(project, EditorType(assetValueClass), state) { newState ->
-                                    currentState.value = newState as Asset
-                                    modified = true
+        // Set column widths
+        columnModel.getColumn(0).preferredWidth = 150
+        columnModel.getColumn(1).preferredWidth = 200
 
-                                    WriteCommandAction.runWriteCommandAction(project) {
-                                        document.setText(Json.toJson(assetFile.copy(asset = newState)))
-                                        modified = false
-                                    }
-                                }
-                        }
+        // Set row height
+        rowHeight = 30
+
+        // Add a listener to mark the editor as modified when the table is edited
+        model.addTableModelListener {
+            modified = true
+        }
+    }
+
+    // Create a panel with the table and add button
+    private val tablePanel = JPanel(BorderLayout()).apply {
+        // Add the table in a scroll pane
+        val scrollPane = JBScrollPane(table).apply {
+            preferredSize = Dimension(400, 200)
+        }
+        add(scrollPane, BorderLayout.CENTER)
+
+        // Add a button panel at the bottom
+        val buttonPanel = JPanel().apply {
+            val addButton = JButton("Add Row").apply {
+                addActionListener {
+                    tableModel.addRow(arrayOf("New Blueprint", ""))
+                    modified = true
+                }
+            }
+            add(addButton)
+
+            val removeButton = JButton("Remove Row").apply {
+                addActionListener {
+                    val selectedRow = table.selectedRow
+                    if (selectedRow != -1) {
+                        tableModel.removeRow(selectedRow)
+                        modified = true
                     }
                 }
             }
-        }, BorderLayout.CENTER)
+            add(removeButton)
+        }
+        add(buttonPanel, BorderLayout.SOUTH)
+    }
+
+    private val component = panel {
+        with(SwingReflectiveEditor) {
+            CreateEditor(project, EditorType(assetValueClass), currentState.value) { newState ->
+                runWriteAction {
+                    document.setText(Json.toJson(assetFile.copy(asset = newState as Asset)))
+                    modified = false
+                }
+            }
+        }
     }
 
     override fun getComponent() = component

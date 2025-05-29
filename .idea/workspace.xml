@@ -4,9 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Add Blueprint and Entity Definition editors along with system upgrades&#10;&#10;Introduced new BlueprintEditor and EntityDefinitionEditor to enhance the editor's capabilities. Added input handling, updated systems for editor/runtime compatibility, and extended components like Sprite and Physics for advanced configuration. Refactored and improved asset handling, world setup, and system configurations.">
+    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Enhance README and streamline workspace configuration.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/classes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/classes.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/AssetFileEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/AssetFileEditor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/editor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/plugin/src/main/kotlin/dev/wildware/udea/editors/editor.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -83,10 +85,10 @@
         <option value="Fleks Component" />
         <option value="Kotlin Data Class" />
         <option value="Kotlin Interface" />
-        <option value="Kotlin Class" />
         <option value="Kotlin Annotation" />
-        <option value="Kotlin Object" />
         <option value="Kotlin File" />
+        <option value="Kotlin Class" />
+        <option value="Kotlin Object" />
       </list>
     </option>
   </component>
@@ -213,7 +215,7 @@
     "project.structure.last.edited": "SDKs",
     "project.structure.proportion": "0.17",
     "project.structure.side.proportion": "0.2",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "settings.editor.selected.configurable": "ml.llm.LLMConfigurable",
     "vue.rearranger.settings.migration": "true"
   },
   "keyToStringList": {
@@ -485,6 +487,7 @@
       <workItem from="1748179162420" duration="13549000" />
       <workItem from="1748340454924" duration="11338000" />
       <workItem from="1748365788681" duration="2948000" />
+      <workItem from="1748505509196" duration="19935000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -534,7 +537,15 @@
       <option name="project" value="LOCAL" />
       <updated>1748127511555</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="Enhance README and streamline workspace configuration.">
+      <option name="closed" value="true" />
+      <created>1748463833919</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1748463833919</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -547,7 +558,9 @@
     <MESSAGE value="Refactor ECS components and systems for improved structure&#10;&#10;Updated package structure for ECS components and systems, ensuring better organization and alignment with their purposes. Removed obsolete code, standardized naming conventions, and integrated support for additional features including rendering, Box2D, and debugging. Additional changes enhance modularity and maintainability of the game framework." />
     <MESSAGE value="Refactor game asset management and ECS system handling&#10;&#10;Reorganized asset management and ECS system architecture for improved modularity and maintainability. Added `GameAssetManager` and updated components to standardize registration processes. Introduced additional refinements in rendering and debug systems, enabling better extensibility and functionality." />
     <MESSAGE value="Add Blueprint and Entity Definition editors along with system upgrades&#10;&#10;Introduced new BlueprintEditor and EntityDefinitionEditor to enhance the editor's capabilities. Added input handling, updated systems for editor/runtime compatibility, and extended components like Sprite and Physics for advanced configuration. Refactored and improved asset handling, world setup, and system configurations." />
-    <option name="LAST_COMMIT_MESSAGE" value="Add Blueprint and Entity Definition editors along with system upgrades&#10;&#10;Introduced new BlueprintEditor and EntityDefinitionEditor to enhance the editor's capabilities. Added input handling, updated systems for editor/runtime compatibility, and extended components like Sprite and Physics for advanced configuration. Refactored and improved asset handling, world setup, and system configurations." />
+    <MESSAGE value="Upgrade project architecture and asset handling.&#10;&#10;Refactored asset management by introducing `GameAssetLoader` for standardized loading and handling of assets. Enhanced ECS system configurations with runtime compatibility improvements and editor support. Updated dependencies, JVM compatibility to Java 17, and added Maven publishing configuration with source JARs." />
+    <MESSAGE value="Enhance README and streamline workspace configuration." />
+    <option name="LAST_COMMIT_MESSAGE" value="Enhance README and streamline workspace configuration." />
   </component>
   <component name="XDebuggerManager">
     <pin-to-top-manager>

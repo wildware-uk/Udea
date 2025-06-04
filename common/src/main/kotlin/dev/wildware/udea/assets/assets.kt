@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.annotation.JsonValue
+import dev.wildware.udea.ecs.component.UdeaClass
+import dev.wildware.udea.ecs.component.UdeaClass.UClassAttribute.NoInline
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -22,7 +24,8 @@ data class AssetFile(
     val asset: Asset?
 )
 
-data class AssetReference<T : Asset>(
+@UdeaClass(NoInline)
+data class AssetReference<out T : Asset>(
     @JsonValue
     val path: String
 ) {
@@ -48,6 +51,9 @@ abstract class Asset {
 
     @JsonIgnore
     var name: String = ""
+
+    val reference: AssetReference<Asset>
+        get()= AssetReference(path)
 
     override fun equals(other: Any?): Boolean {
         return other is Asset && other.path == path

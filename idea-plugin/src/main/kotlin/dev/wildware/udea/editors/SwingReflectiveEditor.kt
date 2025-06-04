@@ -3,6 +3,7 @@ package dev.wildware.udea.editors
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.DialogPanel
 import com.intellij.psi.PsiType
 import com.intellij.ui.dsl.builder.Panel
 import com.intellij.ui.dsl.builder.panel
@@ -13,14 +14,15 @@ import java.awt.Component
 import javax.swing.JTable
 import javax.swing.event.TableModelEvent
 import javax.swing.table.DefaultTableModel
+import javax.swing.table.TableCellRenderer
 import javax.swing.table.TableModel
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.primaryConstructor
 
-object SwingReflectiveEditor : UEditor<Any> {
-    override fun Panel.CreateEditor(
+object SwingReflectiveEditor {
+    fun Panel.CreateEditor(
         project: Project,
         type: EditorType<*>,
         value: Any?,
@@ -31,7 +33,6 @@ object SwingReflectiveEditor : UEditor<Any> {
             val subclasses =
                 findClassesOfType(project, type.type.qualifiedName!!)
                     .map { project.service<ProjectClassLoaderManager>().classLoader.loadClass(it.toJvmQualifiedName()).kotlin }
-
             row {
                 comboBox(subclasses).onChanged {
                     concreteClass = it.item
@@ -55,6 +56,7 @@ object SwingReflectiveEditor : UEditor<Any> {
         val constructor = type.type.primaryConstructor ?: error("No primary constructor found for ${type.type}")
 
         val constructorPsiMap = runReadAction { calculateConstructParams(project, type.type) }
+            .filter { UEditors.getEditorRaw(it.value.toEditorType<Any>().type) != null }
 
         val currentValues =
             constructor.parameters.associateWith { param ->
@@ -160,15 +162,30 @@ class ObjectEditorTable(
 
 class ValueCellRenderer(
     val project: Project
-) : AbstractTableCellEditor() {
-
-    var value: Any? = null
+) : AbstractTableCellEditor(), TableCellRenderer {
 
     override fun getTableCellEditorComponent(
-        table: JTable?, value: Any?,
+        table: JTable?,
+        value: Any?,
         isSelected: Boolean,
         row: Int, column: Int
-    ): Component? {
+    ) = createEditorCell(table, row, value)
+
+    override fun getTableCellRendererComponent(
+        table: JTable?,
+        value: Any?,
+        isSelected: Boolean,
+        hasFocus: Boolean,
+        row: Int,
+        column: Int
+    ) = createEditorCell(table, row, value)
+
+
+    private fun createEditorCell(
+        table: JTable?,
+        row: Int,
+        value: Any?
+    ): DialogPanel {
         table as ObjectEditorTable
 
         val editor = UEditors.getEditorRaw(table.rowTypes[row].type) as UEditor<Any?>?
@@ -177,7 +194,7 @@ class ValueCellRenderer(
             return panel {
                 with(editor) {
                     CreateEditor(project, table.rowTypes[row], value) { newValue ->
-                        this@ValueCellRenderer.value = newValue
+                        table.model.setValueAt(newValue, row, 1)
                     }
                 }
             }
@@ -191,6 +208,6 @@ class ValueCellRenderer(
     }
 
     override fun getCellEditorValue(): Any? {
-        return value
+        return null
     }
 }

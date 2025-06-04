@@ -37,11 +37,15 @@ repositories {
 configurations.runtimeClasspath {
     exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
     exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+    exclude(group = "org.slf4j")
 }
 
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
     implementation(project(":compose-ui"))
+    implementation("org.reflections:reflections:0.10.2") {
+        exclude("org.slf4j")
+    }
     testImplementation(libs.junit)
     testImplementation(libs.opentest4j)
     implementation(kotlin("reflect"))

@@ -12,7 +12,7 @@ val gdxVersion = "1.13.5"
 val ktxVersion = "1.13.1-rc1"
 
 dependencies {
-    api("io.github.quillraven.fleks:Fleks:2.13-SNAPSHOT")
+    api("io.github.quillraven.fleks:Fleks:2.11")
     implementation(kotlin("stdlib"))
     implementation("org.reflections:reflections:0.10.2")
     testImplementation(kotlin("test"))

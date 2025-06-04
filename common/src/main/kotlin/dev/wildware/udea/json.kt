@@ -17,8 +17,7 @@ import java.io.InputStream
  * Provides convenient methods to convert between JSON strings and Kotlin objects.
  */
 object Json {
-    @PublishedApi
-    internal val objectMapper = jacksonObjectMapper().apply {
+    val objectMapper = jacksonObjectMapper().apply {
         configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         configure(SerializationFeature.INDENT_OUTPUT, true)
         setDefaultPrettyPrinter(DefaultPrettyPrinter().apply {

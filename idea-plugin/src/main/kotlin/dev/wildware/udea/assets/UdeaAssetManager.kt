@@ -43,7 +43,9 @@ class UdeaAssetManager(private val project: Project) {
                         asset.asset?.path = path
                         asset.asset?.name = file.nameWithoutExtension
 
-                        Assets[path] = asset.asset!!
+                        asset.asset?.let {
+                            Assets[path] = it
+                        }
                     } catch (e: Exception) {
                         println("Failed to load asset file: ${file.path}")
                         e.printStackTrace()

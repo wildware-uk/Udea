@@ -13,7 +13,7 @@ val ktxVersion = "1.13.1-rc1"
 dependencies {
     implementation(project(":common"))
     testImplementation(kotlin("test"))
-    api("io.github.quillraven.fleks:Fleks:2.13-SNAPSHOT")
+    api("io.github.quillraven.fleks:Fleks:2.11")
     api("com.badlogicgames.gdx:gdx:$gdxVersion")
     api("io.github.libktx:ktx-app:$ktxVersion")
     implementation("com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop")

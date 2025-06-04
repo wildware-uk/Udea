@@ -7,9 +7,9 @@ import dev.wildware.udea.Vector2
 import dev.wildware.udea.assets.*
 import kotlin.reflect.KClass
 
-data class EditorType<T : Any>(
+data class EditorType<out T : Any>(
     val type: KClass<out T>,
-    val generics: List<EditorType<*>> = emptyList(),
+    val generics: List<EditorType<Any>> = emptyList(),
 )
 
 interface ComposeEditor<T : Any> {
@@ -68,7 +68,6 @@ object UEditors {
         registerEditor(UClass::class, UClassEditorSwing)
         registerEditor(Enum::class, EnumEditorSwing)
         registerEditor(AssetReference::class, AssetReferenceSwingEditor)
-        registerEditor(Any::class, SwingReflectiveEditor)
     }
 
     fun <T : Any> registerEditor(type: KClass<T>, editor: UEditor<*>) {

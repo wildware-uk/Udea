@@ -264,3 +264,12 @@ fun <T : Any> PsiType.toEditorType(): EditorType<T> {
     }.get()
     return result!!
 }
+
+fun getJvmQualifiedName(psiClass: PsiClass): String {
+    val outerClass = psiClass.containingClass
+    return if (outerClass != null) {
+        "${getJvmQualifiedName(outerClass)}$${psiClass.name}"
+    } else {
+        psiClass.qualifiedName ?: error("Cannot determine qualified name for class: ${psiClass.name}")
+    }
+}

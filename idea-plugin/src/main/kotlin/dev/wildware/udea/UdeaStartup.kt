@@ -14,6 +14,7 @@ class UdeaStartup : StartupActivity {
     override fun runActivity(project: Project) {
         Json.configure {
             registerModule(SimpleModule().apply {
+//                addSerializer(UBuilder::class.java, UBuilderSerializer())
                 addSerializer(KClass::class.java, KClassSerializer())
                 addDeserializer(
                     KClass::class.java, KClassDeserializer(

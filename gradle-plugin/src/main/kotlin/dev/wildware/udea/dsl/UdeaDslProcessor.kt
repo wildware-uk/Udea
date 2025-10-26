@@ -14,6 +14,96 @@ class UdeaDslProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) : SymbolProcessor {
+    private fun getDslIncludeProperties(decl: KSClassDeclaration): List<KSPropertyDeclaration> {
+        return decl.getAllProperties().filter { prop ->
+            prop.annotations.any {
+                it.annotationType.resolve().declaration.qualifiedName?.asString() == DslInclude::class.qualifiedName
+            }
+        }.toList()
+    }
+
+    private fun validateProperty(prop: KSPropertyDeclaration) {
+        if (!prop.isMutable) {
+            throw IllegalStateException("Property ${prop.simpleName.asString()} marked with @DslInclude must be mutable (var)")
+        }
+    }
+
+    private fun writeParameterDeclarations(
+        out: OutputStreamWriter,
+        params: List<KSValueParameter>,
+        includedProps: List<KSPropertyDeclaration> = emptyList()
+    ) {
+        params.forEachIndexed { index, param ->
+            val paramName = param.name?.asString()
+            val paramType = param.type.resolve()
+            val isOptional = param.hasDefault
+            val isList = isListType(paramType)
+
+            if (isList) {
+                out.append(getListParameterDeclaration(paramName, paramType))
+            } else {
+                out.append("    $paramName: ${paramType.toQualifiedString()}")
+            }
+            if (isOptional) out.append("? = null")
+            if (index < params.size - 1 || includedProps.isNotEmpty()) out.append(",")
+            out.appendLine()
+        }
+
+        includedProps.forEachIndexed { index, prop ->
+            val propName = prop.simpleName.asString()
+            val propType = prop.type.resolve()
+            out.append("    $propName: ${propType.toQualifiedString()}? = null")
+            if (index < includedProps.size - 1) out.append(",")
+            out.appendLine()
+        }
+    }
+
+    private fun writeParameterAssignments(out: OutputStreamWriter, params: List<KSValueParameter>) {
+        params.forEach { param ->
+            val paramName = param.name?.asString() ?: return@forEach
+            val paramType = param.type.resolve()
+            val isList = isListType(paramType)
+            writeParameterAssignment(out, param, paramName, isList)
+        }
+    }
+
+    private fun writeParameterAssignment(
+        out: OutputStreamWriter,
+        param: KSValueParameter,
+        paramName: String,
+        isList: Boolean
+    ) {
+        if (param.hasDefault) {
+            if (isList) {
+                out.appendLine(getListBuilderAssignment(paramName, param.type.resolve(), true))
+            } else {
+                out.appendLine("    if ($paramName != null) parameters[\"$paramName\"] = $paramName")
+            }
+        } else {
+            if (isList) {
+                out.appendLine(getListBuilderAssignment(paramName, param.type.resolve(), false))
+            } else {
+                out.appendLine("    parameters[\"$paramName\"] = $paramName")
+            }
+        }
+    }
+
+    private fun isListType(type: KSType): Boolean =
+        type.declaration.qualifiedName?.asString() == "kotlin.collections.List"
+
+    private fun getListParameterDeclaration(paramName: String?, paramType: KSType): String =
+        "    $paramName: (ListBuilder<${
+            paramType.arguments.first().type?.resolve()?.toQualifiedString() ?: "Any"
+        }>.() -> Unit)"
+
+    private fun getListBuilderAssignment(paramName: String, paramType: KSType, isOptional: Boolean): String {
+        val baseAssignment =
+            "    ${if (isOptional) "if ($paramName != null) " else ""}parameters[\"$paramName\"] = ListBuilder<${
+                paramType.arguments.first().type?.resolve()?.toQualifiedString() ?: "Any"
+            }>().apply($paramName).build()"
+        return baseAssignment
+    }
+
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val deferred = mutableListOf<KSAnnotated>()
         val assetClasses = mutableListOf<KSClassDeclaration>()
@@ -72,78 +162,23 @@ class UdeaDslProcessor(
 
                 out.appendLine("@UdeaDsl")
                 out.appendLine("fun ${name.replaceFirstChar { it.lowercase() }}(")
-                params.forEachIndexed { index, param ->
-                    val paramName = param.name?.asString()
-                    val paramType = param.type.resolve()
-                    val isOptional = param.hasDefault
-                    val isList =
-                        paramType.declaration.qualifiedName?.asString() == "kotlin.collections.List"
-
-                    if (isList) {
-                        out.append(
-                            "    $paramName: (ListBuilder<${
-                                paramType.arguments.first().type?.resolve()?.toQualifiedString() ?: "Any"
-                            }>.() -> Unit)"
-                        )
-                    } else {
-                        out.append("    $paramName: ${paramType.toQualifiedString()}")
-                    }
-                    if (isOptional) out.append("? = null")
-                    if (index < params.size - 1) out.append(",")
-                    out.appendLine()
-                }
+                writeParameterDeclarations(out, params, getDslIncludeProperties(decl))
                 out.appendLine("): ${decl.qualifiedName!!.asString()} {")
                 out.appendLine("    val parameters = mutableMapOf<String, Any?>()")
-                params.forEach { param ->
-                    val paramName = param.name?.asString() ?: return@forEach
-                    val isList = param.type.resolve().declaration.qualifiedName?.asString() == "kotlin.collections.List"
-                    if (param.hasDefault) {
-                        if (isList) {
-                            out.appendLine(
-                                "    if ($paramName != null) parameters[\"$paramName\"] = ListBuilder<${
-                                    param.type.resolve().arguments.first().type?.resolve()?.toQualifiedString() ?: "Any"
-                                }>().apply($paramName).build()"
-                            )
-                        } else {
-                            out.appendLine("    if ($paramName != null) parameters[\"$paramName\"] = $paramName")
-                        }
-                    } else {
-                        if (isList) {
-                            out.appendLine(
-                                "    parameters[\"$paramName\"] = ListBuilder<${
-                                    param.type.resolve().arguments.first().type?.resolve()?.toQualifiedString() ?: "Any"
-                                }>().apply($paramName).build()"
-                            )
-                        } else {
-                            out.appendLine("    parameters[\"$paramName\"] = $paramName")
-                        }
-                    }
-                }
+                writeParameterAssignments(out, params)
                 out.appendLine()
-                out.appendLine("    return createObject(${decl.qualifiedName!!.asString()}::class, parameters)")
+                out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, parameters)")
+                getDslIncludeProperties(decl).forEach { prop ->
+                    validateProperty(prop)
+                    val propName = prop.simpleName.asString()
+                    out.appendLine("    if ($propName != null) obj.$propName = $propName")
+                }
+                out.appendLine("    return obj")
                 out.appendLine("}")
                 out.appendLine()
                 out.appendLine("@UdeaDsl")
                 out.appendLine("fun ListBuilder<in ${decl.qualifiedName!!.asString()}>.${name.replaceFirstChar { it.lowercase() }}(")
-                params.forEachIndexed { index, param ->
-                    val paramName = param.name?.asString()
-                    val paramType = param.type.resolve()
-                    val isOptional = param.hasDefault
-                    val isList = paramType.declaration.qualifiedName?.asString() == "kotlin.collections.List"
-
-                    if (isList) {
-                        out.append(
-                            "    $paramName: (ListBuilder<${
-                                paramType.arguments.first().type?.resolve()?.toQualifiedString() ?: "Any"
-                            }>.() -> Unit)"
-                        )
-                    } else {
-                        out.append("    $paramName: ${paramType.toQualifiedString()}")
-                    }
-                    if (isOptional) out.append("? = null")
-                    if (index < params.size - 1) out.append(",")
-                    out.appendLine()
-                }
+                writeParameterDeclarations(out, params, getDslIncludeProperties(decl))
                 out.appendLine(") {")
                 out.appendLine("    val parameters = mutableMapOf<String, Any?>()")
                 params.forEach { param ->
@@ -175,7 +210,13 @@ class UdeaDslProcessor(
                     }
                 }
                 out.appendLine()
-                out.appendLine("    add(createObject(${decl.qualifiedName!!.asString()}::class, parameters))")
+                out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, parameters)")
+                getDslIncludeProperties(decl).forEach { prop ->
+                    validateProperty(prop)
+                    val propName = prop.simpleName.asString()
+                    out.appendLine("    if ($propName != null) obj.$propName = $propName")
+                }
+                out.appendLine("    add(obj)")
                 out.appendLine("}")
             }
         }

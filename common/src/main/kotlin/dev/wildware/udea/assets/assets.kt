@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.annotation.JsonValue
 import dev.wildware.udea.assets.dsl.ListBuilder
 import dev.wildware.udea.dsl.CreateDsl
+import dev.wildware.udea.dsl.DslInclude
 import dev.wildware.udea.ecs.component.UdeaClass
 import dev.wildware.udea.ecs.component.UdeaClass.UClassAttribute.NoInline
 import kotlinx.serialization.KSerializer
@@ -58,6 +59,7 @@ abstract class Asset {
     var path: String = ""
 
     @JsonIgnore
+    @DslInclude
     var name: String = ""
 
     @get:JsonIgnore
@@ -79,7 +81,7 @@ object Assets {
         get() = assets.isNotEmpty()
 
     inline operator fun <reified T : Asset> get(path: String) = assets[path] as T?
-        ?: error("Asset $path does not exist")
+        ?: error("Asset $path does not exist ${debugAssets()}")
 
     fun <T : Asset> find(path: String) = assets[path] as T?
         ?: error("Asset $path does not exist ${debugAssets()}")
@@ -104,7 +106,7 @@ object Assets {
         return assets.values.filter { it::class.isSubclassOf(type) } as List<T>
     }
 
-    private fun debugAssets(): String {
+    fun debugAssets(): String {
         return assets.toString()
     }
 }

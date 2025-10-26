@@ -1,51 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AIAssistantCustomInstructionsStorage">
+    <option name="instructions">
+      <map>
+        <entry key="AIAssistant.VCS.GenerateCommitMessage">
+          <value>
+            <AIAssistantStoredInstruction>
+              <option name="actionId" value="AIAssistant.VCS.GenerateCommitMessage" />
+              <option name="content" value="Avoid overly verbose descriptions or unnecessary details.&#10;&#10;Use emojis&#10;&#10;Bullet points&#10;" />
+            </AIAssistantStoredInstruction>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="AutoImportSettings">
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Update README">
-      <change afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/editors.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/kotlinc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/kotlinc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="- 🔥 **Remove outdated plugins &amp; editors**&#10;  - Dropped numerous legacy implementations: `UBlueprintEditor`, `UEditor` subclasses, and Sprite-related classes.&#10;- 🚀 **Introduce DSL improvements**&#10;  - Added new KotlinScript support with `UdeaScriptConfiguration`.&#10;  - New DSL creation utilities (`createObject`, `ListBuilder`, etc.).&#10;- 🌟 **Launch Gradle plugin enhancements**&#10;  - Added `AssetScanner` for asset management and a Maven publishing setup.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/common/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/classes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/classes.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/controls.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/controls.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/assetBuilder.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/assetBuilder.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptDef.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/UdeaScript.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/levels.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/levels.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/render.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/Sprite.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/Sprite.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/udeaTypes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/udeaTypes.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle-plugin/src/Main.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle/libs.versions.toml" beforeDir="false" afterPath="$PROJECT_DIR$/gradle/libs.versions.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/AssetFileEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/AssetFileEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/LevelEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/LevelEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/SpriteSelector.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/UdeaAssetAction.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/UdeaAssetAction.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/UObjectBuilder.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/UObjectBuilder.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UAssetReferenceEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UAssetReferenceFormEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UBlueprintEditor.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UBooleanEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UBooleanFormEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UEditors.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UEnumReferenceEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UEnumReferenceFormEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UFloatEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UFloatFormEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UNumberEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UNumberFormEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UObjectBuilder.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UFormObjectBuilder.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/USpriteEditor.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UStringEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UStringFormEditor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UdeaEditor.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/editor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/editor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/idea-plugin/src/test/kotlin/dev/wildware/udea/editors/builder/editors/UEditorsTest.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/level-editor/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/level-editor/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/systems/EditorSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/systems/EditorSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/integrationTest/kotlin/dev/wildware/udea/PluginTest.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/control/Controller.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/control/Controller.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/resources/META-INF/kotlin/script/templates/dev.wildware.udea.assets.dsl.script.UdeaScript" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/resources/test.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/resources/test.udea.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/dsl/UdeaDslProcessor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/dsl/UdeaDslProcessor.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -142,11 +127,11 @@
         <option value="Fleks Component" />
         <option value="Kotlin Data Class" />
         <option value="Kotlin Interface" />
-        <option value="Kotlin Annotation" />
         <option value="Kotlin Object" />
         <option value="Kotlin JUnit3 Test Class" />
         <option value="Kotlin File" />
         <option value="Kotlin Class" />
+        <option value="Kotlin Annotation" />
       </list>
     </option>
   </component>
@@ -161,6 +146,7 @@
     </option>
   </component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/files/FileHandle.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.google.devtools.ksp/symbol-processing-api/2.2.10-2.0.2/f897026a9b54a25b98259d5a6f88a0513250e868/symbol-processing-api-2.2.10-2.0.2-sources.jar!/com/google/devtools/ksp/utils.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.github.quillraven.fleks/Fleks-jvm/2.11/d85c95c5cd96a68c35c2afc35f92cb5ece9eba18/Fleks-jvm-2.11-sources.jar!/commonMain/com/github/quillraven/fleks/component.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.jdks/corretto-11.0.21/lib/src.zip!/java.desktop/javax/swing/Icon.java" root0="SKIP_INSPECTION" />
@@ -171,6 +157,7 @@
     <setting file="jar://$MAVEN_REPOSITORY$/io/github/quillraven/fleks/Fleks-jvm/2.13-SNAPSHOT/Fleks-jvm-2.13-SNAPSHOT-sources.jar!/commonMain/com/github/quillraven/fleks/entity.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$MAVEN_REPOSITORY$/io/github/quillraven/fleks/Fleks-jvm/2.13-SNAPSHOT/Fleks-jvm-2.13-SNAPSHOT-sources.jar!/commonMain/com/github/quillraven/fleks/system.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$MAVEN_REPOSITORY$/io/github/quillraven/fleks/Fleks-jvm/2.13-SNAPSHOT/Fleks-jvm-2.13-SNAPSHOT-sources.jar!/commonMain/com/github/quillraven/fleks/world.kt" root0="SKIP_INSPECTION" />
+    <setting file="jar://$MAVEN_REPOSITORY$/io/github/quillraven/fleks/Fleks-jvm/2.13-SNAPSHOT/Fleks-jvm-2.13-SNAPSHOT.jar!/com/github/quillraven/fleks/Component.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$APPLICATION_HOME_DIR$/lib/app-client.jar!/com/intellij/ide/actions/CreateFileFromTemplateDialog.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$APPLICATION_HOME_DIR$/lib/app-client.jar!/com/intellij/ide/plugins/cl/PluginClassLoader.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$APPLICATION_HOME_DIR$/lib/app-client.jar!/com/intellij/mock/MockProject.class" root0="SKIP_INSPECTION" />
@@ -287,7 +274,7 @@
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
     "last_directory_selection": "C:/Users/shaun/Workspace/udea/common/src/main/kotlin/dev/wildware/udea",
-    "last_opened_file_path": "C:/Users/shaun/Workspace/udea/common/src/main/kotlin/dev/wildware/udea/assets/dsl",
+    "last_opened_file_path": "C:/Users/shaun/Workspace/udea/gradle-plugin/src/main/resources/META-INF",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -309,11 +296,11 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\shaun\Workspace\udea\gradle-plugin\src\main\resources\META-INF" />
       <recent name="C:\Users\shaun\Workspace\udea\common\src\main\kotlin\dev\wildware\udea\assets\dsl" />
       <recent name="C:\Users\shaun\Workspace\udea\idea-plugin\src\main\kotlin\dev\wildware\udea\editors\builder\editors\assets" />
       <recent name="C:\Users\shaun\Workspace\udea\common\src\main\kotlin\dev\wildware\udea\network" />
       <recent name="C:\Users\shaun\Workspace\udea\common\src\main\kotlin\dev\wildware\udea" />
-      <recent name="C:\Users\shaun\Workspace\udea\compose-ui\src\main\kotlin" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\shaun\Workspace\udea\compose-ui\src\main\kotlin\dev\wildware\udea" />
@@ -596,7 +583,7 @@
       <workItem from="1761398983268" duration="8495000" />
       <workItem from="1761410624575" duration="25953000" />
       <workItem from="1761452116443" duration="502000" />
-      <workItem from="1761479058124" duration="13770000" />
+      <workItem from="1761479058124" duration="25280000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -654,7 +641,15 @@
       <option name="project" value="LOCAL" />
       <updated>1748463833919</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="- 🔥 **Remove outdated plugins &amp; editors**&#10;  - Dropped numerous legacy implementations: `UBlueprintEditor`, `UEditor` subclasses, and Sprite-related classes.&#10;- 🚀 **Introduce DSL improvements**&#10;  - Added new KotlinScript support with `UdeaScriptConfiguration`.&#10;  - New DSL creation utilities (`createObject`, `ListBuilder`, etc.).&#10;- 🌟 **Launch Gradle plugin enhancements**&#10;  - Added `AssetScanner` for asset management and a Maven publishing setup.">
+      <option name="closed" value="true" />
+      <created>1761499530745</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1761499530745</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -673,14 +668,16 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Initial commit" />
-    <MESSAGE value="Update README" />
     <MESSAGE value="Add ECS systems and components for abilities, rendering, and debug&#10;&#10;Introduced new systems and components to enhance game mechanics, including Ability and Attribute systems for gameplay effects, rendering systems for lights and camera tracking, and debugging capabilities. These changes also remove obsolete code, integrate with Compose UI, and expand core functionality." />
     <MESSAGE value="Refactor ECS components and systems for improved structure&#10;&#10;Updated package structure for ECS components and systems, ensuring better organization and alignment with their purposes. Removed obsolete code, standardized naming conventions, and integrated support for additional features including rendering, Box2D, and debugging. Additional changes enhance modularity and maintainability of the game framework." />
     <MESSAGE value="Refactor game asset management and ECS system handling&#10;&#10;Reorganized asset management and ECS system architecture for improved modularity and maintainability. Added `GameAssetManager` and updated components to standardize registration processes. Introduced additional refinements in rendering and debug systems, enabling better extensibility and functionality." />
     <MESSAGE value="Add Blueprint and Entity Definition editors along with system upgrades&#10;&#10;Introduced new BlueprintEditor and EntityDefinitionEditor to enhance the editor's capabilities. Added input handling, updated systems for editor/runtime compatibility, and extended components like Sprite and Physics for advanced configuration. Refactored and improved asset handling, world setup, and system configurations." />
     <MESSAGE value="Upgrade project architecture and asset handling.&#10;&#10;Refactored asset management by introducing `GameAssetLoader` for standardized loading and handling of assets. Enhanced ECS system configurations with runtime compatibility improvements and editor support. Updated dependencies, JVM compatibility to Java 17, and added Maven publishing configuration with source JARs." />
     <MESSAGE value="Enhance README and streamline workspace configuration." />
-    <option name="LAST_COMMIT_MESSAGE" value="Enhance README and streamline workspace configuration." />
+    <MESSAGE value="Update README" />
+    <MESSAGE value="Remove legacy editors, integration tests, and obsolete code.&#10;&#10;Replaced old DSLs and asset structures with new Kotlin scripting, `UdeaDsl`, and improved asset factories. Introduced Gradle plugin for asset scanning and Maven publishing configuration. Added network code generator setup while upgrading compatibility to JVM 17. Restructured test and plugin files for streamlined IDE support." />
+    <MESSAGE value="-  **Remove outdated plugins &amp; editors**&#10;  - Dropped numerous legacy implementations: `UBlueprintEditor`, `UEditor` subclasses, and Sprite-related classes.&#10;-  **Introduce DSL improvements**&#10;  - Added new KotlinScript support with `UdeaScriptConfiguration`.&#10;  - New DSL creation utilities (`createObject`, `ListBuilder`, etc.).&#10;-  **Launch Gradle plugin enhancements**&#10;  - Added `AssetScanner` for asset management and a Maven publishing setup." />
+    <option name="LAST_COMMIT_MESSAGE" value="-  **Remove outdated plugins &amp; editors**&#10;  - Dropped numerous legacy implementations: `UBlueprintEditor`, `UEditor` subclasses, and Sprite-related classes.&#10;-  **Introduce DSL improvements**&#10;  - Added new KotlinScript support with `UdeaScriptConfiguration`.&#10;  - New DSL creation utilities (`createObject`, `ListBuilder`, etc.).&#10;-  **Launch Gradle plugin enhancements**&#10;  - Added `AssetScanner` for asset management and a Maven publishing setup." />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

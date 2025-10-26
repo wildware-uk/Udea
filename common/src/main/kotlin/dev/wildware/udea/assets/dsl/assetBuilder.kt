@@ -37,3 +37,9 @@ fun <T : Any> createObject(kClass: KClass<T>, parameters: Map<String, Any?>): T 
 
     return constructor.callBy(parameters)
 }
+
+/**
+ * Creates a list of items using a [ListBuilder].
+ * */
+fun <T> list(block: ListBuilder<T>.() -> Unit) =
+    ListBuilder<T>().apply(block).build()

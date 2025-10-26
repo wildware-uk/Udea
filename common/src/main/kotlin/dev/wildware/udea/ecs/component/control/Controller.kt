@@ -14,8 +14,8 @@ class Controller : Component<Controller> {
     private val controls = Assets
         .filterIsInstance<Control>()
 
-    val bindingPressed = Array(controls.size) { false }
-    val bindingJustPressed = Array(controls.size) { false }
+    val bindingPressed = Array(controls.size + 1) { false }
+    val bindingJustPressed = Array(controls.size + 1) { false }
 
     override fun type() = Controller
 

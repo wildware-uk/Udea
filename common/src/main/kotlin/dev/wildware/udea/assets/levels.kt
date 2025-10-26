@@ -4,18 +4,7 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.UniqueId
 import dev.wildware.udea.dsl.CreateDsl
-import dev.wildware.udea.ecs.component.base.Transform
-import dev.wildware.udea.ecs.system.AbilitySystem
-import dev.wildware.udea.ecs.system.BackgroundDrawSystem
-import dev.wildware.udea.ecs.system.Box2DSystem
-import dev.wildware.udea.ecs.system.CameraTrackSystem
-import dev.wildware.udea.ecs.system.CleanupSystem
-import dev.wildware.udea.ecs.system.ControllerSystem
-import dev.wildware.udea.ecs.system.NetworkClientSystem
-import dev.wildware.udea.ecs.system.NetworkServerSystem
-import dev.wildware.udea.ecs.system.ParticleSystemSystem
-import dev.wildware.udea.ecs.system.SpriteBatchSystem
-import dev.wildware.udea.uClass
+import dev.wildware.udea.ecs.system.*
 import kotlin.reflect.KClass
 
 /**
@@ -65,10 +54,10 @@ data class EntityDefinition(
     val name: String = "Entity $id",
 
     /**
-     * List of components that will be attached to the entity.
+     * Lazy list of components that will be attached to the entity.
      * Components define the entity's behavior and properties.
      */
-    val components: List<Component<out Any>> = listOf(Transform()),
+    val components: (() -> List<Component<out Any>>) = { emptyList() },
 
     /**
      * List of tags associated with this entity.

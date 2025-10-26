@@ -46,6 +46,7 @@ class Game(
     val extraSystems: List<Class<out IntervalSystem>>,
     val isEditor: Boolean
 ) : KtxScreen {
+    var started = false
     var debug: Boolean = true
     var camera: Camera = OrthographicCamera(19.2F, 10.8F).apply {
         translate(19.2F / 2, 10.8F / 2)
@@ -94,10 +95,15 @@ class Game(
 
         Gdx.app.postRunnable {
             level.entities.forEach { entityDef ->
-                world.entity().apply {
+                val entity = entityDef.blueprint?.value?.newInstance(world) {
+                    it += entityDef.components()
+                    it += entityDef.tags
+                } ?: world.entity()
+
+                entity.apply {
                     with(world) {
                         this@apply.configure {
-                            it += entityDef.components
+                            it += entityDef.components()
                             it += entityDef.tags
                         }
 
@@ -108,11 +114,16 @@ class Game(
                         }
                     }
                 }
+
             }
+
+            started = true
         }
     }
 
     override fun render(delta: Float) {
+        if(!started) return
+
         clearScreen(0.1F, 0.1F, 0.1F, 1F)
         this.delta = delta
         world.update(delta)
@@ -262,7 +273,7 @@ class GameAssetLoader : AssetLoader {
                     when (file.extension()) {
                         "png" -> manager.load(path, Texture::class.java)
                         "kts" -> loadAsset(file).forEach {
-                            Assets[it.name] = it
+                            Assets["${it.path}/${it.name}"] = it
                         }
 
                         else -> loaded = false
@@ -288,24 +299,33 @@ class GameAssetLoader : AssetLoader {
                 when (val result = evaluationResult.value.returnValue) {
                     is ResultValue.Value -> {
                         when (val asset = result.value) {
-                            is Asset -> return listOf(asset.apply { name = file.nameWithoutExtension() })
+                            is Asset -> return listOf(asset.apply {
+                                path = file.path().substringBeforeLast("/").replace("assets/", "")
+                                name = file.name().replace(".udea.kts", "")
+                            })
+
                             is AssetBundle -> {
                                 require(asset.assets.all { it.name.isNotBlank() }) {
-                                    "Assets defined in a bundle must be named!"
+                                    "${file.name()}: Assets defined in a bundle must be named!"
                                 }
-                                return asset.assets
+
+                                return asset.assets.map {
+                                    it.apply {
+                                        path = file.path().substringBeforeLast("/").replace("assets/", "")
+                                    }
+                                }
                             }
 
-                            else -> error("udea script evaluated and returned a non Asset object.")
+                            else -> error("${file.name()}: udea script evaluated and returned a non Asset object.")
                         }
                     }
 
                     is ResultValue.Error -> {
-                        error("udea script failed to evaluate: \n${result.error.stackTraceToString()}")
+                        error("${file.name()}:udea script failed to evaluate: \n${result.error.stackTraceToString()}")
                     }
 
-                    is ResultValue.Unit -> error("udea script evaluated but returned Unit")
-                    is ResultValue.NotEvaluated -> error("udea script was not evaluated")
+                    is ResultValue.Unit -> error("${file.name()}:udea script evaluated but returned Unit")
+                    is ResultValue.NotEvaluated -> error("${file.name()}:udea script was not evaluated")
                 }
             }
 

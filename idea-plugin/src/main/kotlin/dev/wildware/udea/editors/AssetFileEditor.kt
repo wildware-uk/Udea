@@ -9,12 +9,11 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.findDocument
-import com.intellij.ui.dsl.builder.panel
 import dev.wildware.udea.Json
 import dev.wildware.udea.ProjectClassLoaderManager
 import dev.wildware.udea.assets.AssetFile
 import dev.wildware.udea.editors.builder.UObjectBuilder
-import dev.wildware.udea.editors.builder.editors.UEditors
+import dev.wildware.udea.editors.builder.editors.UObjectEditors
 import dev.wildware.udea.editors.builder.toUBuilder
 import dev.wildware.udea.findClassByName
 import dev.wildware.udea.toType
@@ -55,20 +54,16 @@ class AssetFileEditor(
 
     var modified = false
 
-    private val component = panel {
-        val builder = findClassByName(project, assetFile.type)!!
-            .toType(project)
-            .toUBuilder(project, assetFile.asset) as UObjectBuilder
+    val builder = findClassByName(project, assetFile.type)!!
+        .toType(project)
+        .toUBuilder(project, assetFile.asset) as UObjectBuilder
 
-        with(UEditors.getEditor(builder)) {
-            buildEditor(project, builder, onSave = {
-                WriteCommandAction.runWriteCommandAction(project) {
-                    document.setText(Json.toJson(AssetBuilder(assetValueClass.qualifiedName!!, builder)))
-                    modified = false
-                }
-            })
+    private val component = UObjectEditors.getEditor(project, builder, onSave = {
+        WriteCommandAction.runWriteCommandAction(project) {
+            document.setText(Json.toJson(AssetBuilder(assetValueClass.qualifiedName!!, builder)))
+            modified = false
         }
-    }
+    }).createEditor()
 
     override fun getComponent() = component
     override fun getPreferredFocusedComponent() = component

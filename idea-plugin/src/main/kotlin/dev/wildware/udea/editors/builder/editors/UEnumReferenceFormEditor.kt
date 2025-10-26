@@ -2,16 +2,15 @@ package dev.wildware.udea.editors.builder.editors
 
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBLabel
+import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.Panel
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.columns
 import dev.wildware.udea.camelCaseToTitle
-import dev.wildware.udea.ecs.component.UdeaClass
-import dev.wildware.udea.ecs.component.UdeaClass.UClassAttribute.NoInline
 import dev.wildware.udea.editors.builder.USelectBuilder
 
 @UdeaEditor(Enum::class)
-class UEnumReferenceEditor : UEditor<USelectBuilder> {
+class UEnumReferenceFormEditor : UFormEditor<USelectBuilder> {
     override fun Panel.buildEditor(project: Project, builder: USelectBuilder, onSave: () -> Unit) {
         row {
             comboBox(
@@ -19,7 +18,8 @@ class UEnumReferenceEditor : UEditor<USelectBuilder> {
                 { list, value, index, isSelected, cellHasFocus ->
                     JBLabel((value as? Enum<*>)?.name?.camelCaseToTitle() ?: "Select Value...")
                 })
-                .columns(16)
+                .align(AlignX.RIGHT)
+                .resizableColumn()
                 .bindItem(
                     getter = { builder.value },
                     setter = { }

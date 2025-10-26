@@ -22,6 +22,7 @@ class UdeaAssetAction :
     CreateFromTemplateAction<PsiFile>("Udea Asset", "Create a new Udea asset", AllIcons.FileTypes.Json) {
     override fun buildDialog(project: Project, directory: PsiDirectory, builder: CreateFileFromTemplateDialog.Builder) {
         val classes = findClassesOfType(project, Asset::class.java.name)
+            .sortedBy { it.name }
 
         builder
             .setTitle("New Udea Asset")

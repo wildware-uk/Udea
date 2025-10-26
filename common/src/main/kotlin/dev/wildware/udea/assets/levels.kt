@@ -3,6 +3,7 @@ package dev.wildware.udea.assets
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.UniqueId
+import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.system.AbilitySystem
 import dev.wildware.udea.ecs.system.BackgroundDrawSystem
@@ -15,6 +16,7 @@ import dev.wildware.udea.ecs.system.NetworkServerSystem
 import dev.wildware.udea.ecs.system.ParticleSystemSystem
 import dev.wildware.udea.ecs.system.SpriteBatchSystem
 import dev.wildware.udea.uClass
+import kotlin.reflect.KClass
 
 /**
  * A level is a collection of entities and components that define a game level.
@@ -23,17 +25,17 @@ data class Level(
     /**
      * The systems that will be used to update the entities in this level.
      * */
-    val systems: List<UClass<out IntervalSystem>> = listOf(
-        BackgroundDrawSystem::class.uClass,
-        Box2DSystem::class.uClass,
-        CameraTrackSystem::class.uClass,
-        AbilitySystem::class.uClass,
-        CleanupSystem::class.uClass,
-        ControllerSystem::class.uClass,
-        SpriteBatchSystem::class.uClass,
-        ParticleSystemSystem::class.uClass,
-        NetworkClientSystem::class.uClass,
-        NetworkServerSystem::class.uClass,
+    val systems: List<KClass<out IntervalSystem>> = listOf(
+        BackgroundDrawSystem::class,
+        Box2DSystem::class,
+        CameraTrackSystem::class,
+        AbilitySystem::class,
+        CleanupSystem::class,
+        ControllerSystem::class,
+        SpriteBatchSystem::class,
+        ParticleSystemSystem::class,
+        NetworkClientSystem::class,
+        NetworkServerSystem::class,
     ),
 
     /**
@@ -50,6 +52,7 @@ data class Level(
  * Defines an entity and its components for use in a level.
  * EntityDefinition provides a blueprint for creating entities with specific components and tags.
  */
+@CreateDsl
 data class EntityDefinition(
     /**
      * Unique identifier

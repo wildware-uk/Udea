@@ -29,7 +29,6 @@ object Editors {
         registerEditor(String::class, StringEditor)
         registerEditor(Float::class, FloatEditor)
         registerEditor(Boolean::class, BooleanEditor)
-        registerEditor(Sprite::class, SpriteSelector)
         registerEditor(AssetReference::class, AssetReferenceEditor)
         registerEditor(Enum::class, EnumEditor)
         registerEditor(UClass::class, UClassEditor)

@@ -1,8 +1,12 @@
+import org.gradle.internal.execution.caching.CachingState.enabled
+
 plugins {
-    kotlin("jvm") version "2.1.20"
+    kotlin("jvm") version "2.2.10"
     id("java-library")
     id("maven-publish")
-    kotlin("plugin.serialization") version "2.1.20"
+    kotlin("plugin.serialization") version "2.2.10"
+    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+    id("kotlin-kapt")
 }
 
 group = "dev.wildware.udea"
@@ -13,7 +17,6 @@ val ktxVersion = "1.13.1-rc1"
 
 dependencies {
     api("io.github.quillraven.fleks:Fleks:2.11")
-    implementation(kotlin("stdlib"))
     implementation("org.reflections:reflections:0.10.2")
     testImplementation(kotlin("test"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
@@ -36,7 +39,15 @@ dependencies {
     implementation("com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop")
     implementation("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop")
     implementation("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop")
+
+    implementation("org.jetbrains.kotlin:kotlin-scripting-jvm:2.2.10")
+    implementation("org.jetbrains.kotlin:kotlin-scripting-jvm-host:2.2.10")
+    implementation("org.jetbrains.kotlin:kotlin-scripting-common:2.2.10")
+
+    ksp(project(":gradle-plugin"))
+    implementation(project(":gradle-plugin"))
 }
+
 
 tasks.test {
     useJUnitPlatform()
@@ -80,3 +91,4 @@ publishing {
         mavenLocal() // This ensures publishing to Maven Local.
     }
 }
+

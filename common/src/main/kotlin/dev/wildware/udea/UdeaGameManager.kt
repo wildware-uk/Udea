@@ -18,22 +18,24 @@ import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.SystemConfiguration
 import com.github.quillraven.fleks.configureWorld
 import dev.wildware.udea.assets.Asset
-import dev.wildware.udea.assets.AssetFile
+import dev.wildware.udea.assets.AssetBundle
 import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.assets.Level
+import dev.wildware.udea.assets.dsl.script.evalScript
 import dev.wildware.udea.config.gameConfig
 import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.base.Transform
-import dev.wildware.udea.ecs.system.NetworkClientSystem
-import dev.wildware.udea.ecs.system.NetworkServerSystem
+import dev.wildware.udea.ecs.system.*
 import ktx.app.KtxGame
 import ktx.app.KtxScreen
 import ktx.app.clearScreen
 import kotlin.reflect.KClass
 import kotlin.reflect.full.createInstance
 import kotlin.reflect.full.findAnnotation
+import kotlin.script.experimental.api.ResultValue
+import kotlin.script.experimental.api.ResultWithDiagnostics
 import com.badlogic.gdx.physics.box2d.World as Box2DWorld
 
 lateinit var game: Game
@@ -77,7 +79,7 @@ class Game(
 
             systems {
                 level.systems.forEach {
-                    addSystem(it.toKClass())
+                    addSystem(it)
                 }
 
                 extraSystems.forEach {
@@ -121,13 +123,14 @@ class Game(
     }
 
     override fun resize(width: Int, height: Int) {
+        println("RESIZE $width $height")
         camera.viewportWidth = width.toFloat() / 10F
         camera.viewportHeight = height.toFloat() / 10F
         camera.update()
     }
 
     private fun SystemConfiguration.addSystem(kClass: KClass<out IntervalSystem>) {
-        val gameRuntime = if(isEditor) Editor else Game
+        val gameRuntime = if (isEditor) Editor else Game
         val runtime = kClass.findAnnotation<UdeaSystem>()?.runIn ?: DefaultRuntime
 
         if (gameRuntime in runtime) {
@@ -167,9 +170,24 @@ class UdeaGameManager(
         assetLoader.load(assetManager)
         assetManager.finishLoading()
 
-        if(!isEditor) {
+        if (!isEditor) {
             gameConfig.defaultLevel
-                ?.let { setLevel(it.value) }
+                ?.let {
+                    setLevel(
+                        it.value, extraSystems = listOf(
+                            BackgroundDrawSystem::class.java,
+                            Box2DSystem::class.java,
+                            CameraTrackSystem::class.java,
+                            AbilitySystem::class.java,
+                            CleanupSystem::class.java,
+                            ControllerSystem::class.java,
+                            SpriteBatchSystem::class.java,
+                            ParticleSystemSystem::class.java,
+                            NetworkClientSystem::class.java,
+                            NetworkServerSystem::class.java,
+                        )
+                    )
+                }
         }
 
         super.create()
@@ -178,7 +196,10 @@ class UdeaGameManager(
 
     override fun dispose() {}
     override fun pause() {}
-    override fun resize(width: Int, height: Int) {}
+    override fun resize(width: Int, height: Int) {
+        game.resize(width, height)
+    }
+
     override fun resume() {}
 }
 
@@ -240,7 +261,10 @@ class GameAssetLoader : AssetLoader {
 
                     when (file.extension()) {
                         "png" -> manager.load(path, Texture::class.java)
-                        "udea" -> Assets[path] = loadAsset(file)
+                        "kts" -> loadAsset(file).forEach {
+                            Assets[it.name] = it
+                        }
+
                         else -> loaded = false
                     }
 
@@ -258,8 +282,36 @@ class GameAssetLoader : AssetLoader {
         return internalFileLoader.resolve(fileName)
     }
 
-    private fun loadAsset(file: FileHandle): Asset {
-        val asset = Json.fromJson<AssetFile>(file.read())
-        return asset.asset ?: error("Asset file $file does not contain an asset")
+    private fun loadAsset(file: FileHandle): List<Asset> {
+        when (val evaluationResult = evalScript(file.file())) {
+            is ResultWithDiagnostics.Success -> {
+                when (val result = evaluationResult.value.returnValue) {
+                    is ResultValue.Value -> {
+                        when (val asset = result.value) {
+                            is Asset -> return listOf(asset.apply { name = file.nameWithoutExtension() })
+                            is AssetBundle -> {
+                                require(asset.assets.all { it.name.isNotBlank() }) {
+                                    "Assets defined in a bundle must be named!"
+                                }
+                                return asset.assets
+                            }
+
+                            else -> error("udea script evaluated and returned a non Asset object.")
+                        }
+                    }
+
+                    is ResultValue.Error -> {
+                        error("udea script failed to evaluate: \n${result.error.stackTraceToString()}")
+                    }
+
+                    is ResultValue.Unit -> error("udea script evaluated but returned Unit")
+                    is ResultValue.NotEvaluated -> error("udea script was not evaluated")
+                }
+            }
+
+            is ResultWithDiagnostics.Failure -> {
+                error("udea script failed to evaluate: ${evaluationResult.reports.joinToString("\n") { it.message }}")
+            }
+        }
     }
 }

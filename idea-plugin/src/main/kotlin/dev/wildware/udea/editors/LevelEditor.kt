@@ -28,7 +28,6 @@ import dev.wildware.udea.assets.GameAssetManager
 import dev.wildware.udea.assets.Level
 import io.kanro.compose.jetbrains.expui.control.Label
 import io.kanro.compose.jetbrains.expui.control.PrimaryButton
-import ktx.assets.load
 import org.jetbrains.compose.splitpane.ExperimentalSplitPaneApi
 import org.jetbrains.compose.splitpane.HorizontalSplitPane
 import org.jetbrains.compose.splitpane.rememberSplitPaneState
@@ -44,7 +43,7 @@ class EditorAssetLoader(
             if (it.extension == "png") {
                 val assetPath = it.path.substringAfter("assets/")
                 println("Adding texture $assetPath")
-                manager.load<Texture>(assetPath)
+//                manager.load(assetPath)
             }
         }
     }

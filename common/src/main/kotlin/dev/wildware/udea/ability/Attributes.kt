@@ -1,5 +1,6 @@
 package dev.wildware.udea.ability
 
+import dev.wildware.udea.assets.dsl.UdeaDsl
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
@@ -35,3 +36,6 @@ sealed class ValueResolver {
         val Min = ConstantValue(Float.MIN_VALUE)
     }
 }
+
+@UdeaDsl
+fun constant(value: Float) = ValueResolver.ConstantValue(value)

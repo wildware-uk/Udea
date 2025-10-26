@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.annotation.JsonValue
+import dev.wildware.udea.assets.dsl.ListBuilder
+import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.ecs.component.UdeaClass
 import dev.wildware.udea.ecs.component.UdeaClass.UClassAttribute.NoInline
 import kotlinx.serialization.KSerializer
@@ -40,6 +42,12 @@ data class AssetReference<out T : Asset>(
     }
 }
 
+/**
+ * Creates a reference to an asset.
+ * */
+fun <T : Asset> reference(path: String) = AssetReference<T>(path)
+
+@CreateDsl
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.CLASS,
     include = JsonTypeInfo.As.PROPERTY,
@@ -52,12 +60,15 @@ abstract class Asset {
     @JsonIgnore
     var name: String = ""
 
+    @get:JsonIgnore
     val reference: AssetReference<Asset>
-        get()= AssetReference(path)
+        get() = AssetReference(path)
 
     override fun equals(other: Any?): Boolean {
         return other is Asset && other.path == path
     }
+
+    override fun hashCode(): Int = path.hashCode()
 }
 
 object Assets {
@@ -93,8 +104,8 @@ object Assets {
         return assets.values.filter { it::class.isSubclassOf(type) } as List<T>
     }
 
-    private fun debugAssets() {
-        println(assets)
+    private fun debugAssets(): String {
+        return assets.toString()
     }
 }
 
@@ -110,4 +121,15 @@ object AssetReferenceSerializer : KSerializer<Asset> {
         val path = decoder.decodeString()
         return Assets[path]
     }
+}
+
+data class AssetBundle(val assets: List<Asset>)
+
+/**
+ * Allows multiple assets to be defined in the same file.
+ * */
+fun bundle(builder: ListBuilder<Asset>.() -> Unit = {}): AssetBundle {
+    val listBuilder = ListBuilder<Asset>()
+    builder(listBuilder)
+    return AssetBundle(listBuilder.build())
 }

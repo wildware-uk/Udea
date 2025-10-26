@@ -46,3 +46,13 @@ data class Binding(
         }
     }
 }
+
+/**
+ * Creates a keyboard key binding.
+ * */
+fun key(key: Int)= Binding.BindingInput.Key(key)
+
+/**
+ * Creates a mouse button binding.
+ * */
+fun mouse(button: Int) = Binding.BindingInput.Mouse(button)

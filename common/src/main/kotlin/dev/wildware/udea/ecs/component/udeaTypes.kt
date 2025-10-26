@@ -21,7 +21,7 @@ annotation class UdeaClass(
 @Retention
 annotation class UdeaProperty(
     vararg val value: UAttribute = [],
-    val name: String = Undefined
+    val name: String = Undefined,
 ) {
     enum class UAttribute {
         /**

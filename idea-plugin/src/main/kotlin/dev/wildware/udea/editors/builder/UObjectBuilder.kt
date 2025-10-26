@@ -2,11 +2,18 @@ package dev.wildware.udea.editors.builder
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonValue
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.psi.*
 import dev.wildware.udea.*
+import dev.wildware.udea.ecs.component.UdeaClass
+import dev.wildware.udea.ecs.component.UdeaClass.UClassAttribute.NoInline
+import dev.wildware.udea.ecs.component.UdeaProperty
+import dev.wildware.udea.ecs.component.UdeaProperty.UAttribute.Ignore
 import dev.wildware.udea.editors.EditorType
 import kotlin.reflect.KProperty1
+import kotlin.reflect.full.findAnnotation
+import kotlin.reflect.full.hasAnnotation
 import kotlin.reflect.full.memberProperties
 
 /**
@@ -78,7 +85,19 @@ private fun PsiClassType.buildConcreteBuilder(
     psiClass: PsiClass,
     project: Project,
     instance: Any? = null
-): UObjectBuilder {
+): UBuilder {
+
+    val kClass = project.service<ProjectClassLoaderManager>().classLoader
+        .loadClass(psiClass.toJvmQualifiedName()).kotlin
+
+    if (kClass.hasAnnotation<UdeaClass>()) {
+        val annotation = kClass.findAnnotation<UdeaClass>()!!
+
+        if (NoInline in annotation.value) {
+            return UValueBuilder(this.toEditorType(), instance)
+        }
+    }
+
     val substitutor = PsiSubstitutor.EMPTY.putAll(this.resolveGenerics().substitutor)
 
     val constructor = psiClass.constructors.maxByOrNull { it.parameters.size }
@@ -86,6 +105,19 @@ private fun PsiClassType.buildConcreteBuilder(
 
     val parameters = constructor.parameters.associate { parameter ->
         val resolvedType = substitutor.substitute(parameter.type as? PsiType)
+
+//        val kClass = project.service<ProjectClassLoaderManager>().classLoader
+//            .loadClass((parameter.type as PsiClassType).resolve()!!.toJvmQualifiedName())
+//            .kotlin
+//
+//        val kClassParam = kClass.memberProperties.find { it.name == parameter.name }
+
+//        val shouldIgnore = kClassParam
+//            ?.findAnnotation<UdeaProperty>()
+//            ?.value
+//            ?.let { Ignore in it } == true
+
+//        if(shouldIgnore) return@associate null
 
         parameter.name!! to resolvedType.toUBuilder(
             project,
@@ -97,7 +129,10 @@ private fun PsiClassType.buildConcreteBuilder(
         )
     }.toMutableMap()
 
-    return UObjectBuilder(this.toEditorType(), parameters, instance)
+    return UObjectBuilder(
+        this.toEditorType(), parameters,
+        /**instance**/
+    )
 }
 
 /**
@@ -118,11 +153,14 @@ sealed interface UBuilder {
  */
 data class UObjectBuilder(
     override val type: EditorType<Any>,
-    val children: MutableMap<String, UBuilder> = mutableMapOf(),
+    val children: MutableMap<String, out UBuilder> = mutableMapOf(),
     var value: Any? = null,
 ) : UBuilder {
     @JsonValue
-    fun serialize() = Json.objectMapper.convertValue(value, Map::class.java) ?: (mapOf("@class" to type.type.java.name) + children)
+    fun serialize() =
+        Json.objectMapper.convertValue(value, Map::class.java) ?: (mapOf("@class" to type.type.java.name) + children)
+
+    inline operator fun <reified T : UBuilder> get(name: String) = children[name] as T
 
     override fun build(): Any? {
         val constructor = type.type.constructors.maxByOrNull { it.parameters.size }!!

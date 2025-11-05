@@ -55,7 +55,7 @@ fun Component<*>.getNetworkData(): NetworkComponent<*> {
 }
 
 inline fun SpriteBatch.use(
-    camera: Camera?,
+    camera: Camera? = null,
     action: (SpriteBatch) -> Unit
 ) {
     if(camera != null) {

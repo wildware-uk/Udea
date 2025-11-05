@@ -1,97 +1,107 @@
 package dev.wildware.udea.editors
 
-import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.fileEditor.FileEditor
-import com.intellij.openapi.fileEditor.FileEditorPolicy
-import com.intellij.openapi.fileEditor.FileEditorProvider
-import com.intellij.openapi.fileEditor.FileEditorState
+import com.badlogic.gdx.assets.AssetManager
+import com.badlogic.gdx.files.FileHandle
+import com.intellij.openapi.fileEditor.*
+import com.intellij.openapi.fileEditor.impl.text.PsiAwareTextEditorProvider
+import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.findDocument
-import dev.wildware.udea.Json
+import com.intellij.ui.JBSplitter
+import dev.wildware.GameEditorCanvas
+import dev.wildware.udea.AssetLoader
 import dev.wildware.udea.ProjectClassLoaderManager
-import dev.wildware.udea.assets.AssetFile
-import dev.wildware.udea.editors.builder.UObjectBuilder
-import dev.wildware.udea.editors.builder.editors.UObjectEditors
-import dev.wildware.udea.editors.builder.toUBuilder
-import dev.wildware.udea.findClassByName
-import dev.wildware.udea.toType
+import dev.wildware.udea.assets.Assets
+import dev.wildware.udea.loadAssets
+import java.awt.BorderLayout
 import java.beans.PropertyChangeListener
+import javax.swing.JComponent
+import javax.swing.JPanel
 
-class AssetFileEditorProvider : FileEditorProvider {
+class AssetFileEditorProvider : FileEditorProvider, DumbAware {
     override fun accept(project: Project, file: VirtualFile): Boolean {
-        return file.extension == "udea"
+        return file.name.endsWith(".udea.kts")
     }
 
     override fun createEditor(
         project: Project,
         file: VirtualFile
     ): FileEditor {
-        val classLoaderManager = ProjectClassLoaderManager.Companion.getInstance(project)
-        val documentText = file.findDocument()!!.text
-        val asset = Json
-            .withClassLoader(classLoaderManager.classLoader)
-            .fromJson<AssetFile>(documentText)
-        return AssetFileEditor(project, file, asset)
+        // Ensure Kotlin script gets standard editor features
+        ProjectClassLoaderManager.getInstance(project)
+        return AssetFileEditor(project, file)
     }
 
-    override fun getEditorTypeId() = "AssetEditor"
+    override fun getEditorTypeId() = "UdeaKtsSplitEditor"
 
-    override fun getPolicy() = FileEditorPolicy.PLACE_BEFORE_DEFAULT_EDITOR
+    // Replace the default text editor with our split editor
+    override fun getPolicy() = FileEditorPolicy.HIDE_DEFAULT_EDITOR
 }
 
 class AssetFileEditor(
     val project: Project,
-    private val file: VirtualFile,
-    val assetFile: AssetFile,
+    private val file: VirtualFile
 ) : FileEditor {
+    private val textEditorProvider = PsiAwareTextEditorProvider()
+    private val textEditor: TextEditor = textEditorProvider.createEditor(project, file) as TextEditor
 
-    val assetValueClass = ProjectClassLoaderManager
-        .getInstance(project).classLoader.loadClass(assetFile.type).kotlin
+    init {
+        loadAssets(file.toNioPath().toFile())
+            .forEach { asset -> Assets[asset.path] = asset }
+    }
 
-    val document = file.findDocument()!!
-
-    var modified = false
-
-    val builder = findClassByName(project, assetFile.type)!!
-        .toType(project)
-        .toUBuilder(project, assetFile.asset) as UObjectBuilder
-
-    private val component = UObjectEditors.getEditor(project, builder, onSave = {
-        WriteCommandAction.runWriteCommandAction(project) {
-            document.setText(Json.toJson(AssetBuilder(assetValueClass.qualifiedName!!, builder)))
-            modified = false
+    val editorPanel = GameEditorCanvas(object : AssetLoader {
+        override fun load(manager: AssetManager) {
         }
-    }).createEditor()
 
-    override fun getComponent() = component
-    override fun getPreferredFocusedComponent() = component
+        override fun resolve(fileName: String): FileHandle {
+            return FileHandle(fileName)
+        }
+    })
 
-    override fun getName() = "Asset Editor"
-
-    override fun setState(p0: FileEditorState) = Unit
-    override fun isModified() = modified
-    override fun isValid() = true
-    override fun addPropertyChangeListener(p0: PropertyChangeListener) {
+    // Expose a secondary panel so more components can be added later by the plugin
+    val rightPanel: JPanel = JPanel(BorderLayout()).apply {
+        name = "UdeaRightPanel"
+        add(editorPanel.getCanvas(), BorderLayout.CENTER)
     }
 
-    override fun removePropertyChangeListener(p0: PropertyChangeListener) {
+    private val splitter: JBSplitter = JBSplitter(false, 0.7f).apply {
+        firstComponent = textEditor.component
+        secondComponent = rightPanel
     }
 
-    override fun <T : Any?> getUserData(p0: Key<T?>): T? = null
+    override fun getComponent(): JComponent = splitter
 
-    override fun <T : Any?> putUserData(p0: Key<T?>, p1: T?) {
+    override fun getPreferredFocusedComponent(): JComponent? = textEditor.preferredFocusedComponent
+
+    override fun getName() = "Udea Kotlin Script"
+
+    override fun setState(state: FileEditorState) {
+        textEditor.setState(state)
+    }
+
+    override fun isModified(): Boolean = textEditor.isModified
+
+    override fun isValid(): Boolean = textEditor.isValid
+
+    override fun addPropertyChangeListener(listener: PropertyChangeListener) {
+        textEditor.addPropertyChangeListener(listener)
+    }
+
+    override fun removePropertyChangeListener(listener: PropertyChangeListener) {
+        textEditor.removePropertyChangeListener(listener)
+    }
+
+    override fun <T : Any?> getUserData(key: Key<T?>): T? = textEditor.getUserData(key)
+
+    override fun <T : Any?> putUserData(key: Key<T?>, value: T?) {
+        textEditor.putUserData(key, value)
     }
 
     override fun dispose() {
+        textEditorProvider.disposeEditor(textEditor)
     }
 
-    override fun getFile() = file
+    override fun getFile(): VirtualFile = file
 }
-
-data class AssetBuilder(
-    val type: String,
-
-    val asset: UObjectBuilder
-)

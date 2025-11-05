@@ -100,25 +100,26 @@ fun World.processEntityCreate(create: EntityCreate, authority: NetworkAuthority)
 }
 
 fun World.processEntityUpdate(update: EntityUpdate, authority: NetworkAuthority) {
-    if (!update.valid) return
+//    if (!update.valid) return
 
-    val (id, networkComponents, tags, delegates) = update
+//    val (id, networkComponents, tags, delegates) = update
 
-    val entity = getNetworkEntityOrNull(id)
+//    val entity = getNetworkEntityOrNull(id)
 
-    if (entity != null) {
-        entity.configure { entity ->
-            entity += networkComponents
-                .filter { it.getNetworkData().checkNetworkAuthority(authority) }
-            entity += tags as List<EntityTag>
-        }
-
-        delegates.forEach {
-            with(it) {
-                applyToEntity(entity)
-            }
-        }
-    }
+    TODO()
+//    if (entity != null) {
+//        entity.configure { entity ->
+//            entity += networkComponents
+//                .filter { it.getNetworkData().checkNetworkAuthority(authority) }
+//            entity += tags as List<EntityTag>
+//        }
+//
+//        delegates.forEach {
+//            with(it) {
+//                applyToEntity(entity)
+//            }
+//        }
+//    }
 }
 
 fun World.processEntityDestroy(entityDestroy: EntityDestroy) {
@@ -146,12 +147,13 @@ fun Entity.toEntityUpdate(world: World, authority: NetworkAuthority): EntityUpda
             component.getNetworkData().delegate!!.createRaw(component)
         }
 
-        return EntityUpdate(
-            this@toEntityUpdate[Networkable].remoteId,
-            nonDelegates,
-            snapshot.tags,
-            delegateInstances
-        )
+        TODO()
+//        return EntityUpdate(
+//            this@toEntityUpdate[Networkable].remoteId,
+//            nonDelegates,
+//            snapshot.tags,
+//            delegateInstances
+//        )
     }
 }
 

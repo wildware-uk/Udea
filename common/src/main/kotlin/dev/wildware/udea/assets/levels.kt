@@ -14,18 +14,7 @@ data class Level(
     /**
      * The systems that will be used to update the entities in this level.
      * */
-    val systems: List<KClass<out IntervalSystem>> = listOf(
-        BackgroundDrawSystem::class,
-        Box2DSystem::class,
-        CameraTrackSystem::class,
-        AbilitySystem::class,
-        CleanupSystem::class,
-        ControllerSystem::class,
-        SpriteBatchSystem::class,
-        ParticleSystemSystem::class,
-        NetworkClientSystem::class,
-        NetworkServerSystem::class,
-    ),
+    val systems: List<KClass<out IntervalSystem>> = emptyList(),
 
     /**
      * Component snapshots that will be placed on entities.
@@ -44,20 +33,15 @@ data class Level(
 @CreateDsl
 data class EntityDefinition(
     /**
-     * Unique identifier
-     * */
-    val id: Long,
-
-    /**
      * The name of this entity
      */
-    val name: String = "Entity $id",
+    val name: String = "Entity",
 
     /**
      * Lazy list of components that will be attached to the entity.
      * Components define the entity's behavior and properties.
      */
-    val components: (() -> List<Component<out Any>>) = { emptyList() },
+    val components: LazyList<Component<out Any>> = emptyLazyList(),
 
     /**
      * List of tags associated with this entity.
@@ -69,4 +53,9 @@ data class EntityDefinition(
      * The parent blueprint for this entity.
      * */
     val blueprint: AssetReference<Blueprint>? = null,
-)
+) {
+    /**
+     * Unique identifier
+     * */
+    var id: Long = -1L
+}

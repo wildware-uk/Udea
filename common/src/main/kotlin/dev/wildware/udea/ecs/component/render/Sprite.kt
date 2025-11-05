@@ -22,10 +22,16 @@ class Sprite(
 
     override fun World.onAdd(entity: Entity) {
         val tex = game.gameManager.assetManager.getAsset<Texture>(sprite)
+
         gdxSprite = GdxSprite(tex).apply {
-            setScale(scale)
+            setSize(
+                width * scale * WORLD_SCALE,
+                height * scale * WORLD_SCALE
+            )
         }
     }
 
-    companion object : UdeaComponentType<Sprite>()
+    companion object : UdeaComponentType<Sprite>() {
+        private const val WORLD_SCALE = 0.1F
+    }
 }

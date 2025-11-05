@@ -7,7 +7,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.*
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.ClassInheritorsSearch
-import dev.wildware.udea.editors.EditorType
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtParameter
 import kotlin.reflect.full.memberProperties
@@ -199,70 +198,6 @@ fun PsiClass.toJvmQualifiedName(): String = runReadAction {
     } else {
         this.qualifiedName ?: ""
     }
-}
-
-/**
- * Converts a PsiClassType to an EditorType, resolving the class and its generics.
- *
- * @param T The type of the EditorType
- * @return The resolved EditorType
- */
-fun <T : Any> PsiType.toEditorType(): EditorType<T> {
-    var result: EditorType<T>? = null
-    pooled {
-        result = ApplicationManager.getApplication().runReadAction<EditorType<T>> {
-            when (this) {
-                is PsiPrimitiveType -> {
-                    @Suppress("UNCHECKED_CAST")
-                    when (this.name) {
-                        "boolean" -> EditorType(Boolean::class)
-                        "byte" -> EditorType(Byte::class)
-                        "short" -> EditorType(Short::class)
-                        "int" -> EditorType(Int::class)
-                        "long" -> EditorType(Long::class)
-                        "float" -> EditorType(Float::class)
-                        "double" -> EditorType(Double::class)
-                        "char" -> EditorType(Char::class)
-                        else -> error("Unsupported primitive type: $this")
-                    } as EditorType<T>
-                }
-
-                is PsiClassType -> {
-                    val psiClass = resolve() ?: error("Unresolved class type: $this")
-                    val kClass = try {
-                        Class.forName(psiClass.toJvmQualifiedName()).kotlin
-                    } catch (e: ClassNotFoundException) {
-                        error("Failed to load class: ${psiClass.toJvmQualifiedName()}")
-                    }
-
-                    val generics = parameters.mapNotNull { param ->
-                        when (param) {
-                            is PsiClassType -> {
-                                // Recursively process nested generic types
-                                param.toEditorType<Any>()
-                            }
-
-                            is PsiWildcardType -> {
-                                // Handle wildcard type (out T or in T)
-                                val bound = param.bound
-                                if (bound is PsiClassType) {
-                                    bound.toEditorType<Any>()
-                                } else null
-                            }
-
-                            else -> null
-                        }
-                    }
-
-                    @Suppress("UNCHECKED_CAST")
-                    EditorType(kClass, generics) as EditorType<T>
-                }
-
-                else -> error("Unsupported PsiType: $this")
-            }
-        }
-    }.get()
-    return result!!
 }
 
 fun getJvmQualifiedName(psiClass: PsiClass): String {

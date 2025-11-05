@@ -18,19 +18,68 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="- 🔥 **Remove outdated plugins &amp; editors**&#10;  - Dropped numerous legacy implementations: `UBlueprintEditor`, `UEditor` subclasses, and Sprite-related classes.&#10;- 🚀 **Introduce DSL improvements**&#10;  - Added new KotlinScript support with `UdeaScriptConfiguration`.&#10;  - New DSL creation utilities (`createObject`, `ListBuilder`, etc.).&#10;- 🌟 **Launch Gradle plugin enhancements**&#10;  - Added `AssetScanner` for asset management and a Maven publishing setup.">
+    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="- ✨ **Introduce @DslInclude annotation support**&#10;  - Added `@DslInclude` to enable property inclusion within asset DSLs.&#10;  - Refactored parameter handling in DSL processors for improved readability and modularity.&#10;  - Enhanced Gradle plugin with better parameter assignments and custom property validation.">
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/common/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectSpec.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectSpec.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/assetBuilder.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/assetBuilder.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptDef.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/UdeaScript.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/componentDsl.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/UdeaScript.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/UdeaScript.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/levels.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/levels.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/control/Controller.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/control/Controller.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/resources/META-INF/kotlin/script/templates/dev.wildware.udea.assets.dsl.script.UdeaScript" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/config/GameConfig.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/config/GameConfig.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/base/Transform.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/base/Transform.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Box.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Box.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Capsule.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Capsule.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Circle.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Circle.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/Sprite.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/Sprite.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/BackgroundDrawSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/BackgroundDrawSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/NetworkClientSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/NetworkClientSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/NetworkServerSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/NetworkServerSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/NetworkPacketSerializer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/NetworkPacketSerializer.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/PacketUtil.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/PacketUtil.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/packets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/packets.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/utils.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/utils.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/resources/test.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/resources/test.udea.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/dsl/CreateDsl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/dsl/CreateDsl.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/dsl/UdeaDslProcessor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/dsl/UdeaDslProcessor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/UdeaStartup.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/UdeaStartup.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/assets/UdeaAssetManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/assets/UdeaAssetManager.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/AssetFileEditor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/AssetFileEditor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/AssetReferenceEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/BlueprintEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/EntityDefinitionEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/LevelEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/ReflectionEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/SwingReflectiveEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/UdeaAssetAction.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/UdeaAssetAction.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/UObjectBuilder.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UAssetReferenceFormEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UBooleanFormEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UClassEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UEnumReferenceFormEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UFloatFormEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UFormObjectBuilder.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UNumberFormEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/UStringFormEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/assets/UBlueprintEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/assets/UEntityDefinitionEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/assets/ULevelEditor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/builder/editors/editors.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/editor.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/primitiveEditors.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/editors/primitiveSwingEditors.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/fileTypes.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/util.kt" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/util.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/main/resources/META-INF/plugin.xml" beforeDir="false" afterPath="$PROJECT_DIR$/idea-plugin/src/main/resources/META-INF/plugin.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/test/kotlin/dev/wildware/udea/UtilTest.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/test/kotlin/dev/wildware/udea/assets/AssetManagerTest.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/test/kotlin/dev/wildware/udea/editors/builder/UObjectBuilderTest.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/test/testData/testAssets/testBinding.udea" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/idea-plugin/src/test/testData/testAssets/testControl.udea" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -81,6 +130,9 @@
         <task path="$PROJECT_DIR$/gradle-plugin">
           <activation />
         </task>
+        <task path="$PROJECT_DIR$/idea-plugin">
+          <activation />
+        </task>
         <projects_view>
           <tree_state>
             <expand>
@@ -91,27 +143,27 @@
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="udea" type="f1a62948:ProjectNode" />
-                <item name="gradle-plugin" type="2d1252cf:ModuleNode" />
+                <item name="idea-plugin" type="2d1252cf:ModuleNode" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="udea" type="f1a62948:ProjectNode" />
-                <item name="gradle-plugin" type="2d1252cf:ModuleNode" />
+                <item name="idea-plugin" type="2d1252cf:ModuleNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="udea" type="f1a62948:ProjectNode" />
-                <item name="gradle-plugin" type="2d1252cf:ModuleNode" />
+                <item name="idea-plugin" type="2d1252cf:ModuleNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
                 <item name="build" type="c8890929:TasksNode$1" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="udea" type="f1a62948:ProjectNode" />
-                <item name="gradle-plugin" type="2d1252cf:ModuleNode" />
+                <item name="idea-plugin" type="2d1252cf:ModuleNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
-                <item name="other" type="c8890929:TasksNode$1" />
+                <item name="intellij platform" type="c8890929:TasksNode$1" />
               </path>
             </expand>
             <select />
@@ -124,31 +176,48 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Kotlin JUnit5 Test Class" />
-        <option value="Fleks Component" />
         <option value="Kotlin Data Class" />
-        <option value="Kotlin Interface" />
         <option value="Kotlin Object" />
         <option value="Kotlin JUnit3 Test Class" />
-        <option value="Kotlin File" />
-        <option value="Kotlin Class" />
         <option value="Kotlin Annotation" />
+        <option value="Kotlin Interface" />
+        <option value="Fleks Component" />
+        <option value="Kotlin Class" />
+        <option value="Kotlin File" />
       </list>
     </option>
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="master" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="GradleScriptDefinitionsStorage" workingDir="$PROJECT_DIR$" gradleHome="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13" javaHome="C:\Users\shaun\.jdks\corretto-17.0.8" gradleVersion="8.13">
     <option name="jvmArguments">
       <list>
+        <option value="-Dorg.gradle.kotlin.dsl.provider.mode=classpath" />
         <option value="-Dandroid.home=C:\Users\shaun\AppData\Local\Android\Sdk" />
       </list>
     </option>
   </component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/Application.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/InputProcessor.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/files/FileHandle.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/input/RemoteSender.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/scenes/scene2d/Stage.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-databind/2.17.0/4241e9bdb3e3c2fe8bdfad112b7794c44c40d1f2/jackson-databind-2.17.0-sources.jar!/com/fasterxml/jackson/databind/deser/DefaultDeserializationContext.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.google.devtools.ksp/symbol-processing-api/2.2.10-2.0.2/f897026a9b54a25b98259d5a6f88a0513250e868/symbol-processing-api-2.2.10-2.0.2-sources.jar!/com/google/devtools/ksp/utils.kt" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.github.libktx/ktx-app/1.13.1-rc1/3b09c7ab806006ec5d65507d297228918ef32e98/ktx-app-1.13.1-rc1-sources.jar!/ktx/app/game.kt" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.github.libktx/ktx-app/1.13.1-rc1/3b09c7ab806006ec5d65507d297228918ef32e98/ktx-app-1.13.1-rc1-sources.jar!/ktx/app/graphics.kt" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.github.libktx/ktx-scene2d/1.13.1-rc1/1dc759c5283032a8c129e044e5c352290fb26ed0/ktx-scene2d-1.13.1-rc1-sources.jar!/ktx/scene2d/Scene2dDsl.kt" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.github.libktx/ktx-scene2d/1.13.1-rc1/1dc759c5283032a8c129e044e5c352290fb26ed0/ktx-scene2d-1.13.1-rc1-sources.jar!/ktx/scene2d/skin.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.github.quillraven.fleks/Fleks-jvm/2.11/d85c95c5cd96a68c35c2afc35f92cb5ece9eba18/Fleks-jvm-2.11-sources.jar!/commonMain/com/github/quillraven/fleks/component.kt" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.jetbrains.intellij.platform/intellij-platform-gradle-plugin/2.5.0/b2110ce31623d91f9ccbf430b5c923375b7193d/intellij-platform-gradle-plugin-2.5.0.jar!/org/jetbrains/intellij/platform/gradle/extensions/IntelliJPlatformDependenciesExtension.class" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/2.1.20/a17d644acea6159970c25bbf99ff204b03c1c0b6/kotlin-stdlib-2.1.20-sources.jar!/commonMain/kotlin/annotation/Annotations.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.jdks/corretto-11.0.21/lib/src.zip!/java.desktop/javax/swing/Icon.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.jdks/corretto-11.0.21/lib/src.zip!/java.desktop/javax/swing/JButton.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.jdks/corretto-11.0.21/lib/src.zip!/java.desktop/javax/swing/JList.java" root0="SKIP_INSPECTION" />
@@ -193,107 +262,113 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Gradle.AssetManagerTest.executor": "Run",
-    "Gradle.AssetManagerTest.testAssetManagerLoading.executor": "Debug",
-    "Gradle.AssetManagerTest.testAssetSerialization.executor": "Run",
-    "Gradle.Build Udea.executor": "Run",
-    "Gradle.Build udea.executor": "Run",
-    "Gradle.Download Sources.executor": "Run",
-    "Gradle.KBuilderTest.executor": "Run",
-    "Gradle.KBuilderTest.testFromInstance.executor": "Run",
-    "Gradle.KBuilderTest.testFromInstance_returnsKObjectBuilder.executor": "Run",
-    "Gradle.KBuilderTest.testFromInstance_withReference.executor": "Run",
-    "Gradle.PluginTest.simpleTestWithoutProject.executor": "Run",
-    "Gradle.Preview: compose.ComponentsKt.PreviewSelectBox.executor": "Run",
-    "Gradle.Preview: dev.wildware.udea.SceneEditorToolWindowFactoryKt.EditorW.executor": "Run",
-    "Gradle.Preview: dev.wildware.udea.compose.ComponentsKt.PreviewPopup.executor": "Run",
-    "Gradle.Preview: dev.wildware.udea.compose.ComponentsKt.PreviewSelectBox.executor": "Run",
-    "Gradle.Preview: dev.wildware.udea.compose.ComponentsKt.PreviewSelectBoxOpen.executor": "Run",
-    "Gradle.Preview: dev.wildware.udea.editors.KObjectBuilderEditorKt.PreviewEditor.executor": "Run",
-    "Gradle.Run Plugin.executor": "Run",
-    "Gradle.SerializersTest.executor": "Run",
-    "Gradle.SimpleTest (1).executor": "Run",
-    "Gradle.SimpleTest.executor": "Run",
-    "Gradle.SimpleTest.testCanAccessJava.executor": "Run",
-    "Gradle.SimpleTest.testCopyFile.executor": "Debug",
-    "Gradle.SimpleTest.testFromPsiTypeWithPrimitiveType (1).executor": "Run",
-    "Gradle.SimpleTest.testFromPsiTypeWithPrimitiveType.executor": "Run",
-    "Gradle.SimpleTest.testFromPsiTypeWithString (1).executor": "Run",
-    "Gradle.SimpleTest.testFromPsiTypeWithString.executor": "Run",
-    "Gradle.Tests in 'udea.plugin'.executor": "Run",
-    "Gradle.Tests in 'udea.plugin.test'.executor": "Run",
-    "Gradle.Tests in 'udea.test'.executor": "Run",
-    "Gradle.UBuilderSerializerTest.testSerialize.executor": "Run",
-    "Gradle.UEditorsTest.executor": "Run",
-    "Gradle.UEditorsTest.testGetEditorInt.executor": "Run",
-    "Gradle.UObjectBuilderTest.executor": "Run",
-    "Gradle.UObjectBuilderTest.testBuildUObjectBuilder.executor": "Run",
-    "Gradle.UObjectBuilderTest.testPsiTypeToUBuilder.executor": "Run",
-    "Gradle.UObjectBuilderTest.testPsiTypeToUBuilder2.executor": "Run",
-    "Gradle.UObjectBuilderTest.testPsiTypeToUBuilder3.executor": "Run",
-    "Gradle.UObjectBuilderTest.testPsiTypeToUBuilder5.executor": "Run",
-    "Gradle.UObjectBuilderTest.testPsiTypeToUBuilder_withInstance.executor": "Debug",
-    "Gradle.UObjectBuilderTest.testPsiTypeToUBuilder_withSprite.executor": "Run",
-    "Gradle.Udea [setupDependencies].executor": "Run",
-    "Gradle.Udea:level-editor [setupDependencies].executor": "Run",
-    "Gradle.Udea:plugin [build].executor": "Run",
-    "Gradle.Udea:plugin [runIde].executor": "Run",
-    "Gradle.Udea:plugin [setupDependencies].executor": "Run",
-    "Gradle.UtilTest.executor": "Run",
-    "Gradle.UtilTest.testEditorType_assetRefType.executor": "Run",
-    "Gradle.UtilTest.testObjectToPsiClassType.executor": "Run",
-    "Gradle.UtilTest.testToAnyBuilder_genericClass.executor": "Run",
-    "Gradle.UtilTest.testToAnyBuilder_nestedGenericClass.executor": "Debug",
-    "Gradle.UtilTest.testToAnyBuilder_simpleClass.executor": "Run",
-    "Gradle.UtilTest.testToEditorType.executor": "Run",
-    "Gradle.UtilTest.testToEditorType_uClassList.executor": "Run",
-    "Gradle.UtilTest.testToJvmQualifiedName.executor": "Run",
-    "Gradle.level-editor [setupDependencies].executor": "Run",
-    "Gradle.plugin [setupDependencies].executor": "Run",
-    "Gradle.udea [build].executor": "Run",
-    "Gradle.udea [setupDependencies].executor": "Run",
-    "Gradle.udea:common [build].executor": "Run",
-    "Gradle.udea:gradle-plugin [build].executor": "Run",
-    "Gradle.udea:level-editor [setupDependencies].executor": "Run",
-    "Gradle.udea:plugin [build].executor": "Run",
-    "Gradle.udea:plugin [runIde].executor": "Run",
-    "Gradle.udea:plugin [setupDependencies].executor": "Run",
-    "Kotlin.ComponentsKt.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary": "JUnit3",
-    "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit3": "junit.framework.TestCase",
-    "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit5": "",
-    "git-widget-placeholder": "feat-assets__v2",
-    "jdk.selected.JAVA_MODULE": "21",
-    "junie.onboarding.icon.badge.shown": "true",
-    "kotlin-language-version-configured": "true",
-    "last_directory_selection": "C:/Users/shaun/Workspace/udea/common/src/main/kotlin/dev/wildware/udea",
-    "last_opened_file_path": "C:/Users/shaun/Workspace/udea/gradle-plugin/src/main/resources/META-INF",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "onboarding.tips.debug.path": "C:/Users/Shaun/Workspace/Udea/gradle-plugin/src/Main.java",
-    "project.structure.last.edited": "Modules",
-    "project.structure.proportion": "0.17",
-    "project.structure.side.proportion": "0.2",
-    "settings.editor.selected.configurable": "reference.settingsdialog.project.gradle",
-    "to.speed.mode.migration.done": "true",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Gradle.AssetManagerTest.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.AssetManagerTest.testAssetManagerLoading.executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.AssetManagerTest.testAssetSerialization.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Build Udea.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Build udea.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Download IntelliJ Platform sources.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Download Sources.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.KBuilderTest.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.KBuilderTest.testFromInstance.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.KBuilderTest.testFromInstance_returnsKObjectBuilder.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.KBuilderTest.testFromInstance_withReference.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.PluginTest.simpleTestWithoutProject.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Preview: compose.ComponentsKt.PreviewSelectBox.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Preview: dev.wildware.udea.SceneEditorToolWindowFactoryKt.EditorW.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Preview: dev.wildware.udea.compose.ComponentsKt.PreviewPopup.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Preview: dev.wildware.udea.compose.ComponentsKt.PreviewSelectBox.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Preview: dev.wildware.udea.compose.ComponentsKt.PreviewSelectBoxOpen.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Preview: dev.wildware.udea.editors.KObjectBuilderEditorKt.PreviewEditor.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Run Plugin.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.SerializersTest.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.SimpleTest (1).executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.SimpleTest.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.SimpleTest.testCanAccessJava.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.SimpleTest.testCopyFile.executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.SimpleTest.testFromPsiTypeWithPrimitiveType (1).executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.SimpleTest.testFromPsiTypeWithPrimitiveType.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.SimpleTest.testFromPsiTypeWithString (1).executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.SimpleTest.testFromPsiTypeWithString.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Tests in 'udea.idea-plugin.test'.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Tests in 'udea.plugin'.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Tests in 'udea.plugin.test'.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Tests in 'udea.test'.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UBuilderSerializerTest.testSerialize.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UEditorsTest.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UEditorsTest.testGetEditorInt.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UObjectBuilderTest.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UObjectBuilderTest.testBuildUObjectBuilder.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UObjectBuilderTest.testPsiTypeToUBuilder.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UObjectBuilderTest.testPsiTypeToUBuilder2.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UObjectBuilderTest.testPsiTypeToUBuilder3.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UObjectBuilderTest.testPsiTypeToUBuilder5.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UObjectBuilderTest.testPsiTypeToUBuilder_withInstance.executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.UObjectBuilderTest.testPsiTypeToUBuilder_withSprite.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Udea [setupDependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Udea:level-editor [setupDependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Udea:plugin [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Udea:plugin [runIde].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Udea:plugin [setupDependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UtilTest.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UtilTest.testEditorType_assetRefType.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UtilTest.testObjectToPsiClassType.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UtilTest.testToAnyBuilder_genericClass.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UtilTest.testToAnyBuilder_nestedGenericClass.executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.UtilTest.testToAnyBuilder_simpleClass.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UtilTest.testToEditorType.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UtilTest.testToEditorType_uClassList.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.UtilTest.testToJvmQualifiedName.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.level-editor [setupDependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.plugin [setupDependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.udea [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.udea [setupDependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.udea:common [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.udea:gradle-plugin [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.udea:idea-plugin [buildPlugin].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.udea:idea-plugin [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.udea:idea-plugin [runIde].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.udea:level-editor [setupDependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.udea:plugin [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.udea:plugin [runIde].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.udea:plugin [setupDependencies].executor&quot;: &quot;Run&quot;,
+    &quot;Kotlin.ComponentsKt.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;android.gradle.sync.needed&quot;: &quot;true&quot;,
+    &quot;com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary&quot;: &quot;JUnit3&quot;,
+    &quot;com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit3&quot;: &quot;junit.framework.TestCase&quot;,
+    &quot;com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit5&quot;: &quot;&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;feat-assets__v2&quot;,
+    &quot;jdk.selected.JAVA_MODULE&quot;: &quot;21&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_directory_selection&quot;: &quot;C:/Users/shaun/Workspace/udea/common/src/main/kotlin/dev/wildware/udea&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/shaun/Workspace/udea/gradle-plugin/src/main/resources/META-INF&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;onboarding.tips.debug.path&quot;: &quot;C:/Users/Shaun/Workspace/Udea/gradle-plugin/src/Main.java&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.17&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.sourceCode.SQL92&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File": [
-      "TEXT"
+  &quot;keyToStringList&quot;: {
+    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File&quot;: [
+      &quot;TEXT&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\shaun\Workspace\udea\gradle-plugin\src\main\resources\META-INF" />
@@ -327,15 +402,15 @@
       <recent name="org.jetbrains.plugins.template" />
     </key>
     <key name="K2MoveDeclarationsDialog.RECENT_PACKAGE_KEY">
+      <recent name="dev.wildware.udea.ecs.component.animation" />
       <recent name="dev.wildware.udea.assets.dsl" />
       <recent name="dev.wildware.udea.editors.builder.editors" />
       <recent name="dev.wildware.udea.editors.builder.editors.assets" />
       <recent name="dev.wildware.udea.ecs.component" />
-      <recent name="dev.wildware.udea.editors" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.udea:common [build]">
-    <configuration name="UObjectBuilderTest.testBuildUObjectBuilder" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+  <component name="RunManager" selected="Gradle.udea:idea-plugin [runIde]">
+    <configuration name="Tests in 'udea.idea-plugin.test'" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -347,8 +422,6 @@
         <option name="taskNames">
           <list>
             <option value=":idea-plugin:test" />
-            <option value="--tests" />
-            <option value="&quot;dev.wildware.udea.editors.builder.UObjectBuilderTest.testBuildUObjectBuilder&quot;" />
           </list>
         </option>
         <option name="vmOptions" />
@@ -357,76 +430,6 @@
       <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
       <DebugAllEnabled>false</DebugAllEnabled>
       <RunAsTest>true</RunAsTest>
-      <method v="2" />
-    </configuration>
-    <configuration name="UObjectBuilderTest.testPsiTypeToUBuilder5" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" value="" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value=":idea-plugin:test" />
-            <option value="--tests" />
-            <option value="&quot;dev.wildware.udea.editors.builder.UObjectBuilderTest.testPsiTypeToUBuilder5&quot;" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>false</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>true</RunAsTest>
-      <method v="2" />
-    </configuration>
-    <configuration name="UObjectBuilderTest.testPsiTypeToUBuilder_withSprite" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" value="" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value=":idea-plugin:test" />
-            <option value="--tests" />
-            <option value="&quot;dev.wildware.udea.editors.builder.UObjectBuilderTest.testPsiTypeToUBuilder_withSprite&quot;" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>false</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>true</RunAsTest>
-      <method v="2" />
-    </configuration>
-    <configuration name="udea:common [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$/common" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" value="--stacktrace" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value="build" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>false</RunAsTest>
       <method v="2" />
     </configuration>
     <configuration name="udea:gradle-plugin [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
@@ -451,6 +454,72 @@
       <RunAsTest>false</RunAsTest>
       <method v="2" />
     </configuration>
+    <configuration name="udea:idea-plugin [buildPlugin]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$/idea-plugin" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="buildPlugin" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <method v="2" />
+    </configuration>
+    <configuration name="udea:idea-plugin [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$/idea-plugin" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="build" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <method v="2" />
+    </configuration>
+    <configuration name="udea:idea-plugin [runIde]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$/idea-plugin" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="runIde" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <method v="2" />
+    </configuration>
     <configuration default="true" type="lua.app" factoryName="Lua Application">
       <option name="program" value="lua.exe" />
       <option name="file" value="" />
@@ -463,19 +532,19 @@
     </configuration>
     <list>
       <item itemvalue="Gradle.Run Plugin" />
-      <item itemvalue="Gradle.udea:common [build]" />
+      <item itemvalue="Gradle.Tests in 'udea.idea-plugin.test'" />
+      <item itemvalue="Gradle.udea:idea-plugin [buildPlugin]" />
+      <item itemvalue="Gradle.udea:idea-plugin [build]" />
+      <item itemvalue="Gradle.udea:idea-plugin [runIde]" />
       <item itemvalue="Gradle.udea:gradle-plugin [build]" />
-      <item itemvalue="Gradle.UObjectBuilderTest.testPsiTypeToUBuilder_withSprite" />
-      <item itemvalue="Gradle.UObjectBuilderTest.testBuildUObjectBuilder" />
-      <item itemvalue="Gradle.UObjectBuilderTest.testPsiTypeToUBuilder5" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.udea:common [build]" />
+        <item itemvalue="Gradle.udea:idea-plugin [runIde]" />
+        <item itemvalue="Gradle.udea:idea-plugin [buildPlugin]" />
+        <item itemvalue="Gradle.udea:idea-plugin [build]" />
+        <item itemvalue="Gradle.Tests in 'udea.idea-plugin.test'" />
         <item itemvalue="Gradle.udea:gradle-plugin [build]" />
-        <item itemvalue="Gradle.UObjectBuilderTest.testPsiTypeToUBuilder_withSprite" />
-        <item itemvalue="Gradle.UObjectBuilderTest.testPsiTypeToUBuilder5" />
-        <item itemvalue="Gradle.UObjectBuilderTest.testBuildUObjectBuilder" />
       </list>
     </recent_temporary>
   </component>
@@ -584,6 +653,16 @@
       <workItem from="1761410624575" duration="25953000" />
       <workItem from="1761452116443" duration="502000" />
       <workItem from="1761479058124" duration="25280000" />
+      <workItem from="1761589441462" duration="2217000" />
+      <workItem from="1761612993094" duration="7039000" />
+      <workItem from="1761659033393" duration="4179000" />
+      <workItem from="1761671682772" duration="3641000" />
+      <workItem from="1761728502420" duration="21429000" />
+      <workItem from="1761770326052" duration="4467000" />
+      <workItem from="1761933502243" duration="11215000" />
+      <workItem from="1761964036499" duration="3820000" />
+      <workItem from="1762033432262" duration="18654000" />
+      <workItem from="1762297374536" duration="869000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -656,8 +735,45 @@
     <option name="version" value="3" />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
+    <option name="OPEN_GENERIC_TABS">
+      <map>
+        <entry key="556c3440-f417-4b71-ac68-d98f7294fe09" value="TOOL_WINDOW" />
+      </map>
+    </option>
     <option name="TAB_STATES">
       <map>
+        <entry key="556c3440-f417-4b71-ac68-d98f7294fe09">
+          <value>
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="HEAD" />
+                      </list>
+                    </value>
+                  </entry>
+                  <entry key="roots">
+                    <value>
+                      <list>
+                        <option value="$PROJECT_DIR$" />
+                      </list>
+                    </value>
+                  </entry>
+                  <entry key="text">
+                    <value>
+                      <list>
+                        <option value="EditorAssetLoader" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+              <option name="SHOW_ONLY_AFFECTED_CHANGES" value="true" />
+            </State>
+          </value>
+        </entry>
         <entry key="MAIN">
           <value>
             <State />
@@ -686,6 +802,16 @@
           <url>file://$PROJECT_DIR$/gradle-plugin/src/Main.java</url>
           <line>11</line>
           <option name="timeStamp" value="1" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/UdeaIconProvider.kt</url>
+          <line>19</line>
+          <option name="timeStamp" value="11" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AnimationSystem.kt</url>
+          <line>16</line>
+          <option name="timeStamp" value="12" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

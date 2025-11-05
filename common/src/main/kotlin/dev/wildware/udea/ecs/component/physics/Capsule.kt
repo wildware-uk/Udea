@@ -28,9 +28,17 @@ data class Capsule(
 
     override fun registerComponent(body: Box2DBody) {
         with(body) {
-            circle(width / 2.0F, Vector2(0F, height / 2).add(offset))
-            box(width, height, offset)
-            circle(width / 2.0F, Vector2(0F, -height/2F).add(offset))
+            circle(width / 2.0F, Vector2(0F, height / 2).add(offset)) {
+                density = 1.0F
+            }
+
+            box(width, height, offset) {
+                density = 1.0F
+            }
+
+            circle(width / 2.0F, Vector2(0F, -height / 2F).add(offset)) {
+                density = 1.0F
+            }
         }
     }
 

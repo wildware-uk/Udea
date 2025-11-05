@@ -139,12 +139,50 @@ class UdeaDslProcessor(
     }
 
 
+    private fun getNameFromCreateDsl(decl: KSClassDeclaration): String? {
+        return (decl.annotations
+            .find { it.annotationType.resolve().declaration.qualifiedName?.asString() == CreateDsl::class.qualifiedName }
+            ?.arguments
+            ?.find { it.name?.asString() == "name" }
+            ?.value as String?)
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    private fun getTypeParameters(decl: KSClassDeclaration): String {
+        val typeParams = decl.typeParameters
+        return if (typeParams.isEmpty()) {
+            ""
+        } else {
+            typeParams.joinToString(", ", prefix = "<", postfix = ">") { param ->
+                buildString {
+                    append(param.name.asString())
+                    val bounds = param.bounds.toList()
+                    if (bounds.isNotEmpty()) {
+                        append(" : ")
+                        append(bounds.joinToString(" & ") { it.resolve().toQualifiedString() })
+                    }
+                }
+            }
+        }
+    }
+
+    private fun getTypeArgumentsOnly(decl: KSClassDeclaration): String {
+        val typeParams = decl.typeParameters
+        return if (typeParams.isEmpty()) {
+            ""
+        } else {
+            typeParams.joinToString(", ", prefix = "<", postfix = ">") { it.name.asString() }
+        }
+    }
+
     private fun generateGenericAssetFactories(assets: List<KSClassDeclaration>) {
         assets.forEach { decl ->
             val pkg = decl.packageName.asString()
-            val name = decl.simpleName.asString()
+            val name = getNameFromCreateDsl(decl) ?: decl.simpleName.asString()
 
             val params = decl.primaryConstructor!!.parameters
+            val typeParams = getTypeParameters(decl)
+            val typeArgs = getTypeArgumentsOnly(decl)
 
             val file = codeGenerator.createNewFile(
                 Dependencies(false, *assets.mapNotNull { it.containingFile }.toTypedArray()),
@@ -161,13 +199,14 @@ class UdeaDslProcessor(
                 if (decl.modifiers.contains(Modifier.ABSTRACT) || decl.classKind != ClassKind.CLASS) return@forEach
 
                 out.appendLine("@UdeaDsl")
-                out.appendLine("fun ${name.replaceFirstChar { it.lowercase() }}(")
+                out.appendLine("fun $typeParams ${name.replaceFirstChar { it.lowercase() }}(")
                 writeParameterDeclarations(out, params, getDslIncludeProperties(decl))
-                out.appendLine("): ${decl.qualifiedName!!.asString()} {")
+                out.appendLine("): ${decl.qualifiedName!!.asString()}$typeArgs {")
                 out.appendLine("    val parameters = mutableMapOf<String, Any?>()")
                 writeParameterAssignments(out, params)
                 out.appendLine()
-                out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, parameters)")
+                val castSuffix = if (typeArgs.isNotEmpty()) " as ${decl.qualifiedName!!.asString()}$typeArgs" else ""
+                out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, parameters)$castSuffix")
                 getDslIncludeProperties(decl).forEach { prop ->
                     validateProperty(prop)
                     val propName = prop.simpleName.asString()
@@ -177,7 +216,7 @@ class UdeaDslProcessor(
                 out.appendLine("}")
                 out.appendLine()
                 out.appendLine("@UdeaDsl")
-                out.appendLine("fun ListBuilder<in ${decl.qualifiedName!!.asString()}>.${name.replaceFirstChar { it.lowercase() }}(")
+                out.appendLine("fun $typeParams ListBuilder<in ${decl.qualifiedName!!.asString()}$typeArgs>.${name.replaceFirstChar { it.lowercase() }}(")
                 writeParameterDeclarations(out, params, getDslIncludeProperties(decl))
                 out.appendLine(") {")
                 out.appendLine("    val parameters = mutableMapOf<String, Any?>()")
@@ -210,7 +249,7 @@ class UdeaDslProcessor(
                     }
                 }
                 out.appendLine()
-                out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, parameters)")
+                out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, parameters)$castSuffix")
                 getDslIncludeProperties(decl).forEach { prop ->
                     validateProperty(prop)
                     val propName = prop.simpleName.asString()
@@ -224,6 +263,12 @@ class UdeaDslProcessor(
 
     private fun KSType.toQualifiedString(): String {
         val decl = declaration
+        
+        // If this is a type parameter, just return its simple name
+        if (decl is KSTypeParameter) {
+            return if (isMarkedNullable) "${decl.simpleName.asString()}?" else decl.simpleName.asString()
+        }
+        
         val pkg = decl.packageName.asString()
         val simple = decl.qualifiedName?.asString() ?: decl.simpleName.asString()
 

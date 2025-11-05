@@ -47,7 +47,7 @@ class UdeaAssetAction :
 
     override fun createFile(name: String, templateName: String, directory: PsiDirectory): PsiFile {
         try {
-            val fileName = "$name.udea"
+            val fileName = "$name.udea.kts"
 
             var asset: Asset? = null
 
@@ -55,14 +55,16 @@ class UdeaAssetAction :
                 asset = Class.forName(templateName).kotlin.primaryConstructor!!.callBy(emptyMap()) as Asset?
             }
 
-            val assetFile = AssetFile(templateName, asset)
-
-            val json = Json.toJson(assetFile)
+            val fileContent = """
+                $templateName {
+                
+                }
+            """.trimIndent()
 
             val file = PsiFileFactory.getInstance(directory.project).createFileFromText(
                 fileName,
                 JsonLanguage.INSTANCE,
-                json,
+                fileContent,
             )
 
             WriteCommandAction.runWriteCommandAction(directory.project) {

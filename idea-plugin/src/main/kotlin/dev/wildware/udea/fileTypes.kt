@@ -8,15 +8,14 @@ import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
-import dev.wildware.udea.assets.AssetFile
 import org.jetbrains.annotations.Unmodifiable
 import javax.swing.Icon
 
 class UdeaFileType : FileType {
-    override fun getName(): String = "UDEA File"
-    override fun getDescription(): String = "UDEA custom file type"
-    override fun getDefaultExtension(): String = "udea"
-    override fun getIcon(): Icon? = null // Provide an icon if needed
+    override fun getName(): String = "UDEA Asset File"
+    override fun getDescription(): String = "UDEA Asset file type"
+    override fun getDefaultExtension(): String = ".udea.kts"
+    override fun getIcon(): Icon = UdeaIcons.Blueprint
     override fun isBinary(): Boolean = false
 }
 
@@ -29,7 +28,8 @@ class UdeaFileStructureProvider : TreeStructureProvider {
         return children.map { child ->
             if (child is PsiFileNode) {
                 val file = child.virtualFile
-                if (file != null && file.extension == "udea") {
+
+                if (file != null && file.name.endsWith(".udea.kts")) {
                     UdeaFileNode(child.project, child.value, settings)
                 } else {
                     child
@@ -46,17 +46,12 @@ class UdeaFileNode(
     val psiFile: PsiFile,
     viewSettings: ViewSettings?,
 ) : PsiFileNode(project, psiFile, viewSettings) {
-
     override fun update(presentation: PresentationData) {
         super.update(presentation)
-        val contents = Json.withClassLoader(
-            ProjectClassLoaderManager
-                .getInstance(project).classLoader
-        )
-            .fromJson<AssetFile>(psiFile.virtualFile.inputStream)
+
         try {
-            presentation.presentableText = psiFile.name.removeSuffix(".udea")
-            presentation.locationString = contents.type.qualifiedNameToTitle()
+            presentation.presentableText = psiFile.name.removeSuffix(".udea.kts")
+            presentation.locationString = "UDEA Asset"
             presentation.setIcon(UdeaIcons.Blueprint)
         } catch (e: Exception) {
         }

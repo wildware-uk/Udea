@@ -48,12 +48,9 @@ class Box2DSystem(
     override fun onAddEntity(entity: Entity) {
         val body = entity[Body].body
 
-        when {
-            Box in entity -> entity[Box].registerComponent(body)
-            Circle in entity -> entity[Circle].registerComponent(body)
-            Capsule in entity -> entity[Capsule].registerComponent(body)
-            else -> error("No physics component found for entity $entity")
-        }
+        if (Box in entity) entity[Box].registerComponent(body)
+        if (Circle in entity) entity[Circle].registerComponent(body)
+        if (Capsule in entity) entity[Capsule].registerComponent(body)
     }
 
     override fun onTick() {

@@ -1,7 +1,7 @@
 package dev.wildware.udea.ability
 
 import dev.wildware.udea.assets.Asset
-import dev.wildware.udea.assets.Assets
+import dev.wildware.udea.assets.dsl.UdeaDsl
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlin.reflect.KProperty
@@ -17,6 +17,8 @@ data class GameplayEffectSpec(
         return tags.contains(tag)
     }
 
+    operator fun contains(tag: GameplayTag) = hasTag(tag)
+
     val tags = mutableSetOf<GameplayTag>()
     var period: Float = 0F
     var duration: Float = 0F
@@ -30,7 +32,7 @@ data class GameplayEffect(
     val period: Duration = Duration.ZERO,
     val tags: List<GameplayTag> = emptyList(),
     val cues: List<GameplayEffectCue> = emptyList()
-): Asset()
+) : Asset()
 
 enum class ModifierType(
     val apply: (Float, Float) -> Float

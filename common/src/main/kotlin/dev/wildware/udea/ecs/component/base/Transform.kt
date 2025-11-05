@@ -4,6 +4,8 @@ import com.badlogic.gdx.math.Vector2
 import com.github.quillraven.fleks.Component
 import dev.wildware.udea.ecs.NetworkComponent.Companion.configureNetwork
 import dev.wildware.udea.ecs.component.UdeaComponentType
+import dev.wildware.udea.network.ComponentSerializer
+import dev.wildware.udea.network.EntityUpdate
 import dev.wildware.udea.network.Networked
 
 /**
@@ -25,4 +27,26 @@ data class Transform(
     companion object : UdeaComponentType<Transform>(
         networkComponent = configureNetwork()
     )
+}
+
+object TransformSerializer : ComponentSerializer<Transform> {
+    override fun serialize(component: Transform, entityUpdate: EntityUpdate) {
+        with(entityUpdate) {
+            byteBuffer.putFloat(component.position.x)
+            byteBuffer.putFloat(component.position.y)
+            byteBuffer.putFloat(component.rotation)
+            byteBuffer.putFloat(component.scale.x)
+            byteBuffer.putFloat(component.scale.y)
+        }
+    }
+
+    override fun deserialize(component: Transform, entityUpdate: EntityUpdate) {
+        with(entityUpdate) {
+            component.position.x = byteBuffer.float
+            component.position.y = byteBuffer.float
+            component.rotation = byteBuffer.float
+            component.scale.x = byteBuffer.float
+            component.scale.y = byteBuffer.float
+        }
+    }
 }

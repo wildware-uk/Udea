@@ -9,10 +9,10 @@ import com.badlogic.gdx.assets.AssetManager
 import com.badlogic.gdx.assets.loaders.FileHandleResolver
 import com.badlogic.gdx.assets.loaders.resolvers.InternalFileHandleResolver
 import com.badlogic.gdx.files.FileHandle
-import com.badlogic.gdx.graphics.Camera
 import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
+import com.badlogic.gdx.utils.viewport.ExtendViewport
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.SystemConfiguration
@@ -31,6 +31,7 @@ import dev.wildware.udea.ecs.system.*
 import ktx.app.KtxGame
 import ktx.app.KtxScreen
 import ktx.app.clearScreen
+import java.io.File
 import kotlin.reflect.KClass
 import kotlin.reflect.full.createInstance
 import kotlin.reflect.full.findAnnotation
@@ -48,15 +49,15 @@ class Game(
 ) : KtxScreen {
     var started = false
     var debug: Boolean = true
-    var camera: Camera = OrthographicCamera(19.2F, 10.8F).apply {
-        translate(19.2F / 2, 10.8F / 2)
-    }
+    val viewport = ExtendViewport(19.20F, 10.80F)
+    var camera = viewport.camera as OrthographicCamera
     var delta: Float = 0F
     var networkServerSystem: NetworkServerSystem? = null
     var networkClientSystem: NetworkClientSystem? = null
     val isServer: Boolean = false
     var localPlayer: Entity? = null
     var clientId: Int = -1
+    var time = 0F
 
     val box2DWorld by lazy { Box2DWorld(Vector2(0.0F, -9.8F), true) }
 
@@ -93,6 +94,8 @@ class Game(
     init {
         game = this
 
+        camera.zoom = 0.7F
+
         Gdx.app.postRunnable {
             level.entities.forEach { entityDef ->
                 val entity = entityDef.blueprint?.value?.newInstance(world) {
@@ -122,7 +125,13 @@ class Game(
     }
 
     override fun render(delta: Float) {
-        if(!started) return
+        if (!started) return
+
+        time += delta
+        if(time > 1.0F) {
+            time = 0F
+            println("FPS: ${Gdx.graphics.framesPerSecond}")
+        }
 
         clearScreen(0.1F, 0.1F, 0.1F, 1F)
         this.delta = delta
@@ -135,9 +144,7 @@ class Game(
 
     override fun resize(width: Int, height: Int) {
         println("RESIZE $width $height")
-        camera.viewportWidth = width.toFloat() / 10F
-        camera.viewportHeight = height.toFloat() / 10F
-        camera.update()
+        viewport.update(width, height, false)
     }
 
     private fun SystemConfiguration.addSystem(kClass: KClass<out IntervalSystem>) {
@@ -186,13 +193,15 @@ class UdeaGameManager(
                 ?.let {
                     setLevel(
                         it.value, extraSystems = listOf(
-                            BackgroundDrawSystem::class.java,
-                            Box2DSystem::class.java,
                             CameraTrackSystem::class.java,
+                            BackgroundDrawSystem::class.java,
+                            AnimationSystem::class.java,
+                            Box2DSystem::class.java,
+                            SpriteBatchSystem::class.java,
+//                            Box2DLightsSystem::class.java,
                             AbilitySystem::class.java,
                             CleanupSystem::class.java,
                             ControllerSystem::class.java,
-                            SpriteBatchSystem::class.java,
                             ParticleSystemSystem::class.java,
                             NetworkClientSystem::class.java,
                             NetworkServerSystem::class.java,
@@ -294,44 +303,58 @@ class GameAssetLoader : AssetLoader {
     }
 
     private fun loadAsset(file: FileHandle): List<Asset> {
-        when (val evaluationResult = evalScript(file.file())) {
-            is ResultWithDiagnostics.Success -> {
-                when (val result = evaluationResult.value.returnValue) {
-                    is ResultValue.Value -> {
-                        when (val asset = result.value) {
-                            is Asset -> return listOf(asset.apply {
-                                path = file.path().substringBeforeLast("/").replace("assets/", "")
-                                name = file.name().replace(".udea.kts", "")
-                            })
+        return loadAssets(file.file())
+    }
+}
 
-                            is AssetBundle -> {
-                                require(asset.assets.all { it.name.isNotBlank() }) {
-                                    "${file.name()}: Assets defined in a bundle must be named!"
-                                }
+fun loadAssets(file: File): List<Asset> {
+    val fileName = file.name
 
-                                return asset.assets.map {
-                                    it.apply {
-                                        path = file.path().substringBeforeLast("/").replace("assets/", "")
-                                    }
-                                }
+    when (val evaluationResult = evalScript(file)) {
+        is ResultWithDiagnostics.Success -> {
+            when (val result = evaluationResult.value.returnValue) {
+                is ResultValue.Value -> {
+                    when (val asset = result.value) {
+                        is Asset -> return listOf(asset.apply {
+                            path = file.path.replace("\\", "/")
+                                .substringBeforeLast("/")
+                                .replace("assets/", "")
+                            name = fileName.replace(".udea.kts", "")
+                        })
+
+                        is AssetBundle -> {
+                            require(asset.assets.all { it.name.isNotBlank() }) {
+                                "${fileName}: Assets defined in a bundle must be named!"
                             }
 
-                            else -> error("${file.name()}: udea script evaluated and returned a non Asset object.")
+                            return asset.assets.map {
+                                it.apply {
+                                    path = file.path
+                                        .replace("\\", "/")
+                                        .substringBeforeLast("/")
+                                        .replace("assets/", "")
+                                }
+                            }
                         }
-                    }
 
-                    is ResultValue.Error -> {
-                        error("${file.name()}:udea script failed to evaluate: \n${result.error.stackTraceToString()}")
+                        else -> error("${fileName}: udea script evaluated and returned a non Asset object.")
                     }
-
-                    is ResultValue.Unit -> error("${file.name()}:udea script evaluated but returned Unit")
-                    is ResultValue.NotEvaluated -> error("${file.name()}:udea script was not evaluated")
                 }
-            }
 
-            is ResultWithDiagnostics.Failure -> {
-                error("udea script failed to evaluate: ${evaluationResult.reports.joinToString("\n") { it.message }}")
+                is ResultValue.Error -> {
+                    error("${fileName}: udea script failed to evaluate:\n${result.error.stackTraceToString()}")
+                }
+
+                is ResultValue.Unit -> error("${fileName}: udea script evaluated but returned Unit")
+                is ResultValue.NotEvaluated -> error("${fileName}: udea script was not evaluated")
             }
+        }
+
+        is ResultWithDiagnostics.Failure -> {
+            val stackTrace = evaluationResult.reports.joinToString("\n") { report ->
+                "${report.message}\n${report.exception?.stackTraceToString() ?: ""}"
+            }
+            error("${fileName}: udea script failed to evaluate:\n$stackTrace")
         }
     }
 }

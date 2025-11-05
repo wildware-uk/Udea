@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.annotation.JsonValue
 import dev.wildware.udea.assets.dsl.ListBuilder
+import dev.wildware.udea.assets.dsl.UdeaDsl
 import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.dsl.DslInclude
 import dev.wildware.udea.ecs.component.UdeaClass
@@ -46,7 +47,17 @@ data class AssetReference<out T : Asset>(
 /**
  * Creates a reference to an asset.
  * */
+@UdeaDsl
 fun <T : Asset> reference(path: String) = AssetReference<T>(path)
+
+
+/**
+ * Adds a reference to an asset to a list builder.
+ * */
+@UdeaDsl
+fun <T : Asset> ListBuilder<AssetReference<T>>.reference(path: String) {
+    add(AssetReference(path))
+}
 
 @CreateDsl
 @JsonTypeInfo(

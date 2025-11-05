@@ -28,6 +28,7 @@ data class Circle(
     override fun registerComponent(body: Box2DBody) {
         body.circle(radius, offset) {
             friction = this@Circle.friction
+            density = 1.0F
         }
     }
 

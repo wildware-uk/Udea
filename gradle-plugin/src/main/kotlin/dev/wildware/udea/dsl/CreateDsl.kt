@@ -5,4 +5,6 @@ package dev.wildware.udea.dsl
  * be used in the asset script environment.
  * */
 @Target(AnnotationTarget.CLASS, AnnotationTarget.TYPEALIAS)
-annotation class CreateDsl
+annotation class CreateDsl(
+    val name: String = ""
+)

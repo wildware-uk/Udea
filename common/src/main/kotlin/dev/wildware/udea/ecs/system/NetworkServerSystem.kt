@@ -5,6 +5,7 @@ import com.esotericsoftware.kryonet.Listener
 import com.esotericsoftware.kryonet.Server
 import com.github.quillraven.fleks.*
 import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.udea.config.gameConfig
 import dev.wildware.udea.ecs.NetworkAuthority
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.network.*
@@ -67,18 +68,25 @@ class NetworkServerSystem : IteratingSystem(
         }
 
         playerJoiningQueue.processAndRemoveEach { id ->
-//            world.entity { TODO add configurable default character
-//                Assets[Blueprint]["player"].newInstance(world).apply {
-//                    println("Setting networkable to $id")
-//                    this += Networkable(id)
-//                }
-//            }
-//
-//            // Sending existing entities to
-//            val creates = world.getEntityCreates()
-//            creates.forEach {
-//                server.sendToTCP(id, it)
-//            }
+            val defaultCharacter = gameConfig.defaultCharacter
+
+            if (defaultCharacter == null) {
+                println("No default character specified")
+                return@processAndRemoveEach
+            }
+
+            world.entity {
+                defaultCharacter.value.newInstance(world).apply {
+                    println("Setting networkable to $id")
+                    this += Networkable(id)
+                }
+            }
+
+            // Sending existing entities to
+            val creates = world.getEntityCreates()
+            creates.forEach {
+                server.sendToTCP(id, it)
+            }
         }
     }
 

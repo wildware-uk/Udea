@@ -25,6 +25,7 @@ data class Box(
     override fun registerComponent(body: Box2DBody) {
         body.box(width, height, offset) {
             friction = this@Box.friction
+            density = 1.0F
         }
     }
 

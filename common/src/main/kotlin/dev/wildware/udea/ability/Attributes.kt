@@ -39,3 +39,6 @@ sealed class ValueResolver {
 
 @UdeaDsl
 fun constant(value: Float) = ValueResolver.ConstantValue(value)
+
+@UdeaDsl
+fun attribute(attribute: Attribute) = ValueResolver.AttributeValue(attribute)

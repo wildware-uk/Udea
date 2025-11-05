@@ -16,31 +16,32 @@ object EntityUpdateSerializer : WorldContextKSerializer<EntityUpdate> {
         element("id", Int.serializer().descriptor)
 
         // Add the remaining fields from the generated serializer
-        val generatedDescriptor = EntityUpdate.generatedSerializer().descriptor
-        for (i in 1 until generatedDescriptor.elementsCount) {
-            element(
-                generatedDescriptor.getElementName(i),
-                generatedDescriptor.getElementDescriptor(i),
-                isOptional = generatedDescriptor.isElementOptional(i)
-            )
-        }
+//        val generatedDescriptor = EntityUpdate.generatedSerializer().descriptor
+//        for (i in 1 until generatedDescriptor.elementsCount) {
+//            element(
+//                generatedDescriptor.getElementName(i),
+//                generatedDescriptor.getElementDescriptor(i),
+//                isOptional = generatedDescriptor.isElementOptional(i)
+//            )
+//        }
     }
 
     override fun World.deserialize(decoder: Decoder): EntityUpdate {
-        val entityId = decoder.decodeInt()
-        val entity = getNetworkEntityOrNull(entityId)
-        EntityContextKSerializer.withEntity(entity) {
-            return EntityUpdate.generatedSerializer().deserialize(decoder).also {
-                it.valid = contextValid()
-            }
-        }
+//        val entityId = decoder.decodeInt()
+//        val entity = getNetworkEntityOrNull(entityId)
+//        EntityContextKSerializer.withEntity(entity) {
+//            return EntityUpdate.generatedSerializer().deserialize(decoder).also {
+//                it.valid = contextValid()
+//            }
+//        }
+        TODO()
     }
 
     override fun World.serialize(encoder: Encoder, obj: EntityUpdate) {
-        encoder.encodeInt(obj.id)
-        val entity = Entity(obj.id, 0u)
-        EntityContextKSerializer.withEntity(entity) {
-            return EntityUpdate.generatedSerializer().serialize(encoder, obj)
-        }
+//        encoder.encodeInt(obj.id)
+//        val entity = Entity(obj.id, 0u)
+//        EntityContextKSerializer.withEntity(entity) {
+//            return EntityUpdate.generatedSerializer().serialize(encoder, obj)
+//        }
     }
 }

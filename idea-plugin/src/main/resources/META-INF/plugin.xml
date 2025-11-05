@@ -1,8 +1,8 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <id>org.jetbrains.plugins.template</id>
-    <name>IntelliJ Platform Plugin Template</name>
-    <vendor>JetBrains</vendor>
+    <id>dev.wildware.udea</id>
+    <name>Udea</name>
+    <vendor>Wildware</vendor>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
@@ -11,8 +11,6 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <fileEditorProvider implementation="dev.wildware.udea.editors.AssetFileEditorProvider"/>
-        <fileTemplateGroup implementation="dev.wildware.udea.AssetTemplateGroup"/>
-        <treeStructureProvider implementation="dev.wildware.udea.UdeaFileStructureProvider"/>
         <postStartupActivity implementation="dev.wildware.udea.UdeaStartup"/>
     </extensions>
 

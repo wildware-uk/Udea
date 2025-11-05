@@ -2,9 +2,12 @@ package dev.wildware.udea.assets.dsl.script
 
 import kotlin.script.experimental.annotations.KotlinScript
 import kotlin.script.experimental.api.*
+import kotlin.script.experimental.jvm.dependenciesFromClassContext
 import kotlin.script.experimental.jvm.dependenciesFromCurrentContext
 import kotlin.script.experimental.jvm.jvm
 import kotlin.script.experimental.jvm.jvmTarget
+import kotlin.script.experimental.jvm.updateClasspath
+import kotlin.script.experimental.jvm.util.classpathFromClass
 
 @KotlinScript(
     fileExtension = "udea.kts",
@@ -27,10 +30,11 @@ object UdeaScriptConfiguration : ScriptCompilationConfiguration({
     }
 
     jvm {
-        // Make the full classpath visible to scripts so they can access engine and game types
-        dependenciesFromCurrentContext(wholeClasspath = true)
         jvmTarget("17")
     }
+
+    compilerOptions.append("-Xcontext-sensitive-resolution")
+    baseClass(UdeaScript::class)
 }) {
     private fun readResolve(): Any = UdeaScriptConfiguration
 }

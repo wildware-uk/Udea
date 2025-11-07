@@ -139,13 +139,25 @@ class UdeaDslProcessor(
     }
 
 
+    private fun getCreateDslAnnotation(decl: KSClassDeclaration): KSAnnotation? {
+        return decl.annotations.find {
+            it.annotationType.resolve().declaration.qualifiedName?.asString() == CreateDsl::class.qualifiedName
+        }
+    }
+
     private fun getNameFromCreateDsl(decl: KSClassDeclaration): String? {
-        return (decl.annotations
-            .find { it.annotationType.resolve().declaration.qualifiedName?.asString() == CreateDsl::class.qualifiedName }
+        return (getCreateDslAnnotation(decl)
             ?.arguments
             ?.find { it.name?.asString() == "name" }
             ?.value as String?)
             ?.takeIf { it.isNotBlank() }
+    }
+
+    private fun isOnlyList(decl: KSClassDeclaration): Boolean {
+        return (getCreateDslAnnotation(decl)
+            ?.arguments
+            ?.find { it.name?.asString() == "onlyList" }
+            ?.value as? Boolean) ?: false
     }
 
     private fun getTypeParameters(decl: KSClassDeclaration): String {
@@ -179,6 +191,7 @@ class UdeaDslProcessor(
         assets.forEach { decl ->
             val pkg = decl.packageName.asString()
             val name = getNameFromCreateDsl(decl) ?: decl.simpleName.asString()
+            val onlyList = isOnlyList(decl)
 
             val params = decl.primaryConstructor!!.parameters
             val typeParams = getTypeParameters(decl)
@@ -198,23 +211,27 @@ class UdeaDslProcessor(
                 // Skip abstract classes or interfaces
                 if (decl.modifiers.contains(Modifier.ABSTRACT) || decl.classKind != ClassKind.CLASS) return@forEach
 
-                out.appendLine("@UdeaDsl")
-                out.appendLine("fun $typeParams ${name.replaceFirstChar { it.lowercase() }}(")
-                writeParameterDeclarations(out, params, getDslIncludeProperties(decl))
-                out.appendLine("): ${decl.qualifiedName!!.asString()}$typeArgs {")
-                out.appendLine("    val parameters = mutableMapOf<String, Any?>()")
-                writeParameterAssignments(out, params)
-                out.appendLine()
-                val castSuffix = if (typeArgs.isNotEmpty()) " as ${decl.qualifiedName!!.asString()}$typeArgs" else ""
-                out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, parameters)$castSuffix")
-                getDslIncludeProperties(decl).forEach { prop ->
-                    validateProperty(prop)
-                    val propName = prop.simpleName.asString()
-                    out.appendLine("    if ($propName != null) obj.$propName = $propName")
+                val castSuffix =
+                    if (typeArgs.isNotEmpty()) " as ${decl.qualifiedName!!.asString()}$typeArgs" else ""
+
+                if (!onlyList) {
+                    out.appendLine("@UdeaDsl")
+                    out.appendLine("fun $typeParams ${name.replaceFirstChar { it.lowercase() }}(")
+                    writeParameterDeclarations(out, params, getDslIncludeProperties(decl))
+                    out.appendLine("): ${decl.qualifiedName!!.asString()}$typeArgs {")
+                    out.appendLine("    val parameters = mutableMapOf<String, Any?>()")
+                    writeParameterAssignments(out, params)
+                    out.appendLine()
+                    out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, parameters)$castSuffix")
+                    getDslIncludeProperties(decl).forEach { prop ->
+                        validateProperty(prop)
+                        val propName = prop.simpleName.asString()
+                        out.appendLine("    if ($propName != null) obj.$propName = $propName")
+                    }
+                    out.appendLine("    return obj")
+                    out.appendLine("}")
+                    out.appendLine()
                 }
-                out.appendLine("    return obj")
-                out.appendLine("}")
-                out.appendLine()
                 out.appendLine("@UdeaDsl")
                 out.appendLine("fun $typeParams ListBuilder<in ${decl.qualifiedName!!.asString()}$typeArgs>.${name.replaceFirstChar { it.lowercase() }}(")
                 writeParameterDeclarations(out, params, getDslIncludeProperties(decl))

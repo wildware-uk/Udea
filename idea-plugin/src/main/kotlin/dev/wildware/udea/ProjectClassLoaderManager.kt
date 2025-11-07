@@ -2,21 +2,14 @@ package dev.wildware.udea
 
 import com.intellij.openapi.compiler.CompilationStatusListener
 import com.intellij.openapi.compiler.CompileContext
-import com.intellij.openapi.compiler.CompilerManager
 import com.intellij.openapi.compiler.CompilerTopics
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.externalSystem.model.project.LibraryDependencyData
-import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
-import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
-import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.rootManager
 import com.intellij.openapi.roots.OrderRootType
 import com.intellij.openapi.roots.libraries.LibraryTablesRegistrar
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.util.messages.MessageBusConnection
-import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
 import java.nio.file.Paths
@@ -56,22 +49,13 @@ class ProjectClassLoaderManager(private val project: Project) {
     private fun updateClassLoader() {
         try {
             // Find the core module
-            val module = ModuleManager.getInstance(project)
-                .modules.find { "core" in it.name }
+            val buildDir = Paths.get(project.basePath, "core", "build", "classes", "kotlin", "main")
+                .toUri().toURL()
 
-            if (module != null) {
-                val projectBasePath = module.rootManager.contentRoots.firstOrNull()?.path
-
-                if (projectBasePath != null) {
-                    val buildDir = Paths.get(projectBasePath, "build", "classes", "kotlin", "main")
-                        .toUri().toURL()
-
-                    val allUrls = arrayOf(buildDir) + getGradleDependencies(project).toTypedArray()
-                    // Create a URLClassLoader with the output directories
-                    classLoader = URLClassLoader(allUrls, javaClass.classLoader)
-                    println("ProjectClassLoaderManager: Classloader updated")
-                }
-            }
+            val allUrls = arrayOf(buildDir) + getGradleDependencies(project).toTypedArray()
+            // Create a URLClassLoader with the output directories
+            classLoader = URLClassLoader(allUrls, javaClass.classLoader)
+            println("ProjectClassLoaderManager: Classloader updated")
         } catch (e: Exception) {
             println("ProjectClassLoaderManager: Error updating classloader: ${e.message}")
             e.printStackTrace()
@@ -80,7 +64,7 @@ class ProjectClassLoaderManager(private val project: Project) {
 
     /**
      * Gets the Gradle dependencies of the project as URLs
-     * 
+     *
      * @param project The project to get dependencies for
      * @return A list of URLs representing the Gradle dependencies
      */

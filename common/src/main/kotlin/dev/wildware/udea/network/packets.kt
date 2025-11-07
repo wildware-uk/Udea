@@ -12,12 +12,12 @@ import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import java.nio.ByteBuffer
 
-annotation class Networked
+annotation class UdeaNetworked
 
 @Serializable
 sealed interface NetworkPacket : Pool.Poolable
 
-@Networked
+@UdeaNetworked
 data class EntityCreate(
     val id: Int,
     val blueprint: @Contextual Blueprint,
@@ -30,7 +30,7 @@ data class EntityCreate(
     }
 }
 
-@Networked
+@UdeaNetworked
 data class EntityDestroy(
     val id: Int,
 ) : NetworkPacket {
@@ -39,7 +39,7 @@ data class EntityDestroy(
     }
 }
 
-@Networked
+@UdeaNetworked
 data class EntityUpdate(
     var id: Int,
     val byteBuffer: ByteBuffer
@@ -50,7 +50,7 @@ data class EntityUpdate(
     }
 }
 
-@Networked
+@UdeaNetworked
 data class AbilityPacket(
     val ability: Ability,
     val source: Entity,

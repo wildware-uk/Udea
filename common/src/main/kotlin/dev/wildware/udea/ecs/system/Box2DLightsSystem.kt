@@ -1,6 +1,8 @@
 package dev.wildware.udea.ecs.system
 
 import box2dLight.RayHandler
+import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.graphics.GL20
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family

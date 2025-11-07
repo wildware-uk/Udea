@@ -7,10 +7,8 @@ import dev.wildware.udea.assets.AssetReferenceSerializer
 import dev.wildware.udea.ecs.NetworkAuthority
 import dev.wildware.udea.ecs.NetworkComponent
 import dev.wildware.udea.ecs.SyncStrategy
-import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.component.base.Blueprint
-import dev.wildware.udea.ecs.isDelegatedSafe
 import dev.wildware.udea.ecs.system.AbilitySystem
 import dev.wildware.udea.game
 import dev.wildware.udea.getNetworkData
@@ -21,19 +19,16 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.serializer
 import org.reflections.Reflections
-import kotlin.reflect.full.companionObjectInstance
 
 val reflections = Reflections("dev.wildware")
-val networkedTypes: Set<Class<*>> = reflections.getTypesAnnotatedWith(Networked::class.java)
-val networkedComponents = networkedTypes
+val udeaNetworkedTypes: Set<Class<*>> = reflections.getTypesAnnotatedWith(UdeaNetworked::class.java)
+val networkedComponents = udeaNetworkedTypes
     .filter { Component::class.java.isAssignableFrom(it) }
 
 fun Kryo.registerDefaultPackets() {
     addDefaultSerializer(NetworkPacket::class.java, SerializableSerializer)
-    networkedTypes.forEach {
+    udeaNetworkedTypes.forEach {
         register(it)
     }
 }

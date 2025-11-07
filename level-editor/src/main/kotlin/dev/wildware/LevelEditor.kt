@@ -8,6 +8,7 @@ import java.awt.Dimension
 
 open class GameEditorCanvas(
     assetLoader: AssetLoader,
+    init: GameEditorCanvas.()->Unit = {}
 ) {
     val gameManager = UdeaGameManager(assetLoader, isEditor = true)
 
@@ -17,5 +18,9 @@ open class GameEditorCanvas(
 
     fun getCanvas(): Canvas {
         return awtCanvasLwjgl.canvas
+    }
+
+    init {
+        init()
     }
 }

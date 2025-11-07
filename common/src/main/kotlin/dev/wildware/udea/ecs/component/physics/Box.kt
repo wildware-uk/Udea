@@ -19,6 +19,8 @@ data class Box(
     val friction: Float = 0.0F,
     /** The offset of the box */
     val offset: Vector2 = Vector2.Zero,
+
+    override val isSensor: Boolean = false
 ) : Component<Box>, PhysicsComponent {
     override fun type() = Box
 
@@ -26,6 +28,7 @@ data class Box(
         body.box(width, height, offset) {
             friction = this@Box.friction
             density = 1.0F
+            isSensor = this@Box.isSensor
         }
     }
 

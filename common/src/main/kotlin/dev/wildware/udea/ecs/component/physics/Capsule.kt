@@ -22,6 +22,8 @@ data class Capsule(
 
     /** The offset of the capsule */
     val offset: Vector2 = Vector2.Zero,
+
+    override val isSensor: Boolean = false
 ) : Component<Capsule>, PhysicsComponent {
     /** @return The component type for this Circle component */
     override fun type() = Capsule
@@ -30,14 +32,17 @@ data class Capsule(
         with(body) {
             circle(width / 2.0F, Vector2(0F, height / 2).add(offset)) {
                 density = 1.0F
+                isSensor = this@Capsule.isSensor
             }
 
             box(width, height, offset) {
                 density = 1.0F
+                isSensor = this@Capsule.isSensor
             }
 
             circle(width / 2.0F, Vector2(0F, -height / 2F).add(offset)) {
                 density = 1.0F
+                isSensor = this@Capsule.isSensor
             }
         }
     }

@@ -1,19 +1,26 @@
 package dev.wildware.udea.assets.dsl.script
 
+import dev.wildware.udea.UdeaGameManager
 import kotlin.script.experimental.annotations.KotlinScript
 import kotlin.script.experimental.api.*
-import kotlin.script.experimental.jvm.dependenciesFromClassContext
-import kotlin.script.experimental.jvm.dependenciesFromCurrentContext
+import kotlin.script.experimental.jvm.baseClassLoader
 import kotlin.script.experimental.jvm.jvm
 import kotlin.script.experimental.jvm.jvmTarget
-import kotlin.script.experimental.jvm.updateClasspath
-import kotlin.script.experimental.jvm.util.classpathFromClass
 
 @KotlinScript(
     fileExtension = "udea.kts",
-    compilationConfiguration = UdeaScriptConfiguration::class
+    compilationConfiguration = UdeaScriptConfiguration::class,
+    evaluationConfiguration = UdeaEvaluationConfiguration::class
 )
 abstract class UdeaScript
+
+object UdeaEvaluationConfiguration : ScriptEvaluationConfiguration({
+    jvm {
+        baseClassLoader(UdeaGameManager::class.java.classLoader)
+    }
+}) {
+    private fun readResolve(): Any = UdeaEvaluationConfiguration
+}
 
 object UdeaScriptConfiguration : ScriptCompilationConfiguration({
     // Common defaults for engine scripts

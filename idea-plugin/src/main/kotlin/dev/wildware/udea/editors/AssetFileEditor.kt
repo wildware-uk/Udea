@@ -1,23 +1,36 @@
 package dev.wildware.udea.editors
 
+import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.assets.AssetManager
 import com.badlogic.gdx.files.FileHandle
+import com.badlogic.gdx.graphics.Texture
+import com.badlogic.gdx.graphics.g2d.ParticleEffect
+import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.fileEditor.*
 import com.intellij.openapi.fileEditor.impl.text.PsiAwareTextEditorProvider
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.JBSplitter
 import dev.wildware.GameEditorCanvas
+import dev.wildware.systems.EditorSystem
 import dev.wildware.udea.AssetLoader
 import dev.wildware.udea.ProjectClassLoaderManager
 import dev.wildware.udea.assets.Assets
+import dev.wildware.udea.assets.entityDefinition
+import dev.wildware.udea.assets.level
+import dev.wildware.udea.assets.reference
 import dev.wildware.udea.loadAssets
 import java.awt.BorderLayout
 import java.beans.PropertyChangeListener
 import javax.swing.JComponent
 import javax.swing.JPanel
+import kotlin.script.experimental.jvm.baseClassLoader
+import kotlin.script.experimental.jvm.dependenciesFromClassContext
+import kotlin.script.experimental.jvm.dependenciesFromClassloader
+import kotlin.script.experimental.jvm.jvm
 
 class AssetFileEditorProvider : FileEditorProvider, DumbAware {
     override fun accept(project: Project, file: VirtualFile): Boolean {
@@ -47,16 +60,67 @@ class AssetFileEditor(
     private val textEditor: TextEditor = textEditorProvider.createEditor(project, file) as TextEditor
 
     init {
-        loadAssets(file.toNioPath().toFile())
-            .forEach { asset -> Assets[asset.path] = asset }
+        System.setProperty("idea.home.path", PathManager.getHomePath())
+        
     }
 
     val editorPanel = GameEditorCanvas(object : AssetLoader {
         override fun load(manager: AssetManager) {
+            val projectDir = project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
+            val assetsDir = projectDir?.findChild("assets")
+
+            if (assetsDir != null) {
+                fun loadRecursively(currentDir: VirtualFile) {
+                    currentDir.children.forEach { child ->
+                        if (child.isDirectory) {
+                            loadRecursively(child)
+                        } else if (child.name.endsWith(".udea.kts")) {
+                            loadAssets(child.toNioPath().toFile(),
+                                evaluationConfig = {
+                                    jvm {
+                                        baseClassLoader(ProjectClassLoaderManager.getInstance(project).classLoader)
+                                    }
+                                },
+                                
+                                compilationConfiguration = {
+                                    jvm {
+                                        dependenciesFromClassloader(wholeClasspath = true,
+                                            classLoader = ProjectClassLoaderManager.getInstance(project).classLoader)
+                                    }
+                                })
+                                .forEach { asset -> Assets["${asset.path}/${asset.name}"] = asset }
+                        } else if(child.name.endsWith(".png")) {
+                            println("LOAED TEXTURE: ${child.path}")
+                            manager.load(child.path.substringAfter("/assets/"), Texture::class.java)
+                        } else if(child.name.endsWith(".p")) {
+                            println("LOAED PARTICLE: ${child.path}")
+                            manager.load(child.path.substringAfter("/assets/"), ParticleEffect::class.java)
+                        }
+                    }
+                }
+                loadRecursively(assetsDir)
+            }
         }
 
         override fun resolve(fileName: String): FileHandle {
-            return FileHandle(fileName)
+            return FileHandle("${project.basePath}/assets/$fileName")
+        }
+    }, init = {
+        Gdx.app.postRunnable {
+            gameManager.setLevel(
+                level(
+                    systems = {
+                        add(EditorSystem::class)
+                    },
+                    entities = {
+                        entityDefinition(
+                            blueprint = reference(file.path
+                                .substringAfter("assets/")
+                                .replace(".udea.kts", "")
+                            ),
+                        )
+                    }
+                ))
         }
     })
 

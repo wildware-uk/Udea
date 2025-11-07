@@ -32,6 +32,10 @@ data class Blueprint(
     fun newInstance(world: World, init: EntityCreateContext.(Entity) -> Unit = {}) = world.entity {
         it += BlueprintComponent(this@Blueprint)
 
+        if (Transform !in it) {
+            it += Transform()
+        }
+
         it += components()
         it += tags
         init(this, it)

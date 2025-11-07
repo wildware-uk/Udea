@@ -8,12 +8,12 @@ import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.UdeaProperty
 import dev.wildware.udea.ecs.component.UdeaProperty.UAttribute.Ignore
 import dev.wildware.udea.game
-import dev.wildware.udea.network.Networked
+import dev.wildware.udea.network.UdeaNetworked
 
 /**
  * Entities with this component are networked and can be owned by a client.
  * */
-@Networked
+@UdeaNetworked
 data class Networkable(
     /**
      * The id of the owner of this entity.

@@ -15,7 +15,7 @@ data class Animation<T>(
 /**
  * A single frame of an animation.
  * */
-@CreateDsl
+@CreateDsl(onlyList = true)
 data class Frame<T>(
     val time: Float,
     val data: T,

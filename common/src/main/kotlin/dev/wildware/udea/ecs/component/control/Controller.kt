@@ -6,9 +6,9 @@ import dev.wildware.udea.assets.Control
 import dev.wildware.udea.ecs.NetworkAuthority.Client
 import dev.wildware.udea.ecs.NetworkComponent.Companion.configureNetwork
 import dev.wildware.udea.ecs.component.UdeaComponentType
-import dev.wildware.udea.network.Networked
+import dev.wildware.udea.network.UdeaNetworked
 
-@Networked
+@UdeaNetworked
 class Controller : Component<Controller> {
     @Transient
     private val controls = Assets

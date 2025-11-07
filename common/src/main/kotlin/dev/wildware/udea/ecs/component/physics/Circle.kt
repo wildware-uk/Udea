@@ -20,7 +20,9 @@ data class Circle(
     val friction: Float = 0.0F,
 
     /** The offset of the circle */
-    val offset: Vector2 = Vector2.Zero
+    val offset: Vector2 = Vector2.Zero,
+
+    override val isSensor: Boolean = false
 ) : Component<Circle>, PhysicsComponent {
     /** @return The component type for this Circle component */
     override fun type() = Circle
@@ -29,6 +31,7 @@ data class Circle(
         body.circle(radius, offset) {
             friction = this@Circle.friction
             density = 1.0F
+            isSensor = this@Circle.isSensor
         }
     }
 

@@ -6,5 +6,8 @@ package dev.wildware.udea.dsl
  * */
 @Target(AnnotationTarget.CLASS, AnnotationTarget.TYPEALIAS)
 annotation class CreateDsl(
-    val name: String = ""
+    val name: String = "",
+
+    /** Only generate ListBuilder<T> DSL for this type. */
+    val onlyList: Boolean = false
 )

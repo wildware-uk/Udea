@@ -3,7 +3,7 @@ package dev.wildware.udea.ecs.component.ability
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
-import dev.wildware.udea.network.Networked
+import dev.wildware.udea.network.UdeaNetworked
 import dev.wildware.udea.ability.Ability
 import dev.wildware.udea.ability.AttributeSet
 import dev.wildware.udea.ability.GameplayEffectSpec
@@ -11,7 +11,7 @@ import dev.wildware.udea.ecs.NetworkComponent.Companion.configureNetwork
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import kotlinx.serialization.Serializable
 
-@Networked
+@UdeaNetworked
 @Serializable
 data class Abilities(
     val attributeSet: AttributeSet,

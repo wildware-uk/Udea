@@ -7,10 +7,12 @@ import com.badlogic.gdx.InputMultiplexer
 import com.badlogic.gdx.InputProcessor
 import com.badlogic.gdx.assets.AssetManager
 import com.badlogic.gdx.assets.loaders.FileHandleResolver
+import com.badlogic.gdx.assets.loaders.ParticleEffectLoader
 import com.badlogic.gdx.assets.loaders.resolvers.InternalFileHandleResolver
 import com.badlogic.gdx.files.FileHandle
 import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.Texture
+import com.badlogic.gdx.graphics.g2d.ParticleEffect
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.utils.viewport.ExtendViewport
 import com.github.quillraven.fleks.Entity
@@ -20,9 +22,9 @@ import com.github.quillraven.fleks.configureWorld
 import dev.wildware.udea.assets.Asset
 import dev.wildware.udea.assets.AssetBundle
 import dev.wildware.udea.assets.Assets
+import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.dsl.script.evalScript
-import dev.wildware.udea.config.gameConfig
 import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
@@ -37,9 +39,12 @@ import kotlin.reflect.full.createInstance
 import kotlin.reflect.full.findAnnotation
 import kotlin.script.experimental.api.ResultValue
 import kotlin.script.experimental.api.ResultWithDiagnostics
+import kotlin.script.experimental.api.ScriptCompilationConfiguration
+import kotlin.script.experimental.api.ScriptEvaluationConfiguration
 import com.badlogic.gdx.physics.box2d.World as Box2DWorld
 
 lateinit var game: Game
+lateinit var gameManager: UdeaGameManager
 
 class Game(
     val gameManager: UdeaGameManager,
@@ -54,7 +59,7 @@ class Game(
     var delta: Float = 0F
     var networkServerSystem: NetworkServerSystem? = null
     var networkClientSystem: NetworkClientSystem? = null
-    val isServer: Boolean = false
+    val isServer: Boolean = true
     var localPlayer: Entity? = null
     var clientId: Int = -1
     var time = 0F
@@ -62,10 +67,15 @@ class Game(
     val box2DWorld by lazy { Box2DWorld(Vector2(0.0F, -9.8F), true) }
 
     val rayHandler by lazy {
-        RayHandler(box2DWorld).apply {
+        RayHandler(
+            box2DWorld,
+            Gdx.graphics.width / 16,
+            Gdx.graphics.height / 16
+        ).apply {
             setShadows(true)
-            setAmbientLight(0.1F)
-            setBlurNum(3)
+            setAmbientLight(0.7F)
+            setBlurNum(0)
+            setBlur(false)
         }
     }
 
@@ -80,12 +90,12 @@ class Game(
             }
 
             systems {
-                level.systems.forEach {
-                    addSystem(it)
-                }
-
                 extraSystems.forEach {
                     addSystem(it.kotlin)
+                }
+
+                level.systems.forEach {
+                    addSystem(it)
                 }
             }
         }
@@ -98,10 +108,8 @@ class Game(
 
         Gdx.app.postRunnable {
             level.entities.forEach { entityDef ->
-                val entity = entityDef.blueprint?.value?.newInstance(world) {
-                    it += entityDef.components()
-                    it += entityDef.tags
-                } ?: world.entity()
+                val entity = entityDef.blueprint?.value?.newInstance(world)
+                    ?: world.entity()
 
                 entity.apply {
                     with(world) {
@@ -128,7 +136,7 @@ class Game(
         if (!started) return
 
         time += delta
-        if(time > 1.0F) {
+        if (time > 1.0F) {
             time = 0F
             println("FPS: ${Gdx.graphics.framesPerSecond}")
         }
@@ -177,9 +185,14 @@ class UdeaGameManager(
 
     var onCreate: (() -> Unit)? = null
 
+    init {
+        gameManager = this
+        assetManager.setLoader(ParticleEffect::class.java, ParticleEffectLoader(assetLoader))
+    }
+
     fun setLevel(level: Level, extraSystems: List<Class<out IntervalSystem>> = emptyList()) {
         screens.clear()
-        addScreen(Game(this, level, extraSystems, isEditor))
+        addScreen(Game(this, level, DefaultSystems, isEditor))
         setScreen<Game>()
     }
 
@@ -189,6 +202,7 @@ class UdeaGameManager(
         assetManager.finishLoading()
 
         if (!isEditor) {
+            val gameConfig = Assets.filterIsInstance<GameConfig>().first()
             gameConfig.defaultLevel
                 ?.let {
                     setLevel(
@@ -198,7 +212,7 @@ class UdeaGameManager(
                             AnimationSystem::class.java,
                             Box2DSystem::class.java,
                             SpriteBatchSystem::class.java,
-//                            Box2DLightsSystem::class.java,
+                            Box2DLightsSystem::class.java,
                             AbilitySystem::class.java,
                             CleanupSystem::class.java,
                             ControllerSystem::class.java,
@@ -217,10 +231,29 @@ class UdeaGameManager(
     override fun dispose() {}
     override fun pause() {}
     override fun resize(width: Int, height: Int) {
-        game.resize(width, height)
+        if (::game.isInitialized) {
+            game.resize(width, height)
+        }
     }
 
     override fun resume() {}
+
+    companion object {
+        val DefaultSystems = listOf(
+            CameraTrackSystem::class.java,
+            BackgroundDrawSystem::class.java,
+            AnimationSystem::class.java,
+            Box2DSystem::class.java,
+            SpriteBatchSystem::class.java,
+            Box2DLightsSystem::class.java,
+            AbilitySystem::class.java,
+            CleanupSystem::class.java,
+            ControllerSystem::class.java,
+            ParticleSystemSystem::class.java,
+            NetworkClientSystem::class.java,
+            NetworkServerSystem::class.java,
+        )
+    }
 }
 
 interface AssetLoader : FileHandleResolver {
@@ -284,6 +317,7 @@ class GameAssetLoader : AssetLoader {
                         "kts" -> loadAsset(file).forEach {
                             Assets["${it.path}/${it.name}"] = it
                         }
+                        "p" -> manager.load(path, ParticleEffect::class.java)
 
                         else -> loaded = false
                     }
@@ -307,10 +341,14 @@ class GameAssetLoader : AssetLoader {
     }
 }
 
-fun loadAssets(file: File): List<Asset> {
+fun loadAssets(
+    file: File,
+    compilationConfiguration: ScriptCompilationConfiguration.Builder.()->Unit = {},
+    evaluationConfig: ScriptEvaluationConfiguration.Builder.() -> Unit = {},
+): List<Asset> {
     val fileName = file.name
 
-    when (val evaluationResult = evalScript(file)) {
+    when (val evaluationResult = evalScript(file, compilationConfiguration, evaluationConfig)) {
         is ResultWithDiagnostics.Success -> {
             when (val result = evaluationResult.value.returnValue) {
                 is ResultValue.Value -> {
@@ -318,7 +356,7 @@ fun loadAssets(file: File): List<Asset> {
                         is Asset -> return listOf(asset.apply {
                             path = file.path.replace("\\", "/")
                                 .substringBeforeLast("/")
-                                .replace("assets/", "")
+                                .substringAfterLast("assets/")
                             name = fileName.replace(".udea.kts", "")
                         })
 

@@ -23,24 +23,26 @@ import kotlin.math.pow
 @UdeaSystem(runIn = [Editor])
 class EditorSystem : IntervalSystem(), InputSystem {
 
+    val scrollSpeed = 30F
+
      override fun onTick() {
         if(Gdx.input.isKeyPressed(Input.Keys.A)) {
-            game.camera.translate(-10F * deltaTime, 0F, 0F)
+            game.camera.translate(-scrollSpeed * deltaTime, 0F, 0F)
             game.camera.update()
         }
 
         if(Gdx.input.isKeyPressed(Input.Keys.D)) {
-            game.camera.translate(10F * deltaTime, 0F, 0F)
+            game.camera.translate(scrollSpeed * deltaTime, 0F, 0F)
             game.camera.update()
         }
 
         if(Gdx.input.isKeyPressed(Input.Keys.W)) {
-            game.camera.translate(0F, 10F * deltaTime, 0F)
+            game.camera.translate(0F, scrollSpeed * deltaTime, 0F)
             game.camera.update()
         }
 
         if(Gdx.input.isKeyPressed(Input.Keys.S)) {
-            game.camera.translate(0F, -10F * deltaTime, 0F)
+            game.camera.translate(0F, -scrollSpeed * deltaTime, 0F)
             game.camera.update()
         }
     }

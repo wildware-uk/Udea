@@ -2,6 +2,7 @@ package dev.wildware.udea.assets
 
 import com.github.quillraven.fleks.*
 import dev.wildware.udea.ecs.component.base.Transform
+import dev.wildware.udea.ecs.component.base.transform
 import dev.wildware.udea.ecs.component.base.Blueprint as BlueprintComponent
 
 val EmptySnapshot = Snapshot(emptyList(), emptyList())
@@ -15,7 +16,7 @@ data class Blueprint(
     /**
      * A list of components on this blueprint.
      * */
-    val components: List<Component<out Any>> = listOf(Transform()),
+    val components: LazyList<Component<out Any>> = LazyList { transform() },
 
     /**
      * A list of tags on this blueprint.
@@ -31,7 +32,11 @@ data class Blueprint(
     fun newInstance(world: World, init: EntityCreateContext.(Entity) -> Unit = {}) = world.entity {
         it += BlueprintComponent(this@Blueprint)
 
-        it += components
+        if (Transform !in it) {
+            it += Transform()
+        }
+
+        it += components()
         it += tags
         init(this, it)
     }

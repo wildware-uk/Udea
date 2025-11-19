@@ -89,10 +89,11 @@ interface ComponentKSerializer<T : Component<T>> : KSerializer<T> {
         require(currentWorld != null) { "Must be run with a world in context!" }
 
         with(currentWorld) {
-            val component = currentEntity?.get(type)
-                ?: dummy.also { invalidateContext() }
-            deserialize(decoder, component)
-            return component
+            TODO()
+//            val component = currentEntity?.get(type)
+//                ?: dummy.also { invalidateContext() }
+//            deserialize(decoder, component)
+//            return component
         }
     }
 }

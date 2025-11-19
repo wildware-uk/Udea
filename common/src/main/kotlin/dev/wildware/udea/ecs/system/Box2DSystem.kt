@@ -10,17 +10,15 @@ import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.base.Transform
+import dev.wildware.udea.ecs.component.physics.*
 import dev.wildware.udea.ecs.component.physics.Body
-import dev.wildware.udea.ecs.component.physics.Box
-import dev.wildware.udea.ecs.component.physics.Capsule
-import dev.wildware.udea.ecs.component.physics.Circle
 import dev.wildware.udea.game
 import com.badlogic.gdx.physics.box2d.World as Box2DWorld
 
 @UdeaSystem(runIn = [Editor, Game])
 class Box2DSystem(
     val box2DWorld: Box2DWorld = inject()
-) : IteratingSystem(family { all(Body, Transform).any(Box, Capsule, Circle) }), FamilyOnAdd {
+) : IteratingSystem(family { all(Body, Transform).any(Box, Capsule, Circle, Chain) }), FamilyOnAdd {
     val box2dDebugRenderer = Box2DDebugRenderer()
 
     private val onCollideListeners = mutableListOf<(Entity, Entity) -> Unit>()
@@ -32,6 +30,9 @@ class Box2DSystem(
                 val bodyB = contact.fixtureB.body.userData
 
                 if (bodyA is Entity && bodyB is Entity) {
+                    bodyB[Body].touchingCount++
+                    bodyA[Body].touchingCount++
+
                     onCollideListeners.forEach {
                         it(bodyB, bodyA)
                         it(bodyA, bodyB)
@@ -39,7 +40,19 @@ class Box2DSystem(
                 }
             }
 
-            override fun endContact(contact: Contact) {}
+            override fun endContact(contact: Contact) {
+                val bodyA = contact.fixtureA.body.userData
+                val bodyB = contact.fixtureB.body.userData
+
+                if (bodyA is Entity) {
+                    bodyA[Body].touchingCount--
+                }
+
+                if (bodyB is Entity) {
+                    bodyB[Body].touchingCount--
+                }
+            }
+
             override fun preSolve(contact: Contact, oldManifold: Manifold) {}
             override fun postSolve(contact: Contact, impulse: ContactImpulse) {}
         })
@@ -47,13 +60,12 @@ class Box2DSystem(
 
     override fun onAddEntity(entity: Entity) {
         val body = entity[Body].body
+        body.userData = entity
 
-        when {
-            Box in entity -> entity[Box].registerComponent(body)
-            Circle in entity -> entity[Circle].registerComponent(body)
-            Capsule in entity -> entity[Capsule].registerComponent(body)
-            else -> error("No physics component found for entity $entity")
-        }
+        if (Box in entity) entity[Box].registerComponent(entity, body)
+        if (Circle in entity) entity[Circle].registerComponent(entity, body)
+        if (Capsule in entity) entity[Capsule].registerComponent(entity, body)
+        if (Chain in entity) entity[Chain].registerComponent(entity, body)
     }
 
     override fun onTick() {

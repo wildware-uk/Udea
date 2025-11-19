@@ -3,18 +3,9 @@ package dev.wildware.udea.assets
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.UniqueId
-import dev.wildware.udea.ecs.component.base.Transform
-import dev.wildware.udea.ecs.system.AbilitySystem
-import dev.wildware.udea.ecs.system.BackgroundDrawSystem
-import dev.wildware.udea.ecs.system.Box2DSystem
-import dev.wildware.udea.ecs.system.CameraTrackSystem
-import dev.wildware.udea.ecs.system.CleanupSystem
-import dev.wildware.udea.ecs.system.ControllerSystem
-import dev.wildware.udea.ecs.system.NetworkClientSystem
-import dev.wildware.udea.ecs.system.NetworkServerSystem
-import dev.wildware.udea.ecs.system.ParticleSystemSystem
-import dev.wildware.udea.ecs.system.SpriteBatchSystem
-import dev.wildware.udea.uClass
+import dev.wildware.udea.dsl.CreateDsl
+import dev.wildware.udea.ecs.system.*
+import kotlin.reflect.KClass
 
 /**
  * A level is a collection of entities and components that define a game level.
@@ -23,18 +14,7 @@ data class Level(
     /**
      * The systems that will be used to update the entities in this level.
      * */
-    val systems: List<UClass<out IntervalSystem>> = listOf(
-        BackgroundDrawSystem::class.uClass,
-        Box2DSystem::class.uClass,
-        CameraTrackSystem::class.uClass,
-        AbilitySystem::class.uClass,
-        CleanupSystem::class.uClass,
-        ControllerSystem::class.uClass,
-        SpriteBatchSystem::class.uClass,
-        ParticleSystemSystem::class.uClass,
-        NetworkClientSystem::class.uClass,
-        NetworkServerSystem::class.uClass,
-    ),
+    val systems: List<KClass<out IntervalSystem>> = emptyList(),
 
     /**
      * Component snapshots that will be placed on entities.
@@ -50,22 +30,18 @@ data class Level(
  * Defines an entity and its components for use in a level.
  * EntityDefinition provides a blueprint for creating entities with specific components and tags.
  */
+@CreateDsl
 data class EntityDefinition(
-    /**
-     * Unique identifier
-     * */
-    val id: Long,
-
     /**
      * The name of this entity
      */
-    val name: String = "Entity $id",
+    val name: String = "Entity",
 
     /**
-     * List of components that will be attached to the entity.
+     * Lazy list of components that will be attached to the entity.
      * Components define the entity's behavior and properties.
      */
-    val components: List<Component<out Any>> = listOf(Transform()),
+    val components: LazyList<Component<out Any>> = emptyLazyList(),
 
     /**
      * List of tags associated with this entity.
@@ -77,4 +53,9 @@ data class EntityDefinition(
      * The parent blueprint for this entity.
      * */
     val blueprint: AssetReference<Blueprint>? = null,
-)
+) {
+    /**
+     * Unique identifier
+     * */
+    var id: Long = -1L
+}

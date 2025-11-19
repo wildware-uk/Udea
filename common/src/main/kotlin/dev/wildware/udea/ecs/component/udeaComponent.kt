@@ -48,23 +48,3 @@ class ComponentDependency private constructor(
     }
 }
 
-/**
- * Annotate a property with this field to specify extra information.
- * */
-@Target(AnnotationTarget.PROPERTY)
-@Retention
-annotation class UdeaProperty(
-    vararg val value: UAttribute = [],
-    val name: String = Undefined
-) {
-    enum class UAttribute {
-        /**
-         * This property will be ignored by the editor.
-         * */
-        Ignore
-    }
-
-    companion object {
-        const val Undefined = ""
-    }
-}

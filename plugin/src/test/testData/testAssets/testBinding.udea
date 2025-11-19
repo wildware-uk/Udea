@@ -1,8 +1,0 @@
-{
-    "@class": "dev.wildware.udea.assets.Binding",
-    "control" : "/src/testAssets/testControl.udea",
-    "input" : {
-      "@class" : "dev.wildware.udea.assets.Binding$BindingInput$Mouse",
-      "button" : 2
-    }
-}

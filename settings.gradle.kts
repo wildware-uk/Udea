@@ -12,5 +12,7 @@ plugins {
 rootProject.name = "udea"
 include("level-editor")
 include("common")
-include("plugin")
+include("idea-plugin")
 include("compose-ui")
+
+include("gradle-plugin")

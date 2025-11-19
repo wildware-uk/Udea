@@ -7,10 +7,8 @@ import dev.wildware.udea.assets.AssetReferenceSerializer
 import dev.wildware.udea.ecs.NetworkAuthority
 import dev.wildware.udea.ecs.NetworkComponent
 import dev.wildware.udea.ecs.SyncStrategy
-import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.component.base.Blueprint
-import dev.wildware.udea.ecs.isDelegatedSafe
 import dev.wildware.udea.ecs.system.AbilitySystem
 import dev.wildware.udea.game
 import dev.wildware.udea.getNetworkData
@@ -21,19 +19,16 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.serializer
 import org.reflections.Reflections
-import kotlin.reflect.full.companionObjectInstance
 
 val reflections = Reflections("dev.wildware")
-val networkedTypes: Set<Class<*>> = reflections.getTypesAnnotatedWith(Networked::class.java)
-val networkedComponents = networkedTypes
+val udeaNetworkedTypes: Set<Class<*>> = reflections.getTypesAnnotatedWith(UdeaNetworked::class.java)
+val networkedComponents = udeaNetworkedTypes
     .filter { Component::class.java.isAssignableFrom(it) }
 
 fun Kryo.registerDefaultPackets() {
     addDefaultSerializer(NetworkPacket::class.java, SerializableSerializer)
-    networkedTypes.forEach {
+    udeaNetworkedTypes.forEach {
         register(it)
     }
 }
@@ -100,25 +95,26 @@ fun World.processEntityCreate(create: EntityCreate, authority: NetworkAuthority)
 }
 
 fun World.processEntityUpdate(update: EntityUpdate, authority: NetworkAuthority) {
-    if (!update.valid) return
+//    if (!update.valid) return
 
-    val (id, networkComponents, tags, delegates) = update
+//    val (id, networkComponents, tags, delegates) = update
 
-    val entity = getNetworkEntityOrNull(id)
+//    val entity = getNetworkEntityOrNull(id)
 
-    if (entity != null) {
-        entity.configure { entity ->
-            entity += networkComponents
-                .filter { it.getNetworkData().checkNetworkAuthority(authority) }
-            entity += tags as List<EntityTag>
-        }
-
-        delegates.forEach {
-            with(it) {
-                applyToEntity(entity)
-            }
-        }
-    }
+    TODO()
+//    if (entity != null) {
+//        entity.configure { entity ->
+//            entity += networkComponents
+//                .filter { it.getNetworkData().checkNetworkAuthority(authority) }
+//            entity += tags as List<EntityTag>
+//        }
+//
+//        delegates.forEach {
+//            with(it) {
+//                applyToEntity(entity)
+//            }
+//        }
+//    }
 }
 
 fun World.processEntityDestroy(entityDestroy: EntityDestroy) {
@@ -146,12 +142,13 @@ fun Entity.toEntityUpdate(world: World, authority: NetworkAuthority): EntityUpda
             component.getNetworkData().delegate!!.createRaw(component)
         }
 
-        return EntityUpdate(
-            this@toEntityUpdate[Networkable].remoteId,
-            nonDelegates,
-            snapshot.tags,
-            delegateInstances
-        )
+        TODO()
+//        return EntityUpdate(
+//            this@toEntityUpdate[Networkable].remoteId,
+//            nonDelegates,
+//            snapshot.tags,
+//            delegateInstances
+//        )
     }
 }
 

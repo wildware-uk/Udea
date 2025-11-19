@@ -32,6 +32,11 @@ data class Body(
     @JsonIgnore
     lateinit var body: Box2DBody
 
+    var touchingCount: Int = 0
+
+    val grounded: Boolean
+        get() = touchingCount > 0
+
     override fun type() = Body
 
     override fun World.onAdd(entity: Entity) {

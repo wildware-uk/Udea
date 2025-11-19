@@ -50,10 +50,10 @@ class NetworkClientSystem : IntervalSystem() {
     }
 
     override fun onTick() {
-        val networkUpdates = world.getNetworkUpdates()
-        networkUpdates.forEach {
-            client.sendUDP(it)
-        }
+//        val networkUpdates = world.getNetworkUpdates()
+//        networkUpdates.forEach {
+//            client.sendUDP(it)
+//        }
 
         inputQueue.processAndRemoveEach { packet ->
             when (packet) {

@@ -25,4 +25,5 @@ dependencies {
   implementation 'org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.8.0'
   implementation 'io.github.quillraven.fleks:Fleks:2.13-SNAPSHOT'
   implementation 'dev.wildware.udea:common:1.0-SNAPSHOT'
+
 }

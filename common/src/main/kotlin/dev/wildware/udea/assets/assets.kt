@@ -4,6 +4,12 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.annotation.JsonValue
+import dev.wildware.udea.assets.dsl.ListBuilder
+import dev.wildware.udea.assets.dsl.UdeaDsl
+import dev.wildware.udea.dsl.CreateDsl
+import dev.wildware.udea.dsl.DslInclude
+import dev.wildware.udea.ecs.component.UdeaClass
+import dev.wildware.udea.ecs.component.UdeaClass.UClassAttribute.NoInline
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -22,7 +28,8 @@ data class AssetFile(
     val asset: Asset?
 )
 
-data class AssetReference<T : Asset>(
+@UdeaClass(NoInline)
+data class AssetReference<out T : Asset>(
     @JsonValue
     val path: String
 ) {
@@ -37,6 +44,22 @@ data class AssetReference<T : Asset>(
     }
 }
 
+/**
+ * Creates a reference to an asset.
+ * */
+@UdeaDsl
+fun <T : Asset> reference(path: String) = AssetReference<T>(path)
+
+
+/**
+ * Adds a reference to an asset to a list builder.
+ * */
+@UdeaDsl
+fun <T : Asset> ListBuilder<AssetReference<T>>.reference(path: String) {
+    add(AssetReference(path))
+}
+
+@CreateDsl
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.CLASS,
     include = JsonTypeInfo.As.PROPERTY,
@@ -47,11 +70,18 @@ abstract class Asset {
     var path: String = ""
 
     @JsonIgnore
+    @DslInclude
     var name: String = ""
+
+    @get:JsonIgnore
+    val reference: AssetReference<Asset>
+        get() = AssetReference(path)
 
     override fun equals(other: Any?): Boolean {
         return other is Asset && other.path == path
     }
+
+    override fun hashCode(): Int = path.hashCode()
 }
 
 object Assets {
@@ -62,7 +92,7 @@ object Assets {
         get() = assets.isNotEmpty()
 
     inline operator fun <reified T : Asset> get(path: String) = assets[path] as T?
-        ?: error("Asset $path does not exist")
+        ?: error("Asset $path does not exist ${debugAssets()}")
 
     fun <T : Asset> find(path: String) = assets[path] as T?
         ?: error("Asset $path does not exist ${debugAssets()}")
@@ -87,8 +117,8 @@ object Assets {
         return assets.values.filter { it::class.isSubclassOf(type) } as List<T>
     }
 
-    private fun debugAssets() {
-        println(assets)
+    fun debugAssets(): String {
+        return assets.toString()
     }
 }
 
@@ -104,4 +134,15 @@ object AssetReferenceSerializer : KSerializer<Asset> {
         val path = decoder.decodeString()
         return Assets[path]
     }
+}
+
+data class AssetBundle(val assets: List<Asset>)
+
+/**
+ * Allows multiple assets to be defined in the same file.
+ * */
+fun bundle(builder: ListBuilder<Asset>.() -> Unit = {}): AssetBundle {
+    val listBuilder = ListBuilder<Asset>()
+    builder(listBuilder)
+    return AssetBundle(listBuilder.build())
 }

@@ -7,14 +7,17 @@ import dev.wildware.udea.ecs.NetworkAuthority.Client
 import dev.wildware.udea.ecs.NetworkComponent.Companion.configureNetwork
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.network.UdeaNetworked
+import dev.wildware.udea.network.serde.UdeaSync
 
 @UdeaNetworked
 class Controller : Component<Controller> {
-    @Transient
     private val controls = Assets
         .filterIsInstance<Control>()
 
+    @UdeaSync
     val bindingPressed = Array(controls.size + 1) { false }
+
+    @UdeaSync
     val bindingJustPressed = Array(controls.size + 1) { false }
 
     override fun type() = Controller

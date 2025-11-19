@@ -5,7 +5,7 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.UniqueId
 import dev.wildware.udea.Vector2
-import dev.wildware.udea.ability.Ability
+import dev.wildware.udea.ability.AbilityExec
 import dev.wildware.udea.assets.Blueprint
 import dev.wildware.udea.ecs.ComponentDelegate
 import kotlinx.serialization.Contextual
@@ -52,7 +52,7 @@ data class EntityUpdate(
 
 @UdeaNetworked
 data class AbilityPacket(
-    val ability: Ability,
+    val ability: AbilityExec,
     val source: Entity,
     val targetPos: Vector2,
     val target: Entity?

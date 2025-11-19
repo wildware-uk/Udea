@@ -21,6 +21,10 @@ class Animations : Component<Animations> {
         }
     }
 
+    fun removeAnimation(animation: AnimationInstance<*>) {
+        this.animations.remove(animation)
+    }
+
     override fun type() = Animations
 
     companion object : ComponentType<Animations>()

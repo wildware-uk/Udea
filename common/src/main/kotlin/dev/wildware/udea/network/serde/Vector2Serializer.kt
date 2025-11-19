@@ -2,6 +2,7 @@ package dev.wildware.udea.network.serde
 
 import com.badlogic.gdx.math.Vector2
 import dev.wildware.udea.network.InPlaceSerializer
+import dev.wildware.udea.network.UdeaSerializer
 import java.nio.ByteBuffer
 
 @UdeaSerializer(Vector2::class)

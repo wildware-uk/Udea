@@ -2,6 +2,7 @@ package dev.wildware.udea.ecs.component.physics
 
 import com.badlogic.gdx.physics.box2d.Body
 import com.github.quillraven.fleks.Component
+import com.github.quillraven.fleks.Entity
 import dev.wildware.udea.assets.dsl.ListBuilder
 import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.ecs.component.ComponentDependency.Companion.dependencies
@@ -20,11 +21,15 @@ data class Chain(
     override val isSensor: Boolean = false,
 
     ) : PhysicsComponent, Component<Chain> {
-    override fun registerComponent(body: Body) {
+    override fun registerComponent(entity: Entity, body: Body) {
         if (loop) {
-            body.loop(vertices.flatMap { listOf(it.x, it.y) }.toFloatArray()) {}
+            body.loop(vertices.flatMap { listOf(it.x, it.y) }.toFloatArray()) {
+                userData = entity
+            }
         } else {
-            body.chain(vertices.flatMap { listOf(it.x, it.y) }.toFloatArray())
+            body.chain(vertices.flatMap { listOf(it.x, it.y) }.toFloatArray()) {
+                userData = entity
+            }
         }.apply {
             friction = this@Chain.friction
             density = 1.0F

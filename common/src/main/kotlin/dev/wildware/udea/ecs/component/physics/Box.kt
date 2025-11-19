@@ -1,6 +1,7 @@
 package dev.wildware.udea.ecs.component.physics
 
 import com.github.quillraven.fleks.Component
+import com.github.quillraven.fleks.Entity
 import dev.wildware.udea.Vector2
 import dev.wildware.udea.ecs.component.ComponentDependency.Companion.dependencies
 import dev.wildware.udea.ecs.component.UdeaComponentType
@@ -24,11 +25,12 @@ data class Box(
 ) : Component<Box>, PhysicsComponent {
     override fun type() = Box
 
-    override fun registerComponent(body: Box2DBody) {
+    override fun registerComponent(entity: Entity, body: Box2DBody) {
         body.box(width, height, offset) {
             friction = this@Box.friction
             density = 1.0F
             isSensor = this@Box.isSensor
+            userData = entity
         }
     }
 

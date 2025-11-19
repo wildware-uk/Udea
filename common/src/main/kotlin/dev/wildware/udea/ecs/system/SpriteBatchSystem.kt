@@ -1,5 +1,6 @@
 package dev.wildware.udea.ecs.system
 
+import com.badlogic.gdx.graphics.g2d.Sprite
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
@@ -12,7 +13,7 @@ import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.game
 import dev.wildware.udea.use
-import dev.wildware.udea.ecs.component.render.Sprite as SpriteComponent
+import dev.wildware.udea.ecs.component.render.SpriteRenderer as SpriteComponent
 
 @UdeaSystem(runIn = [Editor, Game])
 class SpriteBatchSystem(
@@ -32,19 +33,41 @@ class SpriteBatchSystem(
         val transform = entity[Transform]
         val position = transform.position
 
-        val texture = entity[SpriteComponent].gdxSprite ?: return
+        val spriteComponent = entity[SpriteComponent]
+        val texture = spriteComponent.texture ?: return
 
-        spriteBatch.draw(
-            texture,
-            position.x - texture.width / 2,
-            position.y - texture.height / 2,
-            texture.width / 2,
-            texture.height / 2,
-            texture.width,
-            texture.height,
-            transform.scale.x,
-            transform.scale.y,
-            Math.toDegrees(transform.rotation.toDouble()).toFloat()
-        )
+        val scaleX = if(spriteComponent.flipX) -transform.scale.x else transform.scale.x
+        val scaleY = if(spriteComponent.flipY) -transform.scale.y else transform.scale.y
+
+        val posX = position.x + spriteComponent.offset.x
+        val posY = position.y + spriteComponent.offset.y
+
+        if (texture is Sprite) {
+            spriteBatch.draw(
+                texture,
+                posX - texture.width / 2,
+                posY - texture.height / 2,
+                texture.width / 2,
+                texture.height / 2,
+                texture.width,
+                texture.height,
+                scaleX,
+                scaleY,
+                Math.toDegrees(transform.rotation.toDouble()).toFloat()
+            )
+        } else {
+            spriteBatch.draw(
+                texture,
+                posX - texture.regionWidth / 2,
+                posY - texture.regionHeight / 2,
+                texture.regionWidth / 2F,
+                texture.regionHeight / 2F,
+                texture.regionWidth.toFloat(),
+                texture.regionHeight.toFloat(),
+                scaleX,
+                scaleY,
+                Math.toDegrees(transform.rotation.toDouble()).toFloat()
+            )
+        }
     }
 }

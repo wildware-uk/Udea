@@ -1,4 +1,5 @@
 import org.gradle.internal.execution.caching.CachingState.enabled
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "2.2.10"
@@ -92,3 +93,7 @@ publishing {
     }
 }
 
+val compileKotlin: KotlinCompile by tasks
+compileKotlin.compilerOptions {
+    freeCompilerArgs.set(listOf("-Xcontext-parameters", "-Xcontext-sensitive-resolution"))
+}

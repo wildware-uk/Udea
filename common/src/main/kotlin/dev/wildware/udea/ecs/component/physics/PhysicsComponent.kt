@@ -1,6 +1,7 @@
 package dev.wildware.udea.ecs.component.physics
 
 import com.badlogic.gdx.physics.box2d.Body
+import com.github.quillraven.fleks.Entity
 
 interface PhysicsComponent {
     /**
@@ -8,5 +9,5 @@ interface PhysicsComponent {
      * */
     val isSensor: Boolean
 
-    fun registerComponent(body: Body)
+    fun registerComponent(entity: Entity, body: Body)
 }

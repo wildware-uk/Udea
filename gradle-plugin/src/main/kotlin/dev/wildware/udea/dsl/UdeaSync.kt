@@ -14,16 +14,16 @@ annotation class UdeaSync(
      * When to sync this property.
      * */
     val syncMode: SyncMode = SyncMode.Eager
-)
+) {
+    enum class SyncMode {
+        /**
+         * Syncs every time.
+         * */
+        Eager,
 
-enum class SyncMode {
-    /**
-     * Syncs every time.
-     * */
-    Eager,
-
-    /**
-     * Syncs only when the value changes.
-     * */
-    Dirty
+        /**
+         * Syncs only when the value changes.
+         * */
+        Dirty
+    }
 }

@@ -25,9 +25,9 @@ data class GameplayEffectSpec(
 }
 
 data class GameplayEffect(
-    val target: KProperty<Attribute>,
-    val modifierType: ModifierType,
-    val source: ValueResolver,
+    val target: KProperty<Attribute>? = null,
+    val modifierType: ModifierType? = null,
+    val source: ValueResolver? = null,
     var effectDuration: GameplayEffectDuration,
     val period: Duration = Duration.ZERO,
     val tags: List<GameplayTag> = emptyList(),

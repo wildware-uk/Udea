@@ -34,38 +34,45 @@ class AbilitySystem : IntervalSystem() {
         }
     }
 
-    fun activateAbility(entity: Entity, ability: AbilityExec) {
-        with(world) {
-            val target = Mouse.mouseTarget
-            val targetPos = Mouse.mouseWorldPos
+    fun activateAbility(abilityInfo: AbilityInfo, abilityExec: AbilityExec) {
+        val target = Mouse.mouseTarget
+        val targetPos = Mouse.mouseWorldPos
 
-            val networkSource = Entity(entity[Networkable].remoteId, 0u)
-            val networkTarget = target?.let { Entity(it[Networkable].remoteId, 0u) }
+        val networkSource = Entity(abilityInfo.source[Networkable].remoteId, 0u)
+        val networkTarget = target?.let { Entity(it[Networkable].remoteId, 0u) }
 
-            if (game.isServer) {
-                context(world) {
-                    ability.activate(AbilityInfo(networkSource, targetPos, networkTarget))
-                }
-
-                game.networkServerSystem!!.server.sendToAllTCP(
-                    AbilityPacket(
-                        ability,
-                        networkSource,
-                        targetPos,
-                        networkTarget
-                    )
-                )
-            } else {
-                game.networkClientSystem!!.client.sendTCP(
-                    AbilityPacket(
-                        ability,
-                        networkSource,
-                        targetPos,
-                        networkTarget
-                    )
-                )
+        if (game.isServer) {
+            context(world) {
+                abilityExec.activate(AbilityInfo(networkSource, targetPos, networkTarget))
             }
+
+//            game.networkServerSystem!!.server.sendToAllTCP(
+//                AbilityPacket(
+//                    abilityExec,
+//                    networkSource,
+//                    targetPos,
+//                    networkTarget
+//                )
+//            )
+        } else {
+//            game.networkClientSystem!!.client.sendTCP(
+//                AbilityPacket(
+//                    abilityExec,
+//                    networkSource,
+//                    targetPos,
+//                    networkTarget
+//                )
+//            )
         }
     }
-}
 
+    fun activateAbility(entity: Entity, ability: AbilityExec) {
+        val target = Mouse.mouseTarget
+        val targetPos = Mouse.mouseWorldPos
+
+        val networkSource = Entity(entity[Networkable].remoteId, 0u)
+        val networkTarget = target?.let { Entity(it[Networkable].remoteId, 0u) }
+
+        activateAbility(AbilityInfo(networkSource, targetPos, networkTarget), ability)
+    }
+}

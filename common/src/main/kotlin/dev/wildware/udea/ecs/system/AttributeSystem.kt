@@ -22,10 +22,15 @@ class AttributeSystem : IteratingSystem(
                 if ((it.period).toDouble().seconds > it.gameplayEffect.period) {
                     it.period = 0F
 
-                    val targetAttribute = it.gameplayEffect.target.getter.call(abilities.attributeSet)
-                    targetAttribute.currentValue = it.gameplayEffect.modifierType
-                        .apply(targetAttribute.currentValue, it.gameplayEffect.source.value * it.magnitude)
-                        .coerceIn(targetAttribute.min.value, targetAttribute.max.value)
+                    if (it.gameplayEffect.target != null
+                        && it.gameplayEffect.modifierType != null
+                        && it.gameplayEffect.source != null
+                    ) {
+                        val targetAttribute = it.gameplayEffect.target.getter.call(abilities.attributeSet)
+                        targetAttribute.currentValue = it.gameplayEffect.modifierType
+                            .apply(targetAttribute.currentValue, it.gameplayEffect.source.value * it.magnitude)
+                            .coerceIn(targetAttribute.min.value, targetAttribute.max.value)
+                    }
                 }
 
                 it.duration += game.delta

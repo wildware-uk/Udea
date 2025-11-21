@@ -47,10 +47,18 @@ data class Binding(
     }
 }
 
+class Axis : Asset()
+
+class AxisBinding(
+    val axis: AssetReference<Axis>,
+    val input: Binding.BindingInput,
+    val value: Float
+) : Asset()
+
 /**
  * Creates a keyboard key binding.
  * */
-fun key(key: Int)= Binding.BindingInput.Key(key)
+fun key(key: Int) = Binding.BindingInput.Key(key)
 
 /**
  * Creates a mouse button binding.

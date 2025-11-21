@@ -18,37 +18,23 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="- 🔥 **Remove legacy GameConfig and improve asset handling**&#10;  - Removed `GameConfig` and its usage across various systems.&#10;  - Introduced `GameConfig` as an asset for flexible and dynamic configuration loading.&#10;  - Enhanced physics components (`Box`, `Capsule`, `Circle`, `Chain`) with new `isSensor` property.&#10;  - Added support for Box2D chains in `Box2DSystem`.&#10;  - 🎨 Improved particle effect handling via `Particle` asset and associated loader.&#10;  - 🚀 Streamlined script evaluation and asset loading with flexible configurations.&#10;  - 🛠️ Refactored networking annotations (`@Networked` to `@UdeaNetworked`).&#10;  - General cleanup and architecture enhancements.">
+    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="- ✨ **Add Animation System Enhancements**&#10;  - Introduced `AnimationSet` component and its supporting systems for sprite animation management.&#10;  - Added `AnimationSetSystem` for animation handling with dynamic framing and notifies support.&#10;  - Enhanced physics components (`Box`, `Capsule`, `Circle`, `Chain`) to attach entities via `userData`.&#10;  - 🚀 Improved networking with updated sync annotations (`@UdeaSync`) and packet modifications.&#10;  - 🎨 Updated assets with `SpriteSheet`, `SpriteAnimation`, and notify-related features.&#10;  - Introduced Kotlin `context` receivers for ECS system utility functions.&#10;  - 🛠 Miscellaneous config adjustments: enabled context-sensitive resolution for Kotlin compilation.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/common/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Ability.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Ability.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/AttributeModificationExec.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/AttributeModificationExec.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectCue.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectCue.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectSpec.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectSpec.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/LazyList.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/LazyList.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/ability.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/ability.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/animations.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/animations.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/particle.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/particle.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/controls.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/controls.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/gameConfig.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/gameConfig.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/render.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/render.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/ability/Abilities.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/ability/Abilities.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/animation/Animations.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/animation/Animations.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/base/Transform.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/base/Transform.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/control/Controller.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/control/Controller.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Body.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Body.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Box.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Box.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Capsule.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Capsule.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Chain.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Chain.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Circle.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Circle.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/PhysicsComponent.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/PhysicsComponent.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/Sprite.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/SpriteRenderer.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AbilitySystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AbilitySystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AnimationSetSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AnimationSetSystem.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AnimationSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AnimationSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/SpriteBatchSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/SpriteBatchSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/packets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/packets.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/serde/UdeaSerializer.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/serde/UdeaSync.kt" beforeDir="false" afterPath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/dsl/UdeaSync.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/serde/Vector2Serializer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/serde/Vector2Serializer.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/network/NetworkGenerator.kt" beforeDir="false" afterPath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/network/NetworkGenerator.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle-plugin/src/main/resources/META-INF/services/com.google.devtools.ksp.processing.SymbolProcessorProvider" beforeDir="false" afterPath="$PROJECT_DIR$/gradle-plugin/src/main/resources/META-INF/services/com.google.devtools.ksp.processing.SymbolProcessorProvider" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AttributeSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AttributeSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/utils.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/utils.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -132,11 +118,11 @@
       <list>
         <option value="Kotlin JUnit5 Test Class" />
         <option value="Kotlin JUnit3 Test Class" />
-        <option value="Kotlin Interface" />
         <option value="Kotlin Annotation" />
         <option value="Kotlin Data Class" />
         <option value="Kotlin File" />
         <option value="Kotlin Object" />
+        <option value="Kotlin Interface" />
         <option value="Fleks Component" />
         <option value="Kotlin Class" />
       </list>
@@ -637,7 +623,9 @@
       <workItem from="1763302984837" duration="18156000" />
       <workItem from="1763398374341" duration="6889000" />
       <workItem from="1763452235185" duration="15782000" />
-      <workItem from="1763570229079" duration="2623000" />
+      <workItem from="1763570229079" duration="13671000" />
+      <workItem from="1763625901631" duration="16918000" />
+      <workItem from="1763712982256" duration="5413000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -719,7 +707,15 @@
       <option name="project" value="LOCAL" />
       <updated>1762481451655</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="- ✨ **Add Animation System Enhancements**&#10;  - Introduced `AnimationSet` component and its supporting systems for sprite animation management.&#10;  - Added `AnimationSetSystem` for animation handling with dynamic framing and notifies support.&#10;  - Enhanced physics components (`Box`, `Capsule`, `Circle`, `Chain`) to attach entities via `userData`.&#10;  - 🚀 Improved networking with updated sync annotations (`@UdeaSync`) and packet modifications.&#10;  - 🎨 Updated assets with `SpriteSheet`, `SpriteAnimation`, and notify-related features.&#10;  - Introduced Kotlin `context` receivers for ECS system utility functions.&#10;  - 🛠 Miscellaneous config adjustments: enabled context-sensitive resolution for Kotlin compilation.">
+      <option name="closed" value="true" />
+      <created>1763573606400</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1763573606400</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -788,7 +784,9 @@
     <MESSAGE value=" **Remove obsolete editors and tests**&#10;&#10;- Eliminated unused editors such as `LevelEditor`, `BlueprintEditor`, and `EntityDefinitionEditor`.  &#10;- Removed outdated test files and associated implementations.&#10;- Cleaned up redundant DSL definitions and file types for better maintainability.  &#10;- Streamlined project by discarding legacy Swing-based UI editors." />
     <MESSAGE value=" **Remove obsolete editors and tests**&#10;&#10;- Eliminated unused editors such as `LevelEditor`, `BlueprintEditor`, and `EntityDefinitionEditor`.  &#10;- Removed outdated test files and associated implementations.&#10;- Cleaned up redundant DSL definitions and file types for better maintainability.  &#10;- Streamlined project by discarding legacy Swing-based UI editors." />
     <MESSAGE value="-  **Remove legacy GameConfig and improve asset handling**&#10;  - Removed `GameConfig` and its usage across various systems.&#10;  - Introduced `GameConfig` as an asset for flexible and dynamic configuration loading.&#10;  - Enhanced physics components (`Box`, `Capsule`, `Circle`, `Chain`) with new `isSensor` property.&#10;  - Added support for Box2D chains in `Box2DSystem`.&#10;  -  Improved particle effect handling via `Particle` asset and associated loader.&#10;  -  Streamlined script evaluation and asset loading with flexible configurations.&#10;  - ️ Refactored networking annotations (`@Networked` to `@UdeaNetworked`).&#10;  - General cleanup and architecture enhancements." />
-    <option name="LAST_COMMIT_MESSAGE" value="-  **Remove legacy GameConfig and improve asset handling**&#10;  - Removed `GameConfig` and its usage across various systems.&#10;  - Introduced `GameConfig` as an asset for flexible and dynamic configuration loading.&#10;  - Enhanced physics components (`Box`, `Capsule`, `Circle`, `Chain`) with new `isSensor` property.&#10;  - Added support for Box2D chains in `Box2DSystem`.&#10;  -  Improved particle effect handling via `Particle` asset and associated loader.&#10;  -  Streamlined script evaluation and asset loading with flexible configurations.&#10;  - ️ Refactored networking annotations (`@Networked` to `@UdeaNetworked`).&#10;  - General cleanup and architecture enhancements." />
+    <MESSAGE value="-  **Remove legacy GameConfig and improve asset handling**&#10;  - Removed `GameConfig` and its usage across various systems.&#10;  - Introduced `GameConfig` as an asset for flexible and dynamic configuration loading.&#10;  - Enhanced physics components (`Box`, `Capsule`, `Circle`, `Chain`) with new `isSensor` property.&#10;  - Added support for Box2D chains in `Box2DSystem`.&#10;  -  Improved particle effect handling via `Particle` asset and associated loader.&#10;  -  Streamlined script evaluation and asset loading with flexible configurations.&#10;  - ️ Refactored networking annotations (`@Networked` to `@UdeaNetworked`).&#10;  - General cleanup and architecture enhancements." />
+    <MESSAGE value="- ✨ **Add Animation System Enhancements**&#10;  - Introduced `AnimationSet` component and its supporting systems for sprite animation management.&#10;  - Added `AnimationSetSystem` for animation handling with dynamic framing and notifies support.&#10;  - Enhanced physics components (`Box`, `Capsule`, `Circle`, `Chain`) to attach entities via `userData`.&#10;  -  Improved networking with updated sync annotations (`@UdeaSync`) and packet modifications.&#10;  -  Updated assets with `SpriteSheet`, `SpriteAnimation`, and notify-related features.&#10;  - Introduced Kotlin `context` receivers for ECS system utility functions.&#10;  -  Miscellaneous config adjustments: enabled context-sensitive resolution for Kotlin compilation." />
+    <option name="LAST_COMMIT_MESSAGE" value="- ✨ **Add Animation System Enhancements**&#10;  - Introduced `AnimationSet` component and its supporting systems for sprite animation management.&#10;  - Added `AnimationSetSystem` for animation handling with dynamic framing and notifies support.&#10;  - Enhanced physics components (`Box`, `Capsule`, `Circle`, `Chain`) to attach entities via `userData`.&#10;  -  Improved networking with updated sync annotations (`@UdeaSync`) and packet modifications.&#10;  -  Updated assets with `SpriteSheet`, `SpriteAnimation`, and notify-related features.&#10;  - Introduced Kotlin `context` receivers for ECS system utility functions.&#10;  -  Miscellaneous config adjustments: enabled context-sensitive resolution for Kotlin compilation." />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

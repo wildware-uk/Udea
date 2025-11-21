@@ -35,3 +35,13 @@ fun <T> lazy(listBuilder: ListBuilder<T>.() -> Unit) =
  * Creates an empty lazy list.
  * */
 fun <T> emptyLazyList() = LazyList<T> {}
+
+/**
+ * Returns a lazy list with predefined elements.
+ * */
+fun <T> lazyListOf(vararg elements: T) = LazyList { elements.forEach { add(it) } }
+
+/**
+ * Returns a lazy list with predefined elements.
+ * */
+fun <T> Collection<T>.toLazyList() = LazyList { forEach { add(it) } }

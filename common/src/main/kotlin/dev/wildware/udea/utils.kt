@@ -5,12 +5,14 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.math.Vector2
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
+import com.github.quillraven.fleks.EntityCreateContext
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.assets.UClass
 import dev.wildware.udea.ecs.NetworkComponent
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.base.Blueprint
 import dev.wildware.udea.ecs.component.base.Networkable
+import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.system.BackgroundDrawSystem
 import ktx.graphics.use
 import kotlin.contracts.ExperimentalContracts
@@ -67,3 +69,10 @@ inline fun SpriteBatch.use(
 
 val <T : Any> KClass<T>.uClass: UClass<T>
     get()= UClass(this.qualifiedName ?: error("Cannot get qualified name of class: $this"))
+
+/**
+ * Shortcut to get an entity position.
+ * */
+context(world: World)
+val Entity.position: Vector2
+    get() = this[Transform].position

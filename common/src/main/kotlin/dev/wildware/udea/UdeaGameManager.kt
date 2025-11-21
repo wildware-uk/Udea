@@ -242,7 +242,9 @@ class UdeaGameManager(
         val DefaultSystems = listOf(
             CameraTrackSystem::class.java,
             BackgroundDrawSystem::class.java,
+            CharacterAnimationControllerSystem::class.java,
             AnimationSystem::class.java,
+            CharacterControllerSystem::class.java,
             Box2DSystem::class.java,
             AnimationSetSystem::class.java,
             SpriteBatchSystem::class.java,

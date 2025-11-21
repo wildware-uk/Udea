@@ -2,8 +2,6 @@ package dev.wildware.udea.assets
 
 import com.badlogic.gdx.Gdx
 
-// TODO implement these settings
-
 data class GameConfig(
     val defaultLevel: AssetReference<Level>? = null,
     val defaultCharacter: AssetReference<Blueprint>? = null,

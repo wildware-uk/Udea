@@ -12,7 +12,7 @@ val EmptySnapshot = Snapshot(emptyList(), emptyList())
  * It contains essential information like name, state snapshot, and optional parent blueprint
  * that can be used to instantiate game entities with predefined properties.
  */
-data class Blueprint(
+open class Blueprint(
     /**
      * A list of components on this blueprint.
      * */

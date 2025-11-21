@@ -36,10 +36,10 @@ class AnimationSetSystem(
         }
     }
 
-    fun setAnimation(entity: Entity, name: String) {
+    fun setAnimation(entity: Entity, name: String): AnimationInstance<out TextureRegion>? {
         val animationSet = entity[AnimationSet]
 
-        if (animationSet.currentAnimation?.animation?.name == name) return
+        if (animationSet.currentAnimation?.animation?.name == name) return null
 
         val animations = entity[Animations]
 
@@ -51,6 +51,7 @@ class AnimationSetSystem(
             .toAnimationInstance(animationSet)
 
         animations.animations += animationSet.currentAnimation!!
+        return animationSet.currentAnimation!!
     }
 
     override fun onTick() {
@@ -69,7 +70,7 @@ class AnimationSetSystem(
         val instance = AnimationInstance( // TODO is this a bad idea?
             animation(
                 name = this.name,
-                loop = true,
+                loop = this.loop,
                 frames = {
                     var nextFrame = 0.0F
 

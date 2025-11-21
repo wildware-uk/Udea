@@ -15,6 +15,11 @@ data class Attribute(
     @Transient
     var max: ValueResolver = ValueResolver.Max
 
+    fun forceValue(newValue: Float) {
+        this.currentValue = newValue
+        this.baseValue = newValue
+    }
+
     override fun toString(): String {
         return "Attribute(base=$baseValue, current=$currentValue)"
     }

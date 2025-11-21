@@ -39,11 +39,15 @@ data class AnimationInstance<T>(
     private var playing = autoPlay
     private var time = 0F
     private val notifies = mutableMapOf<String, () -> Unit>()
+    private val onFinish = mutableListOf<(AnimationInstance<T>) -> Unit>()
 
     private lateinit var lastFrame: Frame<T>
 
     var currentFrame: Frame<T> = calculateCurrentFrame()
         private set
+
+    val isFinished: Boolean
+        get() = currentFrame == animation.frames.last() && !animation.loop
 
     fun update(delta: Float) {
         time += delta
@@ -53,11 +57,19 @@ data class AnimationInstance<T>(
         if (lastFrame != currentFrame) {
             println("NAME ${currentFrame.name}")
             notifies[currentFrame.name]?.invoke()
+
+            if(isFinished) {
+                onFinish.forEach { it(this) }
+            }
         }
     }
 
-    fun addNotify(name: String, onNotify: () -> Unit) {
+    fun onNotify(name: String, onNotify: () -> Unit) {
         notifies[name] = onNotify
+    }
+
+    fun onFinish(onFinish: (AnimationInstance<T>) -> Unit) {
+        this.onFinish.add(onFinish)
     }
 
     private fun calculateCurrentFrame(): Frame<T> {

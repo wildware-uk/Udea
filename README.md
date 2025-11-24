@@ -1,7 +1,12 @@
-# Udea 👷🏼‍♂️ WIP 🔨️
+![Udea Logo](images/logo.png)
+
+[![shield](https://img.shields.io/badge/Ko--fi-Donate%20-hotpink?logo=kofi&logoColor=white)](https://ko-fi.com/shaunwild)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-purple.svg)](http://kotlinlang.org/)
+![Discord](https://img.shields.io/discord/1442524958432563292)
+    
 
 A Kotlin+LibGDX+Fleks game engine for 2D games.
-
+    
 ## Features
 
 - Many built-in components, streamlining creation of games.

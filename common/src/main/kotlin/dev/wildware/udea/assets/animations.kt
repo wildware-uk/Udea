@@ -55,7 +55,6 @@ data class AnimationInstance<T>(
         currentFrame = calculateCurrentFrame()
 
         if (lastFrame != currentFrame) {
-            println("NAME ${currentFrame.name}")
             notifies[currentFrame.name]?.invoke()
 
             if(isFinished) {

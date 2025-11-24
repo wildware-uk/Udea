@@ -1,9 +1,9 @@
 package dev.wildware.udea.ecs.component.physics
 
+import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.physics.box2d.Body
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
-import dev.wildware.udea.Vector2
 import dev.wildware.udea.ecs.component.ComponentDependency.Companion.dependencies
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import ktx.box2d.circle

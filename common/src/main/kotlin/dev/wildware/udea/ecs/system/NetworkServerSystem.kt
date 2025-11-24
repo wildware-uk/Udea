@@ -4,18 +4,20 @@ import com.esotericsoftware.kryonet.Connection
 import com.esotericsoftware.kryonet.Listener
 import com.esotericsoftware.kryonet.Server
 import com.github.quillraven.fleks.*
-import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.assets.GameConfig
-import dev.wildware.udea.ecs.NetworkAuthority
+import dev.wildware.udea.ecs.component.NetworkAuthority
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.network.*
 import dev.wildware.udea.processAndRemoveEach
 import java.io.IOException
 import java.util.*
 
-class NetworkServerSystem : IteratingSystem(
-    family { all(Networkable) }
+class NetworkServerSystem(
+    world: World
+) : IteratingSystem(
+    family = world.family { all(Networkable) },
+    world = world
 ), FamilyOnAdd, FamilyOnRemove {
     val server = Server(1024 * 8, 1024 * 64).apply {
         kryo.registerDefaultPackets()
@@ -84,9 +86,16 @@ class NetworkServerSystem : IteratingSystem(
                 }
             }
 
+            // TODO
+//            server.sendToTCP(
+//                id,
+//                CommandPacket(SetLevel, listOf(gameConfig.defaultLevel!!.path))
+//            )
+
             // Sending existing entities to
-            val creates = world.getEntityCreates()
+            val creates = getEntityCreates()
             creates.forEach {
+                println("SENDING CREATE $it")
                 server.sendToTCP(id, it)
             }
         }
@@ -104,14 +113,14 @@ class NetworkServerSystem : IteratingSystem(
 
     override fun onRemoveEntity(entity: Entity) {
         if (server.connections.isEmpty()) return
-        server.sendToAllTCP(EntityDestroy(entity.id))
+        server.sendToAllTCP(EntityDestroy(entity))
     }
 
     override fun onDispose() {
         server.stop()
     }
 
-    fun World.getEntityCreates(): List<EntityCreate> {
+    fun getEntityCreates(): List<EntityCreate> {
         return family.map {
             it.toEntityCreate(world, NetworkAuthority.Server)
         }

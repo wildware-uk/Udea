@@ -14,7 +14,14 @@ import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.ParticleEffect
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
+import com.badlogic.gdx.math.Vector2
+import com.badlogic.gdx.scenes.scene2d.InputEvent
+import com.badlogic.gdx.scenes.scene2d.Stage
+import com.badlogic.gdx.scenes.scene2d.ui.Skin
+import com.badlogic.gdx.scenes.scene2d.ui.TextField
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.utils.viewport.ExtendViewport
+import com.badlogic.gdx.utils.viewport.ScreenViewport
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.SystemConfiguration
@@ -25,6 +32,8 @@ import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.dsl.script.evalScript
+import dev.wildware.udea.command.Commands
+import dev.wildware.udea.command.Console
 import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
@@ -33,14 +42,42 @@ import dev.wildware.udea.ecs.system.*
 import ktx.app.KtxGame
 import ktx.app.KtxScreen
 import ktx.app.clearScreen
+import ktx.assets.toInternalFile
+import ktx.scene2d.Scene2DSkin
 import java.io.File
+import kotlin.Boolean
+import kotlin.Exception
+import kotlin.Float
+import kotlin.Int
+import kotlin.String
+import kotlin.Unit
+import kotlin.also
+import kotlin.apply
+import kotlin.arrayOf
+import kotlin.collections.List
+import kotlin.collections.all
+import kotlin.collections.contains
+import kotlin.collections.emptyList
+import kotlin.collections.first
+import kotlin.collections.forEach
+import kotlin.collections.joinToString
+import kotlin.collections.listOf
+import kotlin.collections.map
+import kotlin.error
+import kotlin.getValue
+import kotlin.isInitialized
+import kotlin.lazy
+import kotlin.let
 import kotlin.reflect.KClass
 import kotlin.reflect.full.createInstance
 import kotlin.reflect.full.findAnnotation
+import kotlin.require
 import kotlin.script.experimental.api.ResultValue
 import kotlin.script.experimental.api.ResultWithDiagnostics
 import kotlin.script.experimental.api.ScriptCompilationConfiguration
 import kotlin.script.experimental.api.ScriptEvaluationConfiguration
+import kotlin.stackTraceToString
+import kotlin.with
 import com.badlogic.gdx.physics.box2d.World as Box2DWorld
 
 lateinit var game: Game
@@ -59,10 +96,32 @@ class Game(
     var delta: Float = 0F
     var networkServerSystem: NetworkServerSystem? = null
     var networkClientSystem: NetworkClientSystem? = null
-    val isServer: Boolean = true
+    var isServer: Boolean = true
     var localPlayer: Entity? = null
     var clientId: Int = -1
     var time = 0F
+
+    val console by lazy {
+        Console().apply {
+            onCommand {
+                println(it)
+
+                try {
+                    Commands.execute(it)
+                } catch (e: Exception) {
+                    println("Error executing command: ${e.message}")
+                }
+            }
+        }
+    }
+
+    val stage by lazy {
+        Stage(ScreenViewport()).apply {
+            addActor(console)
+            console.setSize(300F, 300F)
+            console.setPosition(20F, 20F)
+        }
+    }
 
     val box2DWorld by lazy { Box2DWorld(Vector2(0.0F, -9.8F), true) }
 
@@ -79,7 +138,11 @@ class Game(
         }
     }
 
+    val gameConfig = Assets.filterIsInstance<GameConfig>().first()
+
     val spriteBatch by lazy { SpriteBatch() }
+
+    var displayConsole = false
 
     val world by lazy {
         configureWorld {
@@ -103,6 +166,20 @@ class Game(
 
     init {
         game = this
+
+        gameConfig.scene2d?.scene2DDefaultSkin?.let {
+            Scene2DSkin.defaultSkin = Skin(it.toInternalFile())
+        }
+
+        stage.addListener(object : ClickListener() {
+            override fun clicked(event: InputEvent?, x: Float, y: Float) {
+                if (event?.target !is TextField) {
+                    stage.keyboardFocus = null
+                }
+            }
+        })
+
+        gameManager.inputProcessor.addProcessor(stage)
 
         camera.zoom = 0.7F
 
@@ -145,8 +222,35 @@ class Game(
         this.delta = delta
         world.update(delta)
 
+        stage.act(delta)
+        stage.draw()
+
         if (Gdx.input.isKeyJustPressed(Input.Keys.F1)) {
             this.debug = !debug
+        }
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.GRAVE)) {
+            this.displayConsole = !this.displayConsole
+            console.isVisible = displayConsole
+        }
+    }
+
+    fun initializeWorldSource(worldSource: WorldSource) {
+        when (worldSource) {
+            is WorldSource.Host -> {
+                networkServerSystem = NetworkServerSystem(world).also {
+                    world += it
+                }
+                isServer = true
+            }
+
+            is WorldSource.Connect -> {
+                networkClientSystem = NetworkClientSystem(world).also {
+                    world += it
+                    it.start(worldSource.host, worldSource.tcpPort, worldSource.udpPort)
+                }
+                isServer = false
+            }
         }
     }
 
@@ -176,6 +280,7 @@ class Game(
 }
 
 class UdeaGameManager(
+    val udeaGame: UdeaGame,
     val assetLoader: AssetLoader = GameAssetLoader(),
     val isEditor: Boolean = false,
 ) : KtxGame<KtxScreen>() {
@@ -226,6 +331,11 @@ class UdeaGameManager(
 
         super.create()
         onCreate?.invoke()
+
+        UdeaReflections.registerProject(udeaGame::class)
+        UdeaReflections.init()
+
+        udeaGame.init()
     }
 
     override fun dispose() {}
@@ -254,8 +364,6 @@ class UdeaGameManager(
             CleanupSystem::class.java,
             ControllerSystem::class.java,
             ParticleSystemSystem::class.java,
-            NetworkClientSystem::class.java,
-            NetworkServerSystem::class.java,
         )
     }
 }
@@ -269,18 +377,6 @@ interface AssetLoader : FileHandleResolver {
 
 // TODO implement awesome networking
 
-fun initializeWorldSource(worldSource: WorldSource) {
-    when (worldSource) {
-        is WorldSource.Host -> {
-//            world -= networkClientSystem
-        }
-
-        is WorldSource.Connect -> {
-//            networkClientSystem.start(worldSource.host, worldSource.tcpPort, worldSource.udpPort)
-//            world -= networkServerSystem
-        }
-    }
-}
 
 sealed interface WorldSource {
     data class Host(
@@ -321,6 +417,7 @@ class GameAssetLoader : AssetLoader {
                         "kts" -> loadAsset(file).forEach {
                             Assets["${it.path}/${it.name}"] = it
                         }
+
                         "p" -> manager.load(path, ParticleEffect::class.java)
 
                         else -> loaded = false
@@ -347,7 +444,7 @@ class GameAssetLoader : AssetLoader {
 
 fun loadAssets(
     file: File,
-    compilationConfiguration: ScriptCompilationConfiguration.Builder.()->Unit = {},
+    compilationConfiguration: ScriptCompilationConfiguration.Builder.() -> Unit = {},
     evaluationConfig: ScriptEvaluationConfiguration.Builder.() -> Unit = {},
 ): List<Asset> {
     val fileName = file.name

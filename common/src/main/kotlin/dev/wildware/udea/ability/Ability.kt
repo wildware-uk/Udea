@@ -3,13 +3,40 @@ package dev.wildware.udea.ability
 import com.badlogic.gdx.math.Vector2
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
+import dev.wildware.udea.assets.Ability
+
 
 /**
  * The actual execution of an ability.
  * */
-interface AbilityExec {
+abstract class AbilityExec(
+    val abilityActivation: AbilityActivation
+) {
     context(world: World)
-    fun activate(abilityInfo: AbilityInfo)
+    abstract fun activate(abilityInfo: AbilityInfo)
+
+    fun finish() {
+        abilityActivation.abilityFinished = true
+    }
+}
+
+data class AbilityActivation(
+    val ability: Ability,
+    val info: AbilityInfo
+) {
+    private var onFinish: ((AbilityActivation) -> Unit)? = null
+
+    var abilityFinished = false
+        set(value) {
+            field = value
+            if(value) {
+                onFinish?.invoke(this)
+            }
+        }
+
+    fun onFinish(onFinish: (AbilityActivation) -> Unit) {
+        this.onFinish = onFinish
+    }
 }
 
 /**

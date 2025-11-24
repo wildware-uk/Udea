@@ -1,22 +1,12 @@
 package dev.wildware.udea.assets
 
-import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonTypeInfo
-import com.fasterxml.jackson.annotation.JsonValue
 import dev.wildware.udea.assets.dsl.ListBuilder
 import dev.wildware.udea.assets.dsl.UdeaDsl
 import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.dsl.DslInclude
-import dev.wildware.udea.ecs.component.UdeaClass
-import dev.wildware.udea.ecs.component.UdeaClass.UClassAttribute.NoInline
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 import kotlin.reflect.KClass
 import kotlin.reflect.full.isSubclassOf
 
@@ -28,20 +18,14 @@ data class AssetFile(
     val asset: Asset?
 )
 
-@UdeaClass(NoInline)
+val EmptyReference = AssetReference<Asset>("")
+
+@Serializable
 data class AssetReference<out T : Asset>(
-    @JsonValue
     val path: String
 ) {
-    @get:JsonIgnore
     val value: T
         get() = Assets.find(path)
-
-    companion object {
-        @JvmStatic
-        @JsonCreator
-        fun createAssetReference(path: String): AssetReference<*> = AssetReference<Asset>(path)
-    }
 }
 
 /**
@@ -64,7 +48,6 @@ fun <T : Asset> ListBuilder<AssetReference<T>>.reference(path: String) {
     use = JsonTypeInfo.Id.CLASS,
     include = JsonTypeInfo.As.PROPERTY,
 )
-@Serializable(with = AssetReferenceSerializer::class)
 abstract class Asset {
     @JsonIgnore
     var path: String = ""
@@ -73,9 +56,12 @@ abstract class Asset {
     @DslInclude
     var name: String = ""
 
+    val qualifiedName: String
+        get() = "$path/$name"
+
     @get:JsonIgnore
     val reference: AssetReference<Asset>
-        get() = AssetReference(path)
+        get() = AssetReference(qualifiedName)
 
     override fun equals(other: Any?): Boolean {
         return other is Asset && other.path == path
@@ -119,20 +105,6 @@ object Assets {
 
     fun debugAssets(): String {
         return assets.toString()
-    }
-}
-
-object AssetReferenceSerializer : KSerializer<Asset> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("Asset", PrimitiveKind.STRING)
-
-    override fun serialize(encoder: Encoder, value: Asset) {
-        encoder.encodeString(value.path.substringAfter("/assets"))
-    }
-
-    override fun deserialize(decoder: Decoder): Asset {
-        val path = decoder.decodeString()
-        return Assets[path]
     }
 }
 

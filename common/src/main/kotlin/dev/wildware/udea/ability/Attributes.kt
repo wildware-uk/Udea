@@ -1,12 +1,18 @@
 package dev.wildware.udea.ability
 
 import dev.wildware.udea.assets.dsl.UdeaDsl
+import dev.wildware.udea.network.UdeaNetworked
+import dev.wildware.udea.network.serde.UdeaSync
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
 @Serializable
+@UdeaNetworked
 data class Attribute(
+    @UdeaSync
     var baseValue: Float,
+
+    @UdeaSync
     var currentValue: Float = baseValue
 ) {
     @Transient

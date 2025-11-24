@@ -55,7 +55,7 @@ class DebugDrawSystem : IteratingSystem(
         }
 
         if (debug.drawRemote && entity.has(Networkable)) {
-            val id = entity[Networkable].remoteId
+            val id = entity[Networkable].remoteEntity
             size32Font.draw(spriteBatch, "Remote: $id", position.x, position.y + 100F)
         }
 

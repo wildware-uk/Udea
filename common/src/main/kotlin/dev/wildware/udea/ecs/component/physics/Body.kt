@@ -1,17 +1,18 @@
 package dev.wildware.udea.ecs.component.physics
 
 import com.badlogic.gdx.physics.box2d.BodyDef
+import com.badlogic.gdx.physics.box2d.BodyDef.BodyType.StaticBody
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
-import dev.wildware.udea.Vector2
-import dev.wildware.udea.ecs.ComponentDelegate
-import dev.wildware.udea.ecs.NetworkComponent.Companion.configureNetwork
-import dev.wildware.udea.ecs.SerializerDelegate
 import dev.wildware.udea.ecs.component.UdeaComponentType
+import dev.wildware.udea.ecs.component.configureNetwork
+import dev.wildware.udea.ecs.component.delegate
 import dev.wildware.udea.ecs.system.Box2DSystem
+import dev.wildware.udea.network.UdeaNetworked
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import ktx.box2d.body
 import com.badlogic.gdx.physics.box2d.Body as Box2DBody
 
@@ -21,8 +22,10 @@ import com.badlogic.gdx.physics.box2d.Body as Box2DBody
  *
  * @property type The physical behavior type of the body, defaults to [BodyDef.BodyType.StaticBody]
  */
+@Serializable
+@UdeaNetworked
 data class Body(
-    val type: BodyDef.BodyType = BodyDef.BodyType.StaticBody,
+    val type: BodyDef.BodyType = StaticBody,
     val linearDamping: Float = 0.0F,
     val angularDamping: Float = 0.0F,
     val fixedRotation: Boolean = false,
@@ -32,6 +35,7 @@ data class Body(
     @JsonIgnore
     lateinit var body: Box2DBody
 
+    @Transient
     var touchingCount: Int = 0
 
     val grounded: Boolean
@@ -52,29 +56,12 @@ data class Body(
         system<Box2DSystem>().box2DWorld.destroyBody(body)
     }
 
-    companion object : UdeaComponentType<Body>(networkComponent = configureNetwork {
-        delegate = RigidBodyComponentDelegate
-    })
-}
-
-object RigidBodyComponentDelegate : SerializerDelegate<Body, BodyPacketDelegate> {
-    override fun create(component: Body): BodyPacketDelegate {
-        return BodyPacketDelegate(
-            component.body.linearVelocity,
-            component.body.angularVelocity
+    companion object : UdeaComponentType<Body>(
+        networkComponent = configureNetwork(
+            delegates = {
+                delegate { body.linearVelocity }
+                delegate { body.angularVelocity }
+            }
         )
-    }
-}
-
-@Serializable
-data class BodyPacketDelegate(
-    val linearVelocity: Vector2 = Vector2.Zero,
-    val angularVelocity: Float = 0F
-) : ComponentDelegate {
-    override fun World.applyToEntity(entity: Entity) {
-        entity[Body].apply {
-            body.linearVelocity = linearVelocity
-            body.angularVelocity = angularVelocity
-        }
-    }
+    )
 }

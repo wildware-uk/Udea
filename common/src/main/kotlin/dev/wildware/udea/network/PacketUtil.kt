@@ -2,32 +2,47 @@ package dev.wildware.udea.network
 
 import com.esotericsoftware.kryo.Kryo
 import com.github.quillraven.fleks.*
-import dev.wildware.udea.assets.Asset
-import dev.wildware.udea.assets.AssetReferenceSerializer
-import dev.wildware.udea.ecs.NetworkAuthority
-import dev.wildware.udea.ecs.NetworkComponent
-import dev.wildware.udea.ecs.SyncStrategy
-import dev.wildware.udea.ecs.component.base.Networkable
+import dev.wildware.udea.*
+import dev.wildware.udea.UdeaReflections.udeaReflections
+import dev.wildware.udea.assets.AssetReference
+import dev.wildware.udea.ecs.component.NetworkAuthority
+import dev.wildware.udea.ecs.component.NetworkComponent
+import dev.wildware.udea.ecs.component.SyncStrategy
+import dev.wildware.udea.ecs.component.SyncStrategy.Update
 import dev.wildware.udea.ecs.component.base.Blueprint
+import dev.wildware.udea.ecs.component.base.Dead
+import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.system.AbilitySystem
-import dev.wildware.udea.game
-import dev.wildware.udea.getNetworkData
-import dev.wildware.udea.getNetworkEntityOrNull
-import dev.wildware.udea.hasAuthority
-import dev.wildware.udea.isNetworkable
+import dev.wildware.udea.network.InPlaceSerializers.inPlaceSerializer
+import dev.wildware.udea.network.serde.AssetReferenceSerializer
+import dev.wildware.udea.network.serde.SerializableSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.modules.SerializersModule
-import org.reflections.Reflections
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.serializer
+import kotlin.reflect.full.findAnnotation
 
-val reflections = Reflections("dev.wildware")
-val udeaNetworkedTypes: Set<Class<*>> = reflections.getTypesAnnotatedWith(UdeaNetworked::class.java)
-val networkedComponents = udeaNetworkedTypes
+val udeaNetworkedTypes = udeaReflections
+    .getTypesAnnotatedWith(UdeaNetworked::class.java)
     .filter { Component::class.java.isAssignableFrom(it) }
 
 fun Kryo.registerDefaultPackets() {
     addDefaultSerializer(NetworkPacket::class.java, SerializableSerializer)
+
+    register(EntityCreate::class.java, SerializableSerializer)
+    register(AbilityPacket::class.java).apply {
+        instantiator = AbilityPacketInstantiator
+    }
+    register(EntityDestroy::class.java).apply {
+        instantiator = EntityDestroyInstantiator
+    }
+    register(EntityUpdate::class.java, EntityUpdateSerializer)
+
+    register(Entity::class.java, SerializableSerializer)
+    register(AssetReference::class.java, AssetReferenceSerializer)
+
     udeaNetworkedTypes.forEach {
         register(it)
     }
@@ -36,85 +51,59 @@ fun Kryo.registerDefaultPackets() {
 @OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)
 val cbor = Cbor {
     serializersModule = SerializersModule {
-        contextual(Asset::class, AssetReferenceSerializer)
-        contextual(EntityUpdate::class, EntityUpdateSerializer)
-
-
-
         //TODO register polymorphic types
 
-//        polymorphic(Component::class) {
-//            networkedComponents
-//                .map { it.kotlin.companionObjectInstance }
-//                .filterIsInstance<UdeaComponentType<*>>()
-//                .filter { it.networkComponent.isDelegatedSafe }
-//                .forEach {
-//                    println("Registering ${it.simpleName}")
-//                    subclass(it::class, it::class.serializer())
-//                }
-//        }
+        polymorphic(Component::class) {
+            udeaNetworkedTypes
+                .filterIsInstance<Class<Component<*>>>()
+                .filter { it.kotlin.findAnnotation<UdeaNetworked>()?.registerKotlinXSerializer == true }
+                .forEach {
+                    println("Registering ${it.simpleName}")
+                    subclass(it.kotlin, it.kotlin.serializer())
+                }
+        }
 
-
-
-//        polymorphic(UniqueId::class) {
-//            //Find a way to serialize Tags
-//            subclass(Dead::class, Dead.serializer())
-//        }
-//
-//        polymorphic(ComponentDelegate::class) {
-//            subclass(RigidBodyPacketDelegate::class, RigidBodyPacketDelegate.serializer())
-//        }
+        polymorphic(UniqueId::class) {
+            //Find a way to serialize Tags
+            subclass(Dead::class, Dead.serializer())
+        }
     }
 }
 
 fun World.processEntityCreate(create: EntityCreate, authority: NetworkAuthority) {
-    val (id, blueprint, networkComponents, tags, delegates) = create
+    val (ent, blueprint, networkComponents, tags) = create
 
-    val entity = getNetworkEntityOrNull(id)
+    val entity = getNetworkEntityOrNull(ent)
 
     if (entity == null) {
         if (authority != NetworkAuthority.Server) return
+        val blueprint = blueprint.value
         val entity = blueprint.newInstance(this) {
-            it[Networkable].remoteId = id
+            it[Networkable].remoteEntity = ent //TODO this may incorrect
 
             it += networkComponents
                 .filter { it.getNetworkData().checkNetworkAuthority(authority) }
             it += tags as List<EntityTag>
-        }.apply {
-            delegates.forEach {
-                with(it) {
-                    applyToEntity(this@apply)
-                }
-            }
         }
 
         if (hasAuthority(entity) && blueprint.name == "player") {
-            game.localPlayer = entity
+            game.localPlayer = entity // TODO this may be useless
         }
     }
 }
 
 fun World.processEntityUpdate(update: EntityUpdate, authority: NetworkAuthority) {
-//    if (!update.valid) return
+    val remoteEntity = getNetworkEntityOrNull(update.entity) ?: return
+    val entitySnapshot = snapshotOf(remoteEntity)
+    val networkComponents = entitySnapshot.components
+        .filter { it.isNetworkable() && it.getNetworkData().shouldSync(Update, authority) }
 
-//    val (id, networkComponents, tags, delegates) = update
+    networkComponents.forEach {
+        val serializer = it::class.inPlaceSerializer() as InPlaceSerializer<Component<out Any>>
+        serializer.deserialize(it, update.byteBuffer)
+    }
 
-//    val entity = getNetworkEntityOrNull(id)
-
-    TODO()
-//    if (entity != null) {
-//        entity.configure { entity ->
-//            entity += networkComponents
-//                .filter { it.getNetworkData().checkNetworkAuthority(authority) }
-//            entity += tags as List<EntityTag>
-//        }
-//
-//        delegates.forEach {
-//            with(it) {
-//                applyToEntity(entity)
-//            }
-//        }
-//    }
+    EntityUpdatePool.freeSafe(update)
 }
 
 fun World.processEntityDestroy(entityDestroy: EntityDestroy) {
@@ -123,6 +112,8 @@ fun World.processEntityDestroy(entityDestroy: EntityDestroy) {
     getNetworkEntityOrNull(id)?.configure { entity ->
         this@processEntityDestroy -= entity
     }
+
+    EntityDestroyInstantiator.free(entityDestroy)
 }
 
 fun World.processAbilityPacket(packet: AbilityPacket) {
@@ -130,26 +121,25 @@ fun World.processAbilityPacket(packet: AbilityPacket) {
 }
 
 fun Entity.toEntityUpdate(world: World, authority: NetworkAuthority): EntityUpdate {
-    with(world) {
-        val snapshot = world.snapshotOf(this@toEntityUpdate)
+    val snapshot = world.snapshotOf(this@toEntityUpdate)
 
-        val networkedComponents = snapshot.components
-            .filter { it.isNetworkable() && it.getNetworkData().shouldSync(SyncStrategy.Update, authority) }
+    val networkedComponents = snapshot.components
+        .filter { it.isNetworkable() && it.getNetworkData().shouldSync(Update, authority) }
 
-        val (delegates, nonDelegates) = networkedComponents.partition { it.getNetworkData().isDelegated }
+    val remoteEntity = with(world) { this@toEntityUpdate[Networkable].remoteEntity }
 
-        val delegateInstances = delegates.map { component ->
-            component.getNetworkData().delegate!!.createRaw(component)
-        }
-
-        TODO()
-//        return EntityUpdate(
-//            this@toEntityUpdate[Networkable].remoteId,
-//            nonDelegates,
-//            snapshot.tags,
-//            delegateInstances
-//        )
+    val entityUpdate = EntityUpdatePool.obtainSafe().apply {
+        this.entity = remoteEntity
+        // TODO TAGS
     }
+
+    networkedComponents.forEach {
+        val serializer = it::class.inPlaceSerializer() as InPlaceSerializer<Component<out Any>>
+        serializer.serialize(it, entityUpdate.byteBuffer)
+    }
+
+
+    return entityUpdate
 }
 
 fun Entity.toEntityCreate(world: World, authority: NetworkAuthority): EntityCreate {
@@ -159,23 +149,15 @@ fun Entity.toEntityCreate(world: World, authority: NetworkAuthority): EntityCrea
         val networkedComponents = snapshot.components
             .filter { it.isNetworkable() && it.getNetworkData().shouldSync(SyncStrategy.Create, authority) }
 
-        val (delegates, nonDelegates) = networkedComponents
-            .partition { it.getNetworkData().isDelegated }
-
-        val delegateInstances = delegates.map { component ->
-            component.getNetworkData().delegate!!.createRaw(component)
-        }
-
         return EntityCreate(
-            this@toEntityCreate[Networkable].remoteId,
+            this@toEntityCreate[Networkable].remoteEntity,
             this@toEntityCreate[Blueprint].blueprint,
-            nonDelegates,
+            networkedComponents,
             snapshot.tags,
-            delegateInstances
         )
     }
 }
 
-private fun NetworkComponent<*>.shouldSync(syncStrategy: SyncStrategy, networkAuthority: NetworkAuthority): Boolean {
+fun NetworkComponent<*>.shouldSync(syncStrategy: SyncStrategy, networkAuthority: NetworkAuthority): Boolean {
     return this.checkSyncStrategy(syncStrategy) && this.checkNetworkAuthority(networkAuthority)
 }

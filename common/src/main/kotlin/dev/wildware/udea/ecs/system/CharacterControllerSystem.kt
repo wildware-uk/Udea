@@ -24,7 +24,7 @@ class CharacterControllerSystem : IteratingSystem(
         val ability = characterController.abilityQueue.removeFirstOrNull()
 
         if (ability != null) {
-            world.system<AbilitySystem>().activateAbility(ability.info, ability.ability)
+            world.system<AbilitySystem>().activateAbility(ability.info, ability.ability.value)
         }
     }
 }

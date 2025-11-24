@@ -5,15 +5,13 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.math.Vector2
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
-import com.github.quillraven.fleks.EntityCreateContext
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.assets.UClass
-import dev.wildware.udea.ecs.NetworkComponent
+import dev.wildware.udea.ecs.component.NetworkComponent
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.base.Blueprint
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.component.base.Transform
-import dev.wildware.udea.ecs.system.BackgroundDrawSystem
 import ktx.graphics.use
 import kotlin.contracts.ExperimentalContracts
 import kotlin.reflect.KClass
@@ -27,15 +25,16 @@ inline fun <T> MutableList<T>.processAndRemoveEach(onEach: (T) -> Unit) {
 
 fun Entity.blueprint(world: World): BlueprintAsset {
     with(world) {
-        return this@blueprint[Blueprint].blueprint
+        return this@blueprint[Blueprint].blueprint.value
     }
 }
 
-fun World.getNetworkEntity(id: Int): Entity = asEntityBag()
-    .find { it.getOrNull(Networkable)?.remoteId == id } ?: error("No entity with network id: $id")
+// TODO this is unacceptable!!! use a family instead.
+fun World.getNetworkEntity(remoteEntity: Entity): Entity = asEntityBag()
+    .find { it.getOrNull(Networkable)?.remoteEntity == remoteEntity } ?: error("No entity with network id: $remoteEntity")
 
-fun World.getNetworkEntityOrNull(id: Int): Entity? = asEntityBag()
-    .find { it.getOrNull(Networkable)?.remoteId == id }
+fun World.getNetworkEntityOrNull(remoteEntity: Entity): Entity? = asEntityBag()
+    .find { it.getOrNull(Networkable)?.remoteEntity == remoteEntity }
 
 fun World.hasAuthority(entity: Entity) =
     (Networkable !in entity) || entity[Networkable].owner == game.clientId
@@ -76,3 +75,10 @@ val <T : Any> KClass<T>.uClass: UClass<T>
 context(world: World)
 val Entity.position: Vector2
     get() = this[Transform].position
+
+/**
+ * Returns the remote entity reference for an entity.
+ * */
+context(world: World)
+val Entity.remoteEntity: Entity
+    get()= this[Networkable].remoteEntity

@@ -7,7 +7,18 @@ data class GameConfig(
     val defaultCharacter: AssetReference<Blueprint>? = null,
     val backgroundTexture: String? = null,
     val lighting: Lighting? = null,
+    val network: Network? = null,
+    val scene2d: Scene2D? = null,
 ) : Asset()
+
+data class Scene2D(
+    val scene2DDefaultSkin: String? = null
+): Asset()
+
+data class Network(
+    val tcpPort: Int = 28855,
+    val udpPort: Int = 28856,
+): Asset()
 
 data class Lighting(
     val shadows: Boolean = true,

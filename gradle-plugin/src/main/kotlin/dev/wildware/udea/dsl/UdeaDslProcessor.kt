@@ -10,6 +10,8 @@ private val DefaultClasses = listOf(
     "com.github.quillraven.fleks.Component"
 )
 
+private const val ParametersFieldName = "_params"
+
 class UdeaDslProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
@@ -28,6 +30,20 @@ class UdeaDslProcessor(
         }
     }
 
+    private fun isLambdaWithReceiver(type: KSType): Boolean {
+        return type.declaration.qualifiedName?.asString()?.startsWith("kotlin.Function") == true &&
+                type.arguments.size >= 2 && type.arguments[0].type != null
+    }
+
+    private fun getLambdaTypes(type: KSType): Triple<KSType, List<KSType>, KSType> {
+        val receiver = type.arguments[0].type!!.resolve()
+        val returnType = type.arguments.last().type!!.resolve()
+        val args = if (type.arguments.size > 2) {
+            type.arguments.subList(1, type.arguments.size - 1).mapNotNull { it.type?.resolve() }
+        } else emptyList()
+        return Triple(receiver, args, returnType)
+    }
+
     private fun writeParameterDeclarations(
         out: OutputStreamWriter,
         params: List<KSValueParameter>,
@@ -41,6 +57,10 @@ class UdeaDslProcessor(
 
             if (isList) {
                 out.append(getListParameterDeclaration(paramName, paramType))
+            } else if (isLambdaWithReceiver(paramType)) {
+                val (receiver, args, returnType) = getLambdaTypes(paramType)
+                val argsStr = if (args.isEmpty()) "" else args.joinToString(", ") { it.toQualifiedString() }
+                out.append("    $paramName: ${receiver.toQualifiedString()}.(${argsStr}) -> ${returnType.toQualifiedString()}")
             } else {
                 out.append("    $paramName: ${paramType.toQualifiedString()}")
             }
@@ -77,13 +97,13 @@ class UdeaDslProcessor(
             if (isList) {
                 out.appendLine(getListBuilderAssignment(paramName, param.type.resolve(), true))
             } else {
-                out.appendLine("    if ($paramName != null) parameters[\"$paramName\"] = $paramName")
+                out.appendLine("    if ($paramName != null) ${ParametersFieldName}[\"$paramName\"] = $paramName")
             }
         } else {
             if (isList) {
                 out.appendLine(getListBuilderAssignment(paramName, param.type.resolve(), false))
             } else {
-                out.appendLine("    parameters[\"$paramName\"] = $paramName")
+                out.appendLine("    ${ParametersFieldName}[\"$paramName\"] = $paramName")
             }
         }
     }
@@ -98,7 +118,7 @@ class UdeaDslProcessor(
 
     private fun getListBuilderAssignment(paramName: String, paramType: KSType, isOptional: Boolean): String {
         val baseAssignment =
-            "    ${if (isOptional) "if ($paramName != null) " else ""}parameters[\"$paramName\"] = ListBuilder<${
+            "    ${if (isOptional) "if ($paramName != null) " else ""}${ParametersFieldName}[\"$paramName\"] = ListBuilder<${
                 paramType.arguments.first().type?.resolve()?.toQualifiedString() ?: "Any"
             }>().apply($paramName).build()"
         return baseAssignment
@@ -219,10 +239,10 @@ class UdeaDslProcessor(
                     out.appendLine("fun $typeParams ${name.replaceFirstChar { it.lowercase() }}(")
                     writeParameterDeclarations(out, params, getDslIncludeProperties(decl))
                     out.appendLine("): ${decl.qualifiedName!!.asString()}$typeArgs {")
-                    out.appendLine("    val parameters = mutableMapOf<String, Any?>()")
+                    out.appendLine("    val $ParametersFieldName = mutableMapOf<String, Any?>()")
                     writeParameterAssignments(out, params)
                     out.appendLine()
-                    out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, parameters)$castSuffix")
+                    out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, ${ParametersFieldName})$castSuffix")
                     getDslIncludeProperties(decl).forEach { prop ->
                         validateProperty(prop)
                         val propName = prop.simpleName.asString()
@@ -236,7 +256,7 @@ class UdeaDslProcessor(
                 out.appendLine("fun $typeParams ListBuilder<in ${decl.qualifiedName!!.asString()}$typeArgs>.${name.replaceFirstChar { it.lowercase() }}(")
                 writeParameterDeclarations(out, params, getDslIncludeProperties(decl))
                 out.appendLine(") {")
-                out.appendLine("    val parameters = mutableMapOf<String, Any?>()")
+                out.appendLine("    val $ParametersFieldName = mutableMapOf<String, Any?>()")
                 params.forEach { param ->
                     val paramName = param.name?.asString() ?: return@forEach
                     val paramType = param.type.resolve()
@@ -246,27 +266,27 @@ class UdeaDslProcessor(
                     if (isList) {
                         if (param.hasDefault) {
                             out.appendLine(
-                                "    if ($paramName != null) parameters[\"$paramName\"] = ListBuilder<${
+                                "    if ($paramName != null) ${ParametersFieldName}[\"$paramName\"] = ListBuilder<${
                                     paramType.arguments.first().type?.resolve()?.toQualifiedString() ?: "Any"
                                 }>().apply($paramName).build()"
                             )
                         } else {
                             out.appendLine(
-                                "    parameters[\"$paramName\"] = ListBuilder<${
+                                "    ${ParametersFieldName}[\"$paramName\"] = ListBuilder<${
                                     paramType.arguments.first().type?.resolve()?.toQualifiedString() ?: "Any"
                                 }>().apply($paramName).build()"
                             )
                         }
                     } else {
                         if (param.hasDefault) {
-                            out.appendLine("    if ($paramName != null) parameters[\"$paramName\"] = $paramName")
+                            out.appendLine("    if ($paramName != null) ${ParametersFieldName}[\"$paramName\"] = $paramName")
                         } else {
-                            out.appendLine("    parameters[\"$paramName\"] = $paramName")
+                            out.appendLine("    ${ParametersFieldName}[\"$paramName\"] = $paramName")
                         }
                     }
                 }
                 out.appendLine()
-                out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, parameters)$castSuffix")
+                out.appendLine("    val obj = createObject(${decl.qualifiedName!!.asString()}::class, ${ParametersFieldName})$castSuffix")
                 getDslIncludeProperties(decl).forEach { prop ->
                     validateProperty(prop)
                     val propName = prop.simpleName.asString()
@@ -291,7 +311,7 @@ class UdeaDslProcessor(
 
         val args = arguments.takeIf { it.isNotEmpty() }?.joinToString(", ") { arg ->
             buildString {
-                if (arg.variance != Variance.INVARIANT) append("${arg.variance.label} ")
+                if (arg.variance != Variance.INVARIANT && arg.type != null) append("${arg.variance.label} ")
                 append(arg.type?.resolve()?.toQualifiedString() ?: "*")
             }
         }

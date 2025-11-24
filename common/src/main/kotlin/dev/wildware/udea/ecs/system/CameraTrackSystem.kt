@@ -3,7 +3,6 @@ package dev.wildware.udea.ecs.system
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
-import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.component.render.Camera
 import dev.wildware.udea.game

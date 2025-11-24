@@ -20,12 +20,11 @@ import dev.wildware.udea.ecs.component.render.spriteRenderer
 fun ListBuilder<in Blueprint>.character(
     name: String,
     animations: CharacterAnimations,
-    abilityHints: ListBuilder<AbilityHint>.() -> Unit,
     size: CharacterSize,
     attributeSet: AttributeSet,
     components: LazyList<Component<out Any>>
 ) {
-    add(dev.wildware.udea.assets.character(name, animations, abilityHints, size, attributeSet, components))
+    add(dev.wildware.udea.assets.character(name, animations, size, attributeSet, components))
 }
 
 /**
@@ -34,7 +33,6 @@ fun ListBuilder<in Blueprint>.character(
 fun character(
     name: String,
     animations: CharacterAnimations,
-    abilityHints: ListBuilder<AbilityHint>.() -> Unit,
     size: CharacterSize,
     attributeSet: AttributeSet,
     components: LazyList<Component<out Any>>

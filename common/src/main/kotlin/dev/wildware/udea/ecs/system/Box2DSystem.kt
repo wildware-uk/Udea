@@ -13,6 +13,7 @@ import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.component.physics.*
 import dev.wildware.udea.ecs.component.physics.Body
 import dev.wildware.udea.game
+import dev.wildware.udea.getOrNull
 import com.badlogic.gdx.physics.box2d.World as Box2DWorld
 
 @UdeaSystem(runIn = [Editor, Game])
@@ -45,11 +46,11 @@ class Box2DSystem(
                 val bodyB = contact.fixtureB.body.userData
 
                 if (bodyA is Entity) {
-                    bodyA[Body].touchingCount--
+                    bodyA.getOrNull(Body)?.touchingCount--
                 }
 
                 if (bodyB is Entity) {
-                    bodyB[Body].touchingCount--
+                    bodyB.getOrNull(Body)?.touchingCount--
                 }
             }
 

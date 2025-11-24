@@ -3,7 +3,6 @@ package dev.wildware.udea.ecs.component
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
-import dev.wildware.udea.ecs.NetworkComponent
 import dev.wildware.udea.ecs.component.ComponentDependency.Companion.Empty
 import dev.wildware.udea.ecs.component.ComponentDependency.Companion.dependencies
 

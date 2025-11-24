@@ -5,6 +5,8 @@ import com.github.quillraven.fleks.ComponentType
 import com.github.quillraven.fleks.Entity
 import dev.wildware.udea.ability.AbilityExec
 import dev.wildware.udea.ability.AbilityInfo
+import dev.wildware.udea.assets.Ability
+import dev.wildware.udea.assets.AssetReference
 
 /**
  * Generic character controller for allowing players and AI to control
@@ -36,7 +38,7 @@ class CharacterController : Component<CharacterController> {
 }
 
 data class AbilitySpec(
-    val ability: AbilityExec,
+    val ability: AssetReference<Ability>,
     val info: AbilityInfo
 )
 

@@ -3,21 +3,16 @@ package dev.wildware.udea.ecs.component.control
 import com.github.quillraven.fleks.Component
 import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.assets.Control
-import dev.wildware.udea.ecs.NetworkAuthority.Client
-import dev.wildware.udea.ecs.NetworkComponent.Companion.configureNetwork
+import dev.wildware.udea.ecs.component.NetworkAuthority.Client
 import dev.wildware.udea.ecs.component.UdeaComponentType
-import dev.wildware.udea.network.UdeaNetworked
-import dev.wildware.udea.network.serde.UdeaSync
+import dev.wildware.udea.ecs.component.configureNetwork
 
-@UdeaNetworked
 class Controller : Component<Controller> {
     private val controls = Assets
         .filterIsInstance<Control>()
 
-    @UdeaSync
     val bindingPressed = Array(controls.size + 1) { false }
 
-    @UdeaSync
     val bindingJustPressed = Array(controls.size + 1) { false }
 
     override fun type() = Controller
@@ -30,9 +25,5 @@ class Controller : Component<Controller> {
         return bindingJustPressed[control.controlId]
     }
 
-    companion object : UdeaComponentType<Controller>(
-        networkComponent = configureNetwork {
-            networkAuthority = Client
-        }
-    )
+    companion object : UdeaComponentType<Controller>()
 }

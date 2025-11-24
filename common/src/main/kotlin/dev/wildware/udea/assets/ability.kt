@@ -6,8 +6,8 @@ import dev.wildware.udea.dsl.CreateDsl
 import kotlin.reflect.KClass
 
 data class Ability(
-    val display: AbilityDisplay,
     val exec: KClass<out AbilityExec>,
+    val display: AbilityDisplay? = null,
     val params: Map<String, Any> = emptyMap(),
     val cooldownEffect: AssetReference<GameplayEffect>? = null
 ) : Asset()

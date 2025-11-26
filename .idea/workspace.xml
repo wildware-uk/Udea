@@ -19,39 +19,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="- ✨ **Revamp Network, Reflection, and Serializer Systems**&#10;  - Added new command handling framework with `Command`, `Commands`, and console UI for in-game interaction.&#10;  - Introduced `ConnectCommand` and `HostCommand` for network operations.&#10;  - Added powerful reflection utilities with `UdeaReflections` for project registration and type scanning.&#10;  - Implemented `AssetReferenceSerializer` and `SerializableSerializer` for streamlined serialization.&#10;  - Enhanced pooling with better serialization strategies for network packets (e.g., `EntityUpdate`, `AbilityPacket`).&#10;  - Replaced obsolete community serializers with custom reflection-based alternatives.&#10;  - 🚀 Improved `Box2DSystem` with safe component access (`getOrNull`) for compact hitbox detection.&#10;&#10;- 🔥 **Remove Legacy Serializers and Obsolete Files**&#10;  - Deleted outdated `EntityUpdateSerializer` and related infrastructure.&#10;  - Removed legacy `types.kt` and redundant duplication across the codebase.&#10;&#10;- 🛠️ **Refactor and Optimize Across Networking and ECS**&#10;  - Refactored `NetworkPacket`, `CommandPacket`, and `EntityCreate` for clarity and consistency.&#10;  - Improved ECS system inheritance with better `family` handling in systems like `NetworkServerSystem` and `EditorSystem`.&#10;  - 🌟 Introduced cleaner, context-oriented design patterns for future scalability.&#10;&#10;- 🎨 **Code Cleanup and Project Simplification**&#10;  - Streamlined networking utilities for improved maintainability.&#10;  - Modularized code architecture to separate concerns (e.g., moved core systems under `command` and `serde`).&#10;&#10;- ✨ **Big Step Toward Modular Game Systems**">
-      <change afterPath="$PROJECT_DIR$/example/src/main/resources/assets/blueprint/characters.udea.kts" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/example/src/main/resources/assets/level/test_level.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/common/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/Mouse.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/Mouse.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGame.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGame.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/UdeaScript.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/particle.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/particle.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/render.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/render.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/command/ConnectCommand.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/command/ConnectCommand.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/command/Console.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/command/Console.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/command/HostCommand.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/command/HostCommand.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/base/Networkable.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/base/Networkable.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/SpriteRenderer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/render/SpriteRenderer.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AbilitySystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AbilitySystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AnimationSetSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AnimationSetSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AnimationSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AnimationSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AttributeSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AttributeSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/BackgroundDrawSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/BackgroundDrawSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DLightsSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DLightsSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CameraTrackSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CameraTrackSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/DebugDrawSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/DebugDrawSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/NetworkClientSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/NetworkClientSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/ParticleSystemSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/ParticleSystemSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/SpriteBatchSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/SpriteBatchSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/PacketUtil.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/PacketUtil.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/utils.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/utils.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/resources/META-INF/kotlin/script/templates/dev.wildware.udea.assets.dsl.script.UdeaScript" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/systems/EditorSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/level-editor/src/main/kotlin/dev/wildware/systems/EditorSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptHost.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptHost.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ExampleGame.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ExampleGame.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/src/main/kotlin/scriptDef.kt" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/src/main/kotlin/scriptDef.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -334,7 +306,7 @@
     "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary": "JUnit3",
     "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit3": "junit.framework.TestCase",
     "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit5": "",
-    "git-widget-placeholder": "master",
+    "git-widget-placeholder": "example",
     "jdk.selected.JAVA_MODULE": "21",
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
@@ -399,7 +371,7 @@
       <recent name="dev.wildware.udea.dsl" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.udea:scripts [build]">
+  <component name="RunManager" selected="Kotlin.ExampleGameKt">
     <configuration name="udea [publishToMavenLocal]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -729,7 +701,7 @@
       <workItem from="1764059998395" duration="18962000" />
       <workItem from="1764091206112" duration="8566000" />
       <workItem from="1764150912100" duration="1917000" />
-      <workItem from="1764152838493" duration="2023000" />
+      <workItem from="1764152838493" duration="2372000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />

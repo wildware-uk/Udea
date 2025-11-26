@@ -31,6 +31,7 @@ object UdeaScriptConfiguration : ScriptCompilationConfiguration({
 
     jvm {
         jvmTarget("17")
+        dependenciesFromCurrentContext(wholeClasspath = true)
     }
 
     compilerOptions.append("-Xcontext-sensitive-resolution")

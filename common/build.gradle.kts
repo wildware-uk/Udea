@@ -45,7 +45,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-scripting-jvm")
     implementation("org.jetbrains.kotlin:kotlin-scripting-jvm-host")
     implementation("org.jetbrains.kotlin:kotlin-scripting-common")
-    api(project(":scripts"))
+    implementation(project(":scripts"))
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 

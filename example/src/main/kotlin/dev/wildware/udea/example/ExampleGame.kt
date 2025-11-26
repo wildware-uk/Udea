@@ -13,13 +13,6 @@ class ExampleGame : UdeaGame {
     }
 }
 
-fun testIt(testEnum: TestEnum) {
-
-}
-
-enum class TestEnum {
-    A, B
-}
 
 fun main() {
     Lwjgl3Application(

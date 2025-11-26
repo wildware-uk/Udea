@@ -7,7 +7,7 @@ import com.badlogic.gdx.math.Vector2
 import com.github.quillraven.fleks.Component
 import dev.wildware.udea.assets.dsl.UdeaDsl
 import dev.wildware.udea.ecs.component.UdeaComponentType
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import ktx.assets.getAsset
 
 class SpriteRenderer(
@@ -26,7 +26,7 @@ private const val WORLD_SCALE = 0.1F
 
 @UdeaDsl
 fun loadSprite(path: String, scale: Float): Sprite {
-    return Sprite(game.gameManager.assetManager.getAsset<Texture>(path)).apply {
+    return Sprite(gameScreen.gameManager.assetManager.getAsset<Texture>(path)).apply {
         setSize(
             width * scale * WORLD_SCALE,
             height * scale * WORLD_SCALE

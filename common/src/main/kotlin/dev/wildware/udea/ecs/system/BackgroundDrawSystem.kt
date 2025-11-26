@@ -9,14 +9,14 @@ import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import dev.wildware.udea.use
 
 @UdeaSystem(runIn = [Editor, Game])
 class BackgroundDrawSystem : IntervalSystem() {
 
     val gameConfig by lazy { Assets.filterIsInstance<GameConfig>().first() }
-    val background by lazy { game.gameManager.assetManager.get<Texture>(gameConfig.backgroundTexture) }
+    val background by lazy { gameScreen.gameManager.assetManager.get<Texture>(gameConfig.backgroundTexture) }
     val spriteBatch = SpriteBatch()
 
     override fun onTick() {

@@ -1,7 +1,7 @@
 package dev.wildware.udea.assets
 
 import com.badlogic.gdx.graphics.g2d.ParticleEffect
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 
 /**
  * A particle effect asset.
@@ -28,7 +28,7 @@ data class Particle(
      * Loads the GDX particle effect.
      * */
     fun load(): ParticleEffect {
-        val particleEffect = ParticleEffect(game.gameManager.assetManager.get(effectFile))
+        val particleEffect = ParticleEffect(gameScreen.gameManager.assetManager.get(effectFile))
         particleEffect.scaleEffect(scale)
         return particleEffect
     }

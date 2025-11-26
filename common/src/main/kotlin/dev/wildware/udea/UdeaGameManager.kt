@@ -26,6 +26,7 @@ import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.SystemConfiguration
 import com.github.quillraven.fleks.configureWorld
+import com.kotcrab.vis.ui.VisUI
 import dev.wildware.udea.assets.Asset
 import dev.wildware.udea.assets.AssetBundle
 import dev.wildware.udea.assets.Assets
@@ -39,6 +40,8 @@ import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.system.*
+import dev.wildware.udea.screen.LoadingScreen
+import dev.wildware.udea.screen.UIScreen
 import ktx.app.KtxGame
 import ktx.app.KtxScreen
 import ktx.app.clearScreen
@@ -54,15 +57,7 @@ import kotlin.Unit
 import kotlin.also
 import kotlin.apply
 import kotlin.arrayOf
-import kotlin.collections.List
-import kotlin.collections.all
-import kotlin.collections.contains
-import kotlin.collections.emptyList
-import kotlin.collections.first
-import kotlin.collections.forEach
-import kotlin.collections.joinToString
-import kotlin.collections.listOf
-import kotlin.collections.map
+import kotlin.collections.plusAssign
 import kotlin.error
 import kotlin.getValue
 import kotlin.isInitialized
@@ -80,17 +75,17 @@ import kotlin.stackTraceToString
 import kotlin.with
 import com.badlogic.gdx.physics.box2d.World as Box2DWorld
 
-lateinit var game: Game
+lateinit var gameScreen: GameScreen
 lateinit var gameManager: UdeaGameManager
 
-class Game(
-    val gameManager: UdeaGameManager,
+class GameScreen(
+    val gameManager: UdeaGameManager = dev.wildware.udea.gameManager,
+    val isEditor: Boolean = false,
     val level: Level,
-    val extraSystems: List<Class<out IntervalSystem>>,
-    val isEditor: Boolean
+    val extraSystems: List<KClass<out IntervalSystem>> = emptyList(),
 ) : KtxScreen {
     var started = false
-    var debug: Boolean = true
+    var debug: Boolean = false
     val viewport = ExtendViewport(19.20F, 10.80F)
     var camera = viewport.camera as OrthographicCamera
     var delta: Float = 0F
@@ -118,7 +113,7 @@ class Game(
     val stage by lazy {
         Stage(ScreenViewport()).apply {
             addActor(console)
-            console.setSize(300F, 300F)
+            console.setSize(600F, 300F)
             console.setPosition(20F, 20F)
         }
     }
@@ -138,7 +133,7 @@ class Game(
         }
     }
 
-    val gameConfig = Assets.filterIsInstance<GameConfig>().first()
+    val gameConfig = Assets.filterIsInstance<GameConfig>().firstOrNull()
 
     val spriteBatch by lazy { SpriteBatch() }
 
@@ -154,7 +149,7 @@ class Game(
 
             systems {
                 extraSystems.forEach {
-                    addSystem(it.kotlin)
+                    addSystem(it)
                 }
 
                 level.systems.forEach {
@@ -165,9 +160,9 @@ class Game(
     }
 
     init {
-        game = this
+        gameScreen = this
 
-        gameConfig.scene2d?.scene2DDefaultSkin?.let {
+        gameConfig?.scene2d?.scene2DDefaultSkin?.let {
             Scene2DSkin.defaultSkin = Skin(it.toInternalFile())
         }
 
@@ -295,54 +290,76 @@ class UdeaGameManager(
         assetManager.setLoader(ParticleEffect::class.java, ParticleEffectLoader(assetLoader))
     }
 
-    fun setLevel(level: Level, extraSystems: List<Class<out IntervalSystem>> = emptyList()) {
+    /**
+     * Displays the given level in the game.
+     * */
+    fun setLevel(level: Level) {
         screens.clear()
-        addScreen(Game(this, level, DefaultSystems, isEditor))
-        setScreen<Game>()
+        addScreen(
+            GameScreen(
+                isEditor = isEditor,
+                level = level,
+                extraSystems = DefaultSystems
+            )
+        )
+        setScreen<GameScreen>()
     }
+
+    /**
+     * Displays the given UI in the game.
+     * */
+    inline fun <reified T : UIScreen> showUI(uiScreen: T) {
+        addScreen(uiScreen)
+        setScreen<T>()
+    }
+
+    val loadingScreen by lazy { LoadingScreen(AssetLoaderTask(assetLoader, assetManager), udeaGame) }
 
     override fun create() {
         Gdx.input.inputProcessor = inputProcessor
-        assetLoader.load(assetManager)
-        assetManager.finishLoading()
+        VisUI.load()
 
-        if (!isEditor) {
-            val gameConfig = Assets.filterIsInstance<GameConfig>().first()
-            gameConfig.defaultLevel
-                ?.let {
-                    setLevel(
-                        it.value, extraSystems = listOf(
-                            CameraTrackSystem::class.java,
-                            BackgroundDrawSystem::class.java,
-                            AnimationSystem::class.java,
-                            Box2DSystem::class.java,
-                            SpriteBatchSystem::class.java,
-                            Box2DLightsSystem::class.java,
-                            AbilitySystem::class.java,
-                            CleanupSystem::class.java,
-                            ControllerSystem::class.java,
-                            ParticleSystemSystem::class.java,
-                            NetworkClientSystem::class.java,
-                            NetworkServerSystem::class.java,
-                        )
-                    )
-                }
-        }
+        addScreen(loadingScreen)
+        setScreen<LoadingScreen>()
+
+//        if (!isEditor) {
+//            val gameConfig = Assets.filterIsInstance<GameConfig>().first()
+//            gameConfig.defaultLevel
+//                ?.let {
+//                    setLevel(
+//                        it.value, extraSystems = listOf(
+//                            CameraTrackSystem::class.java,
+//                            BackgroundDrawSystem::class.java,
+//                            AnimationSystem::class.java,
+//                            Box2DSystem::class.java,
+//                            SpriteBatchSystem::class.java,
+//                            Box2DLightsSystem::class.java,
+//                            AbilitySystem::class.java,
+//                            CleanupSystem::class.java,
+//                            ControllerSystem::class.java,
+//                            ParticleSystemSystem::class.java,
+//                            NetworkClientSystem::class.java,
+//                            NetworkServerSystem::class.java,
+//                        )
+//                    )
+//                }
+//        }
 
         super.create()
         onCreate?.invoke()
 
         UdeaReflections.registerProject(udeaGame::class)
         UdeaReflections.init()
-
-        udeaGame.init()
     }
 
-    override fun dispose() {}
+    override fun dispose() {
+        VisUI.dispose()
+    }
+
     override fun pause() {}
     override fun resize(width: Int, height: Int) {
-        if (::game.isInitialized) {
-            game.resize(width, height)
+        if (::gameScreen.isInitialized) {
+            gameScreen.resize(width, height)
         }
     }
 
@@ -350,29 +367,68 @@ class UdeaGameManager(
 
     companion object {
         val DefaultSystems = listOf(
-            CameraTrackSystem::class.java,
-            BackgroundDrawSystem::class.java,
-            CharacterAnimationControllerSystem::class.java,
-            AnimationSystem::class.java,
-            CharacterControllerSystem::class.java,
-            Box2DSystem::class.java,
-            AnimationSetSystem::class.java,
-            SpriteBatchSystem::class.java,
-            Box2DLightsSystem::class.java,
-            AbilitySystem::class.java,
-            AttributeSystem::class.java,
-            CleanupSystem::class.java,
-            ControllerSystem::class.java,
-            ParticleSystemSystem::class.java,
+            CameraTrackSystem::class,
+            BackgroundDrawSystem::class,
+            CharacterAnimationControllerSystem::class,
+            AnimationSystem::class,
+            CharacterControllerSystem::class,
+            Box2DSystem::class,
+            AnimationSetSystem::class,
+            SpriteBatchSystem::class,
+            Box2DLightsSystem::class,
+            AbilitySystem::class,
+            AttributeSystem::class,
+            CleanupSystem::class,
+            ControllerSystem::class,
+            ParticleSystemSystem::class,
         )
     }
 }
 
+class AssetLoaderTask(
+    val assetLoader: AssetLoader,
+    val assetManager: AssetManager,
+) {
+    var progress: Int = 0
+        private set
+
+    var total: Int = 0
+        private set
+
+    var status: String = ""
+        private set
+
+    val finished: Boolean
+        get() = progress >= total
+
+    val assets = assetLoader.discoverAssets().also {
+        total = it.size
+    }
+
+    fun load() {
+        val assetToLoad = assets[progress]
+        status = "Loading $assetToLoad"
+        assetLoader.loadAsset(assetToLoad, assetManager)
+        progress++
+
+        if (finished) {
+            status = "Done!"
+            assetManager.finishLoading()
+        }
+    }
+}
+
 interface AssetLoader : FileHandleResolver {
+
+    /**
+     * Scan the assets directory for all assets needed for the game.
+     * */
+    fun discoverAssets(): List<FileHandle>
+
     /**
      * Loads all assets needed for the game into the [AssetManager].
      * */
-    fun load(manager: AssetManager)
+    fun loadAsset(assetFile: FileHandle, manager: AssetManager)
 }
 
 // TODO implement awesome networking
@@ -399,38 +455,46 @@ sealed interface WorldSource {
 /**
  * Default [GameAssetLoader] implementation.
  * */
-class GameAssetLoader : AssetLoader {
+class GameAssetLoader(
+    val baseDir: String = "assets/"
+) : AssetLoader {
     private val internalFileLoader = InternalFileHandleResolver()
 
-    override fun load(manager: AssetManager) {
+    override fun discoverAssets(): List<FileHandle> {
+        val assets = mutableListOf<FileHandle>()
+
         fun scanDirectory(directory: FileHandle) {
             directory.list().forEach { file ->
                 if (file.isDirectory) {
                     scanDirectory(file)
                 } else {
-                    var loaded = true
-
-                    val path = file.path().substringAfter("assets/")
-
-                    when (file.extension()) {
-                        "png" -> manager.load(path, Texture::class.java)
-                        "kts" -> loadAsset(file).forEach {
-                            Assets["${it.path}/${it.name}"] = it
-                        }
-
-                        "p" -> manager.load(path, ParticleEffect::class.java)
-
-                        else -> loaded = false
-                    }
-
-                    if (loaded) {
-                        Gdx.app.log("GameAssetLoader", "Loaded asset: $path")
-                    }
+                    assets += file
                 }
             }
         }
 
-        scanDirectory(Gdx.files.internal("assets"))
+        scanDirectory(Gdx.files.internal(baseDir))
+
+        return assets
+    }
+
+    override fun loadAsset(assetFile: FileHandle, manager: AssetManager) {
+        var loaded = true
+        val path = assetFile.path().substringAfter(baseDir)
+        when (assetFile.extension()) {
+            "png" -> manager.load(path, Texture::class.java)
+            "kts" -> loadAsset(assetFile).forEach {
+                Assets["${it.path}/${it.name}"] = it
+            }
+
+            "p" -> manager.load(path, ParticleEffect::class.java)
+
+            else -> loaded = false
+        }
+
+        if (loaded) {
+            Gdx.app.log("GameAssetLoader", "Loaded asset: $path")
+        }
     }
 
     override fun resolve(fileName: String): FileHandle {

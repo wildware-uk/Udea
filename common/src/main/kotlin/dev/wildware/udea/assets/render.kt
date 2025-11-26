@@ -6,7 +6,7 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion
 import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.ecs.component.UdeaClass
 import dev.wildware.udea.ecs.component.UdeaClass.UClassAttribute.NoInline
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import kotlin.getValue
 import kotlin.lazy
 
@@ -43,7 +43,7 @@ data class SpriteAnimation(
 ) {
     val spriteSheet by lazy {
         val sheetValue = sheet.value
-        val spriteSheetTexture = game.gameManager.assetManager.get<Texture>(sheetValue.spritePath)
+        val spriteSheetTexture = gameScreen.gameManager.assetManager.get<Texture>(sheetValue.spritePath)
         val frames = TextureRegion.split(
             spriteSheetTexture,
             spriteSheetTexture.width / sheetValue.columns,

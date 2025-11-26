@@ -1,5 +1,5 @@
 package dev.wildware.udea
 
 interface UdeaGame {
-    fun init()
+    fun onReady(gameManager: UdeaGameManager)
 }

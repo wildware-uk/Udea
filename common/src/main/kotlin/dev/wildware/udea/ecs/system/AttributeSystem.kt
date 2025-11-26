@@ -5,7 +5,7 @@ import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.udea.ability.GameplayEffectSpec
 import dev.wildware.udea.ecs.component.ability.Abilities
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import kotlin.time.Duration.Companion.seconds
 
 class AttributeSystem : IteratingSystem(
@@ -17,7 +17,7 @@ class AttributeSystem : IteratingSystem(
         abilities.gameplayEffectSpecs
             .sortedBy { it.gameplayEffect.modifierType }
             .forEach {
-                it.period += game.delta
+                it.period += gameScreen.delta
 
                 if ((it.period).toDouble().seconds > it.gameplayEffect.period) {
                     it.period = 0F
@@ -33,7 +33,7 @@ class AttributeSystem : IteratingSystem(
                     }
                 }
 
-                it.duration += game.delta
+                it.duration += gameScreen.delta
             }
 
         (abilities.gameplayEffectSpecs as MutableList<GameplayEffectSpec>).removeIf {

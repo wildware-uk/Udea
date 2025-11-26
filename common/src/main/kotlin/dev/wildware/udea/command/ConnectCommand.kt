@@ -1,7 +1,7 @@
 package dev.wildware.udea.command
 
 import dev.wildware.udea.WorldSource
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 
 @UdeaCommand
 object ConnectCommand : Command {
@@ -13,6 +13,6 @@ object ConnectCommand : Command {
             "Connecting to $address"
         )
 
-        game.initializeWorldSource(WorldSource.Connect(address))
+        gameScreen.initializeWorldSource(WorldSource.Connect(address))
     }
 }

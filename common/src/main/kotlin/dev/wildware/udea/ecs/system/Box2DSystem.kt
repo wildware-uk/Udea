@@ -12,8 +12,7 @@ import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.component.physics.*
 import dev.wildware.udea.ecs.component.physics.Body
-import dev.wildware.udea.game
-import dev.wildware.udea.getOrNull
+import dev.wildware.udea.gameScreen
 import com.badlogic.gdx.physics.box2d.World as Box2DWorld
 
 @UdeaSystem(runIn = [Editor, Game])
@@ -70,7 +69,7 @@ class Box2DSystem(
     }
 
     override fun onTick() {
-        if (!game.isEditor) {
+        if (!gameScreen.isEditor) {
             family.forEach {
                 val transform = it[Transform]
                 val rigidBody = it[Body]
@@ -81,8 +80,8 @@ class Box2DSystem(
             box2DWorld.step(1 / 60F, 2, 2)
         }
 
-        if (game.debug) {
-            box2dDebugRenderer.render(box2DWorld, game.camera.combined)
+        if (gameScreen.debug) {
+            box2dDebugRenderer.render(box2DWorld, gameScreen.camera.combined)
         }
 
         super.onTick()

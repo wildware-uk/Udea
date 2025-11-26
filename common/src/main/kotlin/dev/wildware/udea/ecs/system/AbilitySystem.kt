@@ -1,18 +1,15 @@
 package dev.wildware.udea.ecs.system
 
-import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.World.Companion.family
-import dev.wildware.udea.Mouse
 import dev.wildware.udea.ability.AbilityActivation
 import dev.wildware.udea.ability.AbilityExec
 import dev.wildware.udea.ability.AbilityInfo
 import dev.wildware.udea.assets.Ability
 import dev.wildware.udea.assets.AssetReference
-import dev.wildware.udea.assets.Network
 import dev.wildware.udea.ecs.component.ability.Abilities
 import dev.wildware.udea.ecs.component.base.Networkable
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import dev.wildware.udea.getNetworkEntityOrNull
 import dev.wildware.udea.network.AbilityPacket
 import dev.wildware.udea.network.AbilityPacketInstantiator
@@ -48,8 +45,8 @@ class AbilitySystem : IntervalSystem() {
                 }
             }
 
-            if (game.isServer) {
-                game.networkServerSystem!!.server.sendToAllTCP(
+            if (gameScreen.isServer) {
+                gameScreen.networkServerSystem!!.server.sendToAllTCP(
                     AbilityPacket(
                         ability,
                         it.source,
@@ -67,14 +64,14 @@ class AbilitySystem : IntervalSystem() {
         val networkSource = abilityInfo.source[Networkable].remoteEntity
         val networkTarget = abilityInfo.target?.let { if (Networkable in it) it[Networkable].remoteEntity else null }
 
-        if (game.isServer) {
+        if (gameScreen.isServer) {
             context(world) {
                 val activation = AbilityActivation(ability, abilityInfo)
                 abilityInfo.source[Abilities].currentAbility = activation
                 ability.execInstance(activation).activate(AbilityInfo(networkSource, abilityInfo.targetPos, networkTarget))
             }
 
-            game.networkServerSystem?.server?.sendToAllTCP(
+            gameScreen.networkServerSystem?.server?.sendToAllTCP(
                 AbilityPacket(
                     ability.reference as AssetReference<Ability>,
                     networkSource,
@@ -83,7 +80,7 @@ class AbilitySystem : IntervalSystem() {
                 )
             )
         } else {
-            game.networkClientSystem?.client?.sendTCP(
+            gameScreen.networkClientSystem?.client?.sendTCP(
                 AbilityPacket(
                     ability.reference as AssetReference<Ability>,
                     networkSource,

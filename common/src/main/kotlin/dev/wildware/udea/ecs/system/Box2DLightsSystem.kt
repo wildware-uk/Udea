@@ -1,8 +1,6 @@
 package dev.wildware.udea.ecs.system
 
 import box2dLight.RayHandler
-import com.badlogic.gdx.Gdx
-import com.badlogic.gdx.graphics.GL20
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
@@ -14,7 +12,7 @@ import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.component.lights.PointLight
 import dev.wildware.udea.ecs.component.lights.ConeLight
 import dev.wildware.udea.ecs.component.lights.DirectionalLight
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import ktx.assets.disposeSafely
 
 @UdeaSystem(runIn = [Editor, Game])
@@ -25,7 +23,7 @@ class Box2DLightsSystem(
 ) {
     override fun onTick() {
         super.onTick()
-        game.camera.let {
+        gameScreen.camera.let {
             rayHandler.setCombinedMatrix(
                 it.combined,
                 it.position.x,

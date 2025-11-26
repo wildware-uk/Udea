@@ -8,7 +8,7 @@ import com.github.quillraven.fleks.World
 import dev.wildware.udea.ecs.component.NetworkAuthority
 import dev.wildware.udea.ecs.component.base.Dead
 import dev.wildware.udea.ecs.component.base.Networkable
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import dev.wildware.udea.network.AbilityPacket
 import dev.wildware.udea.network.CommandPacket
 import dev.wildware.udea.network.EntityCreate
@@ -37,7 +37,7 @@ class NetworkClientSystem(world: World) : IntervalSystem(world = world) {
         client.addListener(object : Listener {
             override fun connected(connection: Connection) {
                 println("Connected ${connection.id}")
-                game.clientId = connection.id
+                gameScreen.clientId = connection.id
 
                 myEntities.forEach { entity ->
                     entity.configure {

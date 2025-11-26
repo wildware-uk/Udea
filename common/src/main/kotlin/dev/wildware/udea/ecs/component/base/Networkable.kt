@@ -5,7 +5,7 @@ import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.configureNetwork
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import dev.wildware.udea.network.UdeaNetworked
 import dev.wildware.udea.network.serde.UdeaSync
 import kotlinx.serialization.Serializable
@@ -31,7 +31,7 @@ data class Networkable(
     override fun type() = Networkable
 
     override fun World.onAdd(entity: Entity) {
-        if (game.isServer) {
+        if (gameScreen.isServer) {
             remoteEntity = entity
         }
     }

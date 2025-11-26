@@ -14,7 +14,7 @@ import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.component.physics.Body
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import ktx.assets.toInternalFile
 import ktx.graphics.use
 
@@ -30,11 +30,11 @@ class DebugDrawSystem : IteratingSystem(
     val spriteBatch = SpriteBatch()
 
     override fun onTick() {
-        if (!game.debug) return
+        if (!gameScreen.debug) return
 
         spriteBatch.use {
             super.onTick()
-            size32Font.draw(it, if (game.isServer) "server" else "client", 10F, 50F)
+            size32Font.draw(it, if (gameScreen.isServer) "server" else "client", 10F, 50F)
         }
     }
 
@@ -42,7 +42,7 @@ class DebugDrawSystem : IteratingSystem(
         val transform = entity[Transform]
         val debug = entity[Debug]
 
-        val position = game.camera!!.project(Vector3(transform.position, 0f))
+        val position = gameScreen.camera!!.project(Vector3(transform.position, 0f))
 
         if (debug.drawId) {
             val id = entity.id

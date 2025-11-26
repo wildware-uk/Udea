@@ -17,7 +17,7 @@ import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.animation.Animations
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.component.render.AnimationSet
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import dev.wildware.udea.use
 import dev.wildware.udea.ecs.component.render.SpriteRenderer as SpriteComponent
 
@@ -55,7 +55,7 @@ class AnimationSetSystem(
     }
 
     override fun onTick() {
-        spriteBatch.use(game.camera) {
+        spriteBatch.use(gameScreen.camera) {
             super.onTick()
         }
     }

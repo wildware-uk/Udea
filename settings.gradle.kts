@@ -16,3 +16,6 @@ include("idea-plugin")
 include("compose-ui")
 
 include("gradle-plugin")
+include("example")
+include("example:assets")
+include("scripts")

@@ -4,7 +4,7 @@ import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.udea.ecs.component.animation.Animations
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 
 /**
  * Iterates through all entities with the [Animations] component,
@@ -17,7 +17,7 @@ class AnimationSystem : IteratingSystem(
         val animations = entity[Animations]
 
         animations.animations.forEach {
-            it.update(game.delta)
+            it.update(gameScreen.delta)
         }
     }
 

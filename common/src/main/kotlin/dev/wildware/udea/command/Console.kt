@@ -4,6 +4,8 @@ import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.TextField
+import com.kotcrab.vis.ui.VisUI
+import dev.wildware.udea.screen.useSkin
 import ktx.scene2d.Scene2DSkin
 
 class Console(
@@ -20,9 +22,11 @@ class Console(
     }
 
     init {
-        pad(5f)
-        add(label).grow().left().top().row()
-        add(commandInput).growX().padTop(5f)
+        useSkin(VisUI.getSkin()) {
+            pad(5f)
+            add(label).grow().left().top().row()
+            add(commandInput).growX().padTop(5f)
+        }
     }
 
     fun println(text: String) {

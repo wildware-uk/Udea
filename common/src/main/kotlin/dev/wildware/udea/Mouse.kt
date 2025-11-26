@@ -12,16 +12,16 @@ object Mouse {
 
     val mouseWorldPos: Vector2
         get() {
-            val mousePos = game.camera.unproject(Vector3(Gdx.input.x.toFloat(), Gdx.input.y.toFloat(), 0F))
+            val mousePos = gameScreen.camera.unproject(Vector3(Gdx.input.x.toFloat(), Gdx.input.y.toFloat(), 0F))
             return Vector2(mousePos.x, mousePos.y)
         }
 
     val mouseTarget: Entity?
         get() {
             var fixture: Fixture? = null
-            val mousePos = game.camera.unproject(Vector3(Gdx.input.x.toFloat(), Gdx.input.y.toFloat(), 0F))
+            val mousePos = gameScreen.camera.unproject(Vector3(Gdx.input.x.toFloat(), Gdx.input.y.toFloat(), 0F))
 
-            game.world.system<Box2DSystem>().box2DWorld
+            gameScreen.world.system<Box2DSystem>().box2DWorld
                 .query(mousePos.x - .1F, mousePos.y - .1F, mousePos.x + .1F, mousePos.y + .1F) { f ->
                     fixture = f
                     false

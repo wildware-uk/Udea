@@ -87,7 +87,7 @@ fun World.processEntityCreate(create: EntityCreate, authority: NetworkAuthority)
         }
 
         if (hasAuthority(entity) && blueprint.name == "player") {
-            game.localPlayer = entity // TODO this may be useless
+            gameScreen.localPlayer = entity // TODO this may be useless
         }
     }
 }

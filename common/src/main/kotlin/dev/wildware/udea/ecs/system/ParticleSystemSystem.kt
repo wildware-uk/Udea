@@ -8,7 +8,7 @@ import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.component.render.ParticleEffect
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import dev.wildware.udea.use
 
 @UdeaSystem(runIn = [Editor, Game])
@@ -18,7 +18,7 @@ class ParticleSystemSystem(
     family = family { all(ParticleEffect, Transform) }
 ) {
     override fun onTick() {
-        spriteBatch.use(game.camera) {
+        spriteBatch.use(gameScreen.camera) {
             super.onTick()
         }
     }
@@ -29,7 +29,7 @@ class ParticleSystemSystem(
 
         particles.particleEffects.forEach {
             it.setPosition(transform.position.x, transform.position.y)
-            it.draw(spriteBatch, game.delta)
+            it.draw(spriteBatch, gameScreen.delta)
         }
     }
 }

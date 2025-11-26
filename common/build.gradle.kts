@@ -17,6 +17,7 @@ val gdxVersion = "1.13.5"
 val ktxVersion = "1.13.1-rc1"
 
 dependencies {
+    api("com.kotcrab.vis:vis-ui:1.5.7")
     api("io.github.quillraven.fleks:Fleks:2.13-SNAPSHOT")
     implementation("org.reflections:reflections:0.10.2")
     testImplementation(kotlin("test"))
@@ -41,9 +42,12 @@ dependencies {
     implementation("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop")
     implementation("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop")
 
-    implementation("org.jetbrains.kotlin:kotlin-scripting-jvm:2.2.10")
-    implementation("org.jetbrains.kotlin:kotlin-scripting-jvm-host:2.2.10")
-    implementation("org.jetbrains.kotlin:kotlin-scripting-common:2.2.10")
+    implementation("org.jetbrains.kotlin:kotlin-scripting-jvm")
+    implementation("org.jetbrains.kotlin:kotlin-scripting-jvm-host")
+    implementation("org.jetbrains.kotlin:kotlin-scripting-common")
+    api(project(":scripts"))
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
     ksp(project(":gradle-plugin"))
     implementation(project(":gradle-plugin"))

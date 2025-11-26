@@ -7,7 +7,7 @@ import com.github.quillraven.fleks.IntervalSystem
 import dev.wildware.udea.InputSystem
 import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
-import dev.wildware.udea.game
+import dev.wildware.udea.gameScreen
 import kotlin.math.pow
 
 @UdeaSystem(runIn = [Editor])
@@ -17,28 +17,28 @@ class EditorSystem : IntervalSystem(), InputSystem {
 
     override fun onTick() {
         if (Gdx.input.isKeyPressed(Input.Keys.A)) {
-            game.camera.translate(-scrollSpeed * deltaTime, 0F, 0F)
-            game.camera.update()
+            gameScreen.camera.translate(-scrollSpeed * deltaTime, 0F, 0F)
+            gameScreen.camera.update()
         }
 
         if (Gdx.input.isKeyPressed(Input.Keys.D)) {
-            game.camera.translate(scrollSpeed * deltaTime, 0F, 0F)
-            game.camera.update()
+            gameScreen.camera.translate(scrollSpeed * deltaTime, 0F, 0F)
+            gameScreen.camera.update()
         }
 
         if (Gdx.input.isKeyPressed(Input.Keys.W)) {
-            game.camera.translate(0F, scrollSpeed * deltaTime, 0F)
-            game.camera.update()
+            gameScreen.camera.translate(0F, scrollSpeed * deltaTime, 0F)
+            gameScreen.camera.update()
         }
 
         if (Gdx.input.isKeyPressed(Input.Keys.S)) {
-            game.camera.translate(0F, -scrollSpeed * deltaTime, 0F)
-            game.camera.update()
+            gameScreen.camera.translate(0F, -scrollSpeed * deltaTime, 0F)
+            gameScreen.camera.update()
         }
     }
 
     override fun scrolled(amountX: Float, amountY: Float): Boolean {
-        (game.camera as? OrthographicCamera)?.let {
+        (gameScreen.camera as? OrthographicCamera)?.let {
             it.zoom *= 1.1F.pow(amountY)
             it.update()
         }

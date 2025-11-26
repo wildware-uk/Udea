@@ -15,7 +15,6 @@
             <option value="$PROJECT_DIR$/gradle-plugin" />
             <option value="$PROJECT_DIR$/idea-plugin" />
             <option value="$PROJECT_DIR$/level-editor" />
-            <option value="$PROJECT_DIR$/scripts" />
           </set>
         </option>
       </GradleProjectSettings>

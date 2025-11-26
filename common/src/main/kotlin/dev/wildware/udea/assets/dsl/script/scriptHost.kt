@@ -1,6 +1,5 @@
 package dev.wildware.udea.assets.dsl.script
 
-import UdeaScript
 import dev.wildware.udea.UdeaGameManager
 import java.io.File
 import kotlin.script.experimental.api.EvaluationResult

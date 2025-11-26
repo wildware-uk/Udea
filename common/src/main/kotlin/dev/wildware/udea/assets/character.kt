@@ -21,8 +21,8 @@ fun ListBuilder<in Blueprint>.character(
     name: String,
     animations: CharacterAnimations,
     size: CharacterSize,
-    attributeSet: AttributeSet,
-    components: LazyList<Component<out Any>>
+    attributeSet: ()->AttributeSet,
+    components: LazyList<Component<out Any>> = emptyLazyList()
 ) {
     add(dev.wildware.udea.assets.character(name, animations, size, attributeSet, components))
 }
@@ -34,8 +34,8 @@ fun character(
     name: String,
     animations: CharacterAnimations,
     size: CharacterSize,
-    attributeSet: AttributeSet,
-    components: LazyList<Component<out Any>>
+    attributeSet: ()->AttributeSet,
+    components: LazyList<Component<out Any>> = emptyLazyList()
 ) = Blueprint(
     components = lazy {
         spriteRenderer()
@@ -61,7 +61,7 @@ fun character(
             pathfindingStyle = PathfindingStyle.Walk
         )
         networkable()
-        abilities(attributeSet)
+        abilities(attributeSet())
         particleEffect()
         animations()
         characterController()

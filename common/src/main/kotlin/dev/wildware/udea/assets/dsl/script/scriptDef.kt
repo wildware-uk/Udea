@@ -1,10 +1,15 @@
+package dev.wildware.udea.assets.dsl.script
+
+import dev.wildware.udea.UdeaGameManager
 import kotlin.script.experimental.annotations.KotlinScript
 import kotlin.script.experimental.api.*
+import kotlin.script.experimental.jvm.dependenciesFromClassContext
 import kotlin.script.experimental.jvm.dependenciesFromCurrentContext
 import kotlin.script.experimental.jvm.jvm
 import kotlin.script.experimental.jvm.jvmTarget
 
 @KotlinScript(
+    displayName = "Udea Asset Script",
     fileExtension = "udea.kts",
     compilationConfiguration = UdeaScriptConfiguration::class,
 )
@@ -31,7 +36,7 @@ object UdeaScriptConfiguration : ScriptCompilationConfiguration({
 
     jvm {
         jvmTarget("17")
-        dependenciesFromCurrentContext(wholeClasspath = true)
+        dependenciesFromClassContext(UdeaGameManager::class, wholeClasspath = true)
     }
 
     compilerOptions.append("-Xcontext-sensitive-resolution")

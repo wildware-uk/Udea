@@ -118,7 +118,7 @@ class GameScreen(
         }
     }
 
-    val box2DWorld by lazy { Box2DWorld(Vector2(0.0F, -9.8F), true) }
+    val box2DWorld by lazy { Box2DWorld(gameConfig.physics.gravity, true) }
 
     val rayHandler by lazy {
         RayHandler(
@@ -133,7 +133,7 @@ class GameScreen(
         }
     }
 
-    val gameConfig = Assets.filterIsInstance<GameConfig>().firstOrNull()
+    val gameConfig = Assets.filterIsInstance<GameConfig>().firstOrNull() ?: GameConfig()
 
     val spriteBatch by lazy { SpriteBatch() }
 
@@ -194,6 +194,10 @@ class GameScreen(
                             configure {
                                 it += Transform()
                             }
+                        }
+
+                        if (entityDef.position != null) configure {
+                            it[Transform].position.set(entityDef.position)
                         }
                     }
                 }
@@ -276,18 +280,19 @@ class GameScreen(
 
 class UdeaGameManager(
     val udeaGame: UdeaGame,
-    val assetLoader: AssetLoader = GameAssetLoader(),
+    assetLoaderFun: () -> AssetLoader = ::GameAssetLoader,
     val isEditor: Boolean = false,
+    val fileHandleResolver: FileHandleResolver = InternalFileHandleResolver(),
 ) : KtxGame<KtxScreen>() {
 
     val inputProcessor = InputMultiplexer()
-    val assetManager = AssetManager(assetLoader)
+    val assetLoader by lazy { assetLoaderFun() }
+    val assetManager by lazy { AssetManager(fileHandleResolver) }
 
     var onCreate: (() -> Unit)? = null
 
     init {
         gameManager = this
-        assetManager.setLoader(ParticleEffect::class.java, ParticleEffectLoader(assetLoader))
     }
 
     /**
@@ -316,6 +321,8 @@ class UdeaGameManager(
     val loadingScreen by lazy { LoadingScreen(AssetLoaderTask(assetLoader, assetManager), udeaGame) }
 
     override fun create() {
+        assetManager.setLoader(ParticleEffect::class.java, ParticleEffectLoader(fileHandleResolver))
+
         Gdx.input.inputProcessor = inputProcessor
         VisUI.load()
 
@@ -418,7 +425,7 @@ class AssetLoaderTask(
     }
 }
 
-interface AssetLoader : FileHandleResolver {
+interface AssetLoader {
 
     /**
      * Scan the assets directory for all assets needed for the game.
@@ -456,10 +463,8 @@ sealed interface WorldSource {
  * Default [GameAssetLoader] implementation.
  * */
 class GameAssetLoader(
-    val baseDir: String = "assets/"
+    val baseDir: FileHandle = "assets/".toInternalFile()
 ) : AssetLoader {
-    private val internalFileLoader = InternalFileHandleResolver()
-
     override fun discoverAssets(): List<FileHandle> {
         val assets = mutableListOf<FileHandle>()
 
@@ -473,14 +478,14 @@ class GameAssetLoader(
             }
         }
 
-        scanDirectory(Gdx.files.internal(baseDir))
+        scanDirectory(baseDir)
 
         return assets
     }
 
     override fun loadAsset(assetFile: FileHandle, manager: AssetManager) {
         var loaded = true
-        val path = assetFile.path().substringAfter(baseDir)
+        val path = assetFile.path().substringAfter(baseDir.path())
         when (assetFile.extension()) {
             "png" -> manager.load(path, Texture::class.java)
             "kts" -> loadAsset(assetFile).forEach {
@@ -495,10 +500,6 @@ class GameAssetLoader(
         if (loaded) {
             Gdx.app.log("GameAssetLoader", "Loaded asset: $path")
         }
-    }
-
-    override fun resolve(fileName: String): FileHandle {
-        return internalFileLoader.resolve(fileName)
     }
 
     private fun loadAsset(file: FileHandle): List<Asset> {
@@ -532,10 +533,9 @@ fun loadAssets(
 
                             return asset.assets.map {
                                 it.apply {
-                                    path = file.path
-                                        .replace("\\", "/")
+                                    path = file.path.replace("\\", "/")
                                         .substringBeforeLast("/")
-                                        .replace("assets/", "")
+                                        .substringAfterLast("assets/")
                                 }
                             }
                         }

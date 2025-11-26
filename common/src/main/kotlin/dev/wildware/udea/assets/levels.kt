@@ -3,6 +3,7 @@ package dev.wildware.udea.assets
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.UniqueId
+import dev.wildware.udea.Vector2
 import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.ecs.system.*
 import kotlin.reflect.KClass
@@ -53,6 +54,11 @@ data class EntityDefinition(
      * The parent blueprint for this entity.
      * */
     val blueprint: AssetReference<Blueprint>? = null,
+
+    /**
+     * Convenience property to set the position of the entity.
+     * */
+    val position: Vector2? = null,
 ) {
     /**
      * Unique identifier

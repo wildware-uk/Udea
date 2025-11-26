@@ -1,14 +1,16 @@
 package dev.wildware.udea.assets
 
 import com.badlogic.gdx.Gdx
+import dev.wildware.udea.Vector2
 
 data class GameConfig(
     val defaultLevel: AssetReference<Level>? = null,
     val defaultCharacter: AssetReference<Blueprint>? = null,
     val backgroundTexture: String? = null,
     val lighting: Lighting? = null,
-    val network: Network? = null,
+    val network: Network = Network(),
     val scene2d: Scene2D? = null,
+    val physics: Physics = Physics()
 ) : Asset()
 
 data class Scene2D(
@@ -27,4 +29,8 @@ data class Lighting(
     val blur: Boolean = true,
     val fboWidth: Int = Gdx.graphics.width,
     val fboHeight: Int = Gdx.graphics.height,
+): Asset()
+
+data class Physics(
+    val gravity: Vector2 = Vector2(0F, -9.81F)
 ): Asset()

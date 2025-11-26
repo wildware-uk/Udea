@@ -19,11 +19,27 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="- ✨ **Revamp Network, Reflection, and Serializer Systems**&#10;  - Added new command handling framework with `Command`, `Commands`, and console UI for in-game interaction.&#10;  - Introduced `ConnectCommand` and `HostCommand` for network operations.&#10;  - Added powerful reflection utilities with `UdeaReflections` for project registration and type scanning.&#10;  - Implemented `AssetReferenceSerializer` and `SerializableSerializer` for streamlined serialization.&#10;  - Enhanced pooling with better serialization strategies for network packets (e.g., `EntityUpdate`, `AbilityPacket`).&#10;  - Replaced obsolete community serializers with custom reflection-based alternatives.&#10;  - 🚀 Improved `Box2DSystem` with safe component access (`getOrNull`) for compact hitbox detection.&#10;&#10;- 🔥 **Remove Legacy Serializers and Obsolete Files**&#10;  - Deleted outdated `EntityUpdateSerializer` and related infrastructure.&#10;  - Removed legacy `types.kt` and redundant duplication across the codebase.&#10;&#10;- 🛠️ **Refactor and Optimize Across Networking and ECS**&#10;  - Refactored `NetworkPacket`, `CommandPacket`, and `EntityCreate` for clarity and consistency.&#10;  - Improved ECS system inheritance with better `family` handling in systems like `NetworkServerSystem` and `EditorSystem`.&#10;  - 🌟 Introduced cleaner, context-oriented design patterns for future scalability.&#10;&#10;- 🎨 **Code Cleanup and Project Simplification**&#10;  - Streamlined networking utilities for improved maintainability.&#10;  - Modularized code architecture to separate concerns (e.g., moved core systems under `command` and `serde`).&#10;&#10;- ✨ **Big Step Toward Modular Game Systems**">
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/common/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/character.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/character.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptHost.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptHost.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/gameConfig.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/gameConfig.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/levels.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/levels.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/BackgroundDrawSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/BackgroundDrawSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ExampleGame.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ExampleGame.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/src/main/kotlin/scriptDef.kt" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/src/main/kotlin/scriptDef.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/blueprint/characters.udea.kts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/blueprint/newScript.udea.kts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/blueprint/test.udea.kts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/blueprint/test123.udea.kts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/level/test_level.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/level/test_level.udea.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/build.gradle.kts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/src/main/kotlin/scriptDef.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/src/main/resources/META-INF/kotlin/script/templates/UdeaScript" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -95,20 +111,38 @@
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="udea" type="f1a62948:ProjectNode" />
-                <item name="scripts" type="2d1252cf:ModuleNode" />
+                <item name="common" type="2d1252cf:ModuleNode" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="udea" type="f1a62948:ProjectNode" />
-                <item name="scripts" type="2d1252cf:ModuleNode" />
+                <item name="common" type="2d1252cf:ModuleNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="udea" type="f1a62948:ProjectNode" />
-                <item name="scripts" type="2d1252cf:ModuleNode" />
+                <item name="common" type="2d1252cf:ModuleNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
                 <item name="build" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="udea" type="f1a62948:ProjectNode" />
+                <item name="example" type="2d1252cf:ModuleNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="udea" type="f1a62948:ProjectNode" />
+                <item name="example" type="2d1252cf:ModuleNode" />
+                <item name="Dependencies" type="6de06a37:ExternalSystemViewDefaultContributor$MyDependenciesNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="udea" type="f1a62948:ProjectNode" />
+                <item name="example" type="2d1252cf:ModuleNode" />
+                <item name="Dependencies" type="6de06a37:ExternalSystemViewDefaultContributor$MyDependenciesNode" />
+                <item name="compileClasspath" type="62daadca:ExternalSystemViewDefaultContributor$DependencyScopeExternalSystemNode" />
               </path>
             </expand>
             <select />
@@ -127,8 +161,8 @@
         <option value="Kotlin Object" />
         <option value="Fleks Component" />
         <option value="Kotlin Interface" />
-        <option value="Kotlin Class" />
         <option value="Kotlin File" />
+        <option value="Kotlin Class" />
       </list>
     </option>
   </component>
@@ -150,15 +184,18 @@
   <component name="HighlightingSettingsPerFile">
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.box2dlights/box2dlights/1.5/5115f6b01d36270c56b7a7ed41802f0c1f2ced4f/box2dlights-1.5-sources.jar!/box2dLight/RayHandler.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx-box2d/1.13.5/2de9564466414691f86b151ee65836cd9df733f8/gdx-box2d-1.13.5-sources.jar!/com/badlogic/gdx/physics/box2d/FixtureDef.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx-box2d/1.13.5/2de9564466414691f86b151ee65836cd9df733f8/gdx-box2d-1.13.5-sources.jar!/com/badlogic/gdx/physics/box2d/World.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/Application.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/InputProcessor.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/assets/AssetDescriptor.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/assets/AssetManager.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/assets/loaders/resolvers/InternalFileHandleResolver.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/files/FileHandle.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/graphics/g2d/Sprite.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/graphics/g2d/SpriteBatch.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/graphics/g2d/TextureRegion.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/input/RemoteSender.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/math/Vector2.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/scenes/scene2d/Stage.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx/1.13.5/1cce320aaa3a89cae41f4fd791ec479df8c72699/gdx-1.13.5-sources.jar!/com/badlogic/gdx/utils/DefaultPool.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.esotericsoftware/kryo/5.5.0/c761e4c88b5aa1014713e690ead5babc7917710a/kryo-5.5.0-sources.jar!/com/esotericsoftware/kryo/Kryo.java" root0="SKIP_INSPECTION" />
@@ -311,7 +348,7 @@
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
     "last_directory_selection": "C:/Users/shaun/Workspace/udea/common/src/main/kotlin/dev/wildware/udea",
-    "last_opened_file_path": "C:/Users/shaun/Workspace/udea/scripts/src/main/resources",
+    "last_opened_file_path": "C:/Users/shaun/Workspace/udea/common/src/main/resources",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -333,11 +370,11 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\shaun\Workspace\udea\common\src\main\resources" />
+      <recent name="C:\Users\shaun\Workspace\udea\common\src\main\kotlin\dev\wildware\udea\assets\dsl\script" />
       <recent name="C:\Users\shaun\Workspace\udea\scripts\src\main\resources" />
       <recent name="C:\Users\shaun\Workspace\udea\common\src\main\resources\images" />
       <recent name="C:\Users\shaun\Workspace\udea\images" />
-      <recent name="C:\Users\shaun\Workspace\udea\gradle-plugin\src\main\resources\META-INF" />
-      <recent name="C:\Users\shaun\Workspace\udea\common\src\main\kotlin\dev\wildware\udea\assets\dsl" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\shaun\Workspace\udea" />
@@ -372,6 +409,28 @@
     </key>
   </component>
   <component name="RunManager" selected="Kotlin.ExampleGameKt">
+    <configuration name="udea [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="build" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <method v="2" />
+    </configuration>
     <configuration name="udea [publishToMavenLocal]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -394,32 +453,10 @@
       <RunAsTest>false</RunAsTest>
       <method v="2" />
     </configuration>
-    <configuration name="udea:idea-plugin [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+    <configuration name="udea:common [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$/idea-plugin" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" value="--stacktrace" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value="build" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>false</RunAsTest>
-      <method v="2" />
-    </configuration>
-    <configuration name="udea:idea-plugin [runIde]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$/idea-plugin" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$/common" />
         <option name="externalSystemIdString" value="GRADLE" />
         <option name="scriptParameters" />
         <option name="taskDescriptions">
@@ -427,7 +464,7 @@
         </option>
         <option name="taskNames">
           <list>
-            <option value="runIde" />
+            <option value="build" />
           </list>
         </option>
         <option name="vmOptions" />
@@ -479,19 +516,19 @@
     </configuration>
     <list>
       <item itemvalue="Gradle.Run Plugin" />
+      <item itemvalue="Gradle.udea [build]" />
+      <item itemvalue="Gradle.udea:common [build]" />
       <item itemvalue="Gradle.udea:scripts [build]" />
       <item itemvalue="Gradle.udea [publishToMavenLocal]" />
-      <item itemvalue="Gradle.udea:idea-plugin [build]" />
-      <item itemvalue="Gradle.udea:idea-plugin [runIde]" />
       <item itemvalue="Kotlin.ExampleGameKt" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.udea:scripts [build]" />
         <item itemvalue="Gradle.udea [publishToMavenLocal]" />
+        <item itemvalue="Gradle.udea:common [build]" />
+        <item itemvalue="Gradle.udea [build]" />
+        <item itemvalue="Gradle.udea:scripts [build]" />
         <item itemvalue="Kotlin.ExampleGameKt" />
-        <item itemvalue="Gradle.udea:idea-plugin [build]" />
-        <item itemvalue="Gradle.udea:idea-plugin [runIde]" />
       </list>
     </recent_temporary>
   </component>
@@ -499,22 +536,91 @@
   <component name="ScriptTemplatesDefinitionsFromDependenciesStorage">
     <option name="classpath">
       <list>
+        <option value="C:\Users\shaun\Workspace\udea\common\build\classes\kotlin\main" />
+        <option value="C:\Users\shaun\Workspace\udea\common\build\resources\main" />
+        <option value="C:\Users\shaun\.gradle\caches\8.13\generated-gradle-jars\gradle-api-8.13.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-ant-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-astbuilder-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-console-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-datetime-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-dateutil-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-groovydoc-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-json-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-nio-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-sql-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-templates-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-test-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\groovy-xml-3.0.22.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\javaparser-core-3.17.0.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\kotlin-stdlib-2.0.21.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\kotlin-reflect-2.0.21.jar" />
+        <option value="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\lib\gradle-installation-beacon-8.13.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.kotcrab.vis\vis-ui\1.5.7\ff9cfccb3ff1fac5cfc86dc862d99f965320769\vis-ui-1.5.7.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\io.github.libktx\ktx-box2d\1.13.1-rc1\1ef729347510d16e4dc07590629b6964da340781\ktx-box2d-1.13.1-rc1.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.badlogicgames.box2dlights\box2dlights\1.5\6902dbcd250c95a27973aa24a147a95b3828d348\box2dlights-1.5.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.badlogicgames.gdx\gdx-box2d\1.13.5\3f2d5d6f00fcc4b8a865193751ae7944ac6778c2\gdx-box2d-1.13.5.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\io.github.libktx\ktx-freetype-async\1.13.1-rc1\6f33c2ad3b4f797f8d908a189801e2ffbcc2b7ed\ktx-freetype-async-1.13.1-rc1.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\io.github.libktx\ktx-freetype\1.13.1-rc1\fd02d7a9be3dc55bd83eec2ed043fa2b5b0d28c4\ktx-freetype-1.13.1-rc1.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.badlogicgames.gdx\gdx\1.13.5\c03e724c8a7d744da189a9705378accfdac69630\gdx-1.13.5.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\io.github.libktx\ktx-app\1.13.1-rc1\8d0d87c477d703aa1d664051ebc8b59d58cdfc54\ktx-app-1.13.1-rc1.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\io.github.libktx\ktx-assets\1.13.1-rc1\e69b2927344d3dad65526526bbb108b170648a5d\ktx-assets-1.13.1-rc1.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\io.github.libktx\ktx-async\1.13.1-rc1\e35d7a1c0a021bab83d2146f5cb0cac5187bcb1e\ktx-async-1.13.1-rc1.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\io.github.libktx\ktx-graphics\1.13.1-rc1\44516c24a459ed7218f67c8d365fd51fb1d7a609\ktx-graphics-1.13.1-rc1.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\io.github.libktx\ktx-scene2d\1.13.1-rc1\b6204163a778ccf137fd1c78093470bffc441946\ktx-scene2d-1.13.1-rc1.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.github.crykn\kryonet\2.22.9\35f699763d37f4247d461bb5fbae66640f7226e8\kryonet-2.22.9.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.reflections\reflections\0.10.2\b638d7ca0e0fe0146b60a0e7ba232ad852a73b31\reflections-0.10.2.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.fasterxml.jackson.core\jackson-databind\2.17.0\7173e9e1d4bc6d7ca03bc4eeedcd548b8b580b34\jackson-databind-2.17.0.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.fasterxml.jackson.module\jackson-module-kotlin\2.17.0\665dffdbf9ab92e7cf356621ba8df332048caa3a\jackson-module-kotlin-2.17.0.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.badlogicgames.gdx\gdx-box2d-platform\1.13.5\373bc8252ad7e15df27d4879632eacabf4baf971\gdx-box2d-platform-1.13.5-natives-desktop.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.badlogicgames.gdx\gdx-freetype-platform\1.13.5\90375d7e9d7f4e070c4f9643a11225180912c5b0\gdx-freetype-platform-1.13.5-natives-desktop.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.badlogicgames.gdx\gdx-platform\1.13.5\a09fc96e741a753b95fbab38d65a9f640d16daf0\gdx-platform-1.13.5-natives-desktop.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-scripting-jvm\2.2.10\beecd90e2b145845581e953ba8420f1b30cac848\kotlin-scripting-jvm-2.2.10.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-scripting-jvm-host\2.2.10\65df8acaab0d0b21ba6aaf98adc489fdc2975ba8\kotlin-scripting-jvm-host-2.2.10.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-scripting-common\2.2.10\87769c03c5456d7c827fc950063664907b192c1c\kotlin-scripting-common-2.2.10.jar" />
         <option value="C:\Users\shaun\Workspace\udea\scripts\build\classes\kotlin\main" />
         <option value="C:\Users\shaun\Workspace\udea\scripts\build\resources\main" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-scripting-jvm\2.2.10\beecd90e2b145845581e953ba8420f1b30cac848\kotlin-scripting-jvm-2.2.10.jar" />
+        <option value="C:\Users\shaun\Workspace\udea\gradle-plugin\build\classes\kotlin\main" />
+        <option value="C:\Users\shaun\Workspace\udea\gradle-plugin\build\resources\main" />
+        <option value="C:\Users\shaun\.m2\repository\io\github\quillraven\fleks\Fleks-jvm\2.13-SNAPSHOT\Fleks-jvm-2.13-SNAPSHOT.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.badlogicgames.gdx\gdx-freetype\1.13.1\a386c9b7a10b28f91b2de47f66b12c23a2c3abc2\gdx-freetype-1.13.1.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\io.github.libktx\ktx-assets-async\1.13.1-rc1\e159ca2d643b4c31ecab4f988be73a8facbb901f\ktx-assets-async-1.13.1-rc1.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.badlogicgames.gdx\gdx-jnigen-loader\2.5.2\f35e90affe07c46b4f5e5958a1a4c1820c4890e2\gdx-jnigen-loader-2.5.2.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.esotericsoftware\kryo\5.5.0\29ae74e3929c8e0c8239a490f5d21ca8c97ba379\kryo-5.5.0.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.javassist\javassist\3.28.0-GA\9a958811a88381bb159cc2f5ed79c34a45c4af7a\javassist-3.28.0-GA.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.google.code.findbugs\jsr305\3.0.2\25ea2e8b0c338a877313bd4672d3fe056ea78f0d\jsr305-3.0.2.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.slf4j\slf4j-api\1.7.32\cdcff33940d9f2de763bc41ea05a0be5941176c3\slf4j-api-1.7.32.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlinx\kotlinx-serialization-cbor-jvm\1.8.0\a60c3590473fb7c80a2e3dfa9b3d1477244ee919\kotlinx-serialization-cbor-jvm-1.8.0.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlinx\kotlinx-serialization-json-jvm\1.8.0\8253bf6e8c713a3dace54493a838e0f8fd3e08fa\kotlinx-serialization-json-jvm-1.8.0.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.fasterxml.jackson.core\jackson-annotations\2.17.0\880a742337010da4c851f843d8cac150e22dff9f\jackson-annotations-2.17.0.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.fasterxml.jackson.core\jackson-core\2.17.0\a6e5058ef9720623c517252d17162f845306ff3a\jackson-core-2.17.0.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\net.bytebuddy\byte-buddy\1.14.9\b69e7fff6c473d3ed2b489cdfd673a091fd94226\byte-buddy-1.14.9.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-reflect\1.7.22\e61a16c5c838d324529a6aa72dfb88ea98958a29\kotlin-reflect-1.7.22.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-script-runtime\2.2.10\712f9bc08f378c13a4a00f0bbb28c76e59183e83\kotlin-script-runtime-2.2.10.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-stdlib\2.2.10\30de6faa127a4a012db8e71bf1b9c0a99b1402b2\kotlin-stdlib-2.2.10.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlinx\kotlinx-coroutines-core-jvm\1.10.2\4a9f78ef49483748e2c129f3d124b8fa249dafbf\kotlinx-coroutines-core-jvm-1.10.2.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.esotericsoftware\reflectasm\1.11.9\fd51ad1705d5e27d8785550172a4ab0cb9b8ad23\reflectasm-1.11.9.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.objenesis\objenesis\3.3\1049c09f1de4331e8193e579448d0916d75b7631\objenesis-3.3.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.esotericsoftware\minlog\1.3.1\a406e29d3a44d5f020d7b3218aee6d0952db4f73\minlog-1.3.1.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains\annotations\23.0.0\8cc20c07506ec18e0834947b84a864bfc094484e\annotations-23.0.0.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlinx\kotlinx-serialization-core-jvm\1.8.0\fe5bb37ab4a3771f14c63e0c333c98bdfeb1d7cc\kotlinx-serialization-core-jvm-1.8.0.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.github.esotericsoftware\jsonbeans\c3520fcc51\66353393d497d31244976279cce5ddab8a6db213\jsonbeans-c3520fcc51.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.slf4j\slf4j-api\1.7.36\6c62681a2f655b49963a5983b8b0950a6120ae14\slf4j-api-1.7.36.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-scripting-compiler-embeddable\2.2.10\25d0e9a886551d4a46ae85d4d5d0088829ef9\kotlin-scripting-compiler-embeddable-2.2.10.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-compiler-embeddable\2.2.10\6882d39ef03b18879c1a5d2a83c2212361bed5fe\kotlin-compiler-embeddable-2.2.10.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-scripting-dependencies-maven\2.2.10\91d7a081dee2568992ddb2b5c4e0d981ab3a4777\kotlin-scripting-dependencies-maven-2.2.10.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-scripting-dependencies\2.2.10\3103cfab5f3c617b47c0f5b57ae5cb39d183e0da\kotlin-scripting-dependencies-2.2.10.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-scripting-common\2.2.10\87769c03c5456d7c827fc950063664907b192c1c\kotlin-scripting-common-2.2.10.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-stdlib\2.2.10\30de6faa127a4a012db8e71bf1b9c0a99b1402b2\kotlin-stdlib-2.2.10.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-script-runtime\2.2.10\712f9bc08f378c13a4a00f0bbb28c76e59183e83\kotlin-script-runtime-2.2.10.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains\annotations\13.0\919f0dfe192fb4e063e7dacadee7f8bb9a2672a9\annotations-13.0.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.google.devtools.ksp\symbol-processing-api\2.2.10-2.0.2\6a7c41da95b72d99ee1277c80951a9160db1f1a5\symbol-processing-api-2.2.10-2.0.2.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-scripting-compiler-impl-embeddable\2.2.10\3f1bcab651be1ab86e8d240b797b1a05dd8b0027\kotlin-scripting-compiler-impl-embeddable-2.2.10.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-daemon-embeddable\2.2.10\212fd3c2c6e4e5d0f4db3c4191233e2b622380cc\kotlin-daemon-embeddable-2.2.10.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven\maven-core\3.8.8\6248a474f9dfe20356e822708938b83d850132a6\maven-core-3.8.8.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.wagon\wagon-http\3.5.3\673d54e78f83c4700c8250a48c61f4c70eef9bc3\wagon-http-3.5.3.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.resolver\maven-resolver-connector-basic\1.9.22\574b1f6d76c2c1f7ff66ccc17ff2c94e0a53545\maven-resolver-connector-basic-1.9.22.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.resolver\maven-resolver-transport-file\1.9.22\929bc40b340290a7a94306ee0591d106d9261b28\maven-resolver-transport-file-1.9.22.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.resolver\maven-resolver-transport-wagon\1.9.22\721d6a8e3ed937461cd673134f83aeac5a79e715\maven-resolver-transport-wagon-1.9.22.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.resolver\maven-resolver-impl\1.9.22\19b7a728c9000f8db615f64552d95fe74b413617\maven-resolver-impl-1.9.22.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.wagon\wagon-http\3.5.3\673d54e78f83c4700c8250a48c61f4c70eef9bc3\wagon-http-3.5.3.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\commons-io\commons-io\2.18.0\44084ef756763795b31c578403dd028ff4a22950\commons-io-2.18.0.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.google.inject\guice\4.2.2\fa13659f9128f4c011c8e1d06f137083b4876377\guice-4.2.2-no_aop.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven\maven-resolver-provider\3.8.8\27404d68acc4aba35a57b37a249eec415522f9c0\maven-resolver-provider-3.8.8.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven\maven-plugin-api\3.8.8\a5709000fe497efe5f3dc1317eabb15b22a614fb\maven-plugin-api-3.8.8.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven\maven-model-builder\3.8.8\f512aa9f9a55d89ddee8d14daf329634ab13039b\maven-model-builder-3.8.8.jar" />
@@ -530,36 +636,33 @@
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.shared\maven-shared-utils\3.3.4\f87a61adb1e12a00dcc6cc6005a51e693aa7c4ac\maven-shared-utils-3.3.4.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.eclipse.sisu\org.eclipse.sisu.plexus\0.3.5\d71996bb2e536f966b3b70e647067fff3b73d32f\org.eclipse.sisu.plexus-0.3.5.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.eclipse.sisu\org.eclipse.sisu.inject\0.3.5\d4265dd4f0f1d7a06d80df5a5f475d5ff9c17140\org.eclipse.sisu.inject-0.3.5.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.google.inject\guice\4.2.2\fa13659f9128f4c011c8e1d06f137083b4876377\guice-4.2.2-no_aop.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\javax.inject\javax.inject\1\6975da39a7040257bd51d21a231b76c915872d38\javax.inject-1.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.codehaus.plexus\plexus-utils\3.4.1\4de9992988c534efd668bfcca0480ebe13e0c0eb\plexus-utils-3.4.1.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.codehaus.plexus\plexus-classworlds\2.6.0\8587e80fcb38e70b70fae8d5914b6376bfad6259\plexus-classworlds-2.6.0.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.codehaus.plexus\plexus-interpolation\1.26\25b919c664b79795ccde0ede5cee0fd68b544197\plexus-interpolation-1.26.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.codehaus.plexus\plexus-component-annotations\2.1.0\2f2147a6cc6a119a1b51a96f31d45c557f6244b9\plexus-component-annotations-2.1.0.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.commons\commons-lang3\3.8.1\6505a72a097d9270f7a9e7bf42c4238283247755\commons-lang3-3.8.1.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.slf4j\slf4j-api\1.7.36\6c62681a2f655b49963a5983b8b0950a6120ae14\slf4j-api-1.7.36.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.wagon\wagon-http-shared\3.5.3\635c3d5718a70e3ecfd78f2fef99bb6e0abaed58\wagon-http-shared-3.5.3.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.wagon\wagon-provider-api\3.5.3\39c44ebb3945dee359665272d8acb83f9460491b\wagon-provider-api-3.5.3.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.resolver\maven-resolver-named-locks\1.9.22\121433b079aad9be7ed266b19f2122eeb0e2d111\maven-resolver-named-locks-1.9.22.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.wagon\wagon-http-shared\3.5.3\635c3d5718a70e3ecfd78f2fef99bb6e0abaed58\wagon-http-shared-3.5.3.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.slf4j\jcl-over-slf4j\1.7.36\d877e195a05aca4a2f1ad2ff14bfec1393af4b5e\jcl-over-slf4j-1.7.36.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.httpcomponents\httpclient\4.5.14\1194890e6f56ec29177673f2f12d0b8e627dec98\httpclient-4.5.14.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.maven.resolver\maven-resolver-named-locks\1.9.22\121433b079aad9be7ed266b19f2122eeb0e2d111\maven-resolver-named-locks-1.9.22.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.google.guava\guava\25.1-android\bdaab946ca5ad20253502d873ba0c3313d141036\guava-25.1-android.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\aopalliance\aopalliance\1.0\235ba8b489512805ac13a8f9ea77a1ca5ebe3e8\aopalliance-1.0.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.codehaus.plexus\plexus-sec-dispatcher\2.0\f89c5080614ffd0764e49861895dbedde1b47237\plexus-sec-dispatcher-2.0.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\javax.annotation\javax.annotation-api\1.2\479c1e06db31c432330183f5cae684163f186146\javax.annotation-api-1.2.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\aopalliance\aopalliance\1.0\235ba8b489512805ac13a8f9ea77a1ca5ebe3e8\aopalliance-1.0.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.google.guava\guava\25.1-android\bdaab946ca5ad20253502d873ba0c3313d141036\guava-25.1-android.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.apache.httpcomponents\httpcore\4.4.16\51cf043c87253c9f58b539c9f7e44c8894223850\httpcore-4.4.16.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\commons-codec\commons-codec\1.11\3acb4705652e16236558f0f4f2192cc33c3bd189\commons-codec-1.11.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.codehaus.plexus\plexus-cipher\2.0\425ea8e534716b4bff1ea90f39bd76be951d651b\plexus-cipher-2.0.jar" />
-        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.google.code.findbugs\jsr305\3.0.2\25ea2e8b0c338a877313bd4672d3fe056ea78f0d\jsr305-3.0.2.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.checkerframework\checker-compat-qual\2.0.0\fc89b03860d11d6213d0154a62bcd1c2f69b9efa\checker-compat-qual-2.0.0.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.google.errorprone\error_prone_annotations\2.1.3\39b109f2cd352b2d71b52a3b5a1a9850e1dc304b\error_prone_annotations-2.1.3.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\com.google.j2objc\j2objc-annotations\1.1\ed28ded51a8b1c6b112568def5f4b455e6809019\j2objc-annotations-1.1.jar" />
         <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.codehaus.mojo\animal-sniffer-annotations\1.14\775b7e22fb10026eed3f86e8dc556dfafe35f2d5\animal-sniffer-annotations-1.14.jar" />
+        <option value="C:\Users\shaun\.gradle\caches\modules-2\files-2.1\org.codehaus.plexus\plexus-cipher\2.0\425ea8e534716b4bff1ea90f39bd76be951d651b\plexus-cipher-2.0.jar" />
       </list>
     </option>
     <option name="templates">
       <list>
-        <option value="UdeaScript" />
+        <option value="dev.wildware.udea.assets.dsl.script.UdeaScript" />
       </list>
     </option>
   </component>
@@ -701,7 +804,8 @@
       <workItem from="1764059998395" duration="18962000" />
       <workItem from="1764091206112" duration="8566000" />
       <workItem from="1764150912100" duration="1917000" />
-      <workItem from="1764152838493" duration="2372000" />
+      <workItem from="1764152838493" duration="4316000" />
+      <workItem from="1764158866239" duration="4168000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -885,11 +989,6 @@
             <option name="lambda-ordinal" value="-1" />
           </properties>
           <option name="timeStamp" value="12" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-line">
-          <url>file://$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt</url>
-          <line>500</line>
-          <option name="timeStamp" value="18" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

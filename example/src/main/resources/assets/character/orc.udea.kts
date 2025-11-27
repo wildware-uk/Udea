@@ -1,15 +1,15 @@
 import dev.wildware.udea.ecs.component.base.debug
+import dev.wildware.udea.ecs.component.base.networkable
 import dev.wildware.udea.example.ability.CharacterAttributeSet
-import dev.wildware.udea.example.character.npcAnimations
+import dev.wildware.udea.example.character.gameUnitAnimations
 import dev.wildware.udea.example.component.Team
-import dev.wildware.udea.example.component.npc
+import dev.wildware.udea.example.component.gameUnit
 import dev.wildware.udea.example.component.team
-import dev.wildware.udea.example.tags.Character
 
 bundle {
     character(
         name = "orc",
-        animations = npcAnimations(
+        animations = gameUnitAnimations(
             walk = "orc_walk",
             run = "orc_walk",
             idle = "orc_idle",
@@ -20,12 +20,12 @@ bundle {
         size = characterSize(0.2F, 0.2F),
         attributeSet = ::CharacterAttributeSet,
         components = lazy {
+            networkable()
             team(Team.OrcTeam)
-            npc()
+            gameUnit()
             debug()
         },
         spriteAnimationSet = reference("character/orc_animation_set"),
-        tags = listOf(Character),
     )
 
     spriteAnimationSet(

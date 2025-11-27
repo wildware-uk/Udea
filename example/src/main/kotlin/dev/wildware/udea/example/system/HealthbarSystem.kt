@@ -9,9 +9,7 @@ import com.github.quillraven.fleks.World.Companion.inject
 import dev.wildware.udea.ecs.component.ability.Abilities
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.example.ability.CharacterAttributeSet
-import dev.wildware.udea.example.component.NPC
 import dev.wildware.udea.gameScreen
-import dev.wildware.udea.getOrNull
 import ktx.graphics.use
 
 val HealthBarWidth = 60F

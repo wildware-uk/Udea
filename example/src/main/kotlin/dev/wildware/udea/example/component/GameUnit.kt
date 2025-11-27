@@ -4,11 +4,10 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.dsl.CreateDsl
 
-@CreateDsl(name = "npc")
-class NPC : Component<NPC> {
+class GameUnit : Component<GameUnit> {
     var isDead: Boolean = false
 
-    override fun type() = NPC
+    override fun type() = GameUnit
 
-    companion object : ComponentType<NPC>()
+    companion object : ComponentType<GameUnit>()
 }

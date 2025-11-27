@@ -3,17 +3,13 @@ package dev.wildware.udea.ecs.component.ability
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
-import dev.wildware.udea.ability.AbilityActivation
-import dev.wildware.udea.ability.AbilityExec
-import dev.wildware.udea.ability.AttributeSet
-import dev.wildware.udea.ability.GameplayEffectSpec
-import dev.wildware.udea.ability.GameplayTag
+import dev.wildware.udea.ability.*
 import dev.wildware.udea.assets.Ability
+import dev.wildware.udea.ecs.component.SyncStrategy.Update
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.configureNetwork
 import dev.wildware.udea.network.UdeaNetworked
 import dev.wildware.udea.network.serde.UdeaSync
-import kotlinx.serialization.Serializable
 
 @UdeaNetworked(
     registerKotlinXSerializer = false
@@ -46,7 +42,7 @@ data class Abilities(
                 cue.onGameplayEffectApplied(
                     source,
                     target,
-                    gameplayEffectSpec.gameplayEffect
+                    gameplayEffectSpec
                 )
             }
         }

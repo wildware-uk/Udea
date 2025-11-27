@@ -8,6 +8,6 @@ interface GameplayEffectCue {
     fun onGameplayEffectApplied(
         source: Entity,
         target: Entity,
-        gameplayEffect: GameplayEffect
+        spec: GameplayEffectSpec
     )
 }

@@ -22,8 +22,6 @@ class DebugDrawSystem : IteratingSystem(
     val spriteBatch = SpriteBatch()
 
     override fun onTick() {
-        if (!gameScreen.debug) return
-
         spriteBatch.use {
             super.onTick()
             font.draw(it, if (gameScreen.isServer) "server" else "client", 10F, 50F)
@@ -34,11 +32,13 @@ class DebugDrawSystem : IteratingSystem(
         val transform = entity[Transform]
         val debug = entity[Debug]
 
-        val position = gameScreen.camera.project(Vector3(transform.position, 0f))
+        if (gameScreen.debug) {
+            val position = gameScreen.camera.project(Vector3(transform.position, 0f))
 
-        font.setColor(1.0F, 1.0F, 1.0F, 1.0F)
-        debug.debugMessages.forEachIndexed { i, it ->
-            font.draw(spriteBatch, it.message, position.x + 10F, position.y + i * 25F)
+            font.setColor(1.0F, 1.0F, 1.0F, 1.0F)
+            debug.debugMessages.forEachIndexed { i, it ->
+                font.draw(spriteBatch, it.message, position.x + 10F, position.y + i * 25F)
+            }
         }
 
         debug.debugMessages.removeIf {

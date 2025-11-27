@@ -40,7 +40,6 @@ import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.system.*
-import dev.wildware.udea.ecs.system.DebugDrawSystem
 import dev.wildware.udea.screen.LoadingScreen
 import dev.wildware.udea.screen.UIScreen
 import ktx.app.KtxGame
@@ -384,6 +383,7 @@ class UdeaGameManager(
             BackgroundDrawSystem::class,
             CharacterAnimationControllerSystem::class,
             AnimationSystem::class,
+            ControllerSystem::class,
             CharacterControllerSystem::class,
             Box2DSystem::class,
             AnimationSetSystem::class,
@@ -393,7 +393,6 @@ class UdeaGameManager(
             AbilitySystem::class,
             AttributeSystem::class,
             CleanupSystem::class,
-            ControllerSystem::class,
             ParticleSystemSystem::class,
         )
     }

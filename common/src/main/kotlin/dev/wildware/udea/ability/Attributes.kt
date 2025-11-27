@@ -32,13 +32,20 @@ data class Attribute(
 }
 
 sealed class ValueResolver {
-    abstract val value: Float
+    abstract fun getValue(gameplayEffectSpec: GameplayEffectSpec): Float
 
-    class ConstantValue(override val value: Float) : ValueResolver()
+    class ConstantValue(val value: Float) : ValueResolver() {
+        override fun getValue(gameplayEffectSpec: GameplayEffectSpec) = value
+    }
 
     class AttributeValue(val attribute: Attribute) : ValueResolver() {
-        override val value: Float
-            get() = attribute.currentValue
+        override fun getValue(gameplayEffectSpec: GameplayEffectSpec) = attribute.currentValue
+    }
+
+    class SetByCaller(val gameplayTag: GameplayTag) : ValueResolver() {
+        override fun getValue(gameplayEffectSpec: GameplayEffectSpec): Float {
+            return gameplayEffectSpec.getSetByCallerMagnitude(gameplayTag)
+        }
     }
 
     companion object {
@@ -53,3 +60,6 @@ fun value(value: Float) = ValueResolver.ConstantValue(value)
 
 @UdeaDsl
 fun value(attribute: Attribute) = ValueResolver.AttributeValue(attribute)
+
+@UdeaDsl
+fun value(gameplayTag: GameplayTag) = ValueResolver.SetByCaller(gameplayTag)

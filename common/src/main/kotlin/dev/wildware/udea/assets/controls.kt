@@ -3,6 +3,8 @@ package dev.wildware.udea.assets
 import com.badlogic.gdx.Gdx
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
+import com.github.quillraven.fleks.UniqueId
+import dev.wildware.udea.Vector2
 
 class Control : Asset<Control>() {
     val controlId = ControlId++
@@ -47,13 +49,19 @@ data class Binding(
     }
 }
 
-class Axis : Asset<Axis>()
+class Axis2D : Asset<Axis2D>() {
+    val id: Int = nextId++
 
-class AxisBinding(
-    val axis: AssetReference<Axis>,
+    companion object {
+        private var nextId = 0
+    }
+}
+
+class Axis2DBinding(
+    val axis: AssetReference<Axis2D>,
     val input: Binding.BindingInput,
-    val magnitude: Float
-) : Asset<AxisBinding>()
+    val direction: Vector2
+) : Asset<Axis2DBinding>()
 
 /**
  * Creates a keyboard key binding.

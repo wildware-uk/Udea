@@ -1,15 +1,15 @@
 import dev.wildware.udea.ecs.component.base.debug
+import dev.wildware.udea.ecs.component.base.networkable
 import dev.wildware.udea.example.ability.CharacterAttributeSet
-import dev.wildware.udea.example.character.npcAnimations
+import dev.wildware.udea.example.character.gameUnitAnimations
 import dev.wildware.udea.example.component.Team
-import dev.wildware.udea.example.component.npc
+import dev.wildware.udea.example.component.gameUnit
 import dev.wildware.udea.example.component.team
-import dev.wildware.udea.example.tags.Character
 
 bundle {
     character(
         name = "soldier",
-        animations = npcAnimations(
+        animations = gameUnitAnimations(
             walk = "soldier_walk",
             run = "soldier_walk",
             idle = "soldier_idle",
@@ -20,11 +20,11 @@ bundle {
         size = characterSize(0.2F, 0.2F),
         attributeSet = ::CharacterAttributeSet,
         components = lazy {
+            networkable()
             team(Team.SoldierTeam)
-            npc()
+            gameUnit()
             debug()
         },
-        tags = listOf(Character),
         spriteAnimationSet = reference("character/soldier_animation_set")
     )
 
@@ -63,6 +63,15 @@ bundle {
                 loop = false,
                 interruptable = false
             )
+
+            spriteAnimation(
+                name = "soldier_fire_arrow",
+                sheet = reference("character/soldier_fire_arrow"),
+                notifies = {
+                    animNotify(8, "fire_arrow")
+                },
+                loop = false,
+            )
         }
     )
 
@@ -89,6 +98,14 @@ bundle {
         spritePath = "/sprites/soldier/Soldier-Attack01.png",
         rows = 1,
         columns = 6,
+        scale = soldierScale
+    )
+
+    spriteSheet(
+        name = "soldier_fire_arrow",
+        spritePath = "/sprites/soldier/Soldier-Attack03.png",
+        rows = 1,
+        columns = 9,
         scale = soldierScale
     )
 

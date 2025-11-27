@@ -27,7 +27,8 @@ object UdeaScriptConfiguration : ScriptCompilationConfiguration({
         "dev.wildware.udea.ecs.component.*",
         "dev.wildware.udea.dsl.*",
         "dev.wildware.udea.dsl.blueprint",
-        "dev.wildware.udea.assets.*"
+        "dev.wildware.udea.assets.*",
+        "com.badlogic.gdx.*"
     )
 
     ide {

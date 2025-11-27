@@ -11,10 +11,24 @@ import kotlin.time.Duration
 data class GameplayEffectSpec(
     val gameplayEffect: @Contextual GameplayEffect,
     var stacks: Int = 1,
-    var magnitude: Float = 1F,
 ) {
+    private val setByCallerMagnitudes = mutableMapOf<GameplayTag, Float>()
+    private val dynamicTags = mutableSetOf<GameplayTag>()
+
     fun hasTag(tag: GameplayTag): Boolean {
-        return gameplayEffect.tags.contains(tag)
+        return gameplayEffect.tags.contains(tag) || dynamicTags.contains(tag)
+    }
+
+    fun setSetByCallerMagnitude(tag: GameplayTag, magnitude: Float) {
+        setByCallerMagnitudes[tag] = magnitude
+    }
+
+    fun getSetByCallerMagnitude(tag: GameplayTag): Float {
+        return setByCallerMagnitudes[tag] ?: 0F
+    }
+
+    fun addDynamicTag(tag: GameplayTag) {
+        dynamicTags.add(tag)
     }
 
     operator fun contains(tag: GameplayTag) = hasTag(tag)
@@ -26,7 +40,7 @@ data class GameplayEffectSpec(
 data class GameplayEffect(
     val target: KProperty<Attribute>? = null,
     val modifierType: ModifierType? = null,
-    val source: ValueResolver? = null,
+    val magnitude: ValueResolver? = null,
     var effectDuration: GameplayEffectDuration,
     val period: Duration = Duration.ZERO,
     val tags: List<GameplayTag> = emptyList(),
@@ -42,21 +56,25 @@ enum class ModifierType(
 }
 
 sealed class GameplayEffectDuration {
-    abstract fun hasExpired(currentDuration: Float): Boolean
+    abstract fun hasExpired(spec: GameplayEffectSpec): Boolean
 
     data object Instant : GameplayEffectDuration() {
-        override fun hasExpired(currentDuration: Float) = true
+        override fun hasExpired(spec: GameplayEffectSpec) = true
     }
 
     data object Infinite : GameplayEffectDuration() {
-        override fun hasExpired(currentDuration: Float) = false
+        override fun hasExpired(spec: GameplayEffectSpec) = false
     }
 
     data class Duration(
         val duration: Float
     ) : GameplayEffectDuration() {
-        override fun hasExpired(currentDuration: Float) =
-            currentDuration > duration
+        override fun hasExpired(spec: GameplayEffectSpec) =
+            spec.duration > duration
+    }
+
+    data class SetByCaller(val gameplayTag: GameplayTag) : GameplayEffectDuration() {
+        override fun hasExpired(spec: GameplayEffectSpec) = spec.duration > spec.getSetByCallerMagnitude(gameplayTag)
     }
 }
 
@@ -67,3 +85,6 @@ fun infinite() = GameplayEffectDuration.Infinite
 
 @UdeaDsl
 fun duration(duration: Float) = GameplayEffectDuration.Duration(duration)
+
+@UdeaDsl
+fun duration(gameplayTag: GameplayTag) = GameplayEffectDuration.SetByCaller(gameplayTag)

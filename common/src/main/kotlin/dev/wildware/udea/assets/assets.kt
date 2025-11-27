@@ -78,7 +78,7 @@ object Assets {
     val ready: Boolean
         get() = assets.isNotEmpty()
 
-    inline operator fun <reified T : Asset<T>> get(path: String) = assets[path] as T?
+    operator fun <T : Asset<T>> get(path: String) = assets[path] as T?
         ?: error("Asset $path does not exist ${debugAssets()}")
 
     fun <T : Asset<T>> find(path: String) = assets[path] as T?

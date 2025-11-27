@@ -9,13 +9,14 @@ import kotlinx.serialization.Serializable
 @Serializable
 @UdeaNetworked
 class Team(
-    var teamId: Int
+    var teamId: Int = NoTeam
 ) : Component<Team> {
     override fun type() = Team
 
     companion object : UdeaComponentType<Team>(
         networkComponent = configureNetwork()
     ) {
+        val NoTeam = -1
         val OrcTeam = 0
         val SoldierTeam = 1
     }

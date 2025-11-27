@@ -28,14 +28,18 @@ class CharacterAnimationControllerSystem : IteratingSystem(
         val characterAnimations = animationMapHolder.animationMap as? CharacterAnimationMap ?: return
 
         if (abilities.currentAbility == null) {
-            if (movement.x > 0F) {
+            val moving = !movement.isZero
+
+            if (moving) {
                 animSetSystem.setAnimation(entity, characterAnimations.run)
-                spriteRenderer.flipX = false
-            } else if (movement.x < 0F) {
-                animSetSystem.setAnimation(entity, characterAnimations.run)
-                spriteRenderer.flipX = true
             } else {
                 animSetSystem.setAnimation(entity, characterAnimations.idle)
+            }
+
+            if (movement.x > 0F) {
+                spriteRenderer.flipX = false
+            } else if (movement.x < 0F) {
+                spriteRenderer.flipX = true
             }
         }
     }

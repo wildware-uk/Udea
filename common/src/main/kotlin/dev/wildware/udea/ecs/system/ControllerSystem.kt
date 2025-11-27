@@ -1,23 +1,20 @@
 package dev.wildware.udea.ecs.system
 
-import com.github.quillraven.fleks.Entity
-import com.github.quillraven.fleks.IteratingSystem
-import com.github.quillraven.fleks.World.Companion.family
-import dev.wildware.udea.assets.Assets
-import dev.wildware.udea.assets.Binding
-import dev.wildware.udea.assets.Control
-import dev.wildware.udea.ecs.component.base.Networkable
-import dev.wildware.udea.ecs.component.control.Controller
-import dev.wildware.udea.hasAuthority
+import com.badlogic.gdx.math.Vector2
+import com.github.quillraven.fleks.IntervalSystem
+import dev.wildware.udea.assets.*
 
-class ControllerSystem : IteratingSystem(
-    family { all(Controller, Networkable) }
-) {
+class ControllerSystem : IntervalSystem() {
     private val controls = Assets.filterIsInstance<Control>()
     private val bindings = Assets.filterIsInstance<Binding>()
 
     private val inputPressed = Array(controls.size) { false }
     private val inputJustPressed = Array(controls.size) { false }
+
+    private val axes = Assets.filterIsInstance<Axis2D>()
+    private val axisBindings = Assets.filterIsInstance<Axis2DBinding>()
+
+    private val axisValues = Array(axes.size) { Vector2() }
 
     override fun onTick() {
         inputPressed.fill(false)
@@ -30,14 +27,23 @@ class ControllerSystem : IteratingSystem(
             inputJustPressed[id] = inputJustPressed[id] || b.input.justPressed()
         }
 
-        super.onTick()
+        axisValues.forEach { value -> value.setZero() }
+        axisBindings.forEach { binding -> if (binding.input.pressed()) axisValues[binding.axis.value.id].add(binding.direction) }
+        axisValues.forEach { it.nor() }
     }
 
-    override fun onTickEntity(entity: Entity) {
-        if (!world.hasAuthority(entity)) return
+    /**
+     * Return true if the input is pressed.
+     * */
+    fun isInputPressed(control: Control) = inputPressed[control.controlId]
 
-        val controller = entity[Controller]
-        inputPressed.copyInto(controller.bindingPressed)
-        inputJustPressed.copyInto(controller.bindingJustPressed)
-    }
+    /**
+     * Return true if the input was just pressed.
+     * */
+    fun isInputJustPressed(control: Control) = inputJustPressed[control.controlId]
+
+    /**
+     * Gets the value of an axis.
+     * */
+    fun getAxisValue(axis: Axis2D) = axisValues[axis.id]
 }

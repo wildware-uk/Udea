@@ -4,6 +4,7 @@ import com.badlogic.gdx.physics.box2d.*
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.FamilyOnAdd
 import com.github.quillraven.fleks.IteratingSystem
+import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.World.Companion.family
 import com.github.quillraven.fleks.World.Companion.inject
 import dev.wildware.udea.ecs.UdeaSystem
@@ -21,7 +22,7 @@ class Box2DSystem(
 ) : IteratingSystem(family { all(Body, Transform).any(Box, Capsule, Circle, Chain) }), FamilyOnAdd {
     val box2dDebugRenderer = Box2DDebugRenderer()
 
-    private val onCollideListeners = mutableListOf<(Entity, Entity) -> Unit>()
+    private val onCollideListeners = mutableListOf<context(World) (Entity, Entity) -> Unit>()
 
     init {
         box2DWorld.setContactListener(object : ContactListener {
@@ -33,9 +34,11 @@ class Box2DSystem(
                     bodyB[Body].touchingCount++
                     bodyA[Body].touchingCount++
 
-                    onCollideListeners.forEach {
-                        it(bodyB, bodyA)
-                        it(bodyA, bodyB)
+                    context(world) {
+                        onCollideListeners.forEach {
+                            it(bodyB, bodyA)
+                            it(bodyA, bodyB)
+                        }
                     }
                 }
             }
@@ -95,7 +98,7 @@ class Box2DSystem(
         transform.rotation = rigidBody.body.angle
     }
 
-    fun onCollide(callback: (Entity, Entity) -> Unit) {
+    fun onCollide(callback: context(World) (Entity, Entity) -> Unit) {
         onCollideListeners += callback
     }
 }

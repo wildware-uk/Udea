@@ -11,17 +11,16 @@ import dev.wildware.udea.ecs.component.animation.AnimationMapHolder
 import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.ecs.component.physics.Body
 import dev.wildware.udea.ecs.system.AnimationSetSystem
-import dev.wildware.udea.example.character.NPCAnimationMap
-import dev.wildware.udea.example.component.NPC
+import dev.wildware.udea.example.character.GameUnitAnimationMap
 import dev.wildware.udea.get
 import dev.wildware.udea.position
 
-class NPCMeleeAttack(abilityActivation: AbilityActivation) : AbilityExec(abilityActivation) {
+class UnitMeleeAttack(abilityActivation: AbilityActivation) : AbilityExec(abilityActivation) {
     context(world: World)
     override fun activate(abilityInfo: AbilityInfo) {
         val source = abilityInfo.source
         val target = abilityInfo.target
-        val attackAnimation = source[AnimationMapHolder].animationMap<NPCAnimationMap>().attack
+        val attackAnimation = source[AnimationMapHolder].animationMap<GameUnitAnimationMap>().attack
 
         if (target == null) {
             return endAbility()
@@ -41,13 +40,20 @@ class NPCMeleeAttack(abilityActivation: AbilityActivation) : AbilityExec(ability
                     return@onNotify
                 }
 
-                val hitEffect = GameplayEffectSpec(Assets["ability/melee_damage"])
-                target[Abilities].applyGameplayEffect(source, target, hitEffect)
+                val damageEffect = GameplayEffectSpec(Assets["ability/damage"])
+                damageEffect.setSetByCallerMagnitude(Data.Damage, -10F)
+                damageEffect.addDynamicTag(Damage.Physical)
+                target[Abilities].applyGameplayEffect(source, target, damageEffect)
 
-                val hitStun = GameplayEffectSpec(Assets["ability/melee_stun"])
-                target[Abilities].applyGameplayEffect(source, target, hitStun)
+                val stunEffect = GameplayEffectSpec(Assets["ability/stun"])
+                stunEffect.setSetByCallerMagnitude(Data.StunDuration, 0.5F)
+                target[Abilities].applyGameplayEffect(source, target, stunEffect)
 
-                val knockback = diff.nor().scl(.2F)
+                val knockbackEffect = GameplayEffectSpec(Assets["ability/knockback"])
+                knockbackEffect.setSetByCallerMagnitude(Data.Knockback, .5F)
+                target[Abilities].applyGameplayEffect(source, target, knockbackEffect)
+
+                val knockback = diff.nor().scl(.3F)
                 target[Body].body.applyLinearImpulse(knockback, Zero, true)
             }
 

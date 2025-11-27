@@ -1,8 +1,11 @@
-![Udea Logo](images/logo.png)
+![Udea Logo](images/logo_square.png)
+
+# UDEA
 
 [![shield](https://img.shields.io/badge/Ko--fi-Donate%20-hotpink?logo=kofi&logoColor=white)](https://ko-fi.com/shaunwild)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-purple.svg)](http://kotlinlang.org/)
-![Discord](https://img.shields.io/discord/1442524958432563292)
+[![Discord](https://img.shields.io/discord/1442524958432563292)](https://discord.gg/jzmH5VQDqj)
+[![Trello](https://img.shields.io/badge/check_progress-trello-blue)](https://trello.com/b/3JqieuNR/udea)
     
 
 A Kotlin+LibGDX+Fleks game engine for 2D games.
@@ -18,8 +21,9 @@ A Kotlin+LibGDX+Fleks game engine for 2D games.
 
 - **`comomon`** - Common code for the engine and plugin.
 - **`level-editor`** - An embedded LibGDX level editor.
-- **`plugin`** - An IDE plugin for creating levels and assets.
-- **`compose-ui`** - Reusable compose components used for the plugin.
+- **`idea-plugin`** - An IDE plugin for creating levels and assets.
+- **`gradle-plugin`** - Gradle plugin for generated network code + DSL.
+- **`example`** - Example game created with the engine.
 
 ## Contributing
 

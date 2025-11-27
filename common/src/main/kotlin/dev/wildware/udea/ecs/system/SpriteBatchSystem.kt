@@ -22,7 +22,6 @@ class SpriteBatchSystem(
     family { all(Transform, SpriteComponent) },
     compareEntity { entA, entB -> entA[SpriteComponent].order.compareTo(entB[SpriteComponent].order) }
 ) {
-
     override fun onTick() {
         spriteBatch.use(gameScreen.camera) {
             super.onTick()

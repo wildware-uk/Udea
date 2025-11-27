@@ -24,12 +24,12 @@ class AttributeSystem : IteratingSystem(
 
                     if (it.gameplayEffect.target != null
                         && it.gameplayEffect.modifierType != null
-                        && it.gameplayEffect.source != null
+                        && it.gameplayEffect.magnitude != null
                     ) {
                         val targetAttribute = it.gameplayEffect.target.getter.call(abilities.attributeSet)
                         targetAttribute.currentValue = it.gameplayEffect.modifierType
-                            .apply(targetAttribute.currentValue, it.gameplayEffect.source.value * it.magnitude)
-                            .coerceIn(targetAttribute.min.value, targetAttribute.max.value)
+                            .apply(targetAttribute.currentValue, it.gameplayEffect.magnitude.getValue(it))
+                            .coerceIn(targetAttribute.min.getValue(it), targetAttribute.max.getValue(it))
                     }
                 }
 
@@ -37,7 +37,7 @@ class AttributeSystem : IteratingSystem(
             }
 
         (abilities.gameplayEffectSpecs as MutableList<GameplayEffectSpec>).removeIf {
-            it.gameplayEffect.effectDuration.hasExpired(it.duration)
+            it.gameplayEffect.effectDuration.hasExpired(it)
         }
     }
 }

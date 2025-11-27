@@ -15,7 +15,7 @@ abstract class AbilityExec(
     context(world: World)
     abstract fun activate(abilityInfo: AbilityInfo)
 
-    fun finish() {
+    fun endAbility() {
         abilityActivation.abilityFinished = true
     }
 }

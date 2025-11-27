@@ -14,12 +14,11 @@ data class GameplayEffectSpec(
     var magnitude: Float = 1F,
 ) {
     fun hasTag(tag: GameplayTag): Boolean {
-        return tags.contains(tag)
+        return gameplayEffect.tags.contains(tag)
     }
 
     operator fun contains(tag: GameplayTag) = hasTag(tag)
 
-    val tags = mutableSetOf<GameplayTag>()
     var period: Float = 0F
     var duration: Float = 0F
 }
@@ -60,3 +59,11 @@ sealed class GameplayEffectDuration {
             currentDuration > duration
     }
 }
+
+@UdeaDsl
+fun instant() = GameplayEffectDuration.Instant
+
+fun infinite() = GameplayEffectDuration.Infinite
+
+@UdeaDsl
+fun duration(duration: Float) = GameplayEffectDuration.Duration(duration)

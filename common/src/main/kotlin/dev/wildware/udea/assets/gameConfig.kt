@@ -10,7 +10,8 @@ data class GameConfig(
     val lighting: Lighting? = null,
     val network: Network = Network(),
     val scene2d: Scene2D? = null,
-    val physics: Physics = Physics()
+    val physics: Physics = Physics(),
+    val movementType: MovementType = MovementType.TopDown
 ) : Asset()
 
 data class Scene2D(
@@ -34,3 +35,7 @@ data class Lighting(
 data class Physics(
     val gravity: Vector2 = Vector2(0F, -9.81F)
 ): Asset()
+
+enum class MovementType {
+    TopDown, Sidescroller
+}

@@ -14,7 +14,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.ParticleEffect
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
-import com.badlogic.gdx.math.Vector2
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.scenes.scene2d.InputEvent
 import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
@@ -40,6 +40,7 @@ import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.system.*
+import dev.wildware.udea.ecs.system.DebugDrawSystem
 import dev.wildware.udea.screen.LoadingScreen
 import dev.wildware.udea.screen.UIScreen
 import ktx.app.KtxGame
@@ -94,7 +95,9 @@ class GameScreen(
     var isServer: Boolean = true
     var localPlayer: Entity? = null
     var clientId: Int = -1
-    var time = 0F
+    private var fpsPrintTimer = 0F
+
+    var time: Float = 0F
 
     val console by lazy {
         Console().apply {
@@ -136,6 +139,7 @@ class GameScreen(
     val gameConfig = Assets.filterIsInstance<GameConfig>().firstOrNull() ?: GameConfig()
 
     val spriteBatch by lazy { SpriteBatch() }
+    val shapeRenderer by lazy { ShapeRenderer() }
 
     var displayConsole = false
 
@@ -145,6 +149,7 @@ class GameScreen(
                 add(box2DWorld)
                 add(rayHandler)
                 add(spriteBatch)
+                add(shapeRenderer)
             }
 
             systems {
@@ -212,8 +217,9 @@ class GameScreen(
         if (!started) return
 
         time += delta
-        if (time > 1.0F) {
-            time = 0F
+        fpsPrintTimer += delta
+        if (fpsPrintTimer > 1.0F) {
+            fpsPrintTimer = 0F
             println("FPS: ${Gdx.graphics.framesPerSecond}")
         }
 
@@ -382,6 +388,7 @@ class UdeaGameManager(
             Box2DSystem::class,
             AnimationSetSystem::class,
             SpriteBatchSystem::class,
+            DebugDrawSystem::class,
             Box2DLightsSystem::class,
             AbilitySystem::class,
             AttributeSystem::class,

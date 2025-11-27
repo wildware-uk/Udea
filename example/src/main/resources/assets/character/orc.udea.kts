@@ -1,4 +1,9 @@
+import dev.wildware.udea.ecs.component.base.debug
 import dev.wildware.udea.example.ability.CharacterAttributeSet
+import dev.wildware.udea.example.component.Team
+import dev.wildware.udea.example.component.npc
+import dev.wildware.udea.example.component.team
+import dev.wildware.udea.example.tags.Character
 
 bundle {
     character(
@@ -6,12 +11,22 @@ bundle {
         animations = characterAnimations(
             animationSet = reference("character/orc_animation_set"),
             walk = "orc_walk",
-            run = "orc_run",
+            run = "orc_walk",
             idle = "orc_idle",
-            death = "necromancer_death",
+            death = "orc_death",
         ),
-        size = characterSize(0.5F, 0.5F),
+        size = characterSize(0.2F, 0.2F),
         attributeSet = ::CharacterAttributeSet,
+        components = lazy {
+            team(Team.OrcTeam)
+            npc(
+                attackAnimation = "orc_attack",
+                hitAnimation = "orc_hit",
+                deathAnimation = "orc_death"
+            )
+            debug()
+        },
+        tags = listOf(Character)
     )
 
     spriteAnimationSet(
@@ -23,7 +38,7 @@ bundle {
             )
 
             spriteAnimation(
-                name = "necromancer_walk",
+                name = "orc_walk",
                 sheet = reference("character/orc_walk")
             )
 
@@ -31,32 +46,43 @@ bundle {
                 name = "orc_attack",
                 sheet = reference("character/orc_attack"),
                 loop = false,
+                notifies = {
+                    animNotify(3, "attack_hit")
+                }
             )
 
             spriteAnimation(
-                name = "necromancer_death",
+                name = "orc_hit",
+                sheet = reference("character/orc_hit"),
+                loop = false,
+                interruptable = false
+            )
+
+            spriteAnimation(
+                name = "orc_death",
                 sheet = reference("character/orc_death"),
-                loop = false
+                loop = false,
+                interruptable = false
             )
         }
     )
 
-    val OrcScale = 0.02F
+    val orcScale = 0.02F
 
     spriteSheet(
         name = "orc_idle",
         spritePath = "/sprites/orc/Orc-Idle.png",
         rows = 1,
         columns = 6,
-        scale = OrcScale
+        scale = orcScale
     )
 
     spriteSheet(
-        name = "orc_run",
+        name = "orc_walk",
         spritePath = "/sprites/orc/Orc-Walk.png",
         rows = 1,
         columns = 8,
-        scale = OrcScale
+        scale = orcScale
     )
 
     spriteSheet(
@@ -64,7 +90,15 @@ bundle {
         spritePath = "/sprites/orc/Orc-Attack01.png",
         rows = 1,
         columns = 6,
-        scale = OrcScale
+        scale = orcScale
+    )
+
+    spriteSheet(
+        name = "orc_hit",
+        spritePath = "/sprites/orc/Orc-Hurt.png",
+        rows = 1,
+        columns = 4,
+        scale = orcScale
     )
 
     spriteSheet(
@@ -72,6 +106,6 @@ bundle {
         spritePath = "/sprites/orc/Orc-Death.png",
         rows = 1,
         columns = 4,
-        scale = OrcScale
+        scale = orcScale
     )
 }

@@ -58,9 +58,13 @@ data class AnimationInstance<T>(
             notifies[currentFrame.name]?.invoke()
 
             if(isFinished) {
-                onFinish.forEach { it(this) }
+               finish()
             }
         }
+    }
+
+    fun finish() {
+        onFinish.forEach { it(this) }
     }
 
     fun onNotify(name: String, onNotify: () -> Unit) {

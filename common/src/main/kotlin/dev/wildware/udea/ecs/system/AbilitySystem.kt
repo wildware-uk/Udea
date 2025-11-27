@@ -1,16 +1,21 @@
 package dev.wildware.udea.ecs.system
 
+import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IntervalSystem
+import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.udea.Vector2
 import dev.wildware.udea.ability.AbilityActivation
 import dev.wildware.udea.ability.AbilityExec
 import dev.wildware.udea.ability.AbilityInfo
 import dev.wildware.udea.assets.Ability
 import dev.wildware.udea.assets.AssetReference
 import dev.wildware.udea.ecs.component.ability.Abilities
+import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.gameScreen
 import dev.wildware.udea.getNetworkEntityOrNull
+import dev.wildware.udea.getOrNull
 import dev.wildware.udea.network.AbilityPacket
 import dev.wildware.udea.network.AbilityPacketInstantiator
 import dev.wildware.udea.processAndRemoveEach
@@ -25,8 +30,15 @@ class AbilitySystem : IntervalSystem() {
         family.forEach { entity ->
             val abilities = entity[Abilities]
 
-            if (abilities.currentAbility?.abilityFinished == true) {
-                abilities.currentAbility = null
+            abilities.currentAbility?.let {
+                if(it.ability.blockedBy.any { tag -> abilities.hasGameplayEffectTag(tag) }) {
+                    it.abilityFinished = true
+                }
+
+                if(it.abilityFinished) {
+                    entity.getOrNull(Debug)?.addMessage("Ability Ended", 0.5F)
+                    abilities.currentAbility = null
+                }
             }
         }
 
@@ -37,11 +49,7 @@ class AbilitySystem : IntervalSystem() {
                 val remoteTarget = it.target?.let { t -> world.getNetworkEntityOrNull(t) }
 
                 if (remoteEntity != null) {
-                    val activation =
-                        AbilityActivation(ability.value, AbilityInfo(remoteEntity, it.targetPos!!, remoteTarget))
-                    remoteEntity[Abilities].currentAbility = activation
-                    ability.value.execInstance(activation)
-                        .activate(AbilityInfo(remoteEntity, it.targetPos!!, remoteTarget))
+                    doAbility(remoteEntity, remoteTarget, it.targetPos!!, ability.value)
                 }
             }
 
@@ -66,9 +74,7 @@ class AbilitySystem : IntervalSystem() {
 
         if (gameScreen.isServer) {
             context(world) {
-                val activation = AbilityActivation(ability, abilityInfo)
-                abilityInfo.source[Abilities].currentAbility = activation
-                ability.execInstance(activation).activate(AbilityInfo(networkSource, abilityInfo.targetPos, networkTarget))
+                doAbility(networkSource, networkTarget, abilityInfo.targetPos, ability)
             }
 
             gameScreen.networkServerSystem?.server?.sendToAllTCP(
@@ -91,6 +97,21 @@ class AbilitySystem : IntervalSystem() {
         }
     }
 
-    fun Ability.execInstance(abilityActivation: AbilityActivation) =
+    context(_: World)
+    private fun doAbility(remoteSource: Entity, remoteTarget: Entity?, targetPos: Vector2, ability: Ability) {
+        if (remoteSource[Abilities].currentAbility == null) {
+            val canCast = ability.blockedBy.all { !remoteSource[Abilities].hasGameplayEffectTag(it) }
+
+            if (!canCast) return
+
+            val activation = AbilityActivation(ability, AbilityInfo(remoteSource, targetPos, remoteTarget))
+            remoteSource[Abilities].currentAbility = activation
+
+            ability.execInstance(activation)
+                .activate(AbilityInfo(remoteSource, targetPos, remoteTarget))
+        }
+    }
+
+    private fun Ability.execInstance(abilityActivation: AbilityActivation) =
         exec.primaryConstructor!!.call(abilityActivation) as AbilityExec
 }

@@ -18,7 +18,8 @@ class AnimationSet(
 
     val spriteAnimationSet = spriteAnimationSet.value
 
-    var currentAnimation: AnimationInstance<out TextureRegion>? = null
+    var currentAnimation: SpriteAnimation? = null
+    var currentAnimationInstance: AnimationInstance<out TextureRegion>? = null
 
     override fun type() = AnimationSet
 

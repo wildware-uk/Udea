@@ -39,6 +39,7 @@ data class SpriteAnimation(
     val name: String,
     val sheet: AssetReference<SpriteSheet>,
     val loop: Boolean = true,
+    val interruptable: Boolean = true,
     val notifies: List<AnimNotify> = emptyList()
 ) {
     val spriteSheet by lazy {

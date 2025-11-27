@@ -1,32 +1,24 @@
 package dev.wildware.udea.ecs.system
 
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
-import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
 import com.badlogic.gdx.math.Vector3
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
+import com.kotcrab.vis.ui.VisUI
 import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
-import dev.wildware.udea.ecs.component.ability.Abilities
 import dev.wildware.udea.ecs.component.base.Debug
-import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.component.base.Transform
-import dev.wildware.udea.ecs.component.physics.Body
 import dev.wildware.udea.gameScreen
-import ktx.assets.toInternalFile
 import ktx.graphics.use
 
 @UdeaSystem(runIn = [Editor, Game])
 class DebugDrawSystem : IteratingSystem(
-    family { all(Transform, Debug) }
+    family { all(Transform, Debug) },
 ) {
-    var generator: FreeTypeFontGenerator = FreeTypeFontGenerator("font/LilitaOne-Regular.ttf".toInternalFile())
-    val size32Font = generator.generateFont(FreeTypeFontGenerator.FreeTypeFontParameter().apply {
-        size = 32
-        borderWidth = 1F
-    })
+    val font = VisUI.getSkin().getFont("default-font")
     val spriteBatch = SpriteBatch()
 
     override fun onTick() {
@@ -34,7 +26,7 @@ class DebugDrawSystem : IteratingSystem(
 
         spriteBatch.use {
             super.onTick()
-            size32Font.draw(it, if (gameScreen.isServer) "server" else "client", 10F, 50F)
+            font.draw(it, if (gameScreen.isServer) "server" else "client", 10F, 50F)
         }
     }
 
@@ -42,31 +34,15 @@ class DebugDrawSystem : IteratingSystem(
         val transform = entity[Transform]
         val debug = entity[Debug]
 
-        val position = gameScreen.camera!!.project(Vector3(transform.position, 0f))
+        val position = gameScreen.camera.project(Vector3(transform.position, 0f))
 
-        if (debug.drawId) {
-            val id = entity.id
-            size32Font.draw(spriteBatch, "ID: $id", position.x, position.y)
+        font.setColor(1.0F, 1.0F, 1.0F, 1.0F)
+        debug.debugMessages.forEachIndexed { i, it ->
+            font.draw(spriteBatch, it.message, position.x + 10F, position.y + i * 25F)
         }
 
-        if (debug.drawOwner) {
-            val id = entity[Networkable].owner
-            size32Font.draw(spriteBatch, "Owner: $id", position.x, position.y + 50F)
-        }
-
-        if (debug.drawRemote && entity.has(Networkable)) {
-            val id = entity[Networkable].remoteEntity
-            size32Font.draw(spriteBatch, "Remote: $id", position.x, position.y + 100F)
-        }
-
-        if (debug.drawStats) {
-            val stats = entity[Abilities]
-            size32Font.draw(spriteBatch, "Stats: ${stats.attributeSet}", position.x, position.y + 150F)
-        }
-
-        if (debug.debugPhysics && entity.has(Body)) {
-            val rb = entity[Body]
-            size32Font.draw(spriteBatch, "v: ${rb.body.linearVelocity}", position.x, position.y + 150F)
+        debug.debugMessages.removeIf {
+            gameScreen.time >= it.destroyTime
         }
     }
 }

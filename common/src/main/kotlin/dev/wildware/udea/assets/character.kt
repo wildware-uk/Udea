@@ -2,11 +2,13 @@ package dev.wildware.udea.assets
 
 import com.badlogic.gdx.physics.box2d.BodyDef
 import com.github.quillraven.fleks.Component
+import com.github.quillraven.fleks.EntityTag
 import dev.wildware.udea.ability.AttributeSet
 import dev.wildware.udea.assets.dsl.ListBuilder
 import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.ecs.component.ability.abilities
-import dev.wildware.udea.ecs.component.ai.*
+import dev.wildware.udea.ecs.component.ai.PathfindingStyle
+import dev.wildware.udea.ecs.component.ai.agent
 import dev.wildware.udea.ecs.component.animation.animations
 import dev.wildware.udea.ecs.component.animation.characterAnimationController
 import dev.wildware.udea.ecs.component.base.networkable
@@ -21,10 +23,11 @@ fun ListBuilder<in Blueprint>.character(
     name: String,
     animations: CharacterAnimations,
     size: CharacterSize,
-    attributeSet: ()->AttributeSet,
-    components: LazyList<Component<out Any>> = emptyLazyList()
+    attributeSet: () -> AttributeSet,
+    components: LazyList<Component<out Any>> = emptyLazyList(),
+    tags: List<EntityTag> = emptyList()
 ) {
-    add(dev.wildware.udea.assets.character(name, animations, size, attributeSet, components))
+    add(dev.wildware.udea.assets.character(name, animations, size, attributeSet, components, tags))
 }
 
 /**
@@ -34,8 +37,9 @@ fun character(
     name: String,
     animations: CharacterAnimations,
     size: CharacterSize,
-    attributeSet: ()->AttributeSet,
-    components: LazyList<Component<out Any>> = emptyLazyList()
+    attributeSet: () -> AttributeSet,
+    components: LazyList<Component<out Any>> = emptyLazyList(),
+    tags: List<EntityTag> = emptyList()
 ) = Blueprint(
     components = lazy {
         spriteRenderer()
@@ -47,7 +51,7 @@ fun character(
 
         body(
             type = BodyDef.BodyType.DynamicBody,
-            linearDamping = 1.0F,
+            linearDamping = 5.0F,
             fixedRotation = true,
         )
 
@@ -67,7 +71,9 @@ fun character(
         characterController()
         characterAnimationController(animations)
         components().forEach { add(it) }
-    }
+    },
+
+    tags = tags
 ).apply {
     this.name = name
 }

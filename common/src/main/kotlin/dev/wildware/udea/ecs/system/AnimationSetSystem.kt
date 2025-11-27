@@ -36,22 +36,33 @@ class AnimationSetSystem(
         }
     }
 
-    fun setAnimation(entity: Entity, name: String): AnimationInstance<out TextureRegion>? {
+    fun setAnimation(entity: Entity, name: String, force: Boolean = false): AnimationInstance<out TextureRegion>? {
         val animationSet = entity[AnimationSet]
+        val currentAnimationInstance = animationSet.currentAnimationInstance
 
-        if (animationSet.currentAnimation?.animation?.name == name) return null
+        if (currentAnimationInstance != null) {
+            val currentAnimation = animationSet.currentAnimation!!
+            if (currentAnimationInstance.animation.name == name && currentAnimationInstance.animation.loop) return null
+
+            val canInterrupt = (currentAnimation.interruptable) || force
+            if (!canInterrupt && !currentAnimationInstance.isFinished) return null
+
+            currentAnimationInstance.finish()
+        }
 
         val animations = entity[Animations]
 
-        animationSet.currentAnimation
+        animationSet.currentAnimationInstance
             ?.let(animations::removeAnimation)
 
         animationSet.currentAnimation = animationSet.spriteAnimationSet.animations
-            .first { it.name == name }
-            .toAnimationInstance(animationSet)
+            .firstOrNull { it.name == name }
+            ?: error("Animation $name not found in animation set ${animationSet.spriteAnimationSet.name}")
 
-        animations.animations += animationSet.currentAnimation!!
-        return animationSet.currentAnimation!!
+        animationSet.currentAnimationInstance = animationSet.currentAnimation!!.toAnimationInstance(animationSet)
+
+        animations.animations += animationSet.currentAnimationInstance!!
+        return animationSet.currentAnimationInstance!!
     }
 
     override fun onTick() {
@@ -62,7 +73,7 @@ class AnimationSetSystem(
 
     override fun onTickEntity(entity: Entity) {
         val sprite = entity[SpriteComponent]
-        val texture = entity[AnimationSet].currentAnimation!!.currentFrame.data
+        val texture = entity[AnimationSet].currentAnimationInstance!!.currentFrame.data
         sprite.texture = texture
     }
 

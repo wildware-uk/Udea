@@ -7,6 +7,7 @@ import dev.wildware.udea.ability.AbilityActivation
 import dev.wildware.udea.ability.AbilityExec
 import dev.wildware.udea.ability.AttributeSet
 import dev.wildware.udea.ability.GameplayEffectSpec
+import dev.wildware.udea.ability.GameplayTag
 import dev.wildware.udea.assets.Ability
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.configureNetwork
@@ -49,6 +50,10 @@ data class Abilities(
                 )
             }
         }
+    }
+
+    fun hasGameplayEffectTag(gameplayTag: GameplayTag): Boolean {
+        return _gameplayEffectSpecs.any { it.hasTag(gameplayTag) }
     }
 
     fun giveAbility(ability: Ability) {

@@ -31,7 +31,7 @@ data class GameplayEffect(
     val period: Duration = Duration.ZERO,
     val tags: List<GameplayTag> = emptyList(),
     val cues: List<GameplayEffectCue> = emptyList()
-) : Asset()
+) : Asset<GameplayEffect>()
 
 enum class ModifierType(
     val apply: (Float, Float) -> Float

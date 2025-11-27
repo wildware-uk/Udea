@@ -10,21 +10,20 @@ import kotlinx.serialization.Serializable
 import kotlin.reflect.KClass
 import kotlin.reflect.full.isSubclassOf
 
-/**
- * Contains a reference to an asset which may or may not exist.
- * */
-data class AssetFile(
-    val type: String,
-    val asset: Asset?
-)
+object EmptyReference : AssetReference<Nothing> {
+    override val value: Nothing
+        get() = error("Tried to access empty blueprint reference")
+}
 
-val EmptyReference = AssetReference<Asset>("")
+interface AssetReference<T : Asset<T>> {
+    val value: T
+}
 
 @Serializable
-data class AssetReference<out T : Asset>(
+data class AssetRefImpl<T : Asset<T>>(
     val path: String
-) {
-    val value: T
+) : AssetReference<T> {
+    override val value: T
         get() = Assets.find(path)
 }
 
@@ -32,15 +31,15 @@ data class AssetReference<out T : Asset>(
  * Creates a reference to an asset.
  * */
 @UdeaDsl
-fun <T : Asset> reference(path: String) = AssetReference<T>(path)
+fun <T : Asset<T>> reference(path: String) = AssetRefImpl<T>(path)
 
 
 /**
  * Adds a reference to an asset to a list builder.
  * */
 @UdeaDsl
-fun <T : Asset> ListBuilder<AssetReference<T>>.reference(path: String) {
-    add(AssetReference(path))
+fun <T : Asset<T>> ListBuilder<AssetReference<in T>>.reference(path: String) {
+    add(AssetRefImpl(path))
 }
 
 @CreateDsl
@@ -48,7 +47,7 @@ fun <T : Asset> ListBuilder<AssetReference<T>>.reference(path: String) {
     use = JsonTypeInfo.Id.CLASS,
     include = JsonTypeInfo.As.PROPERTY,
 )
-abstract class Asset {
+abstract class Asset<T : Asset<T>> : AssetReference<T> {
     @JsonIgnore
     var path: String = ""
 
@@ -60,11 +59,13 @@ abstract class Asset {
         get() = "$path/$name"
 
     @get:JsonIgnore
-    val reference: AssetReference<Asset>
-        get() = AssetReference(qualifiedName)
+    val reference: AssetReference<T>
+        get() = AssetRefImpl<T>(qualifiedName)
+
+    override val value: T = this as T
 
     override fun equals(other: Any?): Boolean {
-        return other is Asset && other.path == path
+        return other is Asset<T> && other.path == path
     }
 
     override fun hashCode(): Int = path.hashCode()
@@ -72,18 +73,18 @@ abstract class Asset {
 
 object Assets {
     @PublishedApi
-    internal val assets = mutableMapOf<String, Asset>()
+    internal val assets = mutableMapOf<String, Asset<*>>()
 
     val ready: Boolean
         get() = assets.isNotEmpty()
 
-    inline operator fun <reified T : Asset> get(path: String) = assets[path] as T?
+    inline operator fun <reified T : Asset<T>> get(path: String) = assets[path] as T?
         ?: error("Asset $path does not exist ${debugAssets()}")
 
-    fun <T : Asset> find(path: String) = assets[path] as T?
+    fun <T : Asset<T>> find(path: String) = assets[path] as T?
         ?: error("Asset $path does not exist ${debugAssets()}")
 
-    operator fun set(path: String, asset: Asset) {
+    operator fun set(path: String, asset: Asset<*>) {
         assets[path] = asset
     }
 
@@ -91,15 +92,15 @@ object Assets {
         assets.clear()
     }
 
-    fun toList(): List<Asset> {
+    fun toList(): List<Asset<*>> {
         return assets.values.toList()
     }
 
-    inline fun <reified T : Asset> filterIsInstance(): List<T> {
+    inline fun <reified T : Asset<T>> filterIsInstance(): List<T> {
         return assets.values.filterIsInstance<T>()
     }
 
-    fun <T : Asset> filterIsInstance(type: KClass<out T>): List<T> {
+    fun <T : Asset<T>> filterIsInstance(type: KClass<out T>): List<T> {
         return assets.values.filter { it::class.isSubclassOf(type) } as List<T>
     }
 
@@ -108,13 +109,13 @@ object Assets {
     }
 }
 
-data class AssetBundle(val assets: List<Asset>)
+data class AssetBundle(val assets: List<Asset<*>>)
 
 /**
  * Allows multiple assets to be defined in the same file.
  * */
-fun bundle(builder: ListBuilder<Asset>.() -> Unit = {}): AssetBundle {
-    val listBuilder = ListBuilder<Asset>()
+fun bundle(builder: ListBuilder<Asset<*>>.() -> Unit = {}): AssetBundle {
+    val listBuilder = ListBuilder<Asset<*>>()
     builder(listBuilder)
     return AssetBundle(listBuilder.build())
 }

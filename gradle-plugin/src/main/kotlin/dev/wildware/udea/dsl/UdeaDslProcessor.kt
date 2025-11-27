@@ -5,6 +5,7 @@ import com.google.devtools.ksp.processing.*
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.validate
 import java.io.OutputStreamWriter
+import kotlin.math.log
 
 private val DefaultClasses = listOf(
     "com.github.quillraven.fleks.Component"
@@ -134,9 +135,10 @@ class UdeaDslProcessor(
                 .filter { it.classKind == ClassKind.CLASS || it.classKind == ClassKind.INTERFACE }
                 .forEach { decl ->
                     if (!decl.validate()) {
+                        logger.warn("[UdeaDslProcessor] ${decl.qualifiedName?.asString()} failed validation, trying anyway")
                         deferred += decl
-                        return@forEach
                     }
+
                     if (decl.getAllSuperTypes().any { superType ->
                             superType.declaration.qualifiedName?.asString() in DefaultClasses ||
                                     superType.declaration.annotations.any {
@@ -212,6 +214,8 @@ class UdeaDslProcessor(
             val pkg = decl.packageName.asString()
             val name = getNameFromCreateDsl(decl) ?: decl.simpleName.asString()
             val onlyList = isOnlyList(decl)
+
+            logger.warn("[UdeaDslProcessor] Generating DSL for ${decl.qualifiedName?.asString()}")
 
             val params = decl.primaryConstructor!!.parameters
             val typeParams = getTypeParameters(decl)

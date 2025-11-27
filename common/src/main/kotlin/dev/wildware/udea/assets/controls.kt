@@ -4,7 +4,7 @@ import com.badlogic.gdx.Gdx
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 
-class Control : Asset() {
+class Control : Asset<Control>() {
     val controlId = ControlId++
 
     companion object {
@@ -15,7 +15,7 @@ class Control : Asset() {
 data class Binding(
     val control: AssetReference<Control>,
     val input: BindingInput
-) : Asset() {
+) : Asset<Binding>() {
     @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS) // Use fully qualified class name for type info)
     @JsonSubTypes(
         JsonSubTypes.Type(value = BindingInput.Key::class),
@@ -47,13 +47,13 @@ data class Binding(
     }
 }
 
-class Axis : Asset()
+class Axis : Asset<Axis>()
 
 class AxisBinding(
     val axis: AssetReference<Axis>,
     val input: Binding.BindingInput,
-    val value: Float
-) : Asset()
+    val magnitude: Float
+) : Asset<AxisBinding>()
 
 /**
  * Creates a keyboard key binding.

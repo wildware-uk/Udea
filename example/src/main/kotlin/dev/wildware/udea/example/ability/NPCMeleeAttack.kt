@@ -7,9 +7,11 @@ import dev.wildware.udea.ability.AbilityInfo
 import dev.wildware.udea.ability.GameplayEffectSpec
 import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.ecs.component.ability.Abilities
+import dev.wildware.udea.ecs.component.animation.AnimationMapHolder
 import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.ecs.component.physics.Body
 import dev.wildware.udea.ecs.system.AnimationSetSystem
+import dev.wildware.udea.example.character.NPCAnimationMap
 import dev.wildware.udea.example.component.NPC
 import dev.wildware.udea.get
 import dev.wildware.udea.position
@@ -19,7 +21,7 @@ class NPCMeleeAttack(abilityActivation: AbilityActivation) : AbilityExec(ability
     override fun activate(abilityInfo: AbilityInfo) {
         val source = abilityInfo.source
         val target = abilityInfo.target
-        val attackAnimation = source[NPC].attackAnimation
+        val attackAnimation = source[AnimationMapHolder].animationMap<NPCAnimationMap>().attack
 
         if (target == null) {
             return endAbility()

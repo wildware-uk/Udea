@@ -21,7 +21,7 @@ data class Level(
      * Component snapshots that will be placed on entities.
      * */
     val entities: List<EntityDefinition> = emptyList()
-) : Asset() {
+) : Asset<Level>() {
     fun nextEntityId(): Long {
         return entities.maxOfOrNull { it.id }?.plus(1) ?: 0L
     }

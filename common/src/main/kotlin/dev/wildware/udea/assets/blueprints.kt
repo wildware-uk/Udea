@@ -33,7 +33,7 @@ open class Blueprint(
      * Allows for blueprint hierarchies and component inheritance.
      */
     val parent: AssetReference<Blueprint>? = null
-) : Asset() {
+) : Asset<Blueprint>() {
     fun newInstance(world: World, init: EntityCreateContext.(Entity) -> Unit = {}) = world.entity {
         it += BlueprintComponent(this@Blueprint.reference as AssetReference<Blueprint>)
 

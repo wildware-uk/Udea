@@ -9,25 +9,26 @@ import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.ecs.component.ability.abilities
 import dev.wildware.udea.ecs.component.ai.PathfindingStyle
 import dev.wildware.udea.ecs.component.ai.agent
+import dev.wildware.udea.ecs.component.animation.animationMapHolder
 import dev.wildware.udea.ecs.component.animation.animations
-import dev.wildware.udea.ecs.component.animation.characterAnimationController
 import dev.wildware.udea.ecs.component.base.networkable
 import dev.wildware.udea.ecs.component.control.characterController
 import dev.wildware.udea.ecs.component.physics.body
 import dev.wildware.udea.ecs.component.physics.capsule
-import dev.wildware.udea.ecs.component.render.animationSet
+import dev.wildware.udea.ecs.component.render.animationHolder
 import dev.wildware.udea.ecs.component.render.particleEffect
 import dev.wildware.udea.ecs.component.render.spriteRenderer
 
 fun ListBuilder<in Blueprint>.character(
     name: String,
-    animations: CharacterAnimations,
+    spriteAnimationSet: AssetReference<SpriteAnimationSet>,
+    animations: CharacterAnimationMap,
     size: CharacterSize,
     attributeSet: () -> AttributeSet,
     components: LazyList<Component<out Any>> = emptyLazyList(),
     tags: List<EntityTag> = emptyList()
 ) {
-    add(dev.wildware.udea.assets.character(name, animations, size, attributeSet, components, tags))
+    add(dev.wildware.udea.assets.character(name, spriteAnimationSet, animations, size, attributeSet, components, tags))
 }
 
 /**
@@ -35,7 +36,8 @@ fun ListBuilder<in Blueprint>.character(
  * */
 fun character(
     name: String,
-    animations: CharacterAnimations,
+    spriteAnimationSet: AssetReference<SpriteAnimationSet>,
+    animations: CharacterAnimationMap,
     size: CharacterSize,
     attributeSet: () -> AttributeSet,
     components: LazyList<Component<out Any>> = emptyLazyList(),
@@ -43,10 +45,9 @@ fun character(
 ) = Blueprint(
     components = lazy {
         spriteRenderer()
-        animationSet(
-            spriteAnimationSet = animations.animationSet,
-            defaultAnimation = animations.idle,
-            frameTime = animations.animationSpeed,
+        animationHolder(
+            spriteAnimationSet = spriteAnimationSet,
+            defaultAnimation = animations.idle
         )
 
         body(
@@ -69,7 +70,7 @@ fun character(
         particleEffect()
         animations()
         characterController()
-        characterAnimationController(animations)
+        animationMapHolder(animations)
         components().forEach { add(it) }
     },
 
@@ -78,15 +79,16 @@ fun character(
     this.name = name
 }
 
-@CreateDsl
-data class CharacterAnimations(
-    val animationSet: AssetReference<SpriteAnimationSet>,
+/**
+ * Set of animations for a character.
+ * */
+@CreateDsl(name = "characterAnimations")
+open class CharacterAnimationMap(
     val walk: String,
     val run: String,
     val idle: String,
     val death: String,
-    val animationSpeed: Float = 0.1F,
-)
+) : AnimationMap
 
 @CreateDsl
 data class CharacterSize(

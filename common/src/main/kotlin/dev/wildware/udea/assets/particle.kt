@@ -22,7 +22,7 @@ data class Particle(
      * The amount to scale the particle effect by.
      * */
     val scale: Float = 1.0F
-) : Asset() {
+) : Asset<Particle>() {
 
     /**
      * Loads the GDX particle effect.

@@ -1,5 +1,6 @@
 import dev.wildware.udea.ecs.component.base.debug
 import dev.wildware.udea.example.ability.CharacterAttributeSet
+import dev.wildware.udea.example.character.npcAnimations
 import dev.wildware.udea.example.component.Team
 import dev.wildware.udea.example.component.npc
 import dev.wildware.udea.example.component.team
@@ -8,25 +9,23 @@ import dev.wildware.udea.example.tags.Character
 bundle {
     character(
         name = "soldier",
-        animations = characterAnimations(
-            animationSet = reference("character/soldier_animation_set"),
+        animations = npcAnimations(
             walk = "soldier_walk",
             run = "soldier_walk",
             idle = "soldier_idle",
             death = "soldier_death",
+            attack = "soldier_attack",
+            hit = "soldier_hit",
         ),
         size = characterSize(0.2F, 0.2F),
         attributeSet = ::CharacterAttributeSet,
         components = lazy {
             team(Team.SoldierTeam)
-            npc(
-                attackAnimation = "soldier_attack",
-                hitAnimation = "soldier_hit",
-                deathAnimation = "soldier_death"
-            )
+            npc()
             debug()
         },
-        tags = listOf(Character)
+        tags = listOf(Character),
+        spriteAnimationSet = reference("character/soldier_animation_set")
     )
 
     spriteAnimationSet(

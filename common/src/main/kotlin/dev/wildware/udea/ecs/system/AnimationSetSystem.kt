@@ -9,14 +9,12 @@ import com.github.quillraven.fleks.World.Companion.family
 import com.github.quillraven.fleks.World.Companion.inject
 import dev.wildware.udea.assets.AnimationInstance
 import dev.wildware.udea.assets.SpriteAnimation
-import dev.wildware.udea.assets.animation
-import dev.wildware.udea.assets.frame
 import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.animation.Animations
 import dev.wildware.udea.ecs.component.base.Transform
-import dev.wildware.udea.ecs.component.render.AnimationSet
+import dev.wildware.udea.ecs.component.render.AnimationHolder
 import dev.wildware.udea.gameScreen
 import dev.wildware.udea.use
 import dev.wildware.udea.ecs.component.render.SpriteRenderer as SpriteComponent
@@ -25,23 +23,23 @@ import dev.wildware.udea.ecs.component.render.SpriteRenderer as SpriteComponent
 class AnimationSetSystem(
     val spriteBatch: SpriteBatch = inject()
 ) : IteratingSystem(
-    family { all(Transform, AnimationSet, Animations, SpriteComponent) }
+    family { all(Transform, AnimationHolder, Animations, SpriteComponent) }
 ), FamilyOnAdd {
 
     override fun onAddEntity(entity: Entity) {
-        val animationSet = entity[AnimationSet]
+        val animationHolder = entity[AnimationHolder]
 
-        if (animationSet.defaultAnimation != null) {
-            setAnimation(entity, animationSet.defaultAnimation)
+        if (animationHolder.defaultAnimation != null) {
+            setAnimation(entity, animationHolder.defaultAnimation)
         }
     }
 
     fun setAnimation(entity: Entity, name: String, force: Boolean = false): AnimationInstance<out TextureRegion>? {
-        val animationSet = entity[AnimationSet]
-        val currentAnimationInstance = animationSet.currentAnimationInstance
+        val animationHolder = entity[AnimationHolder]
+        val currentAnimationInstance = animationHolder.currentAnimationInstance
 
         if (currentAnimationInstance != null) {
-            val currentAnimation = animationSet.currentAnimation!!
+            val currentAnimation = animationHolder.currentAnimation!!
             if (currentAnimationInstance.animation.name == name && currentAnimationInstance.animation.loop) return null
 
             val canInterrupt = (currentAnimation.interruptable) || force
@@ -52,17 +50,18 @@ class AnimationSetSystem(
 
         val animations = entity[Animations]
 
-        animationSet.currentAnimationInstance
+        animationHolder.currentAnimationInstance
             ?.let(animations::removeAnimation)
 
-        animationSet.currentAnimation = animationSet.spriteAnimationSet.animations
-            .firstOrNull { it.name == name }
-            ?: error("Animation $name not found in animation set ${animationSet.spriteAnimationSet.name}")
+        animationHolder.currentAnimation = animationHolder.spriteAnimationSet.value.animations
+            .firstOrNull { it.value.name == name }?.value
+            ?: error("Animation $name not found in animation set ${animationHolder.spriteAnimationSet.value.name}")
 
-        animationSet.currentAnimationInstance = animationSet.currentAnimation!!.toAnimationInstance(animationSet)
+        animationHolder.currentAnimationInstance =
+            animationHolder.currentAnimation!!.toAnimationInstance()
 
-        animations.animations += animationSet.currentAnimationInstance!!
-        return animationSet.currentAnimationInstance!!
+        animations.animations += animationHolder.currentAnimationInstance!!
+        return animationHolder.currentAnimationInstance!!
     }
 
     override fun onTick() {
@@ -73,30 +72,10 @@ class AnimationSetSystem(
 
     override fun onTickEntity(entity: Entity) {
         val sprite = entity[SpriteComponent]
-        val texture = entity[AnimationSet].currentAnimationInstance!!.currentFrame.data
+        val texture = entity[AnimationHolder].currentAnimationInstance!!.currentFrame.data
         sprite.texture = texture
     }
 
-    private fun SpriteAnimation.toAnimationInstance(animationSet: AnimationSet): AnimationInstance<out TextureRegion> {
-        val instance = AnimationInstance( // TODO is this a bad idea?
-            animation(
-                name = this.name,
-                loop = this.loop,
-                frames = {
-                    var nextFrame = 0.0F
-
-                    spriteSheet.forEachIndexed { i, it ->
-
-                        frame(
-                            nextFrame,
-                            it,
-                            name = this@toAnimationInstance.notifies.find { it.frame == i }?.name
-                        )
-                        nextFrame += animationSet.frameTime
-                    }
-                })
-        )
-
-        return instance
-    }
+    private fun SpriteAnimation.toAnimationInstance() =
+        AnimationInstance(this.animation)
 }

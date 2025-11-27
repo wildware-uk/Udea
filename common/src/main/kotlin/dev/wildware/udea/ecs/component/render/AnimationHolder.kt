@@ -2,7 +2,10 @@ package dev.wildware.udea.ecs.component.render
 
 import com.badlogic.gdx.graphics.g2d.TextureRegion
 import com.github.quillraven.fleks.Component
-import dev.wildware.udea.assets.*
+import dev.wildware.udea.assets.AnimationInstance
+import dev.wildware.udea.assets.AssetReference
+import dev.wildware.udea.assets.SpriteAnimation
+import dev.wildware.udea.assets.SpriteAnimationSet
 import dev.wildware.udea.ecs.component.ComponentDependency.Companion.dependencies
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.animation.Animations
@@ -10,20 +13,17 @@ import dev.wildware.udea.ecs.component.animation.Animations
 /**
  * A component that holds a reference to a sprite animation set.
  * */
-class AnimationSet(
-    spriteAnimationSet: AssetReference<SpriteAnimationSet>,
+class AnimationHolder(
+    val spriteAnimationSet: AssetReference<SpriteAnimationSet>,
     val defaultAnimation: String? = null,
     val frameTime: Float = 1.0F,
-) : Component<AnimationSet> {
-
-    val spriteAnimationSet = spriteAnimationSet.value
-
+) : Component<AnimationHolder> {
     var currentAnimation: SpriteAnimation? = null
     var currentAnimationInstance: AnimationInstance<out TextureRegion>? = null
 
-    override fun type() = AnimationSet
+    override fun type() = AnimationHolder
 
-    companion object : UdeaComponentType<AnimationSet>(
+    companion object : UdeaComponentType<AnimationHolder>(
         dependsOn = dependencies(Animations)
     )
 }

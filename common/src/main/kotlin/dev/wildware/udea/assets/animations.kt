@@ -10,7 +10,7 @@ import dev.wildware.udea.dsl.CreateDsl
 data class Animation<T>(
     val frames: List<Frame<T>>,
     val loop: Boolean = true,
-) : Asset() {
+) : Asset<Animation<T>>() {
     val duration: Float = frames.last().time
 }
 

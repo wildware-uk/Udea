@@ -8,6 +8,7 @@ import com.github.quillraven.fleks.collection.EntityBag
 import dev.wildware.udea.ability.AbilityInfo
 import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.ecs.component.ability.Abilities
+import dev.wildware.udea.ecs.component.animation.AnimationMapHolder
 import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.ecs.component.control.CharacterController
 import dev.wildware.udea.ecs.component.physics.Body
@@ -15,6 +16,7 @@ import dev.wildware.udea.ecs.system.AbilitySystem
 import dev.wildware.udea.ecs.system.AnimationSetSystem
 import dev.wildware.udea.example.ability.CharacterAttributeSet
 import dev.wildware.udea.example.ability.Debuffs
+import dev.wildware.udea.example.character.NPCAnimationMap
 import dev.wildware.udea.example.component.NPC
 import dev.wildware.udea.example.component.Team
 import dev.wildware.udea.gameScreen
@@ -47,7 +49,7 @@ class UnitAISystem : IteratingSystem(
                 it.isSensor = true
             }
             controller.isActive = false
-            world.system<AnimationSetSystem>().setAnimation(entity, npc.deathAnimation, force = true)
+            world.system<AnimationSetSystem>().setAnimation(entity, entity[AnimationMapHolder].animationMap<NPCAnimationMap>().death, force = true)
             npc.isDead = true
         }
 

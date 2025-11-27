@@ -509,7 +509,7 @@ class GameAssetLoader(
         }
     }
 
-    private fun loadAsset(file: FileHandle): List<Asset> {
+    private fun loadAsset(file: FileHandle): List<Asset<*>> {
         return loadAssets(file.file())
     }
 }
@@ -518,7 +518,7 @@ fun loadAssets(
     file: File,
     compilationConfiguration: ScriptCompilationConfiguration.Builder.() -> Unit = {},
     evaluationConfig: ScriptEvaluationConfiguration.Builder.() -> Unit = {},
-): List<Asset> {
+): List<Asset<*>> {
     val fileName = file.name
 
     when (val evaluationResult = evalScript(file, compilationConfiguration, evaluationConfig)) {
@@ -526,7 +526,7 @@ fun loadAssets(
             when (val result = evaluationResult.value.returnValue) {
                 is ResultValue.Value -> {
                     when (val asset = result.value) {
-                        is Asset -> return listOf(asset.apply {
+                        is Asset<*> -> return listOf(asset.apply {
                             path = file.path.replace("\\", "/")
                                 .substringBeforeLast("/")
                                 .substringAfterLast("assets/")

@@ -18,29 +18,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Implemented script caching">
-      <change afterPath="$PROJECT_DIR$/scripts/cache/168ab2572a668bf959fcd6caf3d6ff74.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/scripts/cache/1b48217adade7038d4499e49b7250b21.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/scripts/cache/260a6d59bd104eee3d09767fa0dde429.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/scripts/cache/46a35daa7644149a838f0c0296beb21f.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/scripts/cache/578c2cdd9dad4929a300454450648df6.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/scripts/cache/7fffb7a59cfabf0625825e254dd2aada.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/scripts/cache/8404aee14c55a77a6caac0b91ee27b9c.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/scripts/cache/de85d04fe35c1c8719a8026182beef70.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/scripts/cache/e080816df4e199ef5063749ded2b7534.jar" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Ability.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Ability.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/animations.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/animations.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptHost.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptHost.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/ability/Abilities.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/ability/Abilities.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AbilitySystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AbilitySystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/SoldierFireArrow.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/SoldierFireArrow.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/UnitMeleeAttack.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/UnitMeleeAttack.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/level/test_level.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/level/test_level.udea.kts" afterDir="false" />
-    </list>
+    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="removed script cache" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -786,7 +764,7 @@
       <workItem from="1764158866239" duration="23355000" />
       <workItem from="1764230853042" duration="43661000" />
       <workItem from="1764314784233" duration="890000" />
-      <workItem from="1764315691265" duration="10981000" />
+      <workItem from="1764315691265" duration="11102000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -908,7 +886,23 @@
       <option name="project" value="LOCAL" />
       <updated>1764329826581</updated>
     </task>
-    <option name="localTasksCounter" value="16" />
+    <task id="LOCAL-00016" summary="Implemented script caching">
+      <option name="closed" value="true" />
+      <created>1764329899102</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1764329899102</updated>
+    </task>
+    <task id="LOCAL-00017" summary="removed script cache">
+      <option name="closed" value="true" />
+      <created>1764329946461</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1764329946461</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -984,7 +978,8 @@
     <MESSAGE value="- Fixed many things" />
     <MESSAGE value="Improved GAS" />
     <MESSAGE value="Implemented script caching" />
-    <option name="LAST_COMMIT_MESSAGE" value="Implemented script caching" />
+    <MESSAGE value="removed script cache" />
+    <option name="LAST_COMMIT_MESSAGE" value="removed script cache" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

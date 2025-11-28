@@ -15,7 +15,6 @@ import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.gameScreen
 import dev.wildware.udea.getNetworkEntityOrNull
-import dev.wildware.udea.getOrNull
 import dev.wildware.udea.network.AbilityPacket
 import dev.wildware.udea.network.AbilityPacketInstantiator
 import dev.wildware.udea.processAndRemoveEach
@@ -31,11 +30,11 @@ class AbilitySystem : IntervalSystem() {
             val abilities = entity[Abilities]
 
             abilities.currentAbility?.let {
-                if(it.ability.blockedBy.any { tag -> abilities.hasGameplayEffectTag(tag) }) {
+                if (it.ability.blockedBy.any { tag -> abilities.hasGameplayEffectTag(tag) }) {
                     it.abilityFinished = true
                 }
 
-                if(it.abilityFinished) {
+                if (it.abilityFinished) {
                     entity.getOrNull(Debug)?.addMessage("Ability Ended", 0.5F)
                     abilities.currentAbility = null
                 }
@@ -100,18 +99,31 @@ class AbilitySystem : IntervalSystem() {
     context(_: World)
     private fun doAbility(remoteSource: Entity, remoteTarget: Entity?, targetPos: Vector2, ability: Ability) {
         if (remoteSource[Abilities].currentAbility == null) {
-            val canCast = ability.blockedBy.all { !remoteSource[Abilities].hasGameplayEffectTag(it) }
-
-            if (!canCast) return
+            if (!canCast(ability, remoteSource)) return
 
             val activation = AbilityActivation(ability, AbilityInfo(remoteSource, targetPos, remoteTarget))
             remoteSource[Abilities].currentAbility = activation
 
-            ability.execInstance(activation)
-                .activate(AbilityInfo(remoteSource, targetPos, remoteTarget))
+            context(activation) {
+                ability.execInstance()
+                    .activate(AbilityInfo(remoteSource, targetPos, remoteTarget))
+            }
         }
     }
 
-    private fun Ability.execInstance(abilityActivation: AbilityActivation) =
-        exec.primaryConstructor!!.call(abilityActivation) as AbilityExec
+    private fun canCast(
+        ability: Ability,
+        remoteSource: Entity
+    ): Boolean {
+        val onCooldown =
+            ability.cooldownEffect == null || remoteSource[Abilities].hasGameplayEffect(ability.cooldownEffect)
+        if (onCooldown) return true
+
+        val isBlocked = ability.blockedBy.any { remoteSource[Abilities].hasGameplayEffectTag(it) }
+
+        return !isBlocked
+    }
+
+    private fun Ability.execInstance() =
+        exec.primaryConstructor!!.call() as AbilityExec
 }

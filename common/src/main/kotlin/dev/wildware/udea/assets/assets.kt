@@ -10,6 +10,15 @@ import kotlinx.serialization.Serializable
 import kotlin.reflect.KClass
 import kotlin.reflect.full.isSubclassOf
 
+/**
+ * Marks a value parameter as an asset reference string.
+ *
+ * Adds the ability to click-through and adds compile-time validation.
+ * */
+@Retention(AnnotationRetention.SOURCE)
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class AssetRef
+
 object EmptyReference : AssetReference<Nothing> {
     override val value: Nothing
         get() = error("Tried to access empty blueprint reference")
@@ -21,7 +30,7 @@ interface AssetReference<T : Asset<T>> {
 
 @Serializable
 data class AssetRefImpl<T : Asset<T>>(
-    val path: String
+    @AssetRef val path: String
 ) : AssetReference<T> {
     override val value: T
         get() = Assets.find(path)
@@ -31,14 +40,14 @@ data class AssetRefImpl<T : Asset<T>>(
  * Creates a reference to an asset.
  * */
 @UdeaDsl
-fun <T : Asset<T>> reference(path: String) = AssetRefImpl<T>(path)
+fun <T : Asset<T>> reference(@AssetRef path: String) = AssetRefImpl<T>(path)
 
 
 /**
  * Adds a reference to an asset to a list builder.
  * */
 @UdeaDsl
-fun <T : Asset<T>> ListBuilder<AssetReference<in T>>.reference(path: String) {
+fun <T : Asset<T>> ListBuilder<AssetReference<in T>>.reference(@AssetRef path: String) {
     add(AssetRefImpl(path))
 }
 

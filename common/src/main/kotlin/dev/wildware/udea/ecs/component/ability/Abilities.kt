@@ -5,6 +5,7 @@ import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.ability.*
 import dev.wildware.udea.assets.Ability
+import dev.wildware.udea.assets.AssetReference
 import dev.wildware.udea.ecs.component.SyncStrategy.Update
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.configureNetwork
@@ -54,6 +55,10 @@ data class Abilities(
 
     fun giveAbility(ability: Ability) {
         _abilities.add(ability)
+    }
+
+    fun hasGameplayEffect(gameplayEffect: AssetReference<GameplayEffect>): Boolean {
+        return _gameplayEffectSpecs.any { it.gameplayEffect == gameplayEffect }
     }
 
     companion object : UdeaComponentType<Abilities>(

@@ -15,8 +15,8 @@ import dev.wildware.udea.example.character.GameUnitAnimationMap
 import dev.wildware.udea.get
 import dev.wildware.udea.position
 
-class UnitMeleeAttack(abilityActivation: AbilityActivation) : AbilityExec(abilityActivation) {
-    context(world: World)
+class UnitMeleeAttack : AbilityExec() {
+    context(world: World, activation: AbilityActivation)
     override fun activate(abilityInfo: AbilityInfo) {
         val source = abilityInfo.source
         val target = abilityInfo.target

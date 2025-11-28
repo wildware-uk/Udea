@@ -33,19 +33,19 @@ level(
         )
 
         repeat(5) {
-//            entityDefinition(
-//                blueprint = reference("character/orc"),
-//                position = randomPos(),
-//                components = lazy {
-//                    aIUnit()
-//                }
-//            )
+            entityDefinition(
+                blueprint = reference("character/soldier"),
+                position = randomPos(),
+                components = lazy {
+                    aIUnit()
+                }
+            )
 
             entityDefinition(
                 blueprint = reference("character/orc"),
                 position = randomPos(),
                 components = lazy {
-//                    aIUnit()
+                    aIUnit()
                 }
             )
         }

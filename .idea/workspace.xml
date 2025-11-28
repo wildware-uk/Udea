@@ -18,37 +18,27 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="- Fixed many things">
+    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Implemented script caching">
+      <change afterPath="$PROJECT_DIR$/scripts/cache/168ab2572a668bf959fcd6caf3d6ff74.jar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/cache/1b48217adade7038d4499e49b7250b21.jar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/cache/260a6d59bd104eee3d09767fa0dde429.jar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/cache/46a35daa7644149a838f0c0296beb21f.jar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/cache/578c2cdd9dad4929a300454450648df6.jar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/cache/7fffb7a59cfabf0625825e254dd2aada.jar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/cache/8404aee14c55a77a6caac0b91ee27b9c.jar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/cache/de85d04fe35c1c8719a8026182beef70.jar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/cache/e080816df4e199ef5063749ded2b7534.jar" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectCue.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectCue.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectSpec.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectSpec.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Ability.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Ability.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/animations.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/animations.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/controls.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/controls.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptDef.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptDef.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptHost.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/dsl/script/scriptHost.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/ability/Abilities.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/ability/Abilities.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AttributeSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AttributeSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CharacterAnimationControllerSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CharacterAnimationControllerSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/ControllerSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/ControllerSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/DebugDrawSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/DebugDrawSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/SpriteBatchSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/SpriteBatchSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/ExampleTags.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/ExampleTags.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/MeleeHitCue.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/DamageCue.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/NPCMeleeAttack.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/UnitMeleeAttack.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/character/NPCAnimationMap.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/character/GameUnitAnimationMap.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/component/NPC.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/component/GameUnit.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/component/Team.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/component/Team.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/HealthbarSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/HealthbarSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/UnitAISystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/UnitAISystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/tags/Character.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/ability/melee_damage.udea.kts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/ability/melee_stun.udea.kts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/ability/npc_melee.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/ability/npc_melee.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/character/orc.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/character/orc.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/character/soldier.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/character/soldier.udea.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AbilitySystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AbilitySystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/SoldierFireArrow.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/SoldierFireArrow.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/UnitMeleeAttack.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/UnitMeleeAttack.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/level/test_level.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/level/test_level.udea.kts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -220,9 +210,6 @@
     <setting file="jar://$APPLICATION_HOME_DIR$/plugins/Kotlin/lib/kotlin-plugin.jar!/org/jetbrains/kotlin/analysis/api/AnalyzeKt.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$APPLICATION_HOME_DIR$/plugins/Kotlin/lib/kotlinc.kotlin-compiler-common.jar!/org/jetbrains/kotlin/asJava/elements/KtLightElement.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$APPLICATION_HOME_DIR$/plugins/java/lib/java-impl.jar!/com/intellij/psi/search/searches/ClassInheritorsSearch.class" root0="SKIP_INSPECTION" />
-    <setting file="file://$PROJECT_DIR$/common/build/classes/kotlin/main/dev/wildware/udea/ability/GameplayEffect.class" root0="SKIP_INSPECTION" />
-    <setting file="file://$PROJECT_DIR$/common/build/classes/kotlin/main/dev/wildware/udea/ability/GameplayEffectDslKt.class" root0="SKIP_INSPECTION" />
-    <setting file="file://$PROJECT_DIR$/common/build/classes/kotlin/main/dev/wildware/udea/assets/AssetsKt.class" root0="SKIP_INSPECTION" />
   </component>
   <component name="KubernetesApiPersistence">{}</component>
   <component name="KubernetesApiProvider">{
@@ -236,6 +223,9 @@
     <option name="CUSTOM_FILTER" />
   </component>
   <component name="PhpWorkspaceProjectConfiguration" interpreter_name="$USER_HOME$/php-8.3.3/php.exe" />
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="AISelfReview" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 4
 }</component>
@@ -512,10 +502,10 @@
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Gradle.udea:common [build]" />
         <item itemvalue="Gradle.udea:example [build]" />
         <item itemvalue="Kotlin.ExampleGameKt" />
         <item itemvalue="Gradle.udea [publishToMavenLocal]" />
-        <item itemvalue="Gradle.udea:common [build]" />
         <item itemvalue="Gradle.udea [build]" />
       </list>
     </recent_temporary>
@@ -794,7 +784,9 @@
       <workItem from="1764150912100" duration="1917000" />
       <workItem from="1764152838493" duration="4316000" />
       <workItem from="1764158866239" duration="23355000" />
-      <workItem from="1764230853042" duration="43531000" />
+      <workItem from="1764230853042" duration="43661000" />
+      <workItem from="1764314784233" duration="890000" />
+      <workItem from="1764315691265" duration="10981000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -900,7 +892,23 @@
       <option name="project" value="LOCAL" />
       <updated>1764259314960</updated>
     </task>
-    <option name="localTasksCounter" value="14" />
+    <task id="LOCAL-00014" summary="Improved GAS">
+      <option name="closed" value="true" />
+      <created>1764286537540</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1764286537540</updated>
+    </task>
+    <task id="LOCAL-00015" summary="Implemented script caching">
+      <option name="closed" value="true" />
+      <created>1764329826581</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1764329826581</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -974,7 +982,9 @@
     <MESSAGE value="- ✨ **Revamp Network, Reflection, and Serializer Systems**&#10;  - Added new command handling framework with `Command`, `Commands`, and console UI for in-game interaction.&#10;  - Introduced `ConnectCommand` and `HostCommand` for network operations.&#10;  - Added powerful reflection utilities with `UdeaReflections` for project registration and type scanning.&#10;  - Implemented `AssetReferenceSerializer` and `SerializableSerializer` for streamlined serialization.&#10;  - Enhanced pooling with better serialization strategies for network packets (e.g., `EntityUpdate`, `AbilityPacket`).&#10;  - Replaced obsolete community serializers with custom reflection-based alternatives.&#10;  -  Improved `Box2DSystem` with safe component access (`getOrNull`) for compact hitbox detection.&#10;&#10;-  **Remove Legacy Serializers and Obsolete Files**&#10;  - Deleted outdated `EntityUpdateSerializer` and related infrastructure.&#10;  - Removed legacy `types.kt` and redundant duplication across the codebase.&#10;&#10;- ️ **Refactor and Optimize Across Networking and ECS**&#10;  - Refactored `NetworkPacket`, `CommandPacket`, and `EntityCreate` for clarity and consistency.&#10;  - Improved ECS system inheritance with better `family` handling in systems like `NetworkServerSystem` and `EditorSystem`.&#10;  -  Introduced cleaner, context-oriented design patterns for future scalability.&#10;&#10;-  **Code Cleanup and Project Simplification**&#10;  - Streamlined networking utilities for improved maintainability.&#10;  - Modularized code architecture to separate concerns (e.g., moved core systems under `command` and `serde`).&#10;&#10;- ✨ **Big Step Toward Modular Game Systems**" />
     <MESSAGE value="✨ **Introduce NPC Combat Behavior and UI Enhancements**&#10;&#10;-  Added `HealthbarSystem` for rendering NPC health.&#10;- ✨ Implemented `UnitAISystem` for NPC combat and AI logic.&#10;-  Created `NPCMeleeAttack` ability with effects like damage and stun.&#10;- ️ Enhanced `soldier` character asset with animations and components.&#10;-  Introduced `Team` and `NPC` components for team-based AI.&#10;-  Updated gradle settings for improved dependency handling.&#10;-  Refactored and enhanced animation and asset systems for flexibility." />
     <MESSAGE value="- Fixed many things" />
-    <option name="LAST_COMMIT_MESSAGE" value="- Fixed many things" />
+    <MESSAGE value="Improved GAS" />
+    <MESSAGE value="Implemented script caching" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implemented script caching" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

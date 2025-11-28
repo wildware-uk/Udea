@@ -43,3 +43,6 @@ bin/
 
 .intellijPlatform/
 .kotlin/
+
+# Cached scripts
+scripts/cache/

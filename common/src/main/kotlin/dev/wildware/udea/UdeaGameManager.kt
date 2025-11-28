@@ -42,6 +42,7 @@ import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.system.*
 import dev.wildware.udea.screen.LoadingScreen
 import dev.wildware.udea.screen.UIScreen
+import kotlinx.coroutines.runBlocking
 import ktx.app.KtxGame
 import ktx.app.KtxScreen
 import ktx.app.clearScreen
@@ -509,18 +510,18 @@ class GameAssetLoader(
     }
 
     private fun loadAsset(file: FileHandle): List<Asset<*>> {
-        return loadAssets(file.file())
+        return runBlocking { loadAssets(file.file()) }
     }
 }
 
-fun loadAssets(
+suspend fun loadAssets(
     file: File,
     compilationConfiguration: ScriptCompilationConfiguration.Builder.() -> Unit = {},
     evaluationConfig: ScriptEvaluationConfiguration.Builder.() -> Unit = {},
 ): List<Asset<*>> {
     val fileName = file.name
 
-    when (val evaluationResult = evalScript(file, compilationConfiguration, evaluationConfig)) {
+    when (val evaluationResult = evalScript(file)) {
         is ResultWithDiagnostics.Success -> {
             when (val result = evaluationResult.value.returnValue) {
                 is ResultValue.Value -> {

@@ -29,6 +29,20 @@ data class Frame<T>(
     val name: String? = null
 )
 
+class EventListener<T> {
+    private val listeners = mutableListOf<(T) -> Unit>()
+
+    fun registerListener(listener: (T) -> Unit) {
+        listeners += listener
+    }
+
+    fun notify(data: T) {
+        listeners.forEach { it(data) }
+    }
+}
+
+typealias AnimationEventListener<T> = (AnimationInstance<T>) -> Unit
+
 /**
  * An instance of an animation.
  * */
@@ -36,10 +50,12 @@ data class AnimationInstance<T>(
     val animation: Animation<T>,
     val autoPlay: Boolean = true
 ) {
+    private var started = false
     private var playing = autoPlay
     private var time = 0F
     private val notifies = mutableMapOf<String, () -> Unit>()
-    private val onFinish = mutableListOf<(AnimationInstance<T>) -> Unit>()
+    private val onFinish = EventListener<AnimationInstance<T>>()
+    private val onStart = EventListener<AnimationInstance<T>>()
 
     private lateinit var lastFrame: Frame<T>
 
@@ -50,6 +66,11 @@ data class AnimationInstance<T>(
         get() = currentFrame == animation.frames.last() && !animation.loop
 
     fun update(delta: Float) {
+        if (!started) {
+            started = true
+            onStart.notify(this)
+        }
+
         time += delta
         lastFrame = currentFrame
         currentFrame = calculateCurrentFrame()
@@ -57,22 +78,24 @@ data class AnimationInstance<T>(
         if (lastFrame != currentFrame) {
             notifies[currentFrame.name]?.invoke()
 
-            if(isFinished) {
-               finish()
+            if (isFinished) {
+                finish()
             }
         }
     }
 
+    fun onStart(listener: AnimationEventListener<T>) = onStart.registerListener(listener)
+
     fun finish() {
-        onFinish.forEach { it(this) }
+        onFinish.notify(this)
     }
 
     fun onNotify(name: String, onNotify: () -> Unit) {
         notifies[name] = onNotify
     }
 
-    fun onFinish(onFinish: (AnimationInstance<T>) -> Unit) {
-        this.onFinish.add(onFinish)
+    fun onFinish(onFinish: AnimationEventListener<T>) {
+        this.onFinish.registerListener(onFinish)
     }
 
     private fun calculateCurrentFrame(): Frame<T> {

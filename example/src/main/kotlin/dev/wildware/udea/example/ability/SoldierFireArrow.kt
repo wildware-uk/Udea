@@ -13,9 +13,9 @@ import dev.wildware.udea.example.component.Projectile
 import dev.wildware.udea.example.component.Team
 import dev.wildware.udea.position
 
-class SoldierFireArrow(abilityActivation: AbilityActivation) : AbilityExec(abilityActivation) {
+class SoldierFireArrow : AbilityExec() {
 
-    context(world: World)
+    context(world: World, activation: AbilityActivation)
     override fun activate(abilityInfo: AbilityInfo) {
         val (source, targetPos) = abilityInfo
 

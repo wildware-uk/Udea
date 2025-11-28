@@ -1,6 +1,5 @@
 package dev.wildware.udea.example.ability
 
-import dev.wildware.udea.ability.Attribute
 import dev.wildware.udea.ability.AttributeSet
 import dev.wildware.udea.ability.value
 import dev.wildware.udea.network.UdeaNetworked
@@ -10,14 +9,37 @@ import kotlinx.serialization.Serializable
 @Serializable
 @UdeaNetworked
 class CharacterAttributeSet(
-    @UdeaSync
-    val maxHealth: Attribute = attribute("health", 100F) {
-        min = value(0F)
-    },
+    private val initHealth: Float = 100F,
+    private val initMana: Float = 0F,
+    private val initArmour: Float = 0F,
+    private val initMagicResist: Float = 0F,
+) : AttributeSet() {
 
     @UdeaSync
-    val health: Attribute = attribute("health", 100F) {
+    val maxHealth = attribute("health", initHealth) {
         min = value(0F)
-        max = value(maxHealth)
-    },
-) : AttributeSet()
+    }
+
+    @UdeaSync
+    val health = attribute("health", initHealth) {
+        min = value(0F)
+        max = value(initHealth)
+    }
+
+    @UdeaSync
+    val maxMana = attribute("mana", initMana) {
+        min = value(0F)
+    }
+
+    @UdeaSync
+    val mana = attribute("mana", initMana) {
+        min = value(0F)
+        max = value(initMana)
+    }
+
+    @UdeaSync
+    val armour = attribute("armour", initArmour)
+
+    @UdeaSync
+    val magicResist = attribute("magicResist", initMagicResist)
+}

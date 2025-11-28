@@ -1,7 +1,7 @@
 package dev.wildware.udea.example.ability
 
 import com.github.quillraven.fleks.World
-import dev.wildware.udea.ability.AbilityActivation
+import dev.wildware.udea.ability.AbilitySpec
 import dev.wildware.udea.ability.AbilityExec
 import dev.wildware.udea.ability.AbilityInfo
 import dev.wildware.udea.ability.GameplayEffectSpec
@@ -16,7 +16,7 @@ import dev.wildware.udea.get
 import dev.wildware.udea.position
 
 class UnitMeleeAttack : AbilityExec() {
-    context(world: World, activation: AbilityActivation)
+    context(world: World, activation: AbilitySpec)
     override fun activate(abilityInfo: AbilityInfo) {
         val source = abilityInfo.source
         val target = abilityInfo.target
@@ -25,6 +25,8 @@ class UnitMeleeAttack : AbilityExec() {
         if (target == null) {
             return endAbility()
         }
+
+        commitAbility(abilityInfo)
 
         source[Debug].addMessage("Animation Started", 0.5F)
 
@@ -46,7 +48,7 @@ class UnitMeleeAttack : AbilityExec() {
                 target[Abilities].applyGameplayEffect(source, target, damageEffect)
 
                 val stunEffect = GameplayEffectSpec(Assets["ability/stun"])
-                stunEffect.setSetByCallerMagnitude(Data.StunDuration, 0.5F)
+                stunEffect.setSetByCallerMagnitude(Data.Duration, 0.5F)
                 target[Abilities].applyGameplayEffect(source, target, stunEffect)
 
                 val knockbackEffect = GameplayEffectSpec(Assets["ability/knockback"])

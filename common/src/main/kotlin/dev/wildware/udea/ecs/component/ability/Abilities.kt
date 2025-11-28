@@ -4,8 +4,9 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.ability.*
-import dev.wildware.udea.assets.Ability
 import dev.wildware.udea.assets.AssetReference
+import dev.wildware.udea.assets.LazyList
+import dev.wildware.udea.assets.emptyLazyList
 import dev.wildware.udea.ecs.component.SyncStrategy.Update
 import dev.wildware.udea.ecs.component.UdeaComponentType
 import dev.wildware.udea.ecs.component.configureNetwork
@@ -18,14 +19,21 @@ import dev.wildware.udea.network.serde.UdeaSync
 data class Abilities(
     @UdeaSync
     val attributeSet: AttributeSet,
+
+    val defaultAbilities: LazyList<AbilitySpec> = emptyLazyList()
 ) : Component<Abilities> {
-    internal val _abilities = mutableListOf<Ability>()
-    val abilities: List<Ability> = _abilities
+
+    private var nextAbilitySpecId = 0
+
+    internal val _abilities = mutableListOf<AbilitySpec>()
+    val abilities: List<AbilitySpec> = _abilities
 
     internal val _gameplayEffectSpecs = mutableListOf<GameplayEffectSpec>()
     val gameplayEffectSpecs: List<GameplayEffectSpec> = _gameplayEffectSpecs
 
-    var currentAbility: AbilityActivation? = null
+    init {
+        defaultAbilities.get().forEach(::grantAbility)
+    }
 
     override fun type() = Abilities
 
@@ -39,7 +47,7 @@ data class Abilities(
         _gameplayEffectSpecs.add(gameplayEffectSpec)
 
         if (!alreadyApplied) {
-            gameplayEffectSpec.gameplayEffect.cues.forEach { cue ->
+            (gameplayEffectSpec.dynamicCues + gameplayEffectSpec.gameplayEffect.cues).forEach { cue ->
                 cue.onGameplayEffectApplied(
                     source,
                     target,
@@ -53,12 +61,21 @@ data class Abilities(
         return _gameplayEffectSpecs.any { it.hasTag(gameplayTag) }
     }
 
-    fun giveAbility(ability: Ability) {
-        _abilities.add(ability)
+    fun grantAbility(spec: AbilitySpec) {
+        _abilities.add(spec)
+        spec.id = nextAbilitySpecId++
     }
 
     fun hasGameplayEffect(gameplayEffect: AssetReference<GameplayEffect>): Boolean {
         return _gameplayEffectSpecs.any { it.gameplayEffect == gameplayEffect }
+    }
+
+    fun findAbilityById(abilityId: Int): AbilitySpec {
+        return abilities.first { it.id == abilityId } // TODO can we do array lookup?
+    }
+
+    fun findAbilityByTag(tag: GameplayTag): AbilitySpec? {
+        return abilities.firstOrNull { tag in it.allTags() }
     }
 
     companion object : UdeaComponentType<Abilities>(

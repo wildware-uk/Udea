@@ -3,6 +3,7 @@ package dev.wildware.udea.assets
 import com.badlogic.gdx.physics.box2d.BodyDef
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.EntityTag
+import dev.wildware.udea.ability.AbilitySpec
 import dev.wildware.udea.ability.AttributeSet
 import dev.wildware.udea.assets.dsl.ListBuilder
 import dev.wildware.udea.dsl.CreateDsl
@@ -26,9 +27,21 @@ fun ListBuilder<in Blueprint>.character(
     size: CharacterSize,
     attributeSet: () -> AttributeSet,
     components: LazyList<Component<out Any>> = emptyLazyList(),
+    abilitySpecs: LazyList<AbilitySpec> = emptyLazyList(),
     tags: List<EntityTag> = emptyList()
 ) {
-    add(dev.wildware.udea.assets.character(name, spriteAnimationSet, animations, size, attributeSet, components, tags))
+    add(
+        dev.wildware.udea.assets.character(
+            name,
+            spriteAnimationSet,
+            animations,
+            size,
+            attributeSet,
+            components,
+            abilitySpecs,
+            tags
+        )
+    )
 }
 
 /**
@@ -41,6 +54,7 @@ fun character(
     size: CharacterSize,
     attributeSet: () -> AttributeSet,
     components: LazyList<Component<out Any>> = emptyLazyList(),
+    abilitySpecs: LazyList<AbilitySpec> = emptyLazyList(),
     tags: List<EntityTag> = emptyList()
 ) = Blueprint(
     components = lazy {
@@ -66,7 +80,7 @@ fun character(
             pathfindingStyle = PathfindingStyle.Walk
         )
         networkable()
-        abilities(attributeSet())
+        abilities(attributeSet(), defaultAbilities = abilitySpecs)
         particleEffect()
         animations()
         characterController()

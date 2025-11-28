@@ -1,6 +1,8 @@
+import dev.wildware.udea.ability.abilitySpec
 import dev.wildware.udea.ecs.component.base.debug
 import dev.wildware.udea.ecs.component.base.networkable
 import dev.wildware.udea.example.ability.CharacterAttributeSet
+import dev.wildware.udea.example.ability.Slot
 import dev.wildware.udea.example.character.gameUnitAnimations
 import dev.wildware.udea.example.component.Team
 import dev.wildware.udea.example.component.gameUnit
@@ -18,7 +20,21 @@ bundle {
             hit = "orc_hit",
         ),
         size = characterSize(0.2F, 0.2F),
-        attributeSet = ::CharacterAttributeSet,
+        attributeSet = {
+            CharacterAttributeSet(
+                initHealth = 150F,
+                initMana = 0F,
+                initMagicResist = 20F
+            )
+        },
+        abilitySpecs = lazy {
+            abilitySpec(
+                ability = Assets["ability/npc_melee"],
+                tags = {
+                    add(Slot.A)
+                }
+            )
+        },
         components = lazy {
             networkable()
             team(Team.OrcTeam)

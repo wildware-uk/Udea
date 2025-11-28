@@ -1,6 +1,5 @@
 package dev.wildware.udea.example.system
 
-import com.badlogic.gdx.math.Vector2.Zero
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World
@@ -15,6 +14,7 @@ import dev.wildware.udea.ecs.component.control.CharacterController
 import dev.wildware.udea.ecs.component.render.Camera
 import dev.wildware.udea.ecs.system.AbilitySystem
 import dev.wildware.udea.ecs.system.ControllerSystem
+import dev.wildware.udea.example.ability.Slot
 import dev.wildware.udea.example.component.GameUnit
 import dev.wildware.udea.example.component.Player
 import dev.wildware.udea.example.component.Team
@@ -37,17 +37,18 @@ class PlayerControlSystem : IteratingSystem(
         controller.movement.set(movementAxis)
 
         if (controls.isInputPressed(attackControl)) {
-            val nearestEnemy = getAttackEntity(entity, entity.position.cpy().add(movementAxis)) ?: return
-            world.system<AbilitySystem>().activateAbility(
-                AbilityInfo(entity, Zero, nearestEnemy),
-                Assets["ability/npc_melee"]
+            val nearestEnemy = getAttackEntity(entity, entity.position.cpy().add(movementAxis))
+            world.system<AbilitySystem>().activateAbilityByTag(
+                AbilityInfo(entity, Mouse.mouseWorldPos, nearestEnemy),
+                Slot.A
             )
         }
 
         if (controls.isInputPressed(attack2Control)) {
-            world.system<AbilitySystem>().activateAbility(
-                AbilityInfo(entity, Mouse.mouseWorldPos, null),
-                Assets["ability/soldier_fire_arrow"]
+            val nearestEnemy = getAttackEntity(entity, entity.position.cpy().add(movementAxis))
+            world.system<AbilitySystem>().activateAbilityByTag(
+                AbilityInfo(entity, Mouse.mouseWorldPos, nearestEnemy),
+                Slot.B
             )
         }
 

@@ -14,9 +14,14 @@ data class GameplayEffectSpec(
 ) {
     private val setByCallerMagnitudes = mutableMapOf<GameplayTag, Float>()
     private val dynamicTags = mutableSetOf<GameplayTag>()
+    val dynamicCues = mutableSetOf<GameplayEffectCue>()
 
     fun hasTag(tag: GameplayTag): Boolean {
         return gameplayEffect.tags.contains(tag) || dynamicTags.contains(tag)
+    }
+
+    fun copySetByTags(tags: Map<GameplayTag, Float>) {
+        setByCallerMagnitudes.putAll(tags)
     }
 
     fun setSetByCallerMagnitude(tag: GameplayTag, magnitude: Float) {
@@ -29,6 +34,10 @@ data class GameplayEffectSpec(
 
     fun addDynamicTag(tag: GameplayTag) {
         dynamicTags.add(tag)
+    }
+
+    fun addDynamicCue(cue: GameplayEffectCue) {
+        dynamicCues.add(cue)
     }
 
     operator fun contains(tag: GameplayTag) = hasTag(tag)

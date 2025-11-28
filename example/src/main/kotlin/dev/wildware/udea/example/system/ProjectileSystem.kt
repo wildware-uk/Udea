@@ -19,6 +19,7 @@ class ProjectileSystem : IteratingSystem(
     override fun onInit() {
         world.system<Box2DSystem>().onCollide { a, b ->
             if (Projectile !in a || GameUnit !in b) return@onCollide
+            if (b[GameUnit].isDead) return@onCollide
             if (a[Team].teamId == b[Team].teamId) return@onCollide
 
             a.configure {

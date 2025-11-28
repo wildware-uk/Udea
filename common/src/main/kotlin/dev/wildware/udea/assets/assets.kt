@@ -87,13 +87,13 @@ object Assets {
     val ready: Boolean
         get() = assets.isNotEmpty()
 
-    operator fun <T : Asset<T>> get(path: String) = assets[path] as T?
+    operator fun <T : Asset<T>> get(@AssetRef path: String) = assets[path] as T?
         ?: error("Asset $path does not exist ${debugAssets()}")
 
-    fun <T : Asset<T>> find(path: String) = assets[path] as T?
+    fun <T : Asset<T>> find(@AssetRef path: String) = assets[path] as T?
         ?: error("Asset $path does not exist ${debugAssets()}")
 
-    operator fun set(path: String, asset: Asset<*>) {
+    operator fun set(@AssetRef path: String, asset: Asset<*>) {
         assets[path] = asset
     }
 

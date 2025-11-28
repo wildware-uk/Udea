@@ -26,6 +26,12 @@ data class Transform(
     @UdeaSync
     val scale: Vector2 = Vector2(1f, 1f),
 ) : Component<Transform> {
+
+    /**
+     * Parent to which this transform is attached.
+     * */
+    var parent: Transform? = null
+
     override fun type() = Transform
 
     companion object : UdeaComponentType<Transform>(

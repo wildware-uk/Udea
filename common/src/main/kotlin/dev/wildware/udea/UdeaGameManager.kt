@@ -380,6 +380,7 @@ class UdeaGameManager(
 
     companion object {
         val DefaultSystems = listOf(
+            TransformSystem::class,
             CameraTrackSystem::class,
             BackgroundDrawSystem::class,
             CharacterAnimationControllerSystem::class,

@@ -43,7 +43,7 @@ blueprint(
                 onHitEffect(
                     reference("ability/knockback"),
                     setByCallerMagnitudes = mapOf(
-                        Data.StunDuration to .2F
+                        Data.Duration to .2F
                     )
                 )
             }

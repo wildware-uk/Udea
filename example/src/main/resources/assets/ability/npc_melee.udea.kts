@@ -1,5 +1,6 @@
 import dev.wildware.udea.ability.duration
 import dev.wildware.udea.ability.gameplayEffect
+import dev.wildware.udea.example.ability.Data
 import dev.wildware.udea.example.ability.Debuffs
 import dev.wildware.udea.example.ability.UnitMeleeAttack
 
@@ -11,11 +12,10 @@ bundle {
         blockedBy = {
             add(Debuffs.Stunned)
         },
-        cooldownEffect = reference("ability/npc_melee_cooldown")
-    )
-
-    gameplayEffect(
-        name = "npc_melee_cooldown",
-        effectDuration = duration(1.0F)
+        cooldownEffect = reference("ability/cooldown"),
+        setByCallerTags = mapOf(
+            Data.Cooldown to 0.5F
+        ),
+        blockAnimations = true
     )
 }

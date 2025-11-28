@@ -13,6 +13,7 @@ import dev.wildware.udea.gameScreen
 import ktx.graphics.use
 
 val HealthBarWidth = 60F
+val HealthBarDistance = 40F
 
 class HealthbarSystem(
     val shapeRenderer: ShapeRenderer = inject()
@@ -36,10 +37,19 @@ class HealthbarSystem(
         val position = gameScreen.camera.project(Vector3(transform.position, 0f))
 
         shapeRenderer.setColor(0.6F, 0.0F, 0.0F, 1.0F)
-        shapeRenderer.rect(position.x - (HealthBarWidth / 2F), position.y + 25F, HealthBarWidth, 10F)
+        shapeRenderer.rect(position.x - (HealthBarWidth / 2F), position.y + HealthBarDistance, HealthBarWidth, 10F)
 
         val healthPercent = attributes.health.currentValue / attributes.maxHealth.currentValue
         shapeRenderer.setColor(0.3F, .6F, 0.3F, 1.0F)
-        shapeRenderer.rect(position.x - (HealthBarWidth / 2f), position.y + 25F, healthPercent * HealthBarWidth, 10F)
+        shapeRenderer.rect(position.x - (HealthBarWidth / 2f), position.y + HealthBarDistance, healthPercent * HealthBarWidth, 10F)
+
+        if(attributes.maxMana.currentValue > 0F) {
+            shapeRenderer.setColor(0.1F, 0.3F, 0.4F, 1.0F)
+            shapeRenderer.rect(position.x - (HealthBarWidth / 2F), position.y + HealthBarDistance + 10F, HealthBarWidth, 5F)
+
+            val manaPercent = attributes.mana.currentValue / attributes.maxMana.currentValue
+            shapeRenderer.setColor(0.2F, 0.7F, 0.8F, 1.0F)
+            shapeRenderer.rect(position.x - (HealthBarWidth / 2F), position.y + HealthBarDistance + 10F, manaPercent * HealthBarWidth, 5F)
+        }
     }
 }

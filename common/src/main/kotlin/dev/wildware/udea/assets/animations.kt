@@ -101,9 +101,9 @@ data class AnimationInstance<T>(
     private fun calculateCurrentFrame(): Frame<T> {
         val time = if (animation.loop) time % animation.duration else time
 
-        return animation.frames.findLast {
+        return (animation.frames.findLast {
             it.time < time
-        } ?: animation.frames.last()
+        } ?: animation.frames.last())
     }
 
     fun start() {

@@ -23,5 +23,5 @@ fun <T : Component<out Any>> Entity.getOrNull(componentType: ComponentType<T>) =
  * Returns true if and only if the [entity][Entity] has a [component][Component] or [tag][EntityTag] of the given [type].
  */
 context(world: World)
-fun <T : Component<out Any>> Entity.contains(componentType: ComponentType<T>) =
+operator fun <T : Component<out Any>> Entity.contains(componentType: ComponentType<T>) =
     with(world) { componentType in this@contains }

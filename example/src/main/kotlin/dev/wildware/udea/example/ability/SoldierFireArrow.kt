@@ -1,7 +1,7 @@
 package dev.wildware.udea.example.ability
 
 import com.github.quillraven.fleks.World
-import dev.wildware.udea.ability.AbilityActivation
+import dev.wildware.udea.ability.AbilitySpec
 import dev.wildware.udea.ability.AbilityExec
 import dev.wildware.udea.ability.AbilityInfo
 import dev.wildware.udea.assets.Assets
@@ -15,9 +15,11 @@ import dev.wildware.udea.position
 
 class SoldierFireArrow : AbilityExec() {
 
-    context(world: World, activation: AbilityActivation)
+    context(world: World, activation: AbilitySpec)
     override fun activate(abilityInfo: AbilityInfo) {
         val (source, targetPos) = abilityInfo
+
+        commitAbility(abilityInfo)
 
         world.system<AnimationSetSystem>().setAnimation(source, "soldier_fire_arrow")?.apply {
             onNotify("fire_arrow") {

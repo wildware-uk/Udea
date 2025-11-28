@@ -10,20 +10,20 @@ import dev.wildware.udea.example.component.team
 
 bundle {
     character(
-        name = "soldier",
+        name = "priest",
         animations = gameUnitAnimations(
-            walk = "soldier_walk",
-            run = "soldier_walk",
-            idle = "soldier_idle",
-            death = "soldier_death",
-            attack = "soldier_attack",
-            hit = "soldier_hit",
+            walk = "priest_walk",
+            run = "priest_walk",
+            idle = "priest_idle",
+            death = "priest_death",
+            attack = "priest_attack",
+            hit = "priest_hit",
         ),
         size = characterSize(0.2F, 0.2F),
         attributeSet = {
             CharacterAttributeSet(
-                initHealth = 100F,
-                initArmour = 50F,
+                initHealth = 50F,
+                initMana = 100F,
             )
         },
         abilitySpecs = lazy {
@@ -35,7 +35,7 @@ bundle {
             )
 
             abilitySpec(
-                ability = Assets["ability/soldier_fire_arrow"],
+                ability = Assets["ability/priest_heal"],
                 tags = {
                     add(Slot.B)
                 }
@@ -47,103 +47,103 @@ bundle {
             gameUnit()
             debug()
         },
-        spriteAnimationSet = reference("character/soldier_animation_set"),
+        spriteAnimationSet = reference("character/priest_animation_set")
     )
 
     spriteAnimationSet(
-        name = "soldier_animation_set",
+        name = "priest_animation_set",
         animations = {
             spriteAnimation(
-                name = "soldier_idle",
-                sheet = reference("character/soldier_idle"),
+                name = "priest_idle",
+                sheet = reference("character/priest_idle"),
             )
 
             spriteAnimation(
-                name = "soldier_walk",
-                sheet = reference("character/soldier_walk")
+                name = "priest_walk",
+                sheet = reference("character/priest_walk")
             )
 
             spriteAnimation(
-                name = "soldier_attack",
-                sheet = reference("character/soldier_attack"),
+                name = "priest_attack",
+                sheet = reference("character/priest_attack"),
                 loop = false,
                 notifies = {
-                    animNotify(3, "attack_hit")
+                    animNotify(5, "attack_hit")
                 }
             )
 
             spriteAnimation(
-                name = "soldier_hit",
-                sheet = reference("character/soldier_hit"),
+                name = "priest_hit",
+                sheet = reference("character/priest_hit"),
                 loop = false,
                 interruptable = false
             )
 
             spriteAnimation(
-                name = "soldier_death",
-                sheet = reference("character/soldier_death"),
+                name = "priest_death",
+                sheet = reference("character/priest_death"),
                 loop = false,
                 interruptable = false
             )
 
             spriteAnimation(
-                name = "soldier_fire_arrow",
-                sheet = reference("character/soldier_fire_arrow"),
+                name = "priest_heal",
+                sheet = reference("character/priest_heal"),
                 notifies = {
-                    animNotify(8, "fire_arrow")
+                    animNotify(4, "heal")
                 },
                 loop = false,
             )
         }
     )
 
-    val soldierScale = 0.02F
+    val priestScale = 0.02F
 
     spriteSheet(
-        name = "soldier_idle",
-        spritePath = "/sprites/soldier/Soldier-Idle.png",
+        name = "priest_idle",
+        spritePath = "/sprites/priest/Priest-Idle.png",
         rows = 1,
         columns = 6,
-        scale = soldierScale
+        scale = priestScale
     )
 
     spriteSheet(
-        name = "soldier_walk",
-        spritePath = "/sprites/soldier/Soldier-Walk.png",
+        name = "priest_walk",
+        spritePath = "/sprites/priest/Priest-Walk.png",
         rows = 1,
         columns = 8,
-        scale = soldierScale
+        scale = priestScale
     )
 
     spriteSheet(
-        name = "soldier_attack",
-        spritePath = "/sprites/soldier/Soldier-Attack01.png",
-        rows = 1,
-        columns = 6,
-        scale = soldierScale
-    )
-
-    spriteSheet(
-        name = "soldier_fire_arrow",
-        spritePath = "/sprites/soldier/Soldier-Attack03.png",
+        name = "priest_attack",
+        spritePath = "/sprites/priest/Priest-Attack.png",
         rows = 1,
         columns = 9,
-        scale = soldierScale
+        scale = priestScale
     )
 
     spriteSheet(
-        name = "soldier_hit",
-        spritePath = "/sprites/soldier/Soldier-Hurt.png",
+        name = "priest_heal",
+        spritePath = "/sprites/priest/Priest-Heal.png",
         rows = 1,
-        columns = 4,
-        scale = soldierScale
+        columns = 6,
+        scale = priestScale
     )
 
     spriteSheet(
-        name = "soldier_death",
-        spritePath = "/sprites/soldier/Soldier-Death.png",
+        name = "priest_hit",
+        spritePath = "/sprites/priest/Priest-Hurt.png",
         rows = 1,
         columns = 4,
-        scale = soldierScale
+        scale = priestScale
+    )
+
+    spriteSheet(
+        name = "priest_death",
+        spritePath = "/sprites/priest/Priest-Death.png",
+        rows = 1,
+        columns = 4,
+        scale = priestScale
     )
 }

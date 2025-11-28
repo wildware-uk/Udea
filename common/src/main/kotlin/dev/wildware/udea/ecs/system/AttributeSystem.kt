@@ -5,7 +5,9 @@ import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.udea.ability.GameplayEffectSpec
 import dev.wildware.udea.ecs.component.ability.Abilities
+import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.gameScreen
+import dev.wildware.udea.getOrNull
 import kotlin.time.Duration.Companion.seconds
 
 class AttributeSystem : IteratingSystem(
@@ -13,6 +15,9 @@ class AttributeSystem : IteratingSystem(
 ) {
     override fun onTickEntity(entity: Entity) {
         val abilities = entity[Abilities]
+
+        entity.getOrNull(Debug)?.addMessage("${abilities.abilities.map { it.ability.name }}")
+        entity.getOrNull(Debug)?.addMessage("${abilities.gameplayEffectSpecs.map { it.gameplayEffect.name }}")
 
         abilities.gameplayEffectSpecs
             .sortedBy { it.gameplayEffect.modifierType }

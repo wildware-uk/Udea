@@ -50,8 +50,12 @@ suspend fun evalScript(
 ): ResultWithDiagnostics<EvaluationResult> {
     val preCompileTime = currentTimeMillis()
     val scriptSource = scriptFile.toScriptSource()
-    val compiledScript = scriptingHost.compiler(scriptSource, compilationConfiguration)
-        .valueOrThrow()
+    val compiledScript = try {
+        scriptingHost.compiler(scriptSource, compilationConfiguration)
+            .valueOrThrow()
+    } catch (e: Exception) {
+        error("Failed to compile ${scriptFile.name} ${e.message}\n\n${e.stackTraceToString()}")
+    }
     println("Compiled ${scriptFile.name} in ${currentTimeMillis() - preCompileTime}ms")
 
     val preRunTime = currentTimeMillis()

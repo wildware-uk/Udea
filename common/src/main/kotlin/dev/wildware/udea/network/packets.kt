@@ -78,13 +78,13 @@ data class EntityUpdate(
 @Serializable
 @UdeaNetworked
 data class AbilityPacket(
-    var ability: AssetReference<@Contextual Ability>? = null,
+    var abilityId: Int = -1,
     var source: Entity? = null,
     var targetPos: Vector2? = null,
     var target: Entity? = null
 ) : NetworkPacket {
     override fun reset() {
-        ability = null
+        abilityId = -1
         source = null
         targetPos = null
         target = null

@@ -27,7 +27,9 @@ class CharacterAnimationControllerSystem : IteratingSystem(
 
         val characterAnimations = animationMapHolder.animationMap as? CharacterAnimationMap ?: return
 
-        if (abilities.currentAbility == null) {
+        val blockingAnimations = abilities.abilities.any { it.active && it.ability.blockAnimations }
+
+        if (!blockingAnimations) {
             val moving = !movement.isZero
 
             if (moving) {

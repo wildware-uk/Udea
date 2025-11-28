@@ -1,12 +1,9 @@
+import dev.wildware.udea.ability.ModifierType.Additive
 import dev.wildware.udea.ability.duration
 import dev.wildware.udea.ability.gameplayEffect
 import dev.wildware.udea.ability.instant
 import dev.wildware.udea.ability.value
-import dev.wildware.udea.example.ability.CharacterAttributeSet
-import dev.wildware.udea.example.ability.DamageCue
-import dev.wildware.udea.example.ability.Data
-import dev.wildware.udea.example.ability.Debuffs
-import dev.wildware.udea.example.ability.KnockbackCue
+import dev.wildware.udea.example.ability.*
 
 bundle {
     gameplayEffect(
@@ -14,7 +11,7 @@ bundle {
         target = CharacterAttributeSet::health,
         modifierType = Additive,
         magnitude = value(Data.Damage),
-        effectDuration = Instant,
+        effectDuration = instant(),
         cues = {
             add(DamageCue)
         }
@@ -30,9 +27,30 @@ bundle {
 
     gameplayEffect(
         name = "stun",
-        effectDuration = duration(Data.StunDuration),
+        effectDuration = duration(Data.Duration),
         tags = {
             add(Debuffs.Stunned)
         }
+    )
+
+    gameplayEffect(
+        name = "cost_mana",
+        target = CharacterAttributeSet::mana,
+        modifierType = Additive,
+        magnitude = value(Cost.Mana),
+        effectDuration = instant()
+    )
+
+    gameplayEffect(
+        name = "heal",
+        target = CharacterAttributeSet::health,
+        modifierType = Additive,
+        magnitude = value(Data.Heal),
+        effectDuration = instant(),
+    )
+    
+    gameplayEffect(
+        name = "cooldown",
+        effectDuration = duration(Data.Cooldown),
     )
 }

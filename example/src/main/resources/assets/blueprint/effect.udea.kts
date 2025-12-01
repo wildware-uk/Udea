@@ -6,7 +6,8 @@ bundle {
         name = "effect",
         components = lazy {
             spriteRenderer(
-                order = 10
+                order = 10,
+                offset = Vector2(0.0F, -0.1F)
             )
             animations()
         }

@@ -1,3 +1,4 @@
+
 package dev.wildware.udea.assets
 
 import com.badlogic.gdx.math.Vector2
@@ -54,8 +55,8 @@ data class AnimationInstance<T>(
     private var playing = autoPlay
     private var time = 0F
     private val notifies = mutableMapOf<String, () -> Unit>()
-    private val onFinish = EventListener<AnimationInstance<T>>()
-    private val onStart = EventListener<AnimationInstance<T>>()
+    private val onFinishListener = EventListener<AnimationInstance<T>>()
+    private val onStartListener = EventListener<AnimationInstance<T>>()
 
     private lateinit var lastFrame: Frame<T>
 
@@ -65,10 +66,13 @@ data class AnimationInstance<T>(
     val isFinished: Boolean
         get() = currentFrame == animation.frames.last() && !animation.loop
 
+    val onFinish = onFinishListener::registerListener
+    val onStart = onStartListener::registerListener
+
     fun update(delta: Float) {
         if (!started) {
             started = true
-            onStart.notify(this)
+            onStartListener.notify(this)
         }
 
         time += delta
@@ -84,18 +88,12 @@ data class AnimationInstance<T>(
         }
     }
 
-    fun onStart(listener: AnimationEventListener<T>) = onStart.registerListener(listener)
-
     fun finish() {
-        onFinish.notify(this)
+        onFinishListener.notify(this)
     }
 
     fun onNotify(name: String, onNotify: () -> Unit) {
         notifies[name] = onNotify
-    }
-
-    fun onFinish(onFinish: AnimationEventListener<T>) {
-        this.onFinish.registerListener(onFinish)
     }
 
     private fun calculateCurrentFrame(): Frame<T> {

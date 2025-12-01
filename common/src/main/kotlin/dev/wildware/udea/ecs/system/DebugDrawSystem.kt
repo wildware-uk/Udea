@@ -1,6 +1,8 @@
 package dev.wildware.udea.ecs.system
 
+import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
+import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Vector3
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
@@ -10,8 +12,10 @@ import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.base.Debug
+import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.gameScreen
+import dev.wildware.udea.getOrNull
 import ktx.graphics.use
 
 @UdeaSystem(runIn = [Editor, Game])
@@ -21,8 +25,9 @@ class DebugDrawSystem : IteratingSystem(
     val font = VisUI.getSkin().getFont("default-font")
     val spriteBatch = SpriteBatch()
 
+
     override fun onTick() {
-        spriteBatch.use {
+        spriteBatch.use(gameScreen.uiViewport.camera) {
             super.onTick()
             font.draw(it, if (gameScreen.isServer) "server" else "client", 10F, 50F)
         }
@@ -36,8 +41,13 @@ class DebugDrawSystem : IteratingSystem(
             val position = gameScreen.camera.project(Vector3(transform.position, 0f))
 
             font.setColor(1.0F, 1.0F, 1.0F, 1.0F)
+            font.draw(spriteBatch, "local: ${entity.id}v${entity.version}", position.x + 40F, position.y - 20F)
+            val remote = entity.getOrNull(Networkable)?.remoteEntity
+            if(remote != null) {
+                font.draw(spriteBatch, "remote: ${remote.id}v${remote.version}", position.x + 40F, position.y - 40F)
+            }
             debug.debugMessages.forEachIndexed { i, it ->
-                font.draw(spriteBatch, it.message, position.x + 10F, position.y + i * 25F)
+                font.draw(spriteBatch, it.message, position.x + 40F, position.y + i * 25F)
             }
         }
 

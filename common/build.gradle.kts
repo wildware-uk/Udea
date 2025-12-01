@@ -50,6 +50,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-scripting-common")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    testImplementation(libs.junit.jupiter)
 
     ksp(project(":gradle-plugin"))
     implementation(project(":gradle-plugin"))

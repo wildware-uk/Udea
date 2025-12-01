@@ -31,8 +31,8 @@ class Box2DSystem(
                 val bodyB = contact.fixtureB.body.userData
 
                 if (bodyA is Entity && bodyB is Entity) {
-                    bodyB[Body].touchingCount++
-                    bodyA[Body].touchingCount++
+                    bodyA[Body].touching += bodyB
+                    bodyB[Body].touching += bodyA
 
                     context(world) {
                         onCollideListeners.forEach {
@@ -47,12 +47,9 @@ class Box2DSystem(
                 val bodyA = contact.fixtureA.body.userData
                 val bodyB = contact.fixtureB.body.userData
 
-                if (bodyA is Entity) {
-                    bodyA.getOrNull(Body)?.touchingCount--
-                }
-
-                if (bodyB is Entity) {
-                    bodyB.getOrNull(Body)?.touchingCount--
+                if (bodyA is Entity && bodyB is Entity) {
+                    bodyA.getOrNull(Body)?.touching -= bodyB
+                    bodyB.getOrNull(Body)?.touching -= bodyA
                 }
             }
 

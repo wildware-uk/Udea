@@ -17,7 +17,8 @@ class NetworkServerSystem(
     world: World
 ) : IteratingSystem(
     family = world.family { all(Networkable) },
-    world = world
+    world = world,
+    interval = Fixed(1 / 20F)
 ), FamilyOnAdd, FamilyOnRemove {
     val server = Server(1024 * 8, 1024 * 64).apply {
         kryo.registerDefaultPackets()
@@ -79,12 +80,13 @@ class NetworkServerSystem(
                 return@processAndRemoveEach
             }
 
-            world.entity {
-                defaultCharacter.value.newInstance(world).apply {
-                    println("Setting networkable to $id")
-                    this += Networkable(id)
+            defaultCharacter.value.newInstance(world).apply {
+                println("Setting networkable to $id")
+                this.configure {
+                    it += Networkable(id)
                 }
             }
+
 
             // TODO
 //            server.sendToTCP(

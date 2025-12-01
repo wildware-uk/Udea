@@ -13,11 +13,17 @@ class Team(
 ) : Component<Team> {
     override fun type() = Team
 
+    override fun equals(other: Any?): Boolean {
+        return other is Team && teamId == other.teamId
+    }
+
     companion object : UdeaComponentType<Team>(
         networkComponent = configureNetwork()
     ) {
+        // TODO you know this should be assets!
         val NoTeam = -1
         val OrcTeam = 0
         val SoldierTeam = 1
+        val UndeadTeam = 2
     }
 }

@@ -1,5 +1,4 @@
-import dev.wildware.udea.ability.duration
-import dev.wildware.udea.ability.gameplayEffect
+import dev.wildware.udea.example.ability.AIHint
 import dev.wildware.udea.example.ability.Data
 import dev.wildware.udea.example.ability.Debuffs
 import dev.wildware.udea.example.ability.UnitMeleeAttack
@@ -14,8 +13,13 @@ bundle {
         },
         cooldownEffect = reference("ability/cooldown"),
         setByCallerTags = mapOf(
-            Data.Cooldown to 0.5F
+            Data.Cooldown to 0.8F
         ),
-        blockAnimations = true
+        blockAnimations = true,
+        tags = {
+            add(AIHint.Damage)
+            add(AIHint.TargetEnemy)
+            add(AIHint.Melee)
+        }
     )
 }

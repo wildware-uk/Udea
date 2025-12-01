@@ -1,5 +1,4 @@
 import dev.wildware.udea.ecs.component.base.networkable
-import dev.wildware.udea.ecs.component.render.animationHolder
 import dev.wildware.udea.example.component.aIUnit
 import dev.wildware.udea.example.component.player
 import dev.wildware.udea.example.system.*
@@ -18,36 +17,57 @@ level(
     },
 
     entities = {
-        val spawnDistance = 3F
+        val spawnDistance = 4F
         fun randomPos() = Vector2(
             Random.nextFloat() * spawnDistance - spawnDistance / 2,
             Random.nextFloat() * spawnDistance - spawnDistance / 2
         )
 
         entityDefinition(
-            blueprint = reference("character/priest"),
+            blueprint = reference("character/orc"),
             components = lazy {
                 networkable(owner = -1)
                 player()
-            }
+            },
+            position = randomPos().sub(5F, 0F)
         )
 
-        repeat(5) {
-            entityDefinition(
-                blueprint = reference("character/soldier"),
-                position = randomPos(),
-                components = lazy {
-                    aIUnit()
-                }
-            )
+//        entityDefinition(
+//            blueprint = reference("character/priest"),
+//            components = lazy {
+//                aIUnit()
+//            },
+//            position = randomPos()
+//        )
 
+//        repeat(5) {
+//            entityDefinition(
+//                blueprint = reference("character/orc"),
+//                components = lazy {
+//                    aIUnit()
+//                },
+//                position = randomPos().sub(5F, 0F)
+//            )
+//        }
+//
+//        repeat(10) {
             entityDefinition(
-                blueprint = reference("character/orc"),
-                position = randomPos(),
+                blueprint = reference("character/skeleton"),
                 components = lazy {
                     aIUnit()
-                }
+                },
+                position = randomPos().sub(-10F, 0F)
             )
-        }
+//        }
+//
+//        repeat(10) {
+//            entityDefinition(
+//                blueprint = reference("character/soldier"),
+//                components = lazy {
+//                    aIUnit()
+//                },
+//                position = randomPos().sub(0F, 5F)
+//            )
+//        }
     }
 )

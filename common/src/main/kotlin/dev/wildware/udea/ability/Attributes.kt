@@ -1,6 +1,11 @@
 package dev.wildware.udea.ability
 
+import com.github.quillraven.fleks.Entity
+import com.github.quillraven.fleks.World
 import dev.wildware.udea.assets.dsl.UdeaDsl
+import dev.wildware.udea.ecs.component.ability.Abilities
+import dev.wildware.udea.ecs.component.ability.Attributes
+import dev.wildware.udea.get
 import dev.wildware.udea.network.UdeaNetworked
 import dev.wildware.udea.network.serde.UdeaSync
 import kotlinx.serialization.Serializable
@@ -21,29 +26,29 @@ data class Attribute(
     @Transient
     var max: ValueResolver = ValueResolver.Max
 
-    fun forceValue(newValue: Float) {
-        this.currentValue = newValue
-        this.baseValue = newValue
-    }
-
     override fun toString(): String {
         return "Attribute(base=$baseValue, current=$currentValue)"
     }
 }
 
 sealed class ValueResolver {
-    abstract fun getValue(gameplayEffectSpec: GameplayEffectSpec): Float
+    context(_: World)
+    abstract fun getValue(entity: Entity, gameplayEffectSpec: GameplayEffectSpec): Float
 
     class ConstantValue(val value: Float) : ValueResolver() {
-        override fun getValue(gameplayEffectSpec: GameplayEffectSpec) = value
+        context(_: World)
+        override fun getValue(entity: Entity, gameplayEffectSpec: GameplayEffectSpec) = value
     }
 
-    class AttributeValue(val attribute: Attribute) : ValueResolver() {
-        override fun getValue(gameplayEffectSpec: GameplayEffectSpec) = attribute.currentValue
+    class AttributeValue(val attribute: GameplayEffectTarget) : ValueResolver() {
+        context(_: World)
+        override fun getValue(entity: Entity, gameplayEffectSpec: GameplayEffectSpec) =
+            attribute(entity[Attributes].attributeSet).currentValue
     }
 
     class SetByCaller(val gameplayTag: GameplayTag) : ValueResolver() {
-        override fun getValue(gameplayEffectSpec: GameplayEffectSpec): Float {
+        context(_: World)
+        override fun getValue(entity: Entity, gameplayEffectSpec: GameplayEffectSpec): Float {
             return gameplayEffectSpec.getSetByCallerMagnitude(gameplayTag)
         }
     }
@@ -59,7 +64,7 @@ sealed class ValueResolver {
 fun value(value: Float) = ValueResolver.ConstantValue(value)
 
 @UdeaDsl
-fun value(attribute: Attribute) = ValueResolver.AttributeValue(attribute)
+fun value(attribute: GameplayEffectTarget) = ValueResolver.AttributeValue(attribute)
 
 @UdeaDsl
 fun value(gameplayTag: GameplayTag) = ValueResolver.SetByCaller(gameplayTag)

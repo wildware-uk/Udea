@@ -57,7 +57,7 @@ data class SpriteAnimation(
                     frame(
                         nextFrame,
                         it,
-                        name = notifies.find { it.frame == i }?.name
+                        name = notifies.find { (it.frame - 1) == i }?.name
                     )
                     nextFrame += frameTime
                 }

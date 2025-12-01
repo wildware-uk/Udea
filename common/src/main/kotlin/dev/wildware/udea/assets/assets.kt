@@ -6,6 +6,7 @@ import dev.wildware.udea.assets.dsl.ListBuilder
 import dev.wildware.udea.assets.dsl.UdeaDsl
 import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.dsl.DslInclude
+import dev.wildware.udea.network.serde.AssetRefKSerializer
 import kotlinx.serialization.Serializable
 import kotlin.reflect.KClass
 import kotlin.reflect.full.isSubclassOf
@@ -22,18 +23,24 @@ annotation class AssetRef
 object EmptyReference : AssetReference<Nothing> {
     override val value: Nothing
         get() = error("Tried to access empty blueprint reference")
+
+    override val qualifiedName: String
+        get() = error("Tried to access empty blueprint reference")
 }
 
-interface AssetReference<T : Asset<T>> {
+@Serializable(AssetRefKSerializer::class)
+sealed interface AssetReference<T : Asset<T>> {
+    val qualifiedName: String
     val value: T
 }
 
-@Serializable
 data class AssetRefImpl<T : Asset<T>>(
     @AssetRef val path: String
 ) : AssetReference<T> {
-    override val value: T
-        get() = Assets.find(path)
+    override val value: T by kotlin.lazy { Assets.find(path) }
+
+    override val qualifiedName: String
+        get() = path
 }
 
 /**
@@ -64,7 +71,7 @@ abstract class Asset<T : Asset<T>> : AssetReference<T> {
     @DslInclude
     var name: String = ""
 
-    val qualifiedName: String
+    override val qualifiedName: String
         get() = "$path/$name"
 
     @get:JsonIgnore

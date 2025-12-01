@@ -36,7 +36,10 @@ data class Body(
     lateinit var body: Box2DBody
 
     @Transient
-    var touchingCount: Int = 0
+    val touching = mutableListOf<Entity>()
+
+    val touchingCount: Int
+        get() = touching.size
 
     val grounded: Boolean
         get() = touchingCount > 0
@@ -56,6 +59,8 @@ data class Body(
         system<Box2DSystem>().box2DWorld.destroyBody(body)
     }
 
+
+    // TODO is this not being serialized?
     companion object : UdeaComponentType<Body>(
         networkComponent = configureNetwork(
             delegates = {

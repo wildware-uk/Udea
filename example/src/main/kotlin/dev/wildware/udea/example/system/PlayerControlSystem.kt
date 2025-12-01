@@ -4,9 +4,7 @@ import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.World.Companion.family
-import dev.wildware.udea.Mouse
 import dev.wildware.udea.Vector2
-import dev.wildware.udea.ability.AbilityInfo
 import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.assets.Axis2D
 import dev.wildware.udea.assets.Control
@@ -18,6 +16,8 @@ import dev.wildware.udea.example.ability.Slot
 import dev.wildware.udea.example.component.GameUnit
 import dev.wildware.udea.example.component.Player
 import dev.wildware.udea.example.component.Team
+import dev.wildware.udea.example.getUnitsWithin
+import dev.wildware.udea.hasAuthority
 import dev.wildware.udea.position
 
 class PlayerControlSystem : IteratingSystem(
@@ -32,24 +32,20 @@ class PlayerControlSystem : IteratingSystem(
     val attack2Control = Assets.get<Control>("control/attack_2")
 
     override fun onTickEntity(entity: Entity) = context(world) {
+        if(!world.hasAuthority(entity)) return@context
+
         val controller = entity[CharacterController]
         val movementAxis = controls.getAxisValue(movementAxis)
         controller.movement.set(movementAxis)
 
         if (controls.isInputPressed(attackControl)) {
-            val nearestEnemy = getAttackEntity(entity, entity.position.cpy().add(movementAxis))
-            world.system<AbilitySystem>().activateAbilityByTag(
-                AbilityInfo(entity, Mouse.mouseWorldPos, nearestEnemy),
-                Slot.A
-            )
+//            val nearestEnemy = getAttackEntity(entity, entity.position.cpy().add(movementAxis))
+            world.system<AbilitySystem>().activateAbilityByTag(entity, Slot.A)
         }
 
         if (controls.isInputPressed(attack2Control)) {
-            val nearestEnemy = getAttackEntity(entity, entity.position.cpy().add(movementAxis))
-            world.system<AbilitySystem>().activateAbilityByTag(
-                AbilityInfo(entity, Mouse.mouseWorldPos, nearestEnemy),
-                Slot.B
-            )
+//            val nearestEnemy = getAttackEntity(entity, entity.position.cpy().add(movementAxis))
+            world.system<AbilitySystem>().activateAbilityByTag(entity, Slot.B)
         }
 
         if (Camera !in entity) {
@@ -61,10 +57,8 @@ class PlayerControlSystem : IteratingSystem(
 
     context(world: World)
     private fun getAttackEntity(entity: Entity, vector: Vector2): Entity? {
-        return gameUnitsFamily
+        return getUnitsWithin(entity, 1.0F)
             .filter { it[Team].teamId != entity[Team].teamId && !it[GameUnit].isDead }
-            .filter { it.position.dst(vector) < 0.5F }
-            .map { it }
             .minByOrNull { it.position.dst(vector) }
     }
 }

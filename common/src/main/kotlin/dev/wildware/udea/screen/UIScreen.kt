@@ -3,12 +3,11 @@ package dev.wildware.udea.screen
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.utils.viewport.ScreenViewport
+import dev.wildware.udea.gameManager
 import ktx.app.KtxScreen
 import ktx.assets.disposeSafely
 
 abstract class UIScreen : KtxScreen {
-
-    private var previousInputProcessor: com.badlogic.gdx.InputProcessor? = null
 
     val screenViewport = ScreenViewport()
     val stage = Stage(screenViewport)
@@ -19,16 +18,15 @@ abstract class UIScreen : KtxScreen {
     }
 
     override fun show() {
-        previousInputProcessor = Gdx.input.inputProcessor
-        Gdx.input.inputProcessor = stage
+        gameManager.inputProcessor.addProcessor(stage)
     }
 
     override fun hide() {
-        Gdx.input.inputProcessor = previousInputProcessor
+        gameManager.inputProcessor.removeProcessor(stage)
     }
 
     override fun dispose() {
-        Gdx.input.inputProcessor = previousInputProcessor
+        gameManager.inputProcessor.removeProcessor(stage)
         stage.disposeSafely()
     }
 

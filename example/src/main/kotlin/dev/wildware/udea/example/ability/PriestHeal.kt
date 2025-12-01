@@ -2,11 +2,12 @@ package dev.wildware.udea.example.ability
 
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
-import dev.wildware.udea.ability.AbilitySpec
 import dev.wildware.udea.ability.AbilityExec
-import dev.wildware.udea.ability.AbilityInfo
+import dev.wildware.udea.ability.AbilitySpec
+import dev.wildware.udea.ability.AbilityTargeting
 import dev.wildware.udea.ability.GameplayEffectSpec
 import dev.wildware.udea.assets.Assets
+import dev.wildware.udea.assets.reference
 import dev.wildware.udea.contains
 import dev.wildware.udea.ecs.component.ability.Abilities
 import dev.wildware.udea.ecs.system.AnimationSetSystem
@@ -18,26 +19,30 @@ import dev.wildware.udea.position
 import ktx.box2d.query
 
 class PriestHeal : AbilityExec() {
-    context(world: World, activation: AbilitySpec)
-    override fun activate(abilityInfo: AbilityInfo) {
-        commitAbility(abilityInfo)
-
-        world.system<AnimationSetSystem>().setAnimation(abilityInfo.source, "priest_heal")?.apply {
+    context(world: World, spec: AbilitySpec)
+    override fun activate() {
+        world.system<AnimationSetSystem>().setAnimation(spec.entity, "priest_heal")?.apply {
             onNotify("heal") {
-                val toHeal = getNearbyFriendlyUnits(abilityInfo.source, 2F)
-
+                val toHeal = getNearbyFriendlyUnits(spec.entity, 3F)
                 toHeal.forEach {
-                    val gameplayEffect = GameplayEffectSpec(Assets["ability/heal"])
+                    val gameplayEffect = GameplayEffectSpec(reference("ability/heal_over_time"))
                     gameplayEffect.addDynamicCue(PriestHealCue)
-                    gameplayEffect.setSetByCallerMagnitude(Data.Heal, 10F)
-                    it[Abilities].applyGameplayEffect(abilityInfo.source, it, gameplayEffect)
+                    gameplayEffect.setSetByCallerMagnitude(Data.Heal, 5F)
+                    gameplayEffect.setSetByCallerMagnitude(Data.Duration, 5F)
+                    it[Abilities].applyGameplayEffect(spec.entity, it, gameplayEffect)
+                }
+
+                if (toHeal.isNotEmpty()) {
+                    commitAbility()
+                } else {
+                    endAbility()
                 }
             }
 
             onFinish {
                 endAbility()
             }
-        }
+        } ?: endAbility()
     }
 
     context(world: World)

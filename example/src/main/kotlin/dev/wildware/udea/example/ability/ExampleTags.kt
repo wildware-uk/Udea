@@ -45,4 +45,13 @@ enum class AIHint : GameplayTag {
     Damage,
     AimEnemy,
     AimFriendly,
+    Melee,
+    Ranged
+}
+
+enum class AITag : GameplayTag {
+    /**
+     * This unit will never run from combat.
+     * */
+    Fearless,
 }

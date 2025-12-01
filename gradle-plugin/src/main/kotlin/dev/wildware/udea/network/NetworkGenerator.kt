@@ -12,6 +12,10 @@ class NetworkGenerator(
     private val logger: KSPLogger,
     private val options: Map<String, String>,
 ) : SymbolProcessor {
+    val serializerMap = mapOf(
+        "com.badlogic.gdx.math.Vector2" to "dev.wildware.udea.Vector2Serializer"
+    )
+
     private val existingSerializers = mutableMapOf<String, String>()
     private val allSerializersForIndex = mutableMapOf<String, String>()
     private var indexGenerated = false
@@ -67,7 +71,12 @@ class NetworkGenerator(
                     val syncProperties = symbol.getAllProperties().filter {
                         it.annotations.any { ann -> ann.shortName.asString() == "UdeaSync" }
                     }.map { property ->
-                        "component.${property.simpleName.asString()}" to property.type.resolve()
+                        Triple(
+                            "component.${property.simpleName.asString()}", property.type.resolve(),
+                            property.annotations.first { it.shortName.asString() == "UdeaSync" }
+                                .arguments.first { it.name?.asString() == "inPlace" }.value as Boolean
+                        )
+
                     }
 
                     // Collect delegated properties from companion object
@@ -75,7 +84,7 @@ class NetworkGenerator(
 
                     // Combine all properties to serialize
                     val allProperties = syncProperties + delegatedProperties.map { (expr, type) ->
-                        "component.$expr" to type
+                        Triple("component.$expr", type, false)
                     }
 
                     val fileContent = buildString {
@@ -87,24 +96,26 @@ class NetworkGenerator(
                         appendLine("@UdeaSerializer($className::class)")
                         appendLine("object $serializerName : InPlaceSerializer<$className> {")
                         appendLine("    override fun serialize(component: $className, data: ByteBuffer) {")
-                        allProperties.forEach { (propertyName, propertyType) ->
+                        allProperties.forEach { (propertyName, propertyType, inPlace) ->
                             appendLine(
                                 serializeLine(
                                     this,
                                     propertyName,
-                                    propertyType
+                                    propertyType,
+                                    inPlace
                                 )
                             )
                         }
                         appendLine("    }")
                         appendLine()
                         appendLine("    override fun deserialize(component: $className, data: ByteBuffer) {")
-                        allProperties.forEach { (propertyName, propertyType) ->
+                        allProperties.forEach { (propertyName, propertyType, inPlace) ->
                             appendLine(
                                 deserializeLine(
                                     this,
                                     propertyName,
-                                    propertyType
+                                    propertyType,
+                                    inPlace
                                 )
                             )
                         }
@@ -129,43 +140,47 @@ class NetworkGenerator(
         logger.warn("[NetworkGen] Generated $generatedCount new serializers")
     }
 
-    private fun serializeLine(out: StringBuilder, property: String, type: KSType): String {
+    private fun serializeLine(out: StringBuilder, property: String, type: KSType, inPlace: Boolean): String {
         val typeName = type.declaration.qualifiedName?.asString() ?: type.declaration.simpleName.asString()
         return when {
+            !inPlace && serializerMap[typeName] != null -> "        data.putSerializable($property, ${serializerMap[typeName]!!})"
+            !inPlace -> "        data.putSerializable($property)"
+            typeName in existingSerializers -> "        ${existingSerializers[typeName]}.serialize($property, data)"
             typeName == "kotlin.Int" -> "        data.putInt($property)"
             typeName == "kotlin.Float" -> "        data.putFloat($property)"
             typeName == "kotlin.Boolean" -> "        data.putBoolean($property)"
             typeName == "kotlin.String" -> "        data.putString($property)"
             typeName == "kotlin.Array" -> """
                     for(element in $property) {
-                        ${serializeLine(out, "element", type.arguments.first().type!!.resolve())}
+                        ${serializeLine(out, "element", type.arguments.first().type!!.resolve(), inPlace)}
                     }
                 """.trimIndent()
 
             isPolymorphic(type) -> "        polymorphicSerializerFor($property::class).serialize($property, data)"
 
-            typeName in existingSerializers -> "        ${existingSerializers[typeName]}.serialize($property, data)"
             else -> "        data.putSerializable($property)"
         }
     }
 
-    private fun deserializeLine(out: StringBuilder, property: String, type: KSType): String {
+    private fun deserializeLine(out: StringBuilder, property: String, type: KSType, inPlace: Boolean): String {
         val typeName = type.declaration.qualifiedName?.asString() ?: type.declaration.simpleName.asString()
 
         return when {
+            !inPlace && serializerMap[typeName] != null -> "        $property = data.getSerializable(${serializerMap[typeName]!!})"
+            !inPlace -> "        $property = data.getSerializable()"
+            typeName in existingSerializers -> "        ${existingSerializers[typeName]}.deserialize($property, data)"
             typeName == "kotlin.Int" -> "        $property = data.getInt()"
             typeName == "kotlin.Float" -> "        $property = data.getFloat()"
             typeName == "kotlin.Boolean" -> "        $property = data.getBoolean()"
             typeName == "kotlin.String" -> "        $property = data.getString()"
             typeName == "kotlin.Array" -> """
                 for(i in $property.indices) {
-                    ${deserializeLine(out, "$property[i]", type.arguments.first().type!!.resolve())}
+                    ${deserializeLine(out, "$property[i]", type.arguments.first().type!!.resolve(), inPlace)}
                 }
             """
 
             isPolymorphic(type) -> "        polymorphicSerializerFor($property::class).deserialize($property, data)"
 
-            typeName in existingSerializers -> "        ${existingSerializers[typeName]}.deserialize($property, data)"
             else -> "        $property = data.getSerializable()"
         }
     }

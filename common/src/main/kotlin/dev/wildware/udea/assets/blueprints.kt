@@ -41,10 +41,16 @@ open class Blueprint(
             it += Transform()
         }
 
-        it += components()
-        it += tags
+        it += allComponents()
+        it += allTags()
         init(this, it)
     }
+
+    private fun allComponents(): List<Component<out Any>> =
+        (parent?.value?.allComponents() ?: emptyList()) + components()
+
+    private fun allTags(): List<UniqueId<Any>> =
+        (parent?.value?.allTags() ?: emptyList()) + tags
 
     override fun toString(): String {
         return "Blueprint(name=$name)"

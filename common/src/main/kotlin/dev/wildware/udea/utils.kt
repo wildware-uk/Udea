@@ -29,11 +29,10 @@ fun Entity.blueprint(world: World): BlueprintAsset {
     }
 }
 
-// TODO this is unacceptable!!! use a family instead.
-fun World.getNetworkEntity(remoteEntity: Entity): Entity = asEntityBag()
-    .find { it.getOrNull(Networkable)?.remoteEntity == remoteEntity } ?: error("No entity with network id: $remoteEntity")
+fun World.getNetworkEntity(remoteEntity: Entity): Entity = getNetworkEntityOrNull(remoteEntity)
+    ?: error("No entity with network id: $remoteEntity")
 
-fun World.getNetworkEntityOrNull(remoteEntity: Entity): Entity? = asEntityBag()
+fun World.getNetworkEntityOrNull(remoteEntity: Entity): Entity? = gameScreen.networkableFamily
     .find { it.getOrNull(Networkable)?.remoteEntity == remoteEntity }
 
 fun World.hasAuthority(entity: Entity) =
@@ -59,7 +58,7 @@ inline fun SpriteBatch.use(
     camera: Camera? = null,
     action: (SpriteBatch) -> Unit
 ) {
-    if(camera != null) {
+    if (camera != null) {
         this.use(camera, action)
     } else {
         this.use(action = action)
@@ -67,7 +66,7 @@ inline fun SpriteBatch.use(
 }
 
 val <T : Any> KClass<T>.uClass: UClass<T>
-    get()= UClass(this.qualifiedName ?: error("Cannot get qualified name of class: $this"))
+    get() = UClass(this.qualifiedName ?: error("Cannot get qualified name of class: $this"))
 
 /**
  * Shortcut to get an entity position.
@@ -81,4 +80,4 @@ val Entity.position: Vector2
  * */
 context(world: World)
 val Entity.remoteEntity: Entity
-    get()= this[Networkable].remoteEntity
+    get() = this[Networkable].remoteEntity

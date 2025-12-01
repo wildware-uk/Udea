@@ -28,14 +28,14 @@ bundle {
         },
         abilitySpecs = lazy {
             abilitySpec(
-                ability = Assets["ability/npc_melee"],
+                ability = reference("ability/npc_melee"),
                 tags = {
                     add(Slot.A)
                 }
             )
 
             abilitySpec(
-                ability = Assets["ability/soldier_fire_arrow"],
+                ability = reference("ability/soldier_fire_arrow"),
                 tags = {
                     add(Slot.B)
                 }
@@ -68,7 +68,8 @@ bundle {
                 sheet = reference("character/soldier_attack"),
                 loop = false,
                 notifies = {
-                    animNotify(3, "attack_hit")
+                    animNotify(3, "swoosh")
+                    animNotify(4, "attack_hit")
                 }
             )
 

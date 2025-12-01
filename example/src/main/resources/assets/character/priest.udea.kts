@@ -24,18 +24,19 @@ bundle {
             CharacterAttributeSet(
                 initHealth = 50F,
                 initMana = 100F,
+                initHealthRegen = 2F
             )
         },
         abilitySpecs = lazy {
             abilitySpec(
-                ability = Assets["ability/npc_melee"],
+                ability = reference("ability/npc_melee"),
                 tags = {
                     add(Slot.A)
                 }
             )
 
             abilitySpec(
-                ability = Assets["ability/priest_heal"],
+                ability = reference("ability/priest_heal"),
                 tags = {
                     add(Slot.B)
                 }
@@ -68,6 +69,7 @@ bundle {
                 sheet = reference("character/priest_attack"),
                 loop = false,
                 notifies = {
+                    animNotify(4, "swoosh")
                     animNotify(5, "attack_hit")
                 }
             )

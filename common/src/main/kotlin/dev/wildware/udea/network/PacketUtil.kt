@@ -4,6 +4,8 @@ import com.esotericsoftware.kryo.Kryo
 import com.github.quillraven.fleks.*
 import dev.wildware.udea.*
 import dev.wildware.udea.UdeaReflections.udeaReflections
+import dev.wildware.udea.ability.AttributeSet
+import dev.wildware.udea.ability.GameplayTag
 import dev.wildware.udea.assets.AssetReference
 import dev.wildware.udea.ecs.component.NetworkAuthority
 import dev.wildware.udea.ecs.component.NetworkComponent
@@ -18,15 +20,27 @@ import dev.wildware.udea.network.serde.AssetReferenceSerializer
 import dev.wildware.udea.network.serde.SerializableSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.Cbor
+import kotlinx.serialization.modules.PolymorphicModuleBuilder
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.serializer
+import java.lang.reflect.Modifier
+import kotlin.reflect.KClass
 import kotlin.reflect.full.findAnnotation
+import kotlin.reflect.full.functions
+import kotlin.reflect.full.hasAnnotation
 
 val udeaNetworkedTypes = udeaReflections
     .getTypesAnnotatedWith(UdeaNetworked::class.java)
     .filter { Component::class.java.isAssignableFrom(it) }
+
+val polymorphicTypes = udeaReflections
+    .getTypesAnnotatedWith(UdeaNetworked::class.java)
+    .filter { it.isInterface || it.modifiers.and(Modifier.ABSTRACT) != 0}
+    .map { it.kotlin to udeaReflections.getSubTypesOf(it).map { it.kotlin } }
 
 fun Kryo.registerDefaultPackets() {
     addDefaultSerializer(NetworkPacket::class.java, SerializableSerializer)
@@ -56,11 +70,23 @@ val cbor = Cbor {
         polymorphic(Component::class) {
             udeaNetworkedTypes
                 .filterIsInstance<Class<Component<*>>>()
-                .filter { it.kotlin.findAnnotation<UdeaNetworked>()?.registerKotlinXSerializer == true }
+                .filter { it.kotlin.hasAnnotation<Serializable>() }
                 .forEach {
                     println("Registering ${it.simpleName}")
                     subclass(it.kotlin, it.kotlin.serializer())
                 }
+        }
+
+        println("Registering polymorphic types")
+        polymorphicTypes.forEach { (type, children) ->
+            println("Registering $type with children:")
+
+            polymorphic(type as KClass<Any>) {
+                children.forEach {
+                    println("  $it")
+                    subclass(it as KClass<Any>, it.serializer() as KSerializer<Any>)
+                }
+            }
         }
 
         polymorphic(UniqueId::class) {

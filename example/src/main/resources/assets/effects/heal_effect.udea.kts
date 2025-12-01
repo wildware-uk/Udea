@@ -24,6 +24,6 @@ bundle {
         name = "heal_effect",
         animationSet = reference("effects/heal_effect_set"),
         animation = "heal",
-        duration = 1.0F
+        duration = 5.0F
     )
 }

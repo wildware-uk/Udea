@@ -13,7 +13,12 @@ annotation class UdeaSync(
     /**
      * When to sync this property.
      * */
-    val syncMode: SyncMode = SyncMode.Eager
+    val syncMode: SyncMode = SyncMode.Eager,
+
+    /**
+     * Should this property be synced in-place?
+     * */
+    val inPlace: Boolean = true
 ) {
     enum class SyncMode {
         /**

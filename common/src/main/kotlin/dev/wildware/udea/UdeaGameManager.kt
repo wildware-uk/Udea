@@ -9,6 +9,7 @@ import com.badlogic.gdx.assets.AssetManager
 import com.badlogic.gdx.assets.loaders.FileHandleResolver
 import com.badlogic.gdx.assets.loaders.ParticleEffectLoader
 import com.badlogic.gdx.assets.loaders.resolvers.InternalFileHandleResolver
+import com.badlogic.gdx.audio.Sound
 import com.badlogic.gdx.files.FileHandle
 import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.Texture
@@ -23,6 +24,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.utils.viewport.ExtendViewport
 import com.badlogic.gdx.utils.viewport.ScreenViewport
 import com.github.quillraven.fleks.Entity
+import com.github.quillraven.fleks.Family
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.SystemConfiguration
 import com.github.quillraven.fleks.configureWorld
@@ -38,6 +40,7 @@ import dev.wildware.udea.command.Console
 import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
+import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.system.*
 import dev.wildware.udea.screen.LoadingScreen
@@ -87,7 +90,7 @@ class GameScreen(
 ) : KtxScreen {
     var started = false
     var debug: Boolean = false
-    val viewport = ExtendViewport(19.20F, 10.80F)
+    val viewport = ExtendViewport(15F, 15F)
     var camera = viewport.camera as OrthographicCamera
     var delta: Float = 0F
     var networkServerSystem: NetworkServerSystem? = null
@@ -96,6 +99,8 @@ class GameScreen(
     var localPlayer: Entity? = null
     var clientId: Int = -1
     private var fpsPrintTimer = 0F
+
+    val uiViewport = ScreenViewport()
 
     var time: Float = 0F
 
@@ -114,7 +119,7 @@ class GameScreen(
     }
 
     val stage by lazy {
-        Stage(ScreenViewport()).apply {
+        Stage(uiViewport).apply {
             addActor(console)
             console.setSize(600F, 300F)
             console.setPosition(20F, 20F)
@@ -164,10 +169,12 @@ class GameScreen(
         }
     }
 
+    lateinit var networkableFamily: Family
+
     init {
         gameScreen = this
 
-        gameConfig?.scene2d?.scene2DDefaultSkin?.let {
+        gameConfig.scene2d?.scene2DDefaultSkin?.let {
             Scene2DSkin.defaultSkin = Skin(it.toInternalFile())
         }
 
@@ -181,9 +188,9 @@ class GameScreen(
 
         gameManager.inputProcessor.addProcessor(stage)
 
-        camera.zoom = 0.7F
-
         Gdx.app.postRunnable {
+            networkableFamily = world.family {  all(Networkable) }
+
             level.entities.forEach { entityDef ->
                 val entity = entityDef.blueprint?.value?.newInstance(world)
                     ?: world.entity()
@@ -261,6 +268,8 @@ class GameScreen(
 
     override fun resize(width: Int, height: Int) {
         println("RESIZE $width $height")
+
+        uiViewport.update(width, height, true)
         viewport.update(width, height, false)
     }
 
@@ -380,6 +389,7 @@ class UdeaGameManager(
 
     companion object {
         val DefaultSystems = listOf(
+            SoundSystem::class,
             TransformSystem::class,
             CameraTrackSystem::class,
             BackgroundDrawSystem::class,
@@ -501,6 +511,8 @@ class GameAssetLoader(
             }
 
             "p" -> manager.load(path, ParticleEffect::class.java)
+
+            "wav", "ogg", "mp3" -> manager.load(path, Sound::class.java)
 
             else -> loaded = false
         }

@@ -4,17 +4,17 @@ import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.World.Companion.family
-import dev.wildware.udea.Vector2
-import dev.wildware.udea.ability.AbilityInfo
 import dev.wildware.udea.ability.AbilitySpec
 import dev.wildware.udea.ability.GameplayTag
 import dev.wildware.udea.ecs.component.ability.Abilities
+import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.gameScreen
 import dev.wildware.udea.getNetworkEntityOrNull
 import dev.wildware.udea.network.AbilityPacket
 import dev.wildware.udea.network.AbilityPacketInstantiator
 import dev.wildware.udea.processAndRemoveEach
+import dev.wildware.udea.remoteEntity
 
 class AbilitySystem : IntervalSystem() {
 
@@ -25,9 +25,18 @@ class AbilitySystem : IntervalSystem() {
         family.forEach { entity ->
             val abilities = entity[Abilities]
 
+
+            entity.getOrNull(Debug)?.addMessage("${abilities.abilities.map { it.ability.value.name }}")
+            entity.getOrNull(Debug)?.addMessage("${abilities.gameplayEffectSpecs.map { it.gameplayEffect.value.name }}")
+
+
             abilities.abilities.forEach {
-                if (it.ability.blockedBy.any { tag -> abilities.hasGameplayEffectTag(tag) }) {
-                    it.finish(cancelled = true)
+                context(world) {
+                    it.tick()
+
+                    if (it.ability.value.blockedBy.any { tag -> abilities.hasGameplayEffectTag(tag) }) {
+                        it.finish(cancelled = true)
+                    }
                 }
             }
         }
@@ -35,69 +44,57 @@ class AbilitySystem : IntervalSystem() {
         abilityQueue.processAndRemoveEach {
             val abilityId = it.abilityId
             context(world) {
-                val remoteSource = world.getNetworkEntityOrNull(it.source!!)
-                val remoteTarget = it.target?.let { t -> world.getNetworkEntityOrNull(t) }
-
-
-                if (remoteSource != null) {
-                    val ability = remoteSource[Abilities].findAbilityById(abilityId)
-                    doAbility(remoteSource, remoteTarget, it.targetPos!!, ability)
-                }
-            }
-
-            if (gameScreen.isServer) {
-                gameScreen.networkServerSystem!!.server.sendToAllTCP(
-                    AbilityPacket(
-                        abilityId,
-                        it.source,
-                        it.targetPos,
-                        it.target
-                    )
+                val remoteSource = world.getNetworkEntityOrNull(it.entity)
+                    ?: return@processAndRemoveEach
+                val spec = remoteSource[Abilities].findAbilityById(abilityId)
+                doAbility(remoteSource, spec)
+                println(
+                    "${if (gameScreen.isServer) "SERVER" else "CLIENT"} " +
+                            "Ability activated: $abilityId ${spec.ability.value.name} by ${it.entity} -> $remoteSource"
                 )
+
+                if (gameScreen.isServer) {
+                    gameScreen.networkServerSystem!!.server.sendToAllTCP(
+                        AbilityPacket(abilityId, remoteSource)
+                    )
+                }
             }
 
             AbilityPacketInstantiator.free(it)
         }
     }
 
-    fun activateAbilityByTag(abilityInfo: AbilityInfo, tag: GameplayTag) {
-        val abilities = abilityInfo.source[Abilities]
+    context(world: World)
+    fun activateAbilityByTag(entity: Entity, tag: GameplayTag) {
+        val abilities = entity.remoteEntity[Abilities]
         val ability = abilities.findAbilityByTag(tag)
 
-        if (ability != null) activateAbility(abilityInfo, ability)
+        if (ability != null) activateAbility(entity, ability)
     }
 
-    fun activateAbility(abilityInfo: AbilityInfo, spec: AbilitySpec) {
-        val networkSource = abilityInfo.source[Networkable].remoteEntity
-        val networkTarget = abilityInfo.target?.let { if (Networkable in it) it[Networkable].remoteEntity else null }
+    fun activateAbility(entity: Entity, spec: AbilitySpec) {
+        val networkEntity = entity[Networkable].remoteEntity
 
         if (gameScreen.isServer) {
             context(world) {
-                doAbility(networkSource, networkTarget, abilityInfo.targetPos, spec)
+                doAbility(networkEntity, spec)
             }
 
             gameScreen.networkServerSystem?.server?.sendToAllTCP(
                 AbilityPacket(
                     spec.id,
-                    networkSource,
-                    abilityInfo.targetPos,
-                    networkTarget
+                    networkEntity
                 )
             )
         } else {
             gameScreen.networkClientSystem?.client?.sendTCP(
-                AbilityPacket(
-                    spec.id,
-                    networkSource,
-                    abilityInfo.targetPos,
-                    networkTarget
-                )
+                AbilityPacket(spec.id, networkEntity)
             )
         }
     }
 
     context(_: World)
-    private fun doAbility(remoteSource: Entity, remoteTarget: Entity?, targetPos: Vector2, spec: AbilitySpec) {
-        spec.activate(AbilityInfo(remoteSource, targetPos, remoteTarget))
+    private fun doAbility(entity: Entity, spec: AbilitySpec) {
+        spec.activate(entity)
     }
 }

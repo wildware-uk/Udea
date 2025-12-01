@@ -13,6 +13,8 @@ class CharacterAttributeSet(
     private val initMana: Float = 0F,
     private val initArmour: Float = 0F,
     private val initMagicResist: Float = 0F,
+    private val initStrength: Float = 10F,
+    private val initHealthRegen: Float = 1F
 ) : AttributeSet() {
 
     @UdeaSync
@@ -38,8 +40,14 @@ class CharacterAttributeSet(
     }
 
     @UdeaSync
+    val strength = attribute("strength", initStrength)
+
+    @UdeaSync
     val armour = attribute("armour", initArmour)
 
     @UdeaSync
     val magicResist = attribute("magicResist", initMagicResist)
+
+    @UdeaSync
+    val healthRegen = attribute("healthRegen", initHealthRegen)
 }

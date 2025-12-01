@@ -1,9 +1,11 @@
 import dev.wildware.udea.ability.abilitySpec
 import dev.wildware.udea.ecs.component.base.debug
 import dev.wildware.udea.ecs.component.base.networkable
+import dev.wildware.udea.example.ability.AITag
 import dev.wildware.udea.example.ability.CharacterAttributeSet
 import dev.wildware.udea.example.ability.Slot
 import dev.wildware.udea.example.character.gameUnitAnimations
+import dev.wildware.udea.example.character.gameUnitSoundMap
 import dev.wildware.udea.example.component.Team
 import dev.wildware.udea.example.component.gameUnit
 import dev.wildware.udea.example.component.team
@@ -19,6 +21,11 @@ bundle {
             attack = "orc_attack",
             hit = "orc_hit",
         ),
+        sounds = gameUnitSoundMap(
+            attack = reference("character/orc_attack_cue"),
+            hit = reference("character/orc_hurt_cue"),
+            death = reference("character/orc_death_cue")
+        ),
         size = characterSize(0.2F, 0.2F),
         attributeSet = {
             CharacterAttributeSet(
@@ -29,7 +36,7 @@ bundle {
         },
         abilitySpecs = lazy {
             abilitySpec(
-                ability = Assets["ability/npc_melee"],
+                ability = reference("ability/npc_melee"),
                 tags = {
                     add(Slot.A)
                 }
@@ -38,7 +45,11 @@ bundle {
         components = lazy {
             networkable()
             team(Team.OrcTeam)
-            gameUnit()
+            gameUnit(
+                aiTags = {
+                    add(AITag.Fearless)
+                }
+            )
             debug()
         },
         spriteAnimationSet = reference("character/orc_animation_set"),
@@ -62,7 +73,8 @@ bundle {
                 sheet = reference("character/orc_attack"),
                 loop = false,
                 notifies = {
-                    animNotify(3, "attack_hit")
+                    animNotify(3, "swoosh")
+                    animNotify(4, "attack_hit")
                 }
             )
 
@@ -122,5 +134,37 @@ bundle {
         rows = 1,
         columns = 4,
         scale = orcScale
+    )
+
+    soundCue(
+        name = "orc_attack_cue",
+        sounds = {
+            add("/sounds/orc/orc_grunt_1.ogg")
+            add("/sounds/orc/orc_grunt_2.ogg")
+            add("/sounds/orc/orc_grunt_3.ogg")
+            add("/sounds/orc/orc_grunt_4.ogg")
+            add("/sounds/orc/orc_grunt_5.ogg")
+        }
+    )
+
+    soundCue(
+        name = "orc_hurt_cue",
+        sounds = {
+            add("/sounds/orc/orc_hurt_1.ogg")
+            add("/sounds/orc/orc_hurt_2.ogg")
+            add("/sounds/orc/orc_hurt_3.ogg")
+            add("/sounds/orc/orc_hurt_4.ogg")
+            add("/sounds/orc/orc_hurt_5.ogg")
+        }
+    )
+
+    soundCue(
+        name = "orc_death_cue",
+        sounds = {
+            add("/sounds/orc/orc_death_1.ogg")
+            add("/sounds/orc/orc_death_2.ogg")
+            add("/sounds/orc/orc_death_3.ogg")
+            add("/sounds/orc/orc_death_4.ogg")
+        }
     )
 }

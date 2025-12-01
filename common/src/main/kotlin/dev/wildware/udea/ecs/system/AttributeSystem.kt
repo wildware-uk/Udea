@@ -4,37 +4,48 @@ import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IteratingSystem
 import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.udea.ability.GameplayEffectSpec
+import dev.wildware.udea.ability.invoke
 import dev.wildware.udea.ecs.component.ability.Abilities
-import dev.wildware.udea.ecs.component.base.Debug
+import dev.wildware.udea.ecs.component.ability.Attributes
 import dev.wildware.udea.gameScreen
-import dev.wildware.udea.getOrNull
 import kotlin.time.Duration.Companion.seconds
 
 class AttributeSystem : IteratingSystem(
-    family = family { all(Abilities) }
+    family = family { all(Attributes, Abilities) }
 ) {
-    override fun onTickEntity(entity: Entity) {
+    override fun onTickEntity(entity: Entity): Unit = context(world) {
+        val attributes = entity[Attributes]
         val abilities = entity[Abilities]
 
-        entity.getOrNull(Debug)?.addMessage("${abilities.abilities.map { it.ability.name }}")
-        entity.getOrNull(Debug)?.addMessage("${abilities.gameplayEffectSpecs.map { it.gameplayEffect.name }}")
+        attributes.attributeSet.resetCurrentValues()
 
         abilities.gameplayEffectSpecs
-            .sortedBy { it.gameplayEffect.modifierType }
+            .sortedBy { it.gameplayEffect.value.value.modifierType }
             .forEach {
+                val gameplayEffect = it.gameplayEffect.value
                 it.period += gameScreen.delta
 
-                if ((it.period).toDouble().seconds > it.gameplayEffect.period) {
-                    it.period = 0F
+                if (gameplayEffect.target != null
+                    && gameplayEffect.modifierType != null
+                    && gameplayEffect.magnitude != null
+                ) {
+                    val targetAttribute = gameplayEffect.target(attributes.attributeSet)
 
-                    if (it.gameplayEffect.target != null
-                        && it.gameplayEffect.modifierType != null
-                        && it.gameplayEffect.magnitude != null
-                    ) {
-                        val targetAttribute = it.gameplayEffect.target.getter.call(abilities.attributeSet)
-                        targetAttribute.currentValue = it.gameplayEffect.modifierType
-                            .apply(targetAttribute.currentValue, it.gameplayEffect.magnitude.getValue(it))
-                            .coerceIn(targetAttribute.min.getValue(it), targetAttribute.max.getValue(it))
+                    if (!it.gameplayEffect.value.isPermanent) {
+                        targetAttribute.currentValue = gameplayEffect.modifierType
+                            .apply(targetAttribute.currentValue, gameplayEffect.magnitude.getValue(entity, it))
+                            .coerceIn(
+                                targetAttribute.min.getValue(entity, it),
+                                targetAttribute.max.getValue(entity, it)
+                            )
+                    } else if (gameplayEffect.period == null || it.period.toDouble().seconds >= gameplayEffect.period) {
+                        it.period = 0F
+                        targetAttribute.baseValue = gameplayEffect.modifierType
+                            .apply(targetAttribute.baseValue, gameplayEffect.magnitude.getValue(entity, it))
+                            .coerceIn(
+                                targetAttribute.min.getValue(entity, it),
+                                targetAttribute.max.getValue(entity, it)
+                            )
                     }
                 }
 
@@ -42,7 +53,9 @@ class AttributeSystem : IteratingSystem(
             }
 
         (abilities.gameplayEffectSpecs as MutableList<GameplayEffectSpec>).removeIf {
-            it.gameplayEffect.effectDuration.hasExpired(it)
+            it.gameplayEffect.value.effectDuration.hasExpired(it).also { expired ->
+                it.active = !expired
+            }
         }
     }
 }

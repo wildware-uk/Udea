@@ -11,6 +11,8 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.UniqueId
 import dev.wildware.udea.Vector2
+import dev.wildware.udea.ability.AbilitySpec
+import dev.wildware.udea.ability.AbilityTargeting
 import dev.wildware.udea.assets.Ability
 import dev.wildware.udea.assets.AssetReference
 import dev.wildware.udea.assets.Blueprint
@@ -23,15 +25,10 @@ import java.nio.ByteBuffer
 
 /**
  * Annotating classes with this type does the following:
- * - The class will be registered with the KotlinX serializer
+ * - The class will be registered with the KotlinX serializer (if [Serializable] annotation present)
  * - The class will be sent over the network
  * */
-annotation class UdeaNetworked(
-    /**
-     * Should this type be registered with the KotlinX serializer?
-     * */
-    val registerKotlinXSerializer: Boolean = true
-)
+annotation class UdeaNetworked
 
 @Serializable
 sealed interface NetworkPacket : Pool.Poolable
@@ -79,15 +76,11 @@ data class EntityUpdate(
 @UdeaNetworked
 data class AbilityPacket(
     var abilityId: Int = -1,
-    var source: Entity? = null,
-    var targetPos: Vector2? = null,
-    var target: Entity? = null
+    var entity: Entity = NONE
 ) : NetworkPacket {
     override fun reset() {
         abilityId = -1
-        source = null
-        targetPos = null
-        target = null
+        entity = NONE
     }
 }
 

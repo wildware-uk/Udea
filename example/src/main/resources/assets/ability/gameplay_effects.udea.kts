@@ -1,9 +1,8 @@
+import dev.wildware.udea.ability.*
 import dev.wildware.udea.ability.ModifierType.Additive
-import dev.wildware.udea.ability.duration
-import dev.wildware.udea.ability.gameplayEffect
-import dev.wildware.udea.ability.instant
-import dev.wildware.udea.ability.value
 import dev.wildware.udea.example.ability.*
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 bundle {
     gameplayEffect(
@@ -48,9 +47,27 @@ bundle {
         magnitude = value(Data.Heal),
         effectDuration = instant(),
     )
-    
+
+    gameplayEffect(
+        name = "heal_over_time",
+        target = CharacterAttributeSet::health,
+        modifierType = Additive,
+        magnitude = value(Data.Heal),
+        effectDuration = duration(Data.Duration),
+        period = 250.milliseconds
+    )
+
     gameplayEffect(
         name = "cooldown",
         effectDuration = duration(Data.Cooldown),
+    )
+
+    gameplayEffect(
+        name = "passive_health_regen",
+        effectDuration = infinite(),
+        target = CharacterAttributeSet::health,
+        modifierType = Additive,
+        magnitude = value(CharacterAttributeSet::healthRegen),
+        period = 1.seconds
     )
 }

@@ -8,10 +8,12 @@ import dev.wildware.udea.ability.AttributeSet
 import dev.wildware.udea.assets.dsl.ListBuilder
 import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.ecs.component.ability.abilities
+import dev.wildware.udea.ecs.component.ability.attributes
 import dev.wildware.udea.ecs.component.ai.PathfindingStyle
 import dev.wildware.udea.ecs.component.ai.agent
 import dev.wildware.udea.ecs.component.animation.animationMapHolder
 import dev.wildware.udea.ecs.component.animation.animations
+import dev.wildware.udea.ecs.component.audio.audioMapHolder
 import dev.wildware.udea.ecs.component.base.networkable
 import dev.wildware.udea.ecs.component.control.characterController
 import dev.wildware.udea.ecs.component.physics.body
@@ -24,6 +26,7 @@ fun ListBuilder<in Blueprint>.character(
     name: String,
     spriteAnimationSet: AssetReference<SpriteAnimationSet>,
     animations: CharacterAnimationMap,
+    sounds: AudioMap? = null,
     size: CharacterSize,
     attributeSet: () -> AttributeSet,
     components: LazyList<Component<out Any>> = emptyLazyList(),
@@ -35,6 +38,7 @@ fun ListBuilder<in Blueprint>.character(
             name,
             spriteAnimationSet,
             animations,
+            sounds,
             size,
             attributeSet,
             components,
@@ -51,6 +55,7 @@ fun character(
     name: String,
     spriteAnimationSet: AssetReference<SpriteAnimationSet>,
     animations: CharacterAnimationMap,
+    sounds: AudioMap? = null,
     size: CharacterSize,
     attributeSet: () -> AttributeSet,
     components: LazyList<Component<out Any>> = emptyLazyList(),
@@ -63,7 +68,7 @@ fun character(
             spriteAnimationSet = spriteAnimationSet,
             defaultAnimation = animations.idle
         )
-
+        sounds?.let { audioMapHolder(it) }
         body(
             type = BodyDef.BodyType.DynamicBody,
             linearDamping = 5.0F,
@@ -80,7 +85,8 @@ fun character(
             pathfindingStyle = PathfindingStyle.Walk
         )
         networkable()
-        abilities(attributeSet(), defaultAbilities = abilitySpecs)
+        attributes(attributeSet())
+        abilities(defaultAbilities = abilitySpecs)
         particleEffect()
         animations()
         characterController()

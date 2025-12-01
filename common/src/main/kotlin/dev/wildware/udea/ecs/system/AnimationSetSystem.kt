@@ -13,9 +13,11 @@ import dev.wildware.udea.ecs.UdeaSystem
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Editor
 import dev.wildware.udea.ecs.UdeaSystem.Runtime.Game
 import dev.wildware.udea.ecs.component.animation.Animations
+import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.ecs.component.base.Transform
 import dev.wildware.udea.ecs.component.render.AnimationHolder
 import dev.wildware.udea.gameScreen
+import dev.wildware.udea.getOrNull
 import dev.wildware.udea.use
 import dev.wildware.udea.ecs.component.render.SpriteRenderer as SpriteComponent
 
@@ -47,6 +49,8 @@ class AnimationSetSystem(
 
             currentAnimationInstance.finish()
         }
+
+        entity.getOrNull(Debug)?.addMessage("New Anim: $name", 1.0F)
 
         val animations = entity[Animations]
 

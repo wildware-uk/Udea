@@ -1,68 +1,101 @@
 package dev.wildware.udea.example.ability
 
 import com.github.quillraven.fleks.World
-import dev.wildware.udea.ability.AbilitySpec
 import dev.wildware.udea.ability.AbilityExec
-import dev.wildware.udea.ability.AbilityInfo
+import dev.wildware.udea.ability.AbilitySpec
+import dev.wildware.udea.ability.AbilityTargeting
 import dev.wildware.udea.ability.GameplayEffectSpec
 import dev.wildware.udea.assets.Assets
+import dev.wildware.udea.assets.SoundCue
+import dev.wildware.udea.assets.reference
 import dev.wildware.udea.ecs.component.ability.Abilities
+import dev.wildware.udea.ecs.component.ability.Attributes
 import dev.wildware.udea.ecs.component.animation.AnimationMapHolder
+import dev.wildware.udea.ecs.component.audio.AudioMapHolder
 import dev.wildware.udea.ecs.component.base.Debug
+import dev.wildware.udea.ecs.component.control.CharacterController
 import dev.wildware.udea.ecs.component.physics.Body
 import dev.wildware.udea.ecs.system.AnimationSetSystem
+import dev.wildware.udea.ecs.system.SoundSystem
 import dev.wildware.udea.example.character.GameUnitAnimationMap
+import dev.wildware.udea.example.character.GameUnitSoundMap
+import dev.wildware.udea.example.component.Team
+import dev.wildware.udea.example.getUnitsWithin
+import dev.wildware.udea.gameScreen
 import dev.wildware.udea.get
+import dev.wildware.udea.getOrNull
 import dev.wildware.udea.position
 
 class UnitMeleeAttack : AbilityExec() {
-    context(world: World, activation: AbilitySpec)
-    override fun activate(abilityInfo: AbilityInfo) {
-        val source = abilityInfo.source
-        val target = abilityInfo.target
-        val attackAnimation = source[AnimationMapHolder].animationMap<GameUnitAnimationMap>().attack
+    context(world: World, spec: AbilitySpec)
+    override fun activate() {
+        val attackAnimation = spec.entity[AnimationMapHolder].animationMap<GameUnitAnimationMap>().attack
 
-        if (target == null) {
-            return endAbility()
+        commitAbility()
+
+        spec.entity[Debug].addMessage("Animation Started", 0.5F)
+
+        spec.entity.getOrNull(AudioMapHolder)?.get<GameUnitSoundMap>()?.attack?.value?.let {
+            world.system<SoundSystem>().playSoundAtPosition(it, spec.entity.position)
         }
 
-        commitAbility(abilityInfo)
+        world.system<AnimationSetSystem>().setAnimation(spec.entity, attackAnimation)?.apply {
+            onNotify("swoosh") {
+                world.system<SoundSystem>().playSoundAtPosition(
+                    Assets.get<SoundCue>("sounds/melee_swoosh_sound_cue"),
+                    spec.entity.position
+                )
+            }
 
-        source[Debug].addMessage("Animation Started", 0.5F)
-
-        world.system<AnimationSetSystem>().setAnimation(source, attackAnimation)?.apply {
             onNotify("attack_hit") {
-                source[Debug].addMessage("Animation Hit", 0.5F)
-                val target = abilityInfo.target ?: return@onNotify
-                val diff = target.position.cpy().sub(source.position)
+                spec.targeting = findTarget() ?: return@onNotify
 
-                if (diff.len() > 0.5F) {
-                    source[Debug].addMessage("Missed!", 0.5F)
+                spec.entity[Debug].addMessage("Animation Hit", 0.5F)
+                val target = spec.getTarget<AbilityTargeting.Single>().target
+                val diff = target.position.cpy().sub(spec.entity.position)
+
+                if (diff.len() > 0.8F) {
+                    spec.entity[Debug].addMessage("Missed!", 0.5F)
                     endAbility()
                     return@onNotify
                 }
 
-                val damageEffect = GameplayEffectSpec(Assets["ability/damage"])
-                damageEffect.setSetByCallerMagnitude(Data.Damage, -10F)
-                damageEffect.addDynamicTag(Damage.Physical)
-                target[Abilities].applyGameplayEffect(source, target, damageEffect)
+                if(gameScreen.isServer) {
+                    val strength = spec.entity[Attributes].getAttributes<CharacterAttributeSet>().strength.currentValue
 
-                val stunEffect = GameplayEffectSpec(Assets["ability/stun"])
-                stunEffect.setSetByCallerMagnitude(Data.Duration, 0.5F)
-                target[Abilities].applyGameplayEffect(source, target, stunEffect)
+                    val damageEffect = GameplayEffectSpec(reference("ability/damage"))
+                    damageEffect.setSetByCallerMagnitude(Data.Damage, -strength)
+                    damageEffect.addDynamicTag(Damage.Physical)
+                    damageEffect.addDynamicCue(MeleeDamageCue)
+                    target[Abilities].applyGameplayEffect(spec.entity, target, damageEffect)
 
-                val knockbackEffect = GameplayEffectSpec(Assets["ability/knockback"])
-                knockbackEffect.setSetByCallerMagnitude(Data.Knockback, .5F)
-                target[Abilities].applyGameplayEffect(source, target, knockbackEffect)
+                    val stunEffect = GameplayEffectSpec(reference("ability/stun"))
+                    stunEffect.setSetByCallerMagnitude(Data.Duration, 0.5F)
+                    target[Abilities].applyGameplayEffect(spec.entity, target, stunEffect)
 
-                val knockback = diff.nor().scl(.3F)
-                target[Body].body.applyLinearImpulse(knockback, Zero, true)
+                    val knockbackEffect = GameplayEffectSpec(reference("ability/knockback"))
+                    knockbackEffect.setSetByCallerMagnitude(Data.Knockback, .1F)
+                    target[Abilities].applyGameplayEffect(spec.entity, target, knockbackEffect)
+
+                    val knockback = diff.nor().scl(.3F)
+                    target[Body].body.applyLinearImpulse(knockback, Zero, true)
+                }
             }
 
             onFinish {
-                source[Debug].addMessage("Animation Finished", 0.5F)
+                spec.entity[Debug].addMessage("Animation Finished", 0.5F)
                 endAbility()
             }
-        }
+        } ?: endAbility()
+    }
+
+    context(world: World, spec: AbilitySpec)
+    private fun findTarget(): AbilityTargeting.Single? {
+        val controller = spec.entity[CharacterController]
+
+        return getUnitsWithin(spec.entity, 1.0F)
+            .filter { it[Team] != spec.entity[Team] }
+            .minByOrNull { it.position.dst(spec.entity.position.cpy().add(controller.movement)) }
+            ?.let { AbilityTargeting.Single(it) }
     }
 }

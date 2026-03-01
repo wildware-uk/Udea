@@ -25,7 +25,7 @@ class CharacterAttributeSet(
     @UdeaSync
     val health = attribute("health", initHealth) {
         min = value(0F)
-        max = value(initHealth)
+        max = value(::maxHealth)
     }
 
     @UdeaSync

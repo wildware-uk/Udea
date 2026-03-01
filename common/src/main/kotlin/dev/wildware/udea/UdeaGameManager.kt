@@ -503,7 +503,7 @@ class GameAssetLoader(
 
     override fun loadAsset(assetFile: FileHandle, manager: AssetManager) {
         var loaded = true
-        val path = assetFile.path().substringAfter(baseDir.path())
+        val path = assetFile.path().substringAfter(baseDir.path() + "/")
         when (assetFile.extension()) {
             "png" -> manager.load(path, Texture::class.java)
             "kts" -> loadAsset(assetFile).forEach {

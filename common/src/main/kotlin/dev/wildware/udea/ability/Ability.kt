@@ -5,6 +5,8 @@ import com.github.quillraven.fleks.World
 import dev.wildware.udea.Vector2
 import dev.wildware.udea.assets.Ability
 import dev.wildware.udea.assets.AssetReference
+import dev.wildware.udea.assets.EventListener
+import dev.wildware.udea.dirty
 import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.ecs.component.ability.Abilities
 import dev.wildware.udea.get
@@ -66,6 +68,7 @@ data class AbilitySpec(
     var level: Int = 1,
 ) {
     var id = 0
+
     @Transient
     lateinit var entity: Entity
 
@@ -73,7 +76,8 @@ data class AbilitySpec(
     var activeInstance: AbilityExec = ability.value.exec.createInstance()
 
     @UdeaSync(inPlace = false)
-    var targeting: AbilityTargeting? = null
+    @PublishedApi
+    internal var target: AbilityTarget? by dirty(null)
 
     var cooldownHandle: EffectHandle = EffectHandle.Invalid
 
@@ -81,10 +85,23 @@ data class AbilitySpec(
     var active: Boolean = false
         internal set
 
+    @Transient
+    val targetListener = EventListener<AbilityTarget>()
+
     fun allTags() = ability.value.tags + tags
     fun getSetByCallerMagnitudes() = ability.value.setByCallerTags + setByCallerTags
 
-    inline fun <reified T : AbilityTargeting> getTarget() = targeting as T
+    inline fun <reified T : AbilityTarget> getTargetAs() = target as T
+
+    val onTargetSet = targetListener::registerListener
+
+    fun updateTarget(target: AbilityTarget?) {
+        this.target = target
+
+        if(target != null) {
+            targetListener.notify(target)
+        }
+    }
 
     context(world: World)
     fun finish(cancelled: Boolean = false) {
@@ -97,6 +114,7 @@ data class AbilitySpec(
         this.entity = entity
 
         if (!active && canCast()) {
+            this.target = null
             active = true
             activeInstance.activate()
         }
@@ -141,16 +159,16 @@ data class AbilitySpec(
 }
 
 @Serializable
-sealed interface AbilityTargeting {
+sealed interface AbilityTarget {
     @Serializable
-    data object None : AbilityTargeting
+    data object None : AbilityTarget
 
     @Serializable
-    data class Single(val target: Entity) : AbilityTargeting
+    data class Single(val target: Entity) : AbilityTarget
 
     @Serializable
-    data class Multi(val targets: List<Entity>) : AbilityTargeting
+    data class Multi(val targets: List<Entity>) : AbilityTarget
 
     @Serializable
-    data class Location(val position: Vector2) : AbilityTargeting
+    data class Location(val position: Vector2) : AbilityTarget
 }

@@ -3,7 +3,7 @@ package dev.wildware.udea.example.ability
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.ability.AbilityExec
 import dev.wildware.udea.ability.AbilitySpec
-import dev.wildware.udea.ability.AbilityTargeting
+import dev.wildware.udea.ability.AbilityTarget
 import dev.wildware.udea.ability.GameplayEffectSpec
 import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.assets.SoundCue
@@ -48,10 +48,10 @@ class UnitMeleeAttack : AbilityExec() {
             }
 
             onNotify("attack_hit") {
-                spec.targeting = findTarget() ?: return@onNotify
+                spec.updateTarget(findTarget() ?: return@onNotify)
 
                 spec.entity[Debug].addMessage("Animation Hit", 0.5F)
-                val target = spec.getTarget<AbilityTargeting.Single>().target
+                val target = spec.getTargetAs<AbilityTarget.Single>().target
                 val diff = target.position.cpy().sub(spec.entity.position)
 
                 if (diff.len() > 0.8F) {
@@ -90,12 +90,12 @@ class UnitMeleeAttack : AbilityExec() {
     }
 
     context(world: World, spec: AbilitySpec)
-    private fun findTarget(): AbilityTargeting.Single? {
+    private fun findTarget(): AbilityTarget.Single? {
         val controller = spec.entity[CharacterController]
 
         return getUnitsWithin(spec.entity, 1.0F)
             .filter { it[Team] != spec.entity[Team] }
             .minByOrNull { it.position.dst(spec.entity.position.cpy().add(controller.movement)) }
-            ?.let { AbilityTargeting.Single(it) }
+            ?.let { AbilityTarget.Single(it) }
     }
 }

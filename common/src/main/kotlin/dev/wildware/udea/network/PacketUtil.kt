@@ -4,13 +4,12 @@ import com.esotericsoftware.kryo.Kryo
 import com.github.quillraven.fleks.*
 import dev.wildware.udea.*
 import dev.wildware.udea.UdeaReflections.udeaReflections
-import dev.wildware.udea.ability.AttributeSet
-import dev.wildware.udea.ability.GameplayTag
 import dev.wildware.udea.assets.AssetReference
 import dev.wildware.udea.ecs.component.NetworkAuthority
 import dev.wildware.udea.ecs.component.NetworkComponent
 import dev.wildware.udea.ecs.component.SyncStrategy
 import dev.wildware.udea.ecs.component.SyncStrategy.Update
+import dev.wildware.udea.ecs.component.ability.Abilities
 import dev.wildware.udea.ecs.component.base.Blueprint
 import dev.wildware.udea.ecs.component.base.Dead
 import dev.wildware.udea.ecs.component.base.Networkable
@@ -18,19 +17,12 @@ import dev.wildware.udea.ecs.system.AbilitySystem
 import dev.wildware.udea.network.InPlaceSerializers.inPlaceSerializer
 import dev.wildware.udea.network.serde.AssetReferenceSerializer
 import dev.wildware.udea.network.serde.SerializableSerializer
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.InternalSerializationApi
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.cbor.Cbor
-import kotlinx.serialization.modules.PolymorphicModuleBuilder
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.serializer
 import java.lang.reflect.Modifier
 import kotlin.reflect.KClass
-import kotlin.reflect.full.findAnnotation
-import kotlin.reflect.full.functions
 import kotlin.reflect.full.hasAnnotation
 
 val udeaNetworkedTypes = udeaReflections
@@ -39,7 +31,7 @@ val udeaNetworkedTypes = udeaReflections
 
 val polymorphicTypes = udeaReflections
     .getTypesAnnotatedWith(UdeaNetworked::class.java)
-    .filter { it.isInterface || it.modifiers.and(Modifier.ABSTRACT) != 0}
+    .filter { it.isInterface || it.modifiers.and(Modifier.ABSTRACT) != 0 }
     .map { it.kotlin to udeaReflections.getSubTypesOf(it).map { it.kotlin } }
 
 fun Kryo.registerDefaultPackets() {
@@ -52,6 +44,7 @@ fun Kryo.registerDefaultPackets() {
     register(EntityDestroy::class.java).apply {
         instantiator = EntityDestroyInstantiator
     }
+    register(AbilityTargetPacket::class.java)
     register(EntityUpdate::class.java, EntityUpdateSerializer)
 
     register(Entity::class.java, SerializableSerializer)
@@ -120,6 +113,12 @@ fun World.processEntityCreate(create: EntityCreate, authority: NetworkAuthority)
 
 fun World.processEntityUpdate(update: EntityUpdate, authority: NetworkAuthority) {
     val remoteEntity = getNetworkEntityOrNull(update.entity) ?: return
+
+    if(authority == Client && !canClientUpdate(remoteEntity, update.clientId)) {
+        println("[WARN] A client attempted to update an entity that it didn't own!")
+        return
+    }
+
     val entitySnapshot = snapshotOf(remoteEntity)
     val networkComponents = entitySnapshot.components
         .filter { it.isNetworkable() && it.getNetworkData().shouldSync(Update, authority) }
@@ -142,8 +141,27 @@ fun World.processEntityDestroy(entityDestroy: EntityDestroy) {
     EntityDestroyInstantiator.free(entityDestroy)
 }
 
+context(world: World)
+private fun canClientUpdate(entity: Entity, clientId: Int): Boolean {
+    return entity[Networkable].owner == clientId
+}
+
+// TODO validate the sender!
 fun World.processAbilityPacket(packet: AbilityPacket) {
     system<AbilitySystem>().abilityQueue.add(packet)
+}
+
+context(world: World)
+fun processAbilityTargetPacket(packet: AbilityTargetPacket) {
+    val entity = world.getNetworkEntityOrNull(packet.entity) ?: return
+
+    if (!canClientUpdate(entity, packet.clientId)) {
+        println("[WARN] A client attempted to update an ability target that it didn't own!")
+        return
+    }
+
+    val ability = entity[Abilities].findAbilityById(packet.abilityId)
+    ability.updateTarget(packet.target)
 }
 
 fun Entity.toEntityUpdate(world: World, authority: NetworkAuthority): EntityUpdate {

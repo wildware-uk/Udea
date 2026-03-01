@@ -3,6 +3,7 @@ package dev.wildware.udea.assets
 
 import com.badlogic.gdx.math.Vector2
 import dev.wildware.udea.dsl.CreateDsl
+import dev.wildware.udea.processAndRemoveEach
 
 /**
  * An animation asset defines a list of keyframes, for a given value to change
@@ -30,6 +31,9 @@ data class Frame<T>(
     val name: String? = null
 )
 
+/**
+ * Event listeners only fire once
+ * */
 class EventListener<T> {
     private val listeners = mutableListOf<(T) -> Unit>()
 
@@ -38,7 +42,7 @@ class EventListener<T> {
     }
 
     fun notify(data: T) {
-        listeners.forEach { it(data) }
+        listeners.processAndRemoveEach { it(data) }
     }
 }
 

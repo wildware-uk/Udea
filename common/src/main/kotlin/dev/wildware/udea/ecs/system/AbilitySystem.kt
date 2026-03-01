@@ -4,17 +4,15 @@ import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.udea.*
 import dev.wildware.udea.ability.AbilitySpec
 import dev.wildware.udea.ability.GameplayTag
 import dev.wildware.udea.ecs.component.ability.Abilities
 import dev.wildware.udea.ecs.component.base.Debug
 import dev.wildware.udea.ecs.component.base.Networkable
-import dev.wildware.udea.gameScreen
-import dev.wildware.udea.getNetworkEntityOrNull
 import dev.wildware.udea.network.AbilityPacket
 import dev.wildware.udea.network.AbilityPacketInstantiator
-import dev.wildware.udea.processAndRemoveEach
-import dev.wildware.udea.remoteEntity
+import dev.wildware.udea.network.AbilityTargetPacket
 
 class AbilitySystem : IntervalSystem() {
 
@@ -33,6 +31,16 @@ class AbilitySystem : IntervalSystem() {
             abilities.abilities.forEach {
                 context(world) {
                     it.tick()
+
+
+                    if (it.target != null) {
+                        val targetProperty = it::target.delegateAs<DirtyProperty<*>>()
+                        if (targetProperty.observe() && !gameScreen.isServer) {
+                            gameScreen.networkClientSystem!!.client.sendTCP(
+                                AbilityTargetPacket(it.id, entity, it.target)
+                            )
+                        }
+                    }
 
                     if (it.ability.value.blockedBy.any { tag -> abilities.hasGameplayEffectTag(tag) }) {
                         it.finish(cancelled = true)
@@ -66,7 +74,7 @@ class AbilitySystem : IntervalSystem() {
 
     context(world: World)
     fun activateAbilityByTag(entity: Entity, tag: GameplayTag) {
-        val abilities = entity.remoteEntity[Abilities]
+        val abilities = entity[Abilities]
         val ability = abilities.findAbilityByTag(tag)
 
         if (ability != null) activateAbility(entity, ability)

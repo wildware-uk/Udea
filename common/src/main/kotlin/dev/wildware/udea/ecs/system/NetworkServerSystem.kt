@@ -46,7 +46,10 @@ class NetworkServerSystem(
                 override fun received(connection: Connection, obj: Any) {
 //                    println("[SERVER] received $obj")
                     when (obj) {
-                        is NetworkPacket -> inputQueue += obj
+                        is NetworkPacket -> {
+                            obj.clientId = connection.id
+                            inputQueue += obj
+                        }
                     }
                 }
             })
@@ -55,11 +58,12 @@ class NetworkServerSystem(
         }
     }
 
-    override fun onTick() {
+    override fun onTick() = context(world) {
         inputQueue.processAndRemoveEach { packet ->
             when (packet) {
                 is EntityUpdate -> world.processEntityUpdate(packet, NetworkAuthority.Client)
                 is AbilityPacket -> world.processAbilityPacket(packet)
+                is AbilityTargetPacket -> processAbilityTargetPacket(packet)
                 else -> {} //disregard other packets
             }
         }

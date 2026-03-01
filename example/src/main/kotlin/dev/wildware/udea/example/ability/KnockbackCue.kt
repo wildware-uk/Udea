@@ -8,7 +8,9 @@ import dev.wildware.udea.ability.GameplayEffectSpec
 import dev.wildware.udea.ecs.component.physics.Body
 import dev.wildware.udea.get
 import dev.wildware.udea.position
+import kotlinx.serialization.Serializable
 
+@Serializable
 object KnockbackCue : GameplayEffectCue {
     context(world: World)
     override fun onGameplayEffectApplied(

@@ -21,7 +21,6 @@ import dev.wildware.udea.example.ability.Debuffs
 import dev.wildware.udea.example.character.GameUnitAnimationMap
 import dev.wildware.udea.example.character.GameUnitSoundMap
 import dev.wildware.udea.example.component.GameUnit
-import dev.wildware.udea.gameScreen
 
 class GameUnitSystem : IteratingSystem(
     family { all(GameUnit, Abilities, CharacterController) }
@@ -35,10 +34,6 @@ class GameUnitSystem : IteratingSystem(
         val attributeSet = attributes.attributeSet as CharacterAttributeSet
 
         checkDead(gameUnit, attributeSet, entity, controller)
-
-        if(gameScreen.isServer) {
-            attributeSet.health.baseValue -= gameScreen.delta * 2F
-        }
 
         if (gameUnit.isDead) return
 

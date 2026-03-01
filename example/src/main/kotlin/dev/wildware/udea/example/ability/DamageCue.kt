@@ -13,7 +13,9 @@ import dev.wildware.udea.example.character.GameUnitSoundMap
 import dev.wildware.udea.get
 import dev.wildware.udea.getOrNull
 import dev.wildware.udea.position
+import kotlinx.serialization.Serializable
 
+@Serializable
 object DamageCue : GameplayEffectCue {
     context(world: World)
     override fun onGameplayEffectApplied(

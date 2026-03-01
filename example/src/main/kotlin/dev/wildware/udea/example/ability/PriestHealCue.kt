@@ -7,7 +7,9 @@ import dev.wildware.udea.ability.GameplayEffectSpec
 import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.example.assets.Effect
 import dev.wildware.udea.example.spawnEffect
+import kotlinx.serialization.Serializable
 
+@Serializable
 object PriestHealCue : GameplayEffectCue {
     context(world: World)
     override fun onGameplayEffectApplied(

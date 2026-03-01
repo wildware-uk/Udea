@@ -9,7 +9,11 @@
     
 
 A Kotlin+LibGDX+Fleks game engine for 2D games.
-    
+
+## 📖 Documentation
+
+Check out the [Udea Engine Documentation](docs/home.md) to get started!
+
 ## Features
 
 - Many built-in components, streamlining creation of games.

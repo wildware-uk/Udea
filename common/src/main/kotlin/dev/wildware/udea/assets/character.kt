@@ -5,6 +5,7 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.EntityTag
 import dev.wildware.udea.ability.AbilitySpec
 import dev.wildware.udea.ability.AttributeSet
+import dev.wildware.udea.ability.GameplayEffectSpec
 import dev.wildware.udea.assets.dsl.ListBuilder
 import dev.wildware.udea.dsl.CreateDsl
 import dev.wildware.udea.ecs.component.ability.abilities
@@ -31,6 +32,7 @@ fun ListBuilder<in Blueprint>.character(
     attributeSet: () -> AttributeSet,
     components: LazyList<Component<out Any>> = emptyLazyList(),
     abilitySpecs: LazyList<AbilitySpec> = emptyLazyList(),
+    defaultGameplayEffects: LazyList<GameplayEffectSpec> = emptyLazyList(),
     tags: List<EntityTag> = emptyList()
 ) {
     add(
@@ -43,6 +45,7 @@ fun ListBuilder<in Blueprint>.character(
             attributeSet,
             components,
             abilitySpecs,
+            defaultGameplayEffects,
             tags
         )
     )
@@ -60,6 +63,7 @@ fun character(
     attributeSet: () -> AttributeSet,
     components: LazyList<Component<out Any>> = emptyLazyList(),
     abilitySpecs: LazyList<AbilitySpec> = emptyLazyList(),
+    defaultGameplayEffects: LazyList<GameplayEffectSpec> = emptyLazyList(),
     tags: List<EntityTag> = emptyList()
 ) = Blueprint(
     components = lazy {
@@ -86,7 +90,7 @@ fun character(
         )
         networkable()
         attributes(attributeSet())
-        abilities(defaultAbilities = abilitySpecs)
+        abilities(abilitySpecs, defaultGameplayEffects)
         particleEffect()
         animations()
         characterController()

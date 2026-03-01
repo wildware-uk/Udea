@@ -8,7 +8,9 @@ import dev.wildware.udea.assets.Assets
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.ecs.system.SoundSystem
 import dev.wildware.udea.position
+import kotlinx.serialization.Serializable
 
+@Serializable
 object MeleeDamageCue : GameplayEffectCue {
 
     val meleeSoundCue = Assets.get<SoundCue>("sounds/melee_hit_sound_cue")

@@ -19,7 +19,10 @@ import kotlinx.serialization.Transient
 @Serializable
 data class Abilities(
     @Transient
-    val defaultAbilities: LazyList<AbilitySpec> = emptyLazyList()
+    val defaultAbilities: LazyList<AbilitySpec> = emptyLazyList(),
+
+    @Transient
+    val defaultGameplayEffects: LazyList<GameplayEffectSpec> = emptyLazyList()
 ) : Component<Abilities> {
 
     private var nextAbilitySpecId = 0
@@ -38,6 +41,9 @@ data class Abilities(
     override fun World.onAdd(entity: Entity) {
         defaultAbilities.get()
             .forEach { grantAbility(entity, it) }
+
+        defaultGameplayEffects.get()
+            .forEach { applyGameplayEffectToSelf(entity, it) }
     }
 
     context(world: World)

@@ -24,7 +24,7 @@ level(
         )
 
         entityDefinition(
-            blueprint = reference("character/orc"),
+            blueprint = reference("character/soldier"),
             components = lazy {
                 networkable(owner = -1)
                 player()
@@ -32,25 +32,25 @@ level(
             position = randomPos().sub(5F, 0F)
         )
 
-//        entityDefinition(
-//            blueprint = reference("character/priest"),
-//            components = lazy {
-//                aIUnit()
-//            },
-//            position = randomPos()
-//        )
+        entityDefinition(
+            blueprint = reference("character/priest"),
+            components = lazy {
+                aIUnit()
+            },
+            position = randomPos()
+        )
 
-//        repeat(5) {
-//            entityDefinition(
-//                blueprint = reference("character/orc"),
-//                components = lazy {
-//                    aIUnit()
-//                },
-//                position = randomPos().sub(5F, 0F)
-//            )
-//        }
-//
-//        repeat(10) {
+        repeat(5) {
+            entityDefinition(
+                blueprint = reference("character/orc"),
+                components = lazy {
+                    aIUnit()
+                },
+                position = randomPos().sub(5F, 0F)
+            )
+        }
+
+        repeat(10) {
             entityDefinition(
                 blueprint = reference("character/skeleton"),
                 components = lazy {
@@ -58,16 +58,16 @@ level(
                 },
                 position = randomPos().sub(-10F, 0F)
             )
-//        }
-//
-//        repeat(10) {
-//            entityDefinition(
-//                blueprint = reference("character/soldier"),
-//                components = lazy {
-//                    aIUnit()
-//                },
-//                position = randomPos().sub(0F, 5F)
-//            )
-//        }
+        }
+
+        repeat(10) {
+            entityDefinition(
+                blueprint = reference("character/soldier"),
+                components = lazy {
+                    aIUnit()
+                },
+                position = randomPos().sub(0F, 5F)
+            )
+        }
     }
 )

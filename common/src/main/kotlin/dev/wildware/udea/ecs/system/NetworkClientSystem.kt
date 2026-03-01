@@ -10,12 +10,14 @@ import dev.wildware.udea.ecs.component.base.Dead
 import dev.wildware.udea.ecs.component.base.Networkable
 import dev.wildware.udea.gameScreen
 import dev.wildware.udea.network.AbilityPacket
+import dev.wildware.udea.network.AbilityTargetPacket
 import dev.wildware.udea.network.CommandPacket
 import dev.wildware.udea.network.EntityCreate
 import dev.wildware.udea.network.EntityDestroy
 import dev.wildware.udea.network.EntityUpdate
 import dev.wildware.udea.network.NetworkPacket
 import dev.wildware.udea.network.processAbilityPacket
+import dev.wildware.udea.network.processAbilityTargetPacket
 import dev.wildware.udea.network.processEntityCreate
 import dev.wildware.udea.network.processEntityDestroy
 import dev.wildware.udea.network.processEntityUpdate
@@ -56,7 +58,7 @@ class NetworkClientSystem(world: World) : IntervalSystem(world = world) {
         client.connect(5000, host, tcpPort, udpPort)
     }
 
-    override fun onTick() {
+    override fun onTick() = context(world) {
         val networkUpdates = world.getNetworkUpdates()
         networkUpdates.forEach {
             client.sendUDP(it)
@@ -68,6 +70,7 @@ class NetworkClientSystem(world: World) : IntervalSystem(world = world) {
                 is EntityUpdate -> world.processEntityUpdate(packet, NetworkAuthority.Server)
                 is EntityDestroy -> world.processEntityDestroy(packet)
                 is AbilityPacket -> world.processAbilityPacket(packet)
+                is AbilityTargetPacket -> {} // IGNORE
                 is CommandPacket -> TODO()
             }
         }

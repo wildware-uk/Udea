@@ -18,66 +18,32 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Comitting in case computer blow up">
+    <list default="true" id="0388aa47-5351-440e-8c08-ca28a155538c" name="Changes" comment="Rewrote ability system and attributes system and game effect system">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/common/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/UdeaGameManager.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Ability.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Ability.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/AttributeSet.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/AttributeSet.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/Attributes.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectSpec.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectSpec.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayTag.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayTag.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/animationSets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/animationSets.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectCue.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ability/GameplayEffectCue.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/animations.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/animations.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/assets.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/blueprints.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/character.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/assets/character.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/ability/Abilities.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/ability/Abilities.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/control/CharacterController.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/control/CharacterController.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Body.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/physics/Body.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/component/ai/AIController.kt" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AbilitySystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AbilitySystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AnimationSetSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AnimationSetSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AttributeSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/AttributeSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/Box2DSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CameraTrackSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CameraTrackSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CharacterAnimationControllerSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/CharacterAnimationControllerSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/DebugDrawSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/DebugDrawSystem.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/NetworkClientSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/NetworkClientSystem.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/NetworkServerSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/ecs/system/NetworkServerSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/InPlaceSerializer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/InPlaceSerializer.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/PacketUtil.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/PacketUtil.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/packets.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/packets.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/serde/AssetReferenceSerializer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/network/serde/AssetReferenceSerializer.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/screen/UIScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/screen/UIScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/utils.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/dev/wildware/udea/utils.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/CharacterAttributeSet.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/CharacterAttributeSet.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/DamageCue.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/DamageCue.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/ExampleTags.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/ExampleTags.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/KnockbackCue.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/KnockbackCue.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/MeleeDamageCue.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/MeleeDamageCue.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/OrcSpinAttack.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/OrcSpinAttack.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/PriestHeal.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/PriestHeal.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/PriestHealCue.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/PriestHealCue.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/SoldierFireArrow.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/SoldierFireArrow.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/UnitMeleeAttack.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/UnitMeleeAttack.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/component/AIUnit.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/component/AIUnit.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/component/GameUnit.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/component/GameUnit.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/component/Team.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/component/Team.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/GameUnitSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/GameUnitSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/HealthbarSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/HealthbarSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/PlayerControlSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/PlayerControlSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/ProjectileSystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/ProjectileSystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/UnitAISystem.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/system/UnitAISystem.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/util.kt" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/util.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/ability/gameplay_effects.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/ability/gameplay_effects.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/ability/npc_melee.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/ability/npc_melee.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/ability/priest_abilities.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/ability/priest_abilities.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/ability/soldier_abilities.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/ability/soldier_abilities.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/blueprint/effect.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/blueprint/effect.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/character/orc.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/character/orc.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/character/priest.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/character/priest.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/character/soldier.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/character/soldier.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/config.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/config.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/effects/heal_effect.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/effects/heal_effect.udea.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/blueprint/player.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/blueprint/player.udea.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/example/src/main/resources/assets/level/test_level.udea.kts" beforeDir="false" afterPath="$PROJECT_DIR$/example/src/main/resources/assets/level/test_level.udea.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/dsl/UdeaSync.kt" beforeDir="false" afterPath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/dsl/UdeaSync.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/network/NetworkGenerator.kt" beforeDir="false" afterPath="$PROJECT_DIR$/gradle-plugin/src/main/kotlin/dev/wildware/udea/network/NetworkGenerator.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle/libs.versions.toml" beforeDir="false" afterPath="$PROJECT_DIR$/gradle/libs.versions.toml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -86,6 +52,10 @@
   </component>
   <component name="ComposerSettings">
     <execution />
+  </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="5381" />
+    <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
@@ -198,12 +168,12 @@
         <option value="Kotlin Annotation" />
         <option value="Kotlin Data Class" />
         <option value="Kotlin Interface" />
-        <option value="Kotlin File" />
         <option value="Kotlin JUnit3 Test Class" />
         <option value="Kotlin JUnit5 Test Class" />
         <option value="Kotlin Object" />
-        <option value="Kotlin Class" />
         <option value="Fleks Component" />
+        <option value="Kotlin File" />
+        <option value="Kotlin Class" />
       </list>
     </option>
   </component>
@@ -215,13 +185,7 @@
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GradleScriptDefinitionsStorage" workingDir="$PROJECT_DIR$" gradleHome="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13" javaHome="C:\Users\shaun\.jdks\corretto-17.0.8" gradleVersion="8.13">
-    <option name="jvmArguments">
-      <list>
-        <option value="-Dandroid.home=C:\Users\shaun\AppData\Local\Android\Sdk" />
-      </list>
-    </option>
-  </component>
+  <component name="GradleScriptDefinitionsStorage" workingDir="$PROJECT_DIR$" gradleHome="C:\Users\shaun\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13" javaHome="C:\Users\shaun\.jdks\corretto-17.0.8" gradleVersion="8.13" />
   <component name="HighlightingSettingsPerFile">
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.box2dlights/box2dlights/1.5/5115f6b01d36270c56b7a7ed41802f0c1f2ced4f/box2dlights-1.5-sources.jar!/box2dLight/RayHandler.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.badlogicgames.gdx/gdx-box2d/1.13.5/2de9564466414691f86b151ee65836cd9df733f8/gdx-box2d-1.13.5-sources.jar!/com/badlogic/gdx/physics/box2d/Body.java" root0="SKIP_INSPECTION" />
@@ -275,11 +239,6 @@
     <setting file="jar://$MAVEN_REPOSITORY$/io/github/quillraven/fleks/Fleks-jvm/2.13-SNAPSHOT/Fleks-jvm-2.13-SNAPSHOT.jar!/com/github/quillraven/fleks/Family.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$MAVEN_REPOSITORY$/io/github/quillraven/fleks/Fleks-jvm/2.13-SNAPSHOT/Fleks-jvm-2.13-SNAPSHOT.jar!/com/github/quillraven/fleks/IteratingSystem.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$MAVEN_REPOSITORY$/io/github/quillraven/fleks/Fleks-jvm/2.13-SNAPSHOT/Fleks-jvm-2.13-SNAPSHOT.jar!/com/github/quillraven/fleks/collection/MutableEntityBag.class" root0="SKIP_INSPECTION" />
-    <setting file="jar://$APPLICATION_HOME_DIR$/lib/app-client.jar!/com/intellij/ide/actions/CreateFileFromTemplateDialog.class" root0="SKIP_INSPECTION" />
-    <setting file="jar://$APPLICATION_HOME_DIR$/lib/app-client.jar!/com/intellij/ide/plugins/cl/PluginClassLoader.class" root0="SKIP_INSPECTION" />
-    <setting file="jar://$APPLICATION_HOME_DIR$/lib/app-client.jar!/com/intellij/mock/MockProject.class" root0="SKIP_INSPECTION" />
-    <setting file="jar://$APPLICATION_HOME_DIR$/lib/app-client.jar!/com/intellij/openapi/project/impl/DefaultProject.class" root0="SKIP_INSPECTION" />
-    <setting file="jar://$APPLICATION_HOME_DIR$/lib/app-client.jar!/com/intellij/openapi/project/impl/DefaultProjectImpl.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$APPLICATION_HOME_DIR$/lib/util-8.jar!/com/intellij/openapi/Disposable.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$APPLICATION_HOME_DIR$/lib/util-8.jar!/com/intellij/openapi/project/Project.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$APPLICATION_HOME_DIR$/lib/util-8.jar!/com/intellij/psi/search/GlobalSearchScope.class" root0="SKIP_INSPECTION" />
@@ -298,6 +257,10 @@
     <option name="FILTER_INFO" value="true" />
     <option name="FILTER_DEBUG" value="true" />
     <option name="CUSTOM_FILTER" />
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
   </component>
   <component name="PhpWorkspaceProjectConfiguration" interpreter_name="$USER_HOME$/php-8.3.3/php.exe" />
   <component name="ProblemsViewState">
@@ -378,6 +341,7 @@
     "Gradle.UtilTest.testToJvmQualifiedName.executor": "Run",
     "Gradle.level-editor [setupDependencies].executor": "Run",
     "Gradle.plugin [setupDependencies].executor": "Run",
+    "Gradle.udea [:example:dev.wildware.udea.example.ExampleGameKt.main()].executor": "Run",
     "Gradle.udea [build].executor": "Run",
     "Gradle.udea [publishToMavenLocal].executor": "Run",
     "Gradle.udea [setupDependencies].executor": "Run",
@@ -394,11 +358,15 @@
     "Gradle.udea:plugin [setupDependencies].executor": "Run",
     "Gradle.udea:scripts [build].executor": "Run",
     "Kotlin.ComponentsKt.executor": "Run",
+    "Kotlin.ExampleGameKt.executor": "Run",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary": "JUnit5",
     "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit3": "junit.framework.TestCase",
     "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit5": "",
@@ -417,7 +385,7 @@
     "project.structure.last.edited": "Modules",
     "project.structure.proportion": "0.13170731",
     "project.structure.side.proportion": "0.40726885",
-    "settings.editor.selected.configurable": "actions.on.save",
+    "settings.editor.selected.configurable": "ml.llm.LLMAIWorkflowsConfigurable",
     "to.speed.mode.migration.done": "true",
     "vue.rearranger.settings.migration": "true"
   },
@@ -427,6 +395,13 @@
     ]
   }
 }]]></component>
+  <component name="RecapSpentCounter">
+    <option name="endsOfQuotaMs" value="1772398800000" />
+    <option name="spentUsd" value="0.078285" />
+  </component>
+  <component name="RecapUselessUpdatesCounter">
+    <option name="suspendCountdown" value="0" />
+  </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\shaun\Workspace\udea\example\src\main\resources\assets\sounds\orc" />
@@ -488,8 +463,11 @@
       </ExternalSystemSettings>
       <ExternalSystemDebugServerProcess>false</ExternalSystemDebugServerProcess>
       <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
       <DebugAllEnabled>false</DebugAllEnabled>
       <RunAsTest>true</RunAsTest>
+      <GradleProfilingDisabled>false</GradleProfilingDisabled>
+      <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
     <configuration name="EntityCacheTest.timeDifference" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
@@ -512,8 +490,11 @@
       </ExternalSystemSettings>
       <ExternalSystemDebugServerProcess>false</ExternalSystemDebugServerProcess>
       <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
       <DebugAllEnabled>false</DebugAllEnabled>
       <RunAsTest>true</RunAsTest>
+      <GradleProfilingDisabled>false</GradleProfilingDisabled>
+      <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
     <configuration name="udea:common [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
@@ -534,8 +515,11 @@
       </ExternalSystemSettings>
       <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
       <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
       <DebugAllEnabled>false</DebugAllEnabled>
       <RunAsTest>false</RunAsTest>
+      <GradleProfilingDisabled>false</GradleProfilingDisabled>
+      <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
     <configuration name="udea:example [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
@@ -556,8 +540,11 @@
       </ExternalSystemSettings>
       <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
       <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
       <DebugAllEnabled>false</DebugAllEnabled>
       <RunAsTest>false</RunAsTest>
+      <GradleProfilingDisabled>false</GradleProfilingDisabled>
+      <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
     <configuration name="ExampleGameKt" type="JetRunConfigurationType" singleton="false" temporary="true" nameIsGenerated="true">
@@ -569,16 +556,6 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
-    <configuration default="true" type="lua.app" factoryName="Lua Application">
-      <option name="program" value="lua.exe" />
-      <option name="file" value="" />
-      <option name="workingDir" value="$PROJECT_DIR$/src/main/resources" />
-      <option name="debuggerType" value="1" />
-      <option name="params" value="" />
-      <option name="charset" value="UTF-8" />
-      <option name="showConsole" value="true" />
-      <method v="2" />
-    </configuration>
     <list>
       <item itemvalue="Gradle.Run Plugin" />
       <item itemvalue="Gradle.udea:example [build]" />
@@ -589,9 +566,9 @@
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Kotlin.ExampleGameKt" />
         <item itemvalue="Gradle.udea:example [build]" />
         <item itemvalue="Gradle.udea:common [build]" />
-        <item itemvalue="Kotlin.ExampleGameKt" />
         <item itemvalue="Gradle.EntityCacheTest.timeDifference" />
         <item itemvalue="Gradle.EntityCacheTest" />
       </list>
@@ -734,8 +711,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26830.84" />
-        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-IU-252.26830.84" />
+        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.30387.90" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.30387.90" />
       </set>
     </attachedChunks>
   </component>
@@ -876,7 +853,17 @@
       <workItem from="1764315691265" duration="45785000" />
       <workItem from="1764405979738" duration="37047000" />
       <workItem from="1764490012655" duration="35400000" />
-      <workItem from="1764575653081" duration="2172000" />
+      <workItem from="1764575653081" duration="17463000" />
+      <workItem from="1764793351961" duration="6761000" />
+      <workItem from="1764885877025" duration="3438000" />
+      <workItem from="1764973699686" duration="632000" />
+      <workItem from="1768328143640" duration="869000" />
+      <workItem from="1768498190941" duration="1973000" />
+      <workItem from="1769305564756" duration="2870000" />
+      <workItem from="1771160685942" duration="1055000" />
+      <workItem from="1771167958982" duration="5869000" />
+      <workItem from="1771811015616" duration="2256000" />
+      <workItem from="1772374035635" duration="828000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -1030,7 +1017,15 @@
       <option name="project" value="LOCAL" />
       <updated>1764351417086</updated>
     </task>
-    <option name="localTasksCounter" value="20" />
+    <task id="LOCAL-00020" summary="Rewrote ability system and attributes system and game effect system">
+      <option name="closed" value="true" />
+      <created>1764577872595</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1764577872595</updated>
+    </task>
+    <option name="localTasksCounter" value="21" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1109,7 +1104,8 @@
     <MESSAGE value="removed script cache" />
     <MESSAGE value="workspace" />
     <MESSAGE value="Comitting in case computer blow up" />
-    <option name="LAST_COMMIT_MESSAGE" value="Comitting in case computer blow up" />
+    <MESSAGE value="Rewrote ability system and attributes system and game effect system" />
+    <option name="LAST_COMMIT_MESSAGE" value="Rewrote ability system and attributes system and game effect system" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1123,14 +1119,6 @@
           <url>file://$PROJECT_DIR$/idea-plugin/src/main/kotlin/dev/wildware/udea/UdeaIconProvider.kt</url>
           <line>19</line>
           <option name="timeStamp" value="11" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="kotlin-function">
-          <url>file://$PROJECT_DIR$/example/src/main/kotlin/dev/wildware/udea/example/ability/CharacterAttributeSet.kt</url>
-          <line>10</line>
-          <properties class="dev.wildware.udea.example.ability.CharacterAttributeSet" method="&lt;init&gt;">
-            <option name="WATCH_EXIT" value="false" />
-          </properties>
-          <option name="timeStamp" value="57" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

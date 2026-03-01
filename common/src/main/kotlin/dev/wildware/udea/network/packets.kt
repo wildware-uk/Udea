@@ -10,10 +10,7 @@ import com.esotericsoftware.kryo.io.Output
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.UniqueId
-import dev.wildware.udea.Vector2
-import dev.wildware.udea.ability.AbilitySpec
-import dev.wildware.udea.ability.AbilityTargeting
-import dev.wildware.udea.assets.Ability
+import dev.wildware.udea.ability.AbilityTarget
 import dev.wildware.udea.assets.AssetReference
 import dev.wildware.udea.assets.Blueprint
 import dev.wildware.udea.assets.EmptyReference
@@ -31,7 +28,9 @@ import java.nio.ByteBuffer
 annotation class UdeaNetworked
 
 @Serializable
-sealed interface NetworkPacket : Pool.Poolable
+sealed class NetworkPacket : Pool.Poolable {
+    var clientId: Int = -1
+}
 
 @Serializable
 @UdeaNetworked
@@ -40,7 +39,7 @@ data class EntityCreate(
     var blueprint: AssetReference<@Contextual Blueprint>,
     var networkComponents: List<Component<out @Contextual Any>>,
     var tags: List<UniqueId<out @Contextual Any>>,
-) : NetworkPacket {
+) : NetworkPacket() {
     override fun reset() {
         entity = NONE
         blueprint = EmptyReference as AssetReference<Blueprint>
@@ -53,7 +52,7 @@ data class EntityCreate(
 @UdeaNetworked
 data class EntityDestroy(
     var entity: Entity = NONE,
-) : NetworkPacket {
+) : NetworkPacket() {
     override fun reset() {
         entity = Entity.NONE
     }
@@ -64,7 +63,7 @@ data class EntityUpdate(
     var entity: Entity = NONE,
     val byteBuffer: ByteBuffer = ByteBuffer.allocate(2048),
     var tags: List<UniqueId<out Any>> = emptyList()
-) : NetworkPacket {
+) : NetworkPacket() {
     override fun reset() {
         entity = NONE
         byteBuffer.clear()
@@ -77,10 +76,24 @@ data class EntityUpdate(
 data class AbilityPacket(
     var abilityId: Int = -1,
     var entity: Entity = NONE
-) : NetworkPacket {
+) : NetworkPacket() {
     override fun reset() {
         abilityId = -1
         entity = NONE
+    }
+}
+
+@Serializable
+@UdeaNetworked
+data class AbilityTargetPacket(
+    var abilityId: Int = -1,
+    var entity: Entity = NONE,
+    var target: AbilityTarget? = null
+): NetworkPacket() {
+    override fun reset() {
+        abilityId = -1
+        entity = NONE
+        target = null
     }
 }
 
@@ -95,7 +108,7 @@ val AbilityPacketInstantiator = PooledInstantiator<AbilityPacket> { AbilityPacke
 data class CommandPacket(
     var command: Command,
     var args: List<String>
-) : NetworkPacket {
+) : NetworkPacket() {
     override fun reset() {
         command = None
         args = emptyList()

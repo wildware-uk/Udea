@@ -16,6 +16,11 @@ junitJupiter = "5.8.1"
 # `kotlin` above is the single authoritative Kotlin version: udea-compiler-plugin and
 # udea-assets-compiler are pinned to it exactly (spec 7), and build-logic's
 # UdeaVersions.KOTLIN is asserted equal to it by a test.
+# It does NOT by itself control the kotlin-stdlib that resolves: Gradle takes the highest
+# requested version, and kotlinpoet and fleks below each request a newer one. Modules on
+# the `udea.kotlin-build-tool` convention - the jars loaded inside the compiler - pin the
+# resolved stdlib back to `kotlin` and prove it with `udeaVerifyKotlinPin`. Everything
+# else deliberately takes the higher stdlib, which is the supported direction.
 ksp = "2.2.10-2.0.2"
 kotlinpoet = "2.3.0"
 fleks = "2.14"

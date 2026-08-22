@@ -56,6 +56,47 @@ class SourceSpanTest {
     }
 
     @Test
+    fun `rejects a current-directory segment so one location has one spelling`() {
+        val failure = assertFailsWith<IllegalArgumentException> {
+            SourceSpan("moba/src/./Health.kt", 12, 5, 12, 24)
+        }
+        assertTrue("normalized" in failure.message.orEmpty(), failure.message.orEmpty())
+        assertFailsWith<IllegalArgumentException> { SourceSpan("./Health.kt", 1, 1, 1, 1) }
+    }
+
+    @Test
+    fun `rejects a repeated separator so one location has one spelling`() {
+        val failure = assertFailsWith<IllegalArgumentException> {
+            SourceSpan("moba/src//Health.kt", 12, 5, 12, 24)
+        }
+        assertTrue("normalized" in failure.message.orEmpty(), failure.message.orEmpty())
+    }
+
+    @Test
+    fun `of canonicalises dot segments and repeated separators to one span`() {
+        // The dedupe property the class exists for: three spellings of one location from
+        // three producers must be one `data class` value, not three.
+        val canonical = SourceSpan("moba/src/Health.kt", 1, 1, 1, 1)
+        assertEquals(canonical, SourceSpan.of("/ci/udea", "/ci/udea/moba/src/./Health.kt", 1, 1))
+        assertEquals(canonical, SourceSpan.of("/ci/udea", "/ci/udea/moba//src/Health.kt", 1, 1))
+        assertEquals(canonical, SourceSpan.of("/ci/udea", "/ci/udea/moba\\src\\Health.kt", 1, 1))
+    }
+
+    @Test
+    fun `relativize canonicalises a relative path it passes through`() {
+        assertEquals("moba/src/Health.kt", SourceSpan.relativize("/ci/udea", "moba/src/./Health.kt"))
+        assertEquals("moba/src/Health.kt", SourceSpan.relativize("/ci/udea", "moba//src/Health.kt"))
+    }
+
+    @Test
+    fun `a dot segment in the repo root does not defeat relativize`() {
+        assertEquals(
+            "moba/src/Health.kt",
+            SourceSpan.relativize("/ci/./udea", "/ci/udea/moba/src/Health.kt"),
+        )
+    }
+
+    @Test
     fun `rejects a blank path`() {
         assertFailsWith<IllegalArgumentException> { SourceSpan("   ", 1, 1, 1, 1) }
     }

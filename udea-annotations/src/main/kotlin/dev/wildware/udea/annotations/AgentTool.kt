@@ -45,39 +45,3 @@ public annotation class Arg(
     val description: String = "",
     val required: Boolean = true,
 )
-
-/**
- * Groups the [AgentTool] functions of one class into a single named MCP toolset.
- *
- * Consumed by the **`udea-codegen` KSP2 processor**, which emits one `ToolModule`
- * ServiceLoader entry per annotated class and prefixes the contained tools' names with
- * [name], so two subsystems can each expose a `describe` tool without colliding.
- *
- * @param name the toolset's name. Empty means "derive it from the class name".
- *
- * Retention is [AnnotationRetention.BINARY]: grouping is resolved into the generated
- * registry at build time.
- */
-@Target(AnnotationTarget.CLASS)
-@Retention(AnnotationRetention.BINARY)
-@MustBeDocumented
-public annotation class AgentToolset(
-    val name: String = "",
-)
-
-/**
- * Marks a property as agent-visible context that is neither replicated nor snapshotted.
- *
- * Consumed by the **`udea-codegen` KSP2 processor**, which adds the property to the
- * generated agent field table - so `describe_entity` can report it - while assigning it
- * no network bit index and no snapshot slot. It is the read-only counterpart to
- * [Net] with `agentWritable = true`: use it for derived or diagnostic state the agent
- * should observe but that must never enter the simulation's rewind or the wire.
- *
- * Retention is [AnnotationRetention.BINARY]: the field table is generated code, so the
- * agent reads values through `Replicator.getField` rather than reflecting on this marker.
- */
-@Target(AnnotationTarget.PROPERTY)
-@Retention(AnnotationRetention.BINARY)
-@MustBeDocumented
-public annotation class AgentState

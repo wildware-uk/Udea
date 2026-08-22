@@ -20,9 +20,28 @@ import kotlin.math.ln
  *
  * - [quantise] returns a value that fits in [bits] bits (as an unsigned field when
  *   `bits == 32`), so `writeBits(quantise(v), bits)` is always in range;
- * - `dequantise(quantise(v))` is within [maxError] of `v`, for every `v` the quantisation
- *   accepts, with values outside a bounded range clamped to that range first;
+ * - [quantise] is deterministic and total over the values it accepts: the same `v` gives the
+ *   same field on both ends of the wire, which is the only reason a desync is detectable;
+ * - [dequantise] returns a value inside the kind's represented domain, and
+ *   `dequantise(quantise(v))` is within [maxError] of `v` **once `v` has been reduced into
+ *   that domain**;
  * - the mapping is stable: it is the wire format, and changing it is a protocol break.
+ *
+ * The reduction is per-kind and is part of the wire format, so it is stated on each kind
+ * rather than assumed here. There are two shapes of it, and they are not interchangeable:
+ *
+ * - **Bounded** ([Norm8], [Pos], [Fixed]) — the domain is an interval and out-of-range values
+ *   **clamp** to the bound they ran past, the infinities included. Round-trip error is
+ *   `abs(decoded - v)` after that clamp.
+ * - **Periodic** ([Angle16]) — the domain is a circle and out-of-range values **wrap**. There
+ *   is no bound to clamp to: 7 radians is not "too large", it is 0.717 radians written
+ *   differently. Round-trip error is angular and must be measured with [angleDistance];
+ *   `abs(decoded - v)` reports 6.28 for a perfect round trip and is a measurement bug, not a
+ *   quantisation one.
+ *
+ * [Exact] reduces nothing and has zero error. Code that reports quantisation error over an
+ * arbitrary `Q` must therefore branch on the kind — with an exhaustive `when`, so that a
+ * kind added later fails to compile rather than being silently measured as a bounded float.
  */
 public sealed interface Q {
 
@@ -30,26 +49,45 @@ public sealed interface Q {
     public val bits: Int
 
     /**
-     * The largest difference between a value in range and its round-trip, in the value's own
-     * units. Half a quantisation step for the bounded kinds; zero for [Exact].
+     * The largest difference between a value in the represented domain and its round-trip,
+     * in the value's own units. Half a quantisation step for the bounded kinds, half a bucket
+     * for [Angle16] (where the difference is angular), zero for [Exact].
      *
      * This is the quantisation error alone. A `Float` result carries its own representation
-     * error on top, which matters only when [bits] approaches 32 over a wide range.
+     * error on top, which matters only when [bits] approaches 32 over a wide range, or when
+     * the caller's angle is large enough that one ulp of it exceeds a bucket.
      */
     public val maxError: Float
 
-    /** Packs [value] into the low [bits] bits. Out-of-range values are clamped, not wrapped. */
+    /**
+     * Packs [value] into the low [bits] bits.
+     *
+     * A value outside the represented domain is reduced into it, never rejected, and how it
+     * is reduced is the kind's own decision: the bounded kinds clamp, [Angle16] wraps. See
+     * the kind, and the two shapes described on [Q] itself.
+     *
+     * @throws IllegalArgumentException for a value no bit pattern of this kind could mean:
+     *   NaN for every kind but [Exact], and the infinities for [Angle16], which has no bound
+     *   for them to clamp to. Bounded kinds do accept the infinities, and clamp them.
+     */
     public fun quantise(value: Float): Int
 
-    /** The inverse of [quantise]. Bits above [bits] in [raw] are ignored. */
+    /**
+     * The inverse of [quantise]. Bits above [bits] in [raw] are ignored, so a field read out
+     * of a wider word needs no masking of its own.
+     *
+     * The result is always inside the represented domain: within `[min, max]` for a bounded
+     * kind, within `[0, 2π)` for [Angle16].
+     */
     public fun dequantise(raw: Int): Float
 
     /**
      * No quantisation: all 32 bits of the IEEE-754 encoding.
      *
      * The escape hatch for a field where any loss is wrong, and the only kind that accepts
-     * NaN and the infinities — the bounded kinds reject NaN, because there is no bit pattern
-     * in a range mapping that could mean it.
+     * NaN: no other kind has a bit pattern that could mean it. It is also the only kind that
+     * carries an infinity through — the bounded kinds clamp one to the bound it ran past, and
+     * [Angle16] rejects it outright.
      */
     public data object Exact : Q {
         override val bits: Int get() = 32
@@ -80,8 +118,21 @@ public sealed interface Q {
      * two. That also means [dequantise] always returns a value in `[0, 2π)`, so a
      * round-tripped angle equals the input modulo a turn, not bit for bit.
      *
+     * The wrap is by `floor`, not by remainder, so a negative angle lands on the facing it
+     * names rather than in a negative bucket a mask would have to rescue: -1 radian is the
+     * facing 2π - 1 ≈ 5.2832 radians, and both quantise to bucket 55106. (Not to be confused
+     * with 5.28 radians, which is a different facing 0.0032 radians away and lands 34 buckets
+     * off, at 55072 — the wrap is exact, not approximate.)
+     *
      * The error is π/65536 ≈ 0.0027°, which is under a pixel of sprite rotation at any
      * sane sprite size. Non-finite angles are rejected: there is no bucket for them.
+     *
+     * The wrap is exact to within [maxError] only while the caller's `Float` still resolves
+     * an angle that finely — one ulp of 800 radians is already a whole bucket, so an
+     * unwrapped rotation accumulator that has run to thousands of radians loses precision in
+     * its own representation before it reaches here. That loss is the caller's, not the
+     * wire's: [quantise] stays deterministic at every magnitude, so both ends still agree on
+     * the bucket and no desync can come of it.
      */
     public data object Angle16 : Q {
         override val bits: Int get() = ANGLE16_BITS
@@ -168,8 +219,16 @@ public sealed interface Q {
          * `udea-codegen` calls this with the annotation's literal arguments, which is why
          * the parameter order matches the annotation rather than [Fixed]'s. The result's
          * [Q.bits] is exactly the [bits] asked for.
+         *
+         * [min] and [max] have **no defaults**, and must not be given any, for the same reason
+         * `@Q` itself has none: a default range is a wrong range that compiles. `[0, 1]` is the
+         * one range that looks harmless and is almost never what a field wants — a rotation in
+         * `[-π, π]` written as `declared(12)` would clamp every negative angle to 0 and every
+         * angle over 1 radian to 1, quantise the survivors 6x finer than asked, and produce a
+         * stream that decodes without error into a world where nothing faces left. There is no
+         * range this function can guess that is safer than making the caller state one.
          */
-        public fun declared(bits: Int, min: Float = 0f, max: Float = 1f): Fixed {
+        public fun declared(bits: Int, min: Float, max: Float): Fixed {
             require(bits in 1..32) { "bits must be in 1..32, was $bits" }
             require(min.isFinite() && max.isFinite()) {
                 "quantisation bounds must be finite, were [$min, $max]"
@@ -200,7 +259,7 @@ internal fun levelsFor(bits: Int): Long = (1L shl bits) - 1L
  * Both slacks absorb the float rounding in [step] itself, and both are load-bearing. A step
  * derived from a bit count must resolve back to *that* bit count: `(max - min) / 3` rounded
  * to a `Float` divides the range 3.0000000086 times, and a naive `ceil` turns that into
- * four levels and `@Q(bits = 2)` into a 3-bit field — a silent protocol split between two
+ * four levels and a `@Q(bits = 2, ...)` field into a 3-bit one — a silent protocol split between two
  * builds. [SLACK] is relative, so it scales with the ratio; the second one is on the log,
  * for the same reason at a power-of-two boundary.
  *
@@ -247,7 +306,20 @@ internal fun dequantiseFixed(raw: Int, min: Float, max: Float, bits: Int): Float
     return (min + (max.toDouble() - min) * level / levels).toFloat()
 }
 
-/** Wraps [radians] into one turn and maps it onto 16 buckets-per-turn. */
+/**
+ * Wraps [radians] into one turn and maps it onto `2^16` buckets-per-turn.
+ *
+ * `floor`, not `%`: the remainder of a negative angle is negative, and a negative bucket is
+ * only ever right by accident of two's complement.
+ *
+ * The mask on the way out is **load-bearing, not defensive**. `floor` leaves `wrapped` in
+ * `[0, 1)`, but `Math.round` rounds half up, so any `wrapped` above `1 - 0.5/2^16` — the last
+ * half-bucket of the turn, which every angle just short of a full turn lands in — rounds to
+ * `2^16`, one past the last bucket. Without the mask this function returns a value that does
+ * not fit in the 16 bits [Q.Angle16] advertises, breaking `Q`'s own width guarantee and
+ * corrupting the field after it in the packet. The mask folds `2^16` back to bucket 0, which
+ * is the same angle. Deleting it turns two tests in `QuantisationBoundaryTest` red.
+ */
 internal fun quantiseAngle16(radians: Float): Int {
     require(radians.isFinite()) {
         "cannot quantise a non-finite angle ($radians); there is no bucket for it"

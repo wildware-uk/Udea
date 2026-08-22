@@ -176,15 +176,22 @@ class NetIdIndexTest {
     fun `resolveOrNull is a constant-time array read`() {
         // Replaces common/utils.kt:35-36, which resolved an inbound network entity with a
         // linear `find` over the Networkable family, once per packet. A linear scan at
-        // 64 000 live ids is roughly a thousand times the cost it is at 64, so it cannot
-        // pass a 2x bound however the timing noise falls.
+        // 64 000 live ids is roughly a thousand times the cost it is at 64.
+        //
+        // The bound is deliberately loose. All this has to do is separate O(1) from O(n),
+        // and that gap is ~1000x; a tight bound buys no extra detection power and imports
+        // wall-clock risk instead — the large arm's working set is ~12KB across three arrays,
+        // so an SMT sibling thrashing L1 for the duration of the phase can inflate the ratio
+        // for reasons that have nothing to do with the code under test, and a sustained one
+        // defeats the best-of-TIMING_TRIALS minimum.
         val smallNanos = timeResolutions(liveIds = 64)
         val largeNanos = timeResolutions(liveIds = 64_000)
 
         assertTrue(
-            largeNanos <= smallNanos * 2,
+            largeNanos <= smallNanos * MAX_SCALING_FACTOR,
             "resolution at 64 000 live ids took ${largeNanos}ns vs ${smallNanos}ns at 64: " +
-                "that is ${largeNanos.toDouble() / smallNanos}x, so resolution is not O(1)",
+                "that is ${largeNanos.toDouble() / smallNanos}x, over ${MAX_SCALING_FACTOR}x, " +
+                "so resolution is not O(1)",
         )
     }
 
@@ -259,5 +266,13 @@ class NetIdIndexTest {
         const val SAMPLES: Int = 64
         const val TIMING_REPEATS: Int = 2_000
         const val TIMING_TRIALS: Int = 9
+
+        /**
+         * How much slower resolution at 64 000 live ids may be than at 64.
+         *
+         * Separating O(1) from O(n) only needs to catch a ~1000x regression, so this sits far
+         * outside any cache, SMT or thermal noise the ratio can realistically pick up.
+         */
+        const val MAX_SCALING_FACTOR: Int = 10
     }
 }

@@ -37,6 +37,12 @@ interface dev.wildware.udea.core.replication.BitWriter
   fun writeInt(value: kotlin.Int): kotlin.Unit
   fun writeLong(value: kotlin.Long): kotlin.Unit
 
+value class dev.wildware.udea.core.replication.ComponentTypeId
+  val raw: kotlin.Int
+  fun equals(other: kotlin.Any?): kotlin.Boolean
+  fun hashCode(): kotlin.Int
+  fun toString(): kotlin.String
+
 value class dev.wildware.udea.core.replication.FieldMask
   internal val bits: kotlin.Long
   fun equals(other: kotlin.Any?): kotlin.Boolean
@@ -91,9 +97,9 @@ object dev.wildware.udea.core.replication.MaskOps
 
 interface dev.wildware.udea.core.replication.Replicator
   val allMask: dev.wildware.udea.core.replication.FieldMask
-  val fieldNames: kotlin.Array<kotlin.String>
+  val fieldNames: kotlin.collections.List<kotlin.String>
   val netMask: dev.wildware.udea.core.replication.FieldMask
-  val typeId: kotlin.Int
+  val typeId: dev.wildware.udea.core.replication.ComponentTypeId
   fun apply(store: dev.wildware.udea.core.replication.FieldStore, slot: kotlin.Int, component: T, mask: dev.wildware.udea.core.replication.FieldMask): kotlin.Unit
   fun capture(component: T, store: dev.wildware.udea.core.replication.FieldStore, slot: kotlin.Int): kotlin.Unit
   fun diff(store: dev.wildware.udea.core.replication.FieldStore, slotA: kotlin.Int, slotB: kotlin.Int): dev.wildware.udea.core.replication.FieldMask

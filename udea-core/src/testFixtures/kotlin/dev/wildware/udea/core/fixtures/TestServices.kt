@@ -3,17 +3,15 @@ package dev.wildware.udea.core.fixtures
 import dev.wildware.udea.core.Cue
 import dev.wildware.udea.core.CueSink
 import dev.wildware.udea.core.EngineConfig
-import dev.wildware.udea.core.EventBus
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.GameContextBuilder
 import dev.wildware.udea.core.NetRole
 import dev.wildware.udea.core.PhysicsWorld
 import dev.wildware.udea.core.RngService
 import dev.wildware.udea.core.RngStream
+import dev.wildware.udea.core.SceneId
 import dev.wildware.udea.core.SceneManager
-import dev.wildware.udea.core.Subscription
 import dev.wildware.udea.core.gameContext
-import kotlin.reflect.KClass
 
 /**
  * Working implementations of the services `GameContext` names, for tests.
@@ -81,15 +79,15 @@ public class RecordingPhysicsWorld : PhysicsWorld {
 }
 
 /** Holds a requested scene until [applyPending], which is what the SimBarrier will do. */
-public class QueueingSceneManager(initialScene: String? = null) : SceneManager {
+public class QueueingSceneManager(initialScene: SceneId? = null) : SceneManager {
 
-    override var activeSceneId: String? = initialScene
+    override var activeSceneId: SceneId? = initialScene
         private set
 
-    public var pendingSceneId: String? = null
+    public var pendingSceneId: SceneId? = null
         private set
 
-    override fun requestScene(sceneId: String) {
+    override fun requestScene(sceneId: SceneId) {
         pendingSceneId = sceneId
     }
 
@@ -99,29 +97,6 @@ public class QueueingSceneManager(initialScene: String? = null) : SceneManager {
         activeSceneId = pending
         pendingSceneId = null
         return true
-    }
-}
-
-/** A real, synchronous event bus: handlers run in subscription order, during `publish`. */
-public class SimpleEventBus : EventBus {
-
-    private val handlers = LinkedHashMap<KClass<*>, MutableList<(Any) -> Unit>>()
-
-    override fun publish(event: Any) {
-        val list = handlers[event::class] ?: return
-        for (handler in list.toList()) handler(event)
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    override fun <E : Any> subscribe(type: KClass<E>, handler: (E) -> Unit): Subscription {
-        val erased = handler as (Any) -> Unit
-        val list = handlers.getOrPut(type) { ArrayList() }
-        list += erased
-        return object : Subscription {
-            override fun cancel() {
-                list -= erased
-            }
-        }
     }
 }
 
@@ -154,7 +129,6 @@ public fun testGameContext(
     rng = DeterministicRngService(config.seed)
     physics = RecordingPhysicsWorld()
     scenes = QueueingSceneManager()
-    events = SimpleEventBus()
     cues = RecordingCueSink()
     configure()
 }

@@ -1,7 +1,6 @@
 package dev.wildware.udea.core
 
 import dev.wildware.udea.core.identity.NetId
-import kotlin.reflect.KClass
 
 /**
  * The services [GameContext] names.
@@ -79,26 +78,29 @@ public interface PhysicsWorld {
  */
 public interface SceneManager {
     /** The scene currently simulating, or `null` before the first scene is active. */
-    public val activeSceneId: String?
+    public val activeSceneId: SceneId?
 
     /** Queues a swap to [sceneId]. Takes effect at the top of the next tick. */
-    public fun requestScene(sceneId: String)
-}
-
-/** Handle returned by [EventBus.subscribe]. Closing it stops delivery. */
-public interface Subscription {
-    public fun cancel()
+    public fun requestScene(sceneId: SceneId)
 }
 
 /**
- * In-simulation event delivery. Events are delivered within the tick that published them, to
- * subscribers registered before it began, so ordering is a function of subscription order and
- * not of wall time.
+ * Names a scene to [SceneManager].
+ *
+ * A value class rather than a `String` so scene identity has exactly one declaration to
+ * narrow to `AssetId` when the asset pipeline lands, instead of a `String` to chase through
+ * every module then. It is *not* typo detection: `SceneId("levle_1")` still compiles, and the
+ * did-you-mean diagnostic the spec mandates comes from build-time asset validation, not from
+ * this type. What it buys today is that a scene name cannot be passed where any other string
+ * is meant, and vice versa.
  */
-public interface EventBus {
-    public fun publish(event: Any)
+@JvmInline
+public value class SceneId(public val value: String) {
+    init {
+        require(value.isNotEmpty()) { "a scene id must not be empty" }
+    }
 
-    public fun <E : Any> subscribe(type: KClass<E>, handler: (E) -> Unit): Subscription
+    override fun toString(): String = value
 }
 
 /**
@@ -109,10 +111,26 @@ public interface EventBus {
  * inside `world.update`. A cue is not simulation state and never enters a snapshot.
  */
 public data class Cue(
-    public val id: Int,
+    /** Which presentation effect this cue asks for. */
+    public val id: CueId,
+    /** The tick the simulation emitted it on. */
     public val tick: Tick,
+    /** The entity it came from, or [NetId.NONE] for a world-level cue. */
     public val source: NetId = NetId.NONE,
 )
+
+/**
+ * Identifies which presentation effect a [Cue] asks for.
+ *
+ * Distinct at compile time from every other `Int` in the engine — an entity count, a field
+ * index, a component type id — so `Cue(id = entityCount, ...)` stops compiling. `udea-render`
+ * and audio switch on this to decide what to play, which makes it a domain identity rather
+ * than a number.
+ */
+@JvmInline
+public value class CueId(public val raw: Int) {
+    override fun toString(): String = "CueId($raw)"
+}
 
 /** Where [Cue]s go. `udea-render` and audio drain it; the simulation only writes. */
 public interface CueSink {

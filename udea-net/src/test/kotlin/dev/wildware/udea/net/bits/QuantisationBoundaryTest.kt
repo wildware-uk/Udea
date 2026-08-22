@@ -4,6 +4,7 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
@@ -24,6 +25,28 @@ class QuantisationBoundaryTest {
         writer.writeFixed(value, min, max, bits)
         reader.reset()
         return reader.readFixed(min, max, bits)
+    }
+
+    /**
+     * `Q`'s round-trip contract, stated as code: `decoded` is within `maxError` of `expected`
+     * once `expected` has been reduced into the kind's own domain.
+     *
+     * The reduction is the half a caller cannot guess, so it is spelled out per kind here.
+     * An exhaustive `when` rather than an `if (q === Q.Angle16)`: a kind added later fails to
+     * compile at this line instead of being silently measured as a bounded float, which is
+     * the reason [Q] is sealed at all.
+     */
+    private fun roundTripError(q: Q, expected: Float, decoded: Float): Float = when (q) {
+        // Wrapping: angleDistance performs the reduction as part of measuring, because a
+        // difference of one turn is a difference of nothing.
+        is Q.Angle16 -> angleDistance(decoded, expected)
+        // Clamping: the reduction is a coerce, and it is what makes an out-of-range write
+        // land on a bound rather than exceed the bound's own error.
+        is Q.Norm8 -> abs(decoded - expected.coerceIn(0f, 1f))
+        is Q.Pos -> abs(decoded - expected.coerceIn(Q.Pos.MIN, Q.Pos.MAX))
+        is Q.Fixed -> abs(decoded - expected.coerceIn(q.min, q.max))
+        // No reduction and no error.
+        is Q.Exact -> abs(decoded - expected)
     }
 
     @Test
@@ -69,10 +92,14 @@ class QuantisationBoundaryTest {
         assertFailsWith<IllegalArgumentException> { writer.reset(); writer.writeNorm8(Float.NaN) }
         assertFailsWith<IllegalArgumentException> { Q.Pos.quantise(Float.NaN) }
         assertFailsWith<IllegalArgumentException> { Q.Norm8.quantise(Float.NaN) }
+        assertFailsWith<IllegalArgumentException> { Q.Fixed(0f, 1f, 0.1f).quantise(Float.NaN) }
+        assertFailsWith<IllegalArgumentException> { Q.declared(12, -5f, 5f).quantise(Float.NaN) }
     }
 
     @Test
     fun `an angle rejects the values that have no place on a circle`() {
+        // Not a clamp and not a wrap: an infinity is not a direction, and unlike a bounded
+        // kind an angle has no bound to send it to, so it must fail loudly instead.
         assertFailsWith<IllegalArgumentException> { writer.reset(); writer.writeAngle16(Float.NaN) }
         assertFailsWith<IllegalArgumentException> {
             writer.reset(); writer.writeAngle16(Float.POSITIVE_INFINITY)
@@ -80,6 +107,9 @@ class QuantisationBoundaryTest {
         assertFailsWith<IllegalArgumentException> {
             writer.reset(); writer.writeAngle16(Float.NEGATIVE_INFINITY)
         }
+        assertFailsWith<IllegalArgumentException> { Q.Angle16.quantise(Float.NaN) }
+        assertFailsWith<IllegalArgumentException> { Q.Angle16.quantise(Float.POSITIVE_INFINITY) }
+        assertFailsWith<IllegalArgumentException> { Q.Angle16.quantise(Float.NEGATIVE_INFINITY) }
     }
 
     @Test
@@ -149,14 +179,24 @@ class QuantisationBoundaryTest {
     }
 
     @Test
-    fun `the presets cost the bits they advertise and honour their own error bound`() {
+    fun `every kind costs the bits it advertises and honours its bound after its own reduction`() {
+        // Half these values are outside the kind's domain on purpose: the contract is that
+        // the reduction happens first and the error bound holds after it, and a kind that
+        // reduced the wrong way (an angle clamped, a position wrapped) is exactly what this
+        // has to catch.
         val cases = listOf<Pair<Q, Float>>(
             Q.Norm8 to 0.37f,
+            Q.Norm8 to 2f,
+            Q.Norm8 to -1f,
             Q.Pos to -517.25f,
             Q.Pos to Q.Pos.MIN,
             Q.Pos to Q.Pos.MAX,
+            Q.Pos to 1e9f,
             Q.Angle16 to 2.5f,
+            Q.Angle16 to 7f,
+            Q.Angle16 to -0.5f,
             Q.Exact to 12345.678f,
+            Q.Fixed(-100f, -50f, step = 0.5f) to -73.25f,
         )
         for ((q, value) in cases) {
             writer.reset()
@@ -164,12 +204,142 @@ class QuantisationBoundaryTest {
             assertEquals(q.bits.toLong(), writer.bitsWritten, "$q must cost ${q.bits} bits")
             reader.reset()
             val decoded = reader.readQ(q)
-            val error = if (q === Q.Angle16) angleDistance(decoded, value) else abs(decoded - value)
+            val error = roundTripError(q, value, decoded)
             assertTrue(
                 error <= q.maxError + Math.ulp(decoded),
                 "$q round-tripped $value to $decoded, error $error over ${q.maxError}",
             )
         }
+    }
+
+    @Test
+    fun `the wrap point is a seam, not a cliff`() {
+        // The one place a clamp would be visibly wrong. 2pi minus a hair is next door to
+        // zero, so the last bucket must be one step from the first and not a whole turn.
+        val bucket = (TWO_PI / ANGLE16_LEVELS).toFloat()
+        val lastBucket = dequantiseAngle16(ANGLE16_LEVELS - 1)
+        assertTrue(
+            angleDistance(lastBucket, dequantiseAngle16(0)) <= bucket + Math.ulp(lastBucket),
+            "the last bucket ($lastBucket) must be one step from the first, not a turn",
+        )
+
+        // Rounding crosses the seam like any other bucket boundary: within half a bucket of
+        // a full turn rounds up to bucket 0, further down stays in 65535.
+        assertEquals(0, quantiseAngle16((TWO_PI - bucket / 3.0).toFloat()))
+        assertEquals(ANGLE16_LEVELS - 1, quantiseAngle16((TWO_PI - bucket * 0.9).toFloat()))
+    }
+
+    @Test
+    fun `a negative angle is a facing, not an underflow`() {
+        // The clamp a bounded kind would apply is the specific wrong answer: -1 radian is
+        // 5.28 radians, which is as far from zero as an angle gets.
+        for (negative in listOf(-1e-4f, -1f, -3f, -6f, -(TWO_PI.toFloat() * 4f) - 1f)) {
+            val decoded = Q.Angle16.dequantise(Q.Angle16.quantise(negative))
+            assertTrue(
+                decoded >= 0f && decoded < TWO_PI,
+                "$negative decoded to $decoded, which is outside one turn",
+            )
+            assertTrue(
+                angleDistance(decoded, negative) <= Q.Angle16.maxError + Math.ulp(negative),
+                "$negative round-tripped to $decoded",
+            )
+        }
+        assertTrue(
+            Q.Angle16.dequantise(Q.Angle16.quantise(-1f)) > 5f,
+            "-1 rad is 5.28 rad; anything near 0 means it was clamped instead of wrapped",
+        )
+    }
+
+    @Test
+    fun `an angle many turns out reduces to the same facing`() {
+        // The wrap is arithmetic over the whole float range, not a mask that happens to work
+        // for the turns that fit in 16 bits.
+        for (turns in listOf(1, 2, 7, 100, -1, -3, -50)) {
+            val far = (1.0 + turns * TWO_PI).toFloat()
+            val decoded = Q.Angle16.dequantise(Q.Angle16.quantise(far))
+            assertTrue(
+                angleDistance(decoded, 1f) <= Q.Angle16.maxError + Math.ulp(far),
+                "1 rad $turns turns out ($far) came back as $decoded",
+            )
+        }
+    }
+
+    @Test
+    fun `a bounded kind clamps a far-outside value to the bound it passed`() {
+        // Including the infinities: to a bounded kind an infinity is not a special case, it
+        // is simply very out of range, and the bound is the honest answer.
+        val negativeRange = Q.Fixed(-100f, -50f, step = 0.5f)
+        assertEquals(1f, Q.Norm8.dequantise(Q.Norm8.quantise(1e9f)))
+        assertEquals(0f, Q.Norm8.dequantise(Q.Norm8.quantise(-1e9f)))
+        assertEquals(Q.Pos.MAX, Q.Pos.dequantise(Q.Pos.quantise(1e9f)))
+        assertEquals(Q.Pos.MIN, Q.Pos.dequantise(Q.Pos.quantise(-1e9f)))
+        assertEquals(Q.Pos.MAX, Q.Pos.dequantise(Q.Pos.quantise(Float.POSITIVE_INFINITY)))
+        assertEquals(Q.Pos.MIN, Q.Pos.dequantise(Q.Pos.quantise(Float.NEGATIVE_INFINITY)))
+        assertEquals(
+            negativeRange.max,
+            negativeRange.dequantise(negativeRange.quantise(0f)),
+            "a wholly negative range clamps upward at its own max, not at zero",
+        )
+        assertEquals(negativeRange.min, negativeRange.dequantise(negativeRange.quantise(-1e9f)))
+    }
+
+    @Test
+    fun `a wholly negative range round-trips like any other`() {
+        // Nothing in the mapping may assume min is at or below zero; a range that never
+        // crosses the origin is where a stray abs or sign assumption would show.
+        val bits = 10
+        val halfStep = 50.0 / ((1L shl bits) - 1L) / 2.0
+        for (value in listOf(-100f, -99.999f, -75.5f, -50f)) {
+            val decoded = roundTripFixed(value, -100f, -50f, bits)
+            assertTrue(decoded in -100f..-50f, "$value decoded outside its own range: $decoded")
+            assertTrue(
+                abs(decoded - value) <= halfStep + Math.ulp(decoded),
+                "$value round-tripped to $decoded",
+            )
+        }
+    }
+
+    @Test
+    fun `one bit is a two-level field whose only levels are the bounds`() {
+        // The narrowest legal width. 2^1 - 1 is one step, so there is nothing between the
+        // bounds and everything rounds to the nearer of them.
+        assertEquals(0, quantiseFixed(0f, 0f, 10f, 1))
+        assertEquals(0, quantiseFixed(4.9f, 0f, 10f, 1))
+        assertEquals(1, quantiseFixed(5.1f, 0f, 10f, 1))
+        assertEquals(1, quantiseFixed(10f, 0f, 10f, 1))
+        assertEquals(0f, dequantiseFixed(0, 0f, 10f, 1))
+        assertEquals(10f, dequantiseFixed(1, 0f, 10f, 1))
+        val q = Q.declared(bits = 1, min = 0f, max = 10f)
+        assertEquals(1, q.bits)
+        assertEquals(5f, q.maxError, "half the whole range is the honest error for one bit")
+    }
+
+    @Test
+    fun `a thirty-two bit field keeps levels distinct across the raw Int sign boundary`() {
+        // Level 2^31 is where the raw field becomes a negative Int. Consecutive levels either
+        // side of it must stay ordered and distinct rather than collapsing or reordering.
+        val levels = (1L shl 32) - 1L
+        var previous = Float.NEGATIVE_INFINITY
+        for (level in (levels / 2 - 2)..(levels / 2 + 2)) {
+            val decoded = dequantiseFixed(level.toInt(), -1024f, 1024f, 32)
+            assertTrue(decoded > previous, "level $level decoded to $decoded, not above $previous")
+            previous = decoded
+        }
+    }
+
+    @Test
+    fun `a zero-width range is refused everywhere it could be used, naming the bounds`() {
+        // A degenerate range has no steps to map onto: quantising into it would divide by
+        // zero and hand back a NaN level rather than a diagnosis.
+        val failure = assertFailsWith<IllegalArgumentException> { quantiseFixed(3f, 3f, 3f, 8) }
+        assertTrue(
+            failure.message!!.contains("3.0"),
+            "the message must name the offending bounds, was: ${failure.message}",
+        )
+        assertFailsWith<IllegalArgumentException> { dequantiseFixed(0, 3f, 3f, 8) }
+        assertFailsWith<IllegalArgumentException> { writer.reset(); writer.writeFixed(3f, 3f, 3f, 8) }
+        assertFailsWith<IllegalArgumentException> { Q.Fixed(3f, 3f, 0.1f) }
+        assertFailsWith<IllegalArgumentException> { Q.declared(8, 3f, 3f) }
     }
 
     @Test
@@ -206,5 +376,30 @@ class QuantisationBoundaryTest {
         assertEquals(32L, writer.bitsWritten)
         reader.reset()
         assertEquals(1f, reader.readFixed(0f, 1f, 32))
+    }
+    /**
+     * `Q.declared` is what `@Q(bits, min, max)` resolves to, so a default on its bounds is the
+     * same defect as a default on the annotation: `declared(12)` would compile into a silent
+     * `[0, 1]` clamp. The annotation side is pinned in `udea-annotations`; this pins the
+     * function, because re-adding a default there would compile cleanly and no call site in
+     * the tree would notice — they all pass both bounds today.
+     *
+     * Kotlin compiles default arguments into a synthetic `<name>$default` bridge, so its
+     * absence is what proves there are none.
+     */
+    @Test
+    fun `declared has no default bounds to silently clamp a field into zero to one`() {
+        val bridges = Q.Companion::class.java.declaredMethods.map { it.name }
+            .filter { it.startsWith("declared") && it != "declared" }
+
+        assertEquals(
+            emptyList(),
+            bridges,
+            "Q.declared must take min and max explicitly; a default range is a wrong range " +
+                "that compiles",
+        )
+        assertFalse(
+            Q.Companion::class.java.declaredMethods.single { it.name == "declared" }.isSynthetic,
+        )
     }
 }

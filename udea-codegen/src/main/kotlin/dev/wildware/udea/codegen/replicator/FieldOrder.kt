@@ -63,12 +63,25 @@ internal object FieldOrder {
      *
      * A collision is resolved by appending the field's index, because a generated file with two
      * `const val FIELD_FOO_BAR` does not compile and a silent rename would be worse.
+     *
+     * Uniquification is **closed**: a disambiguated name is itself checked against everything
+     * already handed out, and bumped again if it collides. Without that the routine is not a
+     * uniquifier at all — `fooBar`, `foo_bar` and `foo_bar_0` produce `FIELD_FOO_BAR_0` twice
+     * (the first from disambiguating the pair, the second because `foo_bar_0` screams to it and
+     * looked unique on its own), and the generated object does not compile.
      */
     fun constantNames(propertyNames: List<String>): List<String> {
         val raw = propertyNames.map(::constantName)
         val occurrences = raw.groupingBy { it }.eachCount()
+        val taken = HashSet<String>(raw.size)
         return raw.mapIndexed { index, candidate ->
-            if (occurrences.getValue(candidate) == 1) candidate else "${candidate}_$index"
+            var name = if (occurrences.getValue(candidate) == 1) candidate else "${candidate}_$index"
+            var suffix = index
+            while (!taken.add(name)) {
+                suffix++
+                name = "${candidate}_$suffix"
+            }
+            name
         }
     }
 }

@@ -100,7 +100,7 @@ class TwoWorldsTest {
         val alpha = testGameContext(seed = 1L)
         val beta = testGameContext(seed = 2L)
 
-        alpha.cues.emit(Cue(id = 7, tick = alpha.tick))
+        alpha.cues.emit(Cue(id = CueId(7), tick = alpha.tick))
 
         assertEquals(1, (alpha.cues as RecordingCueSink).cues.size)
         assertEquals(0, (beta.cues as RecordingCueSink).cues.size)

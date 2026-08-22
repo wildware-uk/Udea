@@ -7,6 +7,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import java.nio.file.Files
+import java.security.MessageDigest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -102,7 +103,10 @@ class UdeaCompilerPluginEndToEndTest {
         assertEquals(
             applied.classFiles,
             without.classFiles,
-            "the plugin must not change what is emitted - it only adds diagnostics",
+            "the plugin must not change what is emitted - it only adds diagnostics. " +
+                "This compares the SHA-256 of every class file, not just its name: the " +
+                "kill switch is only worth anything if a plugin-off build produces the " +
+                "same bytes, and a name-set comparison would pass an IR transform (spec 7).",
         )
     }
 
@@ -123,7 +127,8 @@ class UdeaCompilerPluginEndToEndTest {
     private data class CompileResult(
         val exitCode: ExitCode,
         val output: String,
-        val classFiles: Set<String>,
+        /** Relative path to the SHA-256 of that class file's bytes. */
+        val classFiles: Map<String, String>,
     )
 
     private fun compileProbe(
@@ -157,14 +162,22 @@ class UdeaCompilerPluginEndToEndTest {
         val exitCode = PrintStream(captured, true, "UTF-8").use { stream ->
             K2JVMCompiler().exec(stream, *args.toTypedArray())
         }
+        // Hashing the bytes, not listing the names: two compilations that emit the same
+        // file names can still differ in every byte. Stable across the two temp
+        // directories because a class file records `SourceFile "Probe.kt"` by name only,
+        // the module name defaults identically, and @Metadata carries no path.
         val classFiles = out.walkTopDown()
             .filter { it.isFile && it.extension == "class" }
-            .map { it.relativeTo(out).invariantSeparatorsPath }
-            .toSortedSet()
+            .associate { it.relativeTo(out).invariantSeparatorsPath to sha256(it.readBytes()) }
+            .toSortedMap()
 
         work.deleteOnExit()
         return CompileResult(exitCode, captured.toString("UTF-8"), classFiles)
     }
+
+    private fun sha256(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString(separator = "") { byte -> "%02x".format(byte) }
 
     private fun serviceEntry(serviceName: String): String {
         val resource = checkNotNull(

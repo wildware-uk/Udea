@@ -44,18 +44,47 @@ class UdeaRulesTest {
     }
 
     /**
-     * These four ids are the seed set spec sections 3.2 and 6 demand, and the stability
-     * contract says an id never changes meaning. Pinning them here means renumbering a rule
-     * fails a test rather than silently breaking every suppression file downstream.
+     * These ids are the seed set spec sections 3.2 and 6 demand plus the two `udea-codegen`
+     * raises, and the stability contract says an id never changes meaning. Pinning them here
+     * means renumbering a rule fails a test rather than silently breaking every suppression
+     * file downstream.
+     *
+     * The size assertion is what stops a new rule from being declared and then left out of
+     * [UdeaRules.all], which would make it invisible to [UdeaRules.byId] and to every CI
+     * filter that enumerates the registry.
      */
     @Test
-    fun `the seeded rule ids are pinned`() {
+    fun `the registered rule ids are pinned`() {
         assertEquals("UDEA0001", UdeaRules.NET_ON_VAL.id)
         assertEquals("UDEA0002", UdeaRules.COMPONENT_FIELD_LIMIT.id)
         assertEquals("UDEA0003", UdeaRules.QUANTIZED_NON_FLOAT.id)
         assertEquals("UDEA0004", UdeaRules.UNRESOLVED_REFERENCE.id)
-        assertEquals(4, UdeaRules.all.size)
+        assertEquals("UDEA0005", UdeaRules.SIM_ON_VAL.id)
+        assertEquals("UDEA0006", UdeaRules.UNSUPPORTED_FIELD_TYPE.id)
+        assertEquals(6, UdeaRules.all.size)
         assertTrue(UdeaRules.all.all { it.defaultSeverity == Severity.Error })
+    }
+
+    /**
+     * A rule declared on the object but missing from [UdeaRules.all] is unreachable through
+     * [UdeaRules.byId], so a suppression file naming its id would silently never match. The
+     * count in the test above only catches that if whoever adds a rule also updates the count;
+     * this catches it either way, by reading the declarations back off the object.
+     */
+    @Test
+    fun `every declared rule is registered in all`() {
+        val declared = UdeaRules::class.java.methods
+            .filter { it.name.startsWith("get") && it.parameterCount == 0 }
+            .filter { UdeaRule::class.java.isAssignableFrom(it.returnType) }
+            .map { it.invoke(UdeaRules) as UdeaRule }
+            .toSet()
+
+        assertTrue(declared.isNotEmpty(), "reflection found no UdeaRule properties at all")
+        assertEquals(
+            declared.map { it.id }.sorted(),
+            UdeaRules.all.map { it.id }.sorted(),
+            "a rule is declared on UdeaRules but missing from UdeaRules.all",
+        )
     }
 
     @Test

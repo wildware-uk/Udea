@@ -14,8 +14,11 @@ package dev.wildware.udea.core.replication
  * [MaskOps], that widening changes one file in `udea-core` and breaks nothing.
  *
  * Concretely: never write `mask and other`, never store a mask in a game component, never
- * pass one as a `Long`. If something needs a raw word — the wire encoder does — it asks
- * [MaskOps.wordCount] and [MaskOps.word], which already generalise to more than one word.
+ * pass one as a `Long`. Today's mask framing is [MaskOps.writeTo] and [MaskOps.readFrom],
+ * which live in this file and read the storage directly, so nothing in the tree needs a raw
+ * word. [MaskOps.wordCount], [MaskOps.word] and [MaskOps.fromWords] exist for an encoder
+ * outside `udea-core` that one day does — they already generalise to more than one word —
+ * and they are the only sanctioned way to get one.
  *
  * ## Bit positions
  *
@@ -133,7 +136,8 @@ public object MaskOps {
         }
     }
 
-    // --- raw word access: the only sanctioned escape hatch, for wire encoding ---
+    // --- raw word access: the only sanctioned escape hatch, for an out-of-module encoder ---
+    // Today's encoder is writeTo/readFrom below, which does not need these.
 
     /**
      * How many 64-bit words a mask occupies. One today; the whole point of the accessor is

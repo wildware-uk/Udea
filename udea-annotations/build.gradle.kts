@@ -1,3 +1,4 @@
+import dev.wildware.udea.build.UdeaLeafCheck
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 
 plugins {
@@ -32,11 +33,17 @@ val runtimeModuleIds: Provider<List<String>> =
     }
 
 /**
- * Fails the build if anything outside [leafAllowList] resolves on `runtimeClasspath`.
+ * Fails the build if anything outside [leafAllowList] resolves on `runtimeClasspath`, or
+ * if nothing resolves at all.
  *
  * This module is on the compile classpath of the engine, the game, the processor and the
  * compiler plugin at once, so anything it drags in is dragged everywhere. Wired into
  * `check` so a stray dependency cannot survive a normal build.
+ *
+ * The rule itself lives in `UdeaLeafCheck` in `build-logic`, where `UdeaLeafCheckTest`
+ * executes its failure paths. A `doLast` block is not reachable from any test, so a gate
+ * whose logic lived only here would be enforcement nobody has ever watched fail — and its
+ * worst failure is silent: an empty `runtimeClasspath` has no offenders either.
  */
 val udeaVerifyAnnotationsLeaf by tasks.registering {
     group = "verification"
@@ -50,20 +57,15 @@ val udeaVerifyAnnotationsLeaf by tasks.registering {
     inputs.property("runtimeModuleIds", moduleIds)
     outputs.file(report)
 
+    val projectPath = project.path
+
     doLast {
         val resolved = moduleIds.get().toSortedSet()
-        val offenders = resolved - allowed
         report.get().asFile.apply {
             parentFile.mkdirs()
             writeText(resolved.joinToString(separator = "\n", postfix = "\n"))
         }
-        if (offenders.isNotEmpty()) {
-            throw GradleException(
-                "udea-annotations must stay a zero-dependency leaf (spec 4), but its runtimeClasspath " +
-                    "resolves ${offenders.size} disallowed dependency/dependencies: " +
-                    offenders.joinToString() + ". Allowed: " + allowed.sorted().joinToString() + ".",
-            )
-        }
+        UdeaLeafCheck.violation(projectPath, resolved, allowed)?.let { throw GradleException(it) }
     }
 }
 

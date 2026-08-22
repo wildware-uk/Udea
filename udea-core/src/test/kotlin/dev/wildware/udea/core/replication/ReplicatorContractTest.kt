@@ -269,25 +269,97 @@ class ReplicatorContractTest {
     fun `the field store compares fields without knowing their types`() {
         // desync_report walks the store, not the component, so fieldEquals has to agree with
         // the generated typed diff.
-        val store = store()
-        val transform = transform(x = 1f, y = 2f, rotation = 3f, grounded = 4L)
-        replicator.capture(transform, store, SLOT_BASELINE)
-        transform.rotation = 30f
-        replicator.capture(transform, store, SLOT_CAPTURED)
+        assertDiffAgreesWithFieldEquals(
+            baseline = transform(x = 1f, y = 2f, rotation = 3f, grounded = 4L),
+            captured = transform(x = 1f, y = 2f, rotation = 30f, grounded = 4L),
+            expectedDifferingFields = listOf(TransformReplicator.FIELD_ROTATION),
+        )
+    }
 
-        val typed = replicator.diff(store, SLOT_CAPTURED, SLOT_BASELINE)
+    @Test
+    fun `diff and fieldEquals agree on minus zero, which is a change`() {
+        // The boundary values a float encoding has (charter 5). `getFloat` returns a
+        // statically-typed Float, so a diff written with `!=` would call 0.0f and -0.0f
+        // equal, emit no delta, and leave the receiver holding +0.0f — while fieldEquals,
+        // comparing stored bits, reports that field as differing on every desync report
+        // forever. Bit-identical comparison is the semantics that converges.
+        assertDiffAgreesWithFieldEquals(
+            baseline = transform(x = 1f, y = 2f, rotation = 0.0f, grounded = 4L),
+            captured = transform(x = 1f, y = 2f, rotation = -0.0f, grounded = 4L),
+            expectedDifferingFields = listOf(TransformReplicator.FIELD_ROTATION),
+        )
+    }
+
+    @Test
+    fun `diff and fieldEquals agree that NaN equals itself`() {
+        // The other direction: under IEEE 754 `NaN != NaN`, so a diff written with `!=`
+        // would set this bit on every tick for the rest of the match while fieldEquals
+        // reported the slots identical.
+        assertDiffAgreesWithFieldEquals(
+            baseline = transform(x = 1f, y = 2f, rotation = Float.NaN, grounded = 4L),
+            captured = transform(x = 1f, y = 2f, rotation = Float.NaN, grounded = 4L),
+            expectedDifferingFields = emptyList(),
+        )
+    }
+
+    @Test
+    fun `a delta over a NaN field converges instead of resending forever`() {
+        // What the agreement is actually for. Tick 1 sends the NaN; from tick 2 on the
+        // baseline holds it and the component costs zero bits. Under IEEE comparison this
+        // never happens: the field is redelivered every tick for as long as it holds NaN.
+        val store = store()
+        val source = transform(x = 1f, y = 2f, rotation = 0f, grounded = 4L)
+        replicator.capture(source, store, SLOT_BASELINE)
+
+        source.rotation = Float.NaN
+        replicator.capture(source, store, SLOT_CAPTURED)
+        assertEquals(
+            MaskOps.of(TransformReplicator.FIELD_ROTATION),
+            replicator.diff(store, SLOT_CAPTURED, SLOT_BASELINE),
+            "the tick a field becomes NaN is a real change and must be sent once",
+        )
+
+        // The baseline settles, exactly as it would after the delta was acknowledged.
+        store.copySlot(SLOT_CAPTURED, SLOT_BASELINE)
+        repeat(3) {
+            replicator.capture(source, store, SLOT_CAPTURED)
+            assertEquals(
+                MaskOps.EMPTY,
+                replicator.diff(store, SLOT_CAPTURED, SLOT_BASELINE),
+                "a settled NaN must cost nothing; a delta that never converges is a leak",
+            )
+        }
+    }
+
+    /**
+     * Captures two components and asserts the typed [Replicator.diff] and the type-agnostic
+     * [FieldStore.fieldEquals] name exactly [expectedDifferingFields] — the "both must agree"
+     * contract, pinned to a set of fields so neither side can be vacuously right.
+     */
+    private fun assertDiffAgreesWithFieldEquals(
+        baseline: Transform,
+        captured: Transform,
+        expectedDifferingFields: List<Int>,
+    ) {
+        val store = store()
+        replicator.capture(baseline, store, SLOT_BASELINE)
+        replicator.capture(captured, store, SLOT_CAPTURED)
+
+        val difference = replicator.diff(store, SLOT_CAPTURED, SLOT_BASELINE)
+        val typed = buildList { MaskOps.forEachSetBit(difference) { add(it) } }
         val untyped = buildList {
             for (field in replicator.fieldNames.indices) {
                 if (!store.fieldEquals(SLOT_CAPTURED, SLOT_BASELINE, field)) add(field)
             }
         }
 
-        assertEquals(untyped, buildList { MaskOps.forEachSetBit(typed) { add(it) } })
+        assertEquals(expectedDifferingFields, untyped, "fieldEquals named the wrong fields")
+        assertEquals(untyped, typed, "diff and fieldEquals must agree on every field")
     }
 
     @Test
     fun `typeId is stable`() {
-        assertEquals(1, replicator.typeId)
+        assertEquals(ComponentTypeId(1), replicator.typeId)
     }
 
     private companion object {

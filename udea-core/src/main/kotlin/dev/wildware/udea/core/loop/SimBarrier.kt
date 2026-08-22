@@ -112,6 +112,13 @@ public class SimBarrier(initialCapacity: Int = DEFAULT_CAPACITY) {
      * failed on, and the drain carries on. One bad mutation must not strand the remaining
      * ones or stall the loop — the alternative is a tool call that leaves the queue
      * half-applied, which is exactly the torn state this class exists to prevent.
+     *
+     * An `Error` is **not** contained: `OutOfMemoryError`, `StackOverflowError` and
+     * `LinkageError` leave the world in precisely the undefined state that argument is about,
+     * so absorbing one and continuing to tick over it would defeat the reason the catch
+     * exists. `AssertionError` propagates for a second reason — swallowing it would let an
+     * assertion written inside a [BarrierAction] pass silently, which is a test that cannot
+     * fail, manufactured by production code.
      */
     public fun drain(world: World, ctx: GameContext): Int {
         synchronized(lock) {
@@ -122,20 +129,30 @@ public class SimBarrier(initialCapacity: Int = DEFAULT_CAPACITY) {
 
         val running = batch
         val size = running.size
-        var index = 0
-        while (index < size) {
-            val action = running[index]
-            try {
-                action.apply(world, ctx)
-            } catch (failure: Throwable) {
-                failedActions++
-                ctx.log.error(
-                    "SimBarrier action '${action.label}' failed at ${ctx.clock.tick}", failure,
-                )
+        try {
+            var index = 0
+            while (index < size) {
+                val action = running[index]
+                try {
+                    action.apply(world, ctx)
+                } catch (failure: Exception) {
+                    failedActions++
+                    ctx.log.error(
+                        "SimBarrier action '${action.label}' failed at ${ctx.clock.tick}", failure,
+                    )
+                }
+                index++
             }
-            index++
+        } finally {
+            // In a `finally` because an `Error` is deliberately not caught above. Left outside
+            // one, an escaping `Error` would leave this batch populated, and the next drain's
+            // swap would move it back into `inbox` and re-run every action of the aborted
+            // batch — including the ones that already applied. An embedder or a test harness
+            // that catches the Error and keeps ticking would get exactly the double-applied,
+            // torn state this class exists to prevent. The Error still propagates; only the
+            // buffer is cleaned up on the way out.
+            running.clear()
         }
-        running.clear()
 
         drainedThisTick = size
         totalDrained += size

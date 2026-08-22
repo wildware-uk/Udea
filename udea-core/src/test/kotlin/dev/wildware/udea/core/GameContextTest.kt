@@ -6,7 +6,6 @@ import dev.wildware.udea.core.fixtures.DeterministicRngService
 import dev.wildware.udea.core.fixtures.QueueingSceneManager
 import dev.wildware.udea.core.fixtures.RecordingCueSink
 import dev.wildware.udea.core.fixtures.RecordingPhysicsWorld
-import dev.wildware.udea.core.fixtures.SimpleEventBus
 import dev.wildware.udea.core.fixtures.testGameContext
 import java.lang.reflect.Modifier
 import kotlin.test.Test
@@ -132,7 +131,6 @@ class GameContextTest {
 
         val message = failure.message.orEmpty()
         assertTrue("scenes" in message, message)
-        assertTrue("events" in message, message)
         assertTrue("cues" in message, message)
         assertFalse("rng" in message, message)
         assertFalse("physics" in message, message)
@@ -154,7 +152,6 @@ class GameContextTest {
                 rng = DeterministicRngService(0L)
                 physics = RecordingPhysicsWorld()
                 scenes = QueueingSceneManager()
-                events = SimpleEventBus()
                 cues = RecordingCueSink()
             }
         }

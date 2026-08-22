@@ -31,7 +31,8 @@ public class Vec2(
 /**
  * The component from spec 3.1, hand-written.
  *
- * In the real tree this carries `@Replicated`, `@Net position`, `@Net @Q(bits = 12) rotation`
+ * In the real tree this carries `@Replicated`, `@Net position`,
+ * `@Net @Q(bits = 12, min = -3.1416f, max = 3.1416f) rotation`
  * and `@Sim lastGroundedTick`, and `udea-codegen` emits its `Replicator`. Here the masks are
  * written by hand in [TransformReplicator] and the annotations are named in documentation
  * only: this module is frozen *before* any component is annotated, which is the point of
@@ -40,7 +41,7 @@ public class Vec2(
 public class Transform(
     /** `@Net` — replicated and snapshotted. */
     public val position: Vec2 = Vec2(),
-    /** `@Net @Q(bits = 12)` — replicated and snapshotted. */
+    /** `@Net @Q(bits = 12, min = -3.1416f, max = 3.1416f)` — replicated and snapshotted. */
     public var rotation: Float = 0f,
     /** `@Sim` — snapshotted only. Must rewind; must never reach a client. */
     public var lastGroundedTick: Tick = Tick.ZERO,

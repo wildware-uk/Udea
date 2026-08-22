@@ -91,16 +91,38 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
         val net = property.hasAnnotation(AnnotationNames.NET)
         var failed = false
 
+        if (net && property.hasAnnotation(AnnotationNames.SIM)) {
+            // The two masks are exclusive by definition: `@Sim` means "snapshotted but never
+            // replicated". Accepting both and letting `@Net` win makes an attempted demotion a
+            // silent no-op, and it fails in the leaking direction — the field the developer
+            // meant to stop sending keeps reaching clients with a green build. Spec 3.1 puts
+            // jungle respawn timers and bot blackboards on the wrong side of that.
+            //
+            // No rule id: `udea-diagnostics` registers none for this defect, and this module
+            // does not fabricate one. Same shape as the `@Sim`-on-a-val message below.
+            logger.error(
+                "$ownerName.$propertyName carries both @Net and @Sim, which are mutually " +
+                    "exclusive: @Net is replicated and snapshotted, @Sim is snapshotted only. " +
+                    "Delete @Sim to keep replicating it, or delete @Net to stop it reaching " +
+                    "clients.",
+                property,
+            )
+            failed = true
+        }
+
         if (!property.isMutable) {
             // @Net on a val is always a mistake, never a no-op: replication is capture-and-diff,
             // and a val cannot change, so the field would occupy a bit that can never be set.
-            // @Sim on a val is the same defect but has no registered rule id yet: udea-diagnostics
-            // only registers UDEA0001 for @Net, and this module must not add rules to it.
-            val prefix = if (net) "${UdeaRules.NET_ON_VAL.id}: @Net" else "@Sim"
+            // @Sim on a val is the same defect on the snapshot side. Both ids come from
+            // udea-diagnostics, never from here: an id is permanent public API, so a producer
+            // that mints its own is not sharing an id space with the K2 checker at all.
+            val rule = if (net) UdeaRules.NET_ON_VAL else UdeaRules.SIM_ON_VAL
+            val annotation = if (net) "@Net" else "@Sim"
+            val consequence = if (net) "it can never replicate" else "it can never be snapshotted"
             logger.error(
-                "$prefix annotates the val $ownerName.$propertyName. A val can never change, so " +
-                    "it can never replicate, and Replicator.apply could not restore it. Make it " +
-                    "a var or drop the annotation.",
+                "${rule.id}: $annotation annotates the val $ownerName.$propertyName. A val can " +
+                    "never change, so $consequence, and Replicator.apply could not restore it. " +
+                    "Make it a var or drop the annotation.",
                 property,
             )
             failed = true
@@ -121,7 +143,8 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
         val storage = storageOf(type)
         if (storage == null) {
             logger.error(
-                "$ownerName.$propertyName is ${type.describe()}, which udea-codegen cannot " +
+                "${UdeaRules.UNSUPPORTED_FIELD_TYPE.id}: $ownerName.$propertyName is " +
+                    "${type.describe()}, which udea-codegen cannot " +
                     "replicate yet. Supported field types are Int, Long, Float, Boolean and " +
                     "enums; anything else needs a field codec (@NetCodecFor), which is not " +
                     "implemented.",

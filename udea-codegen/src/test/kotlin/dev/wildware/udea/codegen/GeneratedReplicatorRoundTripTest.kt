@@ -37,24 +37,40 @@ class GeneratedReplicatorRoundTripTest {
         // Health declares maximum, current, invulnerable, lastDamageTick — deliberately not
         // alphabetical. FieldOrder sorts by name, so this is what the wire format is.
         assertContentEquals(
-            arrayOf("current", "invulnerable", "lastDamageTick", "maximum"),
+            listOf("current", "invulnerable", "lastDamageTick", "maximum"),
             HealthReplicator.fieldNames,
         )
         assertContentEquals(
-            arrayOf("groundedTicks", "jumpsRemaining", "speed", "stance"),
+            listOf("groundedTicks", "jumpsRemaining", "speed", "stance"),
             MovementReplicator.fieldNames,
         )
+
+        // And the literal mapping, pinned once and directly. Every other assertion in this file
+        // routes through the FIELD_ constants, so it survives any *consistent* relabelling of
+        // them — a generator that emitted fieldNames name-sorted while numbering the constants
+        // some other way would pass all of them. The frozen contract
+        // (docs/contracts/replicator.md, "Index alignment") calls fieldNames[i] == mask bit i ==
+        // FieldStore index i load-bearing, because desync_report(tick) names fieldNames[i] for
+        // each differing bit. So the numbers themselves are asserted.
+        assertEquals(0, HealthReplicator.FIELD_CURRENT)
+        assertEquals(1, HealthReplicator.FIELD_INVULNERABLE)
+        assertEquals(2, HealthReplicator.FIELD_LAST_DAMAGE_TICK)
+        assertEquals(3, HealthReplicator.FIELD_MAXIMUM)
     }
 
     @Test
     fun `netMask holds the @Net fields and allMask holds every field`() {
+        // Name-mediated, not constant-mediated: MaskOps.of(FIELD_CURRENT, ...) on the expected
+        // side is the same expression the generated initializer uses, so it would hold for any
+        // numbering of those constants. Going through fieldNames asserts what the mask is
+        // actually *for* — which fields reach a client — and it is the assertion udea-core's
+        // ReplicatorContractTest makes about the hand-written TransformReplicator.
         assertEquals(
-            MaskOps.of(
-                HealthReplicator.FIELD_CURRENT,
-                HealthReplicator.FIELD_INVULNERABLE,
-                HealthReplicator.FIELD_MAXIMUM,
-            ),
-            HealthReplicator.netMask,
+            listOf("current", "invulnerable", "maximum"),
+            buildList {
+                MaskOps.forEachSetBit(HealthReplicator.netMask) { add(HealthReplicator.fieldNames[it]) }
+            },
+            "netMask bits must name the @Net fields through fieldNames (spec 3.1)",
         )
         assertEquals(MaskOps.lowest(4), HealthReplicator.allMask)
         assertTrue(
@@ -77,7 +93,7 @@ class GeneratedReplicatorRoundTripTest {
             MovementReplicator.typeId,
             AiBlackboardReplicator.typeId,
         )
-        assertTrue(ids.all { it >= 0 }, "typeIds must be non-negative, were $ids")
+        assertTrue(ids.all { it.raw >= 0 }, "typeIds must be non-negative, were $ids")
         assertEquals(ids.size, ids.toSet().size, "placeholder typeIds collided: $ids")
     }
 
@@ -127,6 +143,103 @@ class GeneratedReplicatorRoundTripTest {
             if (!store.fieldEquals(0, 1, field)) fromStore = MaskOps.set(fromStore, field)
         }
         assertEquals(fromStore, fromReplicator)
+    }
+
+    @Test
+    fun `generated diff agrees with the store on NaN and on negative zero`() {
+        // The two values where IEEE 754 and "same stored bits" disagree, and the only ones that
+        // can tell a `!=`-based diff apart from a toRawBits one. FieldStore.fieldEquals compares
+        // stored representations, so NaN equals itself and -0.0f differs from 0.0f; `!=` says
+        // the opposite on both counts. A diff written with `!=` would resend a NaN field every
+        // tick for ever and would silently drop a sign flip through zero.
+        val store = ArrayFieldStore(2, HealthReplicator.FIELD_COUNT)
+        HealthReplicator.capture(Health(maximum = Float.NaN, current = 0f), store, 0)
+        HealthReplicator.capture(Health(maximum = Float.NaN, current = -0f), store, 1)
+
+        var fromStore = MaskOps.EMPTY
+        for (field in 0 until HealthReplicator.FIELD_COUNT) {
+            if (!store.fieldEquals(0, 1, field)) fromStore = MaskOps.set(fromStore, field)
+        }
+
+        assertEquals(
+            MaskOps.single(HealthReplicator.FIELD_CURRENT),
+            fromStore,
+            "the store must see -0.0f as a change and NaN as no change",
+        )
+        assertEquals(
+            fromStore,
+            HealthReplicator.diff(store, 0, 1),
+            "a generated diff must compare floats bit-identically, as FieldStore.fieldEquals does",
+        )
+    }
+
+    // --- the trust boundary -------------------------------------------------------------------
+
+    @Test
+    fun `read rejects an enum ordinal that names no constant, naming component, field and value`() {
+        // read() is the only entry point that puts bytes it did not produce into a FieldStore.
+        // A corrupt datagram — or ordinary version skew between two builds whose enum has a
+        // different number of constants — arrives here as an unconstrained 32-bit int.
+        val payload = ArrayBitWriter()
+        MaskOps.writeTo(
+            MaskOps.single(MovementReplicator.FIELD_STANCE),
+            payload,
+            MovementReplicator.FIELD_COUNT,
+        )
+        payload.writeInt(99)
+
+        val store = ArrayFieldStore(1, MovementReplicator.FIELD_COUNT)
+        store.setInt(0, MovementReplicator.FIELD_STANCE, Stance.Crouching.ordinal)
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            MovementReplicator.read(payload.toReader(), store, 0)
+        }
+        val message = failure.message.orEmpty()
+        assertTrue("Movement.stance" in message, "must name the component and the field: $message")
+        assertTrue("99" in message, "must name the offending ordinal: $message")
+        assertTrue("Stance" in message, "must name the enum: $message")
+        assertTrue("0 until 3" in message, "must give the valid range: $message")
+
+        // And the point of validating in read() rather than in apply(): the bad value never
+        // entered the store, so this slot — which a snapshot ring would also hold — is intact.
+        assertEquals(
+            Stance.Crouching.ordinal,
+            store.getInt(0, MovementReplicator.FIELD_STANCE),
+            "the rejected ordinal must not have reached the FieldStore",
+        )
+    }
+
+    @Test
+    fun `read rejects every out-of-range ordinal and accepts every in-range one`() {
+        for (ordinal in listOf(-1, Stance.entries.size, Int.MIN_VALUE, Int.MAX_VALUE)) {
+            val payload = ArrayBitWriter()
+            MaskOps.writeTo(
+                MaskOps.single(MovementReplicator.FIELD_STANCE),
+                payload,
+                MovementReplicator.FIELD_COUNT,
+            )
+            payload.writeInt(ordinal)
+            assertFailsWith<IllegalArgumentException>("ordinal $ordinal was accepted") {
+                MovementReplicator.read(payload.toReader(), ArrayFieldStore(1, MovementReplicator.FIELD_COUNT), 0)
+            }
+        }
+
+        // The boundaries on the good side, so the check is not simply rejecting everything.
+        for (stance in Stance.entries) {
+            val payload = ArrayBitWriter()
+            MaskOps.writeTo(
+                MaskOps.single(MovementReplicator.FIELD_STANCE),
+                payload,
+                MovementReplicator.FIELD_COUNT,
+            )
+            payload.writeInt(stance.ordinal)
+
+            val store = ArrayFieldStore(1, MovementReplicator.FIELD_COUNT)
+            MovementReplicator.read(payload.toReader(), store, 0)
+            val restored = Movement()
+            MovementReplicator.apply(store, 0, restored, MaskOps.single(MovementReplicator.FIELD_STANCE))
+            assertEquals(stance, restored.stance)
+        }
     }
 
     // --- the whole pipeline -----------------------------------------------------------------

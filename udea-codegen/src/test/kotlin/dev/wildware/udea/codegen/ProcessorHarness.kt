@@ -3,6 +3,7 @@ package dev.wildware.udea.codegen
 import com.google.devtools.ksp.impl.KotlinSymbolProcessing
 import com.google.devtools.ksp.processing.KSPJvmConfig
 import com.google.devtools.ksp.processing.KSPLogger
+import com.google.devtools.ksp.symbol.FileLocation
 import com.google.devtools.ksp.symbol.KSNode
 import java.io.File
 
@@ -79,9 +80,20 @@ internal object ProcessorHarness {
         val generatedFiles: List<File>,
         private val logger: RecordingLogger,
     ) {
-        val errors: List<String> get() = logger.errors
-        val warnings: List<String> get() = logger.warnings
-        val infos: List<String> get() = logger.infos
+        val errors: List<String> get() = logger.errors.map { it.message }
+        val warnings: List<String> get() = logger.warnings.map { it.message }
+        val infos: List<String> get() = logger.infos.map { it.message }
+
+        /**
+         * The errors with the source position each was reported at.
+         *
+         * "Failures are loud and located" is the module's headline claim over the generator it
+         * replaces (charter section 1), and [errors] can only check the loud half: a processor
+         * that reported the `@Net`-on-a-val error at the *class*, or passed `null` for the
+         * symbol so the compiler prints no file and no line at all, produces byte-identical
+         * message text. Located is only testable if the position is kept.
+         */
+        val errorDiagnostics: List<RecordingLogger.Diagnostic> get() = logger.errors
 
         val succeeded: Boolean get() = exitCode == KotlinSymbolProcessing.ExitCode.OK
 
@@ -89,31 +101,60 @@ internal object ProcessorHarness {
             generatedFiles.single { it.name == simpleFileName }.readText()
     }
 
-    /** A [KSPLogger] that records instead of printing, so a test can assert on what was said. */
+    /**
+     * A [KSPLogger] that records instead of printing, so a test can assert on what was said
+     * **and where**.
+     *
+     * The `KSNode` is kept, not dropped: it is the only thing that carries the position the
+     * Kotlin compiler prints in front of the message, so discarding it would make every failure
+     * test an assertion about text alone.
+     */
     internal class RecordingLogger : KSPLogger {
-        val errors: MutableList<String> = mutableListOf()
-        val warnings: MutableList<String> = mutableListOf()
-        val infos: MutableList<String> = mutableListOf()
-        val loggings: MutableList<String> = mutableListOf()
+        val errors: MutableList<Diagnostic> = mutableListOf()
+        val warnings: MutableList<Diagnostic> = mutableListOf()
+        val infos: MutableList<Diagnostic> = mutableListOf()
+        val loggings: MutableList<Diagnostic> = mutableListOf()
 
         override fun logging(message: String, symbol: KSNode?) {
-            loggings += message
+            loggings += Diagnostic.of(message, symbol)
         }
 
         override fun info(message: String, symbol: KSNode?) {
-            infos += message
+            infos += Diagnostic.of(message, symbol)
         }
 
         override fun warn(message: String, symbol: KSNode?) {
-            warnings += message
+            warnings += Diagnostic.of(message, symbol)
         }
 
         override fun error(message: String, symbol: KSNode?) {
-            errors += message
+            errors += Diagnostic.of(message, symbol)
         }
 
         override fun exception(e: Throwable) {
-            errors += "exception: ${e.message}"
+            errors += Diagnostic("exception: ${e.message}", file = null, line = null)
+        }
+
+        /**
+         * One recorded diagnostic: what was said, and the position it was said at.
+         *
+         * [file] and [line] are `null` when the processor passed no symbol, or one with no
+         * source position — which is exactly the regression the position assertions exist to
+         * catch, so it is represented rather than papered over. KSP2's `FileLocation` carries
+         * a file path and a line and **no column**, so file:line is as precise as this gets.
+         */
+        internal data class Diagnostic(val message: String, val file: String?, val line: Int?) {
+
+            /** `Shield.kt:8`, or `<no location>` when the symbol carried none. */
+            val position: String get() = if (file == null) "<no location>" else "$file:$line"
+
+            companion object {
+                fun of(message: String, symbol: KSNode?): Diagnostic {
+                    val location = symbol?.location as? FileLocation
+                        ?: return Diagnostic(message, file = null, line = null)
+                    return Diagnostic(message, File(location.filePath).name, location.lineNumber)
+                }
+            }
         }
     }
 }

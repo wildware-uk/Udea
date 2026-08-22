@@ -203,6 +203,35 @@ class GameLoopFixedStepTest {
     }
 
     @Test
+    fun `an absurd time scale is rejected rather than wrapping the accumulator`() {
+        // `subTickUnits` is `round(seconds * 1e6) * tickRate`. At timeScale 1e12 a clamped
+        // 0.25s frame saturates `roundToLong`, the multiply by tickRate wraps NEGATIVE, and
+        // `accumulator >= UNITS_PER_TICK` is then false for the next ~3.4e12 frames: the loop
+        // never steps again, never trips the truncation guard, and renders with an alpha
+        // nowhere near [0, 1). Silent and permanent, and reachable from `TimeControl`.
+        val loop = GameLoop(RecordingSimulation())
+
+        assertFailsWith<IllegalArgumentException> { loop.timeScale = 1e12f }
+        assertFailsWith<IllegalArgumentException> { loop.timeScale = Float.MAX_VALUE }
+        assertFailsWith<IllegalArgumentException> { loop.timeScale = Float.POSITIVE_INFINITY }
+        assertFailsWith<IllegalArgumentException> { loop.timeScale = Float.NaN }
+        assertFailsWith<IllegalArgumentException> {
+            TimeControl(loop).timeScale(GameLoop.MAX_TIME_SCALE * 2f)
+        }
+        assertEquals(1f, loop.timeScale, "a rejected scale must not have been stored")
+
+        // The boundary is accepted, and still behaves: it steps, and the following ordinary
+        // frame leaves alpha inside the range the Presentation contract promises.
+        loop.timeScale = GameLoop.MAX_TIME_SCALE
+        loop.frame(GameLoop.MAX_WALL_DELTA)
+        assertTrue(loop.lastFrameTicks > 0, "the largest legal scale must still step")
+
+        loop.timeScale = 1f
+        loop.frame(1f / 60f)
+        assertTrue(loop.alpha >= 0f && loop.alpha < 1f, "alpha was ${loop.alpha}")
+    }
+
+    @Test
     fun `a nonsensical wall delta advances nothing`() {
         val sim = RecordingSimulation()
         val loop = GameLoop(sim)

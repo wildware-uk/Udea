@@ -11,7 +11,11 @@ package dev.wildware.udea.diagnostics
  * producers and would leak the build machine's directory layout into shipped artefacts.
  *
  * The constructor rejects an absolute path, any path containing a `..` segment, and any
- * `\`-separated path, so that a Windows producer and a Linux producer emit identical bytes.
+ * non-canonical spelling — a `\`-separated path, a `.` segment, or a repeated separator —
+ * so that a Windows producer and a Linux producer emit identical bytes. That last part is
+ * not cosmetic: `moba/src/./Health.kt` and `moba/src/Health.kt` are unequal `data class`
+ * values for one location, so a sink keyed on a span would dedupe neither against the
+ * other and `diagnostics.json` would differ between two producers of the same diagnostic.
  * [of] and [relativize] do the normalising, and are the intended way in.
  *
  * Line and column numbers are deliberately **not** validated: producers legitimately use `0`
@@ -83,12 +87,28 @@ public data class SourceSpan(
             return full.substring(root.length + 1)
         }
 
-        /** Converts `\` to `/`. Does not collapse `.`, `..` or repeated separators. */
-        private fun normalize(path: String): String = path.replace('\\', '/')
+        /**
+         * The canonical spelling of [path]: `\` becomes `/`, `.` segments are dropped and
+         * repeated separators collapse. `..` is deliberately **not** resolved - the
+         * constructor rejects it outright rather than letting a producer escape the repo.
+         *
+         * Splitting on `/` rather than string-replacing is what keeps a file *name* that
+         * contains dots (`orc..idle.png`) untouched: only a whole `.` segment is a segment.
+         * A leading `/` is preserved so a POSIX absolute path still trips [isAbsolute]
+         * instead of being silently rewritten into a relative one.
+         */
+        private fun normalize(path: String): String {
+            val slashed = path.replace('\\', '/')
+            val segments = slashed.split('/')
+            if (!slashed.contains("//") && segments.none { it == "." }) return slashed
+            val leading = if (slashed.startsWith("/")) "/" else ""
+            return leading + segments.filter { it.isNotEmpty() && it != "." }.joinToString("/")
+        }
 
         /**
-         * True for a POSIX root (`/x`), a UNC path (`//host/share`, normalized from `\`) and
-         * a Windows drive-qualified path, including the drive-relative `C:x` form.
+         * True for a POSIX root (`/x`), a Windows drive-qualified path including the
+         * drive-relative `C:x` form, and a UNC path - `\\host\\share` normalizes to
+         * `/host/share`, whose leading `/` is the branch that catches it.
          */
         private fun isAbsolute(path: String): Boolean =
             path.startsWith("/") || (path.length >= 2 && path[0].isDriveLetter() && path[1] == ':')

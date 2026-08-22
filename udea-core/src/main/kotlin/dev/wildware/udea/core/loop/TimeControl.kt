@@ -45,7 +45,9 @@ public class TimeControl(private val loop: GameLoop) {
     /**
      * Sets [GameLoop.timeScale].
      *
-     * @throws IllegalArgumentException if [x] is negative or not finite.
+     * @throws IllegalArgumentException unless [x] is in `0..`[GameLoop.MAX_TIME_SCALE]. The
+     *   ceiling is not tidiness: this is an LLM-facing setter, and an absurd scale wraps the
+     *   loop's accumulator negative and wedges the simulation permanently and silently.
      */
     public fun timeScale(x: Float) {
         loop.timeScale = x

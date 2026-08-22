@@ -28,6 +28,7 @@ class ReplicatorApiDumpTest {
     fun `the frozen contract matches its committed dump`() {
         val actual = dump(
             Replicator::class,
+            ComponentTypeId::class,
             FieldMask::class,
             MaskOps::class,
             FieldStore::class,

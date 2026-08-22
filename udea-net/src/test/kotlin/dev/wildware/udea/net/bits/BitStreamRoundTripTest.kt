@@ -57,8 +57,11 @@ class BitStreamRoundTripTest {
             assertEquals(int, reader.readInt(), "int")
             assertEquals(long, reader.readLong(), "long")
             assertEquals(float.toRawBits(), reader.readFloat().toRawBits(), "float bit pattern")
+            // MaskOps.and/lowest, never `MaskOps.word(mask, 0) and ...`: a FieldMask is opaque
+            // (see FieldMask's KDoc), and unwrapping it to one Long here would be a test that
+            // silently stops covering the whole mask the day the mask widens past 64 fields.
             assertEquals(
-                MaskOps.fromWords(longArrayOf(MaskOps.word(mask, 0) and lowMask(fieldCount))),
+                MaskOps.and(mask, MaskOps.lowest(fieldCount)),
                 reader.readMask(fieldCount),
                 "mask",
             )

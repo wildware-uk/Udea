@@ -64,9 +64,23 @@ public interface FieldStore {
 
     public fun getTick(slot: Int, field: Int): Tick
 
-    /** For genuinely reference-typed fields. The only accessor permitted to allocate. */
+    /**
+     * For genuinely reference-typed fields. The only accessor permitted to allocate.
+     *
+     * [value] must be **deeply immutable**. The store retains the reference rather than
+     * copying it, [fieldEquals] compares slots with `equals`, and [copySlot] aliases the same
+     * reference into a second slot — so a mutable value would make a snapshot slot track the
+     * live object, `fieldEquals` would compare that object to itself and always report equal,
+     * and a restore would hand back the object's present state rather than its state at the
+     * captured tick. That is verbatim the in-place-mutation failure spec 3.2 says defeats
+     * setter instrumentation, and the store cannot detect it.
+     *
+     * A composite *value* type is not this: it is lowered to one primitive field index per
+     * component (see the class KDoc). Nothing emits this accessor yet.
+     */
     public fun setObject(slot: Int, field: Int, value: Any?)
 
+    /** The reference written by [setObject], as given — never a copy. */
     public fun getObject(slot: Int, field: Int): Any?
 
     /**
@@ -75,7 +89,27 @@ public interface FieldStore {
      * This is what `desync_report(tick)` walks: it can name the differing field without
      * knowing the component's Kotlin types, because comparison happens against the stored
      * representation. A generated `Replicator.diff` uses the typed getters instead, which is
-     * faster; both must agree.
+     * faster; **both must agree**, and the semantics they must agree on are these.
+     *
+     * ## Two fields are equal iff their stored representations are identical
+     *
+     * Not IEEE 754 equality. For a `Float` that means the comparison is over
+     * `Float.toRawBits`, so `NaN` equals itself and `-0.0f` differs from `0.0f` — the
+     * opposite of `==` on both counts. A `diff` written with `getFloat(a) != getFloat(b)` is
+     * therefore **wrong** and must compare `toRawBits()`.
+     *
+     * That is not pedantry, it is what converges. A delta encoder's job is to make the
+     * destination hold the same bits as the source and then fall silent:
+     *
+     * - under IEEE equality a field holding `NaN` differs from itself, so `diff` sets its bit
+     *   on every tick forever — a delta that never converges and a baseline that never
+     *   settles — while this method reports the two slots equal;
+     * - under IEEE equality `0.0f -> -0.0f` is *not* a change, so no delta is sent and the
+     *   destination keeps `+0.0f`, while this method keeps reporting that field as differing
+     *   — a permanent false positive in `desync_report` with no path to convergence.
+     *
+     * Bit-identical comparison has neither failure: what is reported as different is exactly
+     * what a write would actually change.
      */
     public fun fieldEquals(slotA: Int, slotB: Int, field: Int): Boolean
 

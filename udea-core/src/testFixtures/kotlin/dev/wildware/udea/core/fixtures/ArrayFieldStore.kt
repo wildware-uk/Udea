@@ -13,10 +13,14 @@ import dev.wildware.udea.core.replication.FieldStore
  * the fast implementation against.
  *
  * Every primitive is widened into one `Long` column, which is why [fieldEquals] can compare
- * two slots without knowing the component's types. Reference-typed fields go in a parallel
- * object column. Floats are stored as raw bits, so `fieldEquals` distinguishes `-0.0` from
- * `0.0` and treats `NaN` as equal to itself — both of which are what a delta encoder wants,
- * because they are what actually changed on the wire.
+ * two slots without knowing the component's types. Floats are stored as raw bits, so
+ * `fieldEquals` distinguishes `-0.0` from `0.0` and treats `NaN` as equal to itself — both of
+ * which are what a delta encoder wants, because they are what actually changed on the wire,
+ * and both of which every `Replicator.diff` must match (see `FieldStore.fieldEquals`).
+ *
+ * Reference-typed fields go in a parallel object column, which stores the reference exactly
+ * as given: [setObject]'s deep-immutability requirement is a caller obligation and this class
+ * does not enforce it, because it cannot.
  */
 public class ArrayFieldStore(
     override val slotCount: Int,

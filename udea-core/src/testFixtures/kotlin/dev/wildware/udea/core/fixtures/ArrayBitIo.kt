@@ -34,6 +34,19 @@ public class ArrayBitWriter(initialWords: Int = 8) : BitWriter {
     /** A reader positioned at bit zero over everything written so far. */
     public fun toReader(): ArrayBitReader = ArrayBitReader(words.copyOf(), written)
 
+    /**
+     * Rewinds to bit zero and clears what was written, reusing the buffer.
+     *
+     * For the allocation tests: measuring whether `Replicator.write` allocates is impossible
+     * if the writer it is handed doubles its own array partway through the measurement. The
+     * real `udea-net` writer is pooled for the same reason.
+     */
+    public fun reset() {
+        val usedWords = ((written + 63L) ushr 6).toInt()
+        words.fill(0L, 0, usedWords)
+        written = 0L
+    }
+
     private fun put(value: Long, bitCount: Int) {
         var remaining = bitCount
         var source = value

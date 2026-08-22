@@ -3,6 +3,7 @@ package dev.wildware.udea.core.fixtures
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.replication.BitReader
 import dev.wildware.udea.core.replication.BitWriter
+import dev.wildware.udea.core.replication.ComponentTypeId
 import dev.wildware.udea.core.replication.FieldMask
 import dev.wildware.udea.core.replication.FieldStore
 import dev.wildware.udea.core.replication.MaskOps
@@ -41,10 +42,10 @@ public object TransformReplicator : Replicator<Transform> {
     public const val FIELD_ROTATION: Int = 2
     public const val FIELD_LAST_GROUNDED_TICK: Int = 3
 
-    override val typeId: Int = 1
+    override val typeId: ComponentTypeId = ComponentTypeId(1)
 
-    override val fieldNames: Array<String> =
-        arrayOf("position.x", "position.y", "rotation", "lastGroundedTick")
+    override val fieldNames: List<String> =
+        listOf("position.x", "position.y", "rotation", "lastGroundedTick")
 
     override val netMask: FieldMask =
         MaskOps.of(FIELD_POSITION_X, FIELD_POSITION_Y, FIELD_ROTATION)
@@ -58,15 +59,30 @@ public object TransformReplicator : Replicator<Transform> {
         store.setTick(slot, FIELD_LAST_GROUNDED_TICK, component.lastGroundedTick)
     }
 
+    /**
+     * Bit-identical comparison, never `!=` on two `Float`s.
+     *
+     * `getFloat` returns a statically-typed `Float`, so `!=` would be IEEE 754: `NaN != NaN`
+     * is true and `0.0f != -0.0f` is false — the opposite of `FieldStore.fieldEquals` on both
+     * counts, and the contract says the two must agree. See `FieldStore.fieldEquals` for why
+     * the stored representation is the semantics that converges. Every emitted `diff` must
+     * compare floats this way.
+     */
     override fun diff(store: FieldStore, slotA: Int, slotB: Int): FieldMask {
         var mask = MaskOps.EMPTY
-        if (store.getFloat(slotA, FIELD_POSITION_X) != store.getFloat(slotB, FIELD_POSITION_X)) {
+        if (store.getFloat(slotA, FIELD_POSITION_X).toRawBits() !=
+            store.getFloat(slotB, FIELD_POSITION_X).toRawBits()
+        ) {
             mask = MaskOps.set(mask, FIELD_POSITION_X)
         }
-        if (store.getFloat(slotA, FIELD_POSITION_Y) != store.getFloat(slotB, FIELD_POSITION_Y)) {
+        if (store.getFloat(slotA, FIELD_POSITION_Y).toRawBits() !=
+            store.getFloat(slotB, FIELD_POSITION_Y).toRawBits()
+        ) {
             mask = MaskOps.set(mask, FIELD_POSITION_Y)
         }
-        if (store.getFloat(slotA, FIELD_ROTATION) != store.getFloat(slotB, FIELD_ROTATION)) {
+        if (store.getFloat(slotA, FIELD_ROTATION).toRawBits() !=
+            store.getFloat(slotB, FIELD_ROTATION).toRawBits()
+        ) {
             mask = MaskOps.set(mask, FIELD_ROTATION)
         }
         if (store.getTick(slotA, FIELD_LAST_GROUNDED_TICK) !=

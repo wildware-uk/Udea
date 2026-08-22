@@ -42,30 +42,50 @@ class RngStreamIsolationTest {
 
     @Test
     fun `appending a stream to the enum cannot perturb an existing one`() {
-        // A test cannot add an enum constant, so the property is asserted structurally on the
-        // thing that would change: a stream's seed is a pure function of the root seed and
-        // its own ordinal, so ordinals 0..n are unchanged by the existence of ordinal n + 1.
-        val current = RngStream.entries.size
-        val seedsToday = LongArray(current) { DefaultRngService.streamSeed(ROOT_SEED, it) }
-        val seedsAfterThreeMoreStreams = LongArray(current + 3) {
-            DefaultRngService.streamSeed(ROOT_SEED, it)
-        }
-
-        assertEquals(
-            seedsToday.toList(),
-            seedsAfterThreeMoreStreams.take(current),
-            "an appended stream must not change the seed of any existing one",
+        // A test cannot append an enum constant, so it pins the values instead. These are
+        // `streamSeed(ROOT_SEED, 0..7)`, printed once and checked in. Ordinals 5..7 do not
+        // exist yet and are the point: whoever appends a sixth stream must leave 0..4
+        // byte-identical, and any seeding change that reads the stream population — say
+        // `+ (RngStream.entries.size - 5)`, which is byte-identical today — turns these red
+        // the moment it lands. Comparing streamSeed against itself could not: it is a pure
+        // function of (rootSeed, ordinal), so both sides would move together.
+        val golden = longArrayOf(
+            -2622126769270649565L,
+            8699989649721214301L,
+            -6136402475954816882L,
+            7097835237234771186L,
+            -3844213579123720375L,
+            -5046951398220735997L,
+            -866814163448022610L,
+            -3605477962161790419L,
         )
 
-        // And the derived state, not just the seed, is unchanged — which is what the draws
-        // actually depend on.
-        val combatState = LongArray(SimRandom.STATE_WORDS)
-        DefaultRngService(ROOT_SEED).stream(RngStream.Combat).save(combatState)
-        val standaloneCombat = LongArray(SimRandom.STATE_WORDS)
-        SimRandom(DefaultRngService.streamSeed(ROOT_SEED, RngStream.Combat.ordinal))
-            .save(standaloneCombat)
+        assertEquals(
+            golden.toList(),
+            LongArray(golden.size) { DefaultRngService.streamSeed(ROOT_SEED, it) }.toList(),
+            "a stream seed is a checked-in value: changing one invalidates every recorded replay",
+        )
+        assertTrue(
+            golden.size > RngStream.entries.size,
+            "the golden must cover ordinals beyond today's enum, or it pins nothing about appending",
+        )
+    }
 
-        assertEquals(combatState.toList(), standaloneCombat.toList())
+    @Test
+    fun `a stream's state comes from its own ordinal's seed and nothing else`() {
+        // The second leg: seeds are stable (above), and the state a stream actually draws
+        // from is derived from its own seed alone. Together they say an appended stream
+        // cannot move an existing sequence. This is what would catch a sequential or chained
+        // seeding scheme, where stream n's state depended on stream n-1 having been built.
+        for (stream in RngStream.entries) {
+            val fromService = LongArray(SimRandom.STATE_WORDS)
+            DefaultRngService(ROOT_SEED).stream(stream).save(fromService)
+
+            val standalone = LongArray(SimRandom.STATE_WORDS)
+            SimRandom(DefaultRngService.streamSeed(ROOT_SEED, stream.ordinal)).save(standalone)
+
+            assertEquals(standalone.toList(), fromService.toList(), "$stream")
+        }
     }
 
     @Test

@@ -38,8 +38,10 @@ import kotlin.math.roundToLong
  * half-plus-drift. Microseconds rather than nanoseconds because a `Float` delta only carries
  * about seven digits: a millisecond expressed as a `Float` is exact to the microsecond and
  * off by nanoseconds, so rounding finer than a microsecond would preserve the float's error
- * instead of discarding it. It cannot overflow: a clamped frame contributes at most
- * `0.25 * 1e6 * tickRate` units, fifteen orders of magnitude below `Long.MAX_VALUE`.
+ * instead of discarding it. It cannot overflow: a clamped, *scaled* frame contributes at most
+ * `MAX_WALL_DELTA * MAX_TIME_SCALE * 1e6 * tickRate` units, which is why [MAX_TIME_SCALE]
+ * exists — without a ceiling on [timeScale] the product leaves `Long` range and the
+ * accumulator wraps negative.
  *
  * ## Spiral of death
  *
@@ -73,8 +75,10 @@ public class GameLoop(
      */
     public var timeScale: Float = 1f
         set(value) {
-            require(value >= 0f && value.isFinite()) {
-                "timeScale must be finite and not negative, was $value"
+            // `in 0f..MAX_TIME_SCALE` rejects NaN and both infinities on its own, so there is
+            // no separate isFinite check to keep in step with this one.
+            require(value in 0f..MAX_TIME_SCALE) {
+                "timeScale must be in 0..$MAX_TIME_SCALE, was $value"
             }
             field = value
         }
@@ -182,6 +186,23 @@ public class GameLoop(
 
         /** Matches [EngineConfig.maxCatchUpTicks]'s default. */
         public const val DEFAULT_MAX_CATCH_UP: Int = 5
+
+        /**
+         * Largest accepted [timeScale].
+         *
+         * A frame contributes `round(MAX_WALL_DELTA * timeScale * 1e6) * tickRate` units, and
+         * that product must stay inside `Long`. At `1e12` it does not: `roundToLong`
+         * saturates, the multiply by `tickRate` wraps to a large *negative* accumulator, and
+         * the loop then never satisfies `accumulator >= UNITS_PER_TICK` again — so it never
+         * steps again, never trips the [truncatedFrames] guard, and renders forever with an
+         * [alpha] far outside its documented `[0, 1)`. Silent and permanent.
+         *
+         * `1_000f` keeps the worst frame at `0.25 * 1000 * 1e6 * tickRate` — about `1.5e13`
+         * units at 60Hz, five orders of magnitude below `Long.MAX_VALUE`. Nothing is lost by
+         * capping here: anything beyond [maxCatchUp] ticks in one frame is truncated anyway,
+         * so a larger scale buys no extra simulated time, only overflow.
+         */
+        public const val MAX_TIME_SCALE: Float = 1_000f
 
         /**
          * A loop configured from the simulation's own [EngineConfig].

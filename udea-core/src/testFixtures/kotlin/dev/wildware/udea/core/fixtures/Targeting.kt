@@ -3,6 +3,7 @@ package dev.wildware.udea.core.fixtures
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.replication.BitReader
 import dev.wildware.udea.core.replication.BitWriter
+import dev.wildware.udea.core.replication.ComponentTypeId
 import dev.wildware.udea.core.replication.FieldMask
 import dev.wildware.udea.core.replication.FieldStore
 import dev.wildware.udea.core.replication.MaskOps
@@ -37,9 +38,9 @@ public object TargetingReplicator : Replicator<Targeting> {
     public const val FIELD_LAST_ATTACKER: Int = 1
     public const val FIELD_COUNT: Int = 2
 
-    override val typeId: Int = 2
+    override val typeId: ComponentTypeId = ComponentTypeId(2)
 
-    override val fieldNames: Array<String> = arrayOf("target", "lastAttacker")
+    override val fieldNames: List<String> = listOf("target", "lastAttacker")
 
     override val netMask: FieldMask = MaskOps.of(FIELD_TARGET)
 

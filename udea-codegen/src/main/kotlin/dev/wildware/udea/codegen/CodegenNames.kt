@@ -29,6 +29,7 @@ internal object CoreNames {
     private const val REPLICATION = "dev.wildware.udea.core.replication"
 
     val REPLICATOR: ClassName = ClassName(REPLICATION, "Replicator")
+    val COMPONENT_TYPE_ID: ClassName = ClassName(REPLICATION, "ComponentTypeId")
     val FIELD_MASK: ClassName = ClassName(REPLICATION, "FieldMask")
     val FIELD_STORE: ClassName = ClassName(REPLICATION, "FieldStore")
     val MASK_OPS: ClassName = ClassName(REPLICATION, "MaskOps")

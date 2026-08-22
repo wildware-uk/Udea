@@ -51,8 +51,6 @@ public class GameContext internal constructor(
     public val physics: PhysicsWorld,
     /** Scene lifecycle. Swaps land between ticks. */
     public val scenes: SceneManager,
-    /** In-simulation events. */
-    public val events: EventBus,
     /** Outbound presentation cues. Write-only from the simulation's side. */
     public val cues: CueSink,
     /** Engine logging, scoped to this simulation. */
@@ -143,8 +141,6 @@ public class GameContextBuilder {
 
     public var scenes: SceneManager? = null
 
-    public var events: EventBus? = null
-
     public var cues: CueSink? = null
 
     public var log: Log = Log.NoOp
@@ -163,11 +159,10 @@ public class GameContextBuilder {
     }
 
     public fun build(): GameContext {
-        val missing = ArrayList<String>(6)
+        val missing = ArrayList<String>(4)
         if (rng == null) missing += "rng"
         if (physics == null) missing += "physics"
         if (scenes == null) missing += "scenes"
-        if (events == null) missing += "events"
         if (cues == null) missing += "cues"
         if (missing.isNotEmpty()) {
             throw MissingServiceException(
@@ -187,7 +182,6 @@ public class GameContextBuilder {
             rng = requireNotNull(rng),
             physics = requireNotNull(physics),
             scenes = requireNotNull(scenes),
-            events = requireNotNull(events),
             cues = requireNotNull(cues),
             log = log,
             services = LinkedHashMap(services),

@@ -74,6 +74,30 @@ class FieldOrderTest {
     }
 
     @Test
+    fun `a disambiguated constant name is itself checked for collision`() {
+        // The three-name case the two-name test cannot reach. Sorted by name ('B' < '_'), the
+        // properties are fooBar(0), foo_bar(1), foo_bar_0(2). The first two collide on
+        // FIELD_FOO_BAR and get the index appended, producing FIELD_FOO_BAR_0 — which is
+        // *also* what foo_bar_0 screams to on its own, and it looked unique so it was left
+        // alone. Two `const val FIELD_FOO_BAR_0` in one object is a conflicting-declarations
+        // error inside a generated file, with nothing pointing back at the property that
+        // caused it: exactly the failure mode the emitter claims to have eliminated.
+        val names = FieldOrder.constantNames(listOf("fooBar", "foo_bar", "foo_bar_0"))
+
+        assertEquals(names.size, names.toSet().size, "constant names collided: $names")
+    }
+
+    @Test
+    fun `uniquification is closed however many names pile onto one constant`() {
+        val names = FieldOrder.constantNames(
+            listOf("fooBar", "foo_bar", "foo_bar_0", "foo_bar_1", "FOO_BAR"),
+        )
+
+        assertEquals(names.size, names.toSet().size, "constant names collided: $names")
+        assertTrue(names.all { it.startsWith("FIELD_FOO_BAR") }, names.toString())
+    }
+
+    @Test
     fun `constant names are left alone when nothing collides`() {
         assertEquals(
             listOf("FIELD_CURRENT", "FIELD_MAXIMUM"),

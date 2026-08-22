@@ -1,5 +1,5 @@
 # SHA-256 of every file udea-codegen generates for its fixture components.
 # Regenerate with: gradlew :udea-codegen:test -Pudea.updateGeneratedHashes=true
-dev/wildware/udea/codegen/fixtures/AiBlackboardReplicator.kt  2aca079ad2eac54faf3d7b29a6395c26cefed5f48f28178c92231d548a44e30b
-dev/wildware/udea/codegen/fixtures/HealthReplicator.kt  39b08ac41324c8435f6254056199636c0fef075555d10de41889264b7bc4b27b
-dev/wildware/udea/codegen/fixtures/MovementReplicator.kt  4645a21b99c071859fa5d4097458dbd75798b92ca36fd9da1d28e5d9f46b72ef
+dev/wildware/udea/codegen/fixtures/AiBlackboardReplicator.kt  031ba8c43b8401e0a195f1837f8f06e0fdbe2605b13e18d541504cc2156ba82c
+dev/wildware/udea/codegen/fixtures/HealthReplicator.kt  23d6f969714d177198ec6743e905e6ce9b6f2c9bb70efc9f479f6766a66493d1
+dev/wildware/udea/codegen/fixtures/MovementReplicator.kt  6ed939ada82e4aebca201f545b58a8ef4db427a92e3c11e04befa1ce45b2da7a

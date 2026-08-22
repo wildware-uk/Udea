@@ -4,6 +4,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -31,8 +32,6 @@ class AnnotationVocabularyTest {
         "dev.wildware.udea.annotations.Q" to setOf(AnnotationTarget.PROPERTY),
         "dev.wildware.udea.annotations.AgentTool" to setOf(AnnotationTarget.FUNCTION),
         "dev.wildware.udea.annotations.Arg" to setOf(AnnotationTarget.VALUE_PARAMETER),
-        "dev.wildware.udea.annotations.AgentToolset" to setOf(AnnotationTarget.CLASS),
-        "dev.wildware.udea.annotations.AgentState" to setOf(AnnotationTarget.PROPERTY),
     )
 
     private val expectedEnums = setOf("Authority", "Lifetime", "Visibility")
@@ -129,13 +128,24 @@ class AnnotationVocabularyTest {
         assertEquals(Float::class.javaPrimitiveType, q.getMethod("max").returnType)
     }
 
+    @Test
+    fun `Q has no default range because no default range is right`() {
+        // A defaulted range is uncatchable: the FIR checkers can only see `min >= max`, so a
+        // defaulted 0f..1f would clamp a rotation, a health pool or a world coordinate on
+        // every packet and never report it. `defaultValue` is null exactly when the Kotlin
+        // annotation parameter declares no default.
+        val q = Q::class.java
+        assertNull(q.getMethod("min").defaultValue, "@Q.min must have no default (issue-19)")
+        assertNull(q.getMethod("max").defaultValue, "@Q.max must have no default (issue-19)")
+        assertNull(q.getMethod("bits").defaultValue, "@Q.bits must have no default")
+    }
+
     /**
      * Applying every annotation at a legal site. This does not run: it compiling at all is
      * the assertion, because a wrong `@Target` makes the fixture below fail to compile.
      */
     @Suppress("unused")
     @Replicated
-    @AgentToolset(name = "fixture")
     private class TargetFixture {
         @Net(authority = Authority.OwnerPredicted, lifetime = Lifetime.OnCreate, visibility = Visibility.OwnerOnly)
         @Q(bits = 12, min = -1f, max = 1f)
@@ -143,9 +153,6 @@ class AnnotationVocabularyTest {
 
         @Sim
         var lastGroundedTick: Long = 0L
-
-        @AgentState
-        var debugLabel: String = ""
 
         @AgentTool(name = "nudge", description = "fixture")
         fun nudge(@Arg(description = "how far", required = false) distance: Float): Float = distance

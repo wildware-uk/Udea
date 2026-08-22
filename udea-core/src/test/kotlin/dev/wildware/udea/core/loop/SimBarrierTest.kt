@@ -9,7 +9,6 @@ import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.fixtures.RecordingCueSink
 import dev.wildware.udea.core.fixtures.QueueingSceneManager
 import dev.wildware.udea.core.fixtures.RecordingPhysicsWorld
-import dev.wildware.udea.core.fixtures.SimpleEventBus
 import dev.wildware.udea.core.fixtures.testGameContext
 import dev.wildware.udea.core.gameContext
 import dev.wildware.udea.core.rng.DefaultRngService
@@ -20,6 +19,7 @@ import java.util.concurrent.atomic.AtomicIntegerArray
 import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -92,7 +92,6 @@ class SimBarrierTest {
             rng = DefaultRngService(0L)
             physics = RecordingPhysicsWorld()
             scenes = QueueingSceneManager()
-            events = SimpleEventBus()
             cues = RecordingCueSink()
             simBarrier()
         }
@@ -202,6 +201,76 @@ class SimBarrierTest {
         assertTrue("explode-on-purpose" in message, "the label must name the culprit: $message")
         assertTrue("t0" in message, "the tick must be in the message: $message")
         assertEquals("boom", assertNotNull(cause).message)
+    }
+
+    @Test
+    fun `an Error escapes the drain instead of being absorbed`() {
+        // The catch is there so one bad tool call cannot strand the rest of the batch. An
+        // Error is the opposite case: after an OutOfMemoryError, StackOverflowError or
+        // LinkageError inside an action the world is in exactly the undefined state this
+        // class exists to prevent, and continuing to tick over it is worse than stopping.
+        // AssertionError matters for a second reason — swallowing it would make an assertion
+        // written inside a BarrierAction pass silently.
+        val log = CapturingLog()
+        val f = fixture(log)
+        val after = SpawnAction("must-not-run")
+
+        f.barrier.submit(object : BarrierAction {
+            override val label: String = "assertion-inside-an-action"
+            override fun apply(world: World, ctx: GameContext) {
+                throw AssertionError("an assertion inside a barrier action")
+            }
+        })
+        f.barrier.submit(after)
+
+        val escaped = assertFailsWith<AssertionError> { f.sim.step() }
+        assertEquals("an assertion inside a barrier action", escaped.message)
+        assertEquals(0L, f.barrier.failedActions, "an Error is not a contained failure")
+        assertEquals(emptyList(), log.errors.map { it.first }, "and it is not logged-and-continued")
+        assertNull(after.appliedAtTick, "the drain stopped rather than carrying on")
+    }
+
+    @Test
+    fun `an Error aborting a drain does not re-apply the batch on the next tick`() {
+        // The companion to the test above. The Error is deliberately not caught, so the drain
+        // unwinds partway through the batch. If the batch buffer is not cleared on the way
+        // out, the next drain's swap moves it back into the inbox and every action in it runs
+        // a second time — including the ones that already succeeded before the Error. That is
+        // the double-applied, torn state the class exists to prevent, and it is reachable by
+        // any embedder or harness that catches the Error and keeps ticking, which is exactly
+        // what this test does.
+        val f = fixture()
+        val before = SpawnAction("applied-before-the-error")
+
+        f.barrier.submit(before)
+        f.barrier.submit(object : BarrierAction {
+            override val label: String = "aborts-the-drain"
+            override fun apply(world: World, ctx: GameContext) {
+                throw AssertionError("abort")
+            }
+        })
+
+        assertFailsWith<AssertionError> { f.sim.step() }
+        assertEquals(1, f.world.numEntities, "the first action applied once before the abort")
+        assertEquals(
+            0,
+            f.barrier.pendingCount(),
+            "the aborted batch must not be left where the next swap can queue it again",
+        )
+
+        // Recover and keep ticking, the way a harness or a supervising embedder would. Two
+        // ticks, not one: an uncleared batch takes one swap to travel back into `inbox` and a
+        // second to be drained out of it, so a single step would miss the re-application.
+        f.sim.step()
+        f.sim.step()
+
+        assertEquals(
+            1,
+            f.world.numEntities,
+            "the aborted batch must not be drained again: the action that already applied " +
+                "would spawn a second entity",
+        )
+        assertEquals(0, f.barrier.pendingCount(), "and nothing may be left queued")
     }
 
     @Test

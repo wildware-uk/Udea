@@ -2,12 +2,12 @@ package dev.wildware.udea.codegen.replicator
 
 import com.squareup.kotlinpoet.ANY
 import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.ARRAY
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.INT
 import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.LIST
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.STRING
 import com.squareup.kotlinpoet.TypeName
@@ -70,17 +70,9 @@ internal object ReplicatorEmitter {
                 .build(),
         )
 
+        builder.addProperty(typeIdProperty(component))
         builder.addProperty(
-            PropertySpec.builder("typeId", INT, KModifier.OVERRIDE)
-                .addKdoc(
-                    "Placeholder derived from the FQN. The authoritative id is assigned from\n" +
-                        "`net-protocol.lock`; nothing may persist this value.",
-                )
-                .initializer("%L", TypeIds.placeholder(component.qualifiedName))
-                .build(),
-        )
-        builder.addProperty(
-            PropertySpec.builder("fieldNames", ARRAY.parameterizedBy(STRING), KModifier.OVERRIDE)
+            PropertySpec.builder("fieldNames", LIST.parameterizedBy(STRING), KModifier.OVERRIDE)
                 .initializer(fieldNamesInitializer(fields))
                 .build(),
         )
@@ -105,6 +97,22 @@ internal object ReplicatorEmitter {
         return builder.build()
     }
 
+    /**
+     * The `typeId` override, kept as its own function because it is the one member of the
+     * generated object whose *type* has already moved once: `udea-core` replaced the bare `Int`
+     * with the `ComponentTypeId` value class, so a framing layer cannot transpose it with a
+     * `slot` or a `fieldIndex`. The literal is still an `Int`, and `TypeIds.placeholder` masks
+     * off the sign bit, which is what satisfies `ComponentTypeId`'s `raw >= 0` precondition.
+     */
+    private fun typeIdProperty(component: ReplicatedComponent): PropertySpec =
+        PropertySpec.builder("typeId", CoreNames.COMPONENT_TYPE_ID, KModifier.OVERRIDE)
+            .addKdoc(
+                "Placeholder derived from the FQN. The authoritative id is assigned from\n" +
+                    "`net-protocol.lock`; nothing may persist this value.",
+            )
+            .initializer("%T(%L)", CoreNames.COMPONENT_TYPE_ID, TypeIds.placeholder(component.qualifiedName))
+            .build()
+
     private fun kdoc(component: ReplicatedComponent): CodeBlock {
         val doc = CodeBlock.builder()
             .add("Generated `Replicator` for [%T].\n\n", component.className)
@@ -123,10 +131,10 @@ internal object ReplicatorEmitter {
 
     private fun fieldNamesInitializer(fields: List<ReplicatedField>): CodeBlock =
         if (fields.isEmpty()) {
-            CodeBlock.of("emptyArray()")
+            CodeBlock.of("emptyList()")
         } else {
             CodeBlock.builder()
-                .add("arrayOf(")
+                .add("listOf(")
                 .apply {
                     fields.forEachIndexed { i, field ->
                         if (i > 0) add(", ")
@@ -177,6 +185,15 @@ internal object ReplicatorEmitter {
             .build()
     }
 
+    /**
+     * `diff` must agree field-for-field with `FieldStore.fieldEquals`, which `desync_report`
+     * walks — so a `Float` is compared as `toRawBits()`, never with `!=`. IEEE 754 says
+     * `NaN != NaN` and `0.0f == -0.0f`; the store's semantics are the stored representation and
+     * say the opposite on both counts. `getFloat(a) != getFloat(b)` would make a delta encoder
+     * that never converges (`NaN` resends for ever) and one that silently under-replicates a
+     * sign flip through zero. `FieldStore.fieldEquals`' KDoc states this as a requirement on
+     * every emitted `diff`.
+     */
     private fun diff(component: ReplicatedComponent): FunSpec {
         val body = CodeBlock.builder()
         if (component.fields.isEmpty()) {
@@ -184,9 +201,11 @@ internal object ReplicatorEmitter {
         } else {
             body.addStatement("var mask: %T = %T.EMPTY", CoreNames.FIELD_MASK, CoreNames.MASK_OPS)
             for (field in component.fields) {
+                val compared = if (field.storage == FieldStorage.FLOAT) ".toRawBits()" else ""
                 body.beginControlFlow(
-                    "if (store.get%L(slotA, %L) != store.get%L(slotB, %L))",
-                    field.storage.accessor, field.constant, field.storage.accessor, field.constant,
+                    "if (store.get%L(slotA, %L)%L != store.get%L(slotB, %L)%L)",
+                    field.storage.accessor, field.constant, compared,
+                    field.storage.accessor, field.constant, compared,
                 )
                 body.addStatement("mask = %T.set(mask, %L)", CoreNames.MASK_OPS, field.constant)
                 body.endControlFlow()
@@ -229,6 +248,18 @@ internal object ReplicatorEmitter {
             .build()
     }
 
+    /**
+     * `read` is the **trust boundary**: it is the only entry point that puts bytes it did not
+     * produce into a `FieldStore`. So an enum arrives as an unconstrained 32-bit ordinal and is
+     * range-checked *here*, before the store sees it — not in `apply`, where the array index
+     * would already be reading a poisoned slot and the same bad value would sit in every
+     * rewind slot captured from it.
+     *
+     * The check names the component, the field, the offending ordinal and the valid range,
+     * because the two realistic sources are a corrupt datagram and ordinary version skew
+     * between two builds whose enum has a different number of constants — and a bare
+     * `IndexOutOfBoundsException` from inside generated code names none of them.
+     */
     private fun read(component: ReplicatedComponent): FunSpec {
         val body = CodeBlock.builder()
         body.addStatement(
@@ -237,10 +268,34 @@ internal object ReplicatorEmitter {
         )
         for (field in component.fields) {
             body.beginControlFlow("if (%T.test(mask, %L))", CoreNames.MASK_OPS, field.constant)
-            body.addStatement(
-                "store.set%L(slot, %L, src.read%L())",
-                field.storage.accessor, field.constant, field.storage.accessor,
-            )
+            val enum = field.enumEntries
+            if (enum == null) {
+                body.addStatement(
+                    "store.set%L(slot, %L, src.read%L())",
+                    field.storage.accessor, field.constant, field.storage.accessor,
+                )
+            } else {
+                val local = "${field.name}Ordinal"
+                body.add(
+                    "// The trust boundary: this ordinal is unconstrained until checked, and a\n" +
+                        "// bad one must never reach the store — the snapshot ring shares it.\n",
+                )
+                body.addStatement("val %N = src.read%L()", local, field.storage.accessor)
+                body.addStatement(
+                    "require(%N in %T.entries.indices) { TYPE_NAME + %S + %N + %S + %T.entries.size + %S }",
+                    local,
+                    enum,
+                    ".${field.name}: ordinal ",
+                    local,
+                    " is not a ${display(enum)} constant (0 until ",
+                    enum,
+                    ")",
+                )
+                body.addStatement(
+                    "store.set%L(slot, %L, %N)",
+                    field.storage.accessor, field.constant, local,
+                )
+            }
             body.endControlFlow()
         }
         body.addStatement("return mask")
@@ -254,6 +309,12 @@ internal object ReplicatorEmitter {
             .build()
     }
 
+    /**
+     * `apply` indexes `entries` directly, and that is safe *because* of the two writers into
+     * the store: [capture] writes `.ordinal`, which is in range by construction, and [read]
+     * range-checks before writing. There is no third writer, so an out-of-range ordinal can
+     * never be in the slot this reads.
+     */
     private fun apply(component: ReplicatedComponent): FunSpec {
         val body = CodeBlock.builder()
         for (field in component.fields) {

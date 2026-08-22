@@ -31,8 +31,8 @@ Consequences that fall out of having one mechanism instead of four:
 
 ```kotlin
 interface Replicator<T> {
-    val typeId: Int
-    val fieldNames: Array<String>
+    val typeId: ComponentTypeId
+    val fieldNames: List<String>
     val netMask: FieldMask
     val allMask: FieldMask
 
@@ -86,12 +86,37 @@ fields:
 |---|---|---|
 | 0 | `position.x` | `@Net` |
 | 1 | `position.y` | `@Net` |
-| 2 | `rotation` | `@Net` (`@Q(bits = 12)`) |
+| 2 | `rotation` | `@Net` (`@Q(bits = 12, min = -3.1416f, max = 3.1416f)`) |
 | 3 | `lastGroundedTick` | `@Sim` |
 
 Lowering is what keeps one mask bit meaning one comparable value, keeps the store columnar
 and allocation-free, and keeps the 64-field budget countable. The 64-field limit therefore
 counts lowered fields, not annotated properties.
+
+---
+
+## Field comparison is bit-identical, not IEEE
+
+Two field values are equal **iff their stored representations are identical**. For a `Float`
+that means comparison is over `Float.toRawBits`, so `NaN` equals itself and `-0.0f` differs
+from `0.0f` — the opposite of `==` on both counts.
+
+Both comparison paths must agree on this: `FieldStore.fieldEquals`, which `desync_report`
+walks without knowing the component's Kotlin types, and the typed comparison a generated
+`Replicator.diff` uses for speed. A `diff` written with `getFloat(a) != getFloat(b)` is
+**wrong**; it must compare `toRawBits()`. Only `Float` needs the treatment — `Int`, `Long`
+and `Boolean` have no representation `==` disagrees with.
+
+The rule is what makes a delta converge, rather than a matter of taste:
+
+- under IEEE equality a field holding `NaN` differs from itself, so `diff` sets its bit every
+  tick forever — a delta that never converges and a baseline that never settles;
+- under IEEE equality `0.0f -> -0.0f` is not a change, so no delta is sent and the destination
+  keeps `+0.0f`, while `fieldEquals` goes on reporting that field as differing — a permanent
+  false positive in `desync_report` with no path to convergence.
+
+Under bit-identical comparison, what is reported as different is exactly what a write would
+actually change.
 
 ---
 

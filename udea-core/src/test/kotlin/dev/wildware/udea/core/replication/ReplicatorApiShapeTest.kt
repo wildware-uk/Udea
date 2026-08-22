@@ -105,10 +105,19 @@ class ReplicatorApiShapeTest {
     }
 
     @Test
-    fun `only udea-core and udea-net declare a property of type FieldMask`() {
+    fun `no declared property outside udea-core and udea-net names FieldMask in its type`() {
         // The mask may be passed through the Replicator API, never stored in game code. A
         // component or system holding one is how a Long-to-LongArray widening turns into a
         // breaking change.
+        //
+        // What this enforces is exactly its name: a `val`/`var` whose *declared* type
+        // mentions FieldMask anywhere - `FieldMask`, `FieldMask?`, `List<FieldMask>`,
+        // `Map<NetId, FieldMask>`, a constructor property. It cannot see storage behind an
+        // inferred type (`private val cached = replicator.netMask`); no source scan can, and
+        // the compiled-class variant is no better, because FieldMask is a value class over
+        // Long and its field descriptor is `J` - that check would flag every Long field in
+        // every module. The four reflection tests above carry the load-bearing half of the
+        // spec-7 mitigation; this is a belt over those braces.
         //
         // Scope: shipped source only — `src/main` and `src/testFixtures`, the code a
         // widening would have to keep compiling without a source change. Test sources are
@@ -139,11 +148,83 @@ class ReplicatorApiShapeTest {
         )
     }
 
-    private fun fieldMaskProperties(file: File): List<String> {
-        val code = KotlinSource.stripCommentsAndStrings(file.readText())
-        return FIELD_MASK_PROPERTY.findAll(code)
-            .map { "${ModuleFiles.relativePath(file)}:${KotlinSource.lineOf(code, it.range.first)}" }
+    /**
+     * Every `val`/`var` in [file] whose declared type mentions `FieldMask`.
+     *
+     * Same shape as `FleksEntityBoundaryRule`, the sibling source rule in this module: find
+     * the declaration, extract its type, then look for the name anywhere inside it. Matching
+     * `: FieldMask` directly - as this used to - misses every generic and nullable form,
+     * which is most of the ways a mask would actually get stored.
+     */
+    @Test
+    fun `the FieldMask storage rule fires on the forms idiomatic Kotlin actually uses`() {
+        // A source rule that only matches `: FieldMask` certifies far less than its name
+        // claims, and a guard nobody has watched fail is a guard nobody should trust. Every
+        // line here is a way a mask would really get stored.
+        val caught = """
+            class Offenders(private val ctor: FieldMask) {
+                val plain: FieldMask = MaskOps.EMPTY
+                var nullable: FieldMask? = null
+                private val many: List<FieldMask> = emptyList()
+                val byId: Map<NetId, FieldMask> = emptyMap()
+                val wrapped: Map<NetId, List<FieldMask>> = emptyMap()
+                val multiLine: Map<
+                    NetId,
+                    FieldMask,
+                > = emptyMap()
+            }
+        """.trimIndent()
+        assertEquals(7, fieldMaskProperties("Offenders.kt", caught).size, caught)
+
+        // And it does not fire on prose, on a name that merely starts the same way, or on
+        // passing a mask through the API — which is the sanctioned use.
+        val allowed = """
+            /** A FieldMask is passed through, never stored: val stored: FieldMask. */
+            class Fine(val label: String) {
+                val note: String = "val cached: FieldMask"
+                val other: FieldMaskCache = FieldMaskCache()
+                fun write(mask: FieldMask, out: BitWriter) {
+                    val local = MaskOps.and(mask, mask)
+                }
+            }
+        """.trimIndent()
+        assertEquals(emptyList(), fieldMaskProperties("Fine.kt", allowed), allowed)
+    }
+
+    private fun fieldMaskProperties(file: File): List<String> =
+        fieldMaskProperties(ModuleFiles.relativePath(file), file.readText())
+
+    private fun fieldMaskProperties(path: String, source: String): List<String> {
+        val code = KotlinSource.stripCommentsAndStrings(source)
+        return PROPERTY_DECLARATION.findAll(code)
+            .filter { FIELD_MASK.containsMatchIn(declaredTypeAt(code, it.range.last + 1)) }
+            .map { "$path:${KotlinSource.lineOf(code, it.range.first)}" }
             .toList()
+    }
+
+    /**
+     * The declared type beginning at [from], which is one character past a property's `:`.
+     *
+     * Runs to the initialiser, the accessor or the end of the declaration, carrying across a
+     * newline only while a bracket is open so a multi-line generic argument list is read
+     * whole. A `,` or `)` at depth zero ends it, which is what stops a constructor property's
+     * type from swallowing the parameters declared after it.
+     */
+    private fun declaredTypeAt(code: String, from: Int): String {
+        var cursor = from
+        var depth = 0
+        while (cursor < code.length) {
+            when (val char = code[cursor]) {
+                '<', '(', '[' -> depth++
+                '>', ')', ']' -> when {
+                    depth > 0 -> depth--
+                    char != '>' -> return code.substring(from, cursor)
+                }
+                ',', '=', '{', '\n' -> if (depth == 0) return code.substring(from, cursor)
+            }
+            cursor++
+        }
+        return code.substring(from)
     }
 
     private fun function(name: String) =
@@ -155,7 +236,10 @@ class ReplicatorApiShapeTest {
     private fun typeName(type: KType): String? = (type.classifier as? kotlin.reflect.KClass<*>)?.qualifiedName
 
     private companion object {
-        /** A `val`/`var` declaration whose declared type is `FieldMask`. */
-        val FIELD_MASK_PROPERTY = Regex("""\b(?:val|var)\s+\w+\s*:\s*FieldMask\b""")
+        /** A `val`/`var` declaration with an explicit type, matched up to and including its `:`. */
+        val PROPERTY_DECLARATION = Regex("""\b(?:val|var)\s+\w+\s*:""")
+
+        /** The mask's name, looked for anywhere inside a declared type. */
+        val FIELD_MASK = Regex("""\bFieldMask\b""")
     }
 }

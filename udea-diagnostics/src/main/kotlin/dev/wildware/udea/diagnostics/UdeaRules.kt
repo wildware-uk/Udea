@@ -97,12 +97,45 @@ public object UdeaRules {
         description = "reference(\"...\") names an asset id that no asset declares",
     )
 
+    /**
+     * `@Sim` on a `val`. The same defect as [NET_ON_VAL] on the snapshot side: capture reads
+     * the field every tick and `Replicator.apply` writes it back, and neither is possible for
+     * a `val`, so the field would occupy a mask bit that can never be restored.
+     *
+     * Only `udea-codegen`'s KSP processor raises this today; spec section 3.2 assigns the
+     * `@Net` half to the K2 FIR checker and is silent on `@Sim`. It is registered here anyway,
+     * because this object's own KDoc says the id space is shared and "a rule that only one of
+     * them can raise still lives here" -- an id minted locally by a producer would not be an
+     * id at all.
+     */
+    public val SIM_ON_VAL: UdeaRule = UdeaRule(
+        id = "UDEA0005",
+        defaultSeverity = Severity.Error,
+        description = "@Sim annotates a val, which can never change and so can never be snapshotted",
+    )
+
+    /**
+     * A `@Net`/`@Sim` property whose type no generator can store in a field store. Today that
+     * means anything outside `Int`, `Long`, `Float`, `Boolean` and enums, since a field codec
+     * (`@NetCodecFor`) is not implemented.
+     *
+     * Registered for the same reason as [SIM_ON_VAL]: it is a build-failing error an author
+     * hits, and it sat beside three id-carrying errors without one of its own.
+     */
+    public val UNSUPPORTED_FIELD_TYPE: UdeaRule = UdeaRule(
+        id = "UDEA0006",
+        defaultSeverity = Severity.Error,
+        description = "a @Net/@Sim property has a type udea-codegen cannot replicate",
+    )
+
     /** Every registered rule, in id order. */
     public val all: List<UdeaRule> = listOf(
         NET_ON_VAL,
         COMPONENT_FIELD_LIMIT,
         QUANTIZED_NON_FLOAT,
         UNRESOLVED_REFERENCE,
+        SIM_ON_VAL,
+        UNSUPPORTED_FIELD_TYPE,
     ).sortedBy { it.id }
 
     private val byId: Map<String, UdeaRule> = all.associateBy { it.id }

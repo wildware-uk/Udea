@@ -57,17 +57,24 @@ package dev.wildware.udea.core.replication
 public interface Replicator<T> {
 
     /**
-     * Stable numeric id for the component type, assigned by the one generator from sorted
-     * FQNs and pinned in `net-protocol.lock` (spec 5, "Id assignment").
+     * Stable id for the component type, assigned by the one generator from sorted FQNs and
+     * pinned in `net-protocol.lock` (spec 5, "Id assignment"). See [ComponentTypeId] for why
+     * it is not a bare `Int`.
      */
-    public val typeId: Int
+    public val typeId: ComponentTypeId
 
     /**
      * Field names, index-aligned with [FieldMask] bit positions and [FieldStore] field
      * indices. A composite value type contributes one entry per primitive component, with a
      * dotted path (`"position.x"`).
+     *
+     * A read-only `List` rather than an `Array`: every implementation is a Kotlin `object`,
+     * so an `Array` here would be one process-wide mutable array handed to every consumer,
+     * and `fieldNames[0] = "x"` would permanently corrupt the naming that `desync_report` and
+     * `describe_entity` index into. It is built once at class init, so nothing on a per-tick
+     * path pays for it — and a `List` compares by value, which an `Array` does not.
      */
-    public val fieldNames: Array<String>
+    public val fieldNames: List<String>
 
     /** Fields that are replicated and snapshotted: the `@Net` set. Always a subset of [allMask]. */
     public val netMask: FieldMask

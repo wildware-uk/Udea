@@ -21,7 +21,8 @@ import dev.wildware.udea.core.RngStream
  * state words come from a SplitMix64 run over that. Two consequences, both load-bearing:
  *
  * - a stream's seed depends on nothing but the root seed and its own ordinal, so **appending
- *   a stream to the enum cannot perturb an existing one**;
+ *   a stream to the enum cannot perturb an existing one** — pinned by the checked-in seed
+ *   values in `RngStreamIsolationTest`, which cover ordinals the enum does not have yet;
  * - the extra mix before the run means two adjacent ordinals do not share a SplitMix64
  *   window. Seeding stream *n* straight from `rootSeed + n * GAMMA` would give stream 1 the
  *   state words stream 0 was about to use, and the two would run three-quarters correlated.
@@ -128,9 +129,11 @@ public class DefaultRngService(
         /**
          * The seed for the stream at [ordinal], a pure function of it and [rootSeed].
          *
-         * Exposed because the isolation test proves the property structurally — that the
-         * seed for ordinal *n* is unchanged by the existence of ordinal *n + 1* — rather
-         * than by editing the enum, which a test cannot do.
+         * Exposed so `RngStreamIsolationTest` can pin its output for ordinals past the end of
+         * today's enum. A test cannot append an enum constant, and asserting `streamSeed`
+         * against itself proves nothing, because it would move on both sides; checked-in
+         * seed values are what actually turn red if a future seeding scheme reads the stream
+         * population instead of only the ordinal.
          */
         public fun streamSeed(rootSeed: Long, ordinal: Int): Long {
             require(ordinal >= 0) { "stream ordinal must not be negative, was $ordinal" }

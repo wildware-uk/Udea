@@ -1,0 +1,104 @@
+value class dev.wildware.udea.core.Tick
+  val value: kotlin.Long
+  fun compareTo(other: dev.wildware.udea.core.Tick): kotlin.Int
+  fun dec(): dev.wildware.udea.core.Tick
+  fun equals(other: kotlin.Any?): kotlin.Boolean
+  fun hashCode(): kotlin.Int
+  fun inc(): dev.wildware.udea.core.Tick
+  fun minus(ticks: kotlin.Long): dev.wildware.udea.core.Tick
+  fun plus(ticks: kotlin.Long): dev.wildware.udea.core.Tick
+  fun ticksSince(earlier: dev.wildware.udea.core.Tick): kotlin.Long
+  fun toString(): kotlin.String
+  fun until(end: dev.wildware.udea.core.Tick): dev.wildware.udea.core.TickRange
+
+value class dev.wildware.udea.core.identity.NetId
+  val generation: kotlin.Int
+  val index: kotlin.Int
+  val isNone: kotlin.Boolean
+  val raw: kotlin.Int
+  fun compareTo(other: dev.wildware.udea.core.identity.NetId): kotlin.Int
+  fun equals(other: kotlin.Any?): kotlin.Boolean
+  fun hashCode(): kotlin.Int
+  fun toString(): kotlin.String
+
+interface dev.wildware.udea.core.replication.BitReader
+  val bitPosition: kotlin.Long
+  fun readBits(bitCount: kotlin.Int): kotlin.Int
+  fun readBoolean(): kotlin.Boolean
+  fun readFloat(): kotlin.Float
+  fun readInt(): kotlin.Int
+  fun readLong(): kotlin.Long
+
+interface dev.wildware.udea.core.replication.BitWriter
+  val bitPosition: kotlin.Long
+  fun writeBits(value: kotlin.Int, bitCount: kotlin.Int): kotlin.Unit
+  fun writeBoolean(value: kotlin.Boolean): kotlin.Unit
+  fun writeFloat(value: kotlin.Float): kotlin.Unit
+  fun writeInt(value: kotlin.Int): kotlin.Unit
+  fun writeLong(value: kotlin.Long): kotlin.Unit
+
+value class dev.wildware.udea.core.replication.FieldMask
+  internal val bits: kotlin.Long
+  fun equals(other: kotlin.Any?): kotlin.Boolean
+  fun hashCode(): kotlin.Int
+  fun toString(): kotlin.String
+
+interface dev.wildware.udea.core.replication.FieldStore
+  val fieldCount: kotlin.Int
+  val slotCount: kotlin.Int
+  fun copySlot(fromSlot: kotlin.Int, toSlot: kotlin.Int): kotlin.Unit
+  fun fieldEquals(slotA: kotlin.Int, slotB: kotlin.Int, field: kotlin.Int): kotlin.Boolean
+  fun getBoolean(slot: kotlin.Int, field: kotlin.Int): kotlin.Boolean
+  fun getFloat(slot: kotlin.Int, field: kotlin.Int): kotlin.Float
+  fun getInt(slot: kotlin.Int, field: kotlin.Int): kotlin.Int
+  fun getLong(slot: kotlin.Int, field: kotlin.Int): kotlin.Long
+  fun getNetId(slot: kotlin.Int, field: kotlin.Int): dev.wildware.udea.core.identity.NetId
+  fun getObject(slot: kotlin.Int, field: kotlin.Int): kotlin.Any?
+  fun getTick(slot: kotlin.Int, field: kotlin.Int): dev.wildware.udea.core.Tick
+  fun setBoolean(slot: kotlin.Int, field: kotlin.Int, value: kotlin.Boolean): kotlin.Unit
+  fun setFloat(slot: kotlin.Int, field: kotlin.Int, value: kotlin.Float): kotlin.Unit
+  fun setInt(slot: kotlin.Int, field: kotlin.Int, value: kotlin.Int): kotlin.Unit
+  fun setLong(slot: kotlin.Int, field: kotlin.Int, value: kotlin.Long): kotlin.Unit
+  fun setNetId(slot: kotlin.Int, field: kotlin.Int, value: dev.wildware.udea.core.identity.NetId): kotlin.Unit
+  fun setObject(slot: kotlin.Int, field: kotlin.Int, value: kotlin.Any?): kotlin.Unit
+  fun setTick(slot: kotlin.Int, field: kotlin.Int, value: dev.wildware.udea.core.Tick): kotlin.Unit
+
+object dev.wildware.udea.core.replication.MaskOps
+  val ALL: dev.wildware.udea.core.replication.FieldMask
+  val EMPTY: dev.wildware.udea.core.replication.FieldMask
+  val MAX_FIELDS: kotlin.Int
+  fun and(a: dev.wildware.udea.core.replication.FieldMask, b: dev.wildware.udea.core.replication.FieldMask): dev.wildware.udea.core.replication.FieldMask
+  fun andNot(a: dev.wildware.udea.core.replication.FieldMask, b: dev.wildware.udea.core.replication.FieldMask): dev.wildware.udea.core.replication.FieldMask
+  fun cardinality(mask: dev.wildware.udea.core.replication.FieldMask): kotlin.Int
+  fun clear(mask: dev.wildware.udea.core.replication.FieldMask, fieldIndex: kotlin.Int): dev.wildware.udea.core.replication.FieldMask
+  fun containsAll(mask: dev.wildware.udea.core.replication.FieldMask, subset: dev.wildware.udea.core.replication.FieldMask): kotlin.Boolean
+  fun forEachSetBit(mask: dev.wildware.udea.core.replication.FieldMask, visitor: dev.wildware.udea.core.replication.FieldIndexVisitor): kotlin.Unit
+  fun fromWords(words: kotlin.LongArray): dev.wildware.udea.core.replication.FieldMask
+  fun isEmpty(mask: dev.wildware.udea.core.replication.FieldMask): kotlin.Boolean
+  fun isNotEmpty(mask: dev.wildware.udea.core.replication.FieldMask): kotlin.Boolean
+  fun lowest(fieldCount: kotlin.Int): dev.wildware.udea.core.replication.FieldMask
+  fun lowestSetBit(mask: dev.wildware.udea.core.replication.FieldMask): kotlin.Int
+  fun nextSetBit(mask: dev.wildware.udea.core.replication.FieldMask, from: kotlin.Int): kotlin.Int
+  fun of(fieldIndices: kotlin.IntArray): dev.wildware.udea.core.replication.FieldMask
+  fun or(a: dev.wildware.udea.core.replication.FieldMask, b: dev.wildware.udea.core.replication.FieldMask): dev.wildware.udea.core.replication.FieldMask
+  fun readFrom(src: dev.wildware.udea.core.replication.BitReader, fieldCount: kotlin.Int): dev.wildware.udea.core.replication.FieldMask
+  fun set(mask: dev.wildware.udea.core.replication.FieldMask, fieldIndex: kotlin.Int): dev.wildware.udea.core.replication.FieldMask
+  fun single(fieldIndex: kotlin.Int): dev.wildware.udea.core.replication.FieldMask
+  fun test(mask: dev.wildware.udea.core.replication.FieldMask, fieldIndex: kotlin.Int): kotlin.Boolean
+  fun word(mask: dev.wildware.udea.core.replication.FieldMask, wordIndex: kotlin.Int): kotlin.Long
+  fun wordCount(): kotlin.Int
+  fun writeTo(mask: dev.wildware.udea.core.replication.FieldMask, out: dev.wildware.udea.core.replication.BitWriter, fieldCount: kotlin.Int): kotlin.Unit
+
+interface dev.wildware.udea.core.replication.Replicator
+  val allMask: dev.wildware.udea.core.replication.FieldMask
+  val fieldNames: kotlin.Array<kotlin.String>
+  val netMask: dev.wildware.udea.core.replication.FieldMask
+  val typeId: kotlin.Int
+  fun apply(store: dev.wildware.udea.core.replication.FieldStore, slot: kotlin.Int, component: T, mask: dev.wildware.udea.core.replication.FieldMask): kotlin.Unit
+  fun capture(component: T, store: dev.wildware.udea.core.replication.FieldStore, slot: kotlin.Int): kotlin.Unit
+  fun diff(store: dev.wildware.udea.core.replication.FieldStore, slotA: kotlin.Int, slotB: kotlin.Int): dev.wildware.udea.core.replication.FieldMask
+  fun getField(component: T, fieldIndex: kotlin.Int): kotlin.Any?
+  fun read(src: dev.wildware.udea.core.replication.BitReader, store: dev.wildware.udea.core.replication.FieldStore, slot: kotlin.Int): dev.wildware.udea.core.replication.FieldMask
+  fun setField(component: T, fieldIndex: kotlin.Int, value: kotlin.Any?): kotlin.Unit
+  fun write(store: dev.wildware.udea.core.replication.FieldStore, slot: kotlin.Int, mask: dev.wildware.udea.core.replication.FieldMask, out: dev.wildware.udea.core.replication.BitWriter): kotlin.Unit
+

@@ -1,0 +1,4 @@
+# DiagnosticsJsonGoldenTest byte-compares the golden file, and this repo runs with
+# core.autocrlf=true. Without this, git would rewrite the golden's LF endings to CRLF on
+# a Windows checkout and the byte comparison would fail there but pass on CI.
+src/test/resources/**/*.json -text

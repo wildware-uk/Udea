@@ -2,7 +2,7 @@
 # libraries
 junit = "4.13.2"
 opentest4j = "1.3.0"
-libgdx="1.13.1"
+libgdx = "1.13.1"
 
 # plugins
 changelog = "2.2.1"
@@ -12,10 +12,33 @@ kover = "0.9.1"
 qodana = "2024.3.4"
 junitJupiter = "5.8.1"
 
+# --- udea-* rewrite (Phase 0). Every new module takes its versions from here. ---
+# `kotlin` above is the single authoritative Kotlin version: udea-compiler-plugin and
+# udea-assets-compiler are pinned to it exactly (spec 7), and build-logic's
+# UdeaVersions.KOTLIN is asserted equal to it by a test.
+ksp = "2.2.10-2.0.2"
+kotlinpoet = "2.3.0"
+fleks = "2.14"
+gdx = "1.13.5"
+junit5 = "5.13.4"
+junitPlatform = "1.13.4"
+
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 opentest4j = { group = "org.opentest4j", name = "opentest4j", version.ref = "opentest4j" }
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junitJupiter" }
+
+# --- udea-* rewrite ---
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
+ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
+kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
+fleks = { module = "io.github.quillraven.fleks:Fleks", version.ref = "fleks" }
+gdx = { module = "com.badlogicgames.gdx:gdx", version.ref = "gdx" }
+gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", version.ref = "gdx" }
+junit5-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
+junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }
 
 [plugins]
 changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }

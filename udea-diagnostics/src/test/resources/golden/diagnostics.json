@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "suppressed": 4,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "ruleId": "UDEA0001",
+      "message": "@Net annotates a val: \"health\" can never change",
+      "span": {"path": "moba/src/main/kotlin/Health.kt", "startLine": 12, "startColumn": 5, "endLine": 12, "endColumn": 24},
+      "assetId": null,
+      "causedBy": null,
+      "fix": {
+        "description": "change `val` to `var`",
+        "replacements": [
+          {
+            "span": {"path": "moba/src/main/kotlin/Health.kt", "startLine": 12, "startColumn": 5, "endLine": 12, "endColumn": 8},
+            "newText": "var"
+          }
+        ]
+      }
+    },
+    {
+      "severity": "error",
+      "ruleId": "UDEA0004",
+      "message": "unresolved reference \"charater/orc\" \u2014 did you mean \"character/orc\"?",
+      "span": {"path": "moba/src/main/kotlin/Spawn.kt", "startLine": 30, "startColumn": 17, "endLine": 30, "endColumn": 31},
+      "assetId": "charater/orc",
+      "causedBy": "charater/orc",
+      "fix": null
+    },
+    {
+      "severity": "warning",
+      "ruleId": "UDEA0003",
+      "message": "@Q on a non-float property",
+      "span": null,
+      "assetId": "character/orc",
+      "causedBy": null,
+      "fix": null
+    }
+  ]
+}

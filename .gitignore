@@ -46,3 +46,6 @@ bin/
 
 # Cached scripts
 scripts/cache/
+
+# SDD scratch workspace
+.superpowers/

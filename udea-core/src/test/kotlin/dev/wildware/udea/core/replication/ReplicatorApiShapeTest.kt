@@ -109,6 +109,13 @@ class ReplicatorApiShapeTest {
         // The mask may be passed through the Replicator API, never stored in game code. A
         // component or system holding one is how a Long-to-LongArray widening turns into a
         // breaking change.
+        //
+        // Scope: shipped source only — `src/main` and `src/testFixtures`, the code a
+        // widening would have to keep compiling without a source change. Test sources are
+        // deliberately excluded: a test names a `FieldMask` local to make an assertion
+        // readable, which is passing the mask through the API, not storing it, and it is
+        // recompiled in the same commit as any widening anyway. Generated `Replicator`s
+        // live under `build/` and are regenerated, so they are out of scope by construction.
         val allowedModules = setOf("udea-core", "udea-net")
         val moduleRoots = ModuleFiles.repoRoot.listFiles()
             .orEmpty()
@@ -119,7 +126,10 @@ class ReplicatorApiShapeTest {
         assertTrue(moduleRoots.isNotEmpty(), "expected sibling udea-* modules beside udea-core")
 
         val offenders = moduleRoots.flatMap { module ->
-            ModuleFiles.kotlinFilesIn(module.resolve("src")).flatMap { file -> fieldMaskProperties(file) }
+            listOf("src/main", "src/testFixtures").flatMap { sourceSet ->
+                ModuleFiles.kotlinFilesIn(module.resolve(sourceSet))
+                    .flatMap { file -> fieldMaskProperties(file) }
+            }
         }
 
         assertEquals(

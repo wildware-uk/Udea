@@ -211,6 +211,55 @@ returns `assetGraphChangedSince: true` with the changed ids. It refuses only for
 shape-changing deltas, which the daemon already classifies as
 `RELOAD_REQUIRES_RESTART`.
 
+### 3.7 The agent activity overlay, and why the agent cannot see it
+
+Agents doing most of the work leaves a human with no window into what is happening.
+So a windowed instance draws an **overlay**: a corner panel with the driving session,
+the agent's own one-line description of what it is doing (`agent_say`), and its recent
+tool calls with timings and outcomes — plus transient world-space markers ringing the
+entity a call inspected and pinning where a spawn landed.
+
+The agent must never see it, and that is a correctness requirement rather than a
+preference. An agent doing visual verification — capture, act, capture, diff — would
+see its own narration change between two frames and conclude *the game* changed. It
+would also read its own tool history back through `screenshot`, paying tokens for
+information it already has.
+
+**The exclusion is structural.** `udea-render` splits draw targets by type:
+
+```kotlin
+public sealed interface RenderTarget
+public class OffscreenTarget internal constructor(...) : RenderTarget  // FrameCapture reads this
+public class ScreenTarget    internal constructor(...) : RenderTarget  // never captured
+
+public interface RenderSystem  { public fun render(target: OffscreenTarget, alpha: Float) }
+public interface OverlaySystem { public fun render(target: ScreenTarget,   dtSeconds: Float) }
+```
+
+World and UI systems draw into `OffscreenTarget`; `FrameCapture` reads it; the result is
+blitted to the screen; overlays then draw onto `ScreenTarget`. An `OverlaySystem` is
+never handed a capturable target, so it cannot reach one. "Remember to disable the
+overlay before capturing" is the version that gets forgotten in a refactor and then
+silently corrupts every visual diff an agent does.
+
+Two rules follow. The overlay exists **only in `RenderMode.Windowed`** — `Headless` has
+no GL and `Offscreen` exists solely to produce captures — which removes the question
+entirely from the two modes an agent normally drives. And overlay state is presentation
+state: wall-clock timed, never snapshotted, never touching `SimClock` or `RngService`,
+so it cannot perturb a Phase 7 replay.
+
+Note `dtSeconds` rather than `alpha` or `Tick` in that signature: an overlay is not
+allowed to read simulation time, and the type says so.
+
+The guarantee is owned end to end by one test that enumerates capture routes from the
+render toolset's declared tools, so a newly added capture path is covered automatically
+and fails until it is. It asserts both sides — captures identical with the overlay on and
+off, **and** the on-screen framebuffer differing — because the first assertion alone
+passes just as happily when the overlay is broken.
+
+Read-only by decision: no pausing, seizing input or vetoing tool calls. Intervention is a
+separate question, better answered after watching this work for real.
+
 ---
 
 ## 4. Module tree

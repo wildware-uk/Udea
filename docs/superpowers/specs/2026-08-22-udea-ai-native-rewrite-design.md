@@ -48,7 +48,7 @@ The proving ground is a playable 5v5 three-lane MOBA, built alongside the engine
 | D8 | **KSP2 and a K2 compiler plugin, both from Phase 0** | User call. They compose: KSP2 emits files, K2 adds diagnostics and synthesised members. See §3.2 |
 | D9 | Full MOBA item system with actives and uniques | Heavily exercises GAS |
 | D10 | Public-internet hardening built in Phase 4 | Cheaper than retrofitting a live wire format |
-| D11 | Existing orc/soldier/priest sprites reused as placeholder art | Atlas packer and animation tooling stay minimal until Phase 5 |
+| D11 | Tiny RPG Character Asset Pack parts 1+2 — 40 characters, 19 with three distinct attacks | A real champion roster, not placeholders. Art is licensed and **not committed**; see `docs/art-assets.md` |
 
 ---
 
@@ -81,7 +81,7 @@ the same `FieldStore`. `writeDelta` considers only `NET_MASK`; capture uses `ALL
 @Replicated
 data class Transform(
     @Net var position: Vector2 = Vector2(),
-    @Net @Q(bits = 12) var rotation: Float = 0f,
+    @Net @Q(bits = 12, min = -3.1416f, max = 3.1416f) var rotation: Float = 0f,
     @Sim var lastGroundedTick: Tick = Tick(0),
 ) : Component<Transform> {
     override fun type() = Transform          // deleted later — see §3.2, gated

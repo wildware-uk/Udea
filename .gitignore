@@ -49,3 +49,9 @@ scripts/cache/
 
 # SDD scratch workspace
 .superpowers/
+
+# Third-party character art (Tiny RPG Character Asset Pack parts 1 & 2).
+# Licensed art, NOT redistributable under this repo's terms - see docs/art-assets.md.
+# Extract locally with scripts/extract-art.py; the manifest is committed, the pixels are not.
+moba/src/main/resources/assets/sprites/
+moba/raw-assets/

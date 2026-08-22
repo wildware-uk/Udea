@@ -1,0 +1,402 @@
+# The single CI workflow for this repository.
+#
+# Later epics add *jobs or matrix legs here*; they do not create a second workflow, and they
+# record their numbers in the single `docs/budgets.md` rather than a second budgets document.
+# Gates already scheduled to land in this file: the golden-file diffs and the
+# `net-protocol.lock` drift check (codegen), the allocation budgets (spec 4 of the engineering
+# standards), the `game-bridge-mcp` conformance run (agent), and the plugin-disabled build
+# spec 7 asks for, which already has its switch in `build-logic` via
+# `-Pudea.compilerPlugin.enabled=false`.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  # The Kotlin-RC leg (spec 3.2's version policy). Nightly, and never on a PR, because its
+  # whole job is to find an API break *before* it is urgent - not to block a merge with one.
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      clean_build_budget_ms:
+        description: >-
+          Clean-build budget in milliseconds. Set it to 1 to prove the gate still fails;
+          leave it alone for the real 90s budget from the Phase 0 exit criteria.
+        required: false
+        default: "90000"
+      ksp_cold_budget_ms:
+        description: >-
+          Cold codegen-pass threshold in milliseconds for the `ksp-incremental-budget` job.
+          Set it to 1 to prove that gate still fails.
+        required: false
+        default: "90000"
+      ksp_edit_budget_ms:
+        description: >-
+          One-component-edit threshold in milliseconds for the `ksp-incremental-budget` job.
+        required: false
+        default: "40000"
+
+# A superseded run is a run whose answer nobody wants. Cancelling them is what keeps the
+# windows-latest leg affordable.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The old tree (`common`, `example`, `gradle-plugin`, `level-editor`, `idea-plugin`,
+  # `compose-ui`) is replaced module by module and deleted at the Phase 6 exit. It is not made
+  # green before then, and `:level-editor:compileKotlin` is broken today for reasons that
+  # predate this workflow. Excluding it here is deliberate: CI gates the rewrite.
+  UDEA_LEGACY_EXCLUDES: >-
+    -x :level-editor:compileKotlin
+    -x :level-editor:test
+    -x :idea-plugin:compileKotlin
+    -x :idea-plugin:test
+
+jobs:
+  build:
+    # Both operating systems from Phase 0, not from Phase 7.
+    #
+    # Spec 7 wants float divergence caught on every CI platform early, and the Phase 7 exit
+    # needs replay equality proven on two OS/JVM combinations. Getting windows-latest green
+    # while the tree is small costs a matrix leg; getting it green in Phase 7, against a
+    # simulation that already assumes Linux behaviour, costs a phase.
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          # A pull request writing to the shared cache is a pull request that can poison it.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      # `gradlew` is checked in without the executable bit, so the POSIX launcher has to be
+      # made runnable before it can be run.
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: Build and verify the module graph
+        shell: bash
+        run: >-
+          ./gradlew build udeaVerifyNoLegacyDependencies udeaVerifyModuleGraph
+          --stacktrace $UDEA_LEGACY_EXCLUDES
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.os }}
+          path: |
+            **/build/reports/tests/**
+          retention-days: 7
+
+      # The measured numbers, on a GREEN run as well as a red one. `udeaBenchTickLoop` writes
+      # `build/reports/udea/tick-loop.json` and its own KDoc calls it "published by the Phase 0
+      # CI job as the gate's artifact" - which was only true of a failing build while this
+      # shared the failure-only step above. A budget you can only read once you have blown it
+      # tells you nothing about the headroom you had on the way there, and the Phase 0 exit is
+      # stated as a number, so the number has to survive a passing run.
+      - name: Upload measured budgets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: udea-budgets-${{ matrix.os }}
+          path: |
+            **/build/reports/udea/**
+          if-no-files-found: error
+          retention-days: 7
+
+  plugin-disabled:
+    # Spec 7's mitigation for D8, and a Phase 0 exit criterion: **CI proves the build is green
+    # with the K2 plugin disabled.**
+    #
+    # This is the leg that keeps the plugin from becoming load-bearing. If a Kotlin release
+    # breaks `udea-compiler-plugin`, the project flips `udea.compilerPlugin.enabled=false`,
+    # opens a tracking issue and keeps moving with checkers off - instead of every phase
+    # queueing behind one compiler plugin. `docs/compiler-plugin.md` has the degrade
+    # procedure.
+    #
+    # **This job must be a required status check on `master`.** That is a repository setting,
+    # not something a workflow file can assert; see `docs/compiler-plugin.md`.
+    name: build with the K2 plugin disabled
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      # `udeaVerifyPluginOptional` first: it is a static check and it fails in seconds, so a
+      # production source that has started importing a `dev.wildware.udea.compiler` type says
+      # so before a full build spends ten minutes discovering the same thing indirectly.
+      - name: Verify the plugin is optional
+        shell: bash
+        run: ./gradlew :udea-compiler-plugin:udeaVerifyPluginOptional --stacktrace
+
+      # Every module, `moba` included, with the plugin switched off before any -Xplugin
+      # argument is produced. `:udea-compiler-plugin:test` is excluded deliberately: that suite
+      # applies the plugin to its own throwaway compilations, so it neither proves nor
+      # disproves anything about a plugin-off build of the engine.
+      - name: Build everything with the plugin disabled
+        shell: bash
+        run: >-
+          ./gradlew build -Pudea.compilerPlugin.enabled=false
+          --stacktrace $UDEA_LEGACY_EXCLUDES
+          -x :udea-compiler-plugin:test
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-plugin-disabled
+          path: |
+            **/build/reports/tests/**
+            **/build/reports/udea/**
+          retention-days: 7
+
+  kotlin-upgrade-probe:
+    # Spec 3.2's version policy: the K2 plugin is the most Kotlin-version-fragile thing in the
+    # project, so a coming break should be visible on a schedule rather than on the morning
+    # somebody wants to upgrade.
+    #
+    # **What this leg does not do yet.** Issue #39 asks for a build against the next Kotlin
+    # *RC*. That needs the project Kotlin version to be overridable, and it is not: the
+    # `udea.kotlin-build-tool` convention fails configuration outright when the running Kotlin
+    # Gradle plugin differs from `UdeaVersions.KOTLIN`, which is a hard-coded constant in
+    # `build-logic` (and deliberately so - see spec 7). Until that pin grows an explicit
+    # override, this leg does the half that is honest: it reruns the gate suite nightly and
+    # reports the newest published Kotlin beside the pinned one, so an upgrade is a decision
+    # someone takes rather than a surprise. `docs/compiler-plugin.md` records the gap.
+    #
+    # `continue-on-error` plus the schedule-only guard is what makes it **non-blocking**. It
+    # reports; it never gates a merge.
+    name: kotlin upgrade probe (non-blocking)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      # `check`, not `test`: it pulls in `udeaVerifyKotlinPin` and `udeaVerifyPluginOptional`
+      # as well as the compile-testing suite, and a resolved stdlib that no longer matches the
+      # compiler is the first symptom of an upgrade going wrong.
+      - name: Run the compiler-plugin gate suite
+        shell: bash
+        run: ./gradlew :udea-compiler-plugin:check --stacktrace
+
+      - name: Report the pinned Kotlin against the newest published one
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          pinned=$(sed -n 's/^kotlin = "\(.*\)"$/\1/p' gradle/libs.versions.toml | head -1)
+          latest=$(
+            curl -sS --max-time 60 \
+              https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-compiler-embeddable/maven-metadata.xml \
+              | sed -n 's:.*<latest>\(.*\)</latest>.*:\1:p' | head -1
+          )
+          {
+            echo "### Kotlin upgrade probe"
+            echo
+            echo "| Measure | Value |"
+            echo "| --- | --- |"
+            echo "| Pinned (\`libs.versions.toml\`) | \`${pinned}\` |"
+            echo "| Newest on Maven Central | \`${latest:-unknown}\` |"
+            echo "| Gate suite (\`:udea-compiler-plugin:check\`) | \`${{ job.status }}\` |"
+            echo
+            echo "Advisory only; this leg cannot block a merge. A red gate suite means the K2"
+            echo "plugin needs work before the next Kotlin bump - see the degrade procedure in"
+            echo '`docs/compiler-plugin.md`.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  clean-build-budget:
+    # ubuntu-latest only. The budget is a trend line, and a trend line measured on two
+    # differently sized runners is two trend lines pretending to be one.
+    name: clean build under budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      # The budget is about compiling this project, not about starting a JVM. Warming the
+      # daemon first is what stops the number being dominated by Gradle's own startup.
+      - name: Warm the daemon
+        shell: bash
+        run: ./gradlew help
+
+      - name: Time a clean build of the rewrite tree
+        shell: bash
+        env:
+          # `udeaAssemble`, never `assemble`: the old modules would dominate the number -
+          # `idea-plugin` alone resolves an entire IntelliJ distribution - and a budget the
+          # rewrite cannot move is a budget nobody acts on.
+          #
+          # The configuration cache stays ON (it is on in `gradle.properties`). A fresh runner
+          # has no cache entry, so this is a genuine cold build; disabling it would measure a
+          # configuration the project never actually runs.
+          UDEA_CLEAN_BUILD_BUDGET_MS: ${{ github.event.inputs.clean_build_budget_ms || '90000' }}
+        run: |
+          set -euo pipefail
+          budget="${UDEA_CLEAN_BUILD_BUDGET_MS}"
+          start=$(date +%s%3N)
+          ./gradlew clean udeaAssemble --no-build-cache --stacktrace
+          end=$(date +%s%3N)
+          elapsed=$((end - start))
+
+          {
+            echo "### Clean build budget"
+            echo
+            echo "| Measure | Value |"
+            echo "| --- | --- |"
+            echo "| Command | \`./gradlew clean udeaAssemble --no-build-cache\` |"
+            echo "| Runner | \`${RUNNER_OS}\` / \`ubuntu-latest\` |"
+            echo "| Measured | **${elapsed} ms** |"
+            echo "| Budget | ${budget} ms |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$elapsed" -gt "$budget" ]; then
+            echo "::error::clean build took ${elapsed} ms, over the ${budget} ms budget (spec 6, Phase 0 exit)"
+            exit 1
+          fi
+          echo "clean build took ${elapsed} ms, within the ${budget} ms budget"
+
+  ksp-incremental-budget:
+    # The codegen epic's half of the build budget (issue #35). It owns `ksp.incremental` and a
+    # per-task regression threshold; the <90s clean-build gate above is a different measurement
+    # and stays where it is.
+    #
+    # ubuntu-latest only, for the same reason `clean-build-budget` is: a threshold measured on
+    # two differently sized runners is two thresholds pretending to be one.
+    name: KSP stays incremental
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: Warm the daemon
+        shell: bash
+        run: ./gradlew help
+
+      # The gate that cannot give a false positive on a slow runner, and the one that catches
+      # the exact regression this issue exists to prevent: an output whose name or dependency
+      # set varies between runs is never up to date, so a second identical build re-executes.
+      # The generator this replaces named its module index after the wall clock, which made
+      # every build a full rebuild - and no timing threshold would have said so, because the
+      # first build is the same speed either way.
+      - name: A second identical build must execute nothing
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :udea-codegen:testClasses --no-build-cache > /dev/null
+          ./gradlew :udea-codegen:testClasses --console=plain | tee /tmp/noop.log
+          executed=$(grep -E '^> Task :udea-codegen:' /tmp/noop.log \
+            | grep -vE 'UP-TO-DATE|SKIPPED|NO-SOURCE|FROM-CACHE' || true)
+          if [ -n "$executed" ]; then
+            echo "::error::a no-op build re-executed tasks, so something the processor emits is not reproducible:"
+            echo "$executed"
+            exit 1
+          fi
+          echo "no-op build executed nothing"
+
+      # The timing threshold. `UDEA_KSP_*_BUDGET_MS` default to the committed baseline plus the
+      # 20% the issue allows; override them on a workflow dispatch to prove the gate can fail.
+      # Every run writes both numbers to the job summary, pass or fail, so the trend is
+      # readable without opening a log.
+      - name: Time a cold KSP pass and a one-component edit
+        shell: bash
+        env:
+          UDEA_KSP_COLD_BUDGET_MS: ${{ github.event.inputs.ksp_cold_budget_ms || '90000' }}
+          UDEA_KSP_EDIT_BUDGET_MS: ${{ github.event.inputs.ksp_edit_budget_ms || '40000' }}
+        run: |
+          set -euo pipefail
+          fixtures=udea-codegen/src/test/kotlin/dev/wildware/udea/codegen/fixtures/Components.kt
+
+          ./gradlew :udea-codegen:clean > /dev/null
+          cold_start=$(date +%s%3N)
+          ./gradlew :udea-codegen:testClasses --no-build-cache > /dev/null
+          cold=$(( $(date +%s%3N) - cold_start ))
+
+          printf '\n// touched to measure a one-component edit\n' >> "$fixtures"
+          edit_start=$(date +%s%3N)
+          ./gradlew :udea-codegen:testClasses > /dev/null
+          edit=$(( $(date +%s%3N) - edit_start ))
+          git checkout -- "$fixtures"
+
+          {
+            echo "### KSP incremental budget"
+            echo
+            echo "| Scenario | Measured | Budget |"
+            echo "| --- | --- | --- |"
+            echo "| Cold \`kspTestKotlin\` + compile | **${cold} ms** | ${UDEA_KSP_COLD_BUDGET_MS} ms |"
+            echo "| One-component edit | **${edit} ms** | ${UDEA_KSP_EDIT_BUDGET_MS} ms |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          status=0
+          if [ "$cold" -gt "$UDEA_KSP_COLD_BUDGET_MS" ]; then
+            echo "::error::cold codegen pass took ${cold} ms, over the ${UDEA_KSP_COLD_BUDGET_MS} ms threshold"
+            status=1
+          fi
+          if [ "$edit" -gt "$UDEA_KSP_EDIT_BUDGET_MS" ]; then
+            echo "::error::a one-component edit took ${edit} ms, over the ${UDEA_KSP_EDIT_BUDGET_MS} ms threshold"
+            status=1
+          fi
+          exit "$status"

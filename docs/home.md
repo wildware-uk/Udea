@@ -8,6 +8,17 @@ Udea is a high-level 2D game engine built on **LibGDX** and the **Fleks ECS** fr
 *   **Integrated Physics:** Seamless Box2D integration within the ECS.
 *   **Modular UI:** Screen-based UI management using Scene2D.
 
+> **Two trees live in this repository right now.** Everything below this box describes the
+> **old** engine, which is being replaced module by module and deleted at the Phase 6 exit.
+> The rewrite (`udea-*` and `moba`) is documented separately:
+>
+> - [The AI-native rewrite design spec](superpowers/specs/2026-08-22-udea-ai-native-rewrite-design.md) — what is being built and why.
+> - [Engineering standards](engineering-standards.md) — binding on every `udea-*` module. Section 8 is what a reviewer rejects.
+> - [Module graph](module-graph.md) — the modules, the arrows between them, and the `UDEA-MG-00N` rules the build enforces.
+> - [Replication contract](contracts/replicator.md) — **frozen**. The index-alignment invariant every generated `Replicator` and every `FieldStore` obeys.
+> - [Measured budgets](budgets.md) — the numbers the Phase 0 exit is stated in, and where CI gates each one.
+> - [The K2 compiler plugin](compiler-plugin.md) — the FIR checkers, the KDoc harvester, and why the plugin must stay optional.
+
 #### Documentation Index:
 - [🚀 Getting Started](getting_started.md)
 - [🧩 ECS Framework (Fleks)](ecs.md)

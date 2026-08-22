@@ -18,8 +18,10 @@ public data class UdeaPluginOptions(
     public val synthesis: Boolean = false,
     /** Reserved: compiled asset index paths, for the `reference("...")` checker. */
     public val assetIndex: List<String> = emptyList(),
-    /** Reserved: KDoc index path. */
+    /** Where the KDoc harvester writes its index. `null` means "do not harvest". */
     public val kdocIndex: String? = null,
+    /** Repo root every emitted `SourceSpan` is made relative to (spec 5). */
+    public val repoRoot: String? = null,
 )
 
 /**
@@ -38,6 +40,8 @@ public object UdeaConfigurationKeys {
         CompilerConfigurationKey.create("udea: asset index paths")
     public val KDOC_INDEX: CompilerConfigurationKey<String> =
         CompilerConfigurationKey.create("udea: kdoc index path")
+    public val REPO_ROOT: CompilerConfigurationKey<String> =
+        CompilerConfigurationKey.create("udea: repository root")
 }
 
 /** Reads the options back out of a configuration, applying the defaults of [UdeaPluginOptions]. */
@@ -49,5 +53,6 @@ public fun CompilerConfiguration.toUdeaPluginOptions(): UdeaPluginOptions {
         synthesis = get(UdeaConfigurationKeys.SYNTHESIS, defaults.synthesis),
         assetIndex = get(UdeaConfigurationKeys.ASSET_INDEX)?.toList() ?: defaults.assetIndex,
         kdocIndex = get(UdeaConfigurationKeys.KDOC_INDEX) ?: defaults.kdocIndex,
+        repoRoot = get(UdeaConfigurationKeys.REPO_ROOT) ?: defaults.repoRoot,
     )
 }

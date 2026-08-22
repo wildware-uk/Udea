@@ -206,6 +206,109 @@ public class NetIdIndex(
         }
     }
 
+    // --- snapshot restore ------------------------------------------------------------------
+    // Three members, and nothing else, so that a rewind hands out the same ids the original
+    // run did. Without them a restored world would re-allocate different ids for everything
+    // spawned after the snapshot, and the snapshot-equivalence gate would fail on entity
+    // identity rather than on gameplay. See [HandleState] for what is recorded and why the
+    // generations of live indices are deliberately not.
+
+    /**
+     * Records the allocator state — the free queue, its generations, and the two watermarks —
+     * into [state], which is cleared first.
+     *
+     * Only free indices are recorded. A live index's generation is already carried by its
+     * [NetId] in the snapshot's rows, and an index at or above `nextFresh` has never been
+     * handed out, so its generation is zero by construction.
+     */
+    public fun saveInto(state: HandleState) {
+        state.reset()
+        state.nextFresh = nextFresh
+        state.highWater = highWater
+        var position = freeHead
+        repeat(freeSize) {
+            val index = freeRing[position]
+            state.addFree(index, generations[index])
+            position++
+            if (position == capacity) position = 0
+        }
+    }
+
+    /**
+     * Resets this index to [state]: no live ids, the recorded free queue, the recorded
+     * watermarks.
+     *
+     * Every live id is dropped **without** bumping its generation, unlike [free] — a restore
+     * is not a destruction, and bumping here would make every id in the snapshot stale before
+     * [bind] could reinstate it. The caller re-binds the snapshot's roster afterwards.
+     */
+    public fun restoreFrom(state: HandleState) {
+        require(state.nextFresh in 0..capacity) {
+            "HandleState.nextFresh ${state.nextFresh} is outside 0..$capacity"
+        }
+        require(state.highWater in 0..capacity) {
+            "HandleState.highWater ${state.highWater} is outside 0..$capacity"
+        }
+        require(state.freeCount <= capacity) {
+            "HandleState carries ${state.freeCount} free indices, more than the $capacity available"
+        }
+
+        for (index in 0 until highWater) {
+            entities[index] = null
+            liveFlags[index] = false
+            generations[index] = 0
+        }
+        reverse.fill(NONE_RAW)
+        liveCount = 0
+
+        freeHead = 0
+        freeTail = state.freeCount % capacity
+        freeSize = state.freeCount
+        for (position in 0 until state.freeCount) {
+            val index = state.freeIndexAt(position)
+            require(index in 0 until capacity) {
+                "HandleState free index $index is outside 0 until $capacity"
+            }
+            freeRing[position] = index
+            generations[index] = state.freeGenerationAt(position)
+        }
+
+        nextFresh = state.nextFresh
+        highWater = state.highWater
+    }
+
+    /**
+     * Reinstates [netId] on [entity] exactly as captured, generation included.
+     *
+     * For snapshot restore, and for nothing else: allocation goes through [allocate], which
+     * is the only thing that may choose an id. This exists because a rewind must give a
+     * re-created entity the *same* id it had — a new one would make every reference held by
+     * another restored component point at nothing.
+     *
+     * @throws IllegalArgumentException if the index is already live. Immediately after
+     *   [restoreFrom] no index is, and the free queue provably excludes every index in the
+     *   snapshot's roster (see [HandleState]), so binding a whole roster in ascending order
+     *   always succeeds.
+     */
+    public fun bind(entity: Entity, netId: NetId) {
+        require(!netId.isNone) { "NetId.NONE names no entity and cannot be bound" }
+        val index = netId.index
+        require(index < capacity) { "NetId index $index exceeds this index's capacity $capacity" }
+        require(!liveFlags[index]) {
+            "index $index is already live as ${NetId.of(index, generations[index])}"
+        }
+
+        entities[index] = entity
+        liveFlags[index] = true
+        generations[index] = netId.generation
+        liveCount++
+        if (index >= highWater) highWater = index + 1
+        if (index >= nextFresh) nextFresh = index + 1
+
+        ensureReverseCapacity(entity.id)
+        reverse[entity.id] = netId.raw
+    }
+
     private fun ensureReverseCapacity(entityId: Int) {
         require(entityId >= 0) { "Fleks entity id must not be negative, was $entityId" }
         if (entityId < reverse.size) return

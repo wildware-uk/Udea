@@ -148,20 +148,7 @@ class GeneratedFileDeterminismTest {
             )
         }
 
-        fun hashFile(): File = File(moduleRoot(), "src/test/resources/expected-generated-hashes.txt")
-
-        fun moduleRoot(): File {
-            var candidate: File? = File("").absoluteFile
-            while (candidate != null) {
-                if (candidate.name == "udea-codegen" && File(candidate, "build.gradle.kts").isFile) {
-                    return candidate
-                }
-                val child = File(candidate, "udea-codegen")
-                if (File(child, "build.gradle.kts").isFile) return child
-                candidate = candidate.parentFile
-            }
-            error("could not locate the udea-codegen module from ${File("").absolutePath}")
-        }
+        fun hashFile(): File = ModuleRoot.file("src/test/resources/expected-generated-hashes.txt")
 
         fun sha256(bytes: ByteArray): String =
             MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

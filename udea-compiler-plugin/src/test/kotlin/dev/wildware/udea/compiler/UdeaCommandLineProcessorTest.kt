@@ -39,7 +39,13 @@ class UdeaCommandLineProcessorTest {
         assertEquals(true, options.checkers, "checkers only add diagnostics, so they ship on")
         assertEquals(false, options.synthesis, "declaration synthesis is gated (spec 3.2)")
         assertEquals(emptyList(), options.assetIndex)
-        assertEquals(null, options.kdocIndex)
+        assertEquals(null, options.kdocIndex, "harvesting is opt-in")
+        assertEquals(
+            null,
+            options.repoRoot,
+            "there is no default repo root: a guessed one produces a relative span that is " +
+                "wrong, which survives into a shipped artefact (spec 5)",
+        )
     }
 
     @Test
@@ -51,6 +57,7 @@ class UdeaCommandLineProcessorTest {
             UdeaCompilerPlugin.OPTION_ASSET_INDEX to "build/assets/one.index",
             UdeaCompilerPlugin.OPTION_ASSET_INDEX to "build/assets/two.index",
             UdeaCompilerPlugin.OPTION_KDOC_INDEX to "build/kdoc.index",
+            UdeaCompilerPlugin.OPTION_REPO_ROOT to "/home/shaun/udea",
         )
 
         assertEquals(
@@ -60,6 +67,7 @@ class UdeaCommandLineProcessorTest {
                 synthesis = true,
                 assetIndex = listOf("build/assets/one.index", "build/assets/two.index"),
                 kdocIndex = "build/kdoc.index",
+                repoRoot = "/home/shaun/udea",
             ),
             options,
         )

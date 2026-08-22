@@ -13,7 +13,7 @@ import java.io.File
 internal object GeneratedSources {
 
     val directory: File by lazy {
-        File(moduleRoot(), "build/generated/ksp/test/kotlin").also {
+        ModuleRoot.file("build/generated/ksp/test/kotlin").also {
             check(it.isDirectory) {
                 "no generated sources at ${it.absolutePath}; run :udea-codegen:kspTestKotlin"
             }
@@ -32,16 +32,4 @@ internal object GeneratedSources {
     fun relativePaths(): List<String> =
         files.map { it.relativeTo(directory).invariantSeparatorsPath }
 
-    private fun moduleRoot(): File {
-        var candidate: File? = File("").absoluteFile
-        while (candidate != null) {
-            if (candidate.name == "udea-codegen" && File(candidate, "build.gradle.kts").isFile) {
-                return candidate
-            }
-            val child = File(candidate, "udea-codegen")
-            if (File(child, "build.gradle.kts").isFile) return child
-            candidate = candidate.parentFile
-        }
-        error("could not locate the udea-codegen module from ${File("").absolutePath}")
-    }
 }

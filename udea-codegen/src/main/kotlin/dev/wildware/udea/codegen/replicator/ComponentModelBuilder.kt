@@ -3,11 +3,13 @@ package dev.wildware.udea.codegen.replicator
 import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.ClassName
 import dev.wildware.udea.codegen.AnnotationNames
+import dev.wildware.udea.diagnostics.DidYouMean
 import dev.wildware.udea.diagnostics.UdeaRules
 
 /**
@@ -27,6 +29,24 @@ import dev.wildware.udea.diagnostics.UdeaRules
  * `udea-diagnostics`, so the two producers cannot drift apart (spec 5, "Diagnostics").
  */
 internal class ComponentModelBuilder(private val logger: KSPLogger) {
+
+    /**
+     * One field before it has an index or a constant name.
+     *
+     * Indices are handed out by [FieldOrder] over the *whole* lowered set, so they cannot be
+     * assigned while walking properties: a composite property contributes several names that
+     * interleave with other properties' names in the sort.
+     */
+    private data class Candidate(
+        val path: List<String>,
+        val net: Boolean,
+        val storage: FieldStorage,
+        val declaredType: ClassName,
+        val enumEntries: ClassName?,
+        val quantisation: Quantisation?,
+    ) {
+        val name: String = path.joinToString(".")
+    }
 
     fun build(declaration: KSClassDeclaration): ReplicatedComponent? {
         var failed = false
@@ -49,11 +69,18 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
             .filter { it.hasAnnotation(AnnotationNames.NET) || it.hasAnnotation(AnnotationNames.SIM) }
             .toList()
 
-        if (annotated.size > UdeaRules.MAX_COMPONENT_FIELDS) {
+        val candidates = ArrayList<Candidate>(annotated.size)
+        for (property in annotated) {
+            if (!describe(declaration, property, candidates)) failed = true
+        }
+
+        // Counted **after** lowering, because that is what the mask actually addresses: a
+        // component with 33 Vector2 properties declares 33 things and needs 66 bits.
+        if (candidates.size > UdeaRules.MAX_COMPONENT_FIELDS) {
             // Deliberately not a truncation and not a widening: one FieldMask addresses 64
             // fields, and the fix a developer can actually take is to split the component.
             logger.error(
-                "${UdeaRules.COMPONENT_FIELD_LIMIT.id}: $qualifiedName declares ${annotated.size} " +
+                "${UdeaRules.COMPONENT_FIELD_LIMIT.id}: $qualifiedName declares ${candidates.size} " +
                     "@Net/@Sim fields, but a field mask addresses at most " +
                     "${UdeaRules.MAX_COMPONENT_FIELDS}. SPLIT the component into two or more " +
                     "components of at most ${UdeaRules.MAX_COMPONENT_FIELDS} fields each; " +
@@ -63,16 +90,22 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
             failed = true
         }
 
-        val ordered = FieldOrder.assign(annotated) { it.simpleName.asString() }
-        val constants = FieldOrder.constantNames(ordered.map { it.simpleName.asString() })
-
-        val fields = ArrayList<ReplicatedField>(ordered.size)
-        ordered.forEachIndexed { index, property ->
-            val field = describe(declaration, property, index, constants[index])
-            if (field == null) failed = true else fields += field
-        }
-
         if (failed) return null
+
+        val ordered = FieldOrder.assign(candidates, Candidate::name)
+        val constants = FieldOrder.constantNames(ordered.map(Candidate::name))
+        val fields = ordered.mapIndexed { index, candidate ->
+            ReplicatedField(
+                path = candidate.path,
+                constant = constants[index],
+                index = index,
+                net = candidate.net,
+                storage = candidate.storage,
+                declaredType = candidate.declaredType,
+                enumEntries = candidate.enumEntries,
+                quantisation = candidate.quantisation,
+            )
+        }
         return ReplicatedComponent(
             className = declaration.toClassName(),
             qualifiedName = qualifiedName,
@@ -80,12 +113,12 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
         )
     }
 
+    /** Appends this property's fields to [out]; returns `false` if it reported an error. */
     private fun describe(
         owner: KSClassDeclaration,
         property: KSPropertyDeclaration,
-        index: Int,
-        constant: String,
-    ): ReplicatedField? {
+        out: MutableList<Candidate>,
+    ): Boolean {
         val ownerName = owner.qualifiedName?.asString() ?: owner.simpleName.asString()
         val propertyName = property.simpleName.asString()
         val net = property.hasAnnotation(AnnotationNames.NET)
@@ -110,104 +143,179 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
             failed = true
         }
 
-        if (!property.isMutable) {
-            // @Net on a val is always a mistake, never a no-op: replication is capture-and-diff,
-            // and a val cannot change, so the field would occupy a bit that can never be set.
-            // @Sim on a val is the same defect on the snapshot side. Both ids come from
-            // udea-diagnostics, never from here: an id is permanent public API, so a producer
-            // that mints its own is not sharing an id space with the K2 checker at all.
-            val rule = if (net) UdeaRules.NET_ON_VAL else UdeaRules.SIM_ON_VAL
-            val annotation = if (net) "@Net" else "@Sim"
-            val consequence = if (net) "it can never replicate" else "it can never be snapshotted"
-            logger.error(
-                "${rule.id}: $annotation annotates the val $ownerName.$propertyName. A val can " +
-                    "never change, so $consequence, and Replicator.apply could not restore it. " +
-                    "Make it a var or drop the annotation.",
-                property,
-            )
-            failed = true
-        }
-
         val type = property.type.resolve()
 
-        if (property.hasAnnotation(AnnotationNames.Q) && !type.isFloat()) {
-            logger.error(
-                "${UdeaRules.QUANTIZED_NON_FLOAT.id}: @Q annotates $ownerName.$propertyName, " +
-                    "which is ${type.describe()}, not Float. Quantization is only defined for " +
-                    "floats.",
-                property,
-            )
-            failed = true
-        }
-
-        val storage = storageOf(type)
-        if (storage == null) {
-            logger.error(
-                "${UdeaRules.UNSUPPORTED_FIELD_TYPE.id}: $ownerName.$propertyName is " +
-                    "${type.describe()}, which udea-codegen cannot " +
-                    "replicate yet. Supported field types are Int, Long, Float, Boolean and " +
-                    "enums; anything else needs a field codec (@NetCodecFor), which is not " +
-                    "implemented.",
-                property,
-            )
-            failed = true
-        }
-
-        if (failed || storage == null) return null
-        val enumDeclaration = type.declaration as? KSClassDeclaration
-        return ReplicatedField(
-            name = propertyName,
-            constant = constant,
-            index = index,
-            net = net,
-            storage = storage,
-            declaredType = type.toClassName(),
-            enumEntries = if (enumDeclaration?.classKind == ClassKind.ENUM_CLASS) {
-                enumDeclaration.toClassName()
-            } else {
+        val quantisation = if (property.hasAnnotation(AnnotationNames.Q)) {
+            if (!type.isFloat()) {
+                logger.error(
+                    "${UdeaRules.QUANTIZED_NON_FLOAT.id}: @Q annotates $ownerName.$propertyName, " +
+                        "which is ${type.describe()}, not Float. Quantization is only defined for " +
+                        "floats.",
+                    property,
+                )
+                failed = true
                 null
-            },
+            } else {
+                readQuantisation(property, ownerName, propertyName).also { if (it == null) failed = true }
+            }
+        } else {
+            null
+        }
+
+        when (val lowering = FieldLowering.lower(type)) {
+            is FieldLowering.Result.Direct -> {
+                if (!property.isMutable) {
+                    reportVal(property, ownerName, propertyName, net)
+                    failed = true
+                }
+                if (!failed) {
+                    out += Candidate(
+                        path = listOf(propertyName),
+                        net = net,
+                        storage = lowering.storage,
+                        declaredType = lowering.type,
+                        enumEntries = lowering.enumEntries,
+                        quantisation = quantisation,
+                    )
+                }
+            }
+
+            is FieldLowering.Result.Composite -> {
+                // The property itself may be a `val`: `apply` restores a composite by writing
+                // its components in place, which is what preserves the vector's identity for
+                // whatever holds a reference to it (spec 3.1, "apply mutates in place"). Only
+                // the *components* have to be assignable, and FieldLowering already required
+                // that before calling this a Composite.
+                if (!failed) {
+                    for (component in lowering.components) {
+                        out += Candidate(
+                            path = listOf(propertyName, component.name),
+                            net = net,
+                            storage = component.storage,
+                            declaredType = component.type,
+                            enumEntries = component.enumEntries,
+                            quantisation = null,
+                        )
+                    }
+                }
+            }
+
+            is FieldLowering.Result.Unsupported -> {
+                reportUnsupported(property, ownerName, propertyName, type, lowering.reason)
+                failed = true
+            }
+        }
+        return !failed
+    }
+
+    private fun reportVal(
+        property: KSPropertyDeclaration,
+        ownerName: String,
+        propertyName: String,
+        net: Boolean,
+    ) {
+        // @Net on a val is always a mistake, never a no-op: replication is capture-and-diff,
+        // and a val cannot change, so the field would occupy a bit that can never be set.
+        // @Sim on a val is the same defect on the snapshot side. Both ids come from
+        // udea-diagnostics, never from here: an id is permanent public API, so a producer
+        // that mints its own is not sharing an id space with the K2 checker at all.
+        val rule = if (net) UdeaRules.NET_ON_VAL else UdeaRules.SIM_ON_VAL
+        val annotation = if (net) "@Net" else "@Sim"
+        val consequence = if (net) "it can never replicate" else "it can never be snapshotted"
+        logger.error(
+            "${rule.id}: $annotation annotates the val $ownerName.$propertyName. A val can " +
+                "never change, so $consequence, and Replicator.apply could not restore it. " +
+                "Make it a var or drop the annotation.",
+            property,
         )
     }
 
-    private fun storageOf(type: KSType): FieldStorage? {
-        if (type.isMarkedNullable) return null
-        val declaration = type.declaration
-        return when (declaration.qualifiedName?.asString()) {
-            "kotlin.Boolean" -> FieldStorage.BOOLEAN
-            "kotlin.Int" -> FieldStorage.INT
-            "kotlin.Long" -> FieldStorage.LONG
-            "kotlin.Float" -> FieldStorage.FLOAT
-            // An enum is stored and sent as its ordinal, which is why it needs no codec.
-            else -> if ((declaration as? KSClassDeclaration)?.classKind == ClassKind.ENUM_CLASS) {
-                FieldStorage.INT
-            } else {
-                null
-            }
+    /**
+     * The message that replaces the old generator's silent CBOR fallback.
+     *
+     * It names the type, the owning class and the property, states *why* the type could not
+     * be lowered, and lists what a field may be — and it carries a Levenshtein suggestion
+     * when the type's name is one typo away from a storable one, which the diagnostics
+     * contract makes mandatory rather than optional for an unresolved name.
+     */
+    private fun reportUnsupported(
+        property: KSPropertyDeclaration,
+        ownerName: String,
+        propertyName: String,
+        type: KSType,
+        reason: String,
+    ) {
+        val suggestion = DidYouMean.suggest(type.simpleName(), FieldLowering.DIRECT_TYPE_NAMES)
+        logger.error(
+            "${UdeaRules.UNSUPPORTED_FIELD_TYPE.id}: $ownerName.$propertyName is " +
+                "${type.describe()}, which udea-codegen cannot replicate: $reason. A @Net/@Sim " +
+                "field must be Boolean, Int, Long, Float, an enum, NetId or Tick, or a value " +
+                "type whose public properties are all vars of those — such a type is lowered to " +
+                "one field per property, as a 2D vector lowers to `$propertyName.x` and " +
+                "`$propertyName.y`." +
+                if (suggestion == null) "" else " Did you mean $suggestion?",
+            property,
+        )
+    }
+
+    /**
+     * The `@Q` arguments, folded to a [Quantisation], or `null` after reporting why not.
+     *
+     * `bits` and the range are validated here and not only by the K2 checker, because KSP is
+     * the producer that would otherwise emit them: `writeFixed` requires `bits in 1..32` and
+     * `min < max`, so an unchecked declaration becomes a generated file that compiles and
+     * throws from `write` on the first tick that field changes.
+     *
+     * All three failures report under `UdeaRules.MALFORMED_QUANTIZATION` (`UDEA0007`), which
+     * is about the annotation's *arguments*; `UDEA0003` next door is about the annotated
+     * property's *type*. Two ids because they have two different fixes.
+     */
+    private fun readQuantisation(
+        property: KSPropertyDeclaration,
+        ownerName: String,
+        propertyName: String,
+    ): Quantisation? {
+        val annotation = property.annotations.first {
+            it.annotationType.resolve().declaration.qualifiedName?.asString() == AnnotationNames.Q
         }
+        val bits = annotation.argument<Int>("bits")
+        val min = annotation.argument<Float>("min")
+        val max = annotation.argument<Float>("max")
+        if (bits == null || min == null || max == null) {
+            logger.error(
+                "${UdeaRules.MALFORMED_QUANTIZATION.id}: @Q on $ownerName.$propertyName does " +
+                    "not supply bits, min and max as constants; " +
+                    "all three are folded into the generated codec at build time and must be " +
+                    "compile-time literals.",
+                property,
+            )
+            return null
+        }
+        if (bits !in 1..32) {
+            logger.error(
+                "${UdeaRules.MALFORMED_QUANTIZATION.id}: @Q(bits = $bits) on " +
+                    "$ownerName.$propertyName is out of range: a quantised field " +
+                    "occupies 1..32 bits. Use @Q(bits = 32, ...) for the widest fixed-point " +
+                    "field, or drop @Q to send the float unquantised.",
+                property,
+            )
+            return null
+        }
+        if (!min.isFinite() || !max.isFinite() || min >= max) {
+            logger.error(
+                "${UdeaRules.MALFORMED_QUANTIZATION.id}: @Q(min = $min, max = $max) on " +
+                    "$ownerName.$propertyName is not a range: min must " +
+                    "be finite, max must be finite, and min must be less than max. The range is " +
+                    "the one thing the generator cannot infer, which is why @Q has no defaults.",
+                property,
+            )
+            return null
+        }
+        return Quantisation(bits = bits, min = min, max = max)
     }
 }
 
-private fun KSPropertyDeclaration.hasAnnotation(qualifiedName: String): Boolean =
-    annotations.any { it.annotationType.resolve().declaration.qualifiedName?.asString() == qualifiedName }
+private inline fun <reified T> KSAnnotation.argument(name: String): T? =
+    arguments.firstOrNull { it.name?.asString() == name }?.value as? T
 
 private fun KSType.isFloat(): Boolean = declaration.qualifiedName?.asString() == "kotlin.Float"
-
-/** A type as a developer wrote it, for a message: `Vector2`, `String?`, `List<Int>`. */
-private fun KSType.describe(): String {
-    val base = declaration.qualifiedName?.asString() ?: declaration.simpleName.asString()
-    return if (isMarkedNullable) "$base?" else base
-}
-
-private fun KSClassDeclaration.toClassName(): ClassName {
-    val packageName = packageName.asString()
-    val simpleNames = qualifiedName?.asString()
-        ?.removePrefix(if (packageName.isEmpty()) "" else "$packageName.")
-        ?.split('.')
-        ?: listOf(simpleName.asString())
-    return ClassName(packageName, simpleNames)
-}
-
-private fun KSType.toClassName(): ClassName =
-    (declaration as? KSClassDeclaration)?.toClassName()
-        ?: ClassName(declaration.packageName.asString(), declaration.simpleName.asString())

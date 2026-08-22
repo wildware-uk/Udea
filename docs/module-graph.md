@@ -51,3 +51,220 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
   runtime classpath through `implementation(gradleApi())`; here `gradleApi()` is
   `compileOnly` and nothing depends on the project.
 - `moba` (or any shipping runtime classpath) → `udea-agent-host`.
+
+---
+
+# Build gates
+
+The arrows above are enforced by the build, not by discipline. Three tasks do it, they run
+from `check`, and each has a stable rule id so a failure message and this document can be
+joined up by search.
+
+| Task | Registered on | Reads | Runs from |
+|---|---|---|---|
+| `udeaVerifyNoLegacyDependencies` | every `:udea-*` project and `:moba` | the resolved dependency graph | that project's `check`, plus the root aggregate |
+| `udeaVerifyModuleGraph` | every `:udea-*` project and `:moba` | the resolved dependency graph | that project's `check`, plus the root aggregate |
+| `udeaVerifyRelease` | `:moba` | the **packaged artifact**, plus the release runtime classpath | `finalizedBy` on `:moba:assemble`, release builds only |
+
+All three read the **resolved** graph rather than declared dependencies, because the arrow
+that matters is the one nobody declared: a module two hops away from `common` has nothing in
+its own build file to grep for. Failure messages therefore print the resolution path from the
+root, not just the offending coordinate.
+
+Coordinates are normalised before matching: `group:module` for an external module (the
+version is dropped — no rule here is version-sensitive), the Gradle path for a project, and
+`file:<display name>` for a file dependency. That last one is not a detail: `gradleApi()`
+reaches a classpath as loose jars under the single name `Gradle API` and is invisible to a
+scan that reads only the component graph.
+
+## `UDEA-LEGACY-001` — no old-tree project on a rewrite classpath
+
+**Spec §4.** Banned: `:common`, `:gradle-plugin`, `:level-editor`, `:idea-plugin`,
+`:compose-ui`, `:example`, `:example:*`. Scanned on `compileClasspath`, `runtimeClasspath`,
+`testCompileClasspath`, `testRuntimeClasspath`, `testFixturesCompileClasspath`,
+`testFixturesRuntimeClasspath`.
+
+The old tree is replaced module by module and deleted at the Phase 6 exit. Spec §7 rates two
+coexisting module trees on one classpath as the top structural risk and says why: the
+duplicate declarations and revived globals it produces surface far from the module that added
+the edge. Anything needed from the old tree is copied forward file by file, with the copy
+reviewed. `:example` is banned for a second reason as well — it depends on `:gradle-plugin`,
+whose `implementation(gradleApi())` puts the whole Gradle API downstream.
+
+This rule is run by its own task rather than folded into `udeaVerifyModuleGraph`, so a
+failure cannot mean either "you brought back the old tree" or "you put GL on the kernel".
+
+## `UDEA-MG-001` — `udea-annotations` resolves the Kotlin stdlib and nothing else
+
+**Spec §4.** Allowed on `runtimeClasspath`: `org.jetbrains.kotlin:kotlin-stdlib`,
+`org.jetbrains:annotations`. Everything else fails.
+
+The annotation vocabulary is on the compile classpath of the engine, the game, the KSP
+processor and the K2 plugin at once, so a dependency added here is added to all four — and
+two of them are loaded inside the Kotlin compiler, where an extra jar is a classloader
+conflict rather than an inconvenience.
+
+## `UDEA-MG-002` — only `udea-render` may see a GL backend or a native
+
+**Spec §4, §3.5.** Banned on `compileClasspath` and `runtimeClasspath` of `udea-core`,
+`udea-gas`, `udea-net`, `udea-agent`, `udea-assets`, `udea-assets-compiler`, `udea-codegen`:
+`com.badlogicgames.gdx:gdx-backend-lwjgl3`, `org.lwjgl:*`,
+`com.badlogicgames.gdx:*-platform`.
+
+`com.badlogicgames.gdx:gdx` is deliberately **not** banned — `Vector2` and the rest of
+gdx-math are headless. The ban is on GL and on native loaders, not on maths.
+
+`udea-core` is the headless kernel: the simulation has to run in a test JVM, in a dedicated
+server and inside an agent harness with no display. Once a GL backend is on the compile
+classpath, a `Gdx.gl` reference or a static initialiser gets written and the headless path is
+gone.
+
+### `UDEA-MG-002-BYTECODE` — the same rule, one level down
+
+`udeaVerifyModuleGraph` above reads *dependencies*. `udeaVerifyHeadless` — a task in
+`udea-render`, backed by `HeadlessScan` — reads the *compiled classes* of every headless
+module and fails if one names a GL type. It reports under `UDEA-MG-002-BYTECODE`, an
+extension of this rule rather than an id of its own, because a GL dependency and a GL type
+reference are one defect at two enforcement levels and a CI filter should only have to know
+one number.
+
+It exists because a configuration check structurally cannot see two cases:
+
+- a GL type arriving **transitively** through a dependency that is itself allowed —
+  `com.badlogicgames.gdx:gdx` is legal for `Vector2` and carries
+  `com/badlogic/gdx/graphics/Texture` in the same jar;
+- a type named in source while the dependency providing it is `compileOnly`, so it never
+  reaches a classpath this rule inspects.
+
+The second case is how the old tree lost the property: `SpriteRenderer.kt` imported
+`com.badlogic.gdx.graphics.Texture` into a component the world tick touched, and nothing
+failed. `UDEA-MG-002` is checked first, because "you added `gdx-backend-lwjgl3` to
+`udea-core`" is a better message than forty class-level ones. There is no per-module
+allowlist: the fix is always to move the code to `udea-render`.
+
+## `UDEA-MG-003` — `udea-assets-compiler` holds zero Gradle types
+
+**Spec §4.** Banned on every scanned classpath: `org.gradle:*`, `file:Gradle *` (which is
+`gradleApi()` and `gradleTestKit()`).
+
+The five-pass asset compiler is one implementation behind both the Gradle task and the dev
+daemon. A Gradle type in the compiler makes the daemon path either impossible or a second
+implementation, and a second implementation is how CI and the IDE come to disagree about
+whether an asset is valid.
+
+## `UDEA-MG-004` — nothing depends on `udea-gradle`
+
+**Spec §4.** Banned on `runtimeClasspath` and `testRuntimeClasspath` of every `:udea-*`
+project and `:moba`: `:udea-gradle`.
+
+A Gradle plugin is applied, never depended on. The old `gradle-plugin` module *was* depended
+on — by `example` — and its `implementation(gradleApi())` put the whole Gradle API on the
+shipped game's runtime classpath. In the rewrite `gradleApi()` is `compileOnly`, and this rule
+closes the other half of the same hole.
+
+## `UDEA-MG-005` — no scripting host and no classpath scanner in the game
+
+**Spec §6 (Phase 2 exit), §3.6.** Banned on `:moba`'s `runtimeClasspath`:
+`org.jetbrains.kotlin:kotlin-scripting-*`, `org.jetbrains.kotlin:kotlin-reflect`,
+`org.reflections:reflections`.
+
+This passes trivially while `moba` is empty, which is the point: it is a ratchet placed
+*before* Phase 2 has a reason to reach for `kotlin-scripting-jvm-host`. `common` pulls in five
+`kotlin-scripting-*` artifacts and `org.reflections:reflections` today, which is both a
+startup cost and the mechanism behind the reflection-on-hot-paths smell the rewrite exists to
+kill. Asset scripts are compiled at build time; discovery is codegen and `ServiceLoader`.
+
+## `UDEA-REL-001` — no agent class in the packaged artifact
+
+**Spec §4, §6 (Phase 1 exit).** Banned entry prefixes, configurable via
+`udeaVerifyRelease.bannedPrefixes`:
+
+- `dev/wildware/udea/agent/`
+- `dev/wildware/udea/agenthost/`
+
+Scanned: every zip entry of every archive `:moba` produces — the jar today,
+`distZip`/`distTar` the day a distribution is added. Selected by task type rather than by name
+so the gate cannot silently narrow when the packaging changes.
+
+`udea-agent` is an MCP surface with `spawn_blueprint` and `set_component_field` on it, and
+`udea-agent-host` serves it over loopback HTTP. Spec §4 words this as "verified absent from
+release" rather than "excluded from release" for a reason: the exclusion depends on a Gradle
+variant a developer can misconfigure, and a misconfigured variant fails **silently**. Reading
+the packaged zip rather than the configuration model is the whole point — a green model check
+over a leaky jar is the exact failure mode — and it is also what keeps the gate honest once
+shading or fat-jar packaging arrives, where the model stops describing what ships.
+
+Finding no archive at all fails too. A release gate with no input passes forever.
+
+## `UDEA-REL-002` — no agent module on the release runtime classpath
+
+**Spec §4, §6 (Phase 1 exit).** Banned on `:moba`'s `runtimeClasspath` in a release build:
+`:udea-agent`, `:udea-agent-host`.
+
+Belt to `UDEA-REL-001`'s braces, and not redundant: the model check says *which dependency* to
+remove, which the artifact scan cannot; the artifact scan catches a clean model with dirty
+packaging, which the model check cannot.
+
+A release build is `-Pudea.release=true`. `udeaVerifyRelease` is release-only on purpose — a
+development build is *supposed* to carry the agent surface, and a gate that failed on it is a
+gate people learn to route around.
+
+## Adding a rule
+
+Rules are data in `build-logic/src/main/kotlin/dev/wildware/udea/build/ModuleGraphRules.kt`,
+so adding one is a `DependencyRule(...)` entry. Two things then fail until you finish the job:
+`ModuleGraphRulesTest` asserts every rule id appears in this document, and `DependencyRule`
+rejects a rule that declares neither a ban list nor an allow list, because a rule that cannot
+fail reads as enforcement while reporting green forever.
+
+---
+
+# The Kotlin version pin
+
+Three Kotlin versions exist in this build. Only one of them is a choice anybody makes
+casually, and the other two are the reason `udeaVerifyKotlinPin` exists.
+
+| Version | Where | Chosen by |
+|---|---|---|
+| `2.2.10` | every `udea-*` module and `moba`, compiler and stdlib alike | `gradle/libs.versions.toml`, mirrored by `UdeaVersions.KOTLIN` |
+| Gradle 8.13's embedded `2.0.21` | `build-logic` itself | the Gradle distribution — this is what prints "Unsupported Kotlin plugin version" on every build |
+| whatever KSP2 brings | `udea-codegen`'s **test** JVM only | KSP2's standalone compiler, and recorded as a `UdeaStdlibPin.Exemption` |
+
+## Why the resolved stdlib had to be pinned
+
+The catalog's `kotlin` version controls the compiler. On its own it says nothing about the
+`kotlin-stdlib` that ends up on a classpath, because Gradle resolves the **highest** requested
+version — and Fleks 2.14 asks for `kotlin-stdlib:2.3.21` while KotlinPoet 2.3.0 asks for
+2.3.20. Before the pin, every `udea-*` module compiled with 2.2.10 against a 2.3.21 stdlib,
+and `./gradlew :udea-core:dependencies` was the only way to find out.
+
+That is the direction that hurts. Newer stdlib metadata is read by the older compiler under a
+tolerance warning, and a call site resolved against a 2.3 signature becomes a
+`NoSuchMethodError` on whatever stdlib the classloader actually hands over. For the jars
+loaded *inside* the compiler — `udea-codegen`, `udea-compiler-plugin`, `udea-assets-compiler`
+(spec §7) — that classloader is the compiler's own and stdlib loading is parent-first, so the
+mismatch is certain rather than merely possible.
+
+`udea.kotlin-library` therefore pins the resolved stdlib back to the catalog version, in one
+place, for every module. `udeaVerifyKotlinPin` runs from each module's `check` and fails
+naming both versions. Raising the catalog version is how you get a newer stdlib; a transitive
+dependency is not.
+
+Pinned classpaths: `compileClasspath`, `runtimeClasspath`, `testCompileClasspath`,
+`testRuntimeClasspath`, `testFixturesCompileClasspath`, `testFixturesRuntimeClasspath`. The
+Kotlin plugin's own tool classpaths (`ksp`, `kotlinCompilerPluginClasspath`) are deliberately
+left alone — forcing the project's stdlib onto the tool that compiles the project would be a
+rule meant to protect the compiler breaking it instead.
+
+## Why `build-logic` uses `embeddedKotlin("test")`
+
+`kotlin-dsl` compiles build logic with the Kotlin the *Gradle distribution* embeds — 2.0.21
+for Gradle 8.13 — not with the catalog's 2.2.10. A 2.0.21 compiler cannot read kotlin-test
+2.2.10's metadata, so `libs.kotlin.test` here fails at compile time with a metadata-version
+error. `embeddedKotlin("test")` resolves the kotlin-test that matches the compiler actually
+running, which is the only version that can work.
+
+This is a third Kotlin version in the build and it is deliberate rather than accidental. The
+catalog pin governs the `udea-*` tree; it cannot govern `build-logic`, because Gradle chooses
+that compiler. The day build-logic needs the catalog's Kotlin, the fix is a Gradle upgrade,
+not a version override in `build-logic/build.gradle.kts`.

@@ -26,8 +26,11 @@ internal object ProcessorHarness {
     /**
      * @param sources file name to Kotlin source text.
      * @param workDir a fresh directory, normally a JUnit `@TempDir`.
+     * @param options the KSP processor options the Udea Gradle plugin would have set. Empty
+     *   by default, which is the "generate Replicators only" configuration; a test that wants
+     *   the module-level index passes `udea.moduleName` here exactly as the plugin would.
      */
-    fun run(workDir: File, sources: Map<String, String>): Run {
+    fun run(workDir: File, sources: Map<String, String>, options: Map<String, String> = emptyMap()): Run {
         val sourceRoot = File(workDir, "sources")
         for ((name, text) in sources) {
             val file = File(sourceRoot, name)
@@ -47,6 +50,7 @@ internal object ProcessorHarness {
             kotlinOutputDir = kotlinOut
             resourceOutputDir = File(outputBase, "resources")
             javaOutputDir = File(outputBase, "java")
+            processorOptions = options
             jvmTarget = "17"
             jdkHome = File(System.getProperty("java.home"))
             languageVersion = KOTLIN_LANGUAGE_VERSION
@@ -71,13 +75,27 @@ internal object ProcessorHarness {
         } else {
             emptyList()
         }
-        return Run(exitCode, generated, logger)
+        val resources = File(outputBase, "resources")
+        val generatedResources = if (resources.isDirectory) {
+            resources.walkTopDown().filter(File::isFile).sortedBy { it.path }
+                .associate { it.relativeTo(resources).invariantSeparatorsPath to it.readText() }
+        } else {
+            emptyMap()
+        }
+        return Run(exitCode, generated, generatedResources, logger)
     }
 
     /** The outcome of one processor run. */
     internal class Run(
         val exitCode: KotlinSymbolProcessing.ExitCode,
         val generatedFiles: List<File>,
+        /**
+         * Generated resources by path relative to the resource output root, e.g.
+         * `META-INF/services/dev.wildware.udea.net.NetModule`. Kept as text because the path
+         * *is* the assertion for a `ServiceLoader` file: put it one directory out and nothing
+         * loads, with no error anywhere.
+         */
+        val generatedResources: Map<String, String>,
         private val logger: RecordingLogger,
     ) {
         val errors: List<String> get() = logger.errors.map { it.message }

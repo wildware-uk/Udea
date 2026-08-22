@@ -4,28 +4,36 @@ package dev.wildware.udea.build
  * The rule behind `udeaVerifyKotlinPin`, kept out of the Gradle task so a test can execute
  * its failure paths.
  *
- * `udea-codegen`, `udea-compiler-plugin` and `udea-assets-compiler` are jars that are
- * *loaded by the Kotlin compiler itself* — a KSP processor and a K2 plugin (spec 7). Class
- * loading for `kotlin-stdlib` is parent-first, so at load time they get the **compiler's**
- * stdlib, [UdeaVersions.KOTLIN], whatever they were compiled against. Compiling them
- * against a newer stdlib than that is how you get a green build and a `NoSuchMethodError`
- * inside someone else's build.
+ * The catalog's `kotlin` version is the version the build *compiles* with. On its own it
+ * says nothing about the `kotlin-stdlib` that ends up on a classpath, because Gradle
+ * resolves the highest requested version and Fleks and KotlinPoet each request a newer one.
+ * Left alone, every `udea-*` module compiled with 2.2.10 against a 2.3.21 stdlib and no
+ * message said so.
  *
- * The version catalog does not prevent this on its own: Gradle resolves the *highest*
- * requested version, and KotlinPoet and Fleks both request a newer stdlib than the
- * compiler this project pins. `udea.kotlin-build-tool` therefore pins the resolved stdlib
- * back down, and this check is what proves the pin still holds.
+ * That is the wrong direction. Metadata from a newer stdlib is read by the older compiler
+ * under a tolerance warning, and a call site resolved against a 2.3 signature fails with
+ * `NoSuchMethodError` on whatever stdlib the classloader actually hands over. For the jars
+ * loaded *inside* the compiler — `udea-codegen`, `udea-compiler-plugin`,
+ * `udea-assets-compiler` (spec 7) — that classloader is the compiler's own and stdlib
+ * loading is parent-first, so the mismatch is certain rather than merely possible.
+ *
+ * [UdeaStdlibPin] pins the resolved version back down in one place. This is the check that
+ * proves the pin still holds, and it names both versions so the message alone says what to
+ * change.
  */
 public object UdeaKotlinPin {
+
+    /** Where [pinned] comes from, quoted in the failure message so the fix is obvious. */
+    private const val CATALOG: String = "gradle/libs.versions.toml"
 
     /**
      * The message to fail the build with, or `null` when every resolved stdlib artifact is
      * at [pinned].
      *
      * @param projectPath the Gradle path of the module being checked, for the message.
-     * @param pinned the compiler version this jar will be loaded by.
+     * @param pinned the catalog Kotlin version, which is also the compiler version.
      * @param resolved `<configuration> <module>:<version>` for every `kotlin-stdlib*`
-     *   artifact resolved by the module, across compile and runtime.
+     *   artifact resolved by the module across its pinned configurations.
      */
     public fun violation(
         projectPath: String,
@@ -39,10 +47,11 @@ public object UdeaKotlinPin {
         }
         val offenders = resolved.filterNot { it.endsWith(":$pinned") }
         if (offenders.isEmpty()) return null
-        return "$projectPath is loaded by the Kotlin $pinned compiler (spec 7) but resolves " +
-            offenders.joinToString() + ". A jar compiled against a newer stdlib API than the " +
-            "stdlib on the classloader at load time fails with NoSuchMethodError, not at " +
-            "compile time. Bump the project Kotlin version, hold the offending library at a " +
-            "compatible release, or record why the pin in udea.kotlin-build-tool no longer applies."
+        return "$projectPath compiles with Kotlin $pinned ($CATALOG) but resolves " +
+            offenders.joinToString() + ". Gradle takes the highest requested version, so a " +
+            "transitive dependency can drag the stdlib forward silently; code compiled " +
+            "against the newer stdlib API then fails with NoSuchMethodError at run time, not " +
+            "at compile time. Raise the catalog kotlin version to match, hold the offending " +
+            "library at a compatible release, or record a UdeaStdlibPin.Exemption with a reason."
     }
 }

@@ -41,6 +41,10 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+# Heap dumps. `org.gradle.jvmargs` sets -XX:+HeapDumpOnOutOfMemoryError, so an OOM leaves one
+# of these (hundreds of MB) in whatever directory the JVM was started from.
+*.hprof
+
 .intellijPlatform/
 .kotlin/
 

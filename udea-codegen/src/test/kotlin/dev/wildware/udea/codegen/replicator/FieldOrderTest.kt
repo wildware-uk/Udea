@@ -98,6 +98,39 @@ class FieldOrderTest {
     }
 
     @Test
+    fun `a lowered composite name screams to one constant per component`() {
+        // `position` lowers to `position.x` and `position.y`, and the dot is a word boundary
+        // like an underscore. FIELD_POSITION_X is the name the frozen contract's worked
+        // example uses, and `udea-core`'s hand-written TransformReplicator declares.
+        assertEquals("FIELD_POSITION_X", FieldOrder.constantName("position.x"))
+        assertEquals("FIELD_MUZZLE_OFFSET_Y", FieldOrder.constantName("muzzleOffset.y"))
+    }
+
+    @Test
+    fun `a lowered component sorts immediately after its own property and before any other`() {
+        // '.' is code unit 46, below every character a Kotlin identifier may contain, so a
+        // property's components always sort adjacent — even against a property whose name is
+        // this one plus a suffix. If they did not, `fieldNames` would not be sorted and the
+        // dotted names would interleave with unrelated fields.
+        assertEquals(
+            listOf("position.x", "position.y", "positional", "rotation"),
+            FieldOrder.assign(
+                listOf("rotation", "positional", "position.y", "position.x"),
+            ) { it },
+        )
+    }
+
+    @Test
+    fun `a lowered component and a flat property can collide on a constant, and are separated`() {
+        // `position.x` and `positionX` both scream to FIELD_POSITION_X, and two of those in
+        // one generated object does not compile.
+        val names = FieldOrder.constantNames(listOf("position.x", "positionX"))
+
+        assertEquals(names.size, names.toSet().size, "constant names collided: $names")
+        assertTrue(names.all { it.startsWith("FIELD_POSITION_X") }, names.toString())
+    }
+
+    @Test
     fun `constant names are left alone when nothing collides`() {
         assertEquals(
             listOf("FIELD_CURRENT", "FIELD_MAXIMUM"),

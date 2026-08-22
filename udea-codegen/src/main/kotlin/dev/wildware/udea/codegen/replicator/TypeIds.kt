@@ -1,30 +1,52 @@
 package dev.wildware.udea.codegen.replicator
 
 /**
- * The **placeholder** `Replicator.typeId`.
+ * **The single source of component type ids.**
  *
- * Spec 5 assigns the real ids from sorted FQNs pinned in a checked-in `net-protocol.lock`, and
- * that lock file is a separate issue. Until it exists, an id has to come from somewhere, and
- * the requirements on the stand-in are: identical for identical input, independent of
- * compilation order and of the set of components in the module (an id must not shift when an
- * unrelated component is added), and computed at *generation* time so the emitted file is a
- * literal rather than a runtime hash.
+ * Spec 3.2 states it plainly: bit indices and component ids come from one place — sorted
+ * fully-qualified names in `udea-codegen` — written to a checked-in `net-protocol.lock` that
+ * CI diffs. This is that one place.
  *
- * FNV-1a over the FQN satisfies all three. It is **not** collision-free and is not the wire
- * contract; nothing may persist an id produced here.
+ * Sorted names rather than a content hash, because the id is a `u16` in every packet and a
+ * dense id is a small one. The cost is that inserting a component renumbers its successors,
+ * which is exactly why the lock file is checked in: renumbering the wire format has to be a
+ * reviewed act rather than a side effect of adding a class.
+ *
+ * The generator this replaces had no stable ids at all and named its cross-module index
+ * `UdeaSerializerRegistry_${'$'}{System.currentTimeMillis()}`, so nothing about its wire format was
+ * reproducible between two builds of the same source, let alone between a running server and
+ * a client built yesterday.
  */
 internal object TypeIds {
 
-    private const val FNV_OFFSET_BASIS = -0x7EE3623B // 0x811C9DC5
-    private const val FNV_PRIME = 0x01000193
+    /** Ids are a `u16` in byte 1 of every component entry, so this is the last usable id. */
+    const val MAX_ID: Int = 0xFFFF
 
-    /** A non-negative placeholder id derived from [qualifiedName]. */
-    fun placeholder(qualifiedName: String): Int {
-        var hash = FNV_OFFSET_BASIS
-        for (ch in qualifiedName) {
-            hash = hash xor ch.code
-            hash *= FNV_PRIME
+    /**
+     * Dense ids for [qualifiedNames], assigned `0, 1, 2, …` in ascending name order.
+     *
+     * Pure: no IO, no clock, no dependence on the order the caller discovered the names in.
+     * Two builds that compile the same set of components produce the same map, which is what
+     * makes `net-protocol.lock` diffable and what makes a build cache sound.
+     *
+     * @throws IllegalArgumentException if a name repeats — two `@Replicated` classes cannot
+     *   share a fully-qualified name, and an id space built from a list that thinks they can
+     *   would silently hand one id to two components — or if there are more components than
+     *   the `u16` id space holds.
+     */
+    fun assignIds(qualifiedNames: List<String>): Map<String, Int> {
+        val sorted = qualifiedNames.sorted()
+        for (index in 1 until sorted.size) {
+            require(sorted[index] != sorted[index - 1]) {
+                "two @Replicated components share the fully-qualified name '${sorted[index]}'; " +
+                    "a component type id is assigned per name, so the two would collide on id " +
+                    "${index - 1}"
+            }
         }
-        return hash and 0x7FFFFFFF
+        require(sorted.size <= MAX_ID + 1) {
+            "${sorted.size} @Replicated components exceeds the ${MAX_ID + 1} a u16 component " +
+                "type id can address"
+        }
+        return sorted.withIndex().associate { (index, name) -> name to index }
     }
 }

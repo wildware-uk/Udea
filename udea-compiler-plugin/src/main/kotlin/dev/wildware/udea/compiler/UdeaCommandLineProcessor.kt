@@ -47,7 +47,13 @@ public class UdeaCommandLineProcessor : CommandLineProcessor {
         CliOption(
             optionName = UdeaCompilerPlugin.OPTION_KDOC_INDEX,
             valueDescription = "<path>",
-            description = "Reserved: where the KDoc harvester writes its index.",
+            description = "Where the KDoc harvester writes its index. Absent means do not harvest.",
+            required = false,
+        ),
+        CliOption(
+            optionName = UdeaCompilerPlugin.OPTION_REPO_ROOT,
+            valueDescription = "<path>",
+            description = "Repository root that every emitted SourceSpan is made relative to.",
             required = false,
         ),
     )
@@ -72,6 +78,9 @@ public class UdeaCommandLineProcessor : CommandLineProcessor {
 
             UdeaCompilerPlugin.OPTION_KDOC_INDEX ->
                 configuration.put(UdeaConfigurationKeys.KDOC_INDEX, value)
+
+            UdeaCompilerPlugin.OPTION_REPO_ROOT ->
+                configuration.put(UdeaConfigurationKeys.REPO_ROOT, value)
 
             else -> throw CliOptionProcessingException(
                 "Unknown option '${option.optionName}' for plugin '${UdeaCompilerPlugin.PLUGIN_ID}'.",

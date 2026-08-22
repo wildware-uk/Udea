@@ -5,6 +5,9 @@ import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.extensions.ProjectExtensionDescriptor
+import org.jetbrains.kotlin.fir.analysis.extensions.FirAdditionalCheckersExtension
+import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
+import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -64,6 +67,36 @@ class UdeaCompilerPluginRegistrarTest {
         val extensions = registered.values.single()
         assertEquals(1, extensions.size)
         assertTrue(extensions.single() is FirExtensionRegistrarAdapter)
+    }
+
+    @Test
+    fun `with synthesis off the plugin registers zero FIR declaration generation extensions`() {
+        // Issue #38's hard requirement, and the reason the checkers could ship unconditionally
+        // while synthesis stayed gated (spec 3.2): a checker can only add a diagnostic, whereas
+        // an unresolved synthesised declaration paints a whole project red in an IDE that has
+        // not loaded the plugin. Issue #43's spike returned NO-GO, so this stays at zero.
+        val configuration = CompilerConfiguration()
+        val storage = CompilerPluginRegistrar.ExtensionStorage()
+        with(UdeaCompilerPluginRegistrar()) { storage.registerExtensions(configuration) }
+
+        val registrars = storage.registeredExtensions.values.flatten()
+            .filterIsInstance<FirExtensionRegistrar>()
+        assertEquals(1, registrars.size, "expected exactly one FIR extension registrar")
+
+        // `extensions` carries a key for every FIR extension point, most of them empty; what
+        // matters is which lists have anything in them.
+        val contributed = registrars.single().configure().extensions.filterValues { it.isNotEmpty() }
+        assertEquals(
+            emptyList(),
+            contributed[FirDeclarationGenerationExtension::class].orEmpty(),
+            "synthesis is gated (spec 3.2), so the plugin must contribute no " +
+                "FirDeclarationGenerationExtension",
+        )
+        assertEquals(
+            setOf(FirAdditionalCheckersExtension::class),
+            contributed.keys,
+            "the plugin contributes FIR checkers and nothing else",
+        )
     }
 
     @Test

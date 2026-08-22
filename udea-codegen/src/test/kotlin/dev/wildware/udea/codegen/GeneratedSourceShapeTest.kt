@@ -25,8 +25,14 @@ class GeneratedSourceShapeTest {
         assertEquals(
             listOf(
                 "dev/wildware/udea/codegen/fixtures/AiBlackboardReplicator.kt",
+                "dev/wildware/udea/codegen/fixtures/CombatReplicator.kt",
                 "dev/wildware/udea/codegen/fixtures/HealthReplicator.kt",
                 "dev/wildware/udea/codegen/fixtures/MovementReplicator.kt",
+                "dev/wildware/udea/codegen/fixtures/PlacementReplicator.kt",
+                "dev/wildware/udea/codegen/fixtures/QuantisedProbeReplicator.kt",
+                // The one module-level output: the protocol constant. There is exactly one
+                // aggregating group per module, and this is it.
+                "dev/wildware/udea/generated/CodegenFixturesNetProtocol.kt",
             ),
             GeneratedSources.relativePaths(),
         )
@@ -72,6 +78,7 @@ class GeneratedSourceShapeTest {
             "    data.putSerializable(component.position)",
             "    val m: Map<String, Int> = mapOf()",
             "    val c = Class.forName(name)",
+            "    Cbor.encodeToByteArray(component.position)",
         )
         for (sample in samples) {
             assertTrue(
@@ -97,6 +104,12 @@ class GeneratedSourceShapeTest {
                 "when on something other than the field index",
             Regex("""^\s*is\s+\w""") to "when on a runtime type",
             Regex("""putSerializable|getSerializable""") to "blind serialisation fallback",
+            // The other half of the same fallback: the old generator's answer to any type it
+            // did not recognise was a CBOR blob, which cost an allocation and a full encode
+            // per field per tick and turned an unsupported field into a runtime failure.
+            // Every type udea-codegen accepts now has a folded, allocation-free encoding, so
+            // a CBOR reference in generated output means the fallback came back.
+            Regex("""(?i)\bcbor\b""") to "a CBOR fallback encoding",
         )
     }
 }

@@ -41,6 +41,19 @@ dependencies {
     testImplementation("com.google.devtools.ksp:symbol-processing-common-deps:${libs.versions.ksp.get()}")
 }
 
+// The module-level outputs — the `…NetProtocol` constant and `net-protocol.lock` — are gated
+// on this option, so a module that is only having its Replicators generated emits neither.
+// Setting it here is what makes the fixture source set exercise the aggregating path: the
+// generated protocol object is compiled by `compileTestKotlin` like any other output.
+//
+// `udea.netModuleService` is deliberately NOT set: the generated ServiceLoader index
+// implements the interface named by that option, and this module does not put a `NetModule`
+// implementation on its own test runtime classpath. `ServiceIndexEmitterTest` and
+// `ModuleIndexProcessorTest` cover that path against the real processor instead.
+ksp {
+    arg("udea.moduleName", "CodegenFixtures")
+}
+
 // Acceptance: generated sources compile with -Werror. The generated Replicators land in the
 // test source set, so turning warnings into errors there is what actually enforces it.
 kotlin {

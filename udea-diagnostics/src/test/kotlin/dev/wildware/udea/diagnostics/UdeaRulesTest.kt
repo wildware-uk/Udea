@@ -61,7 +61,8 @@ class UdeaRulesTest {
         assertEquals("UDEA0004", UdeaRules.UNRESOLVED_REFERENCE.id)
         assertEquals("UDEA0005", UdeaRules.SIM_ON_VAL.id)
         assertEquals("UDEA0006", UdeaRules.UNSUPPORTED_FIELD_TYPE.id)
-        assertEquals(6, UdeaRules.all.size)
+        assertEquals("UDEA0007", UdeaRules.MALFORMED_QUANTIZATION.id)
+        assertEquals(7, UdeaRules.all.size)
         assertTrue(UdeaRules.all.all { it.defaultSeverity == Severity.Error })
     }
 

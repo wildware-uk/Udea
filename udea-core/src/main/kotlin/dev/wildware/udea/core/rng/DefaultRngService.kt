@@ -39,7 +39,7 @@ import dev.wildware.udea.core.RngStream
 public class DefaultRngService(
     /** The root seed every stream is derived from. */
     public val rootSeed: Long,
-) : RngService {
+) : RngService, CapturableRng {
 
     override val seed: Long get() = rootSeed
 
@@ -51,7 +51,7 @@ public class DefaultRngService(
         Array(STREAMS.size) { ordinal -> SimRandom(streamSeed(rootSeed, ordinal)) }
 
     /** Longs a full [saveState] occupies. Fixed by the enum; asserted by the layout test. */
-    public val stateWords: Int get() = streams.size * SimRandom.STATE_WORDS
+    override val stateWords: Int get() = streams.size * SimRandom.STATE_WORDS
 
     /**
      * The generator backing [id]. The same instance every time, for the life of the service.
@@ -79,7 +79,7 @@ public class DefaultRngService(
     }
 
     /** [saveState] without the allocation, for a capture that already owns a buffer. */
-    public fun saveInto(into: LongArray, offset: Int = 0) {
+    override fun saveInto(into: LongArray, offset: Int) {
         requireRoom(into.size, offset, "save")
         var at = offset
         for (index in streams.indices) {
@@ -105,7 +105,7 @@ public class DefaultRngService(
     }
 
     /** [restore] from a region of a larger snapshot buffer. */
-    public fun restoreFrom(state: LongArray, offset: Int = 0) {
+    override fun restoreFrom(state: LongArray, offset: Int) {
         requireRoom(state.size, offset, "restore")
         var at = offset
         for (index in streams.indices) {

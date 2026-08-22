@@ -1,17 +1,36 @@
 package dev.wildware.udea.core.loop
 
+import dev.wildware.udea.core.Tick
+
 /**
  * The MCP-facing view of time.
  *
  * A facade rather than handing an agent the [GameLoop] itself: an agent may pause, resume,
- * single-step and change the rate, and must not be able to reach the accumulator, the
- * [Presentation] or the [Simulation] behind them. The snapshot epic adds `rewind` and
- * `fastForward` here, both implemented over [GameLoop.stepTicks].
+ * single-step, change the rate, snapshot, rewind and fast-forward, and must not be able to
+ * reach the accumulator, the [Presentation] or the [Simulation] behind them. Spec 1 promises
+ * an agent can "pause, single-step, rewind sixty seconds and fast-forward" with no debug code
+ * in the game; this is that promise's whole surface.
  *
- * Every method is a whole-tick operation, which is what makes an agent's observation
- * reproducible: after `step(7)` the world is at a named tick, not at a named wall time.
+ * The old engine could not express any of it: `common/UdeaGameManager.kt:235` ran
+ * `world.update(delta)` with the raw frame delta inside `GameScreen.render`, so there was no
+ * addressable tick and no pause that was not a frame-rate artefact.
+ *
+ * Every method is a whole-tick operation and every parameter is a [Tick] count, never seconds
+ * (spec 5, "Time"), which is what makes an agent's observation reproducible: after `step(7)`
+ * the world is at a named tick, not at a named wall time.
+ *
+ * ## Time travel is optional
+ *
+ * [travel] is the snapshot ring behind [rewind], [fastForward] and [snapshot]. A
+ * [TimeControl] built without one is complete and working — every time-travel call returns
+ * [RewindFailure.NoSnapshotRing] instead of throwing — which is what lets a headless loop test
+ * drive this class with no world at all.
  */
-public class TimeControl(private val loop: GameLoop) {
+public class TimeControl(
+    private val loop: GameLoop,
+    /** The snapshot ring, or `null` for a loop that keeps no history. */
+    private val travel: TimeTravel? = null,
+) {
 
     /** Whether the simulation is currently frozen. */
     public val paused: Boolean get() = loop.paused
@@ -51,5 +70,98 @@ public class TimeControl(private val loop: GameLoop) {
      */
     public fun timeScale(x: Float) {
         loop.timeScale = x
+    }
+
+    // --- time travel -------------------------------------------------------------------------
+
+    /**
+     * Captures the world as it stands and stores it in the ring.
+     *
+     * @throws IllegalStateException if this control has no [TimeTravel]. Unlike a rewind,
+     *   which can reasonably be asked for a tick the ring no longer holds, asking a
+     *   history-less loop to record history is a wiring mistake and not a runtime condition.
+     */
+    public fun snapshot(): SnapshotInfo {
+        val ring = checkNotNull(travel) {
+            "this TimeControl has no snapshot ring; build it with a TimeTravel to record history"
+        }
+        return ring.captureNow()
+    }
+
+    /** Every snapshot the ring holds, oldest first. Empty when there is no ring. */
+    public fun listSnapshots(): List<SnapshotInfo> = travel?.listSnapshots() ?: emptyList()
+
+    /**
+     * Rewinds exactly [ticks] ticks and leaves the loop paused.
+     *
+     * Restores the newest keyframe at or before the target and then runs bare steps to close
+     * the gap, which is what makes the landing *exact* at any [ticks] rather than only at
+     * keyframe-aligned ones. That is also why the sparse cadence is the thing that degrades
+     * under budget pressure and the window is not: a wider keyframe spacing costs a few more
+     * of these steps and nothing else (spec 7).
+     *
+     * Failures are returned, never thrown — every one of them is a reasonable answer to a
+     * reasonable question. See [RewindFailure].
+     */
+    public fun rewind(ticks: Int): RewindResult {
+        require(ticks >= 0) { "rewind distance must not be negative, was $ticks" }
+        val ring = travel ?: return RewindResult.Failed(
+            RewindFailure.NoSnapshotRing,
+            "this TimeControl was built without a snapshot ring",
+        )
+
+        val target = ring.currentTick - ticks.toLong()
+        if (target.value < 0) {
+            return RewindResult.Failed(
+                RewindFailure.TickOutOfRing,
+                "rewinding $ticks ticks from ${ring.currentTick} would land before the " +
+                    "simulation started",
+            )
+        }
+
+        return when (val outcome = ring.restoreNearestAtOrBefore(target)) {
+            is RestoreOutcome.Refused -> RewindResult.Failed(outcome.failure, describe(outcome, target))
+            is RestoreOutcome.Restored -> {
+                val steps = target.ticksSince(outcome.restoredTick).toInt()
+                loop.stepTicks(steps)
+                RewindResult.Rewound(
+                    tick = target,
+                    restoredFromTick = outcome.restoredTick,
+                    steppedForward = steps,
+                    assetGraphChangedSince = ring.assetGraphChangedSince(outcome.restoredTick),
+                )
+            }
+        }
+    }
+
+    /**
+     * Runs [ticks] bare steps as fast as the machine will and leaves the loop paused.
+     *
+     * Deliberately **not** a raised [timeScale]. A high time scale still runs through
+     * [GameLoop.frame], which renders once per frame and is capped by `maxCatchUp` — so it
+     * would be bounded by the GPU and by the catch-up ceiling, and would render thousands of
+     * frames nobody looks at. This bypasses [Presentation] entirely: no render call is issued
+     * at all, which is what makes fast-forwarding a hundred simulated seconds take
+     * milliseconds and what makes it work in a headless process with no GL context (spec 3.5).
+     *
+     * It is the same mechanism as [step] under the name the agent surface uses, and it is
+     * written as a delegation rather than a second copy of it precisely so the two can never
+     * drift into meaning different things.
+     */
+    public fun fastForward(ticks: Int): Unit = step(ticks)
+
+    /** The tick the simulation is at, or `null` for a control with no [TimeTravel] behind it. */
+    public val currentTick: Tick? get() = travel?.currentTick
+
+    private fun describe(outcome: RestoreOutcome.Refused, target: Tick): String = when (outcome.failure) {
+        RewindFailure.TickOutOfRing ->
+            "the ring no longer holds a snapshot at or before $target"
+
+        RewindFailure.SceneMismatch ->
+            "the snapshot at or before $target belongs to scene ${outcome.snapshotScene}, " +
+                "but ${outcome.activeScene} is active; load the scene first"
+
+        RewindFailure.NoSnapshotRing ->
+            "this TimeControl was built without a snapshot ring"
     }
 }

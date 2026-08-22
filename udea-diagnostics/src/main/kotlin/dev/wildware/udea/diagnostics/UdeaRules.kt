@@ -128,6 +128,35 @@ public object UdeaRules {
         description = "a @Net/@Sim property has a type udea-codegen cannot replicate",
     )
 
+    /**
+     * A `@Q` whose *arguments* cannot form a quantisation, as distinct from
+     * [QUANTIZED_NON_FLOAT], which is about the annotated property's type.
+     *
+     * Three shapes, one defect — "these three numbers do not describe a mapping":
+     *
+     * - `bits` outside `1..32`, the width `BitWriter.writeBits` accepts;
+     * - `min`/`max` inverted or non-finite, so every value clamps to one output;
+     * - any of the three not a compile-time constant, since all three are folded into the
+     *   generated codec as literals and there is nothing to read at run time.
+     *
+     * They share an id because they share a fix (correct the annotation) and a consequence:
+     * unchecked, each one produces a file that *compiles* and then throws from `write` on the
+     * first tick that field changes — on a server, in front of players.
+     *
+     * Registered rather than left to a bare `logger.error` for the reason this object exists:
+     * both `udea-codegen`'s KSP builder and `udea-compiler-plugin`'s FIR checkers declined to
+     * mint an id locally, and a producer-local id is not an id. `udea-codegen` is the only
+     * producer today — the FIR checker would have to constant-evaluate the annotation
+     * arguments, and the id is here first precisely so that when it does, the developer does
+     * not learn a second number for a defect they have already seen once.
+     */
+    public val MALFORMED_QUANTIZATION: UdeaRule = UdeaRule(
+        id = "UDEA0007",
+        defaultSeverity = Severity.Error,
+        description = "@Q arguments do not describe a quantisation: bits outside 1..32, an " +
+            "inverted or non-finite range, or an argument that is not a compile-time constant",
+    )
+
     /** Every registered rule, in id order. */
     public val all: List<UdeaRule> = listOf(
         NET_ON_VAL,
@@ -136,6 +165,7 @@ public object UdeaRules {
         UNRESOLVED_REFERENCE,
         SIM_ON_VAL,
         UNSUPPORTED_FIELD_TYPE,
+        MALFORMED_QUANTIZATION,
     ).sortedBy { it.id }
 
     private val byId: Map<String, UdeaRule> = all.associateBy { it.id }

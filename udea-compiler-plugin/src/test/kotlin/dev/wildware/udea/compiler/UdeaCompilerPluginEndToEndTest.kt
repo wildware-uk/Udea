@@ -149,7 +149,12 @@ class UdeaCompilerPluginEndToEndTest {
             add("-d")
             add(out.absolutePath)
             if (applyPlugin) {
-                add("-Xplugin=" + pluginJar.absolutePath)
+                // The whole runtime classpath, not just the jar: the plugin reads its rule ids
+                // from udea-diagnostics, and Gradle's KotlinCompilerPluginSupportPlugin passes
+                // the same set. A bare jar would load and then die on the first diagnostic.
+                for (entry in pluginClasspath) {
+                    add("-Xplugin=" + entry)
+                }
                 for (option in pluginOptions) {
                     add("-P")
                     add("plugin:" + UdeaCompilerPlugin.PLUGIN_ID + ":" + option)
@@ -212,6 +217,12 @@ class UdeaCompilerPluginEndToEndTest {
                     "udea.pluginJar is set by udea-compiler-plugin/build.gradle.kts"
                 },
             ).also { check(it.isFile) { "the compiler plugin jar is missing at " + it } }
+
+        /** The plugin jar plus its runtime dependencies, exactly as Gradle assembles them. */
+        val pluginClasspath: List<String> =
+            requireNotNull(System.getProperty("udea.pluginClasspath")) {
+                "udea.pluginClasspath is set by udea-compiler-plugin/build.gradle.kts"
+            }.split(File.pathSeparator).filter { File(it).exists() }
 
         /** The compiled probe needs a stdlib; the test runtime already has exactly one. */
         val kotlinStdlibJar: File =

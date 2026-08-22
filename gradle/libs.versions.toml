@@ -26,6 +26,10 @@ kotlinpoet = "2.3.0"
 fleks = "2.14"
 gdx = "1.13.5"
 junit5 = "5.13.4"
+# ASM is a build/test-time class-file reader: udea-render's udeaVerifyHeadless scans the
+# compiled bytecode of the headless modules for GL references, and udeaVerifyDeterminism
+# (Phase 7) will share the same visitor. Never a runtime dependency of a shipped module.
+asm = "9.6"
 junitPlatform = "1.13.4"
 
 [libraries]
@@ -42,6 +46,7 @@ kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 fleks = { module = "io.github.quillraven.fleks:Fleks", version.ref = "fleks" }
 gdx = { module = "com.badlogicgames.gdx:gdx", version.ref = "gdx" }
 gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", version.ref = "gdx" }
+asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
 junit5-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }
 

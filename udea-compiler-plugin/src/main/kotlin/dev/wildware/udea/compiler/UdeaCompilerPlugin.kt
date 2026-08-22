@@ -30,8 +30,19 @@ public object UdeaCompilerPlugin {
     /** Reserved: paths to the compiled asset index the `reference("...")` checker will read. */
     public const val OPTION_ASSET_INDEX: String = "assetIndex"
 
-    /** Reserved: path the KDoc harvester will write its index to. */
+    /** Path the KDoc harvester writes its index to. Absent means "do not harvest". */
     public const val OPTION_KDOC_INDEX: String = "kdocIndex"
+
+    /**
+     * The repository root every emitted [dev.wildware.udea.diagnostics.SourceSpan] is made
+     * relative to.
+     *
+     * Spec 5 forbids an absolute path in a span, and the compiler only ever hands the plugin
+     * absolute ones, so the root has to come from the build. There is deliberately no default:
+     * guessing it from the process working directory would produce a path that is *relative*
+     * but wrong, which is worse than failing, because it survives into a shipped artefact.
+     */
+    public const val OPTION_REPO_ROOT: String = "repoRoot"
 
     /**
      * The Gradle property that switches the whole plugin off before any `-Xplugin`

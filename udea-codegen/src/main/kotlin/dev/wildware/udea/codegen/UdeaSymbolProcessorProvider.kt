@@ -12,5 +12,9 @@ import com.google.devtools.ksp.processing.SymbolProcessorProvider
  */
 public class UdeaSymbolProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
-        UdeaSymbolProcessor(environment.codeGenerator, environment.logger)
+        UdeaSymbolProcessor(
+            environment.codeGenerator,
+            environment.logger,
+            CodegenOptions.from(environment.options),
+        )
 }

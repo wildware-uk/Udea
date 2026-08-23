@@ -3,6 +3,7 @@ package dev.wildware.udea.assets.compiler.worker
 import dev.wildware.udea.assets.compiler.AssetGraph
 import dev.wildware.udea.assets.compiler.DeclaredAsset
 import dev.wildware.udea.assets.compiler.Ref
+import dev.wildware.udea.assets.compiler.ResFile
 import dev.wildware.udea.assets.compiler.scan.ReferenceSite
 import dev.wildware.udea.assets.compiler.scan.ReferenceSpanIndex
 import dev.wildware.udea.diagnostics.Severity
@@ -95,7 +96,12 @@ public data class AssetRecord(
 }
 
 /** A [Ref] in wire form. */
-public data class RefRecord(val id: String, val origin: SpanRecord?) : Serializable {
+public data class RefRecord(
+    val id: String,
+    val origin: SpanRecord?,
+    /** [Ref.expected]: the kind the slot requires, or null when it does not constrain one. */
+    val expected: String? = null,
+) : Serializable {
     public companion object {
         private const val serialVersionUID: Long = 1L
     }
@@ -115,6 +121,13 @@ public data class DiagnosticRecord(
     }
 }
 
+/** A [ResFile] in wire form. Carried as its own record so a path stays distinguishable from a name. */
+public data class ResFileRecord(val value: String) : Serializable {
+    public companion object {
+        private const val serialVersionUID: Long = 1L
+    }
+}
+
 /** Thrown when an asset field holds something the wire format has no representation for. */
 public class UnencodableAssetValue(
     public val assetId: String,
@@ -123,7 +136,7 @@ public class UnencodableAssetValue(
 ) : IllegalArgumentException(
     "field `$field` of asset `$assetId` holds a ${value.javaClass.name}, which the asset " +
         "compiler's worker protocol cannot carry. Asset fields may hold strings, numbers, " +
-        "booleans, references, lists and maps of those, and nothing else.",
+        "booleans, references, resource paths, lists and maps of those, and nothing else.",
 )
 
 // --- conversions ---------------------------------------------------------------------------
@@ -166,14 +179,23 @@ internal fun DiagnosticRecord.toDiagnostic(): UdeaDiagnostic = UdeaDiagnostic(
 )
 
 /** The graph a worker's [WorkerResponse] describes. */
-public fun WorkerResponse.toGraph(): AssetGraph = AssetGraph.of(assets.map { it.toAsset() })
+public fun WorkerResponse.toGraph(): AssetGraph = AssetGraph.of(toDeclared())
+
+/**
+ * Every declaration the worker made, **in declaration order and duplicates included**.
+ *
+ * [toGraph] keys by id and therefore cannot show a duplicate; this can, which is what
+ * `DuplicateIdValidator` needs.
+ */
+public fun WorkerResponse.toDeclared(): List<DeclaredAsset> = assets.map { it.toAsset() }
 
 /** The diagnostics a worker's [WorkerResponse] describes. */
 public fun WorkerResponse.toDiagnostics(): List<UdeaDiagnostic> = diagnostics.map { it.toDiagnostic() }
 
 private fun encodeValue(assetId: String, field: String, value: Any?): Any? = when (value) {
     null, is String, is Boolean, is Int, is Long, is Float, is Double -> value
-    is Ref -> RefRecord(value.id, value.origin?.toRecord(value.id))
+    is Ref -> RefRecord(value.id, value.origin?.toRecord(value.id), value.expected)
+    is ResFile -> ResFileRecord(value.value)
     is List<*> -> ArrayList(value.map { encodeValue(assetId, field, it) })
     is Map<*, *> -> LinkedHashMap<Any?, Any?>().apply {
         value.forEach { (k, v) -> put(encodeValue(assetId, field, k), encodeValue(assetId, field, v)) }
@@ -182,7 +204,8 @@ private fun encodeValue(assetId: String, field: String, value: Any?): Any? = whe
 }
 
 private fun decodeValue(value: Any?): Any? = when (value) {
-    is RefRecord -> Ref(value.id, value.origin?.toSpan())
+    is RefRecord -> Ref(value.id, value.origin?.toSpan(), value.expected)
+    is ResFileRecord -> ResFile(value.value)
     is List<*> -> value.map(::decodeValue)
     is Map<*, *> -> LinkedHashMap<Any?, Any?>().apply {
         value.forEach { (k, v) -> put(decodeValue(k), decodeValue(v)) }

@@ -10,7 +10,9 @@ import dev.wildware.udea.agent.host.AgentHost
 import dev.wildware.udea.agent.host.AgentHostConfig
 import dev.wildware.udea.agent.host.AgentHostTools
 import dev.wildware.udea.agent.host.ArtifactToolset
+import dev.wildware.udea.agent.host.BuildFlags
 import dev.wildware.udea.agent.host.GameIdentity
+import dev.wildware.udea.agent.host.HostShutdown
 import dev.wildware.udea.agent.host.RenderToolset
 import dev.wildware.udea.agent.host.render.OffscreenRenderControl
 import dev.wildware.udea.agent.host.ToolManifest
@@ -22,6 +24,7 @@ import dev.wildware.udea.agent.tools.BlueprintCatalog
 import dev.wildware.udea.agent.tools.DiagToolset
 import dev.wildware.udea.agent.tools.EngineToolModules
 import dev.wildware.udea.agent.tools.EventsToolset
+import dev.wildware.udea.agent.tools.LifecycleToolset
 import dev.wildware.udea.agent.tools.TimeToolset
 import dev.wildware.udea.agent.tools.WorldToolset
 import dev.wildware.udea.core.SimClock
@@ -155,6 +158,9 @@ public object Phase1OffscreenDemo {
         val artifacts = AgentArtifacts(
             Path.of("build", "udea-agent-artifacts-offscreen").toAbsolutePath(),
         )
+        // Appended to below, once the loop and the host it has to stop exist.
+        val shutdown = HostShutdown()
+        val closeTools = LifecycleToolset(bridge, shutdown)
         val worldTools = WorldToolset(
             world = host.world,
             components = AgentComponentIndex(listOf(demoBodyAccess())),
@@ -169,7 +175,8 @@ public object Phase1OffscreenDemo {
                 ToolIndex.builder(),
                 worldTools,
                 TimeToolset(host.time, host.ctx.clock, bridge),
-                EventsToolset(bridge, host.ctx.clock),
+                EventsToolset(bridge, host.ctx.clock, artifacts.textSpill()),
+                closeTools,
                 DiagToolset(
                     bridge = bridge,
                     clock = host.ctx.clock,
@@ -206,6 +213,9 @@ public object Phase1OffscreenDemo {
                     paused = { host.time.paused },
                 )
             },
+            // Stated rather than defaulted; see `BuildFlags`. A test-source-set demo has no
+            // generated per-variant flag and the library constant is the honest answer.
+            agentAllowed = BuildFlags.AGENT_ALLOWED,
         )
         if (agentHost == null) {
             System.err.println("[phase1-offscreen] no agent host; pass -Dudea.agent.port=<port>")
@@ -217,10 +227,27 @@ public object Phase1OffscreenDemo {
                 "${tools.tools.size} tools, rendering ${RENDER_WIDTH}x$RENDER_HEIGHT offscreen",
         )
         digest.publish()
-        Runtime.getRuntime().addShutdownHook(Thread { backend.close() })
+        shutdown
+            .onClose("frame-loop") { loop.stop() }
+            .onClose("agent-host") { agentHost.stop() }
+            // Last, and on a thread of its own. `close` runs on the simulation thread, which in
+            // Offscreen **is** the GL thread: `Lwjgl3Backend.close` submits the pipeline dispose
+            // to that thread and then waits for the loop to finish, so calling it from inside a
+            // frame is a self-join. Handing it to a daemon thread lets the frame return, drain
+            // the submitted task and exit - which is the whole point of a clean close.
+            .onClose("render-loop") { offThread("phase1-offscreen-exit") { backend.close() } }
+        Runtime.getRuntime().addShutdownHook(Thread { shutdown.shutdown("jvm shutdown hook") })
         // The GL thread becomes the simulation thread from here. See the class KDoc.
         backend.drive(loop::pump)
         backend.awaitExit()
+        backend.close()
+    }
+
+    /** Runs [body] on a short-lived daemon thread. See the `render-loop` close step. */
+    private fun offThread(name: String, body: () -> Unit) {
+        val thread = Thread({ runCatching(body) }, name)
+        thread.isDaemon = true
+        thread.start()
     }
 
     /** World units kept visible on the shorter axis. Small, so a 2-unit box is clearly visible. */

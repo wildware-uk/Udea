@@ -135,7 +135,12 @@ public class IsolatedAssetCompiler(
         val response: WorkerResponse = readObject(responseFile)
         requestFile.deleteIfExists()
         responseFile.deleteIfExists()
-        return AssetCompileResult(response.toGraph(), response.toDiagnostics(), response.cacheHits)
+        return AssetCompileResult(
+            response.toGraph(),
+            response.toDiagnostics(),
+            response.cacheHits,
+            response.toDeclared(),
+        )
     }
 
     public companion object {

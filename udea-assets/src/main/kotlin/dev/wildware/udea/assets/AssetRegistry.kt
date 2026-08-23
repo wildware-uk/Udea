@@ -218,6 +218,41 @@ public class AssetRegistry(
      * the runtime miss and the build-time `udea:unresolved-ref` diagnostic to suggest the same
      * thing, and two implementations of an edit-distance threshold is how they come to disagree.
      */
+    /**
+     * Binds every reference the bundle reader decoded to the slot the packer patched into it
+     * (issue #89, Trello #32).
+     *
+     * This is the step that makes `registry[ref]` an array index for the *whole* graph rather
+     * than for whatever happened to be resolved first. Without it every `Ref` off a bundle
+     * would take the [resolve] path once - a `HashMap<String, Int>` lookup and a `KClass`
+     * instance check - and the id strings would have to stay reachable to make it possible,
+     * which is most of what a packed graph exists to avoid.
+     *
+     * The type check happens here, once, rather than lazily on first use: a bundle whose
+     * `spriteAnimation.sheet` points at a `SoundCue` is a broken *artifact*, and finding that
+     * out during the load screen is strictly better than finding it out on the frame the
+     * animation first plays.
+     */
+    internal fun bindPacked(binder: dev.wildware.udea.assets.pack.RefBinder) {
+        binder.bindAll { ref, index ->
+            if (index !in values.indices) {
+                throw PackedRefOutOfRangeException(ref.id, index, values.size)
+            }
+            val value = values[index]
+            if (value.id != ref.id) {
+                throw PackedRefMismatchException(ref.id, index, value.id)
+            }
+            if (!ref.expected.isInstance(value)) {
+                throw AssetTypeMismatchException(
+                    id = ref.id,
+                    expected = ref.expected.simpleName ?: ref.expected.toString(),
+                    actual = value::class.simpleName ?: value::class.toString(),
+                )
+            }
+            ref.binding = RefBinding(layout, index)
+        }
+    }
+
     private fun unknownAsset(id: AssetId): UnknownAssetException = UnknownAssetException(
         id = id,
         suggestion = DidYouMean.suggest(id.value, layout.ids.map { it.value })?.let(::AssetId),

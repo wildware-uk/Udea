@@ -119,19 +119,23 @@ public object MobaEntry {
         // a followed entity through the definition's `NetIdIndex`, and `Lwjgl3Backend.start` takes
         // a registry that is already complete. Three things in a fixed order, and the order is
         // forced rather than chosen: definition, scene, backend, host.
-        val definition = MobaGame.definition()
-        val scene = scene(definition)
+        // The three `StartupTrace` brackets are the phase breakdown issue #94 requires, and they
+        // are here rather than inside `MobaBench` for the reason that gate exists: a benchmark
+        // that instruments a *copy* of the boot sequence measures the copy. The cost is two
+        // `nanoTime` calls per phase, once per process.
+        val definition = StartupTrace.world { MobaGame.definition() }
+        val scene = StartupTrace.world { scene(definition) }
         // Registered before `start`, because `Lwjgl3Backend.start` builds the pipeline out of the
         // registry and a registration after that point reaches nothing.
         if (overlay != null) scene.registry.overlay(overlay)
-        val backend = Lwjgl3Backend.start(mode, windowConfig(), scene.registry)
+        val backend = StartupTrace.gl { Lwjgl3Backend.start(mode, windowConfig(), scene.registry) }
         var attachment: Attachment? = null
         try {
-            val host = GameHost(mode, definition, backend)
+            val host = StartupTrace.world { GameHost(mode, definition, backend) }
             val pipeline = checkNotNull(backend.pipeline) {
                 "GameHost built no presentation in $mode, so nothing can be captured"
             }
-            val attached = attach(host, Rendering(scene, pipeline))
+            val attached = attach(host, Rendering(scene, pipeline, requestExit = { requestExit(backend) }))
             attachment = attached
             backend.drive(attached.frame)
             backend.awaitExit()
@@ -153,9 +157,40 @@ public object MobaEntry {
         public val scene: MobaScene,
         /** The live pipeline. Its offscreen target is the only surface a capture reads. */
         public val pipeline: RenderPipeline,
+        /**
+         * Asks the render loop to exit, so [runWithGl] returns and the process winds down.
+         *
+         * This is the half of `close` a headless host does not have. `AgentGameLoop.stop` ends a
+         * loop this class is not running: in either GL mode the render thread owns the cadence
+         * and `awaitExit` is what the main thread is parked on, so nothing short of ending the
+         * GL loop makes the process leave. Without it, `close` would unbind the port and leave a
+         * window on the desktop - and the bridge, which takes silence on the port as its
+         * confirmation, would report a clean close over a game that is still running.
+         *
+         * **Safe to call from a frame**, which is the reason it exists at all rather than the
+         * caller being handed the backend. `Lwjgl3Backend.close` submits the pipeline dispose to
+         * the GL thread and then waits for the loop to finish; in Offscreen the GL thread *is*
+         * the simulation thread, so a tool calling it directly would be waiting for the thread
+         * it is running on. See [requestExit].
+         */
+        public val requestExit: () -> Unit = {},
     ) {
         /** The control surface, for a caller that has an agent toolset to wire to it. */
         public fun presentation(): PresentationControl = scene.presentation(pipeline)
+    }
+
+    /**
+     * Ends [backend]'s render loop, from a thread that is not it.
+     *
+     * A daemon thread and not a queued task: `close` disposes on the GL thread and then joins
+     * it, so the frame that asked has to be allowed to return and drain that task. The thread
+     * lives for the length of one shutdown and swallows its own failure - there is nothing left
+     * to report to by then, and a throw here would only replace an exit with a hang.
+     */
+    private fun requestExit(backend: Lwjgl3Backend) {
+        val closer = Thread({ runCatching { backend.close() } }, "moba-render-exit")
+        closer.isDaemon = true
+        closer.start()
     }
 
     /** What [runWithGl]'s caller contributes: a frame driver, and its teardown. */

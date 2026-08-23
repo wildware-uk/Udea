@@ -877,17 +877,61 @@ jobs:
       # will ever report it completed - so the port going quiet is the only success signal
       # `waitForSilence` has, and a host that leaves its HTTP server bound after the game stops
       # leaves the bridge listing an instance it will keep failing against.
-      - name: Stop the instance and assert the port goes silent
+      #
+      # ## What this step used to assert, and what it asserts now
+      #
+      # It used to `kill` the pid a second after starting the watcher, and then assert that the
+      # port went quiet. That is a true statement about `kill(2)` and says nothing whatever
+      # about the game: no `close` tool existed, `stop_instance` escalated to terminating the
+      # process tree on every stop, and this step was green throughout.
+      #
+      # Nothing here signals the process. One `GET /command?cmd=close` is the only input, and
+      # three things are checked after it:
+      #
+      #   1. `close` is in the manifest, spelled the way the bridge sends it. A tool named
+      #      `lifecycle.close` is a tool `game-bridge-mcp` never calls.
+      #   2. the port goes quiet - `expect-silence.mjs`, the bridge's own `waitForSilence`.
+      #   3. the process is gone. Without this, a host that unbound its port and kept running
+      #      would pass: silence is what the bridge believes, and believing it over a live
+      #      process is the failure mode worth catching.
+      - name: Ask the game to close itself, and assert it did
         shell: bash
         env:
           UDEA_AGENT_PORT: "7820"
         run: |
           set -euo pipefail
+          pid="$(cat agent-instance.pid)"
+
+          curl -sf -m 5 http://127.0.0.1:7820/tools > tools.json
+          grep -Eq '"name"[[:space:]]*:[[:space:]]*"close"' tools.json || {
+            echo "::error::GET /tools publishes no tool named close, so the bridge's own close"
+            echo "::error::command would answer no_such_tool and stop_instance would fall back"
+            echo "::error::to killing the process tree."
+            exit 1
+          }
+
           ( cd .github/conformance && node scripts/expect-silence.mjs ) &
           silence=$!
-          sleep 1
-          kill "$(cat agent-instance.pid)" 2>/dev/null || true
+
+          # The only input. No kill, no signal, no interrupt anywhere in this step.
+          curl -s -m 5 'http://127.0.0.1:7820/command?cmd=close&reason=ci+conformance' || true
+          echo
+
           wait "$silence"
+
+          for _ in $(seq 1 60); do
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "process $pid exited on its own after close; nothing signalled it"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::the port went quiet but process $pid is still alive 60s after close."
+          echo "::error::A game that releases its port and keeps running reads to the bridge as"
+          echo "::error::a clean close and leaves a process behind on every session."
+          tail -50 agent-instance.log
+          kill "$pid" 2>/dev/null || true
+          exit 1
 
       - name: Upload the instance log
         if: always()

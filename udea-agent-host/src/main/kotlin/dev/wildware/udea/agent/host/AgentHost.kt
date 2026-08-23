@@ -413,6 +413,21 @@ public class AgentHost private constructor(
         /**
          * Starts a host if, and only if, this build permits one and a port was asked for.
          *
+         * ## [agentAllowed] has no default, and that is the point
+         *
+         * It used to default to [BuildFlags.AGENT_ALLOWED], which is a hand-written `true` in a
+         * library jar. The per-variant flag `udeaGenerateAgentBuildFlags` writes into the game
+         * was therefore **opt-in**: a game that never passed the parameter got `true` from a
+         * constant no build ever regenerates, `-Pudea.release=true` changed nothing about it,
+         * and `udeaVerifyRelease` was checking only the other half of the guard - that the
+         * classes are absent. A release build that somehow carried the classes would have served.
+         *
+         * With no default there is no such game. Every caller states its answer at the call site,
+         * a game states the generated one, and the parameter is the authority rather than a
+         * suggestion. A host that genuinely has no generated flag - the demos in this module's
+         * own test source set - passes [BuildFlags.AGENT_ALLOWED] where a reviewer can see it and
+         * see that it is a development-only entry point.
+         *
          * @return the running host, or `null` when [AgentHostGate] refused - which is the normal
          *   case for a player's launch and is not logged, because a line of startup noise on
          *   every run is how people learn to stop reading startup logs. A refusal that had a
@@ -421,7 +436,7 @@ public class AgentHost private constructor(
         public fun startIfRequested(
             bridge: AgentBridge,
             config: (Int) -> AgentHostConfig,
-            agentAllowed: Boolean = BuildFlags.AGENT_ALLOWED,
+            agentAllowed: Boolean,
             properties: (String) -> String? = System::getProperty,
         ): AgentHost? {
             val decision = AgentHostGate.decide(agentAllowed, properties(BuildFlags.PORT_PROPERTY))

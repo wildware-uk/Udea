@@ -4,6 +4,7 @@ import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.AgentErrorKind
 import dev.wildware.udea.agent.AgentEventRing
 import dev.wildware.udea.agent.AgentResult
+import dev.wildware.udea.agent.Json
 import dev.wildware.udea.annotations.AgentTool
 import dev.wildware.udea.annotations.Arg
 import dev.wildware.udea.core.SimClock
@@ -35,7 +36,34 @@ import dev.wildware.udea.core.SimClock
 public class EventsToolset(
     private val bridge: AgentBridge,
     private val clock: SimClock,
+    /**
+     * Where an event message too long for a page goes, so the caller can still read all of it.
+     *
+     * Defaults to [TextSpill.NONE], which is the honest default for a `SimHarness` run or a unit
+     * test: those have nowhere to put bytes, and an oversized message is then cut and marked
+     * rather than half-promised. A host with an artifact store passes one - see
+     * `AgentArtifacts.textSpill` - and the message arrives whole through `GET /artifact`.
+     */
+    private val spill: TextSpill = TextSpill.NONE,
 ) {
+
+    /**
+     * The last few messages this toolset spilled, so a second read does not file a second copy.
+     *
+     * Without it, a caller polling `recent_events` while it waits for something writes one
+     * artifact per call per oversized entry, and that burst evicts the screenshots an agent was
+     * comparing - the store is bounded on both axes and eviction is oldest-accessed-first, so a
+     * loop here is a loop that quietly deletes somebody else's evidence.
+     *
+     * Bounded, and by [SPILL_MEMO_ENTRIES] rather than by anything clever: the ring itself is
+     * bounded, the messages that reach here are the big ones, and holding a handful of 4KB
+     * strings alive is the price of not writing them again. Keyed by the message, so a *changed*
+     * message is a new artifact even at the same tick.
+     */
+    private val spilled = object : LinkedHashMap<String, String>(SPILL_MEMO_ENTRIES, LOAD_FACTOR, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+            size > SPILL_MEMO_ENTRIES
+    }
 
     /**
      * The event ring, newest first, one page at a time.
@@ -50,7 +78,11 @@ public class EventsToolset(
      * and the caller waiting on its own command read `commandResultsTruncated: true` for as long
      * as it was willing to wait. The tool advertised in the manifest, dispatched, ran, wrote its
      * answer into the ring, and could not deliver a single event. See [ResultPage] for the
-     * settlement and for why it is pagination rather than an artifact handle.
+     * settlement.
+     *
+     * Paging fixed the *list* and left the row: an entry whose message alone exceeded the page
+     * was still dropped at every `limit`, which made this tool undeliverable for anything a
+     * game logged in more than a line or so. [renderEntry] is the rest of the settlement.
      *
      * ## Newest first, which is the opposite of the ring's own order
      *
@@ -104,14 +136,78 @@ public class EventsToolset(
                 // `held`. A caller that wants the ring's own size when it *is* filtering asks
                 // once without the filter.
             },
-        ) { json, index ->
+        ) { json, index, budget ->
             // `collect` hands back oldest-first; index 0 must be the newest. See the KDoc.
-            val entry = matched[matched.size - 1 - index]
-            json.obj {
-                put("tick", entry.tick)
-                put("message", entry.message)
-            }
+            json.raw(renderEntry(matched[matched.size - 1 - index], budget))
         }
+    }
+
+    /**
+     * One entry, rendered whole if it fits [budget] and shortened with a way back if it does not.
+     *
+     * ## The shape that could not fit, and what replaced it
+     *
+     * `{"tick":N,"message":"..."}` is fine until the message is long, and then it is not merely
+     * a big answer - it is an **undeliverable** one. `ResultPage` commits the first row of a page
+     * whatever its size, `AgentBridge.renderCommandResults` then drops any result past the
+     * digest's guarantee, and the caller reads `commandResultsTruncated: true` forever. Reducing
+     * the default `limit` did not touch that: a page of one is still a page of one oversized row.
+     *
+     * So the row shortens itself to the number `ResultPage` hands it, and publishes three things
+     * with the cut:
+     *
+     * - `truncated: true` - never omitted, so a short message and a clipped one are never
+     *   confusable. The clipped text also carries `Json`'s own `~` mark.
+     * - `messageChars` - the **real** length, so a caller knows how much it is missing.
+     * - `messageRef` - the artifact holding the whole message, when a store was wired. Fetched
+     *   with `GET /artifact?id=<ref>`, which is the same mechanism, the same endpoint and the
+     *   same lifetime as `render.screenshot`'s PNG.
+     *
+     * With no store the first two still hold and `messageRef` is absent, which is the difference
+     * between "you are missing 4000 characters and here they are" and "you are missing 4000
+     * characters". Both beat the old answer, which was nothing at all.
+     *
+     * ## Measured, not estimated
+     *
+     * The candidate is rendered and its length checked against [budget] rather than computed
+     * from field widths, for the reason `ResultPage` gives: a JSON escape makes one character
+     * into two or six, so any arithmetic over `message.length` is wrong exactly when the message
+     * contains the quotes and newlines a big message tends to contain. The shrink loop converges
+     * because each pass removes at least the overrun and at least one character.
+     */
+    private fun renderEntry(entry: Entry, budget: Int): String {
+        val scratch = Json()
+        render(scratch, entry, keep = entry.message.length, chars = -1, ref = null)
+        if (scratch.length <= budget) return scratch.toString()
+
+        // Only now, and only once per distinct message: filing an artifact for a row that was
+        // going to fit anyway is a write nobody asked for.
+        val ref = spilled[entry.message] ?: spill.spill(entry.message)?.also {
+            spilled[entry.message] = it
+        }
+        var keep = entry.message.length
+        while (true) {
+            scratch.reset()
+            render(scratch, entry, keep, chars = entry.message.length, ref = ref)
+            val over = scratch.length - budget
+            if (over <= 0 || keep <= 1) return scratch.toString()
+            keep -= if (over > 1) over else 1
+            if (keep < 1) keep = 1
+        }
+    }
+
+    /** [entry] with its message clipped to [keep] characters; [chars] < 0 means "not clipped". */
+    private fun render(out: Json, entry: Entry, keep: Int, chars: Int, ref: String?) {
+        out.beginObject()
+        out.put("tick", entry.tick)
+        out.key("message")
+        out.value(entry.message, if (keep < 1) 1 else keep)
+        if (chars >= 0) {
+            out.put("truncated", true)
+            out.put("messageChars", chars)
+            if (ref != null) out.put("messageRef", ref)
+        }
+        out.endObject()
     }
 
     @AgentTool(
@@ -227,5 +323,11 @@ public class EventsToolset(
 
         /** Ticks back from now that `assert_event` searches when the caller names no window. */
         public const val DEFAULT_WINDOW: Int = 60
+
+        /** How many spilled messages are remembered, so a repeated read refiles none of them. */
+        public const val SPILL_MEMO_ENTRIES: Int = 8
+
+        /** `LinkedHashMap`'s default. Named only because the access-order constructor needs it. */
+        private const val LOAD_FACTOR: Float = 0.75f
     }
 }

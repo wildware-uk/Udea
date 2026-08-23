@@ -43,7 +43,7 @@ class ResultPageTest {
                 put("count", 4_000)
                 put("totalBytes", 1_234_567_890L)
             },
-        ) { json, index ->
+        ) { json, index, _ ->
             json.obj {
                 put("tick", index.toLong())
                 put("kind", "Full")
@@ -86,7 +86,7 @@ class ResultPageTest {
             limit = 10,
             total = 5,
             prelude = { put("note", "x".repeat(ResultPage.MAX_PAGE_BYTES)) },
-        ) { json, index -> json.obj { put("tick", index.toLong()) } }
+        ) { json, index, _ -> json.obj { put("tick", index.toLong()) } }
 
         val json = (page as AgentResult.Ok).json
         assertTrue(json.contains("\"preludeTooLarge\":true"), json)
@@ -118,7 +118,7 @@ class ResultPageTest {
             limit = Int.MAX_VALUE,
             total = 4_000,
             prelude = { put("count", 4_000) },
-        ) { json, index ->
+        ) { json, index, _ ->
             json.obj {
                 put("tick", index.toLong())
                 put("kind", "Full")
@@ -146,15 +146,23 @@ class ResultPageTest {
     }
 
     /**
-     * An unpaged answer of the same data is dropped, which is what makes the test above mean
-     * something.
+     * An unpaged answer of the same data never arrives inline, which is what makes the test above
+     * mean something.
      *
      * Without this the paged result could be passing because the data happened to be small. It
-     * renders the *whole* list the old way and asserts the exact failure the settlement is
-     * about: nothing in `commandResults`, and `commandResultsTruncated` as the only signal.
+     * renders the *whole* list the old way and asserts that what reaches `commandResults` is not
+     * the answer: a `resultTooLarge` marker, with a null `resultRef` because this bridge was
+     * built with no `TextSpill`.
+     *
+     * The marker is why this test no longer asserts an empty array. It used to, and that was the
+     * defect being described rather than a behaviour worth keeping: an answer above
+     * [AgentBridge.MAX_DELIVERABLE_RESULT_CHARS] was dropped outright and the caller polling for
+     * its id waited forever with `commandResultsTruncated` as the only clue. `AgentBridge.complete`
+     * now substitutes a marker the caller can act on. The claim this test exists to make is
+     * untouched and sharper: **the whole list does not arrive, so a tool returning one must page.**
      */
     @Test
-    fun `the unpaged form of the same answer is dropped, which is the defect`() {
+    fun `the unpaged form of the same answer does not arrive, which is the defect`() {
         val bridge = AgentBridge()
         bridge.complete(
             1L,
@@ -182,11 +190,13 @@ class ResultPageTest {
         )
         document.endObject()
 
-        assertTrue(truncated, "an oversized answer must report itself truncated")
-        assertTrue(
-            document.toString().contains("\"commandResults\":[]"),
-            "the whole answer should have been dropped: $document",
-        )
+        val rendered = document.toString()
+        assertTrue(!truncated, "the marker is small and must fit where the answer did not: $rendered")
+        assertTrue("\"resultTooLarge\":true" in rendered, "the answer arrived inline: $rendered")
+        assertTrue("\"rows\"" !in rendered, "the oversized list reached the document: $rendered")
+        // Null, and named: this bridge has no store, so the answer is genuinely unreachable and
+        // the caller is told so rather than left to infer it from an absent key.
+        assertTrue("\"resultRef\":null" in rendered, rendered)
     }
 
     /** Following `nextOffset` enumerates everything, with no entry seen twice and none skipped. */
@@ -199,7 +209,7 @@ class ResultPageTest {
 
         while (true) {
             val json = (
-                ResultPage.render("rows", offset, limit = Int.MAX_VALUE, total = total) { out, index ->
+                ResultPage.render("rows", offset, limit = Int.MAX_VALUE, total = total) { out, index, _ ->
                     out.obj { put("tick", index.toLong()) }
                 } as AgentResult.Ok
                 ).json
@@ -223,7 +233,7 @@ class ResultPageTest {
      */
     @Test
     fun `an entry larger than a whole page is returned and reported as oversized`() {
-        val page = ResultPage.render("rows", offset = 0, limit = 5, total = 3) { json, index ->
+        val page = ResultPage.render("rows", offset = 0, limit = 5, total = 3) { json, index, _ ->
             json.obj { put("blob", "x".repeat(ResultPage.MAX_PAGE_BYTES + 10) + index) }
         }
 
@@ -236,7 +246,7 @@ class ResultPageTest {
     @Test
     fun `an empty list is still a page, and says there is no more`() {
         val json = (
-            ResultPage.render("rows", offset = 0, limit = 10, total = 0) { out, _ -> out.obj { } }
+            ResultPage.render("rows", offset = 0, limit = 10, total = 0) { out, _, _ -> out.obj { } }
                 as AgentResult.Ok
             ).json
 

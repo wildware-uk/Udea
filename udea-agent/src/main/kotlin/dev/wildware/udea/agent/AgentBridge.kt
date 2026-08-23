@@ -7,6 +7,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import dev.wildware.udea.agent.tools.TextSpill
+import dev.wildware.udea.agent.state.DigestBudgets
 
 /**
  * The lock-free hand-off between whatever is talking to the agent and the simulation thread.
@@ -58,6 +60,14 @@ public class AgentBridge(
     public val narration: AgentNarration = AgentNarration(),
     /** How many command answers are kept for the digest to render. */
     resultCapacity: Int = DEFAULT_RESULT_CAPACITY,
+    /**
+     * Where an answer too large for `/state` is put, so that it is not simply lost.
+     *
+     * See [complete]. `TextSpill.NONE` for a host with no artifact store, which is honest rather
+     * than broken: the caller then gets the marker without a handle, and knows both that its
+     * command answered and that the answer is unreachable here.
+     */
+    private val resultSpill: TextSpill = TextSpill.NONE,
 ) {
     init {
         require(queueCapacity > 0) { "queueCapacity must be positive, was $queueCapacity" }
@@ -161,6 +171,55 @@ public class AgentBridge(
     /** The highest command id that has been completed. The strong confirmation. */
     public fun completedCommandId(): Long = completed.get()
 
+    /**
+     * [result], or a handle to it when it is too large to ever reach `/state`.
+     *
+     * ## The defect this closes
+     *
+     * `CommandResultRing.renderInto` spends a byte budget newest-first and drops whole entries
+     * that do not fit. An entry larger than [DigestBudgets.RESULT_CEILING] does not fit in *any*
+     * document, and it is never evicted until [DEFAULT_RESULT_CAPACITY] newer commands arrive - so
+     * the caller polls a document that says `completedCommandId: 4` beside an empty
+     * `commandResults` and a bare `commandResultsTruncated: true`, forever, with no way to learn
+     * even which id it lost. That is not hypothetical: `assets.write` rejecting one typo'd
+     * reference answers with 3490 characters against a 1280-character ceiling, so **every**
+     * asset diagnostic an agent asked for was silently unreachable over HTTP until this existed.
+     * `Phase2ExitTest` is the regression.
+     *
+     * ## Why here and not in the renderer
+     *
+     * The renderer is on the digest's allocation and latency gate (`DigestBudgets`, <0.3ms,
+     * allocation-free), and spilling writes a file. This runs once per command, on the same
+     * simulation thread the tool itself just ran on, and only for an answer that is already
+     * oversized - which is exactly where `EventsToolset` spills an oversized event, through the
+     * same [TextSpill] and out the same `GET /artifact` door.
+     *
+     * ## Why the threshold is "impossible" rather than "guaranteed"
+     *
+     * Only [DigestBudgets.RESULT_MIN_BYTES] is *guaranteed* to a result; the rest of its ceiling
+     * is what the preceding sections happened to leave. Spilling everything above the guarantee
+     * would put a handle in place of almost every ordinary answer and cost a round trip for
+     * results that arrive perfectly well today. Spilling above what the ceiling could ever admit
+     * moves exactly the answers that could not otherwise arrive at all, and leaves the existing
+     * newest-first policy to arbitrate the rest.
+     */
+    private fun deliverable(result: AgentResult): AgentResult {
+        if (result !is AgentResult.Ok) return result
+        if (result.json.length <= MAX_DELIVERABLE_RESULT_CHARS) return result
+        val handle = resultSpill.spill(result.json)
+        return AgentResult.Ok(
+            Json.render {
+                put("resultTooLarge", true)
+                put("resultChars", result.json.length)
+                put("maxInlineChars", MAX_DELIVERABLE_RESULT_CHARS)
+                // Null when the host has no artifact store. Stated rather than omitted: a caller
+                // that sees the key and a null knows the answer exists and is unreachable, which
+                // is a different thing from a caller that sees no key at all.
+                put("resultRef", handle)
+            },
+        )
+    }
+
     /** The most recent command answers, oldest first. Allocating; for tools and tests. */
     public fun commandResults(): List<CommandResult> = results.toList()
 
@@ -207,7 +266,7 @@ public class AgentBridge(
      * a timeout - and a bridge that times out reports a healthy game as frozen.
      */
     public fun complete(id: Long, result: AgentResult) {
-        results.record(id, result)
+        results.record(id, deliverable(result))
         // A high-water mark, not a store: commands may complete out of order if a tool ever
         // defers, and a plain set would let an older id retract a newer confirmation.
         while (true) {
@@ -272,6 +331,18 @@ public class AgentBridge(
          * fell behind by a few commands can still find its own.
          */
         public const val DEFAULT_RESULT_CAPACITY: Int = 32
+
+        /**
+         * The largest answer `/state` could ever carry inline. Above it, [complete] spills.
+         *
+         * Derived from the digest's own budget rather than chosen, so that moving
+         * `DigestBudgets.RESULT_CEILING` moves this with it: an answer above this cannot be
+         * rendered into any document at any moment, whatever the rest of the document holds.
+         * `CommandResultRingTest` pins the derivation against the renderer.
+         */
+        public const val MAX_DELIVERABLE_RESULT_CHARS: Int =
+            DigestBudgets.RESULT_CEILING - CommandResultRing.ARRAY_OVERHEAD -
+                CommandResultRing.ENTRY_OVERHEAD
     }
 }
 
@@ -428,7 +499,7 @@ internal class CommandResultRing(private val capacity: Int) {
         return admitted
     }
 
-    private companion object {
+    internal companion object {
         /** The fixed part of one rendered answer, plus slack. */
         const val ENTRY_OVERHEAD: Int = 40
 

@@ -1,6 +1,8 @@
 package dev.wildware.udea.agent.host
 
+import dev.wildware.udea.agent.tools.TextSpill
 import java.io.IOException
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -164,6 +166,28 @@ public class AgentArtifacts(
         return id
     }
 
+    /**
+     * This store as a [TextSpill], for the tool answers that are too big for the digest.
+     *
+     * ## Why text goes through the same door as a PNG
+     *
+     * Because it is the same problem. A 4KB event message and a 2MB screenshot are both bytes
+     * that cannot ride in a 2048-byte digest, and `render.screenshot` already settled it: file
+     * the bytes, answer with the id, let the caller fetch `GET /artifact?id=cap_0007`. A second
+     * mechanism for text would be a second lifetime to reason about, a second bound to get wrong
+     * and a second endpoint for an agent to learn. The eviction rules, the `Content-Type`, the
+     * typed 404 that distinguishes *evicted* from *never existed* - all of it already works, and
+     * `.txt` is already in [extensionOf].
+     *
+     * `text/plain` rather than `text/plain; charset=utf-8`, because [extensionOf] and
+     * [mediaTypeOf] match on the bare type and a decorated one would be filed as `.bin` and read
+     * back as something else. The bytes are UTF-8 either way; a caller reading an event message
+     * is reading what a Kotlin `String` held.
+     */
+    public fun textSpill(): TextSpill = TextSpill { text ->
+        put(text.toByteArray(StandardCharsets.UTF_8), TEXT)?.value
+    }
+
     /** The artifact for [id], marking it most recently used, or `null` when it is not held. */
     public fun get(id: ArtifactId): Artifact? = synchronized(this) { entries[id.value] }
 
@@ -253,6 +277,9 @@ public class AgentArtifacts(
 
         /** `image/png`, the only type anything produces today. */
         public const val PNG: String = "image/png"
+
+        /** The media type a [textSpill] files under. Bare, so [extensionOf] recognises it. */
+        public const val TEXT: String = "text/plain"
 
         /** 200 artifacts. A long session's worth of captures without a full disk to show for it. */
         public const val DEFAULT_MAX_ENTRIES: Int = 200

@@ -27,10 +27,36 @@ dependencies {
     // public surface names a `UdeaRule`, only its refusal messages quote one.
     implementation(project(":udea-diagnostics"))
 
+    // The runtime asset model, for `AssetHotReload`: a GraphDelta applied to an AssetRegistry
+    // through the SimBarrier. `udea-assets` is a leaf (UDEA-MG-006 keeps it one), so this costs a
+    // shipped game nothing beyond plain data classes.
+    implementation(project(":udea-assets"))
+
+    // The warm daemon behind the `assets` toolset, **compileOnly** and deliberately so.
+    //
+    // `udea-assets-compiler` carries kotlin-compiler-embeddable and the scripting host, and
+    // `UDEA-MG-005` forbids `kotlin-scripting-*` on `:moba`'s runtime classpath - the shipped game
+    // compiles no scripts, which is the entire point of spec 3.6. A plain `implementation` here
+    // would put it there through `udea-agent` and fail that gate.
+    //
+    // So `AssetsToolset` and `AssetToolModule` compile against the daemon and are simply
+    // unloadable in a process that has no daemon on its classpath. That is the correct behaviour
+    // rather than a compromise: only the `udeaDev` daemon and a dev host serve these tools, and
+    // `EngineToolModules` deliberately does not name them, so nothing a shipped game touches can
+    // reach the missing classes. `AssetToolSurfaceTest` runs with the daemon present.
+    compileOnly(project(":udea-assets-compiler"))
+
     // Real Fleks components on real entities, a wired GameContext, and the ArrayFieldStore /
     // ArrayBitWriter pair, so the hand-written test replicators can implement the whole frozen
     // contract rather than only the two methods the agent surface calls.
     testImplementation(testFixtures(project(":udea-core")))
+    // Compile-time only, and that is the whole point. `AgentModuleBoundaryTest` scans the test
+    // JVM's own classpath and bans `kotlin-scripting-*` from it, because this module is compiled
+    // into every game and anything on its classpath is on the game's. A `testImplementation` here
+    // would put the scripting host on `testRuntimeClasspath` and break that gate rather than
+    // satisfy it. The asset-toolset tests get the daemon at run time from their own Test task
+    // below, whose classpath is assembled separately and never becomes this module's.
+    testCompileOnly(project(":udea-assets-compiler"))
 }
 
 // --- the agent surface's own codegen ---------------------------------------------------------
@@ -67,6 +93,61 @@ ksp {
 // the digest less often - never a wider budget. A budget that moves when it is missed measures
 // nothing.
 
+// --- the asset toolset's tests run in their own JVM, on their own classpath ------------------
+//
+// `AssetsToolset` needs a real `AssetDaemon`, and a real daemon needs the Kotlin scripting host.
+// That host may not be on this module's ordinary test classpath - `AgentModuleBoundaryTest` bans
+// it there, and rightly, since udea-agent is compiled into every game. So the daemon reaches these
+// tests through a configuration of their own and a Test task of their own, and never through
+// `testRuntimeClasspath`.
+//
+// The `kotlin-reflect` force is not tidiness. `udea-assets-compiler` drags in kotlin-reflect at a
+// version *newer* than the kotlin-stdlib every module is forced down to, and a newer reflect over
+// an older stdlib is a `ClassNotFoundException: kotlin.jvm.internal.KotlinGenericDeclaration` from
+// the first class whose initialiser touches reflection - which is `CoreModule`, so every test in
+// the JVM dies with it. Left unforced it fails loudly here and silently anywhere else that ever
+// combines the two.
+val assetToolsRuntime: Configuration by configurations.creating {
+    resolutionStrategy.force("org.jetbrains.kotlin:kotlin-reflect:${libs.versions.kotlin.get()}")
+}
+
+dependencies {
+    assetToolsRuntime(project(":udea-assets-compiler"))
+}
+
+/** The tool names this task owns, excluded from `test` so they run once, in the right JVM. */
+val assetToolTests = "dev.wildware.udea.agent.assets.*"
+
+val udeaAssetTools = tasks.register<Test>("udeaAssetTools") {
+    group = "verification"
+    description = "The assets.* toolset against a real warm daemon and a real headless game."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath + assetToolsRuntime
+    filter.includeTestsMatching(assetToolTests)
+}
+
+tasks.named("check") {
+    dependsOn(udeaAssetTools)
+}
+
+// --- the asset toolset's tests drive a real daemon --------------------------------------------
+//
+// `AssetDaemon` takes a repo root, an asset root and a script compile classpath as arguments
+// rather than reading its own environment - that is the property that lets one implementation
+// serve the Gradle task and the daemon - so a test JVM has to be told all three, exactly as
+// `udea-assets-compiler`'s own tests are. Handing the tests a *fake* daemon instead would leave
+// the toolset's whole reason for existing (a warm compiler answering in under 300ms) untested.
+tasks.withType<Test>().configureEach {
+    systemProperty("udea.repoRoot", rootProject.layout.projectDirectory.asFile.absolutePath)
+    // **This task's own** classpath, not `sourceSets.test.runtimeClasspath`. The two differ for
+    // `udeaAssetTools`, which is the only task that has a daemon at all, and a script compiled
+    // against the wrong one fails with "Unresolved reference 'spriteSheet'" - the DSL receiver
+    // missing from the classpath the scripts are compiled against.
+    doFirst {
+        systemProperty("udea.assetsCompiler.classpath", classpath.asPath)
+    }
+}
+
 val budgetTestClasses = listOf(
     "dev.wildware.udea.agent.state.DigestBudgetTest",
     "dev.wildware.udea.agent.query.EntityQueryBudgetTest",
@@ -74,6 +155,10 @@ val budgetTestClasses = listOf(
 
 tasks.named<Test>("test") {
     budgetTestClasses.forEach { filter.excludeTestsMatching(it) }
+    // Not a disabled test: `udeaAssetTools` runs every one of these, on `check`, in a JVM whose
+    // classpath carries the daemon. Running them here as well would put the scripting host on this
+    // task's classpath, which is exactly what `AgentModuleBoundaryTest` exists to forbid.
+    filter.excludeTestsMatching(assetToolTests)
 }
 
 /** The digest under 0.3ms at 500 entities, and allocating nothing but the document. */

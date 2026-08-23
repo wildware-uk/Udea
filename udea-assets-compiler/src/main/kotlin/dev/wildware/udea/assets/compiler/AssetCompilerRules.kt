@@ -88,11 +88,61 @@ public object AssetCompilerRules {
             "faithfully into a build(scope) body",
     )
 
+
+    /**
+     * A field value the bundle format has no encoding for (issue #89).
+     *
+     * `UDEA0024` is the id `docs/contracts/asset-index.md` records as "the next free id in this
+     * module's reserved band", and this is the first thing to need one. It is a *value* defect,
+     * not a kind defect: [UNPACKABLE_KIND] is about a declaration the runtime has no type for,
+     * which is legal and ends up in an `OpaqueAsset`, while this is a field holding something -
+     * a lambda, a `Lazy`, a game's own object - that has no bytes at all.
+     */
+    public val UNPACKABLE_VALUE: UdeaRule = UdeaRule(
+        id = "UDEA0024",
+        defaultSeverity = Severity.Error,
+        description = "an asset field holds a value the .udeapak format cannot encode",
+    )
+
+    /**
+     * A declaration whose kind has no `AssetData` type, met where a *runtime value* is required.
+     *
+     * Distinct from [dev.wildware.udea.assets.compiler.AssetKind.Unpublishable], which is the
+     * same fact reported into the compile-time catalog and is not an error there: a catalog may
+     * legitimately be short an entry. Packing cannot be short one - a graph with a hole is not a
+     * graph - so the daemon raises this rather than inventing a value or dropping the asset.
+     */
+    public val UNPACKABLE_KIND: UdeaRule = UdeaRule(
+        id = "UDEA0025",
+        defaultSeverity = Severity.Error,
+        description = "an asset declaration's kind has no AssetData implementation, so it cannot " +
+            "be packed into a runtime graph",
+    )
+
+    /**
+     * `udeaMigrateAssets` met something in a `.udea.kts` it will not rewrite by guessing.
+     *
+     * A **warning**, and that is the whole design of the migrator: one that fails the build on
+     * the first construct it does not understand migrates nothing, and one that guesses produces
+     * a corpus that compiles and means something else. So the file is rewritten as far as the
+     * rules reach, the undecided span is marked in place with a `// TODO(udea-migrate)` comment,
+     * and this is raised so the count is visible in a report rather than only in the diff.
+     */
+    public val MIGRATION_UNDECIDED: UdeaRule = UdeaRule(
+        id = "UDEA0026",
+        defaultSeverity = Severity.Warning,
+        description = "the asset migrator could not decide how to rewrite a construct and left " +
+            "it as written, marked with a TODO(udea-migrate)",
+    )
+
     /** Every rule this module raises that `UdeaRules` does not already own, in id order. */
     public val all: List<UdeaRule> = listOf(
         NON_LITERAL_ID,
         SCRIPT_COMPILATION_FAILED,
         SCRIPT_EVALUATION_FAILED,
         TRANSPILE_UNSUPPORTED,
+        UNPACKABLE_VALUE,
+        UNPACKABLE_KIND,
+        MIGRATION_UNDECIDED,
     ).sortedBy { it.id }
 }

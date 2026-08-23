@@ -15,7 +15,9 @@ import dev.wildware.udea.agent.host.AgentHost
 import dev.wildware.udea.agent.host.AgentHostConfig
 import dev.wildware.udea.agent.host.AgentHostTools
 import dev.wildware.udea.agent.host.ArtifactToolset
+import dev.wildware.udea.agent.host.BuildFlags
 import dev.wildware.udea.agent.host.GameIdentity
+import dev.wildware.udea.agent.host.HostShutdown
 import dev.wildware.udea.agent.host.RenderToolset
 import dev.wildware.udea.agent.host.ToolManifest
 import dev.wildware.udea.agent.query.AgentComponentIndex
@@ -30,6 +32,7 @@ import dev.wildware.udea.agent.tools.BlueprintCatalog
 import dev.wildware.udea.agent.tools.DiagToolset
 import dev.wildware.udea.agent.tools.EngineToolModules
 import dev.wildware.udea.agent.tools.EventsToolset
+import dev.wildware.udea.agent.tools.LifecycleToolset
 import dev.wildware.udea.agent.tools.TimeToolset
 import dev.wildware.udea.agent.tools.WorldToolset
 import dev.wildware.udea.core.GameContextBuilder
@@ -84,7 +87,11 @@ public object Phase1Demo {
     /** Boots and blocks. Kill the process to stop it. */
     @JvmStatic
     public fun main(args: Array<String>) {
-        val bridge = AgentBridge()
+        val artifacts = AgentArtifacts(Path.of("build", "udea-agent-artifacts").toAbsolutePath())
+        // See `AgentBridge.complete`: an answer larger than the digest's result ceiling reaches
+        // the caller as a handle rather than not at all, and only a host with a store can offer
+        // one. This demo is what the `bridge-conformance` job drives, so it has one.
+        val bridge = AgentBridge(resultSpill = artifacts.textSpill())
         val module = DemoModule()
         val definition = UdeaGameDef(
             modules = listOf(module),
@@ -117,7 +124,14 @@ public object Phase1Demo {
             spawner = spawner,
         )
         val timeTools = TimeToolset(host.time, host.ctx.clock, bridge)
-        val eventTools = EventsToolset(bridge, host.ctx.clock)
+        // The store, not `TextSpill.NONE`: this demo is what the `bridge-conformance` job drives,
+        // and an event message too long for a page is exactly what it has to be able to fetch.
+        val eventTools = EventsToolset(bridge, host.ctx.clock, artifacts.textSpill())
+        // Registered before the loop and the host exist, because the tool index is built before
+        // them. `HostShutdown` is the indirection that makes that possible: it is a list of steps
+        // this function appends to as each thing it owns comes into being.
+        val shutdown = HostShutdown()
+        val closeTools = LifecycleToolset(bridge, shutdown)
         val diagTools = DiagToolset(
             bridge = bridge,
             clock = host.ctx.clock,
@@ -130,9 +144,8 @@ public object Phase1Demo {
         // no `RenderControl`: nothing in `udea-render` implements that interface yet, so every
         // render tool here answers the typed `no_render_context` - which is the correct answer
         // for `RenderMode.Headless` in any case, and is what the demo transcript should show.
-        val artifacts = AgentArtifacts(Path.of("build", "udea-agent-artifacts").toAbsolutePath())
         val tools = EngineToolModules
-            .wireAll(ToolIndex.builder(), worldTools, timeTools, eventTools, diagTools)
+            .wireAll(ToolIndex.builder(), worldTools, timeTools, eventTools, diagTools, closeTools)
             .module(AgentHostTools)
             .toolset(RenderToolset(RenderMode.Headless, control = null, artifacts = artifacts))
             .toolset(ArtifactToolset(artifacts))
@@ -160,6 +173,11 @@ public object Phase1Demo {
                     paused = { host.time.paused },
                 )
             },
+            // This module has no generated per-variant flag - it is a library, and
+            // `AgentBuildFlagsSource` says why one cannot live in its jar. `Phase1Demo` is a
+            // development-only entry point in a *test* source set, so the library constant is
+            // the honest answer and it is stated here rather than inherited from a default.
+            agentAllowed = BuildFlags.AGENT_ALLOWED,
         )
         if (agentHost == null) {
             System.err.println("[phase1-demo] no agent host; pass -Dudea.agent.port=<port>")
@@ -169,8 +187,14 @@ public object Phase1Demo {
         // Publish once before the first frame, so a `/state` that beats the loop is a document
         // rather than an empty string.
         digest.publish()
-        Runtime.getRuntime().addShutdownHook(Thread { loop.stop() })
+        // The order is the contract's: stop simulating, then let the port go quiet. Unbinding
+        // first would hand a caller a closed connection to a command that did run.
+        shutdown
+            .onClose("frame-loop") { loop.stop() }
+            .onClose("agent-host") { agentHost.stop() }
+        Runtime.getRuntime().addShutdownHook(Thread { shutdown.shutdown("jvm shutdown hook") })
         loop.run()
+        println("[phase1-demo] closed: ${shutdown.reason ?: "the loop stopped on its own"}")
     }
 
     /** The snapshot ring's view of [Position]. One component is enough to rewind. */

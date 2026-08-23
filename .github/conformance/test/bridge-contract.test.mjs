@@ -139,7 +139,17 @@ test("every published tool survives the bridge's manifest normalisation", async 
   );
   // The engine's own surface, which every Udea game gets for free. Named explicitly so that a
   // toolset silently disappearing is a failure here rather than a smaller number nobody reads.
-  for (const required of ["world.query_entities", "time.step", "events.recent_events", "diag.frame_report"]) {
+  // `close` is unqualified on purpose and is the one name here the bridge, not this engine,
+  // chose: `stop_instance` sends a bare `?cmd=close` and escalates to killing the process tree
+  // when nothing answers. A rename to `lifecycle.close` would be invisible to every other
+  // assertion in this file and would silently put every stop back on the kill path.
+  for (const required of [
+    "close",
+    "world.query_entities",
+    "time.step",
+    "events.recent_events",
+    "diag.frame_report",
+  ]) {
     assert.ok(kept.includes(required), `${required} is missing from the published manifest`);
   }
 });

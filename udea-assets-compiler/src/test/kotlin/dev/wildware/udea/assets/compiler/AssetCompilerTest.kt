@@ -48,7 +48,10 @@ class AssetCompilerTest {
 
         // ResPath normalisation: the author writes "/sprites/...", the model holds no leading
         // slash. This is the two-keys-for-one-file bug issue #84 names.
-        assertEquals("sprites/orc/idle.png", result.graph.assets["character/orc_idle"]?.fields?.get("spritePath"))
+        // A `ResFile` and not a `String`: pass 3's MissingFileValidator finds every path a
+        // declaration holds by *type*, so that a kind added later cannot forget to register
+        // its path fields in a table somewhere else. See `ResFile`.
+        assertEquals(ResFile("sprites/orc/idle.png"), result.graph.assets["character/orc_idle"]?.fields?.get("spritePath"))
 
         // The sanctioned forEach and the repeat(n) loop both produced their assets.
         assertEquals(

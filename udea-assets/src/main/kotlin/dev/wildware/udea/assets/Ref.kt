@@ -48,8 +48,19 @@ public class Ref<T : AssetData> internal constructor(
     @JvmField
     internal var binding: RefBinding? = null
 
-    /** The interned slot, or `null` when this reference has not been resolved yet. Tests. */
-    internal val resolvedIndex: AssetIndex? get() = binding?.let { AssetIndex(it.index) }
+    /**
+     * The interned slot, or `null` when this reference has not been resolved yet.
+     *
+     * Public because spec 3.6 makes it the *only* asset identity allowed into a snapshot: a
+     * `@Net`/`@Sim` field that names an asset stores this int, which is stable across a hot
+     * reload, so a rewind across a reload restores state that reads the new data. A system
+     * that wants to snapshot a reference needs to read the slot without going through the
+     * registry, and this is that read.
+     *
+     * Off a `.udeapak` it is never null: `BundleReader` binds every reference at open time.
+     * It is null for a `Ref` built by hand that nothing has resolved yet.
+     */
+    public val resolvedIndex: AssetIndex? get() = binding?.let { AssetIndex(it.index) }
 
     override fun equals(other: Any?): Boolean =
         this === other || (other is Ref<*> && id == other.id && expected == other.expected)

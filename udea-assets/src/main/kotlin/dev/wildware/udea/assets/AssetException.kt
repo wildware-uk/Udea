@@ -55,3 +55,22 @@ public class DuplicateAssetIdException internal constructor(
     public val firstIndex: Int,
     public val secondIndex: Int,
 ) : AssetException("asset '$id' is declared twice in one graph, at slots $firstIndex and $secondIndex")
+
+/**
+ * A packed reference names a slot the graph does not have.
+ *
+ * Only reachable from a corrupt or hand-edited `.udeapak`: the packer refuses to write an
+ * unresolved index, and `BundleWriterTest` proves it by trying.
+ */
+public class PackedRefOutOfRangeException internal constructor(
+    public val id: AssetId,
+    public val index: Int,
+    graphSize: Int,
+) : AssetException("packed reference to '$id' names slot $index of a $graphSize-asset graph")
+
+/** A packed reference's slot holds a different asset than the id recorded beside it. */
+public class PackedRefMismatchException internal constructor(
+    public val id: AssetId,
+    public val index: Int,
+    public val found: AssetId,
+) : AssetException("packed reference to '$id' names slot $index, which holds '$found'")

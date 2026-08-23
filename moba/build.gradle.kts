@@ -163,3 +163,200 @@ tasks.register<JavaExec>("runClient") {
 tasks.named("check") {
     dependsOn(agentSources.classesTaskName)
 }
+
+// --- udeaBenchStartup (issue #94) ---------------------------------------------------------
+//
+// The Phase 2 exit criterion "process start to first frame < 800ms", measured on a real
+// `:moba` process rather than on a harness that resembles one.
+//
+// It is the criterion that proves the runtime script host is gone. The old path constructed a
+// `BasicJvmScriptingHost` and compiled every `.udea.kts` during startup
+// (`common/.../assets/dsl/script/scriptHost.kt:41,53-58`), mitigated only by an on-disk jar
+// cache that a first run, a CI run or any changed script missed. There is no assertion that
+// can prove a compiler is absent; a wall-clock gate on the whole boot is what notices if one
+// creeps back, and `StartupClasspathTest` closes the same question from the other end by
+// naming the artifacts.
+
+/** JVM start to first presented frame, in millis. Spec 6's Phase 2 exit criterion. */
+val startupBudgetMillis: Long =
+    (providers.gradleProperty("udea.bench.budgetMillis").orNull ?: "800").toLong()
+
+/** How many processes to launch. The median of these is what the gate compares. */
+val startupRuns: Int = (providers.gradleProperty("udea.bench.runs").orNull ?: "5").toInt()
+
+/**
+ * Launches `moba.bench` N times and gates the median.
+ *
+ * A task class rather than a `doLast` because it has to fork a process per run and read the
+ * files those processes write, and both of those need injected services to survive the
+ * configuration cache.
+ */
+abstract class UdeaBenchStartupTask : DefaultTask() {
+
+    @get:InputFiles
+    abstract val runtimeClasspath: ConfigurableFileCollection
+
+    @get:Input
+    abstract val mainClass: Property<String>
+
+    @get:Input
+    abstract val runs: Property<Int>
+
+    @get:Input
+    abstract val budgetMillis: Property<Long>
+
+    @get:OutputFile
+    abstract val report: RegularFileProperty
+
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    @get:Inject
+    abstract val layout: ProjectLayout
+
+    @TaskAction
+    fun bench() {
+        val scratch = layout.buildDirectory.dir("tmp/udeaBenchStartup").get().asFile
+        scratch.deleteRecursively()
+        scratch.mkdirs()
+        val samples = mutableListOf<Map<String, Double>>()
+        for (run in 0 until runs.get()) {
+            val out = scratch.resolve("run-$run.json")
+            val result = execOperations.javaexec {
+                mainClass.set(this@UdeaBenchStartupTask.mainClass)
+                classpath = runtimeClasspath
+                args("--exit-after-first-frame")
+                systemProperty("udea.bench.out", out.absolutePath)
+                systemProperty("udea.render.mode", "Offscreen")
+                isIgnoreExitValue = true
+            }
+            if (result.exitValue != 0 || !out.isFile) {
+                throw GradleException(
+                    "moba.bench run $run exited ${result.exitValue} and wrote " +
+                        (if (out.isFile) "a report" else "no report") +
+                        ". A machine with no GL driver cannot run this gate; that is a red " +
+                        "build and not a skip, because a silently skipped startup gate is how a " +
+                        "regression ships.",
+                )
+            }
+            samples += parse(out.readText())
+        }
+        val medians = summarise(samples)
+        val median = medians.getValue("firstFrameMillis")
+        val p95 = percentile(samples.map { it.getValue("firstFrameMillis") }, 0.95)
+        val document = render(medians, median, p95, samples.size)
+        val file = report.get().asFile
+        file.parentFile.mkdirs()
+        file.writeText(document)
+        logger.lifecycle("[udeaBenchStartup] median ${fmt(median)}ms, p95 ${fmt(p95)}ms over ${samples.size} runs")
+        logger.lifecycle(document)
+        if (median > budgetMillis.get()) {
+            throw GradleException(
+                "process start to first frame is ${fmt(median)}ms over ${samples.size} runs, " +
+                    "budget ${budgetMillis.get()}ms. The phase breakdown in ${file.absolutePath} " +
+                    "names the phase that grew.",
+            )
+        }
+    }
+
+    private fun parse(json: String): Map<String, Double> =
+        Regex("""["](\w+)["]\s*:\s*([0-9.]+)""").findAll(json)
+            .associate { it.groupValues[1] to it.groupValues[2].toDouble() }
+
+    /** The per-phase median. A median per phase, not the phases of the median run. */
+    private fun summarise(samples: List<Map<String, Double>>): Map<String, Double> =
+        samples.flatMap { it.keys }.distinct().sorted().associateWith { key ->
+            percentile(samples.mapNotNull { it[key] }, 0.5)
+        }
+
+    /** Nearest-rank, so a five-run p95 is the slowest run rather than an interpolation of it. */
+    private fun percentile(values: List<Double>, fraction: Double): Double {
+        require(values.isNotEmpty()) { "no samples" }
+        val sorted = values.sorted()
+        val rank = Math.ceil(fraction * sorted.size).toInt().coerceIn(1, sorted.size)
+        return sorted[rank - 1]
+    }
+
+    private fun render(medians: Map<String, Double>, median: Double, p95: Double, runs: Int): String =
+        buildString {
+            append("{\n")
+            append("  \"runs\": ").append(runs).append(",\n")
+            append("  \"budgetMillis\": ").append(budgetMillis.get()).append(",\n")
+            append("  \"medianFirstFrameMillis\": ").append(fmt(median)).append(",\n")
+            append("  \"p95FirstFrameMillis\": ").append(fmt(p95)).append(",\n")
+            append("  \"phaseMedians\": {\n")
+            val phases = listOf("jvmStartToMainMillis", "assetMillis", "glMillis", "worldMillis")
+            phases.forEachIndexed { i, phase ->
+                append("    \"").append(phase).append("\": ")
+                append(fmt(medians[phase] ?: 0.0))
+                append(if (i == phases.lastIndex) "\n" else ",\n")
+            }
+            append("  }\n")
+            append("}\n")
+        }
+
+    private fun fmt(value: Double): String {
+        val tenths = Math.round(value * 10.0)
+        return "${tenths / 10}.${tenths % 10}"
+    }
+}
+
+val udeaBenchStartup = tasks.register<UdeaBenchStartupTask>("udeaBenchStartup") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Fails when median moba process-start-to-first-frame exceeds the Phase 2 budget."
+    runtimeClasspath.from(sourceSets.main.map { it.runtimeClasspath })
+    mainClass.set("dev.wildware.moba.entry.MobaBench")
+    runs.set(startupRuns)
+    budgetMillis.set(startupBudgetMillis)
+    report.set(layout.buildDirectory.file("reports/udea/startup.json"))
+}
+
+/**
+ * The classpath half of the same gate, run on every `check`.
+ *
+ * Deliberately NOT folded into `udeaBenchStartup`'s action even though issue #94 asks for one
+ * gate: `udeaBenchStartup` needs a GL driver and this does not, so a machine that cannot run
+ * the wall-clock half would otherwise stop asserting the artifact half too - which is the
+ * exact "silently skipped gate" failure mode this whole issue exists to notice. They are one
+ * gate in the sense that both are wired into `check`, and two tasks in the sense that one of
+ * them can run anywhere.
+ */
+tasks.test {
+    // A *local* val, captured by the `doFirst` below. A script-level property here would make
+    // the lambda hold a reference to the build script object, which the configuration cache
+    // refuses to serialize - the build fails at store time rather than at run time, which is
+    // how this was found.
+    val names: Provider<String> = configurations.named("runtimeClasspath")
+        .map { it.files.joinToString(File.pathSeparator) { file -> file.name } }
+    inputs.property("runtimeClasspathNames", names)
+    doFirst {
+        systemProperty("udea.moba.runtimeClasspathNames", names.get())
+    }
+}
+
+// Deliberately NOT wired into `check`. The gate forks a process that creates a real LWJGL3
+// context, so on a machine with no GL driver it is a red build rather than a skip (see the
+// GradleException above) - which is the right behaviour for a gate that is *asked for*, and the
+// wrong behaviour for `./gradlew build` on a developer's headless container. CI runs it
+// explicitly, under xvfb, alongside `udeaGlTest`. `udeaBenchStartup` is referenced here so a
+// configuration error in it is still a configuration error for everyone.
+require(udeaBenchStartup.name == "udeaBenchStartup")
+
+// --- the agent entry point is launchable, not merely compilable --------------------------------
+//
+// `check` compiles `src/agent` above, which catches an API break. It does not catch an entry point
+// the JVM will not start: an `object`'s `@JvmStatic` detached from its `main` compiles cleanly and
+// fails only at launch, with `gamebridge.json` pointing `game-bridge-mcp` straight at it. See
+// `AgentEntryPointTest`, which loads the class from this directory and looks at nothing else.
+tasks.test {
+    dependsOn(agentSources.classesTaskName)
+    // The whole agent runtime classpath, not just this module's output: reflecting on
+    // `MobaAgent` resolves the signatures of every method it declares, and those name
+    // `udea-agent-host` types. A loader given only the class output throws
+    // `NoClassDefFoundError` before it can look at `main`.
+    val agentClasses = agentSources.runtimeClasspath
+    inputs.files(agentClasses).withPropertyName("agentClasses")
+    doFirst {
+        systemProperty("udea.moba.agentClasses", agentClasses.asPath)
+    }
+}

@@ -195,7 +195,7 @@ public class TimeToolset(
                 put("count", held.size)
                 put("totalBytes", totalBytes)
             },
-        ) { json, index -> json.obj { renderSnapshot(held[index]) } }
+        ) { json, index, _ -> json.obj { renderSnapshot(held[index]) } }
     }
 
     @AgentTool(

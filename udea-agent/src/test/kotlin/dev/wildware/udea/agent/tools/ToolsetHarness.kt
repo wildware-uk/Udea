@@ -54,7 +54,11 @@ import kotlin.test.assertIs
  * [ToolIndex] built the way a host builds one. No tool is ever called directly - [call] submits
  * to the bridge, exactly as an HTTP handler would, which is the whole claim of issue #73.
  */
-internal class ToolsetHarness(withSnapshotRing: Boolean = true) {
+internal class ToolsetHarness(
+    withSnapshotRing: Boolean = true,
+    /** Where an oversized event message goes. `NONE` is what a host with no store wires. */
+    private val spill: TextSpill = TextSpill.NONE,
+) {
 
     val bridge: AgentBridge = AgentBridge()
 
@@ -95,6 +99,15 @@ internal class ToolsetHarness(withSnapshotRing: Boolean = true) {
 
     val diagTools: DiagToolset
 
+    val closeTools: LifecycleToolset
+
+    /** Set by the `close` tool's teardown. The harness has no loop and no port to stop. */
+    var closedWith: String? = null
+        private set
+
+    /** Extra teardown, run where a host's would run. For asserting *when* that is. */
+    var onShutdown: ((String) -> Unit)? = null
+
     val sim: SimHarness
 
     init {
@@ -116,7 +129,11 @@ internal class ToolsetHarness(withSnapshotRing: Boolean = true) {
             spawner = spawner,
         )
         timeTools = TimeToolset(host.time, host.ctx.clock, bridge)
-        eventTools = EventsToolset(bridge, host.ctx.clock)
+        eventTools = EventsToolset(bridge, host.ctx.clock, spill)
+        closeTools = LifecycleToolset(bridge) { reason ->
+            closedWith = reason
+            onShutdown?.invoke(reason)
+        }
         diagTools = DiagToolset(
             bridge = bridge,
             clock = host.ctx.clock,
@@ -126,7 +143,7 @@ internal class ToolsetHarness(withSnapshotRing: Boolean = true) {
             barrier = definition.core.barrier,
         )
         val tools = EngineToolModules
-            .wireAll(ToolIndex.builder(), worldTools, timeTools, eventTools, diagTools)
+            .wireAll(ToolIndex.builder(), worldTools, timeTools, eventTools, diagTools, closeTools)
             .build()
         sim = SimHarness(host, bridge, tools, digest)
     }

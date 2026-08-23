@@ -37,6 +37,23 @@ public object UdeaStdlibPin {
         public val reason: String,
     )
 
+    /**
+     * The classpath `udea-agent`'s `udeaAssetTools` test task runs on.
+     *
+     * Named here rather than spelled in that module's build script alone, so that the pin and the
+     * configuration cannot drift into two names for one classpath.
+     */
+    public const val ASSET_TOOLS_RUNTIME: String = "assetToolsRuntime"
+
+    /**
+     * The classpath `udea-agent-host`'s `udeaPhase2Demo` runs on.
+     *
+     * The same arrangement as [ASSET_TOOLS_RUNTIME] and for the same reason: the Phase 2 demo
+     * needs a real `AssetDaemon`, the daemon carries the Kotlin scripting host, and that host may
+     * not reach `udea-agent-host`'s ordinary `testRuntimeClasspath`.
+     */
+    public const val ASSET_DAEMON_RUNTIME: String = "assetDaemonRuntime"
+
     /** Compile classpath of `UdeaAgentPlugin`'s debug source set, at its default name. */
     public const val AGENT_SOURCE_SET_COMPILE_CLASSPATH: String = "agentCompileClasspath"
 
@@ -67,6 +84,19 @@ public object UdeaStdlibPin {
         // which is precisely the "the next source set somebody adds" case this list exists for.
         AGENT_SOURCE_SET_COMPILE_CLASSPATH,
         AGENT_SOURCE_SET_RUNTIME_CLASSPATH,
+        // `udea-agent`'s `assetToolsRuntime`: the classpath the `assets.*` toolset's tests run on,
+        // which carries `udea-assets-compiler` and therefore the Kotlin scripting host. It is a
+        // separate configuration precisely so that host never reaches `testRuntimeClasspath`,
+        // where `AgentModuleBoundaryTest` bans it - udea-agent is compiled into every game. It is
+        // a classpath a test JVM genuinely runs on, so it is pinned rather than exempted, and it
+        // is here for the same reason the two above are: `udeaVerifyKotlinPin` failed the moment
+        // the configuration appeared.
+        ASSET_TOOLS_RUNTIME,
+        // `udea-agent-host`'s `assetDaemonRuntime`: the classpath the Phase 2 exit demo runs on.
+        // Identical in kind to the line above - a JVM genuinely runs on it, so it is pinned - and
+        // it is here for the same reason: `udeaVerifyKotlinPin` failed `:udea-agent-host` the
+        // moment the configuration appeared, which is the rule doing its job.
+        ASSET_DAEMON_RUNTIME,
     )
 
     /**

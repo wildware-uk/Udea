@@ -94,7 +94,12 @@ class AgentHostBindingTest {
     @Test
     fun `startIfRequested binds only when both conditions hold`() {
         assertNull(
-            AgentHost.startIfRequested(dev.wildware.udea.agent.AgentBridge(), { config(it) }, properties = { null }),
+            AgentHost.startIfRequested(
+                dev.wildware.udea.agent.AgentBridge(),
+                { config(it) },
+                agentAllowed = true,
+                properties = { null },
+            ),
             "no -Dudea.agent.port means no server",
         )
         assertNull(

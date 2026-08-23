@@ -26,7 +26,71 @@ public data class Ref(
      * fallback (issue #86).
      */
     public val origin: SourceSpan? = null,
-)
+    /**
+     * Fully qualified name of the [dev.wildware.udea.assets.AssetData] the *slot* this
+     * reference was passed to requires, or `null` when the slot does not constrain it.
+     *
+     * This is the compiler-side half of `reference<Blueprint>("...")`. An author writes
+     * `reference("id")` with no type argument - spec 3.6 keeps scripts on plain string ids -
+     * so the expectation cannot come from the call. It comes from the *parameter*: the DSL
+     * function that accepts the reference stamps it with [expecting], right at the signature
+     * that states what belongs there. There is no table of DSL word to type to keep in step,
+     * which is the only reason it will stay in step - the same argument [AssetKind] makes.
+     *
+     * `null` is a real answer and not a gap to be filled in later: `gameConfig`'s
+     * `defaultCharacter` points at a `character`, and [AssetKind.Unpublishable] means there is
+     * no runtime type to compare against. [dev.wildware.udea.assets.compiler.validate.ReferenceTypeValidator]
+     * stays silent there rather than inventing one.
+     */
+    public val expected: String? = null,
+) {
+    /** This reference, recorded as having to point at a [T]. See [expected]. */
+    public fun expecting(type: kotlin.reflect.KClass<out dev.wildware.udea.assets.AssetData>): Ref =
+        copy(expected = type.qualifiedName)
+}
+
+/**
+ * This reference, recorded as having to point at a [T]. See [Ref.expected].
+ *
+ * An extension rather than a member so the common `null`-able case (`parent: Ref?`) reads as
+ * `parent?.expecting<Blueprint>()` without a second overload.
+ */
+public inline fun <reified T : dev.wildware.udea.assets.AssetData> Ref.expecting(): Ref =
+    expecting(T::class)
+
+/**
+ * A path to a file inside the asset root, as a script wrote it.
+ *
+ * A distinct type and not a `String` for exactly one reason:
+ * [dev.wildware.udea.assets.compiler.validate.MissingFileValidator] has to find every path a
+ * declaration holds, and a `String` field is indistinguishable from a name, a tag or a
+ * component type. Marking it at the DSL signature that accepts it means a kind added later
+ * cannot forget to register its path fields in a table somewhere else, because there is no
+ * table.
+ *
+ * [value] is normalised the way [dev.wildware.udea.assets.ResPath] normalises: the leading `/`
+ * an author writes is stripped, `\` becomes `/`, and repeated separators collapse - so that
+ * `"/sprites/orc/idle.png"` in a script and `sprites/orc/idle.png` in a loader are one value
+ * rather than the two map keys that bug was (issue #84). Unlike `ResPath` this **never
+ * throws**: a blank or `..`-escaping path is kept verbatim and reported as a diagnostic by the
+ * validator, because a script that throws during pass 2 costs the author every other asset in
+ * the file.
+ */
+public data class ResFile(public val value: String) {
+
+    /** True when the path escaped the asset root or named nothing; the validator reports it. */
+    public val isMalformed: Boolean
+        get() = value.isBlank() || value.split('/').any { it == ".." || it == "." }
+
+    override fun toString(): String = value
+
+    public companion object {
+        /** [raw] normalised. Never throws; see the class KDoc. */
+        public fun of(raw: String): ResFile = ResFile(
+            raw.replace('\\', '/').split('/').filter { it.isNotEmpty() }.joinToString("/"),
+        )
+    }
+}
 
 /**
  * One asset declared by a script, as pass 2 produced it.
@@ -217,18 +281,26 @@ public class AssetScope(
         "sounds" to sounds.map(::resPath),
     )
 
+    /**
+     * @param notifies notify name to zero-based frame index into [sheet]'s grid. A map rather
+     *   than a list of a `Notify` type because a notify is matched by name and a name may only
+     *   appear once (`SpriteAnimation`'s own `init` says so), and because a map of `String` to
+     *   `Int` already crosses the worker boundary without a new wire record.
+     */
     public fun spriteAnimation(
         name: String,
         sheet: Ref,
         loop: Boolean = true,
         interruptable: Boolean = true,
+        notifies: Map<String, Int> = emptyMap(),
     ): Unit = declare(
         AssetKind.of<SpriteAnimation>(),
         "spriteAnimation",
         name,
-        "sheet" to sheet,
+        "sheet" to sheet.expecting<SpriteSheet>(),
         "loop" to loop,
         "interruptable" to interruptable,
+        "notifies" to LinkedHashMap(notifies),
     )
 
     public fun character(
@@ -245,16 +317,27 @@ public class AssetScope(
         name,
         "size" to size,
         "health" to health,
-        "animations" to animations,
-        "sounds" to sounds,
+        "animations" to animations.map { it.expecting<SpriteAnimation>() },
+        "sounds" to sounds.mapValues { it.value.expecting<SoundCue>() },
     )
 
     public fun blueprint(name: String, parent: Ref? = null, components: List<String> = emptyList()): Unit =
-        declare(AssetKind.of<Blueprint>(), "blueprint", name, "parent" to parent, "components" to components)
+        declare(
+            AssetKind.of<Blueprint>(),
+            "blueprint",
+            name,
+            "parent" to parent?.expecting<Blueprint>(),
+            "components" to components,
+        )
 
     public fun level(name: String = defaultName, entities: List<Ref> = emptyList()): Unit =
-        declare(AssetKind.of<Level>(), "level", name, "entities" to entities)
+        declare(AssetKind.of<Level>(), "level", name, "entities" to entities.map { it.expecting<Blueprint>() })
 
+    /**
+     * `defaultCharacter` is deliberately **not** stamped with an expected kind: it points at a
+     * `character`, which is [AssetKind.Unpublishable], so there is no `AssetData` type to
+     * compare a resolved declaration against. See [Ref.expected].
+     */
     public fun gameConfig(name: String = defaultName, defaultCharacter: Ref): Unit =
         declare(AssetKind.of<GameConfig>(), "gameConfig", name, "defaultCharacter" to defaultCharacter)
 
@@ -267,6 +350,17 @@ public class AssetScope(
     public fun asset(kind: String, name: String, vararg fields: Pair<String, Any?>): Unit =
         declare(AssetKind.Unpublishable(kind), kind, name, *fields)
 
+    /**
+     * Marks [path] as a file inside the asset root, so the validator checks that it is there.
+     *
+     * The typed kinds call this for you. It is public for [asset], the generic escape: a
+     * particle file or a skin declared through `asset("particle", ..., "file" to
+     * resource("effects/blood.p"))` is checked by
+     * [dev.wildware.udea.assets.compiler.validate.MissingFileValidator] exactly like a sprite
+     * sheet's texture, without this class first growing a `particle` function.
+     */
+    public fun resource(path: String): ResFile = ResFile.of(path)
+
     private fun declare(
         type: AssetKind,
         kind: String,
@@ -277,7 +371,7 @@ public class AssetScope(
     }
 
     /** Strips the leading `/` that authors write and loaders then fail to strip (issue #84). */
-    private fun resPath(path: String): String = path.removePrefix("/")
+    private fun resPath(path: String): ResFile = ResFile.of(path)
 
     /**
      * The stack frame of the *author's* call, or null.
@@ -310,6 +404,7 @@ public class AssetScope(
             "level",
             "gameConfig",
             "asset",
+            "resource",
             "idOf",
         )
 

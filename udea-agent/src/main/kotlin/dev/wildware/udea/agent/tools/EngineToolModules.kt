@@ -115,8 +115,22 @@ public object EngineToolModules {
         listOf(SayToolsetClearTool, SayToolsetSayTool),
     )
 
+    /**
+     * `close`: end this instance through its normal teardown.
+     *
+     * Its own module for the same reason [Say] is one: a host that has nothing to shut down -
+     * a `SimHarness` run, a test that owns its own loop - wires the other modules and leaves
+     * this one out, and the index it builds then advertises no capability it cannot serve. A
+     * `close` that answered and did nothing would be worse than no `close` at all, because the
+     * bridge would wait thirty seconds for a silence that was never coming.
+     */
+    public val Lifecycle: ToolModule = of(
+        "UdeaAgentLifecycle",
+        listOf(LifecycleToolsetCloseTool),
+    )
+
     /** Every engine module, ascending by module name. */
-    public val ALL: List<ToolModule> = listOf(Diag, Events, Say, Time, World)
+    public val ALL: List<ToolModule> = listOf(Diag, Events, Lifecycle, Say, Time, World)
 
     /**
      * Registers every engine toolset that [toolsets] supplies an instance for.
@@ -135,6 +149,7 @@ public object EngineToolModules {
                 is EventsToolset -> Events
                 is DiagToolset -> Diag
                 is SayToolset -> Say
+                is LifecycleToolset -> Lifecycle
                 else -> throw IllegalArgumentException(
                     "${toolset::class.qualifiedName} is not an engine toolset; register a " +
                         "generated module's toolset with ToolIndex.Builder.toolset and let " +

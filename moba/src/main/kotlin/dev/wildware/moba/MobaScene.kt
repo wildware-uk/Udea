@@ -192,7 +192,12 @@ internal class ChampionRenderSystem(
      * on the render thread inside `RenderRegistry.build`, which is where a GL context exists;
      * `onBind` runs there too, but a texture is not a world lookup and does not belong with them.
      */
-    private val frames: Array<TextureRegion> = loadFrames(resources)
+    // Bracketed as the asset phase of `StartupTrace`: this is `moba`'s entire asset load
+    // today - one PNG decoded and uploaded - and it is the phase the `.udeapak` reader
+    // (issue #89) replaces. Naming it now is what lets `udeaBenchStartup` attribute a
+    // regression to assets rather than to "startup".
+    private val frames: Array<TextureRegion> =
+        dev.wildware.moba.entry.StartupTrace.asset { loadFrames(resources) }
 
     /** Frames actually drawn by the most recent [render]. A health signal, not state. */
     internal var drawnCount: Int = 0

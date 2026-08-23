@@ -128,3 +128,93 @@ tasks.test {
 tasks.check {
     dependsOn(udeaAgentGlTest)
 }
+
+// --- the Phase 2 exit demo ---------------------------------------------------------------------
+//
+// `./gradlew :udea-agent-host:udeaPhase2Demo -Pudea.agent.port=7830` boots the headless game of
+// `udeaPhase1Demo` plus a real warm `AssetDaemon` and the `assets.*` toolset, and blocks. It is
+// what spec 6's Phase 2 demo is driven against: an agent patches a value over HTTP and a system
+// running on the loop reads the new one on the next tick.
+//
+// The daemon reaches it through a configuration of its own, never through `testRuntimeClasspath`,
+// for exactly the reason `udea-agent`'s `assetToolsRuntime` gives: `udea-assets-compiler` carries
+// the Kotlin scripting host, `UDEA-MG-005` forbids it on a shipped game's classpath, and it drags
+// kotlin-reflect at a version above the stdlib pin - which is a `ClassNotFoundException:
+// KotlinGenericDeclaration` out of the first class whose initialiser touches reflection.
+// The name is `UdeaStdlibPin.ASSET_DAEMON_RUNTIME`, which is where it is classified as a pinned
+// classpath; the two must not drift into two names for one configuration.
+val assetDaemonRuntime: Configuration by configurations.creating {
+    resolutionStrategy.force("org.jetbrains.kotlin:kotlin-reflect:${libs.versions.kotlin.get()}")
+}
+
+dependencies {
+    // Compile-time only: `Phase2Demo` names `AssetDaemon`, and nothing on this module's ordinary
+    // test runtime classpath may.
+    testCompileOnly(project(":udea-assets-compiler"))
+    assetDaemonRuntime(project(":udea-assets-compiler"))
+}
+
+val udeaPhase2Demo = tasks.register<JavaExec>("udeaPhase2Demo") {
+    group = "udea"
+    description = "Boots a headless game with a warm asset daemon and the agent surface bound, " +
+        "and blocks. -Pudea.agent.port=N"
+    val demoClasspath = sourceSets.test.get().runtimeClasspath + assetDaemonRuntime
+    classpath = demoClasspath
+    mainClass.set("dev.wildware.udea.agent.host.demo.Phase2Demo")
+    // The daemon takes its repo root, asset root and script compile classpath as arguments rather
+    // than reading its environment, so the caller has to supply all three. The script classpath is
+    // *this task's* classpath: a script compiled against anything else fails with "Unresolved
+    // reference 'spriteSheet'".
+    val repoRoot = rootProject.layout.projectDirectory.asFile.absolutePath
+    val port = providers.gradleProperty("udea.agent.port")
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            buildList {
+                add("-Dudea.repoRoot=$repoRoot")
+                add("-Dudea.assetsCompiler.classpath=${demoClasspath.asPath}")
+                port.orNull?.let { add("-Dudea.agent.port=$it") }
+            }
+        },
+    )
+}
+
+/**
+ * The Phase 2 exit criterion, as a gate on `check`.
+ *
+ * Its own `Test` task and not part of `test`, for the same reason `udea-agent`'s `udeaAssetTools`
+ * is: the daemon it needs carries the Kotlin scripting host, and that host reaches this JVM
+ * through `assetDaemonRuntime` alone. Excluded from `test` so it runs once, on the classpath that
+ * can actually load `AssetDaemon`.
+ */
+val phase2ExitTests = "dev.wildware.udea.agent.host.Phase2ExitTest"
+
+val udeaPhase2Exit = tasks.register<Test>("udeaPhase2Exit") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Spec 6 Phase 2 exit: an agent's patch reaches the running game in under a " +
+        "second over HTTP, and a typo'd reference is refused in under 300ms."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath + assetDaemonRuntime
+    filter { includeTestsMatching(phase2ExitTests) }
+    // The measured numbers belong in the log of whatever machine is slow, exactly as the other
+    // budget tasks in this repository do it.
+    testLogging.showStandardStreams = true
+}
+
+tasks.test {
+    filter { excludeTestsMatching(phase2ExitTests) }
+}
+
+tasks.check {
+    dependsOn(udeaPhase2Exit)
+}
+
+// `AssetDaemon` takes its repo root and its script compile classpath as arguments rather than
+// reading its environment, so a test JVM has to be told both. The classpath is **this task's
+// own** - the two differ for `udeaPhase2Exit`, which is the only task here that has a daemon at
+// all, and a script compiled against the wrong one fails with "Unresolved reference 'spriteSheet'".
+tasks.withType<Test>().configureEach {
+    systemProperty("udea.repoRoot", rootProject.layout.projectDirectory.asFile.absolutePath)
+    doFirst {
+        systemProperty("udea.assetsCompiler.classpath", classpath.asPath)
+    }
+}

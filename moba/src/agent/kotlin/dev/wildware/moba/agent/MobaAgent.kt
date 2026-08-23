@@ -18,6 +18,7 @@ import dev.wildware.udea.agent.host.AgentHostConfig
 import dev.wildware.udea.agent.host.AgentHostTools
 import dev.wildware.udea.agent.host.ArtifactToolset
 import dev.wildware.udea.agent.host.GameIdentity
+import dev.wildware.udea.agent.host.HostShutdown
 import dev.wildware.udea.agent.host.RenderControl
 import dev.wildware.udea.agent.host.RenderToolset
 import dev.wildware.udea.agent.host.ToolManifest
@@ -37,6 +38,7 @@ import dev.wildware.udea.agent.tools.BlueprintCatalog
 import dev.wildware.udea.agent.tools.DiagToolset
 import dev.wildware.udea.agent.tools.EngineToolModules
 import dev.wildware.udea.agent.tools.EventsToolset
+import dev.wildware.udea.agent.tools.LifecycleToolset
 import dev.wildware.udea.agent.tools.TimeToolset
 import dev.wildware.udea.agent.tools.WorldToolset
 import dev.wildware.udea.core.blueprint.blueprints
@@ -93,6 +95,18 @@ import java.nio.file.Path
  */
 public object MobaAgent {
 
+    /**
+     * The one artifact store this process has.
+     *
+     * A property rather than a local, because two things now need it and they are built at
+     * opposite ends of `main`: the bridge, which spills an oversized command answer into it
+     * before anything renders, and the render toolset, which puts screenshots in it after the GL
+     * context exists. Two stores would put a `render.screenshot` handle and a `resultRef` in
+     * different directories and `GET /artifact` would resolve only one of them.
+     */
+    private val ARTIFACTS: AgentArtifacts =
+        AgentArtifacts(Path.of("build", "udea-agent-artifacts").toAbsolutePath())
+
     /** Boots, binds if a port was given, and blocks. */
     @JvmStatic
     public fun main(args: Array<String>) {
@@ -102,16 +116,20 @@ public object MobaAgent {
         // builds a pipeline out of it - and the overlay narrates this bridge and colours by this
         // table. Two `AgentSessions` would be the quiet version of the bug: the panel would name
         // no session at all while the host interned every caller into a table nothing drew.
-        val bridge = AgentBridge()
+        // `resultSpill` and not the default: an answer larger than the digest's result ceiling is
+        // otherwise dropped from `/state` outright and the agent that asked for it never learns
+        // what it said. See `AgentBridge.complete`. The store is process-wide here for the same
+        // reason the bridge is - both are built before anything renders.
+        val bridge = AgentBridge(resultSpill = ARTIFACTS.textSpill())
         val sessions = AgentSessions()
         if (mode == RenderMode.Headless) {
             val host = MobaGame.host(RenderMode.Headless)
             // No GL context in Headless, so no capture surface exists and `null` is the
             // honest answer: every `render.*` tool then answers `no_render_context`.
             val session = attach(host, RenderMode.Headless, null, bridge, sessions)
-            Runtime.getRuntime().addShutdownHook(Thread { session.close() })
+            Runtime.getRuntime().addShutdownHook(Thread { session.close("jvm shutdown hook") })
             session.loop.run()
-            session.close()
+            session.close("the frame loop ended")
             return
         }
         MobaEntry.runWithGl(mode, overlay = overlayFor(mode, bridge, sessions)) { host, rendering ->
@@ -120,7 +138,13 @@ public object MobaAgent {
             // `PresentationControl`; the copy is gone with the rule that forced it.
             val control = OffscreenRenderControl(rendering.presentation())
             val session = attach(host, mode, control, bridge, sessions)
-            MobaEntry.Attachment(frame = session.loop::pump, close = session::close)
+            // The third step of `close` in a GL mode, and the one a headless process does not
+            // have: stopping `AgentGameLoop` ends a loop nothing is running here, because the
+            // render thread owns the cadence and `runWithGl` is parked on `awaitExit`. Without
+            // it, `close` would release the port and leave the window up - a clean close, as far
+            // as the bridge could tell, over a game that is still running.
+            session.shutdown.onClose("render-loop", rendering.requestExit)
+            MobaEntry.Attachment(frame = session.loop::pump, close = { session.close("the render loop ended") })
         }
     }
 
@@ -181,9 +205,11 @@ public object MobaAgent {
             sources = DigestSources(entities = census, loop = LoopView(host)),
             timings = timings,
         )
-        val artifacts = AgentArtifacts(
-            Path.of("build", "udea-agent-artifacts").toAbsolutePath(),
-        )
+        val artifacts = ARTIFACTS
+        // Registered here, appended to as each thing it has to stop comes into existence. The
+        // tool index is built before the loop and the surface, so the toolset cannot be handed
+        // either of them directly.
+        val shutdown = HostShutdown()
 
         val worldTools = WorldToolset(
             world = host.world,
@@ -199,7 +225,11 @@ public object MobaAgent {
                 ToolIndex.builder(),
                 worldTools,
                 TimeToolset(host.time, host.ctx.clock, bridge),
-                EventsToolset(bridge, host.ctx.clock),
+                // The artifact store, not `TextSpill.NONE`: an event message too long for the
+                // bytes a command result is guaranteed goes there and comes back through
+                // `GET /artifact`, the same door a screenshot uses.
+                EventsToolset(bridge, host.ctx.clock, artifacts.textSpill()),
+                LifecycleToolset(bridge, shutdown),
                 DiagToolset(
                     bridge = bridge,
                     clock = host.ctx.clock,
@@ -250,10 +280,13 @@ public object MobaAgent {
                     "${tools.tools.size} tools",
             )
         }
-        return Session(
-            loop = AgentGameLoop(host, AgentRuntime(bridge, tools, host.world, host.ctx, digest)),
-            agentHost = agentHost,
-        )
+        val loop = AgentGameLoop(host, AgentRuntime(bridge, tools, host.world, host.ctx, digest))
+        // Loop first: stopping the surface while a tool call is mid-drain would leave the caller
+        // holding a closed connection to a command that did run.
+        shutdown
+            .onClose("frame-loop") { loop.stop() }
+            .onClose("agent-host") { agentHost?.stop() }
+        return Session(loop = loop, shutdown = shutdown)
     }
 
     /** [Position], with x and y writable and `hp` not - so `field_not_writable` is reachable. */
@@ -264,13 +297,18 @@ public object MobaAgent {
         agentWritableFields = setOf(PositionReplicator.FIELD_X, PositionReplicator.FIELD_Y),
     )
 
-    /** The loop and the surface, so one `close` tears both down in the right order. */
-    private class Session(val loop: AgentGameLoop, private val agentHost: AgentHost?) {
-        fun close() {
-            // Loop first: stopping the surface while a tool call is mid-drain would leave the
-            // caller holding a closed connection to a command that did run.
-            loop.stop()
-            agentHost?.stop()
+    /**
+     * The loop and the teardown, so one `close` runs the same steps whoever asked for it.
+     *
+     * The steps used to be two lines in this class's `close`, which meant the `close` **tool**
+     * could not run them: it lives in `udea-agent` and cannot name anything here. Moving them
+     * into a [HostShutdown] the toolset was constructed with is what makes the tool and the JVM
+     * shutdown hook the same teardown rather than two that have to be kept in step - and
+     * `HostShutdown` runs once whichever gets there first.
+     */
+    private class Session(val loop: AgentGameLoop, val shutdown: HostShutdown) {
+        fun close(reason: String) {
+            shutdown.shutdown(reason)
         }
     }
 }

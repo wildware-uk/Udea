@@ -43,6 +43,15 @@ public data class AssetCompileResult(
     public val diagnostics: List<UdeaDiagnostic>,
     /** How many scripts were answered from the compiled-script jar cache. */
     public val cacheHits: Int = 0,
+    /**
+     * Every declaration, in evaluation order, **duplicates included**.
+     *
+     * [graph] is keyed by id and so cannot represent two declarations of one id - `AssetGraph.of`
+     * says "last writer wins on a duplicate id (pass 3 reports those)", and this is what pass 3
+     * reports them from. Defaulted to empty so a caller that only wants the graph is unchanged;
+     * `AssetCompiler.compile` always fills it.
+     */
+    public val declared: List<DeclaredAsset> = emptyList(),
 ) {
     public val hasErrors: Boolean
         get() = diagnostics.any { it.severity == dev.wildware.udea.diagnostics.Severity.Error }
@@ -150,7 +159,7 @@ public class AssetCompiler(
         for (file in files.sortedBy { it.absolutePathString() }) {
             evaluate(host, file, spanIndex, captureOrigins, assets, diagnostics)
         }
-        return AssetCompileResult(AssetGraph.of(assets), diagnostics, hits)
+        return AssetCompileResult(AssetGraph.of(assets), diagnostics, hits, assets.toList())
     }
 
     private fun evaluate(

@@ -13,7 +13,12 @@
  * did not run - leaves the bridge listing an instance it will keep failing against, and nothing
  * on the Kotlin side would notice.
  *
- * The caller stops the instance; this only watches. Usage:
+ * The caller sends the game's own `close` command; this only watches. It never signals the
+ * process, and neither does the CI step around it - that is the whole point. Until a real
+ * `close` tool existed, the step `kill`ed the pid a second after starting this watcher, so the
+ * assertion below was a true statement about `kill(2)` and told nobody anything about the game.
+ *
+ * Usage:
  *
  *     UDEA_AGENT_PORT=7820 node scripts/expect-silence.mjs
  */

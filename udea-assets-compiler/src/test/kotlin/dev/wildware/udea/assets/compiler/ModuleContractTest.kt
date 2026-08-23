@@ -1,5 +1,6 @@
 package dev.wildware.udea.assets.compiler
 
+import dev.wildware.udea.assets.compiler.validate.AssetValidationRules
 import dev.wildware.udea.diagnostics.UdeaRules
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -74,18 +75,29 @@ class ModuleContractTest {
     @Test
     fun `asset compiler rule ids are well formed and disjoint from UdeaRules`() {
         val shared = UdeaRules.all.map { it.id }.toSet()
-        val local = AssetCompilerRules.all.map { it.id }.toSet()
+        val bands = mapOf(
+            "AssetCompilerRules" to (AssetCompilerRules.all to 20..29),
+            "AssetValidationRules" to (AssetValidationRules.all to AssetValidationRules.BAND),
+        )
 
-        assertEquals(AssetCompilerRules.all.size, local.size, "a duplicated id in AssetCompilerRules")
-        assertEquals(emptySet(), shared intersect local, "an id is claimed by both registries")
-        assertTrue(local.all { UdeaRules.ID_FORMAT.matches(it) }, "every id must match UdeaRules.ID_FORMAT")
-        assertTrue(
-            local.all { it.removePrefix("UDEA").toInt() in 20..29 },
-            "the reserved band is UDEA0020..UDEA0029; $local escapes it",
-        )
-        assertTrue(
-            shared.none { it.removePrefix("UDEA").toInt() in 20..29 },
-            "UdeaRules has grown into the band AssetCompilerRules reserved; move these four in now",
-        )
+        val everyLocal = mutableSetOf<String>()
+        for ((owner, entry) in bands) {
+            val (rules, band) = entry
+            val local = rules.map { it.id }.toSet()
+
+            assertEquals(rules.size, local.size, "a duplicated id in $owner")
+            assertEquals(emptySet(), shared intersect local, "an id is claimed by $owner and UdeaRules")
+            assertEquals(emptySet(), everyLocal intersect local, "two local registries claim one id")
+            assertTrue(local.all { UdeaRules.ID_FORMAT.matches(it) }, "every id must match UdeaRules.ID_FORMAT")
+            assertTrue(
+                local.all { it.removePrefix("UDEA").toInt() in band },
+                "$owner reserved UDEA00${band.first}..UDEA00${band.last}; $local escapes it",
+            )
+            assertTrue(
+                shared.none { it.removePrefix("UDEA").toInt() in band },
+                "UdeaRules has grown into the band $owner reserved; move those ids in now",
+            )
+            everyLocal += local
+        }
     }
 }

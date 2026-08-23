@@ -24,15 +24,20 @@ import dev.wildware.udea.agent.state.DigestBudgets
  * This is pagination, for three reasons:
  *
  * 1. **The store is in the wrong module.** `AgentArtifacts` lives in `udea-agent-host`, which
- *    depends on this module and not the other way round. A handle produced here would be a
- *    handle to something this module cannot write, so the tool would answer with a promise
- *    the engine could not keep in a headless test, in `SimHarness`, or in any host that binds
- *    no HTTP surface at all.
+ *    depends on this module and not the other way round, so nothing here can write one
+ *    directly.
  * 2. **A handle needs a second round trip and a lifetime.** An agent that gets `{"handle":...}`
  *    has to fetch it, and something has to decide when the artifact is evictable. Pagination
  *    needs neither: the next page is the same tool with a different `offset`.
  * 3. **The page is measured, not estimated.** Each entry is rendered before it is committed,
  *    so [MAX_PAGE_BYTES] is a fact about the emitted text rather than a guess at its size.
+ *
+ * All three still hold **for the list**, and none of them holds for a single entry that is too
+ * big on its own. Paging chooses how many rows to send; it cannot make one row smaller, so a
+ * 4KB event message was undeliverable at every `limit`. That is what [Entry]'s `budget` and
+ * [TextSpill] are for: the row shortens itself to the number this writer hands it, and the part
+ * that did not fit goes to a store the *host* injected rather than one this module imported.
+ * The module boundary is respected by inversion instead of by refusal.
  *
  * What pagination does not buy is a large page. [MAX_PAGE_BYTES] is derived from
  * [DigestBudgets.RESULT_MIN_BYTES] - the bytes `commandResults` is *guaranteed* whatever the
@@ -117,8 +122,25 @@ public object ResultPage {
 
     /** One entry of a paged answer, rendered into the [Json] it will be committed to. */
     public fun interface Entry {
-        /** Writes the entry at [index] as one JSON value. */
-        public fun render(json: Json, index: Int)
+        /**
+         * Writes the entry at [index] as one JSON value, in at most [budget] characters.
+         *
+         * ## Why the renderer is told the budget rather than left to find out
+         *
+         * Because one entry can be too big for the whole page and no amount of paging fixes it.
+         * A page can always be cut smaller until it fits; a 4KB event message cannot, so
+         * `events.recent_events` was undeliverable for a single oversized entry however small
+         * its `limit` was - the first entry is committed whatever its size, and the digest then
+         * dropped the whole answer. The renderer is the only code that knows *what* in the entry
+         * may be shortened - a message, not a tick - so it is the code that has to be handed the
+         * number.
+         *
+         * [budget] is characters this value may add and still be committed: the closing text is
+         * already reserved out of it, and so is the comma before it. Overrunning it is allowed
+         * and, for the first entry of a page, tolerated - the page reports `entryTooLarge` - but
+         * a renderer that can shorten itself should.
+         */
+        public fun render(json: Json, index: Int, budget: Int)
     }
 
     /**
@@ -178,7 +200,11 @@ public object ResultPage {
         var index = from
         while (index < total && written < limit) {
             scratch.reset()
-            entry.render(scratch, index)
+            // What this row may spend and still be committed: the page budget, less everything
+            // already written, less the comma this row needs and the closing text that must
+            // survive it. Handed to the renderer rather than kept here, because only the
+            // renderer knows which part of its own row is shortenable.
+            entry.render(scratch, index, MAX_PAGE_BYTES - json.length - 1 - tail)
             val text = scratch.toString()
             // `+ 1` for the comma this entry will need, and `tail` for the closing text that
             // must still fit after it. Reserving the tail before committing a row is what stops

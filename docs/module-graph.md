@@ -39,31 +39,52 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 | `udea-net` | `udea.kotlin-library` | Transports, baselines, relevancy, prediction, RPC | `common/network/*`, both `Network*System`s, KryoNet | `udea-core` (api) | `moba` |
 | `udea-render` | `udea.kotlin-library-gl` | The only module that touches GL | `SpriteBatchSystem` et al., `GameScreen`'s rendering half | `udea-core` (api), `udea-assets`, gdx + gdx-backend-lwjgl3 | `moba` |
 | `udea-agent` | `udea.kotlin-library` | MCP surface + test harness — same code path | FruitGameKTX's `DebugBridge` pattern, generalised | `udea-core` (api) | `udea-agent-host` |
-| `udea-agent-host` | `udea.kotlin-library` | HTTP server. Debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` | `udea-agent` (api); `udea-render` + gdx **`testImplementation` only** | *(nothing — deliberately not `moba`)* |
+| `udea-agent-host` | `udea.kotlin-library` | HTTP server, plus the toolsets that need a render context (spec §4: render, input, ui). Debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` | `udea-agent` (api); `udea-render` + gdx (`implementation` — see below) | *(nothing — deliberately not `moba`)* |
 | `udea-gradle` | `udea.gradle-plugin` | Tasks, verifiers, `gamebridge.json` emission | old `gradle-plugin` (which leaked `gradleApi` onto the game runtime) | `udea-assets-compiler`, `udea-diagnostics`, `gradleApi()` (`compileOnly`) | *(nothing — applied as a plugin, never depended on)* |
 | `moba` | `udea.kotlin-library` | The example game | `example` | `udea-core`, `udea-gas`, `udea-net`, `udea-assets`, `udea-render` (all `implementation`) | — |
 
 ## Arrows that must never appear
 
 - Anything → `common`. That is the whole point of the rewrite tree.
-- Anything except `udea-render` → gdx / LWJGL3 / GL. `udea-core` in particular is the
-  headless kernel; Box2D and gdx-math arrive later behind a `PhysicsWorld`-style interface,
-  never as a backend dependency.
+- Anything except `udea-render` and `udea-agent-host` → gdx / LWJGL3 / GL. `udea-core` in
+  particular is the headless kernel; Box2D and gdx-math arrive later behind a
+  `PhysicsWorld`-style interface, never as a backend dependency. The two exempt modules are
+  `ModuleGraphRules.GL_ALLOWED_PROJECTS`, and adding a third means editing that set and the
+  test that pins it.
 - `udea-assets-compiler` → any Gradle type. The daemon and CI must run identical code.
 - Any game module → `udea-gradle`. The old `gradle-plugin` put the Gradle API on the game's
   runtime classpath through `implementation(gradleApi())`; here `gradleApi()` is
   `compileOnly` and nothing depends on the project.
 - `moba` (or any shipping runtime classpath) → `udea-agent-host`.
 
-`udea-agent-host`'s test-only edge onto `udea-render` is the exception that proves both rules.
-Its render toolset is declared against a `RenderControl` port; `udea-render` implements the other
-half as `PresentationControl`; and **neither module may name the other** — an arrow from the
-renderer to the host would put the agent surface on `moba`'s runtime classpath (`UDEA-REL-002`),
-and an arrow from the host to the renderer would put GL on a headless module (`UDEA-MG-002`, and
-the bytecode scan). The adapter therefore belongs to whatever assembles a host out of both, which
-is a game module or a launcher. Today that is the `udeaPhase1OffscreenDemo` entry point in test
-sources, because `UdeaAgentPlugin` has no plugin id and `moba` has no run task; when those land
-the adapter moves there and this edge goes away.
+## `udea-agent-host` → `udea-render`, and why that arrow is allowed
+
+The render toolset is declared against a `RenderControl` port; `udea-render` implements the other
+half as `PresentationControl`; something has to join them, and for one phase the answer was
+"nobody may". `udea-render` still cannot name `udea-agent-host` — that arrow would put the agent
+surface on `moba`'s runtime classpath and make `UDEA-REL-002` impossible to pass. The arrow the
+other way used to be barred too, because `udea-agent-host` was in `HEADLESS_PROJECTS`.
+
+That combination was a **contradiction, not a trade-off.** Spec §4 gives this module "the
+toolsets that need a render context or live input: render, input, ui". A module that owns the
+render toolset and may not name a render type cannot implement the toolset's own port. The
+observable cost was not hypothetical: `OffscreenRenderControl` and the GL `OverlaySystem` were
+both written and both proven against a real LWJGL3 context, and both sat in **test** sources
+because that was the only place the rule allowed — so every `render.*` tool answered
+`no_render_context` on a real `:moba:run`, and the activity overlay spec §3.7 describes was drawn
+by nothing but its own tests.
+
+So `udea-agent-host` takes `udea-render` as a plain `implementation` dependency, owns both
+adapters in `src/main`, and is out of `HEADLESS_PROJECTS`. **What is given up and what is kept:**
+`udeaVerifyHeadless` no longer scans this module's bytecode for GL types, which is the whole
+cost. What it protects is unchanged — `udea-core`, the simulation kernel that must run in a test
+JVM, a dedicated server and an agent harness with no display, is still headless at both
+enforcement levels, and `RenderModuleGraphTest` still fails if it names a `udea.render` type. And
+`udea-agent-host` is the *debug* HTTP host: `UDEA-REL-001` and `UDEA-REL-002` keep it out of every
+shipped artifact and off every shipped runtime classpath, independently enforced by
+`udeaVerifyRelease` and independently tested. It does **not** apply `udea.kotlin-library-gl`;
+`udea-render` is still the only module on that convention, and `RenderModuleGraphTest` asserts
+it.
 
 ---
 
@@ -126,20 +147,27 @@ it empties this module's `runtimeClasspath`. `udea-annotations` used to enforce 
 second time, in a `udeaVerifyAnnotationsLeaf` task with a private allow list and no rule id;
 that task is gone and its one unique branch is the vacuity guard above.
 
-## `UDEA-MG-002` — only `udea-render` may see a GL backend or a native
+## `UDEA-MG-002` — only the GL-allowed modules may see a GL backend or a native
 
 **Spec §4, §3.5.** Banned on `compileClasspath` and `runtimeClasspath` of **every `udea-*`
-module except `udea-render`**: `com.badlogicgames.gdx:gdx-backend-lwjgl3`, `org.lwjgl:*`,
-`com.badlogicgames.gdx:*-platform`.
+module except `udea-render` and `udea-agent-host`**: `com.badlogicgames.gdx:gdx-backend-lwjgl3`,
+`org.lwjgl:*`, `com.badlogicgames.gdx:*-platform`.
 
 The module set is not written out here, or anywhere twice. It is
 `ModuleGraphRules.HEADLESS_PROJECTS` in `build-logic`, and `ModuleGraphRulesTest` derives the
-same set from `settings.gradle.kts` and fails if the two have drifted — so including a new
-`udea-*` module puts it under this rule automatically instead of leaving a gap somebody has
-to notice. It used to be two hand-written lists (this rule's, and the bytecode scan's below)
-that disagreed in both directions, with `udea-agent-host`, `udea-diagnostics`, `udea-gradle`
-and `udea-compiler-plugin` in neither: a GL backend on any of those passed both gates while
-this document called them the same rule.
+same set from `settings.gradle.kts` — minus `ModuleGraphRules.GL_ALLOWED_PROJECTS`, the two
+modules above — and fails if the two have drifted. So including a new `udea-*` module puts it
+under this rule automatically instead of leaving a gap somebody has to notice, and exempting one
+means adding it to a *named* set rather than deleting it from a list. It used to be two
+hand-written lists (this rule's, and the bytecode scan's below) that disagreed in both
+directions, with `udea-agent-host`, `udea-diagnostics`, `udea-gradle` and
+`udea-compiler-plugin` in neither: a GL backend on any of those passed both gates while this
+document called them the same rule.
+
+`udea-agent-host`'s exemption is a controller ruling with its own reasoning — see
+[`udea-agent-host` → `udea-render`](#udea-agent-host--udea-render-and-why-that-arrow-is-allowed)
+above. The short version: it owns the render toolset, and `UDEA-REL-002` rather than
+`UDEA-MG-002` is what keeps it off a shipped classpath.
 
 `com.badlogicgames.gdx:gdx` is deliberately **not** banned — `Vector2` and the rest of
 gdx-math are headless. The ban is on GL and on native loaders, not on maths.
@@ -207,6 +235,25 @@ This passes trivially while `moba` is empty, which is the point: it is a ratchet
 `kotlin-scripting-*` artifacts and `org.reflections:reflections` today, which is both a
 startup cost and the mechanism behind the reflection-on-hot-paths smell the rewrite exists to
 kill. Asset scripts are compiled at build time; discovery is codegen and `ServiceLoader`.
+
+## `UDEA-MG-006` — the runtime asset model is a leaf
+
+**Spec §4, §3.6.** Allowed on `:udea-assets`'s `compileClasspath` and `runtimeClasspath`, and
+nothing else: `:udea-annotations`, `:udea-diagnostics`, `org.jetbrains.kotlin:kotlin-stdlib`,
+`org.jetbrains:annotations`.
+
+An allow list rather than a deny list, for the same reason `UDEA-MG-001` is one: the budget is
+the point, and the interesting failure is the dependency nobody has thought of yet.
+
+The old asset model could not be read without three separate stacks. Asset values held live
+`com.badlogic.gdx.audio.Sound` and `Texture` handles behind `by lazy` blocks that reached a
+global `gameManager` (`common/.../audio.kt`, `common/.../animationSets.kt`); they were
+serialised with Jackson polymorphic type ids (`@JsonTypeInfo` on `Asset`); and they existed at
+all only because a `BasicJvmScriptingHost` evaluated `.udea.kts` at runtime. Spec §3.6 compiles
+and validates assets at build time and ships a packed bundle, which makes the runtime model
+plain data — so a dependency appearing here means an asset value has started holding something
+that is not data, and that is exactly the regression this rule catches. `udea-assets-compiler`,
+which does the compiling, is deliberately not governed by it.
 
 ## `UDEA-REL-001` — no agent class in the packaged artifact
 

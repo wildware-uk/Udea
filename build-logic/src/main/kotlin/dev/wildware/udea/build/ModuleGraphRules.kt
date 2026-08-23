@@ -26,7 +26,42 @@ public object ModuleGraphRules {
     public val CONFIGURATIONS: Set<String> = LegacyDependencyRules.CONFIGURATIONS
 
     /**
-     * Every module that must stay free of GL: the whole `udea-*` tree except `udea-render`.
+     * The two modules that are allowed to see GL, and the whole of the exception list.
+     *
+     * - **`:udea-render`** is spec 4's "the only module that touches GL" — it owns the
+     *   backend, the targets, the pipeline and the capture. It applies
+     *   `udea.kotlin-library-gl`, which is the visible marker, and `RenderModuleGraphTest`
+     *   asserts it is the only module that does.
+     * - **`:udea-agent-host`** is here as of the Phase 1 follow-up, by a controller ruling,
+     *   and the reason is that the previous arrangement was a contradiction rather than a
+     *   trade-off. Spec 4 gives this module "the toolsets that need a render context or live
+     *   input: render, input, ui". A module that **owns the render toolset** and may not
+     *   name a render type cannot implement the toolset's own port: the `RenderControl`
+     *   implementation and the GL `OverlaySystem` were both written, both proven against a
+     *   real LWJGL3 context, and both marooned in **test** sources, because that is the only
+     *   place in this module the old rule allowed them. The shipped result was that every
+     *   `render.*` tool answered `no_render_context` on a real run and the overlay was drawn
+     *   only by tests.
+     *
+     * It does **not** apply `udea.kotlin-library-gl`: it takes `:udea-render` as a plain
+     * `implementation` dependency, so its GL surface is exactly what that module chooses to
+     * expose plus the gdx types it names on that one line of its build script.
+     *
+     * ## What is not weakened by this
+     *
+     * The headless guarantee that matters is `:udea-core` — the simulation kernel must run in
+     * a test JVM, in a dedicated server and inside an agent harness with no display — and
+     * that is untouched: `:udea-core` cannot name `udea-render`, and `RenderModuleGraphTest`
+     * still asserts it. `:udea-agent-host` is the **debug HTTP host**, which
+     * `udeaVerifyRelease` and `UDEA-REL-002` ([ReleaseRules.CLASSPATH_RULE]) already keep off
+     * every shipped runtime classpath — so a GL dependency here reaches no release artifact
+     * by a rule that is independently enforced and independently tested.
+     */
+    public val GL_ALLOWED_PROJECTS: Set<String> = setOf(":udea-render", ":udea-agent-host")
+
+    /**
+     * Every module that must stay free of GL: the whole `udea-*` tree except
+     * [GL_ALLOWED_PROJECTS].
      *
      * This is the **single source of truth** for the headless rule at both enforcement
      * levels. [NO_GL_OUTSIDE_RENDER] (`UDEA-MG-002`) reads it for the dependency check, and
@@ -37,15 +72,16 @@ public object ModuleGraphRules {
      * `udea-diagnostics`, `udea-gradle` and `udea-compiler-plugin` were in neither, so a GL
      * backend on any of them passed both gates.
      *
-     * Membership is *not* a judgement call: `udea-render` is the one module allowed to see
-     * GL (spec 4, spec 3.5), so everything else in the tree belongs here.
-     * `ModuleGraphRulesTest` derives the same set from `settings.gradle.kts` and fails if
+     * Membership is *not* a judgement call: it is every `udea-*` module in
+     * `settings.gradle.kts` that is not in [GL_ALLOWED_PROJECTS].
+     * `ModuleGraphRulesTest` derives exactly that set from `settings.gradle.kts` and fails if
      * this list has drifted from it, which is what makes a newly included module a build
-     * failure rather than a silent gap.
+     * failure rather than a silent gap — and what makes adding a module to
+     * [GL_ALLOWED_PROJECTS] a deliberate, reviewable edit in two places rather than a
+     * deletion from one list.
      */
     public val HEADLESS_PROJECTS: Set<String> = setOf(
         ":udea-agent",
-        ":udea-agent-host",
         ":udea-annotations",
         ":udea-assets",
         ":udea-assets-compiler",
@@ -102,7 +138,9 @@ public object ModuleGraphRules {
             "dedicated server and inside an agent harness with no display. Once a GL backend is " +
             "on the compile classpath, a static initialiser or a Gdx.gl reference gets written and " +
             "the headless path is gone. gdx-math (com.badlogicgames.gdx:gdx) is deliberately still " +
-            "allowed - Vector2 is not GL.",
+            "allowed - Vector2 is not GL. udea-render and udea-agent-host are the two exempt " +
+            "modules; see ModuleGraphRules.GL_ALLOWED_PROJECTS for why the debug HTTP host is " +
+            "one of them and why udea-core's guarantee is untouched by it.",
         specSection = "4, 3.5",
         projects = HEADLESS_PROJECTS,
         configurations = setOf("compileClasspath", "runtimeClasspath"),
@@ -175,6 +213,32 @@ public object ModuleGraphRules {
         ),
     )
 
+    /**
+     * The runtime asset model is on the classpath of the engine, the game and the agent harness,
+     * and it is the module a `.udeapak` reader will live in. Everything it drags in is dragged
+     * into the shipped game.
+     */
+    public val ASSETS_MODEL_IS_A_LEAF: DependencyRule = DependencyRule(
+        id = RuleId("UDEA-MG-006"),
+        summary = "udea-assets resolves only udea-annotations, udea-diagnostics and the stdlib",
+        rationale = "The runtime asset model replaces `common/assets/*` and the `Assets` global, " +
+            "and the old one could not be read without LibGDX, a Jackson databind stack and a " +
+            "Kotlin scripting host, because asset values held live Sound and Texture handles and " +
+            "were produced by evaluating scripts at runtime. Spec 3.6 compiles assets at build " +
+            "time instead, so the runtime model is plain data: a dependency here means an asset " +
+            "value has started holding something that is not.",
+        specSection = "4, 3.6",
+        projects = setOf(":udea-assets"),
+        configurations = setOf("compileClasspath", "runtimeClasspath"),
+        allowOnly = listOf(
+            CoordinatePattern(":udea-annotations"),
+            CoordinatePattern(":udea-assets"),
+            CoordinatePattern(":udea-diagnostics"),
+            CoordinatePattern("org.jetbrains.kotlin:kotlin-stdlib"),
+            CoordinatePattern("org.jetbrains:annotations"),
+        ),
+    )
+
     /** Every rule, in id order. */
     public val ALL: List<DependencyRule> = listOf(
         ANNOTATIONS_ARE_A_LEAF,
@@ -182,6 +246,7 @@ public object ModuleGraphRules {
         ASSETS_COMPILER_HAS_NO_GRADLE,
         NOBODY_DEPENDS_ON_UDEA_GRADLE,
         NO_SCRIPTING_OR_REFLECTION_IN_THE_GAME,
+        ASSETS_MODEL_IS_A_LEAF,
     )
 
     /** True when [projectPath] is part of the rewrite tree and therefore subject to [ALL]. */

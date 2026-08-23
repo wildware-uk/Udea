@@ -72,6 +72,28 @@ internal object UdeaDiagnostics {
     )
 
     /**
+     * [UdeaRules.UNRESOLVED_REFERENCE].
+     *
+     * `DEFAULT` positioning, unlike the declaration rules above: the element handed to
+     * [report] is the string literal itself, so the span the compiler prints is the typo's own
+     * span. Issue #41 asserts that `line:column` explicitly, because a diagnostic on the
+     * enclosing call is the same test without it and does not satisfy the demo criterion.
+     */
+    val REFERENCE_UNRESOLVED: KtDiagnosticFactory1<String> by error1<PsiElement, String>(
+        SourceElementPositioningStrategies.DEFAULT,
+    )
+
+    /** [UdeaRules.REFERENCE_KIND_MISMATCH]. At the literal, for the same reason. */
+    val REFERENCE_KIND_MISMATCH: KtDiagnosticFactory1<String> by error1<PsiElement, String>(
+        SourceElementPositioningStrategies.DEFAULT,
+    )
+
+    /** [UdeaRules.ASSET_INDEX_FORMAT]. */
+    val ASSET_INDEX_FORMAT: KtDiagnosticFactory1<String> by error1<PsiElement, String>(
+        SourceElementPositioningStrategies.DEFAULT,
+    )
+
+    /**
      * Every rule this plugin can raise, and the factory it raises it through.
      *
      * Declared explicitly rather than derived by reflection: reflection over delegated
@@ -83,6 +105,9 @@ internal object UdeaDiagnostics {
         UdeaRules.SIM_ON_VAL to SIM_ON_VAL,
         UdeaRules.COMPONENT_FIELD_LIMIT to COMPONENT_FIELD_LIMIT,
         UdeaRules.QUANTIZED_NON_FLOAT to QUANTIZED_NON_FLOAT,
+        UdeaRules.UNRESOLVED_REFERENCE to REFERENCE_UNRESOLVED,
+        UdeaRules.REFERENCE_KIND_MISMATCH to REFERENCE_KIND_MISMATCH,
+        UdeaRules.ASSET_INDEX_FORMAT to ASSET_INDEX_FORMAT,
     )
 
     /**

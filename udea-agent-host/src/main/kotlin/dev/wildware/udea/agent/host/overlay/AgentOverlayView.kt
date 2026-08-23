@@ -11,19 +11,17 @@ import dev.wildware.udea.core.host.RenderMode
  * ## What this class is, and what it deliberately is not
  *
  * It is the layout, the ordering, the verbosity gate and the per-frame budget. It is **not** an
- * `OverlaySystem`: that interface lives in `udea-render`, which this module may not depend on -
- * `udea-agent-host` is in `ModuleGraphRules.HEADLESS_PROJECTS`, and `udeaVerifyHeadless` fails
- * the build if a class compiled here names a GL type.
+ * `OverlaySystem`, and it names no GL type: it draws through [OverlayCanvas] and locates markers
+ * through [WorldProjector], so every assertion about what a human would be reading is testable
+ * with no context at all.
  *
- * The consequence, stated plainly rather than left to be discovered: **the GL adapter does not
- * exist in `src/main` anywhere in this tree.** Something in `udea-render` must implement
- * [OverlayCanvas] and [WorldProjector] over a `Batch`, a `BitmapFont` and the camera, and wrap
- * this class in an `OverlaySystem` so that it is constructed from an `OverlayResources` and
- * therefore structurally cannot reach a capturable target. That is the same position
- * [dev.wildware.udea.agent.host.RenderControl] is in. What *is* proven here is that this code
- * cannot leak into a capture and that the port is sufficient for a real GL implementation:
- * `OverlayCaptureIsolationTest` boots a real LWJGL3 context, drives a real GL adapter over these
- * two ports, and asserts both halves of spec 3.7's guarantee.
+ * [AgentOverlaySystem] is the GL half - the `OverlaySystem` that implements [OverlayCanvas] over
+ * a `Batch` and a `BitmapFont` and drives this class from it. It sits in `src/main` beside this
+ * file **as of the ruling that took this module out of `ModuleGraphRules.HEADLESS_PROJECTS`**;
+ * before that it was in test sources, because a module that owns the overlay and may not name a
+ * `udea.render` type has nowhere legal to put the adapter - so the panel spec 3.7 describes was
+ * drawn by nothing but its own tests. `OverlayCaptureIsolationTest` boots a real LWJGL3 context,
+ * drives that adapter, and asserts both halves of spec 3.7's guarantee.
  *
  * ## Windowed only
  *

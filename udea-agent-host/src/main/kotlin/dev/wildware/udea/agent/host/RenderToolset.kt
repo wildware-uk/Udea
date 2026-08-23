@@ -23,13 +23,14 @@ import kotlin.reflect.KClass
  *
  * `udea-render` owns the pixel path - the offscreen `FrameBuffer`, the alpha stomp, the PNG
  * encode, and the `FrameCaptureSlot` that fulfils a request *after* the frame is rendered and
- * before the buffer is swapped, which is what makes `screenshot(afterTick = T)` reproducible
- * rather than whenever-the-HTTP-thread-asked. None of that can live in this module: it has no GL
- * on its classpath and would fail `udeaVerifyHeadless` for naming a GL type. The arrow cannot
- * point the other way either - `ReleaseRules.CLASSPATH_RULE` fails any release build that
- * resolves `:udea-agent-host`, so a renderer that depended on this module would put the agent
- * surface in the shipped game. Whoever assembles a host out of both writes the adapter; see
- * `PresentationControl` in `udea-render` for the other half.
+ * before the buffer is swapped, which is what makes a capture reproducible rather than
+ * whenever-the-HTTP-thread-asked. The arrow cannot point the other way -
+ * `ReleaseRules.CLASSPATH_RULE` fails any release build that resolves `:udea-agent-host`, so a
+ * renderer that depended on this module would put the agent surface in the shipped game.
+ *
+ * A port rather than a direct call because a game may hand the toolset a renderer that is not
+ * `udea-render` at all; `OffscreenRenderControl` in this module is the implementation for the one
+ * that is, and `PresentationControl` in `udea-render` is the other half of it.
  *
  * ## Why capture hands back a `Future` and does not just return the bytes
  *
@@ -54,34 +55,101 @@ public interface RenderControl {
     public val framebufferHeight: Int
 
     /**
-     * Queues a capture and returns immediately.
+     * Queues a capture of the **next frame drawn** and returns immediately.
+     *
+     * ## Why there is no `afterTick` here any more
+     *
+     * The renderer can hold a request until a named tick has finished - `FrameCaptureSlot` does
+     * exactly that, and `GameHost.screenshot` uses it. This port cannot expose that, and the
+     * reason is the dispatcher rather than the pixel path. A capture tool queues the request,
+     * returns, and assembles its answer in `AgentContext.answerLater`, which runs **once**, at
+     * the end of the same host iteration. A request for a tick that has not been simulated yet
+     * cannot be served by that iteration's frame, and there is no second callback to answer
+     * from: the only way to wait would be to block the thread that draws the frames, which on an
+     * `Offscreen` or `Windowed` host is this one.
+     *
+     * A request for a tick that *has* already finished is served by the next frame - which is
+     * what a request with no tick at all is served by. So every value the toolset could have
+     * accepted selected the identical frame, and the argument was inert while reading, in the
+     * schema, as though a screenshot could be aimed at a moment. It is gone from the surface
+     * rather than left there answering `ok`; [CaptureFrame.tick] is what an agent actually needs
+     * and is the tick the renderer stamped, not one this module assumed.
+     *
+     * It comes back the day `AgentContext` can complete a command from a later frame, and that
+     * is a change in `udea-agent`, not here.
      *
      * @param region `null` for the whole framebuffer. Already validated against the framebuffer
      *   by the caller, so an implementation may read it as given.
-     * @param afterTick serve the first frame drawn once this simulation tick has finished, or
-     *   `null` for the next frame. An implementation must **not** block waiting for it.
      * @return a future the renderer settles at the capture point of the frame that serves it. A
      *   failure arrives as an [ExecutionException]; its cause's message is reported to the agent.
      */
-    public fun capture(region: PixelRegion?, afterTick: Long?): Future<CaptureFrame>
+    public fun capture(region: PixelRegion?): Future<CaptureFrame>
 
-    /** Points the camera at world [x],[y] with the given [zoom], and stops following. */
-    public fun setCamera(x: Float, y: Float, zoom: Float)
+    /**
+     * Points the camera at world [x],[y] with the given [zoom], and stops following.
+     *
+     * @return [CameraOutcome.APPLIED], or [CameraOutcome.NO_CAMERA_BOUND] when this renderer
+     *   draws with a fixed projection. It returned `Unit`, and `render.set_camera` answered `ok`
+     *   for a renderer with no camera in it - an agent then screenshots, sees the same frame, and
+     *   has nothing to attribute it to. An implementation that cannot move a view must say so.
+     */
+    public fun setCamera(x: Float, y: Float, zoom: Float): CameraOutcome
 
-    /** Follows the entity with this network id, or stops following when [netId] is `null`. */
-    public fun followEntity(netId: NetId?)
+    /**
+     * Follows the entity with this network id, or stops following when [netId] is `null`.
+     *
+     * @return [CameraOutcome.APPLIED] only when the camera will genuinely track it. Every other
+     *   value names a reason it will not - no camera, a camera bound to no world, an id that
+     *   resolves to nothing, an entity with no pose to follow - and an implementation must not
+     *   report `APPLIED` for a request it has merely accepted.
+     */
+    public fun followEntity(netId: NetId?): CameraOutcome
 
     /** Sets debug draw on or off, or toggles when [enabled] is `null`. Returns the new state. */
     public fun toggleDebugDraw(enabled: Boolean?): Boolean
 }
 
 /**
+ * What a camera command actually did, as it crosses the port.
+ *
+ * The presentation side has an enum of its own (`udea-render`'s `CameraOutcome`) and the adapter
+ * maps one onto the other. Two enums rather than one shared type because this port is what a game
+ * implements to hand the toolset *any* renderer: an implementation that is not `udea-render` must
+ * still be able to answer these questions, and it must not have to name a render type to do it.
+ *
+ * Every value except [APPLIED] becomes a typed [AgentResult] failure with its own error kind, so
+ * an agent reads a specific reason - `no_camera_bound`, `entity_not_followable` - rather than a
+ * success followed by a screenshot that did not change.
+ */
+public enum class CameraOutcome {
+
+    /** A live camera took the request; the next frame applies it. */
+    APPLIED,
+
+    /** This renderer has no camera at all: it draws with a fixed projection. */
+    NO_CAMERA_BOUND,
+
+    /** A camera exists but is bound to no world, so it can never resolve a follow target. */
+    CAMERA_NOT_BOUND,
+
+    /** The network id resolves to no live entity. */
+    NO_SUCH_ENTITY,
+
+    /**
+     * The entity is live, but nothing gives it a drawn position, so following it would leave the
+     * camera exactly where it is.
+     */
+    NOT_FOLLOWABLE,
+}
+
+/**
  * One captured frame, as it crosses the port.
  *
  * Carries the dimensions and the tick **the renderer stamped it with** rather than the ones this
- * module assumed. The difference matters for exactly the reason the tool exists: an agent that
- * asked for `afterTick = 200` and quietly got the frame drawn at tick 199 would compare it
- * against the wrong expectation, and a result that echoed the *request* back could never tell it.
+ * module assumed. Since a capture is always of the next frame drawn, [tick] is the only thing
+ * that tells an agent *when* it is looking at - and it has to come from the frame. A result that
+ * echoed back a tick this module had guessed would let an agent compare a picture of tick 199
+ * against its expectation for tick 200 and conclude the game had changed.
  */
 public class CaptureFrame(
     /** Width of [image] in pixels. */
@@ -136,11 +204,10 @@ public class PixelRegion(
  * after it ticks. The command completes with the artifact id, so `completedCommandId` still means
  * "the picture exists", not "the picture was asked for".
  *
- * `afterTick` naming a tick that has **not been simulated yet** is refused rather than queued.
- * The request would be legitimate - the renderer holds it across frames quite happily - but the
- * answer could not be assembled without blocking the thread that draws those frames. Refusing it
- * with the current tick in the message tells an agent exactly what to do instead (`time.step`,
- * then screenshot), which is worth more than a capture that arrives silently late.
+ * A capture is always of the **next frame drawn**, and the answer reports the tick the renderer
+ * stamped that frame with. There is no way to aim one at a chosen tick from here, and the tools
+ * no longer publish an argument that says there is: see [RenderControl.capture] for why the
+ * dispatcher, not the pixel path, is what makes that impossible today.
  */
 public class RenderToolset(
     /** Reported by `/health`; the reason `Headless` refuses. */
@@ -158,8 +225,7 @@ public class RenderToolset(
      *   for a tool that answers later: the dispatcher skips its own completion, and a value here
      *   would be a second answer to one command id.
      */
-    public fun screenshot(afterTick: Long?, context: AgentContext): AgentResult? =
-        capture(null, afterTick, context)
+    public fun screenshot(context: AgentContext): AgentResult? = capture(null, context)
 
     /**
      * Captures a region, in framebuffer pixels from the bottom-left.
@@ -174,7 +240,6 @@ public class RenderToolset(
         y: Int,
         w: Int,
         h: Int,
-        afterTick: Long?,
         context: AgentContext,
     ): AgentResult? {
         val renderer = live() ?: return unavailable()
@@ -187,7 +252,7 @@ public class RenderToolset(
                     "region here is (0, 0, $width, $height)",
             )
         }
-        return capture(PixelRegion(x, y, w, h), afterTick, context)
+        return capture(PixelRegion(x, y, w, h), context)
     }
 
     /** Points the camera. */
@@ -206,7 +271,8 @@ public class RenderToolset(
                     "projection and draws a frame of nothing",
             )
         }
-        renderer.setCamera(x, y, zoom)
+        val outcome = renderer.setCamera(x, y, zoom)
+        if (outcome != CameraOutcome.APPLIED) return cameraRefusal("set_camera", outcome, null)
         return AgentResult.ok {
             put("x", x)
             put("y", y)
@@ -218,7 +284,10 @@ public class RenderToolset(
     public fun followEntity(netId: Long): AgentResult {
         val renderer = live() ?: return unavailable()
         if (netId < 0L) {
-            renderer.followEntity(null)
+            val stopped = renderer.followEntity(null)
+            if (stopped != CameraOutcome.APPLIED) {
+                return cameraRefusal("follow_entity", stopped, null)
+            }
             return AgentResult.ok { put("following", -1L) }
         }
         // `NetId.ofRaw` refuses a word with reserved bits set, which is what an agent that
@@ -233,7 +302,8 @@ public class RenderToolset(
                     "query returned, or -1 to stop following",
             )
         }
-        renderer.followEntity(id)
+        val outcome = renderer.followEntity(id)
+        if (outcome != CameraOutcome.APPLIED) return cameraRefusal("follow_entity", outcome, netId)
         return AgentResult.ok { put("following", netId) }
     }
 
@@ -250,27 +320,14 @@ public class RenderToolset(
      * be queued *before* the frame is drawn, and the answer can only be assembled *after* it. Both
      * happen on the simulation thread, one tick apart, with the render in between.
      */
-    private fun capture(
-        region: PixelRegion?,
-        afterTick: Long?,
-        context: AgentContext,
-    ): AgentResult? {
+    private fun capture(region: PixelRegion?, context: AgentContext): AgentResult? {
         val renderer = live() ?: return unavailable()
         val store = artifacts ?: return AgentResult.failed(
             AgentHostErrors.NO_ARTIFACT_STORE,
             "this instance has no artifact store, so a capture has nowhere to go",
         )
-        val now = context.tick.value
-        if (afterTick != null && afterTick >= now) {
-            return AgentResult.failed(
-                AgentHostErrors.TICK_NOT_REACHED,
-                "afterTick=$afterTick has not been simulated yet: the clock is about to run tick " +
-                    "$now, and the frame that would serve this capture is drawn by the same " +
-                    "thread this call is on. Run time.step first, then screenshot.",
-            )
-        }
 
-        val pending = runCatching { renderer.capture(region, afterTick) }.getOrElse { failure ->
+        val pending = runCatching { renderer.capture(region) }.getOrElse { failure ->
             return AgentResult.failed(
                 AgentHostErrors.CAPTURE_FAILED,
                 "the renderer refused the capture request: ${failure.message ?: failure}",
@@ -340,6 +397,51 @@ public class RenderToolset(
         }
     }
 
+    /**
+     * Turns a camera command that did nothing into the error that says why.
+     *
+     * One place, because the two camera tools share every reason: an agent that gets
+     * `no_camera_bound` from `set_camera` and something vaguer from `follow_entity` learns two
+     * vocabularies for one fact. [CameraOutcome.APPLIED] is not a refusal and is a programming
+     * error here rather than a message an agent should ever read.
+     */
+    private fun cameraRefusal(tool: String, outcome: CameraOutcome, netId: Long?): AgentResult =
+        when (outcome) {
+            CameraOutcome.APPLIED ->
+                error("render.$tool asked for a refusal for an applied camera command")
+
+            CameraOutcome.NO_CAMERA_BOUND -> AgentResult.failed(
+                AgentHostErrors.NO_CAMERA_BOUND,
+                "render.$tool cannot move the view: no camera is wired into this renderer, so it " +
+                    "draws with a fixed projection. Screenshots still work and show the whole " +
+                    "framebuffer; there is nothing to aim.",
+            )
+
+            CameraOutcome.CAMERA_NOT_BOUND -> AgentResult.failed(
+                AgentHostErrors.CAMERA_NOT_BOUND,
+                "render.$tool cannot follow anything: this renderer's camera was never bound to " +
+                    "a world, so it can resolve no entity. render.set_camera still works. This " +
+                    "is a host wiring fault - the camera was not registered with the render " +
+                    "registry the pipeline was built from - and no argument value fixes it.",
+            )
+
+            CameraOutcome.NO_SUCH_ENTITY -> AgentResult.failed(
+                AgentErrorKind.NO_SUCH_ENTITY,
+                "$netId is not a live entity, so the camera has nothing to follow. Pass an id a " +
+                    "current entity query returned; an id from before a rewind or a destroy is " +
+                    "stale and resolves to nothing.",
+            )
+
+            CameraOutcome.NOT_FOLLOWABLE -> AgentResult.failed(
+                AgentHostErrors.ENTITY_NOT_FOLLOWABLE,
+                "entity $netId exists but has no drawn position for the camera to track - " +
+                    "nothing interpolates it, which for this engine means it has no physics " +
+                    "body. Following it would leave the camera exactly where it is, so the " +
+                    "request is refused instead of accepted. Use render.set_camera with the " +
+                    "position a world query reports for it.",
+            )
+        }
+
     /** The renderer, or `null` when this process has no live render context. */
     private fun live(): RenderControl? = if (mode == RenderMode.Headless) null else control
 
@@ -405,8 +507,20 @@ public abstract class RenderToolDef(
     override val name: String,
     override val description: String,
     override val args: List<AgentToolArg>,
-    override val inputSchema: String,
 ) : AgentToolDef<RenderToolset> {
+
+    /**
+     * Built from [args] by [ToolSchema], never written by hand.
+     *
+     * The two were separate literals and had drifted: the hand-written schemas declared no
+     * dialect, allowed additional properties, wrote an empty `required` array the generator
+     * omits, and did not fold defaults into their descriptions - a second dialect on one surface,
+     * which is exactly what the single-mechanism rule exists to stop. Derived, they cannot
+     * disagree with the argument list beside them, and `ToolSchemaTest` checks the derivation
+     * against a real generated tool's own schema.
+     */
+    override val inputSchema: String = ToolSchema.of(args)
+
     override val owner: KClass<*> = RenderToolset::class
 }
 
@@ -421,8 +535,10 @@ public abstract class CaptureToolDef(
     override val name: String,
     override val description: String,
     override val args: List<AgentToolArg>,
-    override val inputSchema: String,
 ) : ContextualToolDef<RenderToolset> {
+
+    /** Derived from [args]. See [RenderToolDef.inputSchema] for why it is not written by hand. */
+    override val inputSchema: String = ToolSchema.of(args)
 
     override val owner: KClass<*> = RenderToolset::class
 
@@ -436,34 +552,20 @@ public abstract class CaptureToolDef(
 /** `render.screenshot`. */
 public object ScreenshotTool : CaptureToolDef(
     name = "render.screenshot",
-    description = "Capture the whole frame as a PNG and file it in the artifact store. Reach for " +
-        "it whenever a number cannot tell you what the screen looks like - before and after a " +
+    description = "Capture the next frame drawn as a PNG and file it in the artifact store. Reach " +
+        "for it whenever a number cannot tell you what the screen looks like - before and after a " +
         "command, or either side of a rewind - and pass the two ids to render.compare_artifacts. " +
-        "Returns the file path (open it directly if you are on this machine) and an artifact id " +
-        "(fetch it with GET /artifact if you are not). Answers no_render_context in Headless.",
-    args = listOf(
-        AgentToolArg(
-            "afterTick",
-            "integer",
-            "Capture the first frame drawn once this already-simulated tick has finished, and " +
-                "report the tick the frame was actually drawn at. A tick still in the future is " +
-                "refused: step to it first. Omit to capture the next frame.",
-            required = false,
-            default = "",
-        ),
-    ),
-    inputSchema = """{"type":"object","properties":{"afterTick":{"type":"integer","description":""" +
-        """"Capture the first frame after this tick, which must already have been simulated. """ +
-        """Omit for the next frame."}},"required":[]}""",
+        "Returns the file path (open it directly if you are on this machine), an artifact id " +
+        "(fetch it with GET /artifact if you are not) and 'tick', the simulation tick the frame " +
+        "was drawn at - read it rather than assuming, because a time tool sent in the same batch " +
+        "runs after this capture. Answers no_render_context in Headless.",
+    args = emptyList(),
 ) {
     override fun invoke(
         receiver: RenderToolset,
         command: AgentCommand,
         context: AgentContext,
-    ): Any? = receiver.screenshot(
-        afterTick = if ("afterTick" in command) command.long("afterTick") else null,
-        context = context,
-    )
+    ): Any? = receiver.screenshot(context = context)
 }
 
 /** `render.screenshot_region`. */
@@ -479,19 +581,7 @@ public object ScreenshotRegionTool : CaptureToolDef(
         AgentToolArg("y", "integer", "Bottom edge in framebuffer pixels.", required = true, default = null),
         AgentToolArg("w", "integer", "Width in pixels, at least 1.", required = true, default = null),
         AgentToolArg("h", "integer", "Height in pixels, at least 1.", required = true, default = null),
-        AgentToolArg(
-            "afterTick",
-            "integer",
-            "Capture the first frame drawn once this already-simulated tick has finished. Omit " +
-                "for the next frame.",
-            required = false,
-            default = "",
-        ),
     ),
-    inputSchema = """{"type":"object","properties":{"x":{"type":"integer","description":"Left edge."},""" +
-        """"y":{"type":"integer","description":"Bottom edge."},"w":{"type":"integer","description":"Width."},""" +
-        """"h":{"type":"integer","description":"Height."},"afterTick":{"type":"integer",""" +
-        """"description":"Capture after this already-simulated tick."}},"required":["x","y","w","h"]}""",
 ) {
     override fun invoke(
         receiver: RenderToolset,
@@ -502,7 +592,6 @@ public object ScreenshotRegionTool : CaptureToolDef(
         y = command.int("y"),
         w = command.int("w"),
         h = command.int("h"),
-        afterTick = if ("afterTick" in command) command.long("afterTick") else null,
         context = context,
     )
 }
@@ -513,7 +602,9 @@ public object SetCameraTool : RenderToolDef(
     description = "Move the camera to a world position and zoom level. Reach for it when what you " +
         "want to look at is off screen, or too small to judge, before taking a screenshot. It " +
         "stops the camera following an entity, changes presentation only, and cannot affect the " +
-        "simulation. Answers no_render_context in Headless.",
+        "simulation. The move lands on the next frame drawn, so the next screenshot shows it. " +
+        "Answers no_camera_bound on a renderer that draws with a fixed projection, and " +
+        "no_render_context in Headless.",
     args = listOf(
         AgentToolArg("x", "number", "World x to centre on.", required = true, default = null),
         AgentToolArg("y", "number", "World y to centre on.", required = true, default = null),
@@ -525,9 +616,6 @@ public object SetCameraTool : RenderToolDef(
             default = "1",
         ),
     ),
-    inputSchema = """{"type":"object","properties":{"x":{"type":"number","description":"World x."},""" +
-        """"y":{"type":"number","description":"World y."},"zoom":{"type":"number",""" +
-        """"description":"Zoom factor, default 1."}},"required":["x","y"]}""",
 ) {
     override fun invoke(receiver: RenderToolset, command: AgentCommand): Any? =
         receiver.setCamera(command.float("x"), command.float("y"), command.float("zoom", 1f))
@@ -538,7 +626,11 @@ public object FollowEntityTool : RenderToolDef(
     name = "render.follow_entity",
     description = "Keep the camera on one entity by network id, so it stays framed as it moves. " +
         "Reach for it before stepping the simulation forward to watch what one unit does. Pass -1 " +
-        "to stop following and leave the camera where it is. Answers no_render_context in Headless.",
+        "to stop following and leave the camera where it is. The request is checked before it is " +
+        "accepted: an id that resolves to nothing answers no_such_entity, and an entity the " +
+        "camera could not actually track - one with no physics body, so nothing draws it at a " +
+        "position - answers entity_not_followable rather than ok. Answers no_camera_bound where " +
+        "there is no camera, and no_render_context in Headless.",
     args = listOf(
         AgentToolArg(
             "netId",
@@ -548,8 +640,6 @@ public object FollowEntityTool : RenderToolDef(
             default = null,
         ),
     ),
-    inputSchema = """{"type":"object","properties":{"netId":{"type":"integer","description":""" +
-        """"Entity network id to follow; -1 stops following."}},"required":["netId"]}""",
 ) {
     override fun invoke(receiver: RenderToolset, command: AgentCommand): Any? =
         receiver.followEntity(command.long("netId"))
@@ -568,11 +658,9 @@ public object ToggleDebugDrawTool : RenderToolDef(
             "boolean",
             "true to show the overlay, false to hide it. Omit to toggle.",
             required = false,
-            default = "",
+            default = null,
         ),
     ),
-    inputSchema = """{"type":"object","properties":{"enabled":{"type":"boolean","description":""" +
-        """"true shows the overlay, false hides it; omit to toggle."}},"required":[]}""",
 ) {
     override fun invoke(receiver: RenderToolset, command: AgentCommand): Any? =
         receiver.toggleDebugDraw(if ("enabled" in command) command.bool("enabled") else null)

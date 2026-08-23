@@ -7,6 +7,7 @@
     "verify-vendor": "node scripts/verify-vendor.mjs",
     "build": "tsc -p tsconfig.json",
     "test": "npm run verify-vendor && npm run build && node --test test/bridge-contract.test.mjs",
+    "test:launch": "node --test test/launch-declaration.test.mjs",
     "test:silence": "node scripts/expect-silence.mjs"
   },
   "devDependencies": {

@@ -30,7 +30,20 @@ class ResultPageTest {
     fun `a page fits the bytes a command result is guaranteed, whatever the list length`() {
         // Ten times the ceiling's worth of entries. An unpaged answer over this is several
         // kilobytes and cannot reach /state at any size of document.
-        val page = ResultPage.render("rows", offset = 0, limit = Int.MAX_VALUE, total = 4_000) { json, index ->
+        //
+        // With a prelude, because the prelude is the half the budget used to miss: `render`
+        // invites one in its signature, `time.list_snapshots` and `events.recent_events` both
+        // pass one, and every character of it used to be emitted outside MAX_PAGE_BYTES.
+        val page = ResultPage.render(
+            "rows",
+            offset = 0,
+            limit = Int.MAX_VALUE,
+            total = 4_000,
+            prelude = {
+                put("count", 4_000)
+                put("totalBytes", 1_234_567_890L)
+            },
+        ) { json, index ->
             json.obj {
                 put("tick", index.toLong())
                 put("kind", "Full")
@@ -39,26 +52,73 @@ class ResultPageTest {
         }
 
         val json = (page as AgentResult.Ok).json
+        // The claim is about what the DIGEST spends, not about what this writer emits. The
+        // result is charged `json.length + ENTRY_OVERHEAD` against a budget already reduced by
+        // `ARRAY_OVERHEAD`, and [ResultPage.ENVELOPE_BYTES] is that arithmetic. Asserting the
+        // bare `json.length` against RESULT_MIN_BYTES - which is what this test used to do -
+        // left the envelope outside the assertion and gave the page 48 characters of slack it
+        // does not have, so it could not fail for the reason it states.
         assertTrue(
-            json.length <= DigestBudgets.RESULT_MIN_BYTES,
-            "a page is ${json.length} chars against a ${DigestBudgets.RESULT_MIN_BYTES}-byte " +
-                "guarantee, so it can still be dropped: $json",
+            json.length + ResultPage.ENVELOPE_BYTES <= DigestBudgets.RESULT_MIN_BYTES,
+            "a page costs ${json.length} + ${ResultPage.ENVELOPE_BYTES} of envelope against a " +
+                "${DigestBudgets.RESULT_MIN_BYTES}-byte guarantee, so it can still be dropped: $json",
         )
         assertTrue(json.contains("\"hasMore\":true"), json)
         assertTrue(json.contains("\"nextOffset\":"), json)
+        // The prelude reached the document and the page still fits. Both halves matter: a
+        // prelude that was silently dropped would also satisfy the byte assertion above.
+        assertTrue(json.contains("\"totalBytes\":1234567890"), json)
+        assertTrue(json.contains("\"tick\":0"), "a page must carry at least one row: $json")
+    }
+
+    /**
+     * A prelude big enough to crowd out the rows says so, and says it about the prelude.
+     *
+     * The page is still emitted and is still valid JSON - a caller that gets nothing back cannot
+     * act - but `preludeTooLarge` names the actual cause. `entryTooLarge` here would send the
+     * caller off shortening rows, which cannot help.
+     */
+    @Test
+    fun `a prelude that spends the budget is named as the cause`() {
+        val page = ResultPage.render(
+            "rows",
+            offset = 0,
+            limit = 10,
+            total = 5,
+            prelude = { put("note", "x".repeat(ResultPage.MAX_PAGE_BYTES)) },
+        ) { json, index -> json.obj { put("tick", index.toLong()) } }
+
+        val json = (page as AgentResult.Ok).json
+        assertTrue(json.contains("\"preludeTooLarge\":true"), json)
+        assertTrue(!json.contains("\"entryTooLarge\":true"), "the row is not the problem: $json")
+        assertTrue(json.contains("\"returned\":1"), "a page must still answer: $json")
     }
 
     /**
      * The end-to-end form of the same claim, through the machinery that does the dropping.
      *
-     * A page rendered into a real [AgentBridge] result ring and then through the digest's own
-     * `renderCommandResults` comes out the far side *present*, and the truncation flag is
-     * absent. Before paging, this is the assertion that failed.
+     * ## Why the document is padded first
+     *
+     * [DigestBudgets.RESULT_CEILING] is 1280 and is only what is left over on a *quiet* frame.
+     * The number a page is designed against is [DigestBudgets.RESULT_MIN_BYTES], 256, which is
+     * what `commandResults` is guaranteed once `ui.elements` has spent everything
+     * [DigestBudgets.LABEL_CEILING] allows. Rendering into an *empty* document therefore tested
+     * the page against five times the budget it claims to respect: it could not fail for its
+     * stated reason, and stayed green with the byte budget removed from `ResultPage` entirely.
+     *
+     * So the document is padded to exactly the point where the guarantee is all that is left,
+     * and the page has to survive that. Before paging, this is the assertion that failed.
      */
     @Test
-    fun `a paged answer survives the digest's command-result ceiling`() {
+    fun `a paged answer survives on the bytes a command result is merely guaranteed`() {
         val bridge = AgentBridge()
-        val page = ResultPage.render("rows", offset = 0, limit = Int.MAX_VALUE, total = 4_000) { json, index ->
+        val page = ResultPage.render(
+            "rows",
+            offset = 0,
+            limit = Int.MAX_VALUE,
+            total = 4_000,
+            prelude = { put("count", 4_000) },
+        ) { json, index ->
             json.obj {
                 put("tick", index.toLong())
                 put("kind", "Full")
@@ -67,8 +127,12 @@ class ResultPageTest {
         }
         bridge.complete(1L, page)
 
-        val document = Json()
-        document.beginObject()
+        val document = paddedTo(DigestBudgets.RESULT_CEILING - DigestBudgets.RESULT_MIN_BYTES)
+        assertEquals(
+            DigestBudgets.RESULT_MIN_BYTES,
+            DigestBudgets.RESULT_CEILING - document.length,
+            "the fixture must leave exactly the guaranteed bytes, or it is not testing the guarantee",
+        )
         val truncated = bridge.renderCommandResults(
             document,
             "commandResults",
@@ -77,7 +141,7 @@ class ResultPageTest {
         )
         document.endObject()
 
-        assertTrue(!truncated, "the paged answer was still dropped: $document")
+        assertTrue(!truncated, "the paged answer was dropped on the bytes it is guaranteed: $document")
         assertTrue(document.toString().contains("\"nextOffset\":"), document.toString())
     }
 
@@ -107,8 +171,9 @@ class ResultPageTest {
             },
         )
 
-        val document = Json()
-        document.beginObject()
+        // Padded to the guarantee, like the test above: the pair only means something if both
+        // halves are measured against the same budget.
+        val document = paddedTo(DigestBudgets.RESULT_CEILING - DigestBudgets.RESULT_MIN_BYTES)
         val truncated = bridge.renderCommandResults(
             document,
             "commandResults",
@@ -176,6 +241,24 @@ class ResultPageTest {
             ).json
 
         assertEquals("""{"total":0,"offset":0,"rows":[],"returned":0,"hasMore":false}""", json)
+    }
+
+    /**
+     * An open JSON object whose rendered length is exactly [target] characters.
+     *
+     * Self-calibrating rather than a hand-counted filler literal: the point of the fixture is
+     * that `RESULT_CEILING - length` equals the guarantee to the byte, and a literal that was
+     * right when it was written stops being right the first time [Json] changes its spacing.
+     */
+    private fun paddedTo(target: Int): Json {
+        val probe = Json()
+        probe.beginObject()
+        probe.put("filler", "")
+        val json = Json()
+        json.beginObject()
+        json.put("filler", "x".repeat(target - probe.length))
+        check(json.length == target) { "padding produced ${json.length} characters, not $target" }
+        return json
     }
 
     private companion object {

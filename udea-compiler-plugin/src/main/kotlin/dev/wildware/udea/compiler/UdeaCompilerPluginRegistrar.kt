@@ -1,7 +1,10 @@
 package dev.wildware.udea.compiler
 
+import dev.wildware.udea.compiler.assets.AssetCatalogSource
+import dev.wildware.udea.compiler.assets.ClasspathAssetCatalogScanner
 import dev.wildware.udea.compiler.fir.UdeaDiagnostics
 import dev.wildware.udea.compiler.fir.UdeaFirExtensionRegistrar
+import org.jetbrains.kotlin.cli.jvm.config.jvmClasspathRoots
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
@@ -35,6 +38,12 @@ public class UdeaCompilerPluginRegistrar : CompilerPluginRegistrar() {
             RootDiagnosticRendererFactory.registerFactory(UdeaDiagnostics.Renderers)
         }
 
-        FirExtensionRegistrarAdapter.registerExtension(UdeaFirExtensionRegistrar(options))
+        // Built here, once per compilation, and shared by every FIR session the compilation
+        // creates. The `lazy` inside it means the classpath is not walked at all unless a
+        // checker actually meets an asset reference, so a module with no `reference("...")`
+        // pays nothing (issue #40).
+        val catalog = AssetCatalogSource(ClasspathAssetCatalogScanner(configuration.jvmClasspathRoots))
+
+        FirExtensionRegistrarAdapter.registerExtension(UdeaFirExtensionRegistrar(options, catalog))
     }
 }

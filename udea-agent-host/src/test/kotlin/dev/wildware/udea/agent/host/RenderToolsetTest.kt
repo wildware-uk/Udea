@@ -37,28 +37,51 @@ class RenderToolsetTest {
         assertContains(json, """"artifactId":"cap_0000"""")
         assertContains(json, """"w":64""")
         assertContains(json, """"h":32""")
-        assertEquals(listOf("full@next"), control.requests)
+        assertEquals(listOf("full"), control.requests)
     }
 
     /**
-     * The result carries the tick the **renderer** stamped the frame with, not the one the agent
-     * asked for.
+     * The result carries the tick the **renderer** stamped the frame with, and nothing else.
      *
-     * An agent that asked for `afterTick = 200`, was quietly handed the frame drawn at 199 and
-     * read its own request back would compare the picture against the wrong expectation and
-     * conclude the game had changed. The only way to notice is for the answer to come from the
-     * frame.
+     * A capture is always of the next frame drawn, so this field is the only thing that tells an
+     * agent *when* it is looking at. A result that echoed back a tick this module had assumed
+     * would let an agent compare a picture of tick 199 against its expectation for 200 and
+     * conclude the game had changed.
      */
     @Test
     fun `the reported tick is the one the frame was drawn at`() {
         val harness = harness(FakeRenderControl())
-        // The clock has to have passed the requested tick, or the request is refused before the
-        // renderer sees it - which is `afterTick in the future is refused` below.
         harness.host.loop.stepTicks(3)
 
-        val json = harness.ok("render.screenshot", "afterTick" to "1")
+        val json = harness.ok("render.screenshot")
 
         assertContains(json, """"tick":${FakeRenderControl.CAPTURED_TICK}""")
+    }
+
+    /**
+     * The capture tools publish no `afterTick`, because this host cannot honour one.
+     *
+     * They did, and it did nothing: a tick still in the future was refused - correctly, the
+     * answer is assembled in the same host iteration and no frame drawn in it could serve one -
+     * and a tick already simulated selected the very frame a request with no tick at all
+     * selects. Every accepted value behaved identically to omitting the argument, while the
+     * schema told a model a screenshot could be aimed at a moment.
+     *
+     * Asserted over the published declarations rather than over a call, because the schema is
+     * what a model reads: an argument that survives only in the schema is still a lie.
+     */
+    @Test
+    fun `no capture tool advertises an argument this host cannot honour`() {
+        val captures = AgentHostTools.tools.filterIsInstance<CaptureToolDef>()
+
+        assertEquals(2, captures.size, "the capture tools are screenshot and screenshot_region")
+        for (tool in captures) {
+            assertTrue(
+                tool.args.none { it.name == "afterTick" },
+                "${tool.name} still declares afterTick",
+            )
+            assertTrue("afterTick" !in tool.inputSchema, "${tool.name}'s schema still declares it")
+        }
     }
 
     /**
@@ -79,7 +102,7 @@ class RenderToolsetTest {
         val a = artifactId(first)
         val b = artifactId(second)
         assertNotEquals(a, b, "two captures were filed under one id")
-        assertEquals(listOf("full@next", "PixelRegion(0, 0, 8x4)@next"), control.requests)
+        assertEquals(listOf("full", "PixelRegion(0, 0, 8x4)"), control.requests)
         assertNotNull(harness.artifacts?.get(ArtifactId.parse(a)!!))
         assertNotNull(harness.artifacts?.get(ArtifactId.parse(b)!!))
     }
@@ -114,31 +137,6 @@ class RenderToolsetTest {
     }
 
     /**
-     * `afterTick` naming a tick that has not been simulated is refused, and the refusal says what
-     * to do instead.
-     *
-     * The renderer would hold such a request across frames quite happily. The reason it is refused
-     * here is the threading one: on an `Offscreen` host the thread that would draw those frames is
-     * the one the tool is running on, so the answer could never be assembled. An agent told
-     * `tick_not_reached` with the current tick in the message can act; one left waiting cannot.
-     */
-    @Test
-    fun `afterTick in the future is refused with the current tick`() {
-        val control = FakeRenderControl()
-        val harness = harness(control)
-
-        val message = harness.refusal(
-            "render.screenshot",
-            "afterTick" to "5000",
-            kind = "tick_not_reached",
-        )
-
-        assertContains(message, "afterTick=5000")
-        assertContains(message, "time.step")
-        assertEquals(emptyList(), control.requests)
-    }
-
-    /**
      * A capture the renderer never serves fails as `capture_failed`, and the loop keeps running.
      *
      * A render loop that has died is the realistic way to get here, and the important half of the
@@ -161,7 +159,7 @@ class RenderToolsetTest {
     fun `a renderer that throws on submit is reported as capture_failed`() {
         val harness = harness(
             object : RenderControl by FakeRenderControl() {
-                override fun capture(region: PixelRegion?, afterTick: Long?) =
+                override fun capture(region: PixelRegion?) =
                     throw IllegalStateException("no pixel source")
             },
         )
@@ -236,6 +234,91 @@ class RenderToolsetTest {
         val harness = harness(control)
 
         harness.refusal("render.follow_entity", "netId" to "16777216", kind = "bad_argument")
+
+        assertEquals(0, control.followCalls)
+    }
+
+    /**
+     * A renderer with no camera refuses both camera tools by name instead of answering `ok`.
+     *
+     * This is the failure the whole outcome enum exists for. `set_camera` used to answer
+     * `{"x":..,"y":..,"zoom":..}` and `follow_entity` `{"following":n}` on a renderer that drew
+     * with a fixed projection - the agent then screenshots, sees the same framing, and has
+     * nothing to attribute it to. There is no round trip that recovers from that: every later
+     * observation is consistent with a camera that moved somewhere uninteresting.
+     */
+    @Test
+    fun `both camera tools refuse by name when no camera is bound`() {
+        val control = FakeRenderControl().apply { cameraOutcome = CameraOutcome.NO_CAMERA_BOUND }
+        val harness = harness(control)
+
+        val placed = harness.refusal(
+            "render.set_camera",
+            "x" to "1", "y" to "2",
+            kind = "no_camera_bound",
+        )
+        assertContains(placed, "fixed projection")
+
+        harness.refusal("render.follow_entity", "netId" to "0", kind = "no_camera_bound")
+        harness.refusal("render.follow_entity", "netId" to "-1", kind = "no_camera_bound")
+
+        assertNull(control.camera, "a refused placement must not be recorded as applied")
+        assertEquals(0, control.followCalls)
+    }
+
+    /**
+     * A camera that exists but is bound to no world says *that*, not `no_camera_bound`.
+     *
+     * Different remedies: one is "this renderer has no camera and never will", the other is "a
+     * camera was built and never registered with the render registry". The first is a property of
+     * the game, the second is a wiring bug somebody can fix in a line.
+     */
+    @Test
+    fun `a camera bound to no world refuses a follow with its own kind`() {
+        val control = FakeRenderControl().apply {
+            followOutcome = CameraOutcome.CAMERA_NOT_BOUND
+        }
+        val harness = harness(control)
+
+        val message = harness.refusal("render.follow_entity", "netId" to "0", kind = "camera_not_bound")
+
+        assertContains(message, "set_camera still works")
+        assertEquals(0, control.followCalls)
+        // ...and placing the camera on such a rig is genuinely fine, so it must still succeed.
+        harness.ok("render.set_camera", "x" to "1", "y" to "1")
+    }
+
+    /**
+     * An entity nothing draws at a position is refused as `entity_not_followable`.
+     *
+     * `moba` had this written down against itself: its units carry `Position` and no
+     * `PhysicsBody`, nothing interpolates them, and `render.follow_entity` answered `ok` while
+     * the camera sat exactly where it was. `no_such_entity` would be the wrong answer - the
+     * entity is there - and `ok` was a worse one.
+     */
+    @Test
+    fun `an entity with no drawn position is refused rather than followed`() {
+        val control = FakeRenderControl().apply { followOutcome = CameraOutcome.NOT_FOLLOWABLE }
+        val harness = harness(control)
+
+        val message = harness.refusal(
+            "render.follow_entity",
+            "netId" to "5",
+            kind = "entity_not_followable",
+        )
+
+        assertContains(message, "entity 5")
+        assertContains(message, "render.set_camera")
+        assertEquals(0, control.followCalls, "a refused follow reached the camera anyway")
+    }
+
+    /** A stale id is a `no_such_entity`, which is the kind the rest of the surface uses for it. */
+    @Test
+    fun `an id that resolves to nothing is refused as no_such_entity`() {
+        val control = FakeRenderControl().apply { followOutcome = CameraOutcome.NO_SUCH_ENTITY }
+        val harness = harness(control)
+
+        harness.refusal("render.follow_entity", "netId" to "9", kind = "no_such_entity")
 
         assertEquals(0, control.followCalls)
     }

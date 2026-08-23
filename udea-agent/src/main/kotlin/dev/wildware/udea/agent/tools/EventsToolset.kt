@@ -37,34 +37,79 @@ public class EventsToolset(
     private val clock: SimClock,
 ) {
 
+    /**
+     * The event ring, newest first, one page at a time.
+     *
+     * ## Why this is paged, when it was the tool least in need of a page
+     *
+     * It was the tool most in need of one and nobody had measured it. An unpaged read of a
+     * populated ring rendered **3384 characters**, and a command answer reaches the agent only
+     * through the digest's `commandResults` array, which `CommandResultRing.fitting` costs
+     * against [dev.wildware.udea.agent.state.DigestBudgets.RESULT_CEILING] - 1280. So a
+     * `recent_events` answer never fitted, was dropped rather than shortened on **every** poll,
+     * and the caller waiting on its own command read `commandResultsTruncated: true` for as long
+     * as it was willing to wait. The tool advertised in the manifest, dispatched, ran, wrote its
+     * answer into the ring, and could not deliver a single event. See [ResultPage] for the
+     * settlement and for why it is pagination rather than an artifact handle.
+     *
+     * ## Newest first, which is the opposite of the ring's own order
+     *
+     * `offset = 0` is the **newest** event and `nextOffset` walks backwards in time. Events are
+     * held oldest-first and the digest renders them that way, but "what just happened" is the
+     * question this tool is asked, and a caller that had to page to the end of the ring before
+     * reading the answer it was waiting for would be back where the drop left it.
+     *
+     * `total` counts the entries matching [contains], not the ring, so following `nextOffset`
+     * enumerates the matches and nothing else.
+     */
     @AgentTool(
         name = "events.recent_events",
-        description = "Read recent game events with the tick each happened on, without " +
-            "consuming them. Use it to find out what the game thinks just happened, " +
-            "including the audit line every agent mutation writes.",
+        description = "Read recent game events with the tick each happened on, newest first " +
+            "and one page at a time, without consuming them. Use it to find out what the " +
+            "game thinks just happened, including the audit line every agent mutation " +
+            "writes; follow nextOffset backwards in time for the rest.",
     )
     public fun recentEvents(
-        @Arg(description = "How many of the newest entries to return.", required = false, default = "40")
+        @Arg(
+            description = "Most entries to return. A page also stops early when it runs out " +
+                "of the bytes a command result is guaranteed in the state document.",
+            required = false,
+            default = "8",
+        )
         limit: Int,
+        @Arg(
+            description = "How many entries to skip, counting back from the newest.",
+            required = false,
+            default = "0",
+        )
+        offset: Int,
         @Arg(description = "Return only entries whose message contains this text.", required = false)
         contains: String?,
     ): AgentResult {
-        val capped = limit.coerceIn(1, bridge.events.capacity)
-        val collected = collect(capped, contains, sinceTick = Long.MIN_VALUE)
-        return AgentResult.ok {
-            put("tick", clock.tick.value)
-            put("held", bridge.events.size)
-            // The difference between `held` and `totalRecorded` is how much the agent has
-            // missed, which is the only way to tell "nothing happened" from "the ring wrapped".
-            put("totalRecorded", bridge.events.totalRecorded)
-            put("returned", collected.size)
-            arr("events") {
-                collected.forEach { entry ->
-                    element {
-                        put("tick", entry.tick)
-                        put("message", entry.message)
-                    }
-                }
+        val matched = collect(bridge.events.capacity, contains, sinceTick = Long.MIN_VALUE)
+        return ResultPage.render(
+            name = "events",
+            offset = offset,
+            limit = limit.coerceAtLeast(0),
+            total = matched.size,
+            prelude = {
+                put("tick", clock.tick.value)
+                // `totalRecorded` minus what the ring holds is how much the agent has missed,
+                // which is the only way to tell "nothing happened" from "the ring wrapped".
+                put("totalRecorded", bridge.events.totalRecorded)
+                // `held` used to sit here and is gone on purpose. A page is measured against
+                // the bytes a command answer is *guaranteed* - see ResultPage - and at that size
+                // a redundant prelude field costs a whole event: `total` already reports how
+                // many entries this call matched, and with no `contains` filter that number is
+                // `held`. A caller that wants the ring's own size when it *is* filtering asks
+                // once without the filter.
+            },
+        ) { json, index ->
+            // `collect` hands back oldest-first; index 0 must be the newest. See the KDoc.
+            val entry = matched[matched.size - 1 - index]
+            json.obj {
+                put("tick", entry.tick)
+                put("message", entry.message)
             }
         }
     }
@@ -170,8 +215,15 @@ public class EventsToolset(
         /** Nothing matched the pattern inside the window. A typed answer, not a failure of the engine. */
         public val EVENT_NOT_FOUND: AgentErrorKind = AgentErrorKind("event_not_found")
 
-        /** Entries `recent_events` returns when the caller names no limit. */
-        public const val DEFAULT_LIMIT: Int = 40
+        /**
+         * Entries `recent_events` returns when the caller names no limit.
+         *
+         * Eight rather than forty, and the number is honest about what a page can hold: the
+         * byte budget in [ResultPage] usually ends the page first, so this is the cap on a quiet
+         * ring with short messages rather than a promise. Forty was a promise the digest could
+         * never keep - forty events is roughly 2KB, and the whole state document is 2048 bytes.
+         */
+        public const val DEFAULT_LIMIT: Int = 8
 
         /** Ticks back from now that `assert_event` searches when the caller names no window. */
         public const val DEFAULT_WINDOW: Int = 60

@@ -18,7 +18,7 @@ import dev.wildware.udea.agent.host.demo.BodyQuadRenderSystem
 import dev.wildware.udea.agent.host.demo.BoxBlueprint
 import dev.wildware.udea.agent.host.demo.DebugGridRenderSystem
 import dev.wildware.udea.agent.host.demo.DemoBodyModule
-import dev.wildware.udea.agent.host.demo.OffscreenRenderControl
+import dev.wildware.udea.agent.host.render.OffscreenRenderControl
 import dev.wildware.udea.agent.host.demo.SimulatedPoseOnly
 import dev.wildware.udea.agent.host.demo.demoBodyAccess
 import dev.wildware.udea.agent.host.demo.demoRegistry
@@ -34,6 +34,7 @@ import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.snapshot.snapshotTimeTravel
 import dev.wildware.udea.render.RenderPhase
@@ -209,6 +210,61 @@ class OffscreenRenderToolsTest {
         }
     }
 
+    /**
+     * `follow_entity` against the real stack: accepted for an entity it can track, and the camera
+     * demonstrably moves because of it.
+     *
+     * The whole point of the check `PresentationControl.follow` now makes is that `APPLIED` is a
+     * promise about the *next frames*, so the assertion has to be about frames. The camera starts
+     * at the origin, the box is spawned twelve units away, and the rig eases toward it - so two
+     * captures a few frames apart differ, and they differ for no other reason: the simulation is
+     * paused throughout, so nothing in the world is moving.
+     */
+    @Test
+    fun `follow_entity accepts a trackable entity and the camera moves onto it`() {
+        GlAvailabilityHere.require()
+        withHost { fixture ->
+            fixture.ok("time.pause")
+            val spawned = fixture.ok(
+                "world.spawn_blueprint",
+                "blueprint" to "box", "x" to "12", "y" to "0",
+            )
+            val netId = requireNotNull(Regex(""""id":(-?\d+)""").find(spawned)).groupValues[1]
+            fixture.ok("time.step", "ticks" to "1")
+
+            val before = fixture.capture()
+            assertContains(fixture.ok("render.follow_entity", "netId" to netId), """"following":""")
+            repeat(FOLLOW_FRAMES) { fixture.ok("render.toggle_debug_draw", "enabled" to "false") }
+            val after = fixture.capture()
+
+            assertFalse(
+                before.bytes.contentEquals(after.bytes),
+                "render.follow_entity answered ok and the camera never moved, which is exactly " +
+                    "the silent success this surface is not allowed to have",
+            )
+        }
+    }
+
+    /**
+     * An id nothing resolves to is refused by name rather than accepted and forgotten.
+     *
+     * Through the real adapter and the real rig, so what is being checked is the whole path:
+     * `RenderToolset` -> `OffscreenRenderControl` -> `PresentationControl` -> `CameraRig` ->
+     * `NetIdIndex`, and back with a reason.
+     */
+    @Test
+    fun `follow_entity refuses an id that resolves to nothing`() {
+        GlAvailabilityHere.require()
+        withHost { fixture ->
+            fixture.ok("time.pause")
+
+            val refusal = fixture.call("render.follow_entity", "netId" to "$UNALLOCATED_NET_ID")
+
+            assertTrue(refusal is AgentResult.Failed, "an unallocated id was accepted: $refusal")
+            assertEquals("no_such_entity", refusal.error.kind.id)
+        }
+    }
+
     /** A region capture crops the framebuffer, and an impossible region is refused by name. */
     @Test
     fun `screenshot_region crops, and an out-of-bounds region is refused`() {
@@ -362,6 +418,22 @@ class OffscreenRenderToolsTest {
     private companion object {
         const val RENDER_WIDTH = 96
         const val RENDER_HEIGHT = 64
+
+        /**
+         * Frames driven between the two captures of the follow test.
+         *
+         * Enough for a 0.1s half-life to close most of twelve world units, and driven with a
+         * harmless tool call because every command this fixture sends pumps exactly one frame.
+         */
+        const val FOLLOW_FRAMES = 6
+
+        /**
+         * A packed id inside the engine's range that nothing has allocated.
+         *
+         * Index 900 with generation 3: `NetId.ofRaw` accepts it - so it reaches the camera rather
+         * than being turned back as a bad argument - and `NetIdIndex` resolves it to nothing.
+         */
+        val UNALLOCATED_NET_ID: Int = NetId.of(index = 900, generation = 3).raw
 
         val PNG_SIGNATURE: ByteArray = byteArrayOf(
             0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,

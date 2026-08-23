@@ -3,6 +3,7 @@ package dev.wildware.udea.render.control
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.render.RenderPipeline
+import dev.wildware.udea.render.camera.CameraOutcome
 import dev.wildware.udea.render.camera.CameraRig
 import dev.wildware.udea.render.capture.CaptureRegion
 import dev.wildware.udea.render.capture.CaptureRequest
@@ -27,16 +28,15 @@ import java.util.concurrent.CompletableFuture
  * because the agent surface mutates the live simulation over loopback HTTP and spec 4 requires it
  * *absent* from a shipped game rather than merely disabled. `moba` depends on `udea-render`, so a
  * dependency from here onto `udea-agent-host` would drag the agent host into every shipped
- * classpath and make that gate impossible to pass. The arrow the other way is equally barred:
- * `udea-agent-host` is a headless module (`UDEA-MG-002`), and `RenderModuleGraphTest` fails if any
- * headless module's bytecode so much as names a `udea.render` type.
+ * classpath and make that gate impossible to pass.
  *
- * So the adapter — a dozen lines that implement `RenderControl` by delegating here — belongs to
- * whoever assembles a host out of both, which is the game module or the launcher, and is the one
- * place allowed to see both sides. `udea-agent-host`'s `OffscreenRenderControl` (test sources, and
- * the Phase 1 demo's composition root) is that adapter today. **Be blunt about what that means:
- * until `UdeaAgentPlugin` has a plugin id and a `moba` run task, no *shipped* main-source class
- * wires these two together — the wiring exists and is executed, but from a demo entry point.**
+ * The arrow the *other* way is now allowed, and that is the resolution: `udea-agent-host` takes
+ * `udea-render` as a plain `implementation` dependency and owns the adapter -
+ * `dev.wildware.udea.agent.host.render.OffscreenRenderControl`, a dozen lines that implement
+ * `RenderControl` by delegating here. It is in that module's `src/main`, so `:moba:run` reaches
+ * it. Before the ruling it was in test sources, because `udea-agent-host` was in
+ * `ModuleGraphRules.HEADLESS_PROJECTS` - and the shipped consequence was that every `render.*`
+ * tool answered `no_render_context` on a real run while the adapter sat proven and unreachable.
  *
  * ## Threading
  *
@@ -99,17 +99,47 @@ public class PresentationControl(
     /**
      * Places the camera and stops following. Applied at the top of the next frame.
      *
+     * @return [CameraOutcome.APPLIED] when a camera took it, or [CameraOutcome.NO_CAMERA] when
+     *   this renderer has none. It returned `Unit` before, and a host with no camera got the
+     *   same silence as one with a camera — which is what let `render.set_camera` answer `ok`
+     *   on a renderer that could not move a view at all.
      * @throws IllegalArgumentException if the position is not finite or [zoom] is not positive.
      *   A caller that takes these from an agent argument should say so in its own vocabulary
      *   first; this is the backstop, not the validation.
      */
-    public fun lookAt(x: Float, y: Float, zoom: Float) {
-        camera?.requestLookAt(x, y, zoom)
+    public fun lookAt(x: Float, y: Float, zoom: Float): CameraOutcome {
+        val rig = camera ?: return CameraOutcome.NO_CAMERA
+        rig.requestLookAt(x, y, zoom)
+        return CameraOutcome.APPLIED
     }
 
-    /** Follows [netId], or stops following when it is `null`. Applied at the next frame. */
-    public fun follow(netId: NetId?) {
-        camera?.requestFollow(netId)
+    /**
+     * Follows [netId], or stops following when it is `null`. Applied at the next frame.
+     *
+     * The request is *checked* before it is queued: [CameraRig.followability] runs the same
+     * resolve-and-interpolate the frame would, so a caller learns that the id names nothing
+     * ([CameraOutcome.UNKNOWN_ENTITY]) or that the entity has no pose to track
+     * ([CameraOutcome.UNFOLLOWABLE]) instead of watching a camera that never moves. An
+     * unfollowable request is **not** queued: leaving a target set that nothing can resolve
+     * would keep the rig looking for it every frame and would also silently discard whatever
+     * the camera was following before.
+     *
+     * Stopping ([netId] `null`) is always [CameraOutcome.APPLIED] where a camera exists — there
+     * is nothing to resolve.
+     *
+     * **Simulation thread only** when [netId] is not `null`; see [CameraRig.followability]. The
+     * rest of this class is callable from anywhere and stays that way.
+     */
+    public fun follow(netId: NetId?): CameraOutcome {
+        val rig = camera ?: return CameraOutcome.NO_CAMERA
+        if (netId == null) {
+            rig.requestFollow(null)
+            return CameraOutcome.APPLIED
+        }
+        val outcome = rig.followability(netId)
+        if (outcome != CameraOutcome.APPLIED) return outcome
+        rig.requestFollow(netId)
+        return CameraOutcome.APPLIED
     }
 
     /**

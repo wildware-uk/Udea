@@ -52,12 +52,18 @@ object UdeaCompileTesting {
      * @param workDir the directory that stands in for the repository root. Supply one when the
      *   test needs to name a path inside it - the KDoc harvester's output, say - or when two
      *   compilations must share a root.
+     * @param extraClasspath roots appended to the compilation classpath. This is how the asset
+     *   index reaches the plugin in a test: exactly as it reaches it in a real build - as a
+     *   `META-INF/udea/asset-index.json` inside a jar or an output directory that the
+     *   compilation depends on. Nothing here reads a path out of a plugin option, because
+     *   nothing in the real build does either (see `ClasspathAssetCatalogScanner`).
      */
     fun compile(
         sources: List<TestSource>,
         pluginOptions: Map<String, String> = emptyMap(),
         applyPlugin: Boolean = true,
         workDir: File = newWorkDir(),
+        extraClasspath: List<File> = emptyList(),
     ): CheckerRun {
         require(sources.isNotEmpty()) { "a compilation needs at least one source" }
         val sourceDir = File(workDir, SOURCE_DIR)
@@ -70,7 +76,8 @@ object UdeaCompileTesting {
         val arguments = K2JVMCompilerArguments().apply {
             freeArgs = listOf(sourceDir.absolutePath)
             destination = out.absolutePath
-            classpath = compilationClasspath
+            classpath = (listOf(compilationClasspath) + extraClasspath.map { it.absolutePath })
+                .joinToString(File.pathSeparator)
             noStdlib = true
             noReflect = true
             moduleName = "udea-checker-test"

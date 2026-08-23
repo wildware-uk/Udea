@@ -35,7 +35,6 @@ class HeadlessRenderToolsTest {
 
         val calls: List<Pair<String, Array<Pair<String, String>>>> = listOf(
             "render.screenshot" to emptyArray(),
-            "render.screenshot" to arrayOf("afterTick" to "1"),
             "render.screenshot_region" to
                 arrayOf("x" to "0", "y" to "0", "w" to "8", "h" to "8"),
             "render.set_camera" to arrayOf("x" to "1", "y" to "2"),

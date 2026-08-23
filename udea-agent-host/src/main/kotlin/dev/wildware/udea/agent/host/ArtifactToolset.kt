@@ -37,13 +37,33 @@ public object AgentHostErrors {
     public val CAPTURE_FAILED: AgentErrorKind = AgentErrorKind("capture_failed")
 
     /**
-     * `afterTick` names a tick the simulation has not reached.
+     * The renderer draws with a fixed projection: there is no camera to move.
      *
-     * A separate kind because the remedy is a specific other tool call - `time.step` to that
-     * tick, then screenshot - rather than a different argument value, which is what
-     * `bad_argument` would suggest.
+     * Distinct from [NO_RENDER_CONTEXT] because the toolset *is* live - `screenshot` works and
+     * returns real pixels - and only the view is immovable. An agent told `no_render_context`
+     * would stop taking screenshots, which is the opposite of the right move: it should keep
+     * capturing and stop trying to aim.
      */
-    public val TICK_NOT_REACHED: AgentErrorKind = AgentErrorKind("tick_not_reached")
+    public val NO_CAMERA_BOUND: AgentErrorKind = AgentErrorKind("no_camera_bound")
+
+    /**
+     * A camera exists but was never bound to a world, so it can never resolve a follow target.
+     *
+     * A different remedy from [NO_CAMERA_BOUND] and a different person's problem: the camera was
+     * built and handed to the renderer without being registered with the `RenderRegistry` the
+     * pipeline was assembled from. `set_camera` still works on such a rig; only following cannot.
+     */
+    public val CAMERA_NOT_BOUND: AgentErrorKind = AgentErrorKind("camera_not_bound")
+
+    /**
+     * The entity exists, but nothing gives it a position the camera could track.
+     *
+     * The failure this kind exists for is the one `moba` documented against itself: a unit with
+     * no `PhysicsBody` has no drawn pose, `render.follow_entity` answered `ok`, and the camera
+     * sat exactly where it was. `no_such_entity` would have been a lie - the entity is there -
+     * and `ok` was a worse one.
+     */
+    public val ENTITY_NOT_FOLLOWABLE: AgentErrorKind = AgentErrorKind("entity_not_followable")
 
     /**
      * This process has no GL context, so the render toolset is not live.
@@ -257,13 +277,14 @@ public object CompareArtifactsTool : AgentToolDef<ArtifactToolset> {
         ),
     )
 
-    override val inputSchema: String = """
-        {"type":"object","properties":{
-        "a":{"type":"string","description":"Artifact id of the first image, e.g. cap_0001."},
-        "b":{"type":"string","description":"Artifact id of the second image, same dimensions as a."},
-        "tolerance":{"type":"integer","description":"Per-channel delta, 0-255, counted as equal. Default 0."}
-        },"required":["a","b"]}
-    """.trimIndent().replace("\n", "")
+    /**
+     * Derived from [args], not written beside them.
+     *
+     * It was a second literal, and it had drifted from the shape `udea-codegen` emits in four
+     * ways at once - no dialect, no `additionalProperties`, and descriptions that were a
+     * paraphrase of the argument text rather than the argument text. See [ToolSchema].
+     */
+    override val inputSchema: String = ToolSchema.of(args)
 
     override val owner: KClass<*> = ArtifactToolset::class
 

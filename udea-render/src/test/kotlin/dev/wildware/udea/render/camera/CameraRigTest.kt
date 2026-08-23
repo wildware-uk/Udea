@@ -7,6 +7,7 @@ import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.SimSystem
 import dev.wildware.udea.core.fixtures.testGameContext
 import dev.wildware.udea.core.gameContext
+import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.loop.WorldSimulation
 import dev.wildware.udea.core.physics.PhysicsBody
@@ -285,6 +286,75 @@ class CameraRigTest {
         fixture.rig.advance(target, alpha = 1f)
 
         assertEquals(null, fixture.rig.target, "a null follow request must stop following")
+    }
+
+    /**
+     * [CameraRig.followability] separates the three ways a follow silently does nothing.
+     *
+     * All three used to look identical from outside: `requestFollow` took the id, the frame that
+     * consumed it found nothing to track, and the camera stayed where it was while the tool that
+     * asked answered `ok`. `moba` wrote the third case down as a known defect of its own surface —
+     * its units have no `PhysicsBody`, so nothing draws them at a position.
+     */
+    @Test
+    fun `followability names the reason a follow would not move the camera`() {
+        val fixture = Fixture()
+        val followable = fixture.netIds.allocate(
+            fixture.world.entity { it += PhysicsBody(x = 3f, y = 0f) },
+        )
+        val poseless = fixture.netIds.allocate(fixture.world.entity { })
+        val neverAllocated = NetId.of(index = 900, generation = 3)
+
+        assertEquals(CameraOutcome.APPLIED, fixture.rig.followability(followable))
+        assertEquals(CameraOutcome.UNFOLLOWABLE, fixture.rig.followability(poseless))
+        assertEquals(CameraOutcome.UNKNOWN_ENTITY, fixture.rig.followability(neverAllocated))
+    }
+
+    /**
+     * A rig that was never registered with the render registry can place but cannot follow.
+     *
+     * It is a host wiring fault rather than a bad argument, and it is worth its own answer: the
+     * remedy is a line in a composition root, and no id the caller passes will ever work.
+     */
+    @Test
+    fun `an unbound rig reports that it can resolve nothing`() {
+        val ctx = testGameContext(seed = 3L)
+        val world = configureWorld {
+            injectables { gameContext(ctx) }
+            systems { add(InterpSnapshotSystem()) }
+        }
+        val netIds = NetIdIndex()
+        val live = netIds.allocate(world.entity { it += PhysicsBody(x = 1f, y = 1f) })
+        val unbound = CameraRig(
+            netIds = netIds,
+            interpolator = Interpolator(ctx.clock, world.system<InterpSnapshotSystem>()),
+            frameTime = FixedFrameTime(1f / 60f),
+        )
+
+        assertEquals(CameraOutcome.CAMERA_UNBOUND, unbound.followability(live))
+    }
+
+    /** Asking the question must not answer it: probing is a read, and the camera stays put. */
+    @Test
+    fun `probing followability moves nothing`() {
+        val fixture = Fixture()
+        // No easing, so the camera is *settled* after one frame and any later movement is the
+        // probe's doing rather than the smoothing still closing the distance.
+        fixture.rig.followHalfLife = 0f
+        fixture.spawnFollowed(x = 40f, velocityX = 0f)
+        fixture.sim.step()
+        fixture.rig.advance(target, alpha = 1f)
+        val settledX = fixture.rig.camera.position.x
+        val followed = fixture.rig.target
+
+        val other = fixture.netIds.allocate(
+            fixture.world.entity { it += PhysicsBody(x = -500f, y = -500f) },
+        )
+        assertEquals(CameraOutcome.APPLIED, fixture.rig.followability(other))
+        fixture.rig.advance(target, alpha = 1f)
+
+        assertEquals(followed, fixture.rig.target, "a probe changed what the rig follows")
+        assertEquals(settledX, fixture.rig.camera.position.x, "a probe moved the camera")
     }
 
     /** A zoom of zero collapses the projection; it is refused where it is asked for. */

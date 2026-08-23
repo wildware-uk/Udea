@@ -135,7 +135,7 @@ internal class FakeRenderControl(
     override val framebufferHeight: Int = 32,
 ) : RenderControl {
 
-    /** Every capture asked for, in order, as `region@afterTick`. */
+    /** Every capture asked for, in order. */
     val requests = ArrayList<String>()
 
     /** The futures handed back, in request order, so a test can settle them. */
@@ -143,6 +143,19 @@ internal class FakeRenderControl(
 
     var camera: String? = null
         private set
+
+    /**
+     * What this renderer answers a camera command with.
+     *
+     * A field rather than a constant because "no camera is wired" is a *state a real renderer is
+     * in*, not a separate class: `PresentationControl` built without a `CameraRig` answers
+     * `NO_CAMERA` to every camera command and serves captures perfectly well. A test that had to
+     * write a second fake to reach that state would be testing its own fake.
+     */
+    var cameraOutcome: CameraOutcome = CameraOutcome.APPLIED
+
+    /** What a non-null follow request answers. Separate: only following can fail this way. */
+    var followOutcome: CameraOutcome = CameraOutcome.APPLIED
 
     var followed: NetId? = null
         private set
@@ -159,8 +172,8 @@ internal class FakeRenderControl(
     /** The bytes handed back. Distinct per capture so two artifacts cannot be confused. */
     var nextImage: () -> ByteArray = { PNG_HEADER + byteArrayOf(requests.size.toByte()) }
 
-    override fun capture(region: PixelRegion?, afterTick: Long?): Future<CaptureFrame> {
-        requests += "${region ?: "full"}@${afterTick ?: "next"}"
+    override fun capture(region: PixelRegion?): Future<CaptureFrame> {
+        requests += "${region ?: "full"}"
         val future = CompletableFuture<CaptureFrame>()
         pending += future
         if (settleImmediately) {
@@ -176,13 +189,20 @@ internal class FakeRenderControl(
         return future
     }
 
-    override fun setCamera(x: Float, y: Float, zoom: Float) {
+    override fun setCamera(x: Float, y: Float, zoom: Float): CameraOutcome {
+        if (cameraOutcome != CameraOutcome.APPLIED) return cameraOutcome
         camera = "$x,$y,$zoom"
+        return CameraOutcome.APPLIED
     }
 
-    override fun followEntity(netId: NetId?) {
+    override fun followEntity(netId: NetId?): CameraOutcome {
+        if (cameraOutcome != CameraOutcome.APPLIED) return cameraOutcome
+        // A stop is always applied where a camera exists: there is nothing to resolve.
+        val outcome = if (netId == null) CameraOutcome.APPLIED else followOutcome
+        if (outcome != CameraOutcome.APPLIED) return outcome
         followed = netId
         followCalls++
+        return CameraOutcome.APPLIED
     }
 
     override fun toggleDebugDraw(enabled: Boolean?): Boolean {

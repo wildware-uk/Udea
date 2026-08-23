@@ -248,8 +248,18 @@ private class LabelSink(private val json: Json) : UiLabelVisitor {
         }
         // The worst case for one element, where every character of the capped label escapes to
         // two: a count cap bounds how many labels there are and nothing about their size.
+        //
+        // [MARK_BYTES] is reserved as well, and that is the whole correction here.
+        // `labelsTruncated` is written *after* this check, by `renderInto`, so its 23 characters
+        // used to be spent past `LABEL_CEILING` - and `LABEL_CEILING` is defined as everything
+        // the document may reach before the bytes `commandResults`, `events` and `game` are
+        // each guaranteed. Overrunning it therefore does not merely make the document a little
+        // longer: it takes those bytes out of `RESULT_MIN_BYTES`, which is the exact budget
+        // `ResultPage` sizes a page against, so a page engineered to land was dropped by a
+        // label section that had already reported itself as truncated. The mark is reserved
+        // unconditionally because whether it will be needed is only known afterwards.
         val cost = minOf(label.length, DigestBudgets.LABEL_CHARS) * 2 + ELEMENT_OVERHEAD
-        if (json.length + cost > DigestBudgets.LABEL_CEILING) {
+        if (json.length + cost + MARK_BYTES > DigestBudgets.LABEL_CEILING) {
             truncated = true
             return
         }
@@ -261,8 +271,11 @@ private class LabelSink(private val json: Json) : UiLabelVisitor {
     }
 
     private companion object {
-        /** The fixed part of an element, with room for the truncation mark. */
+        /** The fixed part of an element: `{"label":"","visible":true}` and its comma. */
         const val ELEMENT_OVERHEAD: Int = 32
+
+        /** `,"labelsTruncated":true` is 23 characters. Rounded up, and reserved before it is due. */
+        const val MARK_BYTES: Int = 24
     }
 }
 

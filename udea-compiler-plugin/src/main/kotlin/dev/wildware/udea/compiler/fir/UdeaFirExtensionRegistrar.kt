@@ -2,12 +2,16 @@ package dev.wildware.udea.compiler.fir
 
 import dev.wildware.udea.compiler.UdeaCompilerPlugin
 import dev.wildware.udea.compiler.UdeaPluginOptions
+import dev.wildware.udea.compiler.assets.AssetCatalogSource
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.DeclarationCheckers
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirDeclarationChecker
+import org.jetbrains.kotlin.fir.analysis.checkers.expression.ExpressionCheckers
+import org.jetbrains.kotlin.fir.analysis.checkers.expression.FirExpressionChecker
 import org.jetbrains.kotlin.fir.analysis.extensions.FirAdditionalCheckersExtension
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
+import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
 
 /**
@@ -23,11 +27,12 @@ import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
  */
 internal class UdeaFirExtensionRegistrar(
     private val options: UdeaPluginOptions,
+    private val catalog: AssetCatalogSource,
 ) : FirExtensionRegistrar() {
 
     override fun ExtensionRegistrarContext.configurePlugin() {
         if (options.checkers) {
-            +::UdeaFirAdditionalCheckers
+            +{ session: FirSession -> UdeaFirAdditionalCheckers(session, catalog) }
         }
         val kdocIndex = options.kdocIndex
         if (kdocIndex != null) {
@@ -53,6 +58,7 @@ internal class UdeaFirExtensionRegistrar(
  */
 internal class UdeaFirAdditionalCheckers(
     session: FirSession,
+    catalog: AssetCatalogSource,
 ) : FirAdditionalCheckersExtension(session) {
 
     override val declarationCheckers: DeclarationCheckers = object : DeclarationCheckers() {
@@ -61,5 +67,18 @@ internal class UdeaFirAdditionalCheckers(
 
         override val propertyCheckers: Set<FirDeclarationChecker<FirProperty>> =
             setOf(UdeaReplicatedPropertyChecker)
+    }
+
+    /**
+     * The `reference("...")` checker (issue #41).
+     *
+     * An instance rather than an `object`, unlike the declaration checkers, because it holds
+     * two pieces of per-compilation state: the merged asset catalog and the "already said the
+     * index is unreadable" latch. This extension is constructed once per FIR session, so an
+     * instance field is the narrowest scope either of them can have.
+     */
+    override val expressionCheckers: ExpressionCheckers = object : ExpressionCheckers() {
+        override val functionCallCheckers: Set<FirExpressionChecker<FirFunctionCall>> =
+            setOf(UdeaAssetReferenceChecker(catalog))
     }
 }

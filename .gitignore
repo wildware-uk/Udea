@@ -66,11 +66,32 @@ scripts/cache/
 moba/src/main/resources/assets/sprites/
 moba/raw-assets/
 
-# `gamebridge.json` — the launch declaration `game-bridge-mcp` reads, written into the repository
-# root by `:moba:udeaGenerateLaunchDeclaration` (which `assemble` and `run` both depend on).
+# `gamebridge.json` - the launch declaration `game-bridge-mcp` reads.
 #
-# Generated, and **OS-specific**: `UdeaAgentPlugin` writes `.\gradlew.bat` on Windows and
-# `./gradlew` everywhere else. Committing one machine's copy hands every other platform a launch
-# command that cannot run, and `launch_instance` fails with a confusing "cannot start" rather than
-# anything pointing at the cause. Run any Gradle build once and it appears.
+# ## The decision, and it is a decision rather than an omission
+#
+# Two options exist: commit a portable file, or generate it on a task everybody runs. The first
+# is not available, and the reason is in the bridge rather than in this repository.
+# `Launcher.launch` spawns `launch.command` with `shell: true`, so on Windows the command is
+# interpreted by `cmd.exe` and everywhere else by a POSIX shell - and no single string invokes
+# this repository's wrapper under both. `./gradlew` is `'.' is not recognized` to `cmd`;
+# `.\gradlew.bat` is meaningless to `sh`; a bare `gradlew.bat` fails whenever
+# `NoDefaultCurrentDirectoryInExePath` is set, which is not hypothetical - it is set in the
+# environment this was first launched in, and the bridge reported a boot failure whose "Last
+# output" was `'gradlew.bat' is not recognized`. `GradleWrapperCommand` carries the full table.
+# The `argv` form avoids the shell but needs a program name, which has the same problem.
+#
+# So: **generated, on a task everybody runs.** `udeaGenerateLaunchDeclaration` is a dependency of
+# both `assemble` and `run`, so any build at all produces it, and crossing operating systems
+# makes the task out of date and rewrites it.
+#
+# ## What stops "generated" from meaning "absent"
+#
+# A fresh clone has no declaration until something builds, and that used to be an unverified
+# claim: nothing anywhere read this file. It is now verified.
+# `.github/conformance/test/launch-declaration.test.mjs` parses it with the bridge's **own**
+# `findProjectConfig` / `applyProjectConfig` / `parsePortRange`, and the `bridge-conformance` CI
+# job runs the generating task on a clean checkout and then that suite - so "a clone plus one
+# Gradle invocation gives you a launchable project" is a thing CI proves rather than a thing this
+# comment asserts. If the file is missing, that suite fails and names the task to run.
 gamebridge.json

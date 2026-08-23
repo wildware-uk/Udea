@@ -18,6 +18,8 @@ than any feature the plugin could deliver.
 | `@Net`/`@Sim` on a `val` (UDEA0001, UDEA0005) | `UdeaReplicatedPropertyChecker` | error at the property name |
 | `@Q` on a non-`Float` (UDEA0003) | `UdeaReplicatedPropertyChecker` | error at the property name |
 | more than 64 `@Net`/`@Sim` fields (UDEA0002) | `UdeaComponentFieldLimitChecker` | error on the class declaration |
+| `reference("typo")` (UDEA0004, UDEA0013) | `UdeaAssetReferenceChecker` | error **at the string literal**, with a did-you-mean |
+| an unreadable asset index (UDEA0014) | `UdeaAssetReferenceChecker` | once per compilation, never per referrer |
 | KDoc → `kdoc-index.json` | `KDocHarvestExtension` | opt-in, off unless `kdocIndex` is set |
 | FIR declaration synthesis | **not shipped** | NO-GO; see [The synthesis gate](#the-synthesis-gate) |
 
@@ -42,6 +44,20 @@ builds. So the plugin decides only what it can decide from the type alone:
 - **UDEA0006 (unsupported field type) is not raised here at all.** KSP raises it, with the
   same id, one task boundary later. A missing in-editor diagnostic costs a developer one
   build; a false one costs them their trust in the checkers.
+
+The same discipline governs `UdeaAssetReferenceChecker`, which has more ways to be wrong than
+any other checker here because it reasons about data produced by a different build step:
+
+- **no asset index on the classpath → silence.** A module with no assets must compile without
+  a word, so absence can never be an error. See `docs/contracts/asset-index.md`.
+- **a non-constant argument → silence.** `reference(someVariable)` is not validated. Constant
+  folding goes as far as the compiler's own evaluator does (`const val`, literal
+  concatenation, templates of constants) and no further.
+- **an indexed kind that is not on this module's classpath → silence** on the kind check. The
+  subtype question cannot be asked, so it is not answered.
+- **an index this build cannot read → loud, once.** This is the one case where silence would
+  be wrong: an unreadable index looks exactly like an empty one, and an empty one is defined to
+  be silent, so a format bump would quietly stop validating every reference in the project.
 
 ---
 

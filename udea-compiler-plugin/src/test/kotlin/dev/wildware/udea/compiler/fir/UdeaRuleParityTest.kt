@@ -7,6 +7,7 @@ import dev.wildware.udea.diagnostics.Severity
 import dev.wildware.udea.diagnostics.UdeaRules
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -82,5 +83,43 @@ class UdeaRuleParityTest : UdeaCheckerTest() {
     @Test
     fun `a clean component raises none of them`() {
         assertCompilesClean(*Fixtures.WELL_FORMED_COMPILATION)
+    }
+
+    /**
+     * The asset-reference half of the parity contract, as far as it can be asserted today.
+     *
+     * Issue #41 asks for "a table of defects, each run through **both** this checker and the
+     * asset validator". The second column does not exist yet: at the time of writing
+     * `udea-assets-compiler` has no validator - `AssetsCompilerModule` is still a placeholder
+     * object - so a test claiming to run a defect through it would be running it through
+     * nothing. What *is* assertable, and is asserted here, is the half that would silently rot:
+     * the two ids are named on `UdeaRules` rather than minted by either producer, and the K2
+     * checker is registered against exactly those two.
+     *
+     * `docs/contracts/asset-index.md` records the validator's side of the obligation. When it
+     * lands, this test gains its second column rather than being written from scratch.
+     */
+    @Test
+    fun `the asset-reference rule ids are shared, not minted by the checker`() {
+        val assetReferenceRules = listOf(
+            UdeaRules.UNRESOLVED_REFERENCE,
+            UdeaRules.REFERENCE_KIND_MISMATCH,
+        )
+
+        for (rule in assetReferenceRules) {
+            assertSame(
+                rule,
+                UdeaRules.byId(rule.id),
+                "${rule.id} must come from the shared registry, so the asset validator can " +
+                    "report the same defect under the same id",
+            )
+            assertTrue(
+                rule in UdeaDiagnostics.factories.keys,
+                "${rule.id} is registered in UdeaRules but the K2 checker has no factory for " +
+                    "it, so only one of the two producers can ever raise it",
+            )
+        }
+        assertEquals("UDEA0004", UdeaRules.UNRESOLVED_REFERENCE.id)
+        assertEquals("UDEA0013", UdeaRules.REFERENCE_KIND_MISMATCH.id)
     }
 }

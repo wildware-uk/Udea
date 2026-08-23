@@ -5,25 +5,34 @@ plugins {
 dependencies {
     api(project(":udea-agent"))
 
-    // --- test only, and it has to stay that way -------------------------------------------
+    // --- the render side, and why it is `implementation` and no longer `testImplementation` ---
     //
-    // The render toolset is declared against the `RenderControl` port; `udea-render` implements
-    // the other half of that pair as `PresentationControl`, and something has to join the two.
-    // Neither module may name the other: this one is headless (`UDEA-MG-002`, and
-    // `RenderModuleGraphTest` fails if a headless module's bytecode names a `udea.render` type),
-    // and an arrow from `udea-render` to here would put the agent surface on `moba`'s runtime
-    // classpath, which `ReleaseRules.CLASSPATH_RULE` (`UDEA-REL-002`) fails a release build for.
+    // Spec 4 gives this module "the toolsets that need a render context or live input: render,
+    // input, ui". It owns `RenderToolset` and `RenderControl`, and it owns `AgentOverlayView`,
+    // which spec 3.7 says is drawn on the human's screen. Both of those need the other half of a
+    // pair that lives here: `RenderControl` needs `PresentationControl`, and the overlay needs an
+    // `OverlaySystem` over a `Batch`.
     //
-    // So the adapter belongs to whoever assembles a host out of both, and until `UdeaAgentPlugin`
-    // has a plugin id that is the offscreen demo below. `testImplementation` keeps GL off this
-    // module's own compile and runtime classpaths, which is what those two rules check.
-    testImplementation(project(":udea-render"))
+    // This line used to be `testImplementation`, because this module was in
+    // `ModuleGraphRules.HEADLESS_PROJECTS`. The result was not a headless agent host; it was
+    // `OffscreenRenderControl` and the GL overlay adapter sitting in *test* sources with no
+    // shipped path able to reach either - so `render.screenshot` answered `no_render_context` on
+    // every real run and the overlay was drawn only by tests. A module that owns the render
+    // toolset and may not name a render type is a contradiction, and the ruling resolved it here
+    // rather than by writing the adapter out a third time in each game.
+    //
+    // What still holds: the module is debug-only, and `ReleaseRules.CLASSPATH_RULE`
+    // (`UDEA-REL-002`) fails any release build whose runtime classpath resolves it. That is the
+    // gate the exemption leans on, it is enforced by `udeaVerifyRelease`, and it is asserted by
+    // `ModuleGraphRulesTest` alongside the exemption itself. `:udea-core` - the headless
+    // guarantee that matters - is untouched and still cannot name a `udea.render` type.
+    implementation(project(":udea-render"))
 
-    // gdx types for the demo's own two render systems. `udea-render` declares gdx as
-    // `implementation` so that GL cannot leak onto a consumer's *compile* classpath - which is
-    // the rule working exactly as intended: a composition root that writes a renderer is opting
-    // in, visibly, one line at a time. Test-scoped for the same reason the line above is.
-    testImplementation(libs.gdx)
+    // gdx types this module's own code names: `Batch`, `BitmapFont`, `Texture` and `Color` in
+    // `AgentOverlaySystem`. `udea-render` declares gdx as `implementation` so GL cannot leak onto
+    // a consumer's *compile* classpath by default - which is the rule working as intended: a
+    // module that writes a renderer opts in, visibly, on this line.
+    implementation(libs.gdx)
 }
 
 // --- the Phase 1 exit demo -------------------------------------------------------------------

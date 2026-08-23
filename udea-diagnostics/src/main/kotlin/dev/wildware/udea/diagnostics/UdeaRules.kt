@@ -240,6 +240,40 @@ public object UdeaRules {
             "them is unreachable",
     )
 
+    /**
+     * A `reference<T>("...")` that resolves to a real asset of the wrong kind.
+     *
+     * Separate from [UNRESOLVED_REFERENCE] because the two have different fixes and different
+     * did-you-means: an unresolved id wants a spelling correction, a mismatched kind wants a
+     * different id or a different type argument, and a suggestion list built from the whole
+     * catalog would be noise for the second. Both the K2 checker in `udea-compiler-plugin` and
+     * the asset validator in `udea-assets-compiler` raise this id, which is the whole point of
+     * it being here rather than in either of them.
+     */
+    public val REFERENCE_KIND_MISMATCH: UdeaRule = UdeaRule(
+        id = "UDEA0013",
+        defaultSeverity = Severity.Error,
+        description = "reference(\"...\") names an asset whose kind is not the referenced type",
+    )
+
+    /**
+     * The compile-time asset catalog on the classpath declares a format version this build
+     * cannot read.
+     *
+     * Loud rather than silent, and this is the rule that makes it so. The tempting behaviour —
+     * treat an unreadable catalog as an empty one — is precisely wrong: an empty catalog is
+     * *defined* to be silent (a module with no assets must compile), so a version bump would
+     * turn every `reference("...")` in the project into an unvalidated string with nothing
+     * anywhere saying so. That is the silent-failure shape section 1 of the engineering
+     * standards forbids, so it gets an id and a message naming both versions.
+     */
+    public val ASSET_INDEX_FORMAT: UdeaRule = UdeaRule(
+        id = "UDEA0014",
+        defaultSeverity = Severity.Error,
+        description = "the asset index on the classpath is written in a format version this " +
+            "build cannot read, so no reference is validated",
+    )
+
     /** Every registered rule, in id order. */
     public val all: List<UdeaRule> = listOf(
         NET_ON_VAL,
@@ -254,6 +288,8 @@ public object UdeaRules {
         AGENT_TOOL_UNSUPPORTED_TYPE,
         AGENT_STATE_NON_SCALAR,
         AGENT_NAME_COLLISION,
+        REFERENCE_KIND_MISMATCH,
+        ASSET_INDEX_FORMAT,
     ).sortedBy { it.id }
 
     private val byId: Map<String, UdeaRule> = all.associateBy { it.id }

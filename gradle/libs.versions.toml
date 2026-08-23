@@ -41,6 +41,14 @@ junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.r
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
+# The scripting host, pinned to `kotlin` for the same reason the compiler is: the host loads
+# classes the embedded compiler produced, so a version skew is a class-load failure inside a
+# Gradle worker rather than a compile error. Build-time only - UDEA-MG-005 bans every one of
+# these from moba's runtime classpath, which is the whole point of moving evaluation to the build.
+kotlin-scripting-common = { module = "org.jetbrains.kotlin:kotlin-scripting-common", version.ref = "kotlin" }
+kotlin-scripting-jvm = { module = "org.jetbrains.kotlin:kotlin-scripting-jvm", version.ref = "kotlin" }
+kotlin-scripting-jvm-host = { module = "org.jetbrains.kotlin:kotlin-scripting-jvm-host", version.ref = "kotlin" }
+kotlin-scripting-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable", version.ref = "kotlin" }
 ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
 kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 fleks = { module = "io.github.quillraven.fleks:Fleks", version.ref = "fleks" }

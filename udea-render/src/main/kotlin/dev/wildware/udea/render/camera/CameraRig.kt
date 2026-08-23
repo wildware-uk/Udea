@@ -120,6 +120,16 @@ public class CameraRig(
 
     private val pose = Pose()
 
+    /**
+     * Scratch pose for [followability], kept apart from [pose] on purpose.
+     *
+     * [pose] is the render thread's, written every frame inside [advance]. A probe that shared
+     * it would overwrite the position a frame is being drawn from, which is a one-frame camera
+     * jump that only shows up when somebody asks whether an entity is followable — the worst
+     * kind of coupling to debug from a screenshot.
+     */
+    private val probe = Pose()
+
     /** The last size this rig configured its viewport for, so it reconfigures only on change. */
     private var viewportWidth: Int = 0
     private var viewportHeight: Int = 0
@@ -216,6 +226,38 @@ public class CameraRig(
      */
     public fun requestFollow(netId: NetId?) {
         pendingFollow.set(Follow(netId))
+    }
+
+    /**
+     * Whether following [netId] would actually move the camera, and if not, why not.
+     *
+     * ## Why this exists
+     *
+     * [requestFollow] accepts anything: it writes an [AtomicReference] and returns, and the
+     * frame that consumes it resolves the id and asks [Interpolator] for a pose. When either
+     * step comes back empty the camera simply does not move, and *nothing says so*. `moba` had
+     * that written down as a known lie — its units carry `Position` and no `PhysicsBody`, so
+     * `render.follow_entity` answered `ok` and the camera stayed exactly where it was. An agent
+     * that then screenshots and sees the wrong part of the map has no way to attribute it.
+     *
+     * This is the same two steps [advance] takes, run once, before the answer is given, so the
+     * caller can report the reason instead of a silence.
+     *
+     * ## Threading
+     *
+     * **Simulation thread only**, unlike the rest of this class: it resolves through
+     * [NetIdIndex] and reads components off the world, and both belong to the thread that ticks
+     * the simulation. Every agent tool call satisfies that — a tool runs inside a `SimBarrier`
+     * drain — and a caller that is somewhere else must ask [requestFollow] and live with the
+     * silence, which is the trade this method exists to let a host avoid.
+     */
+    public fun followability(netId: NetId): CameraOutcome {
+        val world = boundWorld ?: return CameraOutcome.CAMERA_UNBOUND
+        val entity = netIds.resolveOrNull(netId) ?: return CameraOutcome.UNKNOWN_ENTITY
+        // alpha = 1: the question is whether a pose exists at all, and `interpolate` answers
+        // that with its return value rather than with what it wrote.
+        if (!interpolator.interpolate(world, entity, 1f, probe)) return CameraOutcome.UNFOLLOWABLE
+        return CameraOutcome.APPLIED
     }
 
     /**

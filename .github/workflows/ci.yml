@@ -86,10 +86,20 @@ jobs:
         shell: bash
         run: chmod +x ./gradlew
 
+      # `-Pudea.render.requireGl=false` is written out rather than left to the property's
+      # default, and it is a decision rather than a formality. `check` depends on `udeaGlTest`
+      # and `udeaAgentGlTest`, so this leg *does* run them - and neither runner here can serve
+      # them a context: `windows-latest` exposes only the GDI generic renderer (OpenGL 1.1),
+      # which is below what `Lwjgl3Backend` asks for, and this `ubuntu-latest` step runs with
+      # no X server at all. Both therefore skip, on purpose, and the `gl-tests` job below is
+      # where the same tests are made to *pass or fail*. Deleting that job and leaving this
+      # property alone would silently return the whole GL surface to being untested, which is
+      # the state this comment exists to make impossible to reach by accident.
       - name: Build and verify the module graph
         shell: bash
         run: >-
           ./gradlew build udeaVerifyNoLegacyDependencies udeaVerifyModuleGraph
+          -Pudea.render.requireGl=false
           --stacktrace
 
       - name: Upload test reports
@@ -115,6 +125,122 @@ jobs:
           path: |
             **/build/reports/udea/**
           if-no-files-found: error
+          retention-days: 7
+
+  gl-tests:
+    # The GL surface, made to pass or fail rather than to skip.
+    #
+    # ## The defect this closes
+    #
+    # `udeaGlTest` (`:udea-render`) and `udeaAgentGlTest` (`:udea-agent-host`) both read
+    # `udea.render.requireGl` and both default it to `false`, and no job set it. So on every CI
+    # runner `GlAvailability.probe()` failed, `require()` called `Assumptions.abort`, and every
+    # single GL test - the offscreen backend, capture determinism, overlay isolation, the whole
+    # agent render toolset - reported green having checked nothing. "GL tests pass" was a true
+    # statement about a suite that never ran a line of GL.
+    #
+    # ## Why a display, and why this job rather than the `build` matrix
+    #
+    # A skip cannot be removed by asserting harder; the tests need a context, so the job has to
+    # supply one. `xvfb` plus Mesa's software rasteriser gives GLFW a real X display and a real
+    # GL 4.x implementation with no GPU involved, which is what makes this affordable on a
+    # hosted runner. It is a separate job because it needs `apt-get` and a virtual framebuffer -
+    # neither of which `windows-latest` has - and because a red leg here should say "GL broke",
+    # not "the build broke somewhere".
+    #
+    # ## The gate is `-Pudea.render.requireGl=true`
+    #
+    # With it, a context that cannot be created is a **failure**, not a skip: the `check(...)`
+    # in `GlAvailability.require()` throws with the reason. That is the whole point - if Mesa,
+    # xvfb or the LWJGL natives stop working, this job goes red instead of quietly returning to
+    # the state described above. Do not "fix" a red run here by dropping the property.
+    #
+    # Ubuntu only, and that is a stated limitation rather than an oversight: `windows-latest`
+    # runners expose the GDI generic renderer (OpenGL 1.1) with no software fallback that
+    # `Lwjgl3Backend` can use, and `macos-latest` cannot run a GL context under a headless
+    # runner session at all. The `build` job therefore passes `-Pudea.render.requireGl=false`
+    # explicitly on both of its legs, so the skip there is written down instead of defaulted.
+    name: gl tests (xvfb)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      # GLFW opens an X11 window even for an `Offscreen` backend - the window is hidden, not
+      # absent - so the X client libraries have to be present as well as the framebuffer, and a
+      # missing one surfaces as a `GLFW_PLATFORM_ERROR` that reads like a driver fault.
+      # `libgl1-mesa-dri` is the software rasteriser itself; without it there is a display and
+      # no GL on it.
+      - name: Install a display and a software GL stack
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb
+          sudo apt-get install -y --no-install-recommends libgl1 libgl1-mesa-dri libglx-mesa0 libglu1-mesa
+          sudo apt-get install -y --no-install-recommends libx11-6 libxcursor1 libxrandr2 libxinerama1 libxi6 libxxf86vm1
+
+      - name: Make the wrapper executable
+        run: chmod +x ./gradlew
+
+      # `xvfb-run -a` picks a free display number; `LIBGL_ALWAYS_SOFTWARE=1` stops Mesa looking
+      # for a GPU that is not there and falling back with a warning instead of a context.
+      #
+      # `--rerun-tasks` is deliberate and is not paranoia: both test tasks are up-to-date-
+      # checked on their inputs, and *nothing in their inputs changes when a display appears*.
+      # Without it, a cache entry written by the `build` job - where every test skipped - is a
+      # valid up-to-date result for this job, and the gate goes green without executing.
+      - name: Run the GL suites against a real context
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_GL_VERSION_OVERRIDE: "3.3"
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1280x1024x24"
+          ./gradlew :udea-render:udeaGlTest :udea-agent-host:udeaAgentGlTest
+          -Pudea.render.requireGl=true
+          --rerun-tasks --stacktrace
+
+      # A skipped GL test is the failure this job exists to remove, so a run that skipped one is
+      # a failed run even when Gradle was happy. JUnit writes `<skipped/>` into the XML for an
+      # aborted assumption, and that is what is grepped for: it is the exact artefact
+      # `Assumptions.abort` leaves behind.
+      - name: Assert nothing skipped
+        if: always()
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          reports=()
+          reports+=(udea-render/build/test-results/udeaGlTest/*.xml)
+          reports+=(udea-agent-host/build/test-results/udeaAgentGlTest/*.xml)
+          if [ ${#reports[@]} -eq 0 ]; then
+            echo "::error::no GL test results were written at all - the suites did not run"
+            exit 1
+          fi
+          if grep -l "<skipped" "${reports[@]}" > /dev/null 2>&1; then
+            echo "::error::a GL test skipped despite -Pudea.render.requireGl=true"
+            grep -l "<skipped" "${reports[@]}"
+            exit 1
+          fi
+          echo "GL result files: ${#reports[@]}, none skipped"
+
+      - name: Upload GL test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gl-test-reports
+          path: |
+            udea-render/build/reports/tests/**
+            udea-render/build/test-results/**
+            udea-agent-host/build/reports/tests/**
+            udea-agent-host/build/test-results/**
+          if-no-files-found: warn
           retention-days: 7
 
   legacy-ledger:
@@ -679,6 +805,40 @@ jobs:
           npm ci --no-audit --no-fund
           npm run verify-vendor
           npm run build
+
+      # The launch declaration, generated on a clean checkout and then parsed by the bridge's
+      # own reader.
+      #
+      # Two holes closed at once. `gamebridge.json` is gitignored - it has to be, because
+      # `launch.command` is run through a shell and no single string invokes this repository's
+      # wrapper under both `cmd.exe` and `sh`; see `.gitignore` for the full argument. That makes
+      # "a fresh clone can be launched" a claim about a *task*, and this step is what tests it:
+      # the runner checked out a moment ago and has never built, so if the declaration is not on
+      # the path everybody takes, the suite below fails with the task name it needed.
+      #
+      # And `launcher.ts` and `config.ts` were vendored, hashed and compiled by the step above
+      # and then imported by nothing at all, so the one document that decides whether
+      # `launch_instance` works had no test behind it. `launch-declaration.test.mjs` imports
+      # them.
+      - name: Generate the launch declaration the way a clean clone would
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -f gamebridge.json || {
+            echo "::error::gamebridge.json is present in a fresh checkout; it is generated, not committed"
+            exit 1
+          }
+          ./gradlew :moba:udeaGenerateLaunchDeclaration --console=plain
+          test -f gamebridge.json || {
+            echo "::error::udeaGenerateLaunchDeclaration did not write gamebridge.json"
+            exit 1
+          }
+          cat gamebridge.json
+
+      - name: Parse it with the bridge's own reader
+        shell: bash
+        working-directory: .github/conformance
+        run: node --test test/launch-declaration.test.mjs
 
       # Backgrounded, and its log kept: when the contract fails, the first question is always
       # whether the game was healthy, and the answer is in here.

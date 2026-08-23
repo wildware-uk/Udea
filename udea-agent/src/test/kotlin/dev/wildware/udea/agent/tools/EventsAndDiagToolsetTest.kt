@@ -1,6 +1,7 @@
 package dev.wildware.udea.agent.tools
 
 import dev.wildware.udea.agent.AgentErrorKind
+import dev.wildware.udea.agent.Json
 import dev.wildware.udea.agent.state.DigestBudgets
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,6 +18,126 @@ import kotlin.test.assertTrue
 class EventsAndDiagToolsetTest {
 
     // --- events ---------------------------------------------------------------------------
+
+    /**
+     * A `recent_events` answer reaches the agent, which it previously never did.
+     *
+     * ## The defect this pins
+     *
+     * A command answer is delivered only through the digest's `commandResults` array, and
+     * `CommandResultRing.fitting` costs each entry against
+     * [DigestBudgets.RESULT_CEILING] - 1280 - dropping any that does not fit rather than
+     * shortening it. An unpaged `recent_events` over a populated ring renders **thousands** of
+     * characters, so it never fitted: on every single poll it was dropped, and the caller
+     * waiting on its own command id read `commandResultsTruncated: true` and no events, forever.
+     * The tool was in the manifest, dispatched, ran, and could not deliver one line.
+     *
+     * ## Measured at the guarantee, not at the ceiling
+     *
+     * The document is padded so that exactly [DigestBudgets.RESULT_MIN_BYTES] is left, because
+     * 1280 is only what is available on a quiet frame and 256 is what `commandResults` is
+     * promised once `ui.elements` has spent its own ceiling. Testing against the leftovers is
+     * how a paging test passes while the tool still disappears on a busy frame.
+     */
+    @Test
+    fun `a recent_events answer survives the bytes a command result is guaranteed`() {
+        val harness = ToolsetHarness()
+        // A populated ring of realistic messages - the state in which the tool used to be
+        // undeliverable, and the state any game past its first minute is in.
+        repeat(200) { harness.bridge.event("champion_died:blue_team_carry:$it:killed_by_tower_2_dive") }
+
+        val answer = harness.eventTools.recentEvents(
+            limit = EventsToolset.DEFAULT_LIMIT,
+            offset = 0,
+            contains = null,
+        )
+        harness.bridge.complete(1L, answer)
+
+        val document = paddedTo(DigestBudgets.RESULT_CEILING - DigestBudgets.RESULT_MIN_BYTES)
+        val truncated = harness.bridge.renderCommandResults(
+            document,
+            "commandResults",
+            DigestBudgets.RESULT_LIMIT,
+            DigestBudgets.RESULT_CEILING,
+        )
+        document.endObject()
+        val rendered = document.toString()
+
+        assertTrue(
+            !truncated,
+            "the recent_events answer was dropped from the digest, which is the whole defect: $rendered",
+        )
+        assertTrue(
+            rendered.contains("champion_died"),
+            "an answer that carries no event is not an answer: $rendered",
+        )
+        // Newest first, and the ring says so: the last message recorded is index 199.
+        assertTrue(
+            rendered.contains("champion_died:blue_team_carry:199:killed_by_tower_2_dive"),
+            "offset 0 must be the newest event: $rendered",
+        )
+        assertTrue(rendered.contains("\"hasMore\":true"), rendered)
+        assertTrue(rendered.contains("\"nextOffset\":"), rendered)
+    }
+
+    /** Following `nextOffset` walks the ring backwards in time, seeing each entry once. */
+    @Test
+    fun `paging recent_events walks the whole ring exactly once, newest first`() {
+        val harness = ToolsetHarness()
+        repeat(30) { harness.bridge.event("wave_spawned:$it") }
+
+        val seen = ArrayList<Int>()
+        var offset = 0
+        var pages = 0
+        while (true) {
+            val json = (
+                harness.eventTools.recentEvents(
+                    limit = EventsToolset.DEFAULT_LIMIT,
+                    offset = offset,
+                    contains = null,
+                ) as dev.wildware.udea.agent.AgentResult.Ok
+                ).json
+            pages++
+            Regex("wave_spawned:(\\d+)").findAll(json).forEach { seen += it.groupValues[1].toInt() }
+            val next = Regex("\"nextOffset\":(\\d+)").find(json)?.groupValues?.get(1)?.toInt() ?: break
+            check(next > offset) { "nextOffset did not advance past $offset: $json" }
+            offset = next
+            check(pages < 100) { "pagination is not terminating" }
+        }
+
+        assertEquals((0 until 30).reversed().toList(), seen)
+    }
+
+    /** `contains` narrows what is paged, so `total` and `nextOffset` are about the matches. */
+    @Test
+    fun `contains narrows the pages rather than the page`() {
+        val harness = ToolsetHarness()
+        repeat(20) { harness.bridge.event("wave_spawned:$it") }
+        repeat(5) { harness.bridge.event("tower_destroyed:$it") }
+
+        val json = (
+            harness.eventTools.recentEvents(limit = 100, offset = 0, contains = "tower_destroyed")
+                as dev.wildware.udea.agent.AgentResult.Ok
+            ).json
+
+        assertTrue(json.contains("\"total\":5"), "total must count the matches, not the ring: $json")
+        assertTrue(!json.contains("wave_spawned"), "a non-matching event reached the page: $json")
+    }
+
+    /**
+     * An open JSON object of exactly [target] characters, self-calibrating so it stays exact if
+     * [Json] ever changes its spacing.
+     */
+    private fun paddedTo(target: Int): Json {
+        val probe = Json()
+        probe.beginObject()
+        probe.put("filler", "")
+        val json = Json()
+        json.beginObject()
+        json.put("filler", "x".repeat(target - probe.length))
+        check(json.length == target) { "padding produced ${json.length} characters, not $target" }
+        return json
+    }
 
     @Test
     fun `recent_events reads the ring with tick stamps and does not consume it`() {

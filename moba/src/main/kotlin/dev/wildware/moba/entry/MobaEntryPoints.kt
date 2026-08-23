@@ -7,6 +7,8 @@ import dev.wildware.udea.core.blueprint.blueprints
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.render.OverlayResources
+import dev.wildware.udea.render.OverlaySystem
 import dev.wildware.udea.render.RenderPipeline
 import dev.wildware.udea.render.backend.Lwjgl3Backend
 import dev.wildware.udea.render.backend.WindowConfig
@@ -56,7 +58,7 @@ public object MobaEntry {
     public fun windowConfig(): WindowConfig = WindowConfig(title = "moba")
 
     /**
-     * What `moba` draws: one quad per unit, at that unit's position.
+     * What `moba` draws: one animated champion per unit, at that unit's position.
      *
      * Delegates to [MobaScene], which carries the reasoning. The short version is that this
      * returned an **empty** registry until the Phase 1 demo was driven end to end, and an empty
@@ -86,6 +88,11 @@ public object MobaEntry {
      * inside its own constructor, so the presentation cannot be handed a host that does not yet
      * exist.
      *
+     * @param overlay the agent activity overlay, or `null` for a process that draws none. Refused
+     *   outright outside [RenderMode.Windowed]: spec 3.7 makes the overlay a Windowed-only thing,
+     *   and this is the composition root, so this is where that is decided rather than left to
+     *   `AgentOverlayView.isEnabled` to absorb quietly. A client passes `null`; only
+     *   `dev.wildware.moba.agent.MobaAgent` has anything to narrate.
      * @param attach runs once the host exists and before frames start flowing, and returns what
      *   drives a frame. That return value is the whole difference between a player's client and
      *   an agent's instance: a client hands back `host::frame`, and an agent hands back
@@ -93,8 +100,20 @@ public object MobaEntry {
      *   A `GameHost` that a render backend drives directly can never execute an agent command,
      *   because nothing calls `AgentRuntime.beforeFrame`.
      */
-    public fun runWithGl(mode: RenderMode, attach: (GameHost, Rendering) -> Attachment) {
+    public fun runWithGl(
+        mode: RenderMode,
+        overlay: ((OverlayResources) -> OverlaySystem)? = null,
+        attach: (GameHost, Rendering) -> Attachment,
+    ) {
         require(mode != RenderMode.Headless) { "RenderMode.Headless has no GL backend" }
+        require(overlay == null || mode == RenderMode.Windowed) {
+            "an OverlaySystem was passed for $mode. Spec 3.7: the overlay exists only in " +
+                "RenderMode.Windowed - Offscreen exists solely to produce captures, so a panel " +
+                "drawn there is a panel drawn for nobody, and the one arrangement that must " +
+                "never be possible is the one where it is drawn for an agent. This is a refusal " +
+                "and not a silent skip, because a host that thought it had wired an overlay and " +
+                "had not is exactly what took a wave to notice last time."
+        }
         // The definition is built *here* rather than inside `MobaGame.host`, because the scene
         // needs it before the backend exists and the backend needs the scene: `CameraRig` resolves
         // a followed entity through the definition's `NetIdIndex`, and `Lwjgl3Backend.start` takes
@@ -102,6 +121,9 @@ public object MobaEntry {
         // forced rather than chosen: definition, scene, backend, host.
         val definition = MobaGame.definition()
         val scene = scene(definition)
+        // Registered before `start`, because `Lwjgl3Backend.start` builds the pipeline out of the
+        // registry and a registration after that point reaches nothing.
+        if (overlay != null) scene.registry.overlay(overlay)
         val backend = Lwjgl3Backend.start(mode, windowConfig(), scene.registry)
         var attachment: Attachment? = null
         try {

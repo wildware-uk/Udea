@@ -1,4 +1,6 @@
+import dev.wildware.udea.build.ReleaseRules
 import dev.wildware.udea.build.UdeaNetComponents
+import dev.wildware.udea.build.UdeaVerifyReleaseTask
 import dev.wildware.udea.build.registerNetProtocolLock
 import dev.wildware.udea.gradle.UdeaAgentPlugin
 
@@ -53,6 +55,25 @@ dependencies {
 udeaAgent {
     name.set("moba")
     flagsPackage.set("dev.wildware.moba.agent")
+}
+
+/**
+ * The release gate bans **this game's** agent package too, not only the engine's.
+ *
+ * `ReleaseRules.DEFAULT_BANNED_PREFIXES` names `dev/wildware/udea/agent/` and
+ * `dev/wildware/udea/agenthost/`, which is the engine's half. `MobaAgent` is in neither: it is
+ * in `dev.wildware.moba.agent`, in a source set of its own, and it stays out of the jar today
+ * only because `agentClasses` is not wired into `jar`. That is a true statement about the
+ * current packaging and not a guarantee - the day somebody builds a fat jar, or adds
+ * `from(sourceSets["agent"].output)`, the class that binds an HTTP surface onto the live
+ * simulation ships and every rule in the default list is still satisfied.
+ *
+ * So the gate is told the name that is already written down two lines above. Proven load-bearing
+ * rather than asserted: adding `from(sourceSets["agent"].output)` to `jar` turns
+ * `./gradlew :moba:assemble -Pudea.release=true` red on `UDEA-REL-001`.
+ */
+tasks.named<UdeaVerifyReleaseTask>("udeaVerifyRelease") {
+    bannedPrefixes.set(ReleaseRules.DEFAULT_BANNED_PREFIXES + "dev/wildware/moba/agent/")
 }
 
 /**

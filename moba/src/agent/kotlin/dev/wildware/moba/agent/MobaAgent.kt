@@ -8,6 +8,7 @@ import dev.wildware.moba.PositionReplicator
 import dev.wildware.moba.entry.MobaEntry
 import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.AgentTimings
+import dev.wildware.udea.agent.activity.AgentSessions
 import dev.wildware.udea.agent.dispatch.AgentRuntime
 import dev.wildware.udea.agent.dispatch.ToolIndex
 import dev.wildware.udea.agent.host.AgentArtifacts
@@ -20,6 +21,10 @@ import dev.wildware.udea.agent.host.GameIdentity
 import dev.wildware.udea.agent.host.RenderControl
 import dev.wildware.udea.agent.host.RenderToolset
 import dev.wildware.udea.agent.host.ToolManifest
+import dev.wildware.udea.agent.host.overlay.AgentOverlaySystem
+import dev.wildware.udea.agent.host.overlay.AgentOverlayView
+import dev.wildware.udea.agent.host.overlay.GdxOverlayKey
+import dev.wildware.udea.agent.host.render.OffscreenRenderControl
 import dev.wildware.udea.agent.query.AgentComponentIndex
 import dev.wildware.udea.agent.query.AgentComponentType
 import dev.wildware.udea.agent.query.agentComponent
@@ -39,6 +44,8 @@ import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.loop.barrier
 import dev.wildware.udea.core.module.CoreModule
+import dev.wildware.udea.render.OverlayResources
+import dev.wildware.udea.render.OverlaySystem
 import java.nio.file.Path
 
 /**
@@ -68,14 +75,21 @@ import java.nio.file.Path
  * ## What is real here and what is not
  *
  * Real: the game, the loop, the barrier, the snapshot ring, the tool index, the HTTP surface, the
- * registry entry, and - since the Phase 1 demo was driven end to end - the pixels. In either GL
- * mode [MobaRenderControl] joins [RenderToolset] to the live `RenderPipeline`, so `render.screenshot`
- * returns PNG bytes of the actual world and a rewind is visible as a diff between two of them.
+ * registry entry, and the pixels. In either GL mode [OffscreenRenderControl] - the engine's own
+ * adapter, out of `udea-agent-host`'s `src/main` - joins [RenderToolset] to the live
+ * `RenderPipeline`, so `render.screenshot` returns PNG bytes of the actual world and a rewind is
+ * visible as a diff between two of them.
+ *
+ * Real, and Windowed-only: the agent activity overlay. [overlayFor] registers
+ * [AgentOverlaySystem] over the same [AgentBridge] the toolsets narrate into, so a human running
+ * `:moba:runClient`-style Windowed instance watches the panel while every capture taken through
+ * the same process is byte-identical to one taken with the overlay off (spec 3.7).
  *
  * Still not real: `render.follow_entity` is accepted and does nothing, because `CameraRig` tracks
  * a `PhysicsBody` and a `moba` unit has only a [Position] (see `MobaScene`); `render.toggle_debug_draw`
- * flips a switch no renderer here reads; and in [RenderMode.Headless] there is no context at all,
- * so every render tool correctly answers `no_render_context`.
+ * flips a switch no renderer here reads; the overlay's world-space markers are never drawn,
+ * because [overlayFor] has no projector to give it; and in [RenderMode.Headless] there is no
+ * context at all, so every render tool correctly answers `no_render_context`.
  */
 public object MobaAgent {
 
@@ -83,20 +97,66 @@ public object MobaAgent {
     @JvmStatic
     public fun main(args: Array<String>) {
         val mode = MobaEntry.modeFromProperties(fallback = RenderMode.Offscreen)
+        // The bridge and the session table are built *here*, before anything renders, because the
+        // overlay has to be registered into the `RenderRegistry` before `Lwjgl3Backend.start`
+        // builds a pipeline out of it - and the overlay narrates this bridge and colours by this
+        // table. Two `AgentSessions` would be the quiet version of the bug: the panel would name
+        // no session at all while the host interned every caller into a table nothing drew.
+        val bridge = AgentBridge()
+        val sessions = AgentSessions()
         if (mode == RenderMode.Headless) {
             val host = MobaGame.host(RenderMode.Headless)
             // No GL context in Headless, so no capture surface exists and `null` is the
             // honest answer: every `render.*` tool then answers `no_render_context`.
-            val session = attach(host, RenderMode.Headless, control = null)
+            val session = attach(host, RenderMode.Headless, null, bridge, sessions)
             Runtime.getRuntime().addShutdownHook(Thread { session.close() })
             session.loop.run()
             session.close()
             return
         }
-        MobaEntry.runWithGl(mode) { host, rendering ->
-            val session = attach(host, mode, MobaRenderControl(rendering.presentation()))
+        MobaEntry.runWithGl(mode, overlay = overlayFor(mode, bridge, sessions)) { host, rendering ->
+            // The engine's own adapter, out of `udea-agent-host`'s `src/main`. `moba` used to
+            // carry a copy of it in this source set, because a headless agent host could not name
+            // `PresentationControl`; the copy is gone with the rule that forced it.
+            val control = OffscreenRenderControl(rendering.presentation())
+            val session = attach(host, mode, control, bridge, sessions)
             MobaEntry.Attachment(frame = session.loop::pump, close = session::close)
         }
+    }
+
+    /**
+     * The agent activity overlay, or `null` in any mode that must not draw one (spec 3.7).
+     *
+     * The `null` is the whole of the mode rule as far as this process is concerned, and it is
+     * deliberately **not** the only guard: [MobaEntry.runWithGl] refuses a non-`Windowed`
+     * overlay outright, and [AgentOverlayView.isEnabled] is false outside `Windowed` whatever it
+     * is handed. Three checks for one rule looks like belt and braces; it is not. Each one fails
+     * a different mistake - wiring the wrong mode here, passing this to the wrong call, and
+     * constructing a view with the wrong mode - and the failure they are guarding against is an
+     * agent reading its own narration back out of a screenshot and concluding the game changed.
+     */
+    private fun overlayFor(
+        mode: RenderMode,
+        bridge: AgentBridge,
+        sessions: AgentSessions,
+    ): ((OverlayResources) -> OverlaySystem)? {
+        if (mode != RenderMode.Windowed) return null
+        val view = AgentOverlayView(
+            bridge = bridge,
+            sessions = sessions,
+            mode = mode,
+            // The real key, not `HardwareKeyState.NEVER`: an overlay whose verbosity control
+            // nothing can move is a switch, and a switch nothing reads is what reviewers have
+            // correctly rejected here before.
+            keys = GdxOverlayKey(),
+        )
+        // `AgentOverlayView.OFFSCREEN` is the default projector, and it reports every world point
+        // as off-screen, so no world-space marker is drawn. That is honest rather than tidy:
+        // projecting would need `MobaScene`'s `CameraRig`, which `runWithGl` builds after this
+        // function has returned. The panel - the session, the caption, the tool history - is the
+        // whole of what a human sees here, and it is the part `OverlayCaptureIsolationTest`
+        // proves cannot reach a capture.
+        return { resources -> AgentOverlaySystem(resources, view) }
     }
 
     /**
@@ -107,8 +167,13 @@ public object MobaAgent {
      * entry is written by [AgentHost] itself, after the port is bound - never before, because an
      * entry naming a port nobody claimed is worse than no entry.
      */
-    private fun attach(host: GameHost, mode: RenderMode, control: RenderControl?): Session {
-        val bridge = AgentBridge()
+    private fun attach(
+        host: GameHost,
+        mode: RenderMode,
+        control: RenderControl?,
+        bridge: AgentBridge,
+        sessions: AgentSessions,
+    ): Session {
         val timings = AgentTimings()
         val census = MobaCensus(host.world)
         val digest = StateDigest(
@@ -160,6 +225,10 @@ public object MobaAgent {
                     manifest = ToolManifest.of(identity, tools.tools),
                     artifacts = artifacts,
                     paused = { host.time.paused },
+                    // The *same* table the overlay colours from. Left to default, the host would
+                    // intern every caller into a table of its own and the panel would name no
+                    // session while showing that session's tool calls.
+                    sessions = sessions,
                 )
             },
             // The generated per-variant flag, not `udea-agent-host`'s hand-written `true`. A

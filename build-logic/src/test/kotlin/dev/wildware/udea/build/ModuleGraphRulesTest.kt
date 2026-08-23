@@ -153,6 +153,71 @@ class ModuleGraphRulesTest {
     }
 
     @Test
+    fun `UDEA-MG-006 fails anything the asset model is not allowed to hold`() {
+        val violations = violate(
+            ":udea-assets",
+            "runtimeClasspath",
+            graph(
+                ":udea-assets",
+                ":udea-annotations",
+                ":udea-diagnostics",
+                "org.jetbrains.kotlin:kotlin-stdlib",
+                // The three the old asset tree needed, and could not be read without.
+                "com.badlogicgames.gdx:gdx",
+                "com.fasterxml.jackson.core:jackson-databind",
+                "org.jetbrains.kotlin:kotlin-scripting-jvm-host",
+            ),
+        )
+        assertEquals(
+            listOf(
+                "com.badlogicgames.gdx:gdx",
+                "com.fasterxml.jackson.core:jackson-databind",
+                "org.jetbrains.kotlin:kotlin-scripting-jvm-host",
+            ),
+            violations.map { it.coordinate },
+        )
+        assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-006") })
+    }
+
+    @Test
+    fun `UDEA-MG-006 fails udea-core on the asset model, which would be a dependency cycle`() {
+        val violations = violate(
+            ":udea-assets",
+            "compileClasspath",
+            graph(":udea-assets", ":udea-core", ":common"),
+        )
+        assertEquals(listOf(":common", ":udea-core"), violations.map { it.coordinate }.sorted())
+    }
+
+    @Test
+    fun `UDEA-MG-006 passes the three things the asset model is allowed`() {
+        assertTrue(
+            violate(
+                ":udea-assets",
+                "compileClasspath",
+                graph(
+                    ":udea-assets",
+                    ":udea-annotations",
+                    ":udea-diagnostics",
+                    "org.jetbrains.kotlin:kotlin-stdlib",
+                    "org.jetbrains:annotations",
+                ),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
+    fun `UDEA-MG-006 governs only the asset model, not its compiler`() {
+        assertTrue(
+            violate(
+                ":udea-assets-compiler",
+                "compileClasspath",
+                graph(":udea-assets-compiler", "com.fasterxml.jackson.core:jackson-databind"),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
     fun `a transitive violation is reported with the path that produced it`() {
         val transitive = ResolvedGraph(
             root = ":udea-core",
@@ -170,11 +235,16 @@ class ModuleGraphRulesTest {
     }
 
     @Test
-    fun `the headless set is every udea module in settings_gradle_kts except udea-render`() {
+    fun `the headless set is every udea module in settings_gradle_kts except the GL-allowed two`() {
         // The gap this closes: `HEADLESS_PROJECTS` used to be a hand-written subset, and a
         // module added to `settings.gradle.kts` joined neither the dependency rule nor the
         // bytecode scan. Deriving the expectation from the settings file makes including a
         // new `udea-*` module a red test rather than a silent hole in UDEA-MG-002.
+        //
+        // Subtracting `GL_ALLOWED_PROJECTS` rather than a literal `":udea-render"` is what
+        // keeps that property after the controller ruling that put `udea-agent-host` on the
+        // GL side: an exemption has to be *stated* in the rules object to be subtracted here,
+        // so quietly deleting a module from `HEADLESS_PROJECTS` still fails this test.
         val settings = File("../settings.gradle.kts").canonicalFile
         assertTrue(settings.isFile, "settings.gradle.kts not found at ${settings.absolutePath}")
         val included = Regex("""^include\("(udea-[a-z0-9-]+)"\)""", RegexOption.MULTILINE)
@@ -187,10 +257,61 @@ class ModuleGraphRulesTest {
                 "test would pass against nothing",
         )
         assertEquals(
-            (included - ":udea-render").toList(),
+            (included - ModuleGraphRules.GL_ALLOWED_PROJECTS).toList(),
             ModuleGraphRules.HEADLESS_PROJECTS.sorted(),
-            "udea-render is the one module allowed to see GL (spec 4), so every other udea-* " +
-                "module must be in ModuleGraphRules.HEADLESS_PROJECTS",
+            "every udea-* module outside ModuleGraphRules.GL_ALLOWED_PROJECTS must be in " +
+                "ModuleGraphRules.HEADLESS_PROJECTS",
+        )
+    }
+
+    @Test
+    fun `the GL-allowed set is exactly udea-render and the debug agent host`() {
+        // Stated as its own assertion so that widening the exemption is a deliberate edit to
+        // a test, not a side effect of editing a list. Every module here is a module
+        // `udeaVerifyHeadless` no longer scans, so the set is the whole of what the headless
+        // guarantee costs.
+        assertEquals(
+            listOf(":udea-agent-host", ":udea-render"),
+            ModuleGraphRules.GL_ALLOWED_PROJECTS.sorted(),
+        )
+    }
+
+    @Test
+    fun `udea-core is headless whatever else is exempted`() {
+        // The guarantee that actually matters (spec 4, spec 3.5): the simulation kernel runs
+        // in a test JVM, a dedicated server and an agent harness with no display. It is
+        // asserted separately from the derived set above because that one would stay green if
+        // `:udea-core` were added to GL_ALLOWED_PROJECTS.
+        assertTrue(":udea-core" in ModuleGraphRules.HEADLESS_PROJECTS)
+        assertTrue(":udea-core" !in ModuleGraphRules.GL_ALLOWED_PROJECTS)
+        val violations = violate(
+            ":udea-core",
+            "compileClasspath",
+            graph(":udea-core", "com.badlogicgames.gdx:gdx-backend-lwjgl3"),
+        )
+        assertEquals(RuleId("UDEA-MG-002"), violations.single().ruleId)
+    }
+
+    @Test
+    fun `the debug agent host may see GL, because it owns the render toolset`() {
+        // Spec 4 gives udea-agent-host "the toolsets that need a render context or live
+        // input: render, input, ui". Owning the render toolset and being unable to name a
+        // render type is a contradiction, and it is the one that stranded both
+        // OffscreenRenderControl and the GL overlay in test sources. UDEA-REL-002 is what
+        // keeps the module off a shipped classpath - see the assertion below, which is the
+        // other half of the ruling.
+        assertTrue(
+            violate(
+                ":udea-agent-host",
+                "compileClasspath",
+                graph(":udea-agent-host", "com.badlogicgames.gdx:gdx-backend-lwjgl3"),
+            ).isEmpty(),
+        )
+        // ...and it is still refused a release build, which is what makes the exemption safe.
+        assertTrue(
+            ReleaseRules.CLASSPATH_RULE.banned.any { it.matches(":udea-agent-host") },
+            "UDEA-REL-002 must still ban :udea-agent-host; it is the rule the GL exemption " +
+                "leans on for the guarantee it gives up",
         )
     }
 
@@ -208,7 +329,9 @@ class ModuleGraphRulesTest {
     fun `UDEA-MG-002 covers the modules that were previously in neither gate`() {
         // Each of these was outside both the dependency rule and the bytecode scan, so
         // `implementation(libs.gdx.backend.lwjgl3)` on any of them stayed green twice over.
-        listOf(":udea-agent-host", ":udea-diagnostics", ":udea-gradle", ":udea-compiler-plugin").forEach {
+        // `:udea-agent-host` was in this list too and is now deliberately exempt - see
+        // `the debug agent host may see GL, because it owns the render toolset`.
+        listOf(":udea-diagnostics", ":udea-gradle", ":udea-compiler-plugin").forEach {
             val violations = violate(it, "compileClasspath", graph(it, "com.badlogicgames.gdx:gdx-backend-lwjgl3"))
             assertEquals(RuleId("UDEA-MG-002"), violations.single().ruleId, "$it is not guarded")
         }

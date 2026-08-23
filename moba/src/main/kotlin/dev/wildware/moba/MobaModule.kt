@@ -55,12 +55,35 @@ public class MobaModule : UdeaModule {
 }
 
 /**
- * Moves every [Position] a fixed amount per tick.
+ * Moves every [Position] a fixed amount per tick, around a field of fixed width.
  *
  * The smallest system that makes a running instance *observably* running: two `/state` reads a
  * few ticks apart differ, a `time.step(120)` moves the world by a stated amount, and a rewind is
  * visible as a coordinate going back. Deterministic in ticks rather than seconds, so the value
  * after N ticks is the same on every machine and survives a snapshot restore.
+ *
+ * ## Why it wraps, which it did not before
+ *
+ * It used to be `position.x += DRIFT_PER_TICK` with no bound, and that made **every screenshot
+ * after the first eight seconds a black frame.** The unit leaves `MobaScene`'s camera at about
+ * tick 460; an instance an agent connects to has usually been up for thousands of ticks, so
+ * `render.screenshot` returned a perfectly valid PNG of an empty framebuffer and
+ * `render.compare_artifacts` reported `identical:true` for every pair of them. That reads
+ * exactly like a broken renderer, and it took a live instance to tell the two apart - which is
+ * the whole reason a blank capture is worse than a red one.
+ *
+ * So the field is `[0, FIELD_WIDTH)` and the unit laps it, in [LAP_TICKS] ticks. `MobaScene`
+ * frames that interval, so a unit is always somewhere in shot.
+ *
+ * **What that costs, stated rather than discovered:** `x` is now bounded game state.
+ * `world.set_component_field` writing `x = 200` is accepted and the write is real - `/state`
+ * shows 200 - and the **next tick** normalises it to 20. A game with a playfield behaves this
+ * way; an agent testing the write surface on a paused instance sees the value it wrote, and one
+ * that steps afterwards sees the wrap. There is deliberately no clamp-on-write: a barrier
+ * mutation that silently rewrote its own argument would be worse.
+ *
+ * **And the aliasing:** two captures exactly [LAP_TICKS] apart are identical by construction. A
+ * `time.rewind` of a whole lap therefore reports zero differing pixels and is not a bug.
  */
 public class DriftSystem : SimSystem() {
 
@@ -69,13 +92,39 @@ public class DriftSystem : SimSystem() {
     override fun onTick() {
         moving.forEach { entity ->
             val position = entity[Position]
-            position.x += DRIFT_PER_TICK
+            position.x = wrap(position.x + DRIFT_PER_TICK)
         }
     }
 
-    private companion object {
+    public companion object {
+
         /** World units per tick. A round number so a reader can check the arithmetic by eye. */
-        const val DRIFT_PER_TICK: Float = 0.25f
+        public const val DRIFT_PER_TICK: Float = 0.25f
+
+        /**
+         * The playfield, in world units: `x` is always in `[0, FIELD_WIDTH)` after a tick.
+         *
+         * Sized to sit inside `MobaScene`'s camera with room on both sides, so a unit at either
+         * end of the field is fully drawn rather than half off the edge.
+         */
+        public const val FIELD_WIDTH: Float = 90f
+
+        /** Ticks for one lap of the field. At the default 60Hz tick rate, six seconds. */
+        public const val LAP_TICKS: Int = (FIELD_WIDTH / DRIFT_PER_TICK).toInt()
+
+        /**
+         * [x] brought into `[0, FIELD_WIDTH)`.
+         *
+         * `%` alone is not enough and the difference is reachable: `x` is agent-writable, so
+         * `world.set_component_field x = -5` is one HTTP call away, and Kotlin's `%` keeps the
+         * sign - which would leave the unit at `-5`, off camera, drifting toward the field from
+         * outside it for twenty seconds. Public and pure so `MobaSceneTest` can drive it.
+         */
+        public fun wrap(x: Float): Float {
+            if (!x.isFinite()) return 0f
+            val remainder = x % FIELD_WIDTH
+            return if (remainder < 0f) remainder + FIELD_WIDTH else remainder
+        }
     }
 }
 

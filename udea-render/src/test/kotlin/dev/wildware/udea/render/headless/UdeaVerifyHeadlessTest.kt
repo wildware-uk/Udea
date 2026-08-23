@@ -47,13 +47,19 @@ class UdeaVerifyHeadlessTest {
     }
 
     @Test
-    fun `the designated list is every udea module except udea-render`() {
+    fun `the designated list is every udea module except the two allowed GL`() {
         // A module quietly dropped from the list is indistinguishable from a module that
         // passes, so the list itself is asserted -- and asserted against a source neither
         // `HeadlessScan` nor the build script derives from, or this would only be checking
         // that a copy equals itself. `settings.gradle.kts` is what actually decides which
-        // modules exist; `udea-render` is the one allowed to see GL (spec 4), so every other
-        // `udea-*` module must be scanned.
+        // modules exist, and everything it includes must be scanned except the modules
+        // deliberately allowed to see GL.
+        //
+        // [GL_ALLOWED] is written out here rather than read from `ModuleGraphRules`, for the
+        // reason the class KDoc gives: this module's test sources cannot see `build-logic`.
+        // That is the point of the assertion -- two independently maintained lists that have
+        // to agree -- so adding a module here is a deliberate edit that a reviewer sees,
+        // exactly as adding one to `GL_ALLOWED_PROJECTS` is.
         val settings = RepoLayout.repoRoot.resolve("settings.gradle.kts")
         assertTrue(settings.isFile, "settings.gradle.kts not found at $settings")
         val included = Regex("""^include\("(udea-[a-z0-9-]+)"\)""", RegexOption.MULTILINE)
@@ -66,10 +72,26 @@ class UdeaVerifyHeadlessTest {
                 "test would be comparing against nothing",
         )
         assertEquals(
-            (included - "udea-render").toList(),
+            (included - GL_ALLOWED).toList(),
             HeadlessScan.HEADLESS_MODULES.sorted(),
             "udea-render's build script and ModuleGraphRules.HEADLESS_PROJECTS must between " +
-                "them designate every udea-* module but udea-render",
+                "them designate every udea-* module except $GL_ALLOWED",
         )
+    }
+
+    private companion object {
+
+        /**
+         * The modules allowed to name a GL type, and the whole of the list.
+         *
+         * `udea-render` owns GL outright (spec 4, spec 3.5). `udea-agent-host` is exempt by the
+         * Phase 1 follow-up ruling recorded on `ModuleGraphRules.GL_ALLOWED_PROJECTS`: it owns
+         * the render toolset and therefore the implementation of that toolset's own port, and
+         * with the old rule in force `OffscreenRenderControl` and the GL overlay could only live
+         * in test sources -- so no shipped path could build a `RenderControl` at all and every
+         * `render.*` tool answered `no_render_context` on a real run. It stays off every release
+         * classpath through `UDEA-REL-002`, which is a separate gate with its own test.
+         */
+        val GL_ALLOWED: Set<String> = setOf("udea-render", "udea-agent-host")
     }
 }

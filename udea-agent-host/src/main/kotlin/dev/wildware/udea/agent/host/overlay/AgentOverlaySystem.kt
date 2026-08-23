@@ -1,4 +1,4 @@
-package dev.wildware.udea.agent.host.gl
+package dev.wildware.udea.agent.host.overlay
 
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.Pixmap
@@ -7,41 +7,50 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.GlyphLayout
 import com.badlogic.gdx.graphics.g2d.TextureRegion
 import com.badlogic.gdx.math.Matrix4
-import dev.wildware.udea.agent.host.overlay.AgentOverlayView
-import dev.wildware.udea.agent.host.overlay.EntityLocator
-import dev.wildware.udea.agent.host.overlay.OverlayCanvas
-import dev.wildware.udea.agent.host.overlay.WorldProjector
+import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.render.OverlayResources
 import dev.wildware.udea.render.OverlaySystem
+import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.ScreenTarget
 
 /**
- * A real GL implementation of [OverlayCanvas], and the `OverlaySystem` that drives
- * [AgentOverlayView] from it.
+ * The GL implementation of [OverlayCanvas], and the [OverlaySystem] that drives
+ * [AgentOverlayView] from it. Register it with [RenderRegistry.overlay]:
  *
- * ## Why this lives in a test source set, and what that admits
+ * ```
+ * if (mode == RenderMode.Windowed) {
+ *     registry.overlay { resources -> AgentOverlaySystem(resources, view) }
+ * }
+ * ```
  *
- * `udea-agent-host` is in `ModuleGraphRules.HEADLESS_PROJECTS`: `udeaVerifyHeadless` fails the
- * build if any class compiled into its `src/main` names `com/badlogic/gdx/graphics/`, which is
- * where `Batch`, `BitmapFont` and `Texture` all live. That rule governs `main` only - the scan
- * walks `build/classes/<lang>/main` - so a **test** may see GL, and this one does.
+ * ## Why it is here now, when it used to be in test sources
  *
- * So this file is not the shipped adapter and does not pretend to be. **The shipped adapter
- * does not exist**: it belongs in `udea-render`, which this issue does not own, exactly as
- * `RenderControl`'s GL implementation does. What this file buys is not a substitute for it -
- * it is the proof that the port is sufficient for a real one and that the overlay code being
- * shipped cannot reach a capture. `OverlayCaptureIsolationTest` drives it against a real LWJGL3
- * context.
+ * `AgentOverlayView` is the layout, the ordering, the verbosity gate and the per-frame budget,
+ * and it is deliberately GL-free. Something has to turn it into an `OverlaySystem`, and until
+ * the ruling that moved this file there was nowhere legal to put that something:
+ * `udea-agent-host` could not name a `udea.render` type, and `udea-render` may not name
+ * `udea-agent-host` (`UDEA-REL-002`). So this adapter lived in **test** sources, which meant the
+ * shipped overlay was drawn by nothing but its own tests - the panel spec 3.7 describes existed
+ * and no human could see it.
  *
- * ## The structural guarantee, visible in the constructor
+ * ## The structural guarantee, still visible in the constructor
  *
  * It takes [OverlayResources]. That type carries the [ScreenTarget] and the shared batch, and
  * **no capturable target at all** - there is deliberately no expression anywhere in this file
  * that could reach an `OffscreenTarget`, because there is nothing to reach it from. That is
  * spec 3.7's guarantee at the level a refactor can actually break, and `OverlayResourcesTest`
- * in `udea-render` asserts the type itself stays that shape.
+ * in `udea-render` asserts the type itself stays that shape. `OverlayCaptureIsolationTest`
+ * drives this class against a real LWJGL3 context and asserts both halves: the window changes
+ * and every declared capture route does not.
+ *
+ * ## Windowed only, and it is not this class that enforces it
+ *
+ * [AgentOverlayView.isEnabled] is false outside [RenderMode.Windowed] and its `render` returns
+ * immediately, so an instance registered in the wrong mode draws nothing. A composition root
+ * should still not register one outside [RenderMode.Windowed] - a begun-and-ended batch and a
+ * `BitmapFont` per process are not free - and `MobaEntry.runWithGl` refuses to.
  */
-internal class AgentOverlaySystem(
+public class AgentOverlaySystem(
     private val resources: OverlayResources,
     private val view: AgentOverlayView,
     private val projector: WorldProjector = AgentOverlayView.OFFSCREEN,
@@ -153,5 +162,54 @@ internal class AgentOverlaySystem(
                 fill()
             },
         )
+    }
+}
+
+/**
+ * The real overlay hotkey: the physical key, read through LWJGL3's keyboard.
+ *
+ * [OverlayVerbosity]'s KDoc says this implementation "is `Gdx.input.isKeyPressed` in
+ * `udea-render`". It could not be written anywhere until this module was allowed to name a GL
+ * type, so [HardwareKeyState.NEVER] was the only value any composition root could pass and the
+ * verbosity control was a switch nothing could move. This is the one hop it describes, with
+ * nothing agent-writable on it: `Gdx.input` is the LWJGL3 device state, not the game's input
+ * mapping, so no `input.*` tool and no injected intent source can reach it (issue #161).
+ *
+ * ## The key, and the fact that nothing specifies it
+ *
+ * Spec 3.7 describes the overlay and its verbosity levels and never names a key. [KEY] is
+ * therefore a **choice made here**, not a contract being honoured: `F9`, because it is outside
+ * every key a game is likely to bind and outside the `F1`-`F4` range window managers claim.
+ * Change it freely; nothing depends on the value.
+ *
+ * ## What is not covered by an automated test
+ *
+ * Nothing can press a key. `OverlayHotkeyIsHardwareTest` drives [OverlayVerbosityControl]
+ * through a fake [HardwareKeyState] and proves the edge detection and the injected/hardware
+ * separation; what this class adds is the two-line binding to `Gdx.input`, and its only
+ * coverage is that a Windowed instance constructs it and does not crash. Said plainly because
+ * "the hotkey works" is not something the suite establishes.
+ */
+public class GdxOverlayKey(
+    /** The key sampled, as a `com.badlogic.gdx.Input.Keys` code. */
+    private val key: Int = KEY,
+) : HardwareKeyState {
+
+    /**
+     * `false` when there is no input device rather than throwing.
+     *
+     * `Gdx.input` is null until a backend has started and is null again after it stops, and an
+     * overlay polling on a frame either side of that would take down the render thread over a
+     * key nobody pressed.
+     */
+    override fun isOverlayKeyDown(): Boolean =
+        com.badlogic.gdx.Gdx.input?.isKeyPressed(key) ?: false
+
+    override fun toString(): String = "GdxOverlayKey($key)"
+
+    public companion object {
+
+        /** `F9`. See the class KDoc: chosen here, specified nowhere. */
+        public const val KEY: Int = com.badlogic.gdx.Input.Keys.F9
     }
 }

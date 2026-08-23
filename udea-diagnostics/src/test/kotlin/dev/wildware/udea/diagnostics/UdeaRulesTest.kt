@@ -67,7 +67,9 @@ class UdeaRulesTest {
         assertEquals("UDEA0010", UdeaRules.AGENT_TOOL_UNSUPPORTED_TYPE.id)
         assertEquals("UDEA0011", UdeaRules.AGENT_STATE_NON_SCALAR.id)
         assertEquals("UDEA0012", UdeaRules.AGENT_NAME_COLLISION.id)
-        assertEquals(12, UdeaRules.all.size)
+        assertEquals("UDEA0013", UdeaRules.REFERENCE_KIND_MISMATCH.id)
+        assertEquals("UDEA0014", UdeaRules.ASSET_INDEX_FORMAT.id)
+        assertEquals(14, UdeaRules.all.size)
         assertTrue(UdeaRules.all.all { it.defaultSeverity == Severity.Error })
     }
 

@@ -19,10 +19,12 @@ import dev.wildware.udea.agent.dispatch.ToolIndex
 import dev.wildware.udea.agent.host.AgentArtifacts
 import dev.wildware.udea.agent.host.AgentGameLoop
 import dev.wildware.udea.agent.host.AgentHostTools
+import dev.wildware.udea.agent.host.CaptureToolDef
 import dev.wildware.udea.agent.host.ArtifactId
 import dev.wildware.udea.agent.host.ArtifactToolset
 import dev.wildware.udea.agent.host.RenderToolset
-import dev.wildware.udea.agent.host.demo.OffscreenRenderControl
+import dev.wildware.udea.agent.host.render.OffscreenRenderControl
+import dev.wildware.udea.agent.host.overlay.AgentOverlaySystem
 import dev.wildware.udea.agent.host.overlay.AgentOverlayView
 import dev.wildware.udea.agent.host.overlay.OverlayVerbosity
 import dev.wildware.udea.agent.state.DigestSources
@@ -57,11 +59,16 @@ import kotlin.test.assertTrue
  * ## What "enumerates capture routes from the declared tools" means here, and why
  *
  * The routes are not written down. They are **derived from the render toolset's published
- * declarations**: every tool in [AgentHostTools] that declares an `afterTick` argument is a tool
- * that reads pixels back - that argument exists for one reason, to pin a capture to a simulation
- * tick, and nothing that does not capture has any use for one. Each route found is then driven
- * through the real [ToolIndex], the real [AgentRuntime] dispatch path, the real [RenderToolset]
- * and the real artifact store.
+ * declarations**: every tool in [AgentHostTools] declared as a [CaptureToolDef] is a tool that
+ * reads pixels back, because that base class is what queues a capture and answers for it after
+ * the tick - a tool that does not capture has no reason to be one. Each route found is then
+ * driven through the real [ToolIndex], the real [AgentRuntime] dispatch path, the real
+ * [RenderToolset] and the real artifact store.
+ *
+ * (It used to key off an `afterTick` argument, which was the only thing the two capture tools had
+ * in common. That argument is gone - it selected the same frame whatever it was set to - and the
+ * type is a better marker anyway: a new capture route cannot be added without extending the class
+ * that queues captures, while it could very easily be added without copying an argument.)
  *
  * A hand-written list of two tool names would pass for ever after somebody added a third route,
  * and the failure mode of that is not a red test: it is every visual diff an agent does through
@@ -140,7 +147,7 @@ class OverlayCaptureIsolationTest {
 
     /** The capture routes, derived from what the render toolset publishes. */
     private fun captureRoutes(): List<Route> = AgentHostTools.tools
-        .filter { tool -> tool.args.any { it.name == AFTER_TICK } }
+        .filterIsInstance<CaptureToolDef>()
         .map { tool -> Route(tool.name, argumentsFor(tool)) }
 
     /**
@@ -369,7 +376,6 @@ class OverlayCaptureIsolationTest {
         const val SCENE = 0x0000FF
 
         /** The declared argument that marks a tool as a capture route. */
-        const val AFTER_TICK = "afterTick"
 
         const val CAPTION = "verifying the overlay never reaches a capture"
 

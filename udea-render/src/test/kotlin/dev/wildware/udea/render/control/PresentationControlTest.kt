@@ -6,6 +6,8 @@ import dev.wildware.udea.core.gameContext
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.render.RenderPipeline
 import dev.wildware.udea.render.RenderRegistry
+import dev.wildware.udea.core.physics.PhysicsBody
+import dev.wildware.udea.render.camera.CameraOutcome
 import dev.wildware.udea.render.camera.CameraRig
 import dev.wildware.udea.render.capture.CaptureRegion
 import dev.wildware.udea.render.draw.DebugDraw
@@ -112,13 +114,14 @@ class PresentationControlTest {
 
     @Test
     fun `camera commands reach the rig and debug commands reach the switch`() {
-        val rig = rig()
+        val fixture = rig()
+        val rig = fixture.rig
         val debug = DebugDraw(enabled = false)
-        val pipeline = pipeline(rig)
+        val pipeline = pipeline(fixture)
         val control = PresentationControl(pipeline, rig, debug)
 
-        control.lookAt(5f, 6f, 2f)
-        control.follow(NetId.of(index = 3, generation = 1))
+        assertEquals(CameraOutcome.APPLIED, control.follow(fixture.spawnFollowable()))
+        assertEquals(CameraOutcome.APPLIED, control.lookAt(5f, 6f, 2f))
         pipeline.render(alpha = 0f)
 
         // `follow` is applied first and `lookAt` second, in one frame: the placement wins and
@@ -133,13 +136,62 @@ class PresentationControlTest {
         assertFalse(debug.enabled)
     }
 
+    /**
+     * A camera command lands on the camera, and the assertion is the camera and not the call.
+     *
+     * `follow` reporting [CameraOutcome.APPLIED] is only worth anything if the frame after it
+     * actually tracks the entity, so this drives a real frame and reads the position back. The
+     * agent-side test for `render.follow_entity` can only see the port; this is the half that
+     * proves the port was telling the truth.
+     */
+    @Test
+    fun `an applied follow moves the camera onto the entity`() {
+        val fixture = rig()
+        val rig = fixture.rig
+        rig.followHalfLife = 0f
+        val pipeline = pipeline(fixture)
+        val control = PresentationControl(pipeline, rig)
+
+        assertEquals(CameraOutcome.APPLIED, control.follow(fixture.spawnFollowable(x = 12f)))
+        pipeline.render(alpha = 1f)
+
+        assertEquals(12f, rig.camera.position.x, "the camera did not follow what it accepted")
+    }
+
+    /**
+     * The three ways a follow request cannot work, each answered by name.
+     *
+     * `follow` used to take all of them, return `Unit`, and leave the camera where it was — which
+     * is what let `render.follow_entity` answer `{"following": n}` for an entity the camera was
+     * never going to track.
+     */
+    @Test
+    fun `follow reports why a camera would not move rather than accepting silently`() {
+        val fixture = rig()
+        val control = PresentationControl(pipeline(fixture), fixture.rig)
+
+        assertEquals(
+            CameraOutcome.UNKNOWN_ENTITY,
+            control.follow(NetId.of(index = 3, generation = 1)),
+        )
+        assertEquals(CameraOutcome.UNFOLLOWABLE, control.follow(fixture.spawnPoseless()))
+        assertEquals(null, fixture.rig.target, "a refused follow was queued anyway")
+
+        val unbound = fixture.unboundRig()
+        assertEquals(
+            CameraOutcome.CAMERA_UNBOUND,
+            PresentationControl(pipeline(), unbound).follow(fixture.spawnFollowable()),
+        )
+    }
+
     /** A host with neither a camera nor a debug switch answers rather than throwing. */
     @Test
-    fun `a control with no camera and no debug switch still answers`() {
+    fun `a control with no camera says so instead of accepting the command`() {
         val control = PresentationControl(pipeline())
 
-        control.lookAt(1f, 2f, 1f)
-        control.follow(null)
+        assertEquals(CameraOutcome.NO_CAMERA, control.lookAt(1f, 2f, 1f))
+        assertEquals(CameraOutcome.NO_CAMERA, control.follow(null))
+        assertEquals(CameraOutcome.NO_CAMERA, control.follow(NetId.of(index = 1, generation = 0)))
 
         assertFalse(control.hasCamera)
         assertFalse(control.toggleDebugDraw(true), "nothing draws debug, so nothing may claim to")
@@ -147,30 +199,65 @@ class PresentationControlTest {
 
     // --- fixture -----------------------------------------------------------------------------
 
-    private fun rig(): CameraRig {
+    private fun rig(): RigFixture = RigFixture()
+
+    /**
+     * A bound rig, the world behind it, and the entities a follow test needs.
+     *
+     * The entities are the point: `followability` resolves an id and asks for a pose, so a test
+     * that wants a real answer has to have a real world with real components in it. A rig alone
+     * could only ever produce `UNKNOWN_ENTITY`.
+     */
+    private class RigFixture {
+
         val ctx = testGameContext(seed = 7L)
+
         val world = configureWorld {
             injectables { gameContext(ctx) }
             systems { add(InterpSnapshotSystem()) }
         }
-        return CameraRig(
-            netIds = NetIdIndex(),
+
+        val netIds = NetIdIndex()
+
+        val rig: CameraRig = newRig().also { it.onBind(world, ctx) }
+
+        /** An entity with a body, so `Interpolator` can give the camera a position to track. */
+        fun spawnFollowable(x: Float = 4f): NetId =
+            netIds.allocate(world.entity { it += PhysicsBody(x = x, y = 0f) })
+
+        /** An entity with no body: live, resolvable, and impossible to follow. `moba`'s case. */
+        fun spawnPoseless(): NetId = netIds.allocate(world.entity { })
+
+        /** A rig that was never registered with a registry, so `onBind` never ran. */
+        fun unboundRig(): CameraRig = newRig()
+
+        private fun newRig() = CameraRig(
+            netIds = netIds,
             interpolator = Interpolator(ctx.clock, world.system<InterpSnapshotSystem>()),
             frameTime = object : FrameTime {
                 override val frameSeconds: Float = 1f / 60f
             },
-        ).also { it.onBind(world, ctx) }
+        )
     }
 
+    /**
+     * A pipeline, optionally with [fixture]'s rig in it.
+     *
+     * When a rig is passed the pipeline is built over **that fixture's world**, and it has to be:
+     * `RenderRegistry.build` binds every system it holds, so a pipeline built over a world of its
+     * own would silently re-bind the rig away from the world the test spawned its entities in -
+     * and every follow would then answer `UNKNOWN_ENTITY` for an entity that plainly exists.
+     */
     private fun pipeline(
-        rig: CameraRig? = null,
+        fixture: RigFixture? = null,
         pixels: FakePixelSource? = FakePixelSource(),
         offscreenWidth: Int = 64,
         offscreenHeight: Int = 32,
     ): RenderPipeline {
-        val ctx = testGameContext(seed = 11L)
-        val world = configureWorld { injectables { gameContext(ctx) } }
+        val ctx = fixture?.ctx ?: testGameContext(seed = 11L)
+        val world = fixture?.world ?: configureWorld { injectables { gameContext(ctx) } }
         val registry = RenderRegistry()
+        val rig = fixture?.rig
         if (rig != null) registry.register(dev.wildware.udea.render.RenderPhase.PreRender, { rig })
         return registry.build(
             world,

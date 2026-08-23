@@ -2,6 +2,7 @@ package dev.wildware.udea.compiler.testing
 
 import dev.wildware.udea.diagnostics.Severity
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -16,9 +17,18 @@ import kotlin.test.fail
  */
 abstract class UdeaCheckerTest {
 
-    /** Compiles [sources] with the plugin loaded and the checkers on. */
-    fun compile(vararg sources: TestSource, pluginOptions: Map<String, String> = emptyMap()): CheckerRun =
-        UdeaCompileTesting.compile(sources.toList(), pluginOptions)
+    /**
+     * Compiles [sources] with the plugin loaded and the checkers on.
+     *
+     * @param extraClasspath roots added to the compilation classpath, for a test that has to
+     *   put an asset index where the plugin will actually find it.
+     */
+    fun compile(
+        vararg sources: TestSource,
+        pluginOptions: Map<String, String> = emptyMap(),
+        extraClasspath: List<File> = emptyList(),
+    ): CheckerRun =
+        UdeaCompileTesting.compile(sources.toList(), pluginOptions, extraClasspath = extraClasspath)
 
     /**
      * Compiles [sources] and asserts the checkers found nothing, and that the fixture itself

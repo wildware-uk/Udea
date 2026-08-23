@@ -275,9 +275,9 @@ separate question, better answered after watching this work for real.
 | `udea-assets-compiler` | Build-time only, zero Gradle types | `scriptHost.kt`, `AssetScanner`, `GameAssetLoader` |
 | `udea-gas` | Abilities, attributes, effects — tick-denominated | `common/ability/*`, `AbilitySystem`, `AttributeSystem` |
 | `udea-net` | Transports, baselines, relevancy, prediction, RPC | `common/network/*`, both `Network*System`s, KryoNet |
-| `udea-render` | The only module that touches GL | `SpriteBatchSystem` et al., `GameScreen`'s rendering half |
+| `udea-render` | The only module that *owns* GL — the backend, the targets, the pipeline, the capture | `SpriteBatchSystem` et al., `GameScreen`'s rendering half |
 | `udea-agent` | MCP surface + test harness — same code path | FruitGameKTX's `DebugBridge` pattern, generalised |
-| `udea-agent-host` | HTTP server, debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` |
+| `udea-agent-host` | HTTP server + the toolsets that need a render context or live input: render, input, ui. Debug-only, verified absent from release. **Depends on `udea-render` and may see GL** — it implements `RenderControl` and the activity overlay's `OverlaySystem`, which is what owning the render toolset means; it is kept out of shipped artifacts by `UDEA-REL-001`/`UDEA-REL-002`, not by the headless rule (`docs/module-graph.md`) | `level-editor`, `idea-plugin`, `compose-ui` |
 | `udea-gradle` | Tasks, verifiers, `gamebridge.json` emission | old `gradle-plugin` (which leaked `gradleApi` onto the game runtime) |
 | `moba` | The example game | `example` |
 

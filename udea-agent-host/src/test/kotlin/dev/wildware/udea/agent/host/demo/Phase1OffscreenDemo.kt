@@ -12,6 +12,7 @@ import dev.wildware.udea.agent.host.AgentHostTools
 import dev.wildware.udea.agent.host.ArtifactToolset
 import dev.wildware.udea.agent.host.GameIdentity
 import dev.wildware.udea.agent.host.RenderToolset
+import dev.wildware.udea.agent.host.render.OffscreenRenderControl
 import dev.wildware.udea.agent.host.ToolManifest
 import dev.wildware.udea.agent.query.AgentComponentIndex
 import dev.wildware.udea.agent.state.DigestSources

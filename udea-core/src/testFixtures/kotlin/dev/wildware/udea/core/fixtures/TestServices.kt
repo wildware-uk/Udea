@@ -6,7 +6,15 @@ import dev.wildware.udea.core.EngineConfig
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.GameContextBuilder
 import dev.wildware.udea.core.NetRole
-import dev.wildware.udea.core.PhysicsWorld
+import com.github.quillraven.fleks.World
+import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.core.identity.NetIdIndex
+import dev.wildware.udea.core.physics.BodyDef
+import dev.wildware.udea.core.physics.BodyHandle
+import dev.wildware.udea.core.physics.BodyPose
+import dev.wildware.udea.core.physics.NoOpPhysicsWorld
+import dev.wildware.udea.core.physics.PhysicsRebuildPlan
+import dev.wildware.udea.core.physics.PhysicsWorld
 import dev.wildware.udea.core.RngService
 import dev.wildware.udea.core.RngStream
 import dev.wildware.udea.core.SceneId
@@ -61,20 +69,69 @@ public class DeterministicRngService(override val seed: Long) : RngService {
     }
 }
 
-/** Counts what the simulation asked of physics. Never simulates anything. */
-public class RecordingPhysicsWorld : PhysicsWorld {
+/**
+ * Counts what the simulation asked of physics, and does the real bookkeeping underneath.
+ *
+ * Delegation rather than a hand-written double: body creation, destruction and the
+ * deterministic rebuild walk are the behaviour under test in several places, so a fake that
+ * reimplemented them would be testing itself. What this adds is the counters — how many ticks
+ * were stepped, how many rebuilds ran, how many transform writes happened — which is what
+ * makes "exactly 600 steps at the fixed dt" and "zero teleports on a normal tick" assertable.
+ */
+public class RecordingPhysicsWorld(
+    private val delegate: NoOpPhysicsWorld = NoOpPhysicsWorld(),
+) : PhysicsWorld by delegate {
+
     public var stepCount: Int = 0
         private set
 
     public var rebuildCount: Int = 0
         private set
 
+    /** Transform writes. Must stay zero across a tick nobody queued a `Teleport` on. */
+    public var teleportCount: Int = 0
+        private set
+
+    /** Owners of every body created since construction, in creation order. */
+    public val creationOrder: List<NetId> get() = created
+
+    private val created = ArrayList<NetId>()
+
     override fun stepOneTick() {
         stepCount++
+        delegate.stepOneTick()
     }
 
-    override fun rebuildFromComponents() {
+    override fun createBody(def: BodyDef): BodyHandle {
+        created += def.owner
+        return delegate.createBody(def)
+    }
+
+    override fun teleport(handle: BodyHandle, pose: BodyPose) {
+        teleportCount++
+        delegate.teleport(handle, pose)
+    }
+
+    /**
+     * The same three lines a Box2D backend writes: destroy everything, then walk the shared
+     * [PhysicsRebuildPlan]. Not `delegate.rebuildFrom`, because that would call the delegate's
+     * own `createBody` and this class would record none of the creations it is here to record.
+     */
+    override fun rebuildFrom(world: World, netIds: NetIdIndex) {
         rebuildCount++
+        created.clear()
+        destroyAllBodies()
+        for (planned in PhysicsRebuildPlan.of(world, netIds).bodies) {
+            planned.component.handle = createBody(planned.def)
+        }
+    }
+
+    /** Forgets the counters, so a test can measure one phase of a longer run. */
+    public fun resetCounters() {
+        stepCount = 0
+        rebuildCount = 0
+        teleportCount = 0
+        created.clear()
     }
 }
 

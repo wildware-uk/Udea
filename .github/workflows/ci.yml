@@ -43,16 +43,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # The old tree (`common`, `example`, `gradle-plugin`, `level-editor`, `idea-plugin`,
-  # `compose-ui`) is replaced module by module and deleted at the Phase 6 exit. It is not made
-  # green before then, and `:level-editor:compileKotlin` is broken today for reasons that
-  # predate this workflow. Excluding it here is deliberate: CI gates the rewrite.
-  UDEA_LEGACY_EXCLUDES: >-
-    -x :level-editor:compileKotlin
-    -x :level-editor:test
-    -x :idea-plugin:compileKotlin
-    -x :idea-plugin:test
+# No build exclusions. There used to be four: `level-editor` and `idea-plugin` could not
+# compile, and every job worked around it with `-x`. D6 deleted both modules along with
+# `compose-ui` (Phase 0, issue #137), so the whole repository - old tree included - builds
+# green. A workflow that carries an exclusion nobody has retested is a workflow that hides the
+# next breakage, so the list is gone rather than emptied.
 
 jobs:
   build:
@@ -91,7 +86,7 @@ jobs:
         shell: bash
         run: >-
           ./gradlew build udeaVerifyNoLegacyDependencies udeaVerifyModuleGraph
-          --stacktrace $UDEA_LEGACY_EXCLUDES
+          --stacktrace
 
       - name: Upload test reports
         if: failure()
@@ -117,6 +112,95 @@ jobs:
             **/build/reports/udea/**
           if-no-files-found: error
           retention-days: 7
+
+  legacy-ledger:
+    # Issues #136 and #146. Two questions the rest of CI cannot answer: is every old-tree file
+    # still accounted for, and has anything in the new tree been copied out of the old one
+    # without a current review?
+    #
+    # Spec section 7 rates two coexisting module trees as the highest-impact insidious risk on
+    # the project - the globals leak back and headless silently breaks, with the symptom
+    # appearing far from the cause. `udeaVerifyNoLegacyDependencies` catches the *classpath*
+    # half of that. This catches the half a classpath check cannot see: a file copied forward
+    # by hand.
+    #
+    # **This job must be a required status check on `master`.** That is a repository setting,
+    # not something a workflow file can assert.
+    #
+    # Both tasks are also on `check`, so the `build` job above already runs them. Naming them
+    # here as well is deliberate: this leg finishes in under a minute and says *which* rule
+    # broke, where a red `build` on two operating systems says only that something did.
+    name: migration ledger
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      # `build-logic` is an included build, so its tests are NOT run by the root `build`.
+      # Without this step every rule behind every Phase 0 gate - the module graph, the legacy
+      # classpath, the release scan and both migration gates - would be verified only by the
+      # gates themselves passing on a tree that happens to be clean, which proves nothing about
+      # whether they can still fail.
+      - name: The gate rules' own test suite
+        shell: bash
+        run: ./gradlew -p build-logic check --stacktrace
+
+      - name: Every old-tree file is in the ledger, and no copy is unreviewed
+        shell: bash
+        run: ./gradlew udeaLegacyReport udeaVerifyMigration --stacktrace
+
+      - name: Upload the reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: udea-migration-reports
+          path: build/reports/udea/**
+          if-no-files-found: error
+          retention-days: 7
+
+  agents-md:
+    # Issues #138 and #139. `AGENTS.md` is the only thing an agent starting cold reads, so a
+    # module table that no longer matches `settings.gradle.kts` is a correctness bug rather
+    # than a docs nit - it is how an agent ends up writing into a module that does not exist,
+    # or never learning about one that does.
+    #
+    # `udeaVerifyTrelloMap` rides along because it is the same class of failure: bookkeeping
+    # spanning two systems, which decays into nothing unless something goes red when it drifts.
+    #
+    # **This job must be a required status check on `master`.**
+    name: agent brief matches the tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: AGENTS.md and the Trello map describe the tree that exists
+        shell: bash
+        run: ./gradlew udeaVerifyAgentsMd udeaVerifyTrelloMap --stacktrace
 
   plugin-disabled:
     # Spec 7's mitigation for D8, and a Phase 0 exit criterion: **CI proves the build is green
@@ -163,7 +247,7 @@ jobs:
         shell: bash
         run: >-
           ./gradlew build -Pudea.compilerPlugin.enabled=false
-          --stacktrace $UDEA_LEGACY_EXCLUDES
+          --stacktrace
           -x :udea-compiler-plugin:test
 
       - name: Upload test reports

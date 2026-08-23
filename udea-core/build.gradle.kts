@@ -30,6 +30,22 @@ dependencies {
 // `sparseInterval`, keeping the full sixty-second rewind window at lower keyframe density.
 // Never loosen a number in `SnapshotBudgets` and never disable a task here.
 
+/**
+ * The `CoreModule` system-order golden pins which systems run and in what order, so it has to
+ * be regenerable on purpose and never by accident. `./gradlew :udea-core:test
+ * -Dupdate.goldens=true` rewrites it; without the flag an order change is a failing diff.
+ *
+ * Gradle has no `--update-goldens` option for a plain `Test` task, so the flag is a system
+ * property, matching `:udea-net`. `udea.projectDir` gives the test the source path to rewrite,
+ * which the classpath alone cannot provide.
+ */
+val updateGoldens: Provider<String> = providers.systemProperty("update.goldens").orElse("false")
+
+tasks.withType<Test>().configureEach {
+    systemProperty("udea.projectDir", projectDir.absolutePath)
+    systemProperty("update.goldens", updateGoldens.get())
+}
+
 val budgetTestClasses = listOf(
     "dev.wildware.udea.core.snapshot.SnapshotBudgetTest",
     "dev.wildware.udea.core.snapshot.TickLoopBudgetTest",

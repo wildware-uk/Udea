@@ -51,25 +51,10 @@ public interface RngService {
     public fun nextBoolean(stream: RngStream): Boolean
 }
 
-/**
- * Everything physical that is *not* authoritative movement (spec 3.4).
- *
- * `CharacterMover` — an allocation-free capsule sweep, replayable 60x per frame — owns
- * movement for every predicted or replicated entity. Box2D survives behind this interface
- * for sensor queries, debris and server-only projectiles, and **is never snapshot state**:
- * after a restore, bodies are rebuilt from components in one deterministic pass, which is
- * what [rebuildFromComponents] is for.
- *
- * There is no `step(seconds)`. The physics world advances a whole tick at a time like
- * everything else.
- */
-public interface PhysicsWorld {
-    /** Advances the non-authoritative physics world by exactly one simulation tick. */
-    public fun stepOneTick()
-
-    /** Rebuilds every body from component state. Called after a snapshot restore. */
-    public fun rebuildFromComponents()
-}
+// `PhysicsWorld` was declared here while it was two methods. It now carries body handles,
+// shapes, sensor and raycast queries and contact registration, so it lives in
+// `dev.wildware.udea.core.physics` beside the components it rebuilds from — this file is an
+// index of what `GameContext` names, not a home for a subsystem's whole surface.
 
 /**
  * Scene lifecycle. A scene swap is a between-tick mutation, so a request made mid-tick takes

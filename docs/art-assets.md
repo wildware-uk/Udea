@@ -13,6 +13,11 @@ python scripts/extract-art.py
 This manifest IS committed so blueprints, issues and champion designs can name real
 characters and animation frame counts without shipping the art.
 
+> **The `moba` half of that is true. The `example` half is not.** Third-party art from the same
+> pack is already committed under `example/src/main/resources/assets/sprites/`, and this
+> repository is public. See [Committed art in `example`](#committed-art-in-example) at the
+> bottom of this file for what is there, the options, and the recommendation.
+
 ## Format
 
 Every sheet is a horizontal strip of 100x100 frames, so `columns = width / 100` and
@@ -98,3 +103,65 @@ if a visual faction split is wanted. That is a gameplay decision, not baked into
 - `warlock_attack02_effect.png` (9 frames)
 - `wizard_attack01_effect.png` (10 frames)
 - `wizard_attack02_effect.png` (7 frames)
+
+
+---
+
+## Committed art in `example`
+
+`example/src/main/resources/assets/sprites/` holds 64 committed image files from the same **Tiny
+RPG Character Asset Pack**, 42 of them in the four paid-pack directories. They landed in commit `2ffb932`, long before the `moba` rule above
+existed, and the repository is **public**.
+
+### What is actually there
+
+| Directory | Pack | Redistributable? |
+|---|---|---|
+| `soldier/`, `orc/`, `arrow/` | the free **Soldier & Orc** demo | Under the demo's own terms — still not this repo's to relicense |
+| `wizard/`, `priest/`, `skeleton/`, `orc_elite/` | the **paid** pack | **No.** This is the part that matters |
+
+The four paid-pack directories are the exposure. A public MIT repository reads, to anyone who
+does not open this file, as an offer of everything in it under MIT — including art the author
+has a licence to *use* and no right to *sublicense*.
+
+Two smaller inconsistencies found alongside it, both worth fixing when their module is next
+touched:
+
+- `common/build.gradle.kts` and `gradle-plugin/build.gradle.kts` both publish a POM declaring
+  **Apache-2.0**, while `README.md` and the new `LICENSE` say MIT. Three claims, one project.
+  Those two POMs belong to old-tree modules deleted in Phase 6, so the cheapest correct fix is
+  to let them go with the modules rather than edit them now — but a `mavenLocal` publish made
+  before then carries the wrong licence.
+- The provenance of `example/src/main/resources/assets/sounds/` is recorded nowhere. It may be
+  the author's, it may not. Until somebody says which, `LICENSE` excludes it.
+
+### The options
+
+Deciding this is the owner's call, not an agent's, because only the owner knows what the pack
+licence actually permits and what the risk appetite is. All four options are real.
+
+| # | Option | Cost | What it does not fix |
+|---|---|---|---|
+| 1 | **Leave it. Rely on the `LICENSE` exclusion.** | None | The files stay in the published tree and in every clone. A reader who does not open `LICENSE` still sees art under an MIT repo |
+| 2 | **Delete the four paid directories from `HEAD`**, keep the free demo art, and replace the affected `.udea.kts` characters with placeholders | Half a day; `example` is deleted in Phase 6 anyway | History still carries them. Anyone can `git checkout` an old commit |
+| 3 | **Option 2, plus rewrite history** (`git filter-repo`) and force-push | Breaks every clone and every open PR; rewrites 500+ commits | Nothing, but it is the most expensive option and the tree is public, so copies may already exist |
+| 4 | **Make the repository private** until the art is out | Loses the public project | Reversible, but it is a bigger decision than the art |
+
+### Recommendation
+
+**Option 2, now; not option 3.**
+
+- The exposure that matters is what a visitor sees at `HEAD`, and option 2 removes it for the
+  cost of a placeholder swap in a module that is being deleted in Phase 6 regardless.
+- Option 3 buys very little on top. The repository is already public: history rewriting removes
+  the files from *this* copy, not from any clone, fork or cache that already has them, so it
+  pays the full cost of breaking every clone for a partial guarantee. **This is explicitly the
+  owner's call and nothing here should rewrite published history to force it.**
+- Option 1 is defensible only as a deliberate, recorded choice. It is not defensible as the
+  thing that happens because nobody decided.
+- Option 4 is a bigger lever than the problem needs.
+
+Whichever is chosen, the `LICENSE` exclusion stays: it is what makes the position explicit
+rather than implied, and it is needed for the free-demo art in any case.
+
+**Status:** undecided. This is a Phase 0 checkpoint item — `docs/decisions/phase-log.md`.

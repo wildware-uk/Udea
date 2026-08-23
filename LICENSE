@@ -1,0 +1,53 @@
+MIT License
+
+Copyright (c) 2025-2026 Shaun Wild
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-------------------------------------------------------------------------------
+
+THIRD-PARTY ASSETS — NOT COVERED BY THE LICENSE ABOVE
+
+The MIT licence above covers the source code, build scripts and documentation
+in this repository. It does NOT grant any right in third-party artwork, audio
+or other media that may be present in the tree. Those files remain the property
+of their respective creators and are licensed to this project's author only,
+under the terms the creators supply. They are not sublicensed, and no right to
+use, copy, modify or redistribute them is granted by this file.
+
+Specifically excluded, and NOT redistributable under this licence:
+
+  * Character sprite art, shadow sheets and spell-effect sheets under
+    example/src/main/resources/assets/sprites/ — derived from the "Tiny RPG
+    Character Asset Pack" by Free Game Assets (craftpix.net). This includes,
+    but is not limited to, the wizard/, priest/, skeleton/ and orc_elite/
+    directories, which come from the PAID pack rather than the free demo.
+
+  * Any content under moba/src/main/resources/assets/sprites/ or
+    moba/raw-assets/. These paths are excluded by .gitignore and the pixels are
+    not committed; docs/art-assets.md carries the manifest instead.
+
+  * Audio under example/src/main/resources/assets/sounds/. The provenance of
+    these files is not recorded anywhere in the repository, so no claim is made
+    that they are the author's to license. Treat them as excluded until that is
+    established; docs/art-assets.md tracks it as open.
+
+If you fork, vendor or redistribute this repository, you must supply your own
+art and audio. See docs/art-assets.md for the current status of these files and
+the options for resolving the committed ones.

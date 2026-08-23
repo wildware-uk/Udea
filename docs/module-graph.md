@@ -1,9 +1,12 @@
 # Module graph
 
 The rewrite tree (spec §4), the convention plugin each module is on, the old code it
-replaces, and its arrows. The old modules (`common`, `example`, `gradle-plugin`,
-`level-editor`, `idea-plugin`, `compose-ui`) stay in `settings.gradle.kts` until the
-Phase 6 exit; nothing below may depend on them.
+replaces, and its arrows. The old modules that remain (`common`, `example`, `gradle-plugin`)
+stay in `settings.gradle.kts` until the Phase 6 exit; nothing below may depend on them.
+`level-editor`, `idea-plugin` and `compose-ui` were deleted in Phase 0 under D6 — they had no
+replacement to wait for. They stay on the banned list below regardless: a coordinate that
+cannot match costs nothing, and it is what stops one being quietly re-added.
+`docs/migration/ledger.md` carries the retirement order.
 
 **Rule, enforced from Phase 0:** no `udea-*` or `moba` project may have `common` on its
 compile classpath. Anything needed is copied forward deliberately, file by file, with the

@@ -154,9 +154,10 @@ public class SnapshotService(
         rng.restoreFrom(snapshot.rng, 0)
 
         // Box2D is never snapshot state (spec 3.4): bodies come back from components in one
-        // deterministic pass. The sibling physics issue makes this do work; until then the
-        // context's PhysicsWorld is free to make it a no-op, and the seam does not move.
-        ctx.physics.rebuildFromComponents()
+        // deterministic pass, and this is the last thing a restore does — after every
+        // Replicator.apply above, because the components it reads are what those calls just
+        // wrote. Ascending NetId order comes from the index, which is why it is passed.
+        ctx.physics.rebuildFrom(world, netIds)
 
         for (subsystem in excluded) subsystem.onRestored()
         restoreCount++

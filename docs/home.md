@@ -26,8 +26,16 @@ Udea is a high-level 2D game engine built on **LibGDX** and the **Fleks ECS** fr
 - [📦 Asset Management & DSL](assets.md)
 - [🌐 Networking & Synchronization](networking.md)
 
+> **These pages describe the pre-rewrite engine and are being replaced.** `AGENTS.md` at the
+> repository root is the current brief: module table, dependency rules, the tick model and the
+> frozen contracts. The rewrite of this tree is scheduled for Phase 6.
+
 #### Core Modules:
-- **`common`**: Core engine code, ECS systems, and network synchronization.
-- **`level-editor`**: In-game editor for creating levels.
-- **`idea-plugin`**: IntelliJ IDEA support for `.udea.kts` files.
-- **`gradle-plugin`**: Automated code generation for DSL and networking.
+- **`udea-*`**: The engine being built. See `AGENTS.md`.
+- **`moba`**: The 5v5 MOBA the engine is built against.
+- **`common`**: Old engine core, ECS systems and network synchronization. Deleted in Phase 6.
+- **`gradle-plugin`**: Old code generation for DSL and networking. Deleted in Phase 6.
+- **`example`**: Old example game. Replaced by `moba`, deleted in Phase 6.
+
+The level editor, the IDEA plugin and `compose-ui` were deleted in Phase 0: the MCP tool
+surface is the editor, so nothing replaces them. `docs/migration/ledger.md` has the order.

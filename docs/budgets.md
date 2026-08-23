@@ -23,9 +23,9 @@ and notes drift.
 
 `udeaAssemble` assembles every `:udea-*` project and `:moba`, and nothing else —
 `./gradlew udeaAssemble --dry-run` lists no old-module task. Budgeting plain `assemble` would
-measure `idea-plugin` resolving a whole IntelliJ distribution and `compose-ui` behind it; that
-number is real but it is not a number the rewrite can move, and a budget nobody can act on is
-a budget nobody looks at.
+measure `common` and `example` resolving KryoNet, Box2D natives and five `kotlin-scripting-*`
+artifacts; that number is real but it is not a number the rewrite can move — it belongs to code
+on its way out — and a budget nobody can act on is a budget nobody looks at.
 
 The configuration cache stays **on**. It is on in `gradle.properties`, so it is the
 configuration this project actually runs; turning it off for the measurement would produce a

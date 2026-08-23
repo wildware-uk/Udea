@@ -9,6 +9,7 @@ import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.RngStream
 import dev.wildware.udea.core.SceneId
 import dev.wildware.udea.core.SimSystem
+import dev.wildware.udea.core.physics.PhysicsWorld
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.fixtures.QueueingSceneManager
 import dev.wildware.udea.core.fixtures.RecordingCueSink
@@ -47,6 +48,13 @@ internal class SnapshotWorld(
      * world configuration scope — which is also what stops a test bolting one on mid-tick.
      */
     withProbe: Boolean = false,
+    /**
+     * The context's physics world.
+     *
+     * Injectable so a test can watch *when* `rebuildFrom` is called relative to the restore's
+     * `Replicator.apply` calls, which is an ordering the default recording double cannot see.
+     */
+    physicsWorld: PhysicsWorld = RecordingPhysicsWorld(),
 ) {
 
     val netIds: NetIdIndex = NetIdIndex(capacity = idCapacity, entityCapacity = idCapacity)
@@ -58,7 +66,7 @@ internal class SnapshotWorld(
         // The production generator, not the fixture: SnapshotService requires a CapturableRng,
         // which is the whole reason the interface exists.
         rng = DefaultRngService(seed)
-        physics = RecordingPhysicsWorld()
+        physics = physicsWorld
         scenes = QueueingSceneManager(scene)
         cues = RecordingCueSink()
         simBarrier(barrier)
@@ -126,6 +134,12 @@ internal class SnapshotWorld(
             with(world) { entity[Link] }.target = ids[(index + 1) % ids.size]
         }
         return ids
+    }
+
+    /** The `x` of [netId]'s [Movement], for tests that need one scalar out of the world. */
+    fun positionXOf(netId: NetId): Float {
+        val entity = checkNotNull(netIds.resolveOrNull(netId)) { "$netId is not live" }
+        return with(world) { entity[Movement] }.position.x
     }
 
     /** Destroys [netId]'s entity the way a gameplay system would. */

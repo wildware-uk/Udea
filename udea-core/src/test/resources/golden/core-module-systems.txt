@@ -1,0 +1,2 @@
+PreSimulation dev.wildware.udea.core.physics.TeleportSystem
+Physics dev.wildware.udea.core.physics.PhysicsStepSystem after=dev.wildware.udea.core.physics.TeleportSystem

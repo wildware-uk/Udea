@@ -206,6 +206,29 @@ public class NetIdIndex(
         }
     }
 
+    /**
+     * Drops every id **and** the recycling history, so the next [allocate] returns index zero.
+     *
+     * Stronger than [clear], and only correct where the whole population is being replaced: a
+     * scene swap. After [clear] the free queue still holds the ids the previous population
+     * used, in the order they were released — so loading the same scene twice in one process
+     * lays its entities out at different indices depending on what ran in between, and two
+     * clients that took different routes to the same level disagree about which index is which.
+     * Resetting the queue makes a scene load a pure function of the scene.
+     *
+     * Generations are **not** reset. An id captured before the reset must still read stale, or
+     * a reference held across a scene swap would silently resolve to whatever occupies its
+     * index in the new scene — which is the aliasing bug the generation counter exists for.
+     */
+    public fun reset() {
+        clear()
+        freeHead = 0
+        freeTail = 0
+        freeSize = 0
+        nextFresh = 0
+        highWater = 0
+    }
+
     // --- snapshot restore ------------------------------------------------------------------
     // Three members, and nothing else, so that a rewind hands out the same ids the original
     // run did. Without them a restored world would re-allocate different ids for everything

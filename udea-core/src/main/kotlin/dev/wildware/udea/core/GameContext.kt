@@ -1,6 +1,7 @@
 package dev.wildware.udea.core
 
 import com.github.quillraven.fleks.InjectableConfiguration
+import dev.wildware.udea.core.physics.PhysicsWorld
 
 /**
  * Everything a simulation system is allowed to reach that is not a component.

@@ -15,11 +15,12 @@ plugins {
 rootProject.name = "udea"
 
 // --- old tree: replaced module by module, deleted at the Phase 6 exit (spec 6) ---
-include("level-editor")
+//
+// `level-editor`, `idea-plugin` and `compose-ui` are gone: D6 drops all three outright, since
+// the MCP tool surface *is* the editor (spec 1). They had no replacement to wait for, so they
+// went in Phase 0. The three below do have replacements and stay until those land - see
+// `docs/migration/ledger.md` for the retirement order and the gate that settles each one.
 include("common")
-include("idea-plugin")
-include("compose-ui")
-
 include("gradle-plugin")
 include("example")
 include("example:assets")

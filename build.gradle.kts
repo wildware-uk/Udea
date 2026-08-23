@@ -2,16 +2,22 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "2.2.10"
     id("java")
-    id("org.jetbrains.compose") version "1.7.3"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.1.20"
+
+    // Not applied: the root project has no sources of its own. It is declared so that the
+    // Kotlin Gradle plugin is on this script's classpath, which is what makes the
+    // `KotlinCompile` type below resolvable for the `allprojects` jvmTarget rule.
+    kotlin("jvm") version "2.2.10" apply false
 
     // Phase 0 build gates from the `build-logic` included build. Applied to the rewrite
     // subprojects below, never to the root or to the old tree.
     id("udea.legacy-dependency-check") apply false
     id("udea.module-graph-check") apply false
     id("udea.release-check") apply false
+
+    // The exception: the migration gates ask about the whole tree at once, so they are the one
+    // pair that belongs on the root. See `docs/migration/ledger.md`.
+    id("udea.migration-check")
 }
 
 group = "dev.wildware.udea"
@@ -28,7 +34,6 @@ allprojects {
         maven("https://oss.sonatype.org/content/repositories/snapshots/")
         maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
         maven("https://s01.oss.sonatype.org")
-        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
         maven("https://jitpack.io")
     }
 
@@ -44,32 +49,10 @@ allprojects {
     }
 }
 
-sourceSets {
-    create("integrationTest") {
-        compileClasspath += sourceSets.main.get().output
-        runtimeClasspath += sourceSets.main.get().output
-    }
-}
-
-val integrationTestImplementation by configurations.getting {
-    extendsFrom(configurations.testImplementation.get())
-}
-
-dependencies {
-    testImplementation("junit:junit:4.13.2")
-    implementation(kotlin("reflect"))
-    implementation(compose.desktop.currentOs) {
-        exclude("org.jetbrains.compose.material")
-    }
-    implementation("com.bybutter.compose:compose-jetbrains-expui-theme:2.0.0")
-    implementation("org.jetbrains.skiko:skiko-awt:0.8.11")
-    implementation(project(":level-editor"))
-    implementation(project(":common"))
-
-    integrationTestImplementation("org.junit.jupiter:junit-jupiter:5.7.1")
-    integrationTestImplementation("org.kodein.di:kodein-di-jvm:7.20.2")
-    integrationTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.1")
-}
+// The root project deliberately declares no sources and no dependencies. It used to be a
+// Compose Desktop application wrapping `:level-editor`, with an `integrationTest` source set
+// over a checked-in copy of an entire sample project. D6 deleted the editor; the root is now
+// only an aggregator for the subprojects and the gates below.
 
 // --- Phase 0 build gates (spec 4, spec 6, spec 7) ------------------------------------
 //
@@ -119,8 +102,10 @@ val udeaVerifyRelease by tasks.registering {
  * `assemble` for the rewrite tree only.
  *
  * The clean-build budget (spec 6, Phase 0 exit: <90s) is measured against this. Budgeting
- * `assemble` instead would measure `idea-plugin` and `compose-ui` downloading an IntelliJ
- * distribution, which would dominate the number and make the gate meaningless.
+ * `assemble` instead would measure `common` and `example` resolving KryoNet, Box2D natives and
+ * five `kotlin-scripting-*` artifacts, which would dominate the number and make the gate
+ * meaningless - and it is a number the rewrite cannot move, because it belongs to code that is
+ * on its way out.
  */
 val udeaAssemble by tasks.registering {
     group = "build"

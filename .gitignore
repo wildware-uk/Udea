@@ -4,6 +4,12 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+# Test-report output. `allure-results/` is written by the old `example` suite; both of these
+# have been committed by accident before, which is why they are named rather than left to the
+# `build/` rule - neither lives under a `build/` directory.
+allure-results/
+.attach_pid*
+
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml

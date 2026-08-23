@@ -19,15 +19,22 @@ Check out the [Udea Engine Documentation](docs/home.md) to get started!
 - Many built-in components, streamlining creation of games.
 - Networking, automatically syncs components across clients.
 - A feature-rich asset system.
-- An IDE plugin to create levels and assets.
+- An MCP tool surface on every game, so an agent can inspect and drive a running world.
 
 ## Modules
 
-- **`comomon`** - Common code for the engine and plugin.
-- **`level-editor`** - An embedded LibGDX level editor.
-- **`idea-plugin`** - An IDE plugin for creating levels and assets.
-- **`gradle-plugin`** - Gradle plugin for generated network code + DSL.
-- **`example`** - Example game created with the engine.
+Udea is mid-rewrite. The `udea-*` tree is the engine being built; the modules below it are the
+old tree, kept only until their replacements land. `AGENTS.md` has the full module table and the
+dependency rules; `docs/migration/ledger.md` has the retirement order.
+
+- **`udea-*`** - The rewrite. See `AGENTS.md`.
+- **`moba`** - The 5v5 MOBA the engine is built against.
+- **`common`** - Old engine core. Replaced module by module; deleted in Phase 6.
+- **`gradle-plugin`** - Old codegen plugin. Replaced by `udea-gradle` + `udea-codegen` in Phase 6.
+- **`example`** - Old example game. Replaced by `moba` in Phase 3.
+
+The level editor, the IDEA plugin and `compose-ui` were deleted in Phase 0: the tool surface is
+the editor, so there is nothing to replace them with.
 
 ## Contributing
 
@@ -42,7 +49,13 @@ Contributions are welcome! Please follow these steps:
 - Open a pull request.
 
 ## License
-This project is licensed under the MIT License. See the LICENSE file for details.
+
+The **code** is MIT. See [`LICENSE`](LICENSE).
+
+The **art and audio are not**. Third-party sprite art from a paid asset pack is committed under
+`example/src/main/resources/assets/sprites/`; `LICENSE` names it and excludes it explicitly, and
+[`docs/art-assets.md`](docs/art-assets.md) records what is there, the options and the
+recommendation. If you fork this repository, bring your own art.
 
 ## Contact
 For questions or support, raise an issue on the project.

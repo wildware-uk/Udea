@@ -96,7 +96,10 @@ public class UnitBlueprint(
 /**
  * Every unit the level can spawn, and the lookup from an authored id to the code that builds it.
  *
- * The ids are the ones `assets/blueprint/units.udea.kts` declares. Renaming one there without
+ * The ids are the ones `assets/blueprint/units.udea.kts` declares - one per character the art
+ * tree packs, which is the invariant that broke once already: `orc_elite` and `wizard` were
+ * declared, packed and cut into the atlas with no blueprint naming them, so no level could
+ * have spawned either. Renaming one there without
  * renaming it here turns the scene swap red on the next boot with a message naming both sides,
  * which is the whole reason [byAssetId] refuses rather than skips.
  */
@@ -114,11 +117,34 @@ public class MobaBlueprints(
     /** `blueprint/orc`. */
     public val orc: UnitBlueprint = build(UnitKind.Orc, Team.ORC)
 
+    /**
+     * `blueprint/orc_elite`, and the unit a human drives.
+     *
+     * The old game's `blueprint/player` declared `inherits = reference("blueprint/orc_elite")`,
+     * so the player *was* the elite. It is here for a reason beyond fidelity: `MobaUnits` grants
+     * `ability/orc_elite_spin` to this kind and to nothing else, so with no `orc_elite` on the
+     * field [dev.wildware.moba.ability.OrcSpinExec] - a registered exec with a `TargetPolicy`, an
+     * eleven-frame sheet and a `MobaCues` entry behind it - could not activate in any process
+     * this game can boot. A registered ability no shipped entity can be granted is dead code that
+     * every test in front of it reports as green.
+     */
+    public val orcElite: UnitBlueprint = build(UnitKind.OrcElite, Team.ORC)
+
     /** `blueprint/skeleton`. */
     public val skeleton: UnitBlueprint = build(UnitKind.Skeleton, Team.UNDEAD)
 
-    /** All four, in declaration order. What the agent's blueprint catalog is built from. */
-    public val all: List<UnitBlueprint> = listOf(soldier, priest, orc, skeleton)
+    /**
+     * `blueprint/wizard`. On the soldiers' side, as `MobaUnits` declares it.
+     *
+     * The sixth character, and the second whose packed art nothing could name. It carries the
+     * basic attack alone - `wizard.udea.kts` records that the source corpus' `ability/wizard_heal`
+     * had neither art nor a declaration behind it, and the priest is this tree's healer.
+     */
+    public val wizard: UnitBlueprint = build(UnitKind.Wizard, Team.SOLDIER)
+
+    /** All six, in declaration order. What the agent's blueprint catalog is built from. */
+    public val all: List<UnitBlueprint> =
+        listOf(soldier, priest, orc, orcElite, skeleton, wizard)
 
     private val byId: Map<String, UnitBlueprint> = all.associateBy { it.assetId.value }
 

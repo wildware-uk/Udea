@@ -166,10 +166,27 @@ public class MobaScene private constructor(
             // Positional, not a trailing lambda: `register`'s trailing lambda is the ordering
             // constraint block, and a factory written there registers nothing at all.
             registry.register(RenderPhase.PreRender, { camera })
+            // The ground, first in the phase and constrained rather than merely registered first:
+            // `RenderOrder` tie-breaks by registration index, so this would in fact draw first
+            // today - and an edit that moved a line would have painted the field over the units
+            // with nothing to say so. See `BackgroundRenderSystem` for why `moba` had no ground
+            // at all until now (`gameConfig.backgroundTexture` was null, and the old
+            // `BackgroundDrawSystem` drew nothing when it was).
+            val ground = registry.register(
+                RenderPhase.World,
+                { resources -> BackgroundRenderSystem(resources, camera) },
+            )
             val characters = registry.register(
                 RenderPhase.World,
                 { resources -> CharacterRenderSystem(resources, camera) },
-            )
+            ) { after(ground) }
+            // Arrows and flashes over bodies. A second pass and not a wider family on the first:
+            // `CharacterView` indexes the `CharacterRoster`, which refuses anything short of the
+            // five `UnitState`s, and an arrow has one frame and no states. See `MobaVfx.kt`.
+            registry.register(
+                RenderPhase.World,
+                { resources -> SpriteRenderSystem(resources, camera) },
+            ) { after(characters) }
             // Bars over bodies. `after` and not registration order: both are in `RenderPhase.World`
             // and the phase alone does not order two systems inside it, so a later edit that moves
             // this line above the characters would silently draw every bar behind its own sprite.

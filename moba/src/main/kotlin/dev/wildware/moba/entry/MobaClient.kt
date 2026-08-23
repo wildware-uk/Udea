@@ -1,6 +1,7 @@
 package dev.wildware.moba.entry
 
 import dev.wildware.moba.MobaGame
+import dev.wildware.moba.audio.MobaAudio
 import dev.wildware.udea.core.host.RenderMode
 
 /**
@@ -38,9 +39,24 @@ public object MobaClient {
             MobaEntry.wireInput(host, rendering, extra = null)
             MobaEntry.follow(rendering, player)
             println("[moba.client] you are net id ${player.raw}; WASD to walk, Space to swing")
-            // `host::frame` and nothing else: a client binds no port, drains no command queue and
-            // holds no resource the backend's own `close` does not already own.
-            MobaEntry.Attachment(frame = host::frame)
+            // Audio. Built on the render thread because `Gdx.audio` has the same thread affinity
+            // every `Gdx` static has, and this is the call that opens the OpenAL buffers.
+            var built: MobaAudio? = null
+            rendering.onRenderThread { built = MobaAudio.forHost(host) }
+            val audio = checkNotNull(built) { "MobaAudio was not built on the render thread" }
+            audio.listenTo(player)
+            // `host.frame` *and* `audio.frame`, which is the one line that separates a client from
+            // a silent one. It is not only "you can hear it now": nothing in the shipped build
+            // emptied `GameContext.cues`, so `CueQueue` filled its 1024 slots in about two seconds
+            // of fighting and discarded every cue after that. A client that renders and never
+            // drains is a client whose cue mechanism is inert, whatever it does about sound.
+            MobaEntry.Attachment(
+                frame = { delta ->
+                    host.frame(delta)
+                    audio.frame()
+                },
+                close = audio::close,
+            )
         }
     }
 }

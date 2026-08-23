@@ -7,6 +7,7 @@ import com.github.quillraven.fleks.World
 import dev.wildware.udea.core.replication.ComponentTypeId
 import dev.wildware.udea.core.replication.FieldStore
 import dev.wildware.udea.core.replication.Replicator
+import kotlin.reflect.KClass
 
 /**
  * One replicated component type, as the snapshot spine needs to see it.
@@ -31,6 +32,21 @@ public interface ReplicatedComponentType<T : Any> {
 
     /** The column layout for this component's lowered fields. */
     public val schema: ComponentSchema
+
+    /**
+     * The Kotlin class of the component this type captures.
+     *
+     * Carried so that [SnapshotCoverage] can ask a live world the one question no other part of
+     * the spine can answer: *is everything on this entity actually in the registry?* Capture
+     * walks the registry and asks each type whether the entity has it, so a component nobody
+     * registered is not merely uncaptured - it is invisible, and a rewind silently rebuilds an
+     * entity without it. Going the other way, from the component instances Fleks holds back to
+     * the registry, needs an identity for the type, and this is it.
+     *
+     * Never read on a per-tick path. Registration binds it once, and the audit is an explicit
+     * call.
+     */
+    public val componentClass: KClass<T>
 
     /** True when [entity] currently carries this component. */
     public fun isPresent(world: World, entity: Entity): Boolean
@@ -92,11 +108,15 @@ public inline fun <reified T> fleksComponentType(
     val codec = replicator
     val layout = schema
 
+    val declared = T::class
+
     return object : ReplicatedComponentType<T> {
 
         override val replicator: Replicator<T> get() = codec
 
         override val schema: ComponentSchema get() = layout
+
+        override val componentClass: KClass<T> get() = declared
 
         override fun isPresent(world: World, entity: Entity): Boolean =
             with(world) { entity.getOrNull(componentType) != null }
@@ -181,6 +201,9 @@ public class ComponentRegistry(types: List<ReplicatedComponentType<*>>) {
         }
     }
 
+    /** Every registered component's class, for [covers]. Built once; never walked per tick. */
+    private val coveredClasses: Set<KClass<*>> = ordered.mapTo(LinkedHashSet()) { it.componentClass }
+
     /** How many component types are registered. Also the width of a presence mask. */
     public val size: Int get() = ordered.size
 
@@ -209,6 +232,18 @@ public class ComponentRegistry(types: List<ReplicatedComponentType<*>>) {
     /** Whether [typeId] is registered here at all. */
     public operator fun contains(typeId: ComponentTypeId): Boolean =
         typeId.raw < denseIndex.size && denseIndex[typeId.raw] != NOT_REGISTERED
+
+    /**
+     * Whether a component of [componentClass] is captured and restored by this registry.
+     *
+     * Exact class identity, not `isInstance`: a subclass of a registered component is a
+     * different Fleks `ComponentType` with a different `Replicator`, and answering "yes" for one
+     * would report coverage the spine does not have.
+     */
+    public fun covers(componentClass: KClass<*>): Boolean = componentClass in coveredClasses
+
+    /** Every component class this registry captures, for a diagnostic that wants to list them. */
+    public val componentClasses: Set<KClass<*>> get() = coveredClasses
 
     override fun toString(): String =
         "ComponentRegistry(${ordered.joinToString { it.schema.typeName }})"

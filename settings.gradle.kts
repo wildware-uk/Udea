@@ -36,6 +36,11 @@ include("udea-assets-compiler")
 include("udea-gas")
 include("udea-net")
 include("udea-render")
+
+// Presentation, like `udea-render`, and headless like every other module here: it names no GL
+// type and no gdx backend. See `docs/module-graph.md` for the arrow set and for why the device
+// that actually opens a `Sound` lives in the game rather than in this module.
+include("udea-audio")
 include("udea-agent")
 include("udea-agent-host")
 include("udea-gradle")

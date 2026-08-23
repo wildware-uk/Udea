@@ -38,6 +38,7 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 | `udea-gas` | `udea.kotlin-library` | Abilities, attributes, effects — tick-denominated | `common/ability/*`, `AbilitySystem`, `AttributeSystem` | `udea-core` (api) | `moba` |
 | `udea-net` | `udea.kotlin-library` | Transports, baselines, relevancy, prediction, RPC | `common/network/*`, both `Network*System`s, KryoNet | `udea-core` (api) | `moba` |
 | `udea-render` | `udea.kotlin-library-gl` | The only module that touches GL | `SpriteBatchSystem` et al., `GameScreen`'s rendering half | `udea-core` (api), `udea-assets`, gdx + gdx-backend-lwjgl3 | `moba` |
+| `udea-audio` | `udea.kotlin-library` | Cue-driven sound: the drain that empties `GameContext.cues`, the cue-to-`SoundCue` routing table, distance attenuation, stereo pan, pitch variance and a per-frame voice cap. **No GL and no `Gdx`** — playback is an `AudioDevice` SPI, and `AudioDevice.Silent` is a shipped implementation, so a headless process drains the queue and makes no noise | `common/.../ecs/system/SoundSystem.kt`, which read `gameScreen.camera` off a file-level global inside a Fleks system and called `play` on a `Sound` held by an asset value | `udea-core` (api), `udea-assets` | `moba` |
 | `udea-agent` | `udea.kotlin-library` | MCP surface + test harness — same code path | FruitGameKTX's `DebugBridge` pattern, generalised | `udea-core` (api) | `udea-agent-host` |
 | `udea-agent-host` | `udea.kotlin-library` | HTTP server, plus the toolsets that need a render context (spec §4: render, input, ui). Debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` | `udea-agent` (api); `udea-render` + gdx (`implementation` — see below) | *(nothing — deliberately not `moba`)* |
 | `udea-gradle` | `udea.gradle-plugin` | Tasks, verifiers, `gamebridge.json` emission | old `gradle-plugin` (which leaked `gradleApi` onto the game runtime) | `udea-assets-compiler`, `udea-diagnostics`, `gradleApi()` (`compileOnly`) | *(nothing — applied as a plugin, never depended on)* |
@@ -52,6 +53,11 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
   `ModuleGraphRules.GL_ALLOWED_PROJECTS`, and adding a third means editing that set and the
   test that pins it.
 - `udea-assets-compiler` → any Gradle type. The daemon and CI must run identical code.
+- `udea-audio` → gdx, in any form. It is a designated headless module, so `UDEA-MG-002` bans
+  the backend on its classpath and `UDEA-MG-002-BYTECODE` bans `com/badlogic/gdx/Gdx` by
+  exact name. The class that turns a path into a noise is `moba`'s
+  `dev.wildware.moba.audio.GdxAudioDevice`, behind this module's `AudioDevice` interface —
+  the same shape as `Presentation`, which `udea-core` holds without owning a renderer.
 - Any game module → `udea-gradle`. The old `gradle-plugin` put the Gradle API on the game's
   runtime classpath through `implementation(gradleApi())`; here `gradleApi()` is
   `compileOnly` and nothing depends on the project.

@@ -9,6 +9,7 @@ import dev.wildware.udea.core.GameContextBuilder
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
 import dev.wildware.udea.core.blueprint.SpawnPlacement
 import dev.wildware.udea.core.blueprint.blueprintSpawner
+import dev.wildware.udea.core.blueprint.blueprints
 import dev.wildware.udea.core.module.SimPhase
 import dev.wildware.udea.core.module.SimRegistry
 import dev.wildware.udea.core.module.UdeaModule
@@ -118,7 +119,33 @@ public class MobaModule(
         registry.add(SimPhase.Cleanup, { CharacterAnimationSystem() }) {
             after(CharacterStateSystem::class)
         }
+        // The flashes. `Cleanup` and `before(GasCueForwardSystem)`, because that is the system
+        // that empties the GAS cue queue: every phase that can emit a cue has run by now, and
+        // reading the queue after the forwarder would read an empty one. See `EffectSpawnSystem`.
+        registry.add(
+            SimPhase.Cleanup,
+            { ctx ->
+                EffectSpawnSystem(
+                    cues = combat.gas.cues,
+                    netIds = ctx[dev.wildware.udea.core.module.CoreModule.NET_IDS],
+                    spawner = ctx.blueprints,
+                    blueprint = effects,
+                )
+            },
+        ) { before(dev.wildware.udea.gas.GasCueForwardSystem::class) }
+        // After the spawner, so a flash asked for this tick is not expired by the same tick it
+        // was asked for - which it could not be anyway (a spawn is a barrier action), but the
+        // constraint is what stops a later edit making it possible.
+        registry.add(SimPhase.Cleanup, { EffectExpirySystem() }) { after(EffectSpawnSystem::class) }
     }
+
+    /**
+     * The one blueprint every flash is spawned from.
+     *
+     * Held here rather than constructed per spawn: `EffectSpawnSystem` differs one flash from the
+     * next with `SpawnOverrides`, so a hit allocates a closure and not a blueprint.
+     */
+    public val effects: EffectBlueprint = EffectBlueprint()
 }
 
 /** This game's spatial component is [Position]. */

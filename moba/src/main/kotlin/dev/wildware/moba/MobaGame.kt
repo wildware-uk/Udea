@@ -3,7 +3,17 @@ package dev.wildware.moba
 import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.GameUnitReplicator
 import dev.wildware.moba.level.TestLevelScene
+import dev.wildware.moba.ability.CharacterAttributes
+import dev.wildware.moba.ability.Combatant
+import dev.wildware.moba.ability.CombatantReplicator
+import dev.wildware.moba.ability.Corpse
+import dev.wildware.moba.ability.CorpseReplicator
 import dev.wildware.moba.ability.MobaAbilityModule
+import dev.wildware.moba.ability.Motion
+import dev.wildware.moba.ability.MotionReplicator
+import dev.wildware.moba.ability.Projectile
+import dev.wildware.moba.ability.ProjectileReplicator
+import dev.wildware.moba.ability.UnitBlueprint
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.PresentationFactory
@@ -14,6 +24,13 @@ import dev.wildware.udea.core.snapshot.ComponentSchema
 import dev.wildware.udea.core.snapshot.FieldKind
 import dev.wildware.udea.core.snapshot.fleksComponentType
 import dev.wildware.udea.core.snapshot.snapshotTimeTravel
+import dev.wildware.udea.gas.Abilities
+import dev.wildware.udea.gas.AbilitiesReplicator
+import dev.wildware.udea.gas.AttributeTable
+import dev.wildware.udea.gas.Attributes
+import dev.wildware.udea.gas.AttributesReplicator
+import dev.wildware.udea.gas.GameplayEffects
+import dev.wildware.udea.gas.GameplayEffectsReplicator
 import dev.wildware.udea.render.RenderModule
 import dev.wildware.udea.render.input.InputModule
 
@@ -81,7 +98,10 @@ public object MobaGame {
                 combat,
                 RenderModule(),
             ),
-            timeTravel = snapshotTimeTravel(componentRegistry()),
+            // The registry is built over **this** module's attribute table and not a fresh
+            // one: an `AttributeVector` is a dense positional array, so a registry indexed by
+            // a different table would restore a unit's strength into its armour in silence.
+            timeTravel = snapshotTimeTravel(componentRegistry(combat.attributes.table)),
         )
         module.spawner = BlueprintSpawner(
             barrier = definition.core.barrier,
@@ -108,24 +128,61 @@ public object MobaGame {
         GameHost(mode, definition(), presentation)
 
     /**
-     * What the snapshot ring records: where a unit is, and what it is.
+     * **Everything a live entity carries**, so a rewind restores a world and not a silhouette.
      *
-     * Both replicators are generated - `udea-codegen` runs over this module's `@Replicated`
-     * classes - but the *schema* beside each one is hand-assembled, because a `FieldKind` list is
-     * a claim about column types that no generator emits yet. The two must agree field for field,
-     * in the replicator's own order, which is alphabetical by name and not declaration order:
+     * ## What this list being short used to cost
+     *
+     * It held two entries - `Position` and `GameUnit` - and a dressed unit carries nine. Capture
+     * walks *this list* and asks each entry whether an entity has it, so the other seven were not
+     * partly captured, they were invisible. A play agent measured the result on the real level:
+     * rewinding 300 ticks brought back 27 units where 22 had been alive, five of them bare
+     * `Position`+`GameUnit` shells with no art and no combat state, while total health and the
+     * count of in-flight ability activations did not move at all, because the components holding
+     * them had never been in a snapshot. `SnapshotCoverage` exists so that this can never again be
+     * discovered by playing the game; `SnapshotRestoreProofTest` runs it over the real roster.
+     *
+     * ## The schema beside each replicator
+     *
+     * A `FieldKind` list is a claim about column types that no generator emits yet, so it is
+     * hand-assembled here and must agree with the replicator field for field, **in the
+     * replicator's own order, which is alphabetical by field name and not declaration order**:
      *
      * | component | fields, in index order |
      * |---|---|
-     * | `Position` | `hp`, `x`, `y` - three floats |
+     * | `CharacterView` | `character`, `flipX`, `startTick`, `state` - int, bool, long, enum-as-int |
+     * | `Combatant` | `teamId` - one int |
+     * | `Corpse` | `diedTick` - one long |
      * | `GameUnit` | `kind`, `targetRaw`, `team` - three ints |
+     * | `Motion` | `damping`, `vx`, `vy` - three floats |
+     * | `Player` | `facing`, `moveX`, `moveY` - three floats |
+     * | `Position` | `hp`, `x`, `y` - three floats |
+     * | `Projectile` | `damage`, `hitRadius`, `knockback`, `lifeTicks`, `owner`, `stunTicks`, `teamId` |
+     * | `Attributes` | `base` - the whole vector, one object field |
+     * | `Abilities` | `instances` - every activation record, one object field |
+     * | `GameplayEffects` | `applied` - the whole effect list, one object field |
      *
      * `ComponentSchema.of` refuses a list whose length disagrees with `fieldNames`, so a field
-     * added to either component fails here rather than silently shifting a column - but a *kind*
-     * typed wrong at the right length is not caught by anything except `SnapshotRoundTripTest`
-     * style coverage, which is why the table above is written out rather than left implied.
+     * added to a component fails here rather than silently shifting a column - but a *kind* typed
+     * wrong at the right length is caught by nothing except a round trip, which is why the table
+     * is written out rather than left implied.
+     *
+     * ## The three `udea-gas` components, and why their codecs are hand-written
+     *
+     * `Attributes`, `Abilities` and `GameplayEffects` are each a variable-length array of records.
+     * `udea-codegen` lowers one property at a time and refuses anything that is not a scalar, so
+     * none of the three can be `@Replicated` and none is in `net-components.lock`. Their codecs
+     * carry the id their caller passes and default to 64, 65 and 66 - above that file's space, so
+     * they cannot collide with a name in it, and `ComponentRegistry` refuses a duplicate id loudly
+     * if it ever grows that far.
+     *
+     * @param attributes the table every unit's `Attributes` is indexed by. It **must** be the same
+     *   table `MobaAbilityModule` dressed the units with: an `AttributeVector` is a dense array
+     *   whose meaning is entirely positional, so a registry built over a different table would
+     *   restore a unit's strength into its armour without anything noticing.
      */
-    public fun componentRegistry(): ComponentRegistry = ComponentRegistry(
+    public fun componentRegistry(
+        attributes: AttributeTable = CharacterAttributes.create().table,
+    ): ComponentRegistry = ComponentRegistry(
         listOf(
             fleksComponentType(
                 PositionReplicator,
@@ -145,6 +202,98 @@ public object MobaGame {
                 ),
                 GameUnit,
             ) { GameUnit() },
+            fleksComponentType(
+                CharacterViewReplicator,
+                ComponentSchema.of(
+                    CharacterViewReplicator,
+                    "CharacterView",
+                    listOf(FieldKind.Int, FieldKind.Bool, FieldKind.Long, FieldKind.Int),
+                ),
+                CharacterView,
+            ) { CharacterView() },
+            fleksComponentType(
+                PlayerReplicator,
+                ComponentSchema.of(
+                    PlayerReplicator,
+                    "Player",
+                    listOf(FieldKind.Float, FieldKind.Float, FieldKind.Float),
+                ),
+                Player,
+            ) { Player() },
+            fleksComponentType(
+                CombatantReplicator,
+                ComponentSchema.of(CombatantReplicator, "Combatant", listOf(FieldKind.Int)),
+                Combatant,
+            ) { Combatant() },
+            fleksComponentType(
+                CorpseReplicator,
+                ComponentSchema.of(CorpseReplicator, "Corpse", listOf(FieldKind.Long)),
+                Corpse,
+            ) { Corpse() },
+            fleksComponentType(
+                MotionReplicator,
+                ComponentSchema.of(
+                    MotionReplicator,
+                    "Motion",
+                    listOf(FieldKind.Float, FieldKind.Float, FieldKind.Float),
+                ),
+                Motion,
+            ) { Motion() },
+            fleksComponentType(
+                ProjectileReplicator,
+                ComponentSchema.of(
+                    ProjectileReplicator,
+                    "Projectile",
+                    listOf(
+                        FieldKind.Float,
+                        FieldKind.Float,
+                        FieldKind.Float,
+                        FieldKind.Int,
+                        FieldKind.NetId,
+                        FieldKind.Int,
+                        FieldKind.Int,
+                    ),
+                ),
+                Projectile,
+            ) { Projectile() },
+            attributesType(attributes),
+            abilitiesType(),
+            effectsType(),
         ),
     )
+
+    /**
+     * `Attributes`, through the hand-written dense-vector codec in `udea-gas`.
+     *
+     * The `create` lambda only ever runs when a restore rebuilds an entity the live world had
+     * dropped - a unit that died after the keyframe - and it has to hand back a component indexed
+     * by the same table the vector was captured against, which is why the table is threaded all
+     * the way down here rather than defaulted at the point of use.
+     */
+    private fun attributesType(table: AttributeTable) = fleksComponentType(
+        AttributesReplicator(table),
+        ComponentSchema.of(AttributesReplicator(table), "Attributes", listOf(FieldKind.Object)),
+        Attributes,
+    ) { Attributes(table) }
+
+    /**
+     * `Abilities`, with the slot count a unit is dressed with.
+     *
+     * `AbilitiesReplicator` refuses to apply a vector whose slot count differs from the
+     * component's, because the vector is positional; a resurrected unit must therefore be rebuilt
+     * with the same slot count `UnitBlueprint.dress` gave it. That constant is the one place the
+     * number is written down, so it is read from there rather than repeated.
+     */
+    private fun abilitiesType() = fleksComponentType(
+        AbilitiesReplicator(),
+        ComponentSchema.of(AbilitiesReplicator(), "Abilities", listOf(FieldKind.Object)),
+        Abilities,
+    ) { Abilities(UnitBlueprint.ABILITY_SLOTS) }
+
+    /** `GameplayEffects`, whose whole applied list is one object field. */
+    private fun effectsType() = fleksComponentType(
+        GameplayEffectsReplicator(),
+        ComponentSchema.of(GameplayEffectsReplicator(), "GameplayEffects", listOf(FieldKind.Object)),
+        GameplayEffects,
+    ) { GameplayEffects() }
 }

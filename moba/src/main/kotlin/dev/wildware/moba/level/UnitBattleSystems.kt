@@ -5,6 +5,7 @@ import com.github.quillraven.fleks.Family
 import dev.wildware.moba.CharacterView
 import dev.wildware.moba.Player
 import dev.wildware.moba.Position
+import dev.wildware.moba.ai.UnitBrain
 import dev.wildware.udea.core.SimSystem
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
@@ -121,6 +122,12 @@ public class UnitBattleSystem : SimSystem() {
         // it does not do is walk there on its own, which would fight the axis the human is holding
         // and read as unresponsive controls rather than as an AI decision.
         if (Player in self) return
+        // A unit that has decided to run does not also close. `UnitBrain.retreat` pushes it away
+        // through `Motion`; without this line the very next statement walked it back at
+        // `moveSpeed` in the same tick, and the two netted about a sixth of the flight speed the
+        // rout was tuned for. It faced its threat above and its abilities still fire, so a runner
+        // is a unit backing away swinging rather than a unit that has left the simulation.
+        if (UnitBrain.isRouted(position.hp, unit.team)) return
         // Closing. `distance` is greater than `reach`, which is positive, so it cannot be zero
         // here and the normalisation is safe without a guard.
         position.x += dx / distance * kind.moveSpeed

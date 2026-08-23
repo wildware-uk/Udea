@@ -26,3 +26,20 @@ blueprint(name = "priest", components = unitComponents)
 blueprint(name = "orc", components = unitComponents)
 
 blueprint(name = "skeleton", components = unitComponents)
+
+// The two the roster packed art for and no level could ever spawn.
+//
+// `character/orc_elite_animation_set` and `character/wizard_animation_set` were declared, packed
+// and cut into the atlas from the first day the art tree landed, and nothing named them: there
+// was no `blueprint/orc_elite` and no `blueprint/wizard`, so `MobaBlueprints` had nothing to
+// answer an authored id with and `level/test_level` could not have written one. Two of the six
+// characters were dead weight in the bundle, and `OrcSpinExec` - a registered exec with an
+// eleven-frame sheet behind it and a `TargetPolicy` pointing at it - was unreachable code in a
+// shipped game, because the only unit whose `MobaUnits` entry grants `ability/orc_elite_spin` is
+// the elite orc.
+//
+// The old game's `blueprint/player` inherited `orc_elite`, so a human drove the elite with the
+// spin. `level/test_level` names `blueprint/orc_elite` for its `player` entity for that reason.
+blueprint(name = "orc_elite", components = unitComponents)
+
+blueprint(name = "wizard", components = unitComponents)

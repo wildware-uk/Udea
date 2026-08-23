@@ -1,8 +1,9 @@
 // The playable level: twenty-seven units, three sides, four clearings.
 //
 // Ported from `example/src/main/resources/assets/level/test_level.udea.kts`, which spawned the
-// same roster - a player-controlled soldier, a priest, five orcs, ten skeletons and ten
-// soldiers - and is what made the old demo feel alive.
+// same roster - a player, a priest, orcs, ten skeletons and ten soldiers - and is what made the
+// old demo feel alive. All six characters the art tree packs are on the field: the player is the
+// elite orc the old `blueprint/player` inherited from, and the wizard stands with the soldiers.
 //
 // Two differences from the source, and both are rules this pipeline has that the old one did not:
 //
@@ -22,7 +23,7 @@
 // wrote them in a world where a character was about one across; these are the same four
 // clearings, scaled to this one.
 
-// Where the orcs stand, and where the player's soldier arrives. The old level put both at
+// Where the orcs stand, and where the player arrives. The old level put both at
 // `randomPos().sub(5F, 0F)`, which is why a game began with a fight already in progress.
 val orcClearing = vec(-50F, 0F)
 
@@ -38,15 +39,30 @@ val soldierCamp = vec(0F, -50F)
 level(
     name = "test_level",
     entities = {
-        // The old level gave this one a `Player` component and `networkable(owner = -1)`. It is
-        // named `player` here so the entity a control port has to find already exists, and is
-        // already the one standing in the orc clearing where a game began with a fight in
-        // progress.
-        entity(name = "player", blueprint = reference("blueprint/soldier"), position = orcClearing)
+        // The player is an **elite orc**, as `blueprint/player` was in the old game: it declared
+        // `inherits = reference("blueprint/orc_elite")`, so the unit a human drove was the one
+        // with five hundred health and `ability/orc_elite_spin` in its second slot. Restoring
+        // that is what makes `OrcSpinExec` reachable in a running process at all - it is the only
+        // exec in `MobaAbilities` whose ability no other unit is granted.
+        //
+        // It stands in the orc clearing, which is where the old level put it, and it is on
+        // `Team.ORC` because `MobaBlueprints` reads the side off the kind rather than off the
+        // entity - so a game now begins with one elite and four orcs against eleven soldiers, a
+        // priest, a wizard and ten skeletons.
+        entity(name = "player", blueprint = reference("blueprint/orc_elite"), position = orcClearing)
 
         entity(name = "priest", blueprint = reference("blueprint/priest"), position = priestPost)
 
-        repeat(5) {
+        // The wizard. Its art was packed and unreachable for the same reason the elite's was; the
+        // sheets are the corrected ones (`orc.udea.kts`' sibling `wizard.udea.kts` explains why
+        // the source corpus' wizard pointed at priest PNGs and was invisible).
+        entity(name = "wizard", blueprint = reference("blueprint/wizard"), position = soldierCamp)
+
+        // Four, not five. The player took the fifth orc's place in the clearing as an elite, so
+        // `Team.ORC` still fields five bodies - which is what `MobaLevelTest` counts, and it
+        // counts the *team* rather than the blueprint precisely so a roster can be recomposed
+        // without the test becoming a list of blueprint names.
+        repeat(4) {
             entity(name = "orc_$it", blueprint = reference("blueprint/orc"), position = orcClearing)
         }
 

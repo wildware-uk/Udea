@@ -5,6 +5,8 @@ import com.github.quillraven.fleks.ComponentType
 import com.github.quillraven.fleks.Family
 import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.MobaBlueprints
+import dev.wildware.udea.annotations.Replicated
+import dev.wildware.udea.annotations.Sim
 import dev.wildware.udea.core.SimSystem
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
 import dev.wildware.udea.core.blueprint.SpawnPosition
@@ -42,11 +44,20 @@ import dev.wildware.udea.render.input.IntentState
  * components, minus the second component - the family that named `AIUnit` was the only reader it
  * ever had.
  */
+@Replicated
 public class Player(
-    /** Horizontal axis this tick, `-1..1`. Written only at `SimPhase.Intent`. */
-    public var moveX: Float = 0f,
-    /** Vertical axis this tick, `-1..1`. Positive is up. */
-    public var moveY: Float = 0f,
+    /**
+     * Horizontal axis this tick, `-1..1`. Written only at `SimPhase.Intent`.
+     *
+     * `@Sim` rather than `@Net`: a client is the *source* of its own intent and the server is the
+     * source of everybody else's position, so sending this back would be echoing an input. It is
+     * snapshotted because the component's **presence** is what tells two systems this unit is
+     * driven rather than autonomous, and a restore that dropped it would hand the player's
+     * soldier to the AI.
+     */
+    @Sim public var moveX: Float = 0f,
+    /** Vertical axis this tick, `-1..1`. Positive is up. `@Sim`, for the reason [moveX] carries. */
+    @Sim public var moveY: Float = 0f,
     /**
      * `-1` or `1`: which way the sprite faces.
      *
@@ -54,7 +65,7 @@ public class Player(
      * character that snapped back to facing right the moment you let go of A would read as a
      * rendering bug rather than as an input one.
      */
-    public var facing: Float = 1f,
+    @Sim public var facing: Float = 1f,
 ) : Component<Player> {
 
     override fun type(): ComponentType<Player> = Player

@@ -53,6 +53,7 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `udea-gas` | Abilities, attributes, effects — tick-denominated |
 | `udea-net` | Transports, baselines, relevancy, prediction, RPC |
 | `udea-render` | **The only module that touches GL** |
+| `udea-audio` | Drains `GameContext.cues` and plays sound. No GL and no `Gdx`: playback is an `AudioDevice` SPI, and `AudioDevice.Silent` is what Headless uses |
 | `udea-agent` | MCP tool surface and test harness — the same code path |
 | `udea-agent-host` | HTTP server. Debug-only, verified absent from release |
 | `udea-gradle` | Tasks, verifiers, `gamebridge.json` emission |

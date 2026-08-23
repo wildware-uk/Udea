@@ -90,6 +90,17 @@ public class SnapshotService(
     public fun newSnapshot(): WorldSnapshot = WorldSnapshot(registry)
 
     /**
+     * Every component class on a live entity that this service cannot capture.
+     *
+     * Capture asks the registry what to look for, so a component type the registry does not know
+     * about is silently absent from every snapshot and silently missing from every restored
+     * entity. This is the question asked the other way round. Allocating and off the per-tick
+     * path by construction - see [SnapshotCoverage].
+     */
+    public fun uncoveredComponents(): List<String> =
+        SnapshotCoverage.uncovered(registry, world, netIds)
+
+    /**
      * Captures the whole world into [target], which is reset first.
      *
      * @throws IllegalStateException if [target] was built against a different registry, which

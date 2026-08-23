@@ -2,6 +2,9 @@ package dev.wildware.moba.ability
 
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
+import dev.wildware.udea.annotations.Net
+import dev.wildware.udea.annotations.Replicated
+import dev.wildware.udea.annotations.Sim
 import dev.wildware.udea.core.identity.NetId
 
 /**
@@ -15,9 +18,15 @@ import dev.wildware.udea.core.identity.NetId
  * and a spectator team, a neutral camp or a per-match team count are all ordinary numbers. The
  * three the old game had are on [Teams].
  */
+@Replicated
 public class Combatant(
-    /** Which side. Two units with the same value never damage each other. */
-    public var teamId: Int = Teams.NEUTRAL,
+    /**
+     * Which side. Two units with the same value never damage each other.
+     *
+     * `@Net` because a client colours a unit by its side before it can draw one, and because it
+     * is what a restore needs to make a rebuilt entity a combatant again rather than a shell.
+     */
+    @Net public var teamId: Int = Teams.NEUTRAL,
 ) : Component<Combatant> {
 
     override fun type(): ComponentType<Combatant> = Combatant
@@ -58,18 +67,25 @@ public object Teams {
  * "the solver decides authoritative movement" arrangement spec 3.4 forbids. `PhysicsWorld` is a
  * no-op in this engine today, so a projectile that needed to move had nothing to move it.
  */
+@Replicated
 public class Motion(
-    /** World units per tick along x. */
-    public var vx: Float = 0f,
-    /** World units per tick along y. */
-    public var vy: Float = 0f,
+    /**
+     * World units per tick along x.
+     *
+     * `@Sim`: a knockback lasts about a fifth of a second and a client sees it as the position
+     * moving, which is already replicated. Snapshotted, because a rewind that dropped an
+     * in-flight knockback would leave the unit standing where the push had already taken it.
+     */
+    @Sim public var vx: Float = 0f,
+    /** World units per tick along y. `@Sim`, for the reason [vx] carries. */
+    @Sim public var vy: Float = 0f,
     /**
      * Fraction of velocity kept each tick.
      *
      * `1.0` is a projectile, which never slows; `0.85` is a unit absorbing a knockback over about
      * a fifth of a second. Zero is a legitimate value and means "this impulse lasts one tick".
      */
-    public var damping: Float = UNIT_DAMPING,
+    @Sim public var damping: Float = UNIT_DAMPING,
 ) : Component<Motion> {
 
     override fun type(): ComponentType<Motion> = Motion
@@ -104,21 +120,22 @@ public class Motion(
  * effects that list ever held were damage, stun and knockback, so they are three fields, and the
  * hit path allocates nothing.
  */
+@Replicated
 public class Projectile(
     /** Who fired it. Never hit; credited as the damage source. */
-    public var owner: NetId = NetId.NONE,
+    @Net public var owner: NetId = NetId.NONE,
     /** The firer's team at the moment of firing, so an owner who changes sides mid-flight is honest. */
-    public var teamId: Int = Teams.NEUTRAL,
+    @Net public var teamId: Int = Teams.NEUTRAL,
     /** Health removed on contact. Positive; applied as a negative magnitude. */
-    public var damage: Float = 0f,
+    @Sim public var damage: Float = 0f,
     /** How long the target is stunned on contact, in ticks. */
-    public var stunTicks: Int = 0,
+    @Sim public var stunTicks: Int = 0,
     /** How hard the target is pushed, in world units per tick. */
-    public var knockback: Float = 0f,
+    @Sim public var knockback: Float = 0f,
     /** How close the centres have to be for a hit. */
-    public var hitRadius: Float = DEFAULT_HIT_RADIUS,
+    @Sim public var hitRadius: Float = DEFAULT_HIT_RADIUS,
     /** Ticks left before it expires. Counted down; zero despawns it. */
-    public var lifeTicks: Int = DEFAULT_LIFE_TICKS,
+    @Sim public var lifeTicks: Int = DEFAULT_LIFE_TICKS,
 ) : Component<Projectile> {
 
     override fun type(): ComponentType<Projectile> = Projectile

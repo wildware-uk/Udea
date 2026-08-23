@@ -143,12 +143,30 @@ public class ArrowBlueprint : Blueprint {
             entity += Position()
             entity += Motion(damping = Motion.PROJECTILE_DAMPING)
             entity += Projectile(stunTicks = STUN_TICKS, knockback = KNOCKBACK)
+            // The picture the port dropped. `blueprint/arrow.udea.kts` carried
+            // `spriteRenderer(texture = loadSprite("/sprites/arrow/arrow.png", .1F))`; this
+            // blueprint carried nothing, and `sprites/arrow/arrow.png` was not in this module at
+            // all - so a soldier's arrow crossed forty world units and took ten health off a
+            // skeleton with nothing drawn between them.
+            //
+            // `facesMotion`, which the old one did not do: the arrow was a Box2D kinematic body
+            // whose angle nothing ever set, so the sprite pointed right however the shot was
+            // aimed. `SpriteView.FOREVER` because an arrow is despawned by `ProjectileSystem` on
+            // contact or when its `lifeTicks` run out, not by an animation ending.
+            entity += dev.wildware.moba.SpriteView(
+                animation = ANIMATION,
+                facesMotion = true,
+            )
         }
     }
 
     override fun toString(): String = "ArrowBlueprint"
 
     public companion object {
+
+        /** The authored one-frame `spriteAnimation` an arrow wears. */
+        public val ANIMATION: dev.wildware.udea.assets.AssetId =
+            dev.wildware.udea.assets.AssetId("sprites/arrow/arrow")
 
         /** `Data.Duration to 0.2F` on the arrow's stun effect, at 60Hz. */
         public const val STUN_TICKS: Int = 12

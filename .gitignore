@@ -73,6 +73,14 @@ moba/raw-assets/
 # `scripts/stage-moba-art.py` puts them here from art the repository already holds.
 moba/assets/sprites/*
 !moba/assets/sprites/champion_idle.png
+#
+# The arrow is not from that pack and is not new exposure: `arrow.png` has been committed at
+# `example/src/main/resources/assets/sprites/arrow/arrow.png` since the old game shipped, and the
+# copy under `moba/assets/sprites/arrow/` is the same 260-byte file at the path the packed bundle
+# reads from. It is excepted here rather than filed under `effects/` because the `.udea.kts` that
+# declares it has to sit beside it, and an ignored asset script is a build that packs on this
+# machine and fails on a fresh clone with a missing `spritePath`.
+!moba/assets/sprites/arrow/
 
 # `gamebridge.json` - the launch declaration `game-bridge-mcp` reads.
 #

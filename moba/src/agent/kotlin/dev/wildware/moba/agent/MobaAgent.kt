@@ -7,6 +7,7 @@ import dev.wildware.moba.MobaControls
 import dev.wildware.moba.MobaGame
 import dev.wildware.moba.Position
 import dev.wildware.moba.PositionReplicator
+import dev.wildware.moba.audio.MobaAudio
 import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.GameUnitReplicator
 import dev.wildware.moba.level.MobaBlueprints
@@ -173,7 +174,24 @@ public object MobaAgent {
             // it, `close` would release the port and leave the window up - a clean close, as far
             // as the bridge could tell, over a game that is still running.
             session.shutdown.onClose("render-loop", rendering.requestExit)
-            MobaEntry.Attachment(frame = session.loop::pump, close = { session.close("the render loop ended") })
+            // Silent, and it still drains. An agent instance wants no sound - a play session is
+            // watched through screenshots - but it must not be the one process where
+            // `GameContext.cues` fills its 1024 slots and starts discarding, because the cue
+            // stream is what `events.*` and `EffectSpawnSystem` read. `AudioDevice.Silent` opens
+            // no device, loads no file and allocates nothing per frame, so this costs the drain
+            // and nothing else. See `MobaAudio` for why the drain is not a Fleks system.
+            val audio = MobaAudio.silent(host)
+            audio.listenTo(session.player)
+            MobaEntry.Attachment(
+                frame = { delta ->
+                    session.loop.pump(delta)
+                    audio.frame()
+                },
+                close = {
+                    audio.close()
+                    session.close("the render loop ended")
+                },
+            )
         }
     }
 

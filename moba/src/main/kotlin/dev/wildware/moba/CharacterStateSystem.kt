@@ -27,6 +27,7 @@ import dev.wildware.udea.gas.GameplayEffects
  *
  * | State | Asked | Why that question |
  * |---|---|---|
+ * | [UnitState.Death] | [Position.hp] is at or below zero | The corpse `dev.wildware.moba.ability.DeathSystem` leaves behind. Asked first, because a unit that died mid-swing still has an activation in flight and would otherwise be drawn swinging for ever. |
  * | [UnitState.Attack] | any ability instance is active | An activation is the swing. The windup, the hit tick and the recovery are the same numbers the animation is cut into ([dev.wildware.moba.ability.MeleeAttackExec.HIT_TICK] is `attack_hit`'s frame), so the picture and the damage cannot drift apart. |
  * | [UnitState.Hit] | an `ability/stun` effect is on it | Every landed blow in this game stuns ([dev.wildware.moba.ability.CombatRules.stun]), so "stunned" *is* "just been hit", and a unit that cannot act is exactly the one that should be flinching. |
  * | [UnitState.Walk] | [GameUnit.movingTick] is this tick | Written by the one system that moves a unit, so this cannot disagree with whether it actually moved. |
@@ -50,14 +51,28 @@ import dev.wildware.udea.gas.GameplayEffects
  * tick each `animNotify` frame lands on - a notify computed from a state written *after* it would
  * be a frame late on the tick a unit changed what it was doing.
  *
- * ## What it deliberately does not do
+ * ## Death, and why it is asked first
  *
- * **It never enters [UnitState.Death].** `dev.wildware.moba.ability.DeathSystem` removes an
- * entity on the tick its health reaches zero, so there is no entity left to play a death
- * animation on and no corpse to draw. The art is packed and addressable and nothing shows it.
- * Fixing that is a two-stage death - a dying tag, the animation, then the removal - which changes
- * when a net id is freed and when a unit stops being a legal target, and that is a combat
- * decision rather than an animation one.
+ * This paragraph used to say that this system **never** enters [UnitState.Death], because
+ * `dev.wildware.moba.ability.DeathSystem` removed the entity on the tick its health reached zero:
+ * six packed, cut, addressable death animations that no running game had ever drawn a frame of.
+ * That system leaves a corpse now, and the corpse is what this reads.
+ *
+ * The question is [Position.hp] and not "is there a `Corpse` component", for the reason the whole
+ * of this file is written the way it is: `hp` is one of the three floats
+ * `MobaGame.componentRegistry` snapshots, so a `time.rewind` restores the deadness with the
+ * position, and the pose is recomputed from it on the first tick after the restore. A marker
+ * component would have to be minted in `net-components.lock` to get the same property.
+ *
+ * It is asked **first**, above [UnitState.Attack], because a unit killed during its own swing
+ * still has an activation in flight: `dev.wildware.udea.gas.AbilityInstance` is not cancelled by
+ * dying, so an attack-first order would leave the corpse mid-swing until the exec's own
+ * `DURATION_TICKS` elapsed and then drop it to the death animation seconds late.
+ *
+ * `priest_death`, `soldier_death` and the rest are authored `loop = false`, and
+ * [CharacterAnimator.frameAt] clamps a non-looping animation at its last frame - so a corpse
+ * settles onto the final frame of its death and stays there, which is what "the body is left on
+ * the field" looks like.
  */
 public class CharacterStateSystem(
     /** Which effect index means `ability/stun`. */
@@ -87,6 +102,13 @@ public class CharacterStateSystem(
     }
 
     private fun stateOf(entity: Entity, now: Long): UnitState {
+        // First, and out of `Position` rather than out of a marker: see the class KDoc. `getOrNull`
+        // because this family is `CharacterView` plus `GameUnit`, and `MobaShot`'s roster entries
+        // carry a `CharacterView` with no `GameUnit` - a family this system never sees, but a
+        // blueprint that spawned a `GameUnit` with no `Position` would crash a renderer here
+        // rather than in the file that wrote it.
+        val position = entity.getOrNull(Position)
+        if (position != null && position.hp <= 0f) return UnitState.Death
         if (isCasting(entity)) return UnitState.Attack
         if (isStunned(entity)) return UnitState.Hit
         if (entity[GameUnit].movingTick == now) return UnitState.Walk

@@ -180,6 +180,24 @@ public enum class UnitKind(
 
     /** Cheap and quick, and the most numerous thing on the field. */
     Skeleton(character = "skeleton", moveSpeed = 0.8f, reach = 22f),
+
+    /**
+     * The elite orc, and the unit the old `blueprint/player` inherited from.
+     *
+     * Slower and heavier than an orc, and the only kind `MobaUnits` grants
+     * `ability/orc_elite_spin` to - so until `blueprint/orc_elite` existed,
+     * [dev.wildware.moba.ability.OrcSpinExec] was registered, targeted, animated and unreachable.
+     */
+    OrcElite(character = "orc_elite", moveSpeed = 0.6f, reach = 26f),
+
+    /**
+     * The sixth character. Fragile, walks with the soldiers, carries the basic attack alone.
+     *
+     * Appended rather than inserted, and that is load-bearing rather than tidy: [id] is the
+     * ordinal and [GameUnit.kind] is a `@Net` field carrying it, so putting a new constant in the
+     * middle would renumber every unit already on the wire and in the snapshot ring.
+     */
+    Wizard(character = "wizard", moveSpeed = 0.7f, reach = 24f),
     ;
 
     /** This kind's ordinal, which is what [GameUnit.kind] stores. */

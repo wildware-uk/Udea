@@ -58,6 +58,12 @@ dependencies {
     implementation(project(":udea-assets"))
     implementation(project(":udea-render"))
 
+    // The cue drain and the mixer. Presentation, like `udea-render`, but with no GL in it: the
+    // module that names `Gdx.audio` is this one (`dev.wildware.moba.audio.GdxAudioDevice`),
+    // because `udea-audio` is a designated headless module and `UDEA-MG-002-BYTECODE` bans
+    // `com/badlogic/gdx/Gdx` there by exact name.
+    implementation(project(":udea-audio"))
+
     // `udea-render` declares gdx as `implementation`, so GL types do not leak onto a consumer's
     // compile classpath by default - a game that draws has to opt in, visibly, on this line.
     // `moba` draws (see `MobaScene`), so it opts in. Runtime already had gdx transitively; what
@@ -82,12 +88,19 @@ udeaAgent {
  * Where this game's assets live, and what they are compiled by.
  *
  * `assets/` and not `src/main/assets` or `src/main/resources`. Two roots exist in this module
- * today, and the reason has changed since this comment was first written. The old reason - that
+ * today, and the reason has narrowed twice since this comment was first written. The old reason - that
  * `src/main/assets`, the mechanically migrated 19-script corpus of issue #93, could not compile
  * until #84's generated DSL landed - is **no longer true**: `AssetScope` grew the eight missing
  * kinds, the 19 scripts carry no imports at all, and `MigratedCorpusCompilesTest` compiles and
  * validates every one of them with zero errors. Breaking a reference in that tree turns it red
  * without a `--rerun-tasks`, so it is a live check and not a stale one.
+ *
+ * It is also **no longer a capability gap**, which is the correction this line needed most.
+ * `control`, `axis2D`, `binding` and `axis2DBinding` are published `AssetKind`s and `AssetCodecs`
+ * has always round-tripped all four; nothing had simply ever put one in a *packed* root, and
+ * `assets/control/controls.udea.kts` now does - `MobaControls.BINDINGS` is loaded from the bundle
+ * and `MobaFieldTest` fails if the packed key codes stop being the ones the game runs on. So this
+ * split costs the corpus, not the controls.
  *
  * What still keeps the roots apart is narrower and is a *packing* limit, not a compiling one:
  * `character`, `gameplayEffect` and `effect` are `AssetKind.Unpublishable`, so
@@ -244,6 +257,25 @@ tasks.register<JavaExec>("runClient") {
     description = "moba.client: a visible LWJGL3 window."
     mainClass.set("dev.wildware.moba.entry.MobaClient")
     classpath = sourceSets.main.get().runtimeClasspath
+}
+
+// The audible client. Identical to `runClient` except that its frame drains `GameContext.cues`
+// through `MobaAudio` - see `MobaAudioProbe` for why that is a separate main today and what one
+// line moves it into `MobaClient`. The default working directory is this project, which is what
+// lets `GdxAudioDevice` find `assets/sounds/**` on disk: the `.ogg` files are not packed into
+// `assets.udeapak`, because `AssetPackCli` writes no blob sections.
+tasks.register<JavaExec>("runAudio") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.audio: a windowed client that drains the cue queue and plays sound."
+    mainClass.set("dev.wildware.moba.audio.MobaAudioProbe")
+    classpath = sourceSets.main.get().runtimeClasspath
+    // Forwarded through `providers` rather than read off `System.getProperties()`: a configuration
+    // -time system property read is exactly what the configuration cache refuses to serialise, and
+    // these two are the only knobs the probe has.
+    listOf("udea.audio.probe.frames", "udea.render.mode").forEach { name ->
+        val value = providers.systemProperty(name)
+        if (value.isPresent) systemProperty(name, value.get())
+    }
 }
 
 /**

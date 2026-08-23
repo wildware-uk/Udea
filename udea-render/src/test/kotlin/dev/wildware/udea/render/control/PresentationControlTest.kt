@@ -233,7 +233,7 @@ class PresentationControlTest {
 
         private fun newRig() = CameraRig(
             netIds = netIds,
-            interpolator = Interpolator(ctx.clock, world.system<InterpSnapshotSystem>()),
+            poses = Interpolator(ctx.clock, world.system<InterpSnapshotSystem>()),
             frameTime = object : FrameTime {
                 override val frameSeconds: Float = 1f / 60f
             },

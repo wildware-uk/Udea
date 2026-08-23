@@ -34,11 +34,41 @@ class MobaAssetsTest {
     fun `the packed bundle is on the runtime classpath`() {
         val bundle = MobaAssets.bundle
         assertTrue(bundle.registry.size > 0, "the bundle decoded no assets: $bundle")
-        assertEquals(
-            listOf("blueprint/grunt", "champion/idle", "champion/idle_sheet", "config", "level/arena"),
-            bundle.registry.ids.map { it.value },
-            "the graph the game loads is the graph `moba/assets` declares",
+        val ids = bundle.registry.ids.map { it.value }
+        // Containment rather than the whole sorted list: the art tree next to this one grows a
+        // character at a time, and a test that pinned every id would fail on an addition that
+        // broke nothing. What the *game* cannot boot without is named exactly - the level, and
+        // the four blueprints its twenty-seven entities point at.
+        val required = listOf(
+            "config",
+            "level/test_level",
+            "blueprint/soldier",
+            "blueprint/priest",
+            "blueprint/orc",
+            "blueprint/skeleton",
         )
+        assertTrue(ids.containsAll(required), "the bundle is missing ${required - ids.toSet()}: $ids")
+    }
+
+    /**
+     * The packed level is the roster the old game had, entity for entity.
+     *
+     * The count is the whole point of the port: 1 player-soldier, 1 priest, 5 orcs, 10 skeletons
+     * and 10 soldiers is what `example/.../level/test_level.udea.kts` spawned, and it is what
+     * `TestLevelScene` walks. Delete a `repeat(10)` from the asset and this fails here rather
+     * than as a battle that is quietly one side short.
+     */
+    @Test
+    fun `the packed level carries the whole roster`() {
+        val level = MobaAssets.registry[GameAssets.level.testLevel]
+        assertEquals(27, level.entities.size, "the roster: ${level.entities.map { it.name }}")
+        val byBlueprint = level.entities.groupingBy { it.blueprint?.id?.value }.eachCount()
+        assertEquals(11, byBlueprint["blueprint/soldier"], "the player and ten soldiers")
+        assertEquals(1, byBlueprint["blueprint/priest"])
+        assertEquals(5, byBlueprint["blueprint/orc"])
+        assertEquals(10, byBlueprint["blueprint/skeleton"])
+        // Every entity carries a cluster centre; the scatter around it is the Spawn stream's.
+        assertTrue(level.entities.all { it.position != null }, "an entity has no authored position")
     }
 
     /**

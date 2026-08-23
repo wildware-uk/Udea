@@ -327,7 +327,7 @@ class CameraRigTest {
         val live = netIds.allocate(world.entity { it += PhysicsBody(x = 1f, y = 1f) })
         val unbound = CameraRig(
             netIds = netIds,
-            interpolator = Interpolator(ctx.clock, world.system<InterpSnapshotSystem>()),
+            poses = Interpolator(ctx.clock, world.system<InterpSnapshotSystem>()),
             frameTime = FixedFrameTime(1f / 60f),
         )
 
@@ -390,7 +390,7 @@ class CameraRigTest {
 
         val rig = CameraRig(
             netIds = netIds,
-            interpolator = Interpolator(ctx.clock, world.system<InterpSnapshotSystem>()),
+            poses = Interpolator(ctx.clock, world.system<InterpSnapshotSystem>()),
             frameTime = FixedFrameTime(frameSeconds),
         ).also { it.onBind(world, ctx) }
 

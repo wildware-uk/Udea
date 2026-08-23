@@ -10,8 +10,8 @@ import dev.wildware.udea.render.FrameTime
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderSystem
-import dev.wildware.udea.render.interp.Interpolator
 import dev.wildware.udea.render.interp.Pose
+import dev.wildware.udea.render.interp.PoseSource
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.exp
 
@@ -46,8 +46,17 @@ import kotlin.math.exp
 public class CameraRig(
     /** Resolves the followed [NetId] to an entity. */
     private val netIds: NetIdIndex,
-    /** Interpolated poses, so the camera tracks the same position the sprite is drawn at. */
-    private val interpolator: Interpolator,
+    /**
+     * Where a followed entity is, so the camera tracks the same position the sprite is drawn at.
+     *
+     * A [PoseSource] and not an `Interpolator`, and the difference is the whole of what made
+     * `render.follow_entity` a lie in `moba`: an `Interpolator` reads `PhysicsBody`, a `moba`
+     * unit carries `Position`, so the rig resolved the id, found no pose, moved nothing and the
+     * tool answered `{"following": 0}` regardless. A game hands over the reader for its own
+     * spatial component; `Interpolator` is still the reader for a physics body, and
+     * [followability] refuses a follow this source cannot serve instead of accepting it.
+     */
+    private val poses: PoseSource,
     /** Wall seconds per frame; smoothing is a wall-time behaviour, never a tick one. */
     private val frameTime: FrameTime,
     /** Minimum world units kept visible on the shorter axis. */
@@ -169,7 +178,7 @@ public class CameraRig(
         // reference is an object, Kotlin does not cache one, and this runs every frame.
         val followedId = this.target
         val followed = if (followedId == null) null else netIds.resolveOrNull(followedId)
-        if (followed != null && interpolator.interpolate(world, followed, alpha, pose)) {
+        if (followed != null && poses.poseOf(world, followed, alpha, pose)) {
             val desiredX = pose.x + offsetX
             val desiredY = pose.y + offsetY
             val t = smoothingFactor(frameTime.frameSeconds)
@@ -193,7 +202,7 @@ public class CameraRig(
         val world = boundWorld ?: return
         val followedId = target ?: return
         val followed = netIds.resolveOrNull(followedId) ?: return
-        if (!interpolator.interpolate(world, followed, 1f, pose)) return
+        if (!poses.poseOf(world, followed, 1f, pose)) return
         camera.position.x = pose.x + offsetX
         camera.position.y = pose.y + offsetY
         bounds?.clamp(camera, viewport)
@@ -234,7 +243,7 @@ public class CameraRig(
      * ## Why this exists
      *
      * [requestFollow] accepts anything: it writes an [AtomicReference] and returns, and the
-     * frame that consumes it resolves the id and asks [Interpolator] for a pose. When either
+     * frame that consumes it resolves the id and asks the [PoseSource] for a pose. When either
      * step comes back empty the camera simply does not move, and *nothing says so*. `moba` had
      * that written down as a known lie — its units carry `Position` and no `PhysicsBody`, so
      * `render.follow_entity` answered `ok` and the camera stayed exactly where it was. An agent
@@ -256,7 +265,7 @@ public class CameraRig(
         val entity = netIds.resolveOrNull(netId) ?: return CameraOutcome.UNKNOWN_ENTITY
         // alpha = 1: the question is whether a pose exists at all, and `interpolate` answers
         // that with its return value rather than with what it wrote.
-        if (!interpolator.interpolate(world, entity, 1f, probe)) return CameraOutcome.UNFOLLOWABLE
+        if (!poses.poseOf(world, entity, 1f, probe)) return CameraOutcome.UNFOLLOWABLE
         return CameraOutcome.APPLIED
     }
 

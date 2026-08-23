@@ -1,10 +1,16 @@
 package dev.wildware.moba.agent
 
+import com.github.quillraven.fleks.Family
 import com.github.quillraven.fleks.World
-import dev.wildware.moba.GruntBlueprint
+import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.moba.MobaControls
 import dev.wildware.moba.MobaGame
 import dev.wildware.moba.Position
 import dev.wildware.moba.PositionReplicator
+import dev.wildware.moba.level.GameUnit
+import dev.wildware.moba.level.GameUnitReplicator
+import dev.wildware.moba.level.MobaBlueprints
+import dev.wildware.moba.level.Team
 import dev.wildware.moba.entry.MobaEntry
 import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.AgentTimings
@@ -16,7 +22,9 @@ import dev.wildware.udea.agent.host.AgentGameLoop
 import dev.wildware.udea.agent.host.AgentHost
 import dev.wildware.udea.agent.host.AgentHostConfig
 import dev.wildware.udea.agent.host.AgentHostTools
+import dev.wildware.udea.agent.host.AgentInputTools
 import dev.wildware.udea.agent.host.ArtifactToolset
+import dev.wildware.udea.agent.host.InputToolset
 import dev.wildware.udea.agent.host.GameIdentity
 import dev.wildware.udea.agent.host.HostShutdown
 import dev.wildware.udea.agent.host.RenderControl
@@ -48,6 +56,8 @@ import dev.wildware.udea.core.loop.barrier
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.render.OverlayResources
 import dev.wildware.udea.render.OverlaySystem
+import dev.wildware.udea.render.input.InjectedIntent
+import dev.wildware.udea.render.input.IntentState
 import java.nio.file.Path
 
 /**
@@ -87,8 +97,12 @@ import java.nio.file.Path
  * `:moba:runClient`-style Windowed instance watches the panel while every capture taken through
  * the same process is byte-identical to one taken with the overlay off (spec 3.7).
  *
- * Still not real: `render.follow_entity` is accepted and does nothing, because `CameraRig` tracks
- * a `PhysicsBody` and a `moba` unit has only a [Position] (see `MobaScene`); `render.toggle_debug_draw`
+ * Real, and new: `input.*` and `render.follow_entity`. Input goes through the same
+ * `IntentSource` seam a keyboard does, so the agent drives the character a player drives; and the
+ * camera follows a game-supplied `PoseSource`, so following a `moba` unit genuinely moves the view
+ * rather than answering `ok` and staying put.
+ *
+ * Still not real: `render.toggle_debug_draw`
  * flips a switch no renderer here reads; the overlay's world-space markers are never drawn,
  * because [overlayFor] has no projector to give it; and in [RenderMode.Headless] there is no
  * context at all, so every render tool correctly answers `no_render_context`.
@@ -122,11 +136,18 @@ public object MobaAgent {
         // reason the bridge is - both are built before anything renders.
         val bridge = AgentBridge(resultSpill = ARTIFACTS.textSpill())
         val sessions = AgentSessions()
+        // The agent's hands, built once per process. It is an ordinary `IntentSource`, so the
+        // simulation cannot tell it from a keyboard - which is the whole of issue #124's claim
+        // that synthesised input is indistinguishable from a human's, made structural rather than
+        // argued. In `Headless` it is the *only* source there is, which is the mode the old
+        // `Gdx.input.inputProcessor` injection could not serve at all.
+        val injected = InjectedIntent(MobaControls.BINDINGS.catalog)
         if (mode == RenderMode.Headless) {
             val host = MobaGame.host(RenderMode.Headless)
+            host.ctx[IntentState.KEY].source = injected
             // No GL context in Headless, so no capture surface exists and `null` is the
             // honest answer: every `render.*` tool then answers `no_render_context`.
-            val session = attach(host, RenderMode.Headless, null, bridge, sessions)
+            val session = attach(host, RenderMode.Headless, null, bridge, sessions, injected)
             Runtime.getRuntime().addShutdownHook(Thread { session.close("jvm shutdown hook") })
             session.loop.run()
             session.close("the frame loop ended")
@@ -137,7 +158,15 @@ public object MobaAgent {
             // carry a copy of it in this source set, because a headless agent host could not name
             // `PresentationControl`; the copy is gone with the rule that forced it.
             val control = OffscreenRenderControl(rendering.presentation())
-            val session = attach(host, mode, control, bridge, sessions)
+            // Keyboard *and* agent, combined rather than one replacing the other: a human
+            // watching a Windowed agent instance can still play. See `CompositeIntent` for why
+            // there is deliberately no priority rule between the two.
+            MobaEntry.wireInput(host, rendering, extra = injected)
+            val session = attach(host, mode, control, bridge, sessions, injected)
+            // The camera goes on the unit the agent drives, so a screenshot after an `input.*`
+            // call shows the thing that moved. Real now: `CameraRig` follows a game-supplied
+            // `PoseSource` rather than only a `PhysicsBody`, which is what `moba` never had.
+            MobaEntry.follow(rendering, session.player)
             // The third step of `close` in a GL mode, and the one a headless process does not
             // have: stopping `AgentGameLoop` ends a loop nothing is running here, because the
             // render thread owns the cadence and `runWithGl` is parked on `awaitExit`. Without
@@ -197,6 +226,7 @@ public object MobaAgent {
         control: RenderControl?,
         bridge: AgentBridge,
         sessions: AgentSessions,
+        injected: InjectedIntent,
     ): Session {
         val timings = AgentTimings()
         val census = MobaCensus(host.world)
@@ -213,11 +243,11 @@ public object MobaAgent {
 
         val worldTools = WorldToolset(
             world = host.world,
-            components = AgentComponentIndex(listOf(positionAccess())),
+            components = AgentComponentIndex(listOf(positionAccess(), unitAccess())),
             netIds = host.ctx[CoreModule.NET_IDS],
             bridge = bridge,
             clock = host.ctx.clock,
-            catalog = BlueprintCatalog.of(listOf(GruntBlueprint)),
+            catalog = BlueprintCatalog.of(host.ctx[MobaBlueprints.KEY].all),
             spawner = host.ctx.blueprints,
         )
         val tools = EngineToolModules
@@ -242,6 +272,11 @@ public object MobaAgent {
             .module(AgentHostTools)
             .toolset(RenderToolset(mode, control, artifacts))
             .toolset(ArtifactToolset(artifacts))
+            // `input.*`, over the same source a keyboard writes through. A separate module from
+            // `AgentHostTools` because a `ToolModule` promises every tool in it has a receiver,
+            // and a host that only wants screenshots must not be forced to wire input as well.
+            .module(AgentInputTools)
+            .toolset(InputToolset(injected))
 
         // `assets.*`, over the real corpus and the real running graph. Registered here rather
         // than in `EngineToolModules` for the reason `AssetToolModule` gives: the daemon carries
@@ -273,7 +308,7 @@ public object MobaAgent {
             agentAllowed = UdeaAgentBuildFlags.AGENT_ALLOWED,
         )
 
-        MobaEntry.seed(host)
+        val player = MobaEntry.seed(host)
         digest.publish()
         if (agentHost == null) {
             System.err.println(
@@ -292,7 +327,7 @@ public object MobaAgent {
         shutdown
             .onClose("frame-loop") { loop.stop() }
             .onClose("agent-host") { agentHost?.stop() }
-        return Session(loop = loop, shutdown = shutdown)
+        return Session(loop = loop, shutdown = shutdown, player = player)
     }
 
     /** [Position], with x and y writable and `hp` not - so `field_not_writable` is reachable. */
@@ -304,6 +339,21 @@ public object MobaAgent {
     )
 
     /**
+     * `GameUnit`, so an agent can ask the question the level exists to answer.
+     *
+     * With this registered, `world.query_entities with=GameUnit where team=0` is the orc count
+     * from outside the process, and running it either side of a `time.step` is what shows that
+     * the fight happened. Nothing here is agent-writable: a caller that could set `team` could
+     * make two armies change sides mid-battle, which would make every count it then read a
+     * statement about its own writes rather than about the simulation.
+     */
+    private fun unitAccess(): AgentComponentType = agentComponent(
+        name = "GameUnit",
+        replicator = GameUnitReplicator,
+        componentType = GameUnit,
+    )
+
+    /**
      * The loop and the teardown, so one `close` runs the same steps whoever asked for it.
      *
      * The steps used to be two lines in this class's `close`, which meant the `close` **tool**
@@ -312,7 +362,12 @@ public object MobaAgent {
      * shutdown hook the same teardown rather than two that have to be kept in step - and
      * `HostShutdown` runs once whichever gets there first.
      */
-    private class Session(val loop: AgentGameLoop, val shutdown: HostShutdown) {
+    private class Session(
+        val loop: AgentGameLoop,
+        val shutdown: HostShutdown,
+        /** The unit an agent's `input.*` calls steer, and the one the camera follows. */
+        val player: dev.wildware.udea.core.identity.NetId,
+    ) {
         fun close(reason: String) {
             shutdown.shutdown(reason)
         }
@@ -329,10 +384,45 @@ public object MobaAgent {
  */
 private class MobaCensus(private val world: World) : EntityCensus {
 
+    private val units: Family = world.family { all(GameUnit) }
+
     override val entityCount: Int get() = world.numEntities
 
+    /**
+     * One row per side, plus what is left over.
+     *
+     * This **does** walk a family, which [EntityCensus] asks implementations not to do, and the
+     * trade is stated rather than hidden: it is 27 reads of one component on a digest publish and
+     * not on a tick, and the alternative - three counters maintained at the spawn site and at
+     * every death - is bookkeeping that goes wrong silently the first time a unit is removed by
+     * something other than `UnitDeathSystem`. A count that is late is a bug; a count that is
+     * wrong is worse. When a spawn/despawn seam exists that every removal goes through, the
+     * counters move there.
+     */
     override fun forEachArchetype(visitor: ArchetypeVisitor) {
-        visitor.visit(GruntBlueprint.id.value, entityCount)
+        val counts = IntArray(TEAM_COUNT)
+        val entities = units.entities
+        var index = 0
+        with(world) {
+            while (index < entities.size) {
+                val team = entities[index][GameUnit].team
+                index++
+                if (team in counts.indices) counts[team]++
+            }
+        }
+        var team = 0
+        while (team < counts.size) {
+            visitor.visit(Team.nameOf(team), counts[team])
+            team++
+        }
+        val other = entityCount - counts.sum()
+        if (other > 0) visitor.visit("unaligned", other)
+    }
+
+    private companion object {
+
+        /** `Team.ORC`, `Team.SOLDIER`, `Team.UNDEAD`. */
+        const val TEAM_COUNT: Int = 3
     }
 }
 

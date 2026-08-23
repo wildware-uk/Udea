@@ -3,8 +3,18 @@
 Source: **Tiny RPG Character Asset Pack**, parts 1 and 2 (40 characters).
 
 The pixels are **not committed** - they are third-party licensed art and this repo is public.
-`.gitignore` excludes `moba/src/main/resources/assets/sprites/` and `moba/raw-assets/`.
-Re-extract locally from the two zips with:
+`.gitignore` excludes `moba/src/main/resources/assets/sprites/`, `moba/assets/sprites/` and
+`moba/raw-assets/`.
+
+`moba/assets/sprites/` is the path `moba/assets/character/*.udea.kts` actually names and the one
+`:moba:udeaPackBundle` reads, so **a fresh clone cannot build `:moba` until it is populated**.
+Populate it from art this repository already holds:
+
+```
+python scripts/stage-moba-art.py
+```
+
+Or re-extract everything locally from the two zips:
 
 ```
 python scripts/extract-art.py

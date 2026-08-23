@@ -1,5 +1,9 @@
 package dev.wildware.moba
 
+import dev.wildware.moba.level.GameUnit
+import dev.wildware.moba.level.GameUnitReplicator
+import dev.wildware.moba.level.TestLevelScene
+import dev.wildware.moba.ability.MobaAbilityModule
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.PresentationFactory
@@ -11,6 +15,7 @@ import dev.wildware.udea.core.snapshot.FieldKind
 import dev.wildware.udea.core.snapshot.fleksComponentType
 import dev.wildware.udea.core.snapshot.snapshotTimeTravel
 import dev.wildware.udea.render.RenderModule
+import dev.wildware.udea.render.input.InputModule
 
 /**
  * The **one** simulation, and the one place it is assembled.
@@ -45,14 +50,37 @@ public object MobaGame {
      * `moba` does not yet distinguish the two - see [componentRegistry] for the honest cost.
      */
     public fun definition(): UdeaGameDef {
-        val module = MobaModule()
+        val combat = MobaAbilityModule()
+        val module = MobaModule(combat)
         val definition = UdeaGameDef(
             // `RenderModule` is in the list for **every** mode, including the headless server.
             // It contributes one simulation system, `InterpSnapshotSystem`, and leaving it out of
             // the headless build would make "all three modes run the identical Simulation" false
             // in the one place it is cheapest to keep true. The cost to a server is one lookup
             // per tick against a family that is empty until something spawns a physics body.
-            modules = listOf(module, RenderModule()),
+            // `InputModule` before `MobaModule`, so `IntentState` is on the context by the time
+            // `PlayerControlSystem`'s factory asks for it - a module's `context` hook runs for
+            // every module before any `simulation` hook does, but the *service lookup* happens
+            // when the system is constructed, and constructing it needs the key to be there.
+            //
+            // It is in the list for **every** mode, including the headless server, for the same
+            // reason `RenderModule` is: the three modes must run the identical simulation, and a
+            // server whose tick has no `SimPhase.Intent` system in it is a different simulation
+            // from the client's. A server's source is `IntentSource.NONE`, which costs one
+            // virtual call per tick and produces an intent that is idle by construction.
+            //
+            // `MobaAbilityModule` is the game's ability system: the attributes, effects,
+            // abilities and execs ported from the old example game onto `udea-gas`, plus the
+            // `GasModule` that runs them. It is in the list for every mode for the same reason
+            // the other two are. Every system it registers is scoped to a family that needs
+            // `Combatant`, so it costs an empty family lookup per tick until something spawns a
+            // unit that has one.
+            modules = listOf(
+                InputModule(MobaControls.BINDINGS),
+                module,
+                combat,
+                RenderModule(),
+            ),
             timeTravel = snapshotTimeTravel(componentRegistry()),
         )
         module.spawner = BlueprintSpawner(
@@ -60,6 +88,12 @@ public object MobaGame {
             netIds = definition.core.netIds,
             placement = PositionPlacement,
         )
+        // Registered, not loaded. `register` only makes the id addressable; the swap itself is a
+        // barrier action, and submitting one here would queue work against a world that does not
+        // exist until `definition.build()`. `MobaEntry.seed` is what asks for it, once, in every
+        // entry point - so a scene an agent later swaps away from and back to is the same object
+        // this line named.
+        definition.core.scenes.register(TestLevelScene())
         return definition
     }
 
@@ -74,12 +108,22 @@ public object MobaGame {
         GameHost(mode, definition(), presentation)
 
     /**
-     * What the snapshot ring records.
+     * What the snapshot ring records: where a unit is, and what it is.
      *
-     * One entry, because [Position] is the whole of this game's state. It is hand-assembled for
-     * the same reason [PositionReplicator] is hand-written: `udea-codegen` is not pointed at
-     * `moba` yet, so the registry a `@Replicated` component would have produced has to be typed
-     * out. Adding a second component today means editing three files that nothing cross-checks.
+     * Both replicators are generated - `udea-codegen` runs over this module's `@Replicated`
+     * classes - but the *schema* beside each one is hand-assembled, because a `FieldKind` list is
+     * a claim about column types that no generator emits yet. The two must agree field for field,
+     * in the replicator's own order, which is alphabetical by name and not declaration order:
+     *
+     * | component | fields, in index order |
+     * |---|---|
+     * | `Position` | `hp`, `x`, `y` - three floats |
+     * | `GameUnit` | `kind`, `targetRaw`, `team` - three ints |
+     *
+     * `ComponentSchema.of` refuses a list whose length disagrees with `fieldNames`, so a field
+     * added to either component fails here rather than silently shifting a column - but a *kind*
+     * typed wrong at the right length is not caught by anything except `SnapshotRoundTripTest`
+     * style coverage, which is why the table above is written out rather than left implied.
      */
     public fun componentRegistry(): ComponentRegistry = ComponentRegistry(
         listOf(
@@ -92,6 +136,15 @@ public object MobaGame {
                 ),
                 Position,
             ) { Position() },
+            fleksComponentType(
+                GameUnitReplicator,
+                ComponentSchema.of(
+                    GameUnitReplicator,
+                    "GameUnit",
+                    listOf(FieldKind.Int, FieldKind.Int, FieldKind.Int),
+                ),
+                GameUnit,
+            ) { GameUnit() },
         ),
     )
 }

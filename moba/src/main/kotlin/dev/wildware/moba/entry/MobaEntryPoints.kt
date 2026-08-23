@@ -1,15 +1,23 @@
 package dev.wildware.moba.entry
 
-import dev.wildware.moba.GruntBlueprint
+import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.moba.MobaGame
 import dev.wildware.moba.MobaScene
-import dev.wildware.udea.core.blueprint.blueprints
+import dev.wildware.moba.Player
+import dev.wildware.moba.level.TestLevelScene
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.render.OverlayResources
 import dev.wildware.udea.render.OverlaySystem
 import dev.wildware.udea.render.RenderPipeline
+import dev.wildware.udea.render.input.CompositeIntent
+import dev.wildware.udea.render.input.DeviceIntent
+import dev.wildware.udea.render.input.GdxKeyboard
+import dev.wildware.udea.render.input.IntentSource
+import dev.wildware.udea.render.input.IntentState
 import dev.wildware.udea.render.backend.Lwjgl3Backend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.control.PresentationControl
@@ -68,16 +76,107 @@ public object MobaEntry {
     public fun scene(definition: UdeaGameDef): MobaScene = MobaScene.build(definition)
 
     /**
-     * Puts one entity in the world and runs the tick that applies it.
+     * Loads `level/test_level` and runs the tick that applies the swap.
      *
-     * Shared by all three entry points so that a fresh instance is never an empty world: an
-     * agent's first `get_state` on an empty world and its first `get_state` on a broken spawn
-     * path look identical, and one of those is a bug. A spawn goes through the `SimBarrier`, so
-     * the tick is what makes the entity exist rather than merely be requested.
+     * Shared by all three entry points, which is the point of it: `runServer`, `runClient` and
+     * the agent's instance load the **same scene** over the same `Simulation`, so a fight that
+     * unfolds one way in a capture and another way on the server would be a real defect rather
+     * than two games that were never the same to begin with.
+     *
+     * A scene swap is a `BarrierAction`: `requestScene` submits, and the next tick is what
+     * clears the world, resets the net ids and populates. So the `run(1)` is not a nicety - a
+     * caller that skipped it would read an empty world from `/state` and could not tell that
+     * from a level that failed to spawn. `MobaGame.definition` is where the scene was registered
+     * under this id; requesting an unregistered one throws with the known ids in the message.
      */
-    public fun seed(host: GameHost) {
-        host.ctx.blueprints.spawn(GruntBlueprint)
+    public fun seed(host: GameHost): NetId {
+        host.ctx.scenes.requestScene(TestLevelScene.ID)
         host.run(1)
+        // The player is the level's own `player` entity, not a twenty-eighth unit spawned beside
+        // it: `TestLevelScene` puts the `Player` component on the authored entity of that name,
+        // so the unit a human drives is the one standing in the orc clearing where the old game
+        // dropped it. Resolved from the world rather than returned by the swap, because a scene
+        // swap is a barrier action and the entities do not exist until the tick above drained it.
+        return playerId(host)
+    }
+
+    /**
+     * The net id of the level's player unit.
+     *
+     * Exactly one, and a failure when there is not: zero means the level lost its `player` entity
+     * or the override that marks it, and two means something spawned a second one - and both of
+     * those end as "the camera follows the wrong soldier", which is the kind of bug that gets
+     * blamed on the camera. `render.follow_entity` is handed whatever this returns, so the
+     * refusal belongs here rather than in the rig.
+     */
+    public fun playerId(host: GameHost): NetId {
+        val players = host.world.family { all(Player) }
+        val entities = players.entities
+        check(entities.size == 1) {
+            "the level must contain exactly one Player, and this world has ${entities.size}; " +
+                "`TestLevelScene` marks the authored entity named " +
+                "'${TestLevelScene.PLAYER_ENTITY}'"
+        }
+        return host.ctx[CoreModule.NET_IDS].netIdOf(entities[0])
+    }
+
+    /**
+     * Points [rendering]'s camera at [player] and puts the view on it immediately.
+     *
+     * `snapToTarget` as well as `requestFollow`, because the first frame of a scene is one of the
+     * two frames easing is wrong on: the camera's previous position describes the default framing
+     * rather than a world it was tracking, and easing from it drags the view across the level
+     * while the player is trying to work out where their character is.
+     */
+    public fun follow(rendering: Rendering, player: NetId) {
+        rendering.scene.follow(player)
+    }
+
+    /**
+     * Wires this process's keyboard into the simulation's [IntentState], and returns the source.
+     *
+     * ## The two halves, and why only one of them names LibGDX
+     *
+     * [GdxKeyboard] is the device half - the one class in the tree that reads a physical key -
+     * and it is installed as the window's input processor here, on the render thread, because
+     * `Gdx.input` has the same thread affinity every `Gdx` static has. [DeviceIntent] is the
+     * mapping half: it turns key states into the [dev.wildware.udea.render.input.Intent] the
+     * simulation reads, names no GL type, and is what `MobaInputTest` drives with no window.
+     *
+     * ## Where an agent's input joins
+     *
+     * [extra] is the agent's [dev.wildware.udea.render.input.InjectedIntent], or `null` for a
+     * plain client. When it is present the two are combined rather than one replacing the other,
+     * so a human watching a Windowed agent instance can still play - see `CompositeIntent` for
+     * why there is deliberately no priority rule between them.
+     *
+     * ## What an agent still cannot reach
+     *
+     * The overlay hotkey. `GdxOverlayKey` polls `Gdx.input.isKeyPressed` directly and is not in
+     * the chain installed here, so no `input.*` tool and no injected source can toggle the panel
+     * that narrates what the agent is doing (issue #161). That is structural: the arrow runs from
+     * a device to an intent, and there is no arrow back.
+     */
+    public fun wireInput(
+        host: GameHost,
+        rendering: Rendering,
+        extra: IntentSource? = null,
+    ): IntentSource {
+        val state = host.ctx[IntentState.KEY]
+        val keyboard = GdxKeyboard()
+        val device = DeviceIntent(state.bindings, keyboard)
+        val source = if (extra == null) {
+            device
+        } else {
+            CompositeIntent(state.bindings.catalog, listOf(device, extra))
+        }
+        rendering.onRenderThread {
+            // The scene2d stage would go first in this chain when this game grows one; the
+            // keyboard consumes nothing, so it is safe at the end of any chain.
+            GdxKeyboard.install(keyboard)
+        }
+        state.source = source
+        return source
     }
 
     /**
@@ -135,7 +234,15 @@ public object MobaEntry {
             val pipeline = checkNotNull(backend.pipeline) {
                 "GameHost built no presentation in $mode, so nothing can be captured"
             }
-            val attached = attach(host, Rendering(scene, pipeline, requestExit = { requestExit(backend) }))
+            val attached = attach(
+                host,
+                Rendering(
+                    scene,
+                    pipeline,
+                    requestExit = { requestExit(backend) },
+                    onRenderThread = { block -> backend.onRenderThread(block) },
+                ),
+            )
             attachment = attached
             backend.drive(attached.frame)
             backend.awaitExit()
@@ -174,6 +281,18 @@ public object MobaEntry {
          * it is running on. See [requestExit].
          */
         public val requestExit: () -> Unit = {},
+        /**
+         * Runs a block on the render thread and waits for it.
+         *
+         * Exists for exactly one caller and it is worth naming: `Gdx.input` has the same thread
+         * affinity every other `Gdx` static has, and installing the window's input chain is the
+         * one piece of start-up work that touches it. Handing over the whole `Lwjgl3Backend` so
+         * an entry point could call `onRenderThread` itself would also hand it `close`, and
+         * `close` from inside a frame deadlocks (see [requestExit]).
+         *
+         * The default runs inline, for a `Rendering` a test builds with no backend behind it.
+         */
+        public val onRenderThread: (() -> Unit) -> Unit = { it() },
     ) {
         /** The control surface, for a caller that has an agent toolset to wire to it. */
         public fun presentation(): PresentationControl = scene.presentation(pipeline)

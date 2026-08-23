@@ -309,7 +309,7 @@ class OffscreenRenderToolsTest {
         val registry = RenderRegistry()
         val camera = CameraRig(
             netIds = netIds,
-            interpolator = Interpolator(SimClock(), SimulatedPoseOnly),
+            poses = Interpolator(SimClock(), SimulatedPoseOnly),
             frameTime = registry.frameTime,
         )
         registry.register(RenderPhase.PreRender, { camera })

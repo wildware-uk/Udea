@@ -3,6 +3,7 @@ package dev.wildware.udea.gas
 import dev.wildware.udea.core.Cue
 import dev.wildware.udea.core.CueSink
 import dev.wildware.udea.core.Tick
+import dev.wildware.udea.core.identity.NetId
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -107,6 +108,27 @@ class RepeatedApplicationCueTest {
             fixture.cues.eventAt(0).effectHandle != fixture.cues.eventAt(1).effectHandle,
             "they are distinct applications, so they carry distinct handles",
         )
+    }
+
+    /**
+     * A cue with no handle and no prediction key is never a duplicate.
+     *
+     * This is what an `AbilityExec` emits directly - a swing, a shout, an arrow leaving a bow -
+     * and keying the window on the cue id alone made every one of them after the first collide,
+     * across units as well as across ticks. `moba`'s melee attack emitted one swoosh for the whole
+     * game and the queue counted the rest as duplicates.
+     */
+    @Test
+    fun `two unpredicted cues with no effect handle both survive`() {
+        val cues = GasCueQueue()
+
+        val first = cues.emit(cueId = 3, tick = Tick(10), source = NetId.of(1, 0))
+        val second = cues.emit(cueId = 3, tick = Tick(50), source = NetId.of(1, 0))
+        val other = cues.emit(cueId = 3, tick = Tick(50), source = NetId.of(2, 0))
+
+        assertTrue(first && second && other, "none of these has an identity to be a duplicate of")
+        assertEquals(3, cues.size)
+        assertEquals(0L, cues.deduplicatedCount)
     }
 
     @Test

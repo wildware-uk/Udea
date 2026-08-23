@@ -55,7 +55,7 @@ public class Pose(
 public class Interpolator(
     private val clock: SimClock,
     private val history: PoseHistory,
-) {
+) : PoseSource {
 
     /**
      * True when the world's tick sequence broke since the last recorded pose.
@@ -72,6 +72,16 @@ public class Interpolator(
      * @param alpha the loop's interpolation alpha, in `[0, 1]`.
      * @return `false` if [entity] has no [PhysicsBody] and nothing was written, so a caller can
      *   skip it without a second component lookup.
+     */
+    override fun poseOf(world: World, entity: Entity, alpha: Float, into: Pose): Boolean =
+        interpolate(world, entity, alpha, into)
+
+    /**
+     * [poseOf] under the name every renderer in this module already calls it by.
+     *
+     * Kept as the primary spelling: "interpolate" says what this implementation does, while
+     * [PoseSource.poseOf] says what the *capability* is, and a game supplying a pose for a
+     * component that never interpolates would be implementing a method whose name was a lie.
      */
     public fun interpolate(world: World, entity: Entity, alpha: Float, into: Pose): Boolean {
         with(world) {

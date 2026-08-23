@@ -165,12 +165,25 @@ public class GasCueQueue(
             suppressedCount++
             return false
         }
-        val key = dedupKey(cueId, effectHandle, predictionKey)
-        if (isDuplicate(key)) {
-            deduplicatedCount++
-            return false
+        // De-duplicate only a cue that *has* an identity. A cue with no effect handle and no
+        // prediction key - which is every cue an `AbilityExec` emits directly: a swing, a shout,
+        // an arrow leaving a bow - has nothing to be a duplicate *of*, and keying one on its id
+        // alone made every repeat of it collide: the same unit's second swing, and worse, every
+        // other unit's first. A game with twenty-seven units played one hit sound and dropped the
+        // rest, counted as `deduplicatedCount`, with nothing to say which cue went missing.
+        //
+        // The prediction case is untouched, because that is the case this window exists for: a
+        // client predicts with a key, or an effect application carries a handle, and the server's
+        // confirmation of either is still recognised and still dropped. A re-simulation is not
+        // this mechanism's job either - [CueMode.Suppress] is.
+        if (isIdentifiable(effectHandle, predictionKey)) {
+            val key = dedupKey(cueId, effectHandle, predictionKey)
+            if (isDuplicate(key)) {
+                deduplicatedCount++
+                return false
+            }
+            rememberKey(key)
         }
-        rememberKey(key)
         if (size == capacity) {
             droppedCount++
             return false
@@ -234,6 +247,10 @@ public class GasCueQueue(
             mode = previous
         }
     }
+
+    /** Whether this cue carries something that could identify it as a repeat of another. */
+    private fun isIdentifiable(handle: EffectHandle, predictionKey: Int): Boolean =
+        !handle.isInvalid || predictionKey != CueEvent.NO_PREDICTION
 
     private fun dedupKey(cueId: Int, handle: EffectHandle, predictionKey: Int): Long =
         (cueId.toLong() shl 40) xor (handle.raw.toLong() shl 8) xor predictionKey.toLong()

@@ -217,6 +217,28 @@ tasks.register<JavaExec>("runServer") {
     classpath = sourceSets.main.get().runtimeClasspath
 }
 
+/**
+ * `moba.shot`: one Offscreen frame of the whole character roster, written as a PNG.
+ *
+ * Deliberately NOT wired into `check`. It creates a real GL context, so on a machine with no
+ * driver it is a failure rather than a skip - which is the right behaviour for a task that is
+ * *asked for* and the wrong behaviour for `./gradlew build` on a headless container. See
+ * `MobaShot` for what it draws and why it does not load `level/test_level`.
+ */
+tasks.register<JavaExec>("runShot") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.shot: captures one frame of the character roster to -Pudea.shot.out=<png>."
+    mainClass.set("dev.wildware.moba.entry.MobaShot")
+    classpath = sourceSets.main.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty(
+        "udea.shot.out",
+        providers.gradleProperty("udea.shot.out").orNull
+            ?: layout.buildDirectory.file("reports/udea/roster.png").get().asFile.absolutePath,
+    )
+    systemProperty("udea.shot.tick", providers.gradleProperty("udea.shot.tick").orNull ?: "18")
+}
+
 tasks.register<JavaExec>("runClient") {
     group = ApplicationPlugin.APPLICATION_GROUP
     description = "moba.client: a visible LWJGL3 window."

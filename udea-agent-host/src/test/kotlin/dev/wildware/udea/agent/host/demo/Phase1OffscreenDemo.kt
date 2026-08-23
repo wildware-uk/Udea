@@ -115,7 +115,7 @@ public object Phase1OffscreenDemo {
             // reports every frame as a restore frame, and an entity spawned by this demo has no
             // `Interp` component, so `Interpolator` takes the "draw at the simulated pose" branch
             // either way. The demo pauses for every capture, so there is nothing to interpolate.
-            interpolator = Interpolator(SimClock(), SimulatedPoseOnly),
+            poses = Interpolator(SimClock(), SimulatedPoseOnly),
             frameTime = registry.frameTime,
             worldWidth = WORLD_WIDTH,
             worldHeight = WORLD_HEIGHT,

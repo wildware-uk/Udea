@@ -23,6 +23,7 @@
 # which is what exercises the generator end to end (issue #29). moba and udea-gas add their
 # names here as they gain components.
 dev.wildware.moba.Position
+dev.wildware.moba.level.GameUnit
 dev.wildware.udea.codegen.fixtures.AiBlackboard
 dev.wildware.udea.codegen.fixtures.Combat
 dev.wildware.udea.codegen.fixtures.Health

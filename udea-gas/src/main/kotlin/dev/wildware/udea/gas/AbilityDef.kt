@@ -108,6 +108,16 @@ public class AbilityCost(
     public val amount: ValueResolver,
     /** The [GameplayEffectTable] index of the effect that actually spends it. */
     public val effectIndex: Int,
+    /**
+     * The set-by-caller tag [effectIndex]'s magnitude reads, or [GameplayTag.NONE] for an effect
+     * whose magnitude is a constant.
+     *
+     * Named here rather than assumed, because the amount lives on **this** declaration and the
+     * effect that spends it is shared: one `ability/cost_mana` serves every ability, and each
+     * one spends a different number. `AbilityActivation.activate` stages `-amount` under this tag
+     * when it applies the cost.
+     */
+    public val magnitudeTag: GameplayTag = GameplayTag.NONE,
 ) {
     override fun toString(): String = "AbilityCost($attribute)"
 }

@@ -1,38 +1,73 @@
 package dev.wildware.moba
 
 import com.github.quillraven.fleks.Entity
-import com.github.quillraven.fleks.EntityCreateContext
 import com.github.quillraven.fleks.World
-import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.moba.ability.MobaAbilityModule
+import dev.wildware.moba.level.MobaBlueprints
+import dev.wildware.moba.level.UnitBattleSystem
 import dev.wildware.udea.core.GameContextBuilder
-import dev.wildware.udea.core.SimSystem
-import dev.wildware.udea.core.blueprint.Blueprint
-import dev.wildware.udea.core.blueprint.BlueprintId
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
 import dev.wildware.udea.core.blueprint.SpawnPlacement
 import dev.wildware.udea.core.blueprint.blueprintSpawner
 import dev.wildware.udea.core.module.SimPhase
 import dev.wildware.udea.core.module.SimRegistry
 import dev.wildware.udea.core.module.UdeaModule
+import dev.wildware.udea.render.input.IntentSampleSystem
+import dev.wildware.udea.render.input.IntentState
 
 /**
- * The example game's content, such as it is: one component, one blueprint, one system.
+ * This game's content: the units, the fight between them, and the spawner that places them.
  *
  * ## What this module is and is not
  *
  * It is a real [UdeaModule], contributed to a real [dev.wildware.udea.core.module.UdeaGameDef],
  * and every entry point in `dev.wildware.moba.entry` builds the same one. That is the property
- * spec 4 asks for and the property that was missing: before this, nothing in the repository could
- * boot a game at all, so "dedicated server, agent harness and player run the identical
- * `Simulation`" was a claim with no executable behind it.
+ * spec 4 asks for: a behaviour that reproduces on the server and not in the agent's instance is
+ * a bug in a renderer, because there is only one simulation here.
  *
- * It is **not** a MOBA. There are no champions, no lanes, no abilities and no network role; the
- * `raw-assets` tree next door has art for all of them and nothing consumes it yet. Adding content
- * here is Phase 2's work, and inventing some now would only make the wiring harder to read.
+ * It **was** one component, one blueprint called `grunt` and a system that slid it sideways, with
+ * a note saying content was Phase 2's work. The content is here now: `level/test_level` is the
+ * old example game's roster - a soldier, a priest, five orcs, ten skeletons and ten soldiers.
+ *
+ * ## Two modules, one unit
+ *
+ * This module owns a [MobaAbilityModule] and the game's [MobaBlueprints] are built against it, so
+ * a unit the level spawns carries both halves of the game on one entity: [UnitBattleSystem]'s
+ * spatial half (who to go for, walking there, which way to face) and `udea-gas`'s combat half
+ * (health as an attribute, damage as an effect, cooldowns that rewind, the priest's heal and the
+ * soldier's arrow). They were built in parallel by two agents and were, until this wire-up, two
+ * rosters that never met: every family in `dev.wildware.moba.ability` was empty in the shipped
+ * game because no entity in it had a `Combatant`.
+ *
+ * Owning the combat module rather than listing it beside this one in `MobaGame.definition` is
+ * what makes that unfakeable. `MobaBlueprints` needs the *same* attribute, effect and ability
+ * tables the `GasModule` runs, and two modules constructed independently and handed to one
+ * definition is four chances to build a game whose units hold ability indices into a table they
+ * are not in.
+ *
+ * ## Where the drift went
+ *
+ * `DriftSystem` moved every `Position` a quarter of a unit per tick around a 90-unit field, and
+ * existed for one reason: an instance had to be *observably* running from outside, and one unit
+ * sliding was the smallest thing that made two `/state` reads differ. Units that walk toward
+ * enemies and die do that better, and the drift would now be a second, invisible force acting on
+ * a fight - so it is deleted rather than kept as a system nothing wants. `MobaSceneTest`'s
+ * playfield tests went with it; the level's own layout tests replaced them.
  */
-public class MobaModule : UdeaModule {
+public class MobaModule(
+    /** This game's combat. Contributed to the definition by [MobaGame], not by this module. */
+    public val combat: MobaAbilityModule,
+) : UdeaModule {
 
     override val name: String get() = "moba"
+
+    /**
+     * The four units the level can spawn, built against [combat]'s tables.
+     *
+     * Published on the context under [MobaBlueprints.KEY], because a scene, an agent's blueprint
+     * catalog and a player spawn all need it and none of them holds this module.
+     */
+    public val blueprints: MobaBlueprints = MobaBlueprints(combat)
 
     /**
      * The spawner, published on the context so `ctx.blueprints` can find it.
@@ -47,83 +82,41 @@ public class MobaModule : UdeaModule {
         builder.blueprintSpawner(
             checkNotNull(spawner) { "MobaGame wires the spawner before building the definition" },
         )
+        builder.service(MobaBlueprints.KEY, blueprints)
     }
 
+    /**
+     * Input, movement, the spatial half of the fight, and the animation the fight produces.
+     *
+     * Death is **not** here any more. `UnitDeathSystem` removed a unit whose `Position.hp` had
+     * run out, and `Position.hp` is now a copy that `dev.wildware.moba.ability.DeathSystem`
+     * writes from the `health` attribute - so keeping it would have been a second remover reading
+     * the first one's mirror, with the loser of that race deciding when a net id is freed. One
+     * death path, in the module that owns health.
+     */
     override fun simulation(registry: SimRegistry) {
-        registry.add(SimPhase.Movement, { DriftSystem() })
-    }
-}
-
-/**
- * Moves every [Position] a fixed amount per tick, around a field of fixed width.
- *
- * The smallest system that makes a running instance *observably* running: two `/state` reads a
- * few ticks apart differ, a `time.step(120)` moves the world by a stated amount, and a rewind is
- * visible as a coordinate going back. Deterministic in ticks rather than seconds, so the value
- * after N ticks is the same on every machine and survives a snapshot restore.
- *
- * ## Why it wraps, which it did not before
- *
- * It used to be `position.x += DRIFT_PER_TICK` with no bound, and that made **every screenshot
- * after the first eight seconds a black frame.** The unit leaves `MobaScene`'s camera at about
- * tick 460; an instance an agent connects to has usually been up for thousands of ticks, so
- * `render.screenshot` returned a perfectly valid PNG of an empty framebuffer and
- * `render.compare_artifacts` reported `identical:true` for every pair of them. That reads
- * exactly like a broken renderer, and it took a live instance to tell the two apart - which is
- * the whole reason a blank capture is worse than a red one.
- *
- * So the field is `[0, FIELD_WIDTH)` and the unit laps it, in [LAP_TICKS] ticks. `MobaScene`
- * frames that interval, so a unit is always somewhere in shot.
- *
- * **What that costs, stated rather than discovered:** `x` is now bounded game state.
- * `world.set_component_field` writing `x = 200` is accepted and the write is real - `/state`
- * shows 200 - and the **next tick** normalises it to 20. A game with a playfield behaves this
- * way; an agent testing the write surface on a paused instance sees the value it wrote, and one
- * that steps afterwards sees the wrap. There is deliberately no clamp-on-write: a barrier
- * mutation that silently rewrote its own argument would be worse.
- *
- * **And the aliasing:** two captures exactly [LAP_TICKS] apart are identical by construction. A
- * `time.rewind` of a whole lap therefore reports zero differing pixels and is not a bug.
- */
-public class DriftSystem : SimSystem() {
-
-    private val moving = family { all(Position) }
-
-    override fun onTick() {
-        moving.forEach { entity ->
-            val position = entity[Position]
-            position.x = wrap(position.x + DRIFT_PER_TICK)
-        }
-    }
-
-    public companion object {
-
-        /** World units per tick. A round number so a reader can check the arithmetic by eye. */
-        public const val DRIFT_PER_TICK: Float = 0.25f
-
-        /**
-         * The playfield, in world units: `x` is always in `[0, FIELD_WIDTH)` after a tick.
-         *
-         * Sized to sit inside `MobaScene`'s camera with room on both sides, so a unit at either
-         * end of the field is fully drawn rather than half off the edge.
-         */
-        public const val FIELD_WIDTH: Float = 90f
-
-        /** Ticks for one lap of the field. At the default 60Hz tick rate, six seconds. */
-        public const val LAP_TICKS: Int = (FIELD_WIDTH / DRIFT_PER_TICK).toInt()
-
-        /**
-         * [x] brought into `[0, FIELD_WIDTH)`.
-         *
-         * `%` alone is not enough and the difference is reachable: `x` is agent-writable, so
-         * `world.set_component_field x = -5` is one HTTP call away, and Kotlin's `%` keeps the
-         * sign - which would leave the unit at `-5`, off camera, drifting toward the field from
-         * outside it for twenty seconds. Public and pure so `MobaSceneTest` can drive it.
-         */
-        public fun wrap(x: Float): Float {
-            if (!x.isFinite()) return 0f
-            val remainder = x % FIELD_WIDTH
-            return if (remainder < 0f) remainder + FIELD_WIDTH else remainder
+        // `SimPhase.Intent`, and *after* the sampler, so the axis this reads was sampled on this
+        // tick rather than on the previous one. Declared rather than left to registration order:
+        // `MobaModule` is listed after `InputModule` in `MobaGame.definition` today, and somebody
+        // reordering that list would otherwise introduce a one-tick input lag no test names.
+        registry.add(
+            SimPhase.Intent,
+            { ctx -> PlayerControlSystem(ctx[IntentState.KEY], combat.gas.activation) },
+        ) { after(IntentSampleSystem::class) }
+        registry.add(SimPhase.Movement, { PlayerMovementSystem() })
+        registry.add(SimPhase.Gameplay, { UnitBattleSystem() })
+        // Both in `Cleanup`, and the order between them is declared rather than left to this
+        // file's line order: `CharacterStateSystem` decides which animation a unit is in and
+        // `CharacterAnimationSystem` computes which of that animation's notify frames the tick
+        // landed on. Run the other way round, a unit that changed what it was doing this tick has
+        // its notifies computed against last tick's animation - one frame of wrong sound effect
+        // per state change, on every unit, which is exactly the class of bug nobody files.
+        //
+        // They run after the fighting and the walking so a unit that started swinging on this
+        // tick is drawn swinging on this tick. Neither writes anything a gameplay system reads.
+        registry.add(SimPhase.Cleanup, { CharacterStateSystem(combat.effects) })
+        registry.add(SimPhase.Cleanup, { CharacterAnimationSystem() }) {
+            after(CharacterStateSystem::class)
         }
     }
 }
@@ -143,15 +136,5 @@ public object PositionPlacement : SpawnPlacement {
             position.x = x
             position.y = y
         }
-    }
-}
-
-/** The one thing that can be spawned. */
-public object GruntBlueprint : Blueprint {
-
-    override val id: BlueprintId = BlueprintId("grunt")
-
-    override fun configure(context: EntityCreateContext, entity: Entity) {
-        with(context) { entity += Position(hp = 40f) }
     }
 }

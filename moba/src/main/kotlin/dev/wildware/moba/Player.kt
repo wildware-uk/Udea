@@ -1,0 +1,232 @@
+package dev.wildware.moba
+
+import com.github.quillraven.fleks.Component
+import com.github.quillraven.fleks.ComponentType
+import com.github.quillraven.fleks.Family
+import dev.wildware.moba.level.GameUnit
+import dev.wildware.moba.level.MobaBlueprints
+import dev.wildware.udea.core.SimSystem
+import dev.wildware.udea.core.blueprint.BlueprintSpawner
+import dev.wildware.udea.core.blueprint.SpawnPosition
+import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.core.identity.NetIdIndex
+import dev.wildware.udea.core.module.CoreModule
+import dev.wildware.udea.gas.Abilities
+import dev.wildware.udea.gas.AbilityActivation
+import dev.wildware.udea.gas.ActivationResult
+import dev.wildware.udea.gas.Attributes
+import dev.wildware.udea.gas.GameplayEffects
+import dev.wildware.udea.render.input.IntentState
+
+/**
+ * The unit a human (or an agent) is driving, and what they asked it to do this tick.
+ *
+ * ## Why the intent is a component and not a device read at the point of use
+ *
+ * [moveX]/[moveY] are written at `SimPhase.Intent` by [PlayerControlSystem] and read at
+ * `SimPhase.Movement` by [PlayerMovementSystem], and nothing else writes them. That is the same
+ * split `udea-core`'s `MoveIntent` makes, for the same reason: a tick's movement is then a pure
+ * function of (state, intent), so replaying a tick means restoring the state and re-supplying
+ * this - no device, no frame rate and no wall clock anywhere in it.
+ *
+ * `udea-core`'s own `MoveIntent` is deliberately **not** reused: it is one horizontal axis and a
+ * jump, because it drives `CharacterMover`, which is a platformer capsule with gravity and
+ * ground normals. A top-down MOBA needs two axes and no gravity, and bending a 1D platformer
+ * intent into that shape would be worse than three floats of this game's own.
+ *
+ * ## It is a marker as much as a value
+ *
+ * Two systems branch on its *presence*: [dev.wildware.moba.level.UnitBattleSystem] does not walk
+ * a unit that has one (a player closes with WASD, not by itself), and the camera follows the
+ * entity that has one. That is the same split the old game made with its `Player` and `AIUnit`
+ * components, minus the second component - the family that named `AIUnit` was the only reader it
+ * ever had.
+ */
+public class Player(
+    /** Horizontal axis this tick, `-1..1`. Written only at `SimPhase.Intent`. */
+    public var moveX: Float = 0f,
+    /** Vertical axis this tick, `-1..1`. Positive is up. */
+    public var moveY: Float = 0f,
+    /**
+     * `-1` or `1`: which way the sprite faces.
+     *
+     * Held rather than derived, because it must **persist** while the player stands still: a
+     * character that snapped back to facing right the moment you let go of A would read as a
+     * rendering bug rather than as an input one.
+     */
+    public var facing: Float = 1f,
+) : Component<Player> {
+
+    override fun type(): ComponentType<Player> = Player
+
+    override fun toString(): String = "Player(move=($moveX, $moveY) facing=$facing)"
+
+    public companion object : ComponentType<Player>() {
+
+        /**
+         * Where the player's soldier lands, in the middle of the level's soldier cluster.
+         *
+         * The old `level/test_level.udea.kts` put a player-controlled soldier at the centre of
+         * ten more; this is that position in this game's world units.
+         */
+        public const val SPAWN_X: Float = 0f
+
+        /** @see SPAWN_X */
+        public const val SPAWN_Y: Float = 0f
+
+        /**
+         * Spawns the soldier a client drives, and hands back the id the camera follows.
+         *
+         * A [MobaBlueprints.soldier] with a [Player] laid over it rather than a blueprint of its
+         * own, and that is the point: the unit a human steers must be **the same kind of thing**
+         * as the ten beside it, or the game a player experiences is not the game the server
+         * simulates. The override is one component, and it is the whole difference.
+         *
+         * `spawn` and not `spawnNow`: this is called from outside a tick, so the entity appears
+         * when the barrier drains at the top of the next one - which is also why the caller must
+         * run a tick before the returned [NetId] resolves to anything.
+         */
+        public fun spawn(
+            spawner: BlueprintSpawner,
+            blueprints: MobaBlueprints,
+            x: Float = SPAWN_X,
+            y: Float = SPAWN_Y,
+        ): NetId = spawner.spawn(
+            blueprint = blueprints.soldier,
+            position = SpawnPosition(x, y),
+        ) { context, entity ->
+            with(context) { entity += Player() }
+        }
+    }
+}
+
+/**
+ * Turns this tick's [dev.wildware.udea.render.input.Intent] into every [Player]'s move axis.
+ *
+ * ## It reads a value, not a device
+ *
+ * This is what `PlayerControlSystem` was in the old tree, and the difference is the whole of
+ * issue #124. That one held `world.system<ControllerSystem>()` and asked it for an axis that
+ * `ControllerSystem` had polled off `Gdx.input` **inside the tick**, at frame rate. This one
+ * reads [IntentState.intent], which `IntentSampleSystem` filled at the top of this same tick out
+ * of whatever source is wired: a keyboard, an agent's `input.*` tools, a replayed buffer. There
+ * is no branch here for which, which is exactly why an agent driving this game is not driving a
+ * different code path from a human - `MobaInputTest` runs it from an injected source with no
+ * window in the process at all.
+ *
+ * Registered at `SimPhase.Intent` **after** `IntentSampleSystem` (declared in [MobaModule], not
+ * left to registration order), so the axis it reads was sampled on this tick rather than the
+ * previous one.
+ *
+ * ## Attack
+ *
+ * The primary attack activates the player's own ability slot through [AbilityActivation] - the
+ * same call `dev.wildware.moba.ability.AbilityAutopilotSystem` makes for every AI unit on the
+ * field, with the same cost check, the same cooldown effect and the same exec. It used to write
+ * `unit.attackReadyTick = 0L`, which reached into a second combat implementation that no longer
+ * exists; a player whose swing is a different code path from the soldier beside them is a player
+ * playing a different game from the one the server simulates.
+ *
+ * The highest granted slot that will actually fire wins, so pressing the key uses the soldier's
+ * arrow when it is off cooldown and its sword when it is not - which is what the character's two
+ * `Slot.A`/`Slot.B` loadout meant. Refusals are counted, not swallowed: [attacksRefused] is what
+ * separates "the input never arrived" from "it arrived and the ability was on cooldown", and
+ * those two look identical from outside the process.
+ */
+public class PlayerControlSystem(
+    private val input: IntentState,
+    /** The one activation path in this game. The AI uses the same object. */
+    private val activation: AbilityActivation,
+) : SimSystem() {
+
+    /** Resolved once at construction; `world.family { }` per tick is a lookup on a hot path. */
+    private val players: Family = world.family { all(Player) }
+
+    private val netIds: NetIdIndex = ctx[CoreModule.NET_IDS]
+
+    /** Abilities actually started by a key press. A signal for a test and a log line. */
+    public var attacksRequested: Long = 0L
+        private set
+
+    /** Presses that reached a unit and fired nothing: on cooldown, out of mana, stunned. */
+    public var attacksRefused: Long = 0L
+        private set
+
+    override fun onTick() {
+        val intent = input.intent
+        val x = intent.axisX(MobaControls.MOVE_AXIS)
+        val y = intent.axisY(MobaControls.MOVE_AXIS)
+        val attacking = intent.isJustPressed(MobaControls.ATTACK_ACTION)
+        val now = tick
+        players.forEach { entity ->
+            val player = entity[Player]
+            player.moveX = x
+            player.moveY = y
+            // Only on a real deflection: see `Player.facing`.
+            if (x > 0f) player.facing = 1f else if (x < 0f) player.facing = -1f
+            // The sprite follows the hands, overwriting the facing `UnitBattleSystem` derived
+            // from whoever this unit is targeting. A character that turns to face an enemy while
+            // you walk the other way reads as the controls being ignored.
+            entity.getOrNull(CharacterView)?.flipX = player.facing < 0f
+            if (!attacking) return@forEach
+            val abilities = entity.getOrNull(Abilities) ?: return@forEach
+            val attributes = entity.getOrNull(Attributes) ?: return@forEach
+            val effects = entity.getOrNull(GameplayEffects) ?: return@forEach
+            val self = netIds.netIdOf(entity)
+            // Highest slot first: the special when it is up, the basic attack when it is not,
+            // which is the order the autopilot uses for exactly the same reason.
+            var slot = abilities.slotCount - 1
+            while (slot >= 0) {
+                if (abilities.instanceAt(slot).isGranted &&
+                    activation.activate(self, abilities, attributes, effects, slot, now) ===
+                    ActivationResult.Activated
+                ) {
+                    attacksRequested++
+                    return@forEach
+                }
+                slot--
+            }
+            attacksRefused++
+        }
+    }
+}
+
+/**
+ * Moves every [Player] by its axis. `SimPhase.Movement`.
+ *
+ * ## Units per **tick**, matching the units beside it
+ *
+ * `UnitKind.moveSpeed` is world units per tick - that is the convention the ported level uses,
+ * and `UnitBattleSystem` closes on a target with `position.x += dx / distance * kind.moveSpeed`.
+ * A player scaled by `ctx.clock.dt` instead would be sixty times slower than the soldier next to
+ * it, which is a difference a player notices immediately and a reviewer notices never. When the
+ * fight moves to seconds, both move together.
+ *
+ * Either way it is **not** `IntervalSystem.deltaTime`: a frame duration would make how far you
+ * walked depend on how long the last frame took, and two processes fed the same intent stream
+ * would end at different coordinates.
+ *
+ * A player with no [GameUnit] - which nothing spawns today, but a test may - falls back to the
+ * soldier's speed rather than standing still, because a controllable thing that does not move is
+ * the hardest bug in this file to attribute.
+ */
+public class PlayerMovementSystem : SimSystem() {
+
+    private val players: Family = world.family { all(Player, Position) }
+
+    override fun onTick() {
+        players.forEach { entity ->
+            val player = entity[Player]
+            if (player.moveX == 0f && player.moveY == 0f) return@forEach
+            val position = entity[Position]
+            val speed = entity.getOrNull(GameUnit)?.unitKind?.moveSpeed ?: FALLBACK_SPEED
+            position.x += player.moveX * speed
+            position.y += player.moveY * speed
+        }
+    }
+
+    private companion object {
+        /** What a [Player] with no [GameUnit] walks at. Nothing the level spawns is one. */
+        const val FALLBACK_SPEED: Float = 0.75f
+    }
+}

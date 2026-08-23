@@ -120,8 +120,19 @@ public class AbilityActivation(
         // "ability comes off cooldown early" defect this issue exists to fix.
         instance.reset()
 
+        costCursor.bind(attributes)
         for (cost in def.costs) {
-            applier.begin(cost.effectIndex).applyTo(effects, attributes, now, targetId = self, source = self)
+            applier.begin(cost.effectIndex)
+            // The amount the gate just checked, staged for the effect that spends it. Without
+            // this the cost effect's `SetByCaller` magnitude resolved to zero and **no cost was
+            // ever paid**: `canActivate` refused an activation the entity could not afford and
+            // then the activation it allowed took nothing, so mana was a gate and never a
+            // resource. Negated once, here, because the amount is declared positive and the
+            // effect is additive on the attribute it spends.
+            if (cost.magnitudeTag != GameplayTag.NONE) {
+                applier.magnitude(cost.magnitudeTag, -cost.amount.resolve(costCursor))
+            }
+            applier.applyTo(effects, attributes, now, targetId = self, source = self)
         }
 
         if (def.cooldownEffectIndex >= 0) {
@@ -137,6 +148,9 @@ public class AbilityActivation(
 
         context.bind(instance, self, attributes, effects, now)
         execs.execAt(def.execId).onActivate(context)
+        // After the call and never inside it: `end` runs `onEnd` through this same context, so
+        // ending from within `onActivate` would rebind mid-call.
+        if (context.endRequested) endIfRequested(instance, def)
         return ActivationResult.Activated
     }
 
@@ -164,6 +178,7 @@ public class AbilityActivation(
                     end(instance, def, cancelled = true)
                 } else {
                     execs.execAt(def.execId).onTick(context)
+                    if (context.endRequested) endIfRequested(instance, def)
                 }
             }
             slot++
@@ -185,6 +200,12 @@ public class AbilityActivation(
         val def = abilityTable.defAt(instance.abilityIndex)
         context.bind(instance, self, attributes, effects, now)
         end(instance, def, cancelled)
+    }
+
+    /** Runs the end an exec asked for with [AbilityContext.endAbility], clearing the request. */
+    private fun endIfRequested(instance: AbilityInstance, def: AbilityDef) {
+        context.endRequested = false
+        if (instance.isActive) end(instance, def, cancelled = false)
     }
 
     private fun end(instance: AbilityInstance, def: AbilityDef, cancelled: Boolean) {

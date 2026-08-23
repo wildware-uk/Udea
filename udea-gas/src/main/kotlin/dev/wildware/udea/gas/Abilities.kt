@@ -311,6 +311,53 @@ public class AbilityContext internal constructor(
     /** The definition of the ability being run. */
     public val def: AbilityDef get() = abilities.defAt(instance.abilityIndex)
 
+    /**
+     * Ticks since this activation started. What an exec times its windup and its end against.
+     *
+     * A subtraction of two [Tick]s and never a stored accumulator: an exec that counted frames
+     * into a field of its own would be counting on a singleton shared by every entity running the
+     * ability, and a rewind would not restore the count.
+     */
+    public val elapsedTicks: Long get() = tick.ticksSince(instance.activatedTick)
+
+    /**
+     * Whether an exec has asked for this activation to end.
+     *
+     * Read and cleared by [AbilityActivation] the moment the exec call returns. Deliberately not
+     * an immediate `end()`: `onEnd` runs through this same context object, so ending from inside
+     * `onActivate` would re-enter the bind and hand `onEnd` a half-built activation.
+     */
+    internal var endRequested: Boolean = false
+
+    /**
+     * Ends this activation at the end of the current exec call.
+     *
+     * The public replacement for `AbilityExec.endAbility()`, which the old `AbilityExec` had as a
+     * method on itself because state lived there. It exists because [AbilityInstance.phase] has an
+     * `internal` setter: without it a game module - which is every real consumer of this API - can
+     * start an ability and has no way to say it has finished. That is not a limitation an exec can
+     * work around; the ability simply never ends, blocks its own next activation forever
+     * ([ActivationResult.AlreadyActive]) and holds the slot for the life of the entity.
+     */
+    public fun endAbility() {
+        endRequested = true
+    }
+
+    /**
+     * Parks this activation in [AbilityPhase.AwaitingTarget].
+     *
+     * The phase an exec sits in while it waits for the thing it cannot decide itself - a cursor,
+     * a server confirmation. It still ticks; it is a label on what the tick is for.
+     */
+    public fun awaitTarget() {
+        instance.phase = AbilityPhase.AwaitingTarget
+    }
+
+    /** Moves a parked activation back to [AbilityPhase.Active], its target settled. */
+    public fun resumeActive() {
+        instance.phase = AbilityPhase.Active
+    }
+
     internal fun bind(
         instance: AbilityInstance,
         self: NetId,

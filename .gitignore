@@ -65,6 +65,14 @@ scripts/cache/
 # Extract locally with scripts/extract-art.py; the manifest is committed, the pixels are not.
 moba/src/main/resources/assets/sprites/
 moba/raw-assets/
+#
+# The same pack, at the path the packed bundle reads from. The wave that brought the characters
+# back copied thirty-four sheets here - four of the six characters (wizard, priest, skeleton,
+# orc_elite) are from the *paid* pack, which docs/art-assets.md calls "the part that matters".
+# Committing them would have doubled an exposure that file already recommends removing.
+# `scripts/stage-moba-art.py` puts them here from art the repository already holds.
+moba/assets/sprites/*
+!moba/assets/sprites/champion_idle.png
 
 # `gamebridge.json` - the launch declaration `game-bridge-mcp` reads.
 #

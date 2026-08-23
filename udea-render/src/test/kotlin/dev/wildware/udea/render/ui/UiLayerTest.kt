@@ -13,6 +13,7 @@ import dev.wildware.udea.render.OverlaySystem
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderPipeline
 import dev.wildware.udea.render.RenderRegistry
+import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.Resizable
 import dev.wildware.udea.render.ScreenTarget
 import dev.wildware.udea.render.support.HeadlessGl
@@ -57,8 +58,7 @@ class UiLayerTest {
 
     @Test
     fun `sixty frames act the stage exactly sixty times`() {
-        val layer = layer()
-        val pipeline = pipelineWith(layer)
+        val (layer, pipeline) = pipelineWithLayer()
         frameTime.frameSeconds = 1f / 60f
 
         repeat(60) { pipeline.render(0f) }
@@ -68,10 +68,9 @@ class UiLayerTest {
 
     @Test
     fun `a stalled frame is clamped so an action does not jump to its end state`() {
-        val layer = layer()
+        val (layer, pipeline) = pipelineWithLayer()
         val recorder = RecordingAction()
         layer.show(ScreenOf(Group().apply { addAction(recorder) }))
-        val pipeline = pipelineWith(layer)
 
         frameTime.frameSeconds = 1f / 60f
         pipeline.render(0f)
@@ -87,7 +86,7 @@ class UiLayerTest {
 
     @Test
     fun `showing a screen mounts its root and hiding removes and disposes it`() {
-        val layer = layer()
+        val layer = standaloneLayer()
         val screen = ScreenOf(Actor())
 
         layer.show(screen)
@@ -103,7 +102,7 @@ class UiLayerTest {
     fun `showing a second screen replaces the first rather than stacking on it`() {
         // The failure this prevents: a loading screen's actors left behind a menu, still
         // receiving clicks from a player who cannot see them.
-        val layer = layer()
+        val layer = standaloneLayer()
         val first = ScreenOf(Actor())
         val second = ScreenOf(Actor())
 
@@ -152,14 +151,67 @@ class UiLayerTest {
         assertEquals(emptyList(), overlay.resizes)
     }
 
+    @Test
+    fun `the default stage shares the pipeline's batch instead of constructing a second one`() {
+        // `Stage(Viewport)` constructs and owns its own SpriteBatch -- the three-argument
+        // constructor exists precisely to avoid that -- and the shipped default was `Stage(it)`.
+        // `RenderTargets` and `RenderPipeline` both name "three batches, three lifetimes" as
+        // the defect they fixed, so a UI layer quietly flushing a second vertex buffer every
+        // frame put one of the three back.
+        val (layer, _) = pipelineWithLayer()
+
+        assertSame(
+            targets.batch,
+            layer.stage.batch,
+            "the stage built its own batch: that is a second vertex buffer flushed per frame, " +
+                "and a second GL lifetime nobody disposes",
+        )
+    }
+
+    @Test
+    fun `the layer is disposed by the pipeline rather than by whoever remembered`() {
+        // `UiLayer.dispose`'s KDoc claimed it was "registered in RenderTargets.owned by whoever
+        // builds the pipeline". It could not have been: `UiLayer` took no RenderResources, and
+        // `Lwjgl3Backend` hard-codes `owned = listOf(buffer, batch)`. It registers itself now.
+        val (layer, pipeline) = pipelineWithLayer()
+        val screen = ScreenOf(Actor())
+        layer.show(screen)
+
+        pipeline.dispose()
+
+        assertTrue(screen.disposed, "the pipeline did not dispose the UI layer")
+    }
+
     // --- fixture -------------------------------------------------------------------------
 
-    private fun layer(): UiLayer = UiLayer(frameTime) { viewport -> Stage(viewport, batch.batch) }
+    /**
+     * A layer outside a pipeline, for the mount/unmount tests that never draw.
+     *
+     * It still goes through a [RenderResources], because that is now how a `UiLayer` gets both
+     * its batch and its place in the disposal list. The constructor is `internal` and this is
+     * the same module, so a test can build one; nothing outside can.
+     */
+    private fun standaloneLayer(): UiLayer =
+        UiLayer(RenderResources(batch.batch, targets.offscreen), frameTime)
 
-    private fun pipelineWith(layer: UiLayer): RenderPipeline {
+    /**
+     * A layer built the way a game builds one: by the registry, from the pipeline's own
+     * resources, with the **default** stage factory.
+     *
+     * The fixture used to pass `Stage(viewport, batch.batch)` explicitly while the shipped
+     * default was `Stage(it)` — which constructs and owns a *second* `SpriteBatch`. So the
+     * tested configuration differed from the shipped one in exactly the respect under review,
+     * and nothing here exercised the default at all. It does now.
+     */
+    private fun pipelineWithLayer(): Pair<UiLayer, RenderPipeline> {
+        var built: UiLayer? = null
         val registry = RenderRegistry()
-        registry.register(RenderPhase.UI, { layer })
-        return registry.build(world(), ctx, targets)
+        registry.register(
+            RenderPhase.UI,
+            { resources -> UiLayer(resources, frameTime).also { built = it } },
+        )
+        val pipeline = registry.build(world(), ctx, targets)
+        return checkNotNull(built) to pipeline
     }
 
     private class MutableFrameTime(override var frameSeconds: Float = 0f) : FrameTime

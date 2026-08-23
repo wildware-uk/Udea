@@ -48,7 +48,11 @@ class NoReflectionInQueryPathTest {
         // a generated `AgentToolDef`/`AgentStateSource` with the instance a host registered,
         // resolved once when the index is built.
         //
-        // So the exemption's *size* is asserted rather than trusted. If a sixth file starts
+        // The engine's own toolsets are hand-written `AgentToolDef`s (see `EngineToolDef` for
+        // why), so `EngineToolDef` overrides the same `owner` property with the same class
+        // literal and is exempt for the same reason - it is the declaration site, not a lookup.
+        //
+        // So the exemption's *size* is asserted rather than trusted. If a fifth file starts
         // importing KClass, this list is where that shows up in a diff.
         val importers = ModuleSources.mainSources
             .filter { CLASS_TOKEN_IMPORT.containsMatchIn(it.readText()) }
@@ -59,6 +63,7 @@ class NoReflectionInQueryPathTest {
                 "udea-agent/src/main/kotlin/dev/wildware/udea/agent/AgentStateSource.kt",
                 "udea-agent/src/main/kotlin/dev/wildware/udea/agent/AgentToolDef.kt",
                 "udea-agent/src/main/kotlin/dev/wildware/udea/agent/OwnerBinding.kt",
+                "udea-agent/src/main/kotlin/dev/wildware/udea/agent/tools/EngineToolDef.kt",
             ),
             importers.sorted(),
         )

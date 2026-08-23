@@ -47,6 +47,12 @@ public annotation class AgentTool(
  *   optional, non-nullable argument without a `default` is a build error rather than a
  *   manifest that advertises a default the tool does not actually have.
  *
+ *   A **nullable** parameter is the other half of that rule and is published as optional with
+ *   no default: absent means `null`, which the dispatcher passes and the tool decides about. A
+ *   `default` on one is therefore a build error too — it would be advertised in the manifest
+ *   and never once used — and so is a Kotlin `= ...` on one, for the same reason a Kotlin
+ *   default is unreadable anywhere else here.
+ *
  * Retention is [AnnotationRetention.BINARY]: it feeds schema generation at build time only.
  */
 @Target(AnnotationTarget.VALUE_PARAMETER)

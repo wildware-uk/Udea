@@ -307,7 +307,14 @@ public class Json(initialCapacity: Int = DEFAULT_CAPACITY) {
     private fun quote(text: String, limit: Int = Int.MAX_VALUE, suffix: Char? = null) {
         out.append('"')
         var index = 0
-        val end = if (limit < text.length) limit else text.length
+        var end = if (limit < text.length) limit else text.length
+        // A cut at a fixed char index can land between the two halves of a surrogate pair -
+        // any emoji or astral-plane character in a game-authored event message or UI label. The
+        // lone high surrogate survives in the builder and becomes '?' when the document is
+        // UTF-8 encoded onto the wire, so the agent sees a corrupted tail instead of the
+        // truncation mark's honest signal. Dropping it costs one comparison on a path that
+        // already indexes by char.
+        if (end < text.length && end > 0 && Character.isHighSurrogate(text[end - 1])) end--
         // Index-based rather than `for (c in text)`: a CharSequence iterator is an allocation
         // per string on a path budgeted at zero bytes.
         while (index < end) {

@@ -8,6 +8,7 @@ import dev.wildware.udea.core.loop.Presentation
 import dev.wildware.udea.core.loop.TimeControl
 import dev.wildware.udea.core.module.UdeaGame
 import dev.wildware.udea.core.module.UdeaGameDef
+import java.util.concurrent.locks.LockSupport
 
 /**
  * The single entry point that stands a game up, in any [RenderMode].
@@ -137,7 +138,7 @@ public class GameHost(
     }
 
     /**
-     * Runs ticks as fast as the CPU allows until [stop] is called.
+     * Runs ticks as fast as the CPU allows until [stop] is called, honouring [time].
      *
      * Headless only, and checked rather than assumed: a host with a render context is driven
      * by its windowing backend, which owns the frame cadence and calls [frame]. Spinning a
@@ -145,13 +146,26 @@ public class GameHost(
      *
      * Something must be able to call [stop] — a system, a barrier action, or an agent on
      * another thread — or this does not return.
+     *
+     * **Every tick goes through [loop].** This used to call `Simulation.step()` directly, and
+     * that made [time] a lie in the one continuous headless mode the kernel ships: `pause()`
+     * reported the game frozen while it ran on at millions of ticks, [totalTicks] stayed at
+     * zero, and — worst of the three — `TimeControl.rewind` relies on its pause actually
+     * stopping the simulation before it forces a `SimBarrier` drain, so a rewind from another
+     * thread applied a whole-world restore concurrently with `world.update`.
+     *
+     * While paused this parks briefly instead of spinning hot: a paused agent session would
+     * otherwise hold a core at 100% doing nothing, and a fraction of a millisecond of resume
+     * latency is invisible next to the round trip of the tool call that resumes it.
      */
     public fun run() {
         check(mode == RenderMode.Headless) {
             "run() paces nothing and is for ${RenderMode.Headless}; a $mode host is driven by " +
                 "its render backend calling frame(wallDelta)"
         }
-        while (running) game.simulation.step()
+        while (running) {
+            if (!loop.tickIfRunning()) LockSupport.parkNanos(PAUSED_PARK_NANOS)
+        }
     }
 
     /**
@@ -191,6 +205,16 @@ public class GameHost(
     }
 
     override fun toString(): String = "GameHost(mode=$mode, tick=$tick, running=$running)"
+
+    private companion object {
+        /**
+         * How long [run] parks between checks while the loop is paused.
+         *
+         * Long enough that a paused host costs nothing, short enough that `resume()` looks
+         * instant to the agent that called it.
+         */
+        const val PAUSED_PARK_NANOS: Long = 200_000L
+    }
 }
 
 /**

@@ -2,6 +2,8 @@ package dev.wildware.udea.render.headless
 
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.math.Vector2
+import com.badlogic.gdx.utils.Array as GdxArray
+import com.badlogic.gdx.utils.viewport.ExtendViewport
 
 /**
  * The two classes the headless gate exists to tell apart, compiled here in `udea-render` --
@@ -38,4 +40,33 @@ internal class TextureNamingFixture {
 internal class MathNamingFixture {
 
     fun lengthOf(vector: Vector2): Float = vector.len()
+}
+
+/**
+ * Names `com.badlogic.gdx.utils.viewport.ExtendViewport`, which is banned everywhere headless.
+ *
+ * The positive control for the gap that shipped: `GL_BANNED_OWNERS` covered
+ * `com/badlogic/gdx/graphics/`, `scenes/`, `Gdx`, `box2dLight/` and `org/lwjgl/` and nothing
+ * else, so a headless module could hold an `ExtendViewport` field and call `update(...)` and
+ * pass the gate outright -- then die on a server with no display, because `Viewport.apply()`
+ * reaches `Gdx.gl` through `HdpiUtils` (see `HeadlessGl`, which exists for that exact reason).
+ * `UDEA-MG-002` cannot close it either: viewports ship in `com.badlogicgames.gdx:gdx`, the jar
+ * that rule allows.
+ */
+internal class ViewportNamingFixture {
+
+    fun widthOf(viewport: ExtendViewport): Int = viewport.screenWidth
+}
+
+/**
+ * Names `com.badlogic.gdx.utils.Array`, which is **not** banned.
+ *
+ * The negative control for the two exact-name entries added alongside it: `com/badlogic/gdx/utils/`
+ * is a package of headless collections and must stay legal, while `utils/viewport/` and
+ * `utils/GdxNativesLoader` inside it must not. A gate that banned the package would be turned
+ * off within a week, which is the same argument that keeps `gdx-math` legal.
+ */
+internal class GdxCollectionNamingFixture {
+
+    fun sizeOf(values: GdxArray<String>): Int = values.size
 }

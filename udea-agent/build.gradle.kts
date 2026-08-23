@@ -5,6 +5,12 @@ plugins {
 dependencies {
     api(project(":udea-core"))
 
+    // The stable rule ids, so the runtime description gate in `ToolIndex.Builder.build` reports
+    // under exactly the id the KSP checker and the K2 checker report under (spec 5: one defect,
+    // one name, wherever it surfaces). `implementation` and not `api`: nothing in this module's
+    // public surface names a `UdeaRule`, only its refusal messages quote one.
+    implementation(project(":udea-diagnostics"))
+
     // Real Fleks components on real entities, a wired GameContext, and the ArrayFieldStore /
     // ArrayBitWriter pair, so the hand-written test replicators can implement the whole frozen
     // contract rather than only the two methods the agent surface calls.

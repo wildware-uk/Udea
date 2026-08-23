@@ -69,6 +69,9 @@ internal class UdeaSymbolProcessor(
      */
     private var emittedModuleFiles = false
 
+    /** So a malformed `udea.moduleName` is reported once and not once per KSP round. */
+    private var reportedModuleName = false
+
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val components = resolver.getSymbolsWithAnnotation(AnnotationNames.REPLICATED)
             .filterIsInstance<KSClassDeclaration>()
@@ -83,6 +86,13 @@ internal class UdeaSymbolProcessor(
         // no tools for exactly the module the agent epic cares about most.
         val agentIsEmpty = agent.isEmpty(resolver)
         if (components.isEmpty() && agentIsEmpty) return emptyList()
+        // Validated once, here, and not at each writer. `udea.moduleName` gates the lock, the
+        // protoHash, both ServiceLoader indexes and the tool manifest, and a module whose name
+        // is malformed can produce none of them - so a check inside one writer and a bare
+        // `return` inside another had the two paths disagreeing about whether the same
+        // misconfiguration was a failure at all. Tools-only modules took the silent path:
+        // dispatchers compiled, nothing indexed them, and no diagnostic said so.
+        if (!checkModuleName()) return emptyList()
         if (components.isEmpty()) {
             if (emittedModuleFiles) return emptyList()
             val agentResult = agent.run(resolver)
@@ -175,20 +185,36 @@ internal class UdeaSymbolProcessor(
 
         val moduleName = options.moduleName
         if (moduleName != null && !emittedModuleFiles) {
-            if (!CodegenOptions.MODULE_NAME_FORMAT.matches(moduleName)) {
-                logger.error(
-                    "${CodegenOptions.MODULE_NAME} is '$moduleName', which cannot be part of a " +
-                        "generated object name. It must match " +
-                        "${CodegenOptions.MODULE_NAME_FORMAT.pattern} — UpperCamelCase, letters " +
-                        "and digits only.",
-                )
-            } else {
-                writeModuleFiles(moduleName, emitted, sourceFiles)
-                writeAgentModuleFiles(agentResult, sourceFiles)
-                emittedModuleFiles = true
-            }
+            writeModuleFiles(moduleName, emitted, sourceFiles)
+            writeAgentModuleFiles(agentResult, sourceFiles)
+            emittedModuleFiles = true
         }
         return emptyList()
+    }
+
+    /**
+     * False, having reported it, when `udea.moduleName` cannot be half of a generated object
+     * name.
+     *
+     * The name is checked rather than sanitised: silently turning `my-game` into `MyGame` would
+     * make a generated object's name depend on a rule nobody can see, and two modules could
+     * sanitise to the same one. Reported once rather than once per round, because KSP calls
+     * `process` again for every round and the same misconfiguration is one mistake.
+     */
+    private fun checkModuleName(): Boolean {
+        val moduleName = options.moduleName ?: return true
+        if (CodegenOptions.MODULE_NAME_FORMAT.matches(moduleName)) return true
+        if (!reportedModuleName) {
+            reportedModuleName = true
+            logger.error(
+                "${CodegenOptions.MODULE_NAME} is '$moduleName', which cannot be part of a " +
+                    "generated object name. It must match " +
+                    "${CodegenOptions.MODULE_NAME_FORMAT.pattern} — UpperCamelCase, letters " +
+                    "and digits only. Nothing this module publishes can be indexed under that " +
+                    "name: not its NetModule, not its ToolModule and not its tool manifest.",
+            )
+        }
+        return false
     }
 
     /**
@@ -309,8 +335,9 @@ internal class UdeaSymbolProcessor(
      * has not yet grown one.
      */
     private fun writeAgentModuleFiles(result: AgentPass.Result, sourceFiles: List<KSFile>) {
+        // The name's shape was checked once, before anything was written; reaching here with a
+        // malformed one is impossible rather than tolerated.
         val moduleName = options.moduleName ?: return
-        if (!CodegenOptions.MODULE_NAME_FORMAT.matches(moduleName)) return
         if (result.isEmpty) return
         val dependencies = aggregating(sourceFiles)
 

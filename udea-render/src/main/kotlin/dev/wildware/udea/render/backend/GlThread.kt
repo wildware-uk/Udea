@@ -48,6 +48,17 @@ internal class GlThread(private val window: WindowConfig, visible: Boolean) {
     private val frames = AtomicReference<Frames>(Frames.Idle)
     private val resizes = AtomicReference<((Int, Int) -> Unit)?>(null)
 
+    /**
+     * Run once when the loop exits, however it exits.
+     *
+     * The render loop can die three ways -- the window closed, [stop] asked it to, or a
+     * renderer threw out of `Listener.render` -- and only the second of those runs a host's
+     * shutdown path. Without this, the third left every thread blocked in
+     * `FrameCaptureSlot.capture` waiting out its whole deadline on a loop that had already
+     * gone, and reporting the timeout rather than the exception.
+     */
+    private val shutdown = AtomicReference<(() -> Unit)?>(null)
+
     private val config = Lwjgl3ApplicationConfiguration().apply {
         setTitle(window.title)
         setWindowedMode(window.windowWidth, window.windowHeight)
@@ -137,6 +148,16 @@ internal class GlThread(private val window: WindowConfig, visible: Boolean) {
     }
 
     /**
+     * Installs the callback run when the loop exits, whatever ended it.
+     *
+     * Called on the GL thread, after the context has gone, so it must not issue GL: it is for
+     * releasing the things *waiting* on the loop, not the things the loop owned.
+     */
+    fun onShutdown(hook: () -> Unit) {
+        shutdown.set(hook)
+    }
+
+    /**
      * Asks the loop to exit and waits for the thread to finish.
      *
      * Idempotent: a host's shutdown path and a test's `finally` both call it.
@@ -164,6 +185,9 @@ internal class GlThread(private val window: WindowConfig, visible: Boolean) {
             ready.countDown()
             finished.countDown()
             failAllQueued()
+            // Last, and swallowing its own failure: a broken hook must not stop the two latches
+            // above from having been counted down, and there is nobody left to report it to.
+            runCatching { shutdown.get()?.invoke() }
         }
     }
 

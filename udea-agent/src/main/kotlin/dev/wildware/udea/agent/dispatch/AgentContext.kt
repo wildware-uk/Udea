@@ -1,7 +1,10 @@
 package dev.wildware.udea.agent.dispatch
 
 import com.github.quillraven.fleks.World
+import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.AgentCommand
+import dev.wildware.udea.agent.AgentErrorKind
+import dev.wildware.udea.agent.AgentResult
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.Tick
 
@@ -27,7 +30,12 @@ public class AgentContext internal constructor(
     /** The command being served. A tool reads its arguments from here. */
     public val command: AgentCommand,
     private val deferred: DeferredQueue,
+    private val bridge: AgentBridge,
 ) {
+
+    /** Whether [answerLater] was called. Read by [AgentDispatcher] to decide who completes. */
+    internal var answersLater: Boolean = false
+        private set
 
     /** The tick about to be simulated. Every duration an agent gives or gets is in these. */
     public val tick: Tick get() = game.clock.tick
@@ -48,6 +56,58 @@ public class AgentContext internal constructor(
      */
     public fun defer(work: DeferredWork) {
         deferred.add(command.name, work)
+    }
+
+    /**
+     * Runs [work] after the tick and completes this command with whatever it returns.
+     *
+     * ## The tool this exists for, and why it cannot be written any other way
+     *
+     * A tool call runs **inside** a `SimBarrier` drain - that is the whole point of
+     * [AgentRuntime], and it is what makes a mutation land at a tick boundary. But
+     * `Simulation.step` drains the barrier, and `SimBarrier.drain` refuses to re-enter: a
+     * nested drain swaps the batch the outer one is walking and destroys every action queued
+     * since it started. So a tool that **runs the simulation** - `time.step`, `time.rewind`,
+     * `time.fast_forward` - cannot do its work where it is called. `TimeControl.rewind` says the
+     * same thing from the other side: it forces a drain of its own, and the only thing that
+     * makes that safe is the loop being stopped between frames.
+     *
+     * [defer] already runs work at the right moment - after every system of this tick, before
+     * the state document is published, outside any drain. What it could not do is *answer*: the
+     * dispatcher completes the command the instant the tool returns, so a deferred step would
+     * confirm before it had happened, which is the one failure an agent cannot recover from.
+     *
+     * This is [defer] with the answer attached. The command completes when [work] returns, so
+     * `completedCommandId` still means "it happened", and the digest that carries the
+     * confirmation is the one published after the work ran.
+     *
+     * **A throw is still an answer.** [work] failing completes the command as `tool_threw`
+     * rather than leaving it outstanding - a command that never completes is a healthy game
+     * reported as frozen, which is exactly what `AgentDispatcher` exists to prevent.
+     *
+     * @throws IllegalStateException if called twice for one command. Two answers to one id is
+     *   two entries in the result ring for the same command, and a caller reading its own
+     *   answer would get whichever was written last.
+     */
+    public fun answerLater(work: () -> AgentResult) {
+        check(!answersLater) {
+            "${command.name} already deferred its answer; one command has one answer"
+        }
+        answersLater = true
+        val id = command.id
+        val name = command.name
+        deferred.add(name) {
+            val answer = try {
+                work()
+            } catch (failure: Exception) {
+                AgentResult.failed(
+                    AgentErrorKind.TOOL_THREW,
+                    "$name threw ${failure.javaClass.simpleName} after the tick: " +
+                        (failure.message ?: "no message"),
+                )
+            }
+            bridge.complete(id, answer)
+        }
     }
 }
 

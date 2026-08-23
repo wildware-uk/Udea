@@ -92,7 +92,7 @@ public class DebugOverlayRenderSystem(
         batch.begin()
         try {
             with(bound.world) {
-                bound.labelled.forEach { entity -> drawLabels(entity, alpha, bound.clock) }
+                bound.labelled.forEach { entity -> drawLabels(entity, alpha, bound.clock, target) }
             }
         } finally {
             batch.end()
@@ -103,19 +103,44 @@ public class DebugOverlayRenderSystem(
         entity: com.github.quillraven.fleks.Entity,
         alpha: Float,
         clock: SimClock,
+        target: OffscreenTarget,
     ) {
         val labels = entity[DebugLabels]
         // Expiry runs whether or not anything is drawn: a disabled overlay that stopped
         // expiring would hand back a thousand stale lines the moment it was switched on.
-        labels.messages.removeAll { it.expiresAt <= clock.tick }
+        expire(labels.messages, clock.tick)
         if (!enabled) return
         if (!interpolator.interpolate(this, entity, alpha, pose)) return
 
-        val screen = camera.camera.project(scratch.set(pose.x, pose.y, 0f))
+        // The five-argument overload, and the viewport is the *target's*. `project(v)` is
+        // defined as `project(v, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight())`,
+        // which is the window -- and the window is not the surface this system is drawing on.
+        // In `RenderMode.Offscreen` the two differ by construction (a 320x240 window over a
+        // 64x32 framebuffer), so the one-argument form placed every label at a five-times-wrong
+        // scale, off the captured frame entirely. That is the same defect this file's own KDoc
+        // says it removed from `BackgroundDrawSystem` -- reading the window from inside a draw
+        // call -- and `DrawSystemPortTest` now boots a differently sized fake window so the
+        // one-argument form cannot come back green.
+        val screen = camera.camera.project(
+            scratch.set(pose.x, pose.y, 0f),
+            0f,
+            0f,
+            target.width.toFloat(),
+            target.height.toFloat(),
+        )
         val x = screen.x + LABEL_OFFSET_X
         var y = screen.y + LABEL_OFFSET_Y
 
-        font.draw(resources.batch, netIds.netIdOf(entity).toString(), x, y)
+        // Built into a reused StringBuilder rather than `netIds.netIdOf(entity).toString()`.
+        // `NetId.toString` is a string template, so the shipped form allocated a StringBuilder
+        // *and* a String per labelled entity per frame -- per-entity garbage on the per-frame
+        // path, which is what `RenderAllocationTest` measures. `BitmapFont.draw` takes a
+        // `CharSequence`, so the builder goes straight in. The text loses the `NetId(...)`
+        // wrapper and keeps the part that identifies the entity.
+        val netId = netIds.netIdOf(entity)
+        label.setLength(0)
+        label.append('#').append(netId.index).append('@').append(netId.generation)
+        font.draw(resources.batch, label, x, y)
         for (index in labels.messages.indices) {
             y += LINE_HEIGHT
             font.draw(resources.batch, labels.messages[index].text, x, y)
@@ -125,10 +150,43 @@ public class DebugOverlayRenderSystem(
 
     /**
      * Reused. `camera.project` takes a `Vector3` and returns the same instance, so the original
-     * allocating one per entity per frame (`DebugDrawSystem.kt:41`) is exactly the per-frame
-     * `Vector3` `RenderAllocationTest` looks for.
+     * allocated one per entity per frame (`DebugDrawSystem.kt:41`).
+     *
+     * `RenderAllocationTest` does **not** catch that particular one — C2 scalar-replaces a
+     * `Vector3` that never escapes the frame, which was verified by putting the allocation back
+     * and watching the test stay green. It is a field because it costs nothing to make it one
+     * and because relying on the JIT to undo an obvious mistake is not a design. The
+     * allocations that test does catch are the escaping kind; its KDoc says which.
      */
     private val scratch = com.badlogic.gdx.math.Vector3()
+
+    /**
+     * Reused, and sized once for the longest id it can hold (`#65535@255`).
+     *
+     * See the call site: the point is that neither the builder nor a `String` is allocated per
+     * labelled entity per frame.
+     */
+    private val label = StringBuilder(16)
+
+    /**
+     * Drops every message whose tick has passed, in place and without allocating.
+     *
+     * `messages.removeAll { it.expiresAt <= tick }` is the obvious form and was what shipped:
+     * it allocates a capturing lambda **and** an iterator per labelled entity per frame, on the
+     * per-frame path, which is exactly what `RenderAllocationTest` measures. A compacting index
+     * loop allocates neither: `for (i in list.indices)` compiles to a plain `int` loop.
+     */
+    private fun expire(messages: MutableList<DebugLabel>, tick: dev.wildware.udea.core.Tick) {
+        var survivors = 0
+        for (index in messages.indices) {
+            val message = messages[index]
+            if (message.expiresAt > tick) {
+                if (survivors != index) messages[survivors] = message
+                survivors++
+            }
+        }
+        while (messages.size > survivors) messages.removeAt(messages.size - 1)
+    }
 
     private class Bound(val world: World, val labelled: Family, val clock: SimClock)
 

@@ -4,6 +4,7 @@ import com.github.quillraven.fleks.Entity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -102,6 +103,49 @@ class NetIdReservationTest {
         assertEquals(0, index.reservedCount)
         assertEquals(0, index.liveCount)
         assertNull(index.resolveOrNull(abandoned), "the freed id must read stale")
+    }
+
+    @Test
+    fun `a snapshot taken while a spawn is queued does not leak the reserved index`() {
+        // The ordering the engine actually produces: `BlueprintSpawner.spawn` reserves, and the
+        // capture at the end of the tick happens before the barrier drain that would attach.
+        // A reserved index is in none of the three places a restore rebuilds from — it is not
+        // in the free ring, `forEachLive` skips it so the roster has no row, and it is below
+        // `nextFresh` — so unless `saveInto` records it, `takeIndex` can never hand it out
+        // again and every rewind across a queued spawn leaks one index for good.
+        val index = NetIdIndex(capacity = 4, entityCapacity = 8)
+        val settled = index.allocate(Entity(1, version = 0u))
+        val queued = index.reserve()
+
+        val state = HandleState()
+        index.saveInto(state)
+
+        // The restore as `SnapshotService` performs it: reset the allocator, re-bind the roster.
+        index.restoreFrom(state)
+        index.bind(Entity(1, version = 0u), settled)
+
+        assertEquals(1, index.liveCount, "only the rostered entity is live after the restore")
+        assertNull(index.resolveOrNull(queued), "the unwound reservation must read stale")
+        assertFalse(
+            index.isOutstandingReservation(queued),
+            "a restore unwinds the future the reservation named, so attach must still refuse it",
+        )
+        assertFailsWith<IllegalStateException> { index.attach(Entity(7, version = 0u), queued) }
+
+        // Three ids remain in a four-id index: the reservation's recycled index and two fresh.
+        val handed = List(3) { index.allocate(Entity(it + 2, version = 0u)) }
+        assertEquals(
+            listOf(queued.index, 2, 3),
+            handed.map { it.index },
+            "the reserved index must come back, at the head of the queue as FIFO puts it",
+        )
+        assertEquals(
+            queued.generation + 1,
+            handed.first().generation,
+            "and re-minted a generation on, or the id the spawn is still holding would alias " +
+                "the new occupant",
+        )
+        assertFailsWith<NetIdExhaustedException> { index.allocate(Entity(9, version = 0u)) }
     }
 
     @Test

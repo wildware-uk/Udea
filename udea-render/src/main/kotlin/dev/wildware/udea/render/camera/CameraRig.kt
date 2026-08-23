@@ -130,7 +130,10 @@ public class CameraRig(
         val world = boundWorld ?: return
         fitTo(target)
 
-        val followed = this.target?.let(netIds::resolveOrNull)
+        // Spelled out rather than `target?.let(netIds::resolveOrNull)`: a bound callable
+        // reference is an object, Kotlin does not cache one, and this runs every frame.
+        val followedId = this.target
+        val followed = if (followedId == null) null else netIds.resolveOrNull(followedId)
         if (followed != null && interpolator.interpolate(world, followed, alpha, pose)) {
             val desiredX = pose.x + offsetX
             val desiredY = pose.y + offsetY
@@ -153,7 +156,8 @@ public class CameraRig(
      */
     public fun snapToTarget() {
         val world = boundWorld ?: return
-        val followed = target?.let(netIds::resolveOrNull) ?: return
+        val followedId = target ?: return
+        val followed = netIds.resolveOrNull(followedId) ?: return
         if (!interpolator.interpolate(world, followed, 1f, pose)) return
         camera.position.x = pose.x + offsetX
         camera.position.y = pose.y + offsetY

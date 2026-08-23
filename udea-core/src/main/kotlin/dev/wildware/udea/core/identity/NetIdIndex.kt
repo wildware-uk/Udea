@@ -125,7 +125,8 @@ public class NetIdIndex(
      * neither will [reserve]. It resolves to `null`, exactly as a stale id does, and
      * [forEachLive] skips it — so a snapshot taken while a spawn is queued simply does not
      * contain the entity that does not exist yet, rather than containing a row with no
-     * component data.
+     * component data. Being in none of the places a restore rebuilds from is exactly why
+     * [saveInto] has to record it explicitly; see there.
      *
      * @throws NetIdExhaustedException when [capacity] ids are already live.
      */
@@ -158,7 +159,7 @@ public class NetIdIndex(
         require(!netId.isNone) { "NetId.NONE names no reservation and cannot be attached to" }
         val index = netId.index
         require(index < capacity) { "NetId index $index exceeds this index's capacity $capacity" }
-        check(liveFlags[index] && generations[index] == netId.generation && entities[index] == null) {
+        check(isOutstandingReservation(netId)) {
             "$netId is not an outstanding reservation; reserve() it before attaching an entity"
         }
         require(netIdOf(entity).isNone) { "Entity $entity already has a NetId" }
@@ -167,6 +168,21 @@ public class NetIdIndex(
         reservedCount--
         ensureReverseCapacity(entity.id)
         reverse[entity.id] = netId.raw
+    }
+
+    /**
+     * True if [netId] is a [reserve]d index that no entity has been [attach]ed to yet.
+     *
+     * The predicate form of what [attach] checks, so a caller holding a reservation from an
+     * earlier tick can ask whether it survived — a rewind past the submission unwinds it — and
+     * skip the work instead of creating an entity and discovering during [attach] that it has
+     * no identity to give it. `BlueprintSpawner`'s queued spawn is the caller this exists for.
+     */
+    public fun isOutstandingReservation(netId: NetId): Boolean {
+        if (netId.isNone) return false
+        val index = netId.index
+        if (index >= capacity) return false
+        return liveFlags[index] && generations[index] == netId.generation && entities[index] == null
     }
 
     /**
@@ -321,9 +337,29 @@ public class NetIdIndex(
      * Records the allocator state — the free queue, its generations, and the two watermarks —
      * into [state], which is cleared first.
      *
-     * Only free indices are recorded. A live index's generation is already carried by its
-     * [NetId] in the snapshot's rows, and an index at or above `nextFresh` has never been
-     * handed out, so its generation is zero by construction.
+     * A live index's generation is already carried by its [NetId] in the snapshot's rows, and
+     * an index at or above `nextFresh` has never been handed out, so its generation is zero by
+     * construction. Everything else — every index the restored world will not account for —
+     * has to be here, or it is lost.
+     *
+     * ## Outstanding reservations are recorded as free
+     *
+     * A [reserve]d index is live-but-empty, so [forEachLive] skips it and the snapshot's roster
+     * has no row for it. It is also not in [freeRing] and is below [nextFresh]. If only the
+     * free ring were written here, [restoreFrom] would leave that index neither free, nor
+     * fresh, nor in the roster: [takeIndex] could never hand it out again, and every rewind
+     * across a queued spawn — the normal case, because `BlueprintSpawner.spawn` reserves at
+     * submit time and the barrier applies it a tick later — would leak one index permanently
+     * until the id space ran out.
+     *
+     * So each one is appended to the free queue, with its generation bumped exactly as [free]
+     * bumps it. The bump is not cosmetic: without it the index would be re-minted at the
+     * generation the in-flight spawn is still holding, and that stale id would alias the new
+     * occupant — the one thing the generation counter exists to prevent. With it, the reserved
+     * id reads stale from the restore onwards and [attach] refuses it loudly.
+     *
+     * They go **after** the ring's own entries, which is the FIFO order [free] would have
+     * produced had the reservations been abandoned at the moment of capture.
      */
     public fun saveInto(state: HandleState) {
         state.reset()
@@ -335,6 +371,11 @@ public class NetIdIndex(
             state.addFree(index, generations[index])
             position++
             if (position == capacity) position = 0
+        }
+        if (reservedCount == 0) return
+        for (index in 0 until highWater) {
+            if (!liveFlags[index] || entities[index] != null) continue
+            state.addFree(index, (generations[index] + 1) and NetId.GENERATION_MASK)
         }
     }
 
@@ -365,9 +406,13 @@ public class NetIdIndex(
         reverse.fill(NONE_RAW)
         liveCount = 0
         // A restore replaces the whole population, and a reservation names an entity in a
-        // future that has just been unwound. Its index goes back to the snapshot's free queue
-        // below, so the id an in-flight spawn is holding reads stale from here on — which is
-        // what `attach` refuses loudly rather than binding into a world that never asked for it.
+        // future that has just been unwound. `saveInto` recorded every reservation outstanding
+        // at capture time into the free queue with a bumped generation, so those indices come
+        // back below as free and recyclable, and the id an in-flight spawn is holding reads
+        // stale from here on — which is what `attach` refuses loudly rather than binding into
+        // a world that never asked for it. A reservation taken *after* the capture needs no
+        // record: the index it drew is either still in the snapshot's free queue or still
+        // above the snapshot's `nextFresh`, so restoring the two watermarks hands it back.
         reservedCount = 0
 
         freeHead = 0

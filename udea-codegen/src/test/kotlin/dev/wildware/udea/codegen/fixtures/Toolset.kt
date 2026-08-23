@@ -14,8 +14,9 @@ import dev.wildware.udea.core.identity.NetId
  *
  * Between them the parameters cover every supported shape once: a required `String`, an
  * optional `Int` with a folded default, an optional nullable `Float`, an enum, a `NetId`, a
- * `List<String>` and a `Boolean` with a default — which is also every branch of the coercion
- * emitter and every JSON Schema type the bridge understands.
+ * `List<String>`, a `List<Boolean>`, a `List<Int>` with a folded default and a `Boolean` with
+ * a default — which is also every branch of the coercion emitter and every JSON Schema type
+ * the bridge understands.
  */
 public class Playground {
 
@@ -32,11 +33,15 @@ public class Playground {
         blueprint: String,
         @Arg(description = "How many to create, 1..64.", required = false, default = "1")
         count: Int = 1,
+        // No `= null`, and that is the rule rather than a style: the generated dispatcher
+        // always passes an explicit value, and KSP cannot read a Kotlin default's expression,
+        // so a nullable parameter carrying one would have it overwritten with `null` on every
+        // call that omitted the argument. Nullable *is* the way to say "optional, no default".
         @Arg(
             description = "Uniform scale applied to each spawned entity; omit to leave it alone.",
             required = false,
         )
-        scale: Float? = null,
+        scale: Float?,
     ): Int {
         repeat(count) { spawned += blueprint }
         return count * (scale?.toInt() ?: 1)
@@ -66,6 +71,35 @@ public class Playground {
         @Arg(description = "Labels to attach; each must be lower_snake_case.")
         labels: List<String>,
     ): Int = target.index + labels.size
+
+    /**
+     * Deliberately `internal`, and deliberately taking a `List<Boolean>`.
+     *
+     * A game's debug toolset is normally not part of its published API, and the generated
+     * dispatcher has to match that visibility or it does not compile — a `public object` whose
+     * `invoke` calls an internal function is not a warning, it is an error in a file nobody
+     * wrote. It is still listed in this module's public `ToolModule` index, which is what
+     * `GeneratedAgentIndexServiceTest` loads through a real `ServiceLoader`.
+     *
+     * The `List<Boolean>` is the other half: a scalar `Boolean` argument accepts `1` and `0`,
+     * and until an element of a boolean list did too, a call written the way the schema
+     * describes was refused by an error naming the values it had just refused.
+     */
+    @AgentTool(
+        name = "set_overlays",
+        description = "Turn the debug overlays on or off in the order the HUD lists them. Reach " +
+            "for this before a screenshot that has to show collision shapes or pathing.",
+    )
+    internal fun setOverlays(
+        @Arg(description = "One true/false (or 1/0) per overlay, in HUD order: collision, pathing, ids.")
+        visible: List<Boolean>,
+        @Arg(
+            description = "Ticks each overlay stays up for; 0 leaves it up until it is turned off.",
+            required = false,
+            default = "0,0,0",
+        )
+        holds: List<Int>,
+    ): Int = visible.count { it } + holds.sum()
 }
 
 /**

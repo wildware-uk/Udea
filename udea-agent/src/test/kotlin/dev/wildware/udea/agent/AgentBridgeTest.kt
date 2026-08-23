@@ -23,6 +23,9 @@ class AgentBridgeTest {
 
     private val bridge = AgentBridge()
 
+    /** Roomy enough for three of the fixed-size answers below, and not for four. */
+    private val CEILING = 350
+
     private fun drainAll(): List<AgentCommand> {
         val out = ArrayList<AgentCommand>()
         bridge.drain(out)
@@ -123,6 +126,13 @@ class AgentBridgeTest {
         bridge.drain(drained)
 
         assertEquals(0, overCap, "the queue exceeded its cap under concurrent submission")
+        // Without this the test can pass having exercised neither half of its name: on a run
+        // where the drainer keeps up, nothing is ever refused and the cap is never reached.
+        assertTrue(
+            rejected.isNotEmpty(),
+            "no submission was refused, so the cap was never exercised; raise the submitter " +
+                "count or lower the capacity until it is",
+        )
         assertEquals(
             accepted.size,
             drained.size,
@@ -173,13 +183,69 @@ class AgentBridgeTest {
 
         val json = Json()
         json.beginObject()
-        bridge.renderCommandResults(json, "commandResults", 8)
+        val truncated = bridge.renderCommandResults(json, "commandResults", 8, Int.MAX_VALUE)
         json.endObject()
+
+        assertFalse(truncated, "nothing here is near a ceiling of Int.MAX_VALUE")
 
         assertEquals(
             """{"commandResults":[{"id":18,"ok":true,"result":{"total":3}},""" +
                 """{"id":19,"ok":false,"error":{"kind":"no_such_entity","message":"gone"}}]}""",
             json.toString(),
+        )
+    }
+
+    @Test
+    fun `a ceiling drops the oldest answers and always keeps the newest`() {
+        // Four answers of equal size and room for three. The newest is the only entry a caller
+        // polling completedCommandId is actually waiting for, so it is the one that must
+        // survive - a live /state on the Phase 1 demo confirmed completedCommandId 11 beside a
+        // commandResults holding 8, 9 and 10, because the budget was spent oldest-first and ran
+        // out before it reached the answer anybody wanted.
+        val filler = "x".repeat(50)
+        for (id in 8L..11L) bridge.complete(id, AgentResult.ok { put("note", filler) })
+
+        val json = Json()
+        json.beginObject()
+        val truncated = bridge.renderCommandResults(json, "commandResults", 4, CEILING)
+        json.endObject()
+        val document = json.toString()
+
+        assertTrue(truncated, "four answers of this size do not fit in $CEILING characters")
+        assertTrue(
+            document.contains(""""id":11"""),
+            "the newest answer must reach the document; got $document",
+        )
+        assertFalse(
+            document.contains(""""id":8"""),
+            "the oldest answer is what a ceiling drops; got $document",
+        )
+        assertTrue(
+            json.length <= CEILING,
+            "the render must stay inside its ceiling; spent ${json.length}",
+        )
+    }
+
+    @Test
+    fun `the answers a ceiling keeps are contiguous and end at the newest`() {
+        // A hole in the middle is unreadable: an agent that saw 20 and 22 with no 21 could not
+        // tell a dropped answer from a command that never ran. So a large entry stops the walk
+        // rather than being skipped in favour of an older, smaller one.
+        bridge.complete(20L, AgentResult.ok { put("id", 1) })
+        bridge.complete(21L, AgentResult.ok { put("note", "y".repeat(400)) })
+        bridge.complete(22L, AgentResult.ok { put("id", 3) })
+
+        val json = Json()
+        json.beginObject()
+        bridge.renderCommandResults(json, "commandResults", 8, CEILING)
+        json.endObject()
+        val document = json.toString()
+
+        assertTrue(document.contains(""""id":22"""), "the newest survives; got $document")
+        assertFalse(document.contains(""""id":21"""), "the oversized entry is dropped; got $document")
+        assertFalse(
+            document.contains(""""id":20"""),
+            "and nothing older than a dropped entry is admitted past it; got $document",
         )
     }
 

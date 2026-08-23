@@ -1,5 +1,6 @@
 package dev.wildware.udea.codegen.agent
 
+import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
@@ -62,6 +63,7 @@ internal class AgentStateBuilder(private val logger: KSPLogger) {
                 model = AgentStateModel(
                     owner = ownerName,
                     objectName = AgentNaming.stateObjectName(ownerName.simpleName),
+                    internal = isInternal(owner),
                     // Sorted by digest key so the `game` block's key order is a function of the
                     // sources alone, never of the order KSP handed the properties over.
                     entries = entries.sortedBy(AgentStateEntry::name),
@@ -80,6 +82,21 @@ internal class AgentStateBuilder(private val logger: KSPLogger) {
         }
         val propertyName = property.simpleName.asString()
         val name = annotation.stringArgument("name").orEmpty().ifEmpty { propertyName }
+
+        // The digest writer is a *sibling file*: it reads `source.$propertyName` from outside
+        // the class. A private or protected property passes every type check below and then
+        // fails in `compileKotlin`, pointed at a generated file the author never wrote.
+        inaccessible(property)?.let { hidden ->
+            logger.error(
+                "@AgentState ${owner.simpleName.asString()}.$propertyName cannot be read from " +
+                    "generated code: ${hidden.simpleName.asString()} is " +
+                    "${hidden.getVisibility().name.lowercase()}. The digest writer is emitted as " +
+                    "a separate file and listed in this module's public StateModule index, so a " +
+                    "published property and the class declaring it must be public or internal.",
+                hidden,
+            )
+            return null
+        }
 
         val type = property.type.resolve()
         if (type.isMarkedNullable) {

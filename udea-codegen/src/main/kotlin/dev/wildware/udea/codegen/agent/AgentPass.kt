@@ -61,11 +61,17 @@ internal class AgentPass(private val logger: KSPLogger) {
         }
         if (!checkUniqueToolNames(tools, functions)) return Result(emptyList(), emptyList())
 
-        val states = stateModels.build(properties).mapNotNull { owned ->
-            val containingFile = owned.owner.containingFile ?: return@mapNotNull sourceless(owned.owner)
-            Emitted(owned.model, AgentStateEmitter.emit(owned.model), containingFile)
+        // The collision check runs over the *owned* models, before anything is emitted, because
+        // it is the only place the declaring `KSClassDeclaration` still exists: `Emitted` keeps
+        // the source file and not the declaration, and a diagnostic without one is printed with
+        // no file and no line in front of it.
+        val owned = stateModels.build(properties)
+        if (!checkUniqueStateNames(owned)) return Result(tools, emptyList())
+
+        val states = owned.mapNotNull { state ->
+            val containingFile = state.owner.containingFile ?: return@mapNotNull sourceless(state.owner)
+            Emitted(state.model, AgentStateEmitter.emit(state.model), containingFile)
         }
-        if (!checkUniqueStateNames(states)) return Result(tools, emptyList())
 
         return Result(tools, states)
     }
@@ -105,12 +111,20 @@ internal class AgentPass(private val logger: KSPLogger) {
         return false
     }
 
-    /** The same rule for digest keys, across every declaring class in the module. */
-    private fun checkUniqueStateNames(states: List<Emitted<AgentStateModel>>): Boolean {
-        val byName = HashMap<String, MutableList<String>>()
+    /**
+     * The same rule for digest keys, across every declaring class in the module.
+     *
+     * Reported **at the second declaring class**, which is the one an author can move: the
+     * models arrive sorted by qualified name, so the first is the incumbent and the second is
+     * the one that collided with it. Passing `null` here instead would print two canonical
+     * names and no place to go — and the module's headline claim over the generator it replaces
+     * is that a failure is located.
+     */
+    private fun checkUniqueStateNames(states: List<AgentStateBuilder.OwnedState>): Boolean {
+        val byName = HashMap<String, MutableList<AgentStateBuilder.OwnedState>>()
         for (state in states) {
             for (entry in state.model.entries) {
-                byName.getOrPut(entry.name) { mutableListOf() } += state.model.owner.canonicalName
+                byName.getOrPut(entry.name) { mutableListOf() } += state
             }
         }
         val duplicates = byName.filterValues { it.size > 1 }.toSortedMap()
@@ -118,10 +132,11 @@ internal class AgentPass(private val logger: KSPLogger) {
         for ((name, owners) in duplicates) {
             logger.error(
                 "${UdeaRules.AGENT_NAME_COLLISION.id}: the digest key '$name' is published by " +
-                    "${owners.size} types in this module (${owners.joinToString(", ")}). The " +
-                    "game block is one flat object, so one of the two values would silently " +
-                    "replace the other; give one an @AgentState(name = \"...\").",
-                null,
+                    "${owners.size} types in this module (" +
+                    owners.joinToString(", ") { it.model.owner.canonicalName } +
+                    "). The game block is one flat object, so one of the two values would " +
+                    "silently replace the other; give one an @AgentState(name = \"...\").",
+                owners[1].owner,
             )
         }
         return false

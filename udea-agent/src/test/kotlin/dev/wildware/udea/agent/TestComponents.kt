@@ -355,5 +355,11 @@ internal fun championAccess(): AgentComponentType =
  * Two components carrying `current` is what a game looks like the moment it grows a second
  * resource pool, and the resolution rule has to have an answer for it.
  */
+internal fun transformAliasAccess(name: String): AgentComponentType =
+    agentComponent(name = name, replicator = TransformReplicator, componentType = Transform)
+
+/**
+ * [Health] registered under a second name, so a bare field name can genuinely be ambiguous.
+ */
 internal fun agentComponentAlias(name: String): AgentComponentType =
     agentComponent(name = name, replicator = HealthReplicator, componentType = Health)

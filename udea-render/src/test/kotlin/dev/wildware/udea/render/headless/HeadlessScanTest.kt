@@ -103,6 +103,11 @@ class HeadlessScanTest {
             "com/badlogic/gdx/Gdx" to "com/badlogic/gdx/Gdx",
             "box2dLight/" to "box2dLight/RayHandler",
             "org/lwjgl/" to "org/lwjgl/glfw/GLFW",
+            "com/badlogic/gdx/utils/viewport/" to "com/badlogic/gdx/utils/viewport/ExtendViewport",
+            "com/badlogic/gdx/backends/" to
+                "com/badlogic/gdx/backends/lwjgl3/Lwjgl3Application",
+            "com/badlogic/gdx/utils/GdxNativesLoader" to
+                "com/badlogic/gdx/utils/GdxNativesLoader",
         )
 
         assertEquals(samples.keys.sorted(), GL_BANNED_OWNERS.map { it.pattern }.sorted())
@@ -110,6 +115,29 @@ class HeadlessScanTest {
             val entry = GL_BANNED_OWNERS.first { it.pattern == pattern }
             assertTrue(entry.matches(sample), "$pattern did not match $sample")
         }
+    }
+
+    @Test
+    fun `a class naming a Viewport is caught, though the jar it comes from is an allowed one`() {
+        // The gap this closes: `Viewport.apply()` reaches `Gdx.gl` through `HdpiUtils`, so a
+        // headless module holding one dies on a machine with no display -- and `UDEA-MG-002`
+        // cannot see it, because viewports ship inside `com.badlogicgames.gdx:gdx`, the jar
+        // that rule deliberately allows. It is precisely the transitive case this scan owns.
+        val violations = HeadlessScan.violations(MODULE, fixtureClasses("ViewportNamingFixture"))
+
+        val diagnostic = violations.firstOrNull { "widthOf" in it.message }
+        assertNotNull(diagnostic, "a Viewport passed the headless gate: $violations")
+        assertTrue("com/badlogic/gdx/utils/viewport/ExtendViewport" in diagnostic.message, diagnostic.message)
+    }
+
+    @Test
+    fun `gdx collections stay legal, so the viewport ban is not a ban on gdx utils`() {
+        // The negative control for the two entries inside `com/badlogic/gdx/utils/`. `Array`,
+        // `ObjectMap` and `Pool` are headless collections the kernel uses everywhere; a gate
+        // that banned the package would be switched off within a week.
+        val violations = HeadlessScan.violations(MODULE, fixtureClasses("GdxCollectionNamingFixture"))
+
+        assertEquals(emptyList(), violations.map { it.message })
     }
 
     @Test

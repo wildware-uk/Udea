@@ -14,12 +14,18 @@ import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.backend.Lwjgl3Backend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.capture.CaptureRequest
+import dev.wildware.udea.core.Tick
+import dev.wildware.udea.render.capture.CaptureStalledException
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -104,6 +110,92 @@ class OffscreenBackendTest {
     }
 
     @Test
+    fun `a second create is refused before it allocates anything`() {
+        GlAvailability.require()
+        // The bug: `create` allocated the SpriteBatch, the FrameBuffer and a whole pipeline
+        // inside `gl.submit { ... }` and only then called `built.compareAndSet(null, pipeline)`.
+        // A second call therefore made a second batch and framebuffer, leaked both, and ran
+        // `registry.build` again -- which re-invokes `onBind(world, ctx)` on the *same retained
+        // system instances*, replacing the live pipeline's bound Families -- on its way to
+        // throwing. `OffscreenBackendTest` appeared to cover this and did not: it called
+        // `create` after `close()`, so it failed at `GlThread.submit`'s `check(isRunning)` and
+        // the guard itself was never reached.
+        val builds = AtomicInteger()
+        val registry = RenderRegistry()
+        registry.register(RenderPhase.World, { CountingBuildSystem(builds) })
+        val backend = startBackend(registry)
+        try {
+            val first = backend.create(definition().build())
+            assertEquals(1, builds.get(), "the first create did not build the pipeline")
+
+            assertFailsWith<IllegalStateException> { backend.create(definition().build()) }
+
+            // The factory runs *after* the FrameBuffer and the SpriteBatch inside the same
+            // submitted block, so one invocation is one framebuffer: had the refused call
+            // reached the submit, this would read 2 and two GL objects would have leaked.
+            assertEquals(1, builds.get(), "a second pipeline was built and then thrown away")
+            assertSame<Any?>(
+                first.presentation,
+                backend.pipeline,
+                "the live pipeline was replaced by the refused call",
+            )
+        } finally {
+            backend.close()
+        }
+    }
+
+    @Test
+    fun `a renderer that throws releases every waiting capture instead of stranding it`() {
+        GlAvailability.require()
+        // The failure: `GlThread.run` records the exception and exits, and nothing closed the
+        // capture slot. Every thread blocked in `capture()` then burned its full 10s deadline
+        // and reported "the render thread drew no frame that satisfied it" -- a timeout message
+        // for what was a renderer exception seconds earlier.
+        val explode = AtomicBoolean(false)
+        val registry = RenderRegistry()
+        registry.register(RenderPhase.World, { ExplodingRenderSystem(explode) })
+        val backend = startBackend(registry)
+        try {
+            val host = GameHost(RenderMode.Offscreen, definition(), backend)
+            backend.drive(host)
+            val slot = backend.pipeline!!.capture!!
+
+            val failure = AtomicReference<Throwable?>(null)
+            val done = CountDownLatch(1)
+            val worker = Thread {
+                try {
+                    // A tick far enough out that no ordinary frame will ever serve it, so the
+                    // only two ways this returns are the deadline and the pipeline closing.
+                    slot.capture(CaptureRequest(afterTick = Tick(9_000_000)), timeoutMillis = 30_000)
+                } catch (t: Throwable) {
+                    failure.set(t)
+                } finally {
+                    done.countDown()
+                }
+            }
+            worker.isDaemon = true
+            worker.start()
+            assertTrue(slot.awaitQueued(count = 1, timeoutMillis = 5_000), "the request never queued")
+
+            explode.set(true)
+
+            assertTrue(
+                done.await(15, TimeUnit.SECONDS),
+                "the waiter was left on a render loop that had already died",
+            )
+            val thrown = failure.get()
+            assertTrue(thrown is CaptureStalledException, "was $thrown")
+            assertTrue(
+                "closed" in thrown.message.orEmpty(),
+                "the waiter was told it timed out rather than that the pipeline had gone: " +
+                    thrown.message,
+            )
+        } finally {
+            backend.close()
+        }
+    }
+
+    @Test
     fun `closing the backend stops the render thread`() {
         GlAvailability.require()
         val backend = startBackend(RenderRegistry())
@@ -153,6 +245,22 @@ class OffscreenBackendTest {
     private class CountingRenderSystem(private val frames: AtomicInteger) : RenderSystem {
         override fun render(target: OffscreenTarget, alpha: Float) {
             frames.incrementAndGet()
+        }
+    }
+
+    /** Counts how many times the registry built it, which is how many times `create` allocated. */
+    private class CountingBuildSystem(builds: AtomicInteger) : RenderSystem {
+        init {
+            builds.incrementAndGet()
+        }
+
+        override fun render(target: OffscreenTarget, alpha: Float): Unit = Unit
+    }
+
+    /** Throws out of a frame once armed, taking the render loop down with it. */
+    private class ExplodingRenderSystem(private val armed: AtomicBoolean) : RenderSystem {
+        override fun render(target: OffscreenTarget, alpha: Float) {
+            if (armed.get()) error("a renderer threw in the middle of a frame")
         }
     }
 

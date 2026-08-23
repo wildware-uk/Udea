@@ -44,6 +44,14 @@ internal data class BannedOwner(
  * rest of `gdx-math` are headless value types the simulation legitimately uses; the ban is
  * on GL and on natives, not on maths. That distinction is the same one `UDEA-MG-002` draws
  * at the dependency level, and the two must agree or one of them is wrong.
+ *
+ * `com/badlogic/gdx/utils/` is likewise not banned as a package -- `Array`, `ObjectMap` and
+ * `Pool` are headless collections -- but two things inside it are, by exact name and by
+ * sub-package: `GdxNativesLoader`, which links the desktop natives, and `utils/viewport/`,
+ * which reaches `Gdx.gl` through `HdpiUtils` on every `apply()`. The viewport case is the one
+ * a configuration rule structurally cannot see: it ships inside `com.badlogicgames.gdx:gdx`,
+ * the jar `UDEA-MG-002` deliberately allows, which is exactly the transitive gap this scan
+ * exists to close. `HeadlessScanTest` names a `Viewport` as a positive control.
  */
 internal val GL_BANNED_OWNERS: List<BannedOwner> = listOf(
     BannedOwner(
@@ -65,5 +73,20 @@ internal val GL_BANNED_OWNERS: List<BannedOwner> = listOf(
     BannedOwner(
         "org/lwjgl/",
         "LWJGL is the native GL/GLFW binding; nothing outside udea-render may name it",
+    ),
+    BannedOwner(
+        "com/badlogic/gdx/utils/viewport/",
+        "a Viewport reaches Gdx.gl through HdpiUtils in apply() and update(), so a module " +
+            "holding one dies on a machine with no display",
+    ),
+    BannedOwner(
+        "com/badlogic/gdx/backends/",
+        "a gdx backend *is* a window and a context; UDEA-MG-002 catches it as a dependency, " +
+            "and this catches it as a type named through one that is allowed",
+    ),
+    BannedOwner(
+        "com/badlogic/gdx/utils/GdxNativesLoader",
+        "it extracts and links the gdx desktop natives, which a headless module must never " +
+            "require to be present",
     ),
 )

@@ -120,6 +120,39 @@ constrain a return type and a `toString` that reads like data is worse than a re
 receiver. The host owns the instance and therefore owns the pairing; that is also why
 `AgentStateSource` is not a `GameStateSource`, which has no receiver to read from.
 
+## A tool that must run outside the barrier drain (`udea-agent`, additive)
+
+Nothing above changes. This is a second interface *beside* `AgentToolDef`, declared in
+`udea-agent` and never emitted by `udea-codegen`, so a generated tool is unaffected:
+
+```kotlin
+public interface ContextualToolDef<in T> : AgentToolDef<T> {
+    public fun invoke(receiver: T, command: AgentCommand, context: AgentContext): Any?
+}
+```
+
+`ToolIndex.invoke` passes the context to a tool of this type and to nothing else. There is
+exactly one reason to be one, and the engine's `time.step`, `time.fast_forward` and
+`time.rewind` are the only tools in that position today: **they run the simulation**, and a tool
+call executes inside a `SimBarrier` drain, and `Simulation.step` drains the barrier, and
+`SimBarrier.drain` refuses to re-enter. `TimeControl.rewind` states the same requirement from
+the other side - it forces a drain of its own, safe only with the loop stopped between frames.
+
+Such a tool calls `AgentContext.answerLater { … }`, which runs the work after the tick (outside
+any drain, before the state document is published) and completes the command with what it
+returned. `AgentDispatcher` does not complete a command whose tool deferred its answer, so
+`completedCommandId` still means *it happened*; a throw inside the deferred block still
+completes the command, as `tool_threw`, because a command that never completes is a healthy game
+reported as frozen.
+
+## The description gate applies at runtime as well as at the symbol
+
+`UDEA0008` and `UDEA0009` are compile errors at the `@AgentTool` symbol. They can only see a
+tool that passed through a KSP round, and this contract explicitly allows a hand-written
+`AgentToolDef` - which is what the engine's own `world`/`time`/`events`/`diag` toolsets are, and
+what any game may write. So `ToolIndex.Builder.build` applies the same two rules to every tool it
+indexes, refusing under the same rule ids. One defect, one name, wherever it surfaces.
+
 ## `@AgentState` is not in the `Replicator` field space
 
 The frozen `Replicator` contract makes `fieldNames[i]`, `FieldMask` bit `i` and `FieldStore`

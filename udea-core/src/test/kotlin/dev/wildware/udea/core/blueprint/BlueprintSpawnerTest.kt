@@ -211,6 +211,42 @@ class BlueprintSpawnerTest {
     }
 
     @Test
+    fun `a reservation unwound before the drain costs its own spawn and nothing else`() {
+        val harness = Harness()
+        val ids = harness.spawner.spawnAll(List(3) { SpawnRequest(Grunt) })
+
+        // What a rewind past the submission does: the reservation is unwound while the action
+        // is still queued. Creating the entity first and discovering it in a throwing `attach`
+        // cost far more than the one spawn — the entity was already in the world with no NetId,
+        // and the throw escaped into SimBarrier.drain, which logs and moves on to the next
+        // *action*, so requests 3 onwards were never created at all.
+        assertTrue(harness.netIds.free(ids[1]), "the middle reservation is unwound")
+
+        harness.host.run(1)
+
+        assertEquals(2, harness.host.world.numEntities, "the requests either side must still land")
+        assertEquals(2L, harness.spawner.spawnedCount)
+        assertEquals(1L, harness.spawner.droppedSpawns, "and the loss must be counted, not silent")
+        assertEquals(
+            0L,
+            harness.barrier.failedActions,
+            "an unwound reservation is a legitimate outcome of a rewind, not a failing action",
+        )
+        assertNotNull(harness.netIds.resolveOrNull(ids[0]), "the request before the dead one")
+        assertNotNull(harness.netIds.resolveOrNull(ids[2]), "and the one after it")
+        assertNull(harness.netIds.resolveOrNull(ids[1]))
+
+        var rostered = 0
+        harness.netIds.forEachLive { _, _ -> rostered++ }
+        assertEquals(
+            harness.host.world.numEntities,
+            rostered,
+            "an entity with no NetId is a permanent orphan: SnapshotService walks forEachLive, " +
+                "so no snapshot can hold it and no restore can ever destroy it",
+        )
+    }
+
+    @Test
     fun `an empty batch queues nothing`() {
         val harness = Harness()
         assertEquals(emptyList(), harness.spawner.spawnAll(emptyList()))

@@ -5,6 +5,7 @@ import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.SceneId
 import dev.wildware.udea.core.SimSystem
 import dev.wildware.udea.core.loop.BarrierAction
+import dev.wildware.udea.core.loop.GameLoop
 import dev.wildware.udea.core.loop.SimBarrier
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.SimPhase
@@ -37,6 +38,22 @@ class HeadlessHostTest {
     private companion object {
         /** Enough ticks that the loop is unmistakably running before the stop is sent. */
         const val TICKS_BEFORE_STOP: Int = 100
+
+        /**
+         * How long a paused host is watched for illicit progress.
+         *
+         * An unpaused host of this size runs six figures of ticks in this window, so a pause
+         * that does not take is not a close call.
+         */
+        const val PAUSE_OBSERVATION_MILLIS: Long = 100L
+
+        /**
+         * How long one tick is held open while another thread pauses across it.
+         *
+         * Long enough that "pause() returned early" is a certainty rather than a coin toss:
+         * every scheduler in use returns from a flag write in microseconds.
+         */
+        const val HOLD_MILLIS: Long = 250L
     }
 
     /** Moves every body a little, so ten thousand ticks are ten thousand ticks of work. */
@@ -75,6 +92,39 @@ class HeadlessHostTest {
     private class TickLatchModule(private val ticked: CountDownLatch) : UdeaModule {
         override fun simulation(registry: SimRegistry) {
             registry.add(SimPhase.Cleanup, { TickLatchSystem(ticked) })
+        }
+    }
+
+    /**
+     * Holds its first tick open for [HOLD_MILLIS], so another thread can pause mid-tick.
+     *
+     * Only the first: the point is to make "a tick is in flight" a fact the test controls
+     * rather than a window it races for, and every later tick can run at full speed.
+     */
+    private class SlowTickSystem(private val entered: CountDownLatch) : SimSystem() {
+
+        @Volatile
+        var inTick: Boolean = false
+            private set
+
+        private var held = false
+
+        override fun onTick() {
+            if (held) return
+            held = true
+            inTick = true
+            entered.countDown()
+            Thread.sleep(HOLD_MILLIS)
+            inTick = false
+        }
+    }
+
+    private class SlowTickModule(private val entered: CountDownLatch) : UdeaModule {
+        var system: SlowTickSystem? = null
+            private set
+
+        override fun simulation(registry: SimRegistry) {
+            registry.add(SimPhase.Gameplay, { SlowTickSystem(entered).also { system = it } })
         }
     }
 
@@ -166,6 +216,120 @@ class HeadlessHostTest {
             host.tick.value >= TICKS_BEFORE_STOP,
             "it stopped where the other thread asked, at ${host.tick.value}",
         )
+    }
+
+    @Test
+    fun `time pause stops a free-running host, and its ticks are the loop's`() {
+        // `host.time` is the agent's whole handle on time, and `run()` is the only continuous
+        // headless mode the kernel ships. When run() called Simulation.step() directly the two
+        // did not meet: pause() reported the game frozen while it ran on at millions of ticks,
+        // totalTicks stayed at zero, and — worse — TimeControl.rewind's forced SimBarrier drain
+        // relies on that pause having actually stopped the simulation before it fires.
+        // Structural as well as functional, for the reason the `running` test gives: whether a
+        // particular JIT hoists a particular read out of run()'s loop is not something a test
+        // can pin, but the modifier that forbids it is.
+        assertTrue(
+            Modifier.isVolatile(GameLoop::class.java.getDeclaredField("paused").modifiers),
+            "GameLoop.paused must be @Volatile: run() reads it every tick and TimeControl.pause() " +
+                "is documented as an agent call from another thread",
+        )
+
+        val ticked = CountDownLatch(TICKS_BEFORE_STOP)
+        val scene = MarkerScene(SceneId("arena"), seed = 5L, entityCount = 3)
+        val def = UdeaGameDef(listOf(TickLatchModule(ticked)))
+        def.core.scenes.register(scene)
+        val host = GameHost(RenderMode.Headless, def)
+        host.ctx.scenes.requestScene(scene.id)
+
+        val runner = thread(name = "host-runner") { host.run() }
+        try {
+            assertTrue(
+                ticked.await(10L, TimeUnit.SECONDS),
+                "the host never reached $TICKS_BEFORE_STOP ticks on its own thread",
+            )
+
+            // Returns only at a tick boundary, so everything the simulation thread wrote is
+            // visible here and the readings below are of a whole tick rather than a torn one.
+            host.time.pause()
+            val atPause = host.tick.value
+
+            assertTrue(host.time.paused)
+            assertEquals(
+                atPause,
+                host.totalTicks,
+                "every tick run() runs must go through the loop, or totalTicks — the number the " +
+                    "agent is given for how far the game has got — is fiction",
+            )
+
+            // The only way to show a stopped loop is to give it the chance to run and find that
+            // it did not. A thousand ticks is microseconds of work for this scene.
+            Thread.sleep(PAUSE_OBSERVATION_MILLIS)
+            assertEquals(
+                atPause,
+                host.tick.value,
+                "time.pause() must stop run(), not merely report that it did",
+            )
+            assertEquals(atPause, host.totalTicks)
+
+            host.time.resume()
+            assertTrue(
+                awaitTickPast(host, atPause),
+                "resume() must hand the loop back; it was still frozen at ${host.tick.value}",
+            )
+        } finally {
+            host.stop()
+            runner.join(TimeUnit.SECONDS.toMillis(10))
+        }
+
+        assertTrue(!runner.isAlive, "run() never returned after stop()")
+    }
+
+    /** Spins until the host's clock passes [tick], or gives up. Returns whether it moved. */
+    private fun awaitTickPast(host: GameHost, tick: Long): Boolean {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (System.nanoTime() < deadline) {
+            if (host.tick.value > tick) return true
+            Thread.onSpinWait()
+        }
+        return false
+    }
+
+    @Test
+    fun `pause returns only once the tick in flight has finished`() {
+        // The property `TimeControl.rewind` rests on. It restores a snapshot by forcing a
+        // SimBarrier drain on the caller's thread, and the only thing that makes a forced drain
+        // safe is that no system is running when it happens. Setting a flag does not achieve
+        // that on a host whose simulation owns a thread: the tick already inside world.update
+        // runs on, and the restore tears the world underneath it. SimBarrier's own re-entrancy
+        // guard cannot catch it — that guard is per-object state, not a cross-thread one.
+        val entered = CountDownLatch(1)
+        val module = SlowTickModule(entered)
+        val scene = MarkerScene(SceneId("arena"), seed = 5L, entityCount = 3)
+        val def = UdeaGameDef(listOf(module))
+        def.core.scenes.register(scene)
+        val host = GameHost(RenderMode.Headless, def)
+        host.ctx.scenes.requestScene(scene.id)
+
+        val runner = thread(name = "host-runner") { host.run() }
+        try {
+            assertTrue(
+                entered.await(10L, TimeUnit.SECONDS),
+                "the held tick never started, so there was no tick in flight to pause against",
+            )
+            val system = checkNotNull(module.system)
+
+            host.time.pause()
+
+            assertTrue(
+                !system.inTick,
+                "pause() returned while a system was still inside its tick; a rewind's forced " +
+                    "barrier drain would have applied a whole-world restore on top of it",
+            )
+        } finally {
+            host.stop()
+            host.time.resume()
+            runner.join(TimeUnit.SECONDS.toMillis(10))
+        }
     }
 
     @Test

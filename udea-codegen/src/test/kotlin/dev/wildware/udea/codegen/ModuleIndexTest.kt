@@ -317,6 +317,46 @@ class ModuleIndexTest {
         assertFalse(run.succeeded)
     }
 
+    @Test
+    fun `a malformed module name fails a tools-only module too, rather than dropping its index`(
+        @TempDir workDir: File,
+    ) {
+        // The path with no `@Replicated` components did no name validation of its own and
+        // answered a malformed name with a bare `return`: the tool dispatchers were generated,
+        // the ToolModule index, the META-INF/services line and the manifest were not, and no
+        // diagnostic said so anywhere. That is a tool that compiles and that nothing can
+        // discover - the exact state the agent surface exists to make impossible.
+        val run = ProcessorHarness.run(
+            workDir,
+            mapOf(
+                "Tools.kt" to """
+                package fixtures
+
+                import dev.wildware.udea.annotations.AgentTool
+
+                class Tools {
+                    @AgentTool(description = "Reset the arena to its starting layout before a run.")
+                    fun reset() {
+                    }
+                }
+                """.trimIndent(),
+            ),
+            mapOf(
+                CodegenOptions.MODULE_NAME to "my-game",
+                CodegenOptions.TOOL_MODULE_SERVICE to "dev.wildware.udea.agent.ToolModule",
+            ),
+        )
+
+        val message = run.errors.single()
+        assertFalse(run.succeeded)
+        assertTrue("my-game" in message, message)
+        assertTrue(CodegenOptions.MODULE_NAME_FORMAT.pattern in message, message)
+        assertTrue(
+            run.generatedFiles.isEmpty(),
+            "nothing may be emitted under a name nothing can be indexed by: ${run.generatedFiles.map { it.name }}",
+        )
+    }
+
     private fun hashOf(protocolSource: String): String =
         Regex("""HASH: Int = (0x[0-9a-f]{4})""").find(protocolSource)?.groupValues?.get(1)
             ?: error("no HASH constant in:\n$protocolSource")

@@ -2,6 +2,7 @@ package dev.wildware.udea.agent.dispatch
 
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.configureWorld
+import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.AgentCommand
 import dev.wildware.udea.agent.AgentErrorKind
 import dev.wildware.udea.agent.AgentResult
@@ -190,7 +191,7 @@ class ToolIndexTest {
 
     private fun call(index: ToolIndex, tool: String, vararg args: Pair<String, String>): AgentResult {
         val command = AgentCommand(tool, args.toMap())
-        return index.invoke(command, AgentContext(world, ctx, command, DeferredQueue()))
+        return index.invoke(command, AgentContext(world, ctx, command, DeferredQueue(), AgentBridge()))
     }
 
     private fun ok(index: ToolIndex, tool: String): String =

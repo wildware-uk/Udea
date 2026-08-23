@@ -41,9 +41,16 @@ public class TimeControl(
     /** Ticks run since the loop was created. */
     public val totalTicks: Long get() = loop.totalTicks
 
-    /** Freezes the simulation. Rendering continues, so the agent can still take a picture. */
+    /**
+     * Freezes the simulation. Rendering continues, so the agent can still take a picture.
+     *
+     * Returns only once the tick in flight has finished, so the world an agent reads
+     * immediately afterwards is a whole one. On a single-threaded host that costs nothing —
+     * there is no tick in flight when a tool call is being served — and on a `GameHost.run()`
+     * host it is the difference between a pause and a request for one.
+     */
     public fun pause() {
-        loop.paused = true
+        loop.pauseAtBoundary()
     }
 
     /** Resumes normal stepping. */
@@ -110,12 +117,13 @@ public class TimeControl(
      * Failures are returned, never thrown — every one of them is a reasonable answer to a
      * reasonable question. See [RewindFailure].
      *
-     * The loop is paused **before** the restore, not after it. `SnapshotTimeTravel` forces a
-     * `SimBarrier` drain from here rather than waiting for the next `Simulation.step`, and the
-     * only thing that makes a forced drain safe is that the loop is stopped at a tick boundary
-     * when it happens. Pausing on the way out — which is what `stepTicks` used to be the first
-     * thing to do it — left that guarantee resting on the accident that a tool call arrives
-     * between frames.
+     * The loop is paused **before** the restore, not after it, and the pause waits for the
+     * tick in flight ([GameLoop.pauseAtBoundary]). `SnapshotTimeTravel` forces a `SimBarrier`
+     * drain from here rather than waiting for the next `Simulation.step`, and the only thing
+     * that makes a forced drain safe is that the loop is stopped at a tick boundary when it
+     * happens — which on a free-running host means stopped, not merely asked to stop. Pausing on
+     * the way out instead, as `stepTicks` alone would, left that guarantee resting on the
+     * accident that a tool call arrives between frames.
      *
      * **A refused rewind leaves the loop as it found it.** The pause exists to make the drain
      * safe, so it is taken only around the attempt and handed back on every failure that
@@ -142,9 +150,11 @@ public class TimeControl(
         }
 
         // Before anything can restore or step, and before the forced drain inside
-        // `restoreNearestAtOrBefore`: see the note above.
+        // `restoreNearestAtOrBefore`: see the note above. `pauseAtBoundary` and not
+        // `paused = true`, because on a host whose simulation runs on its own thread the flag
+        // alone leaves the tick already inside `world.update` running underneath the restore.
         val wasPaused = loop.paused
-        loop.paused = true
+        loop.pauseAtBoundary()
 
         return when (val outcome = ring.restoreNearestAtOrBefore(target)) {
             is RestoreOutcome.Refused -> {

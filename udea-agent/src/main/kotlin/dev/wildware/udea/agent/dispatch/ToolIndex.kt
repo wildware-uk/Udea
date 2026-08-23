@@ -7,6 +7,8 @@ import dev.wildware.udea.agent.AgentToolDef
 import dev.wildware.udea.agent.Json
 import dev.wildware.udea.agent.OwnerBinding
 import dev.wildware.udea.agent.ToolModule
+import dev.wildware.udea.agent.tools.ContextualToolDef
+import dev.wildware.udea.diagnostics.UdeaRules
 import java.util.ServiceLoader
 
 /**
@@ -64,24 +66,40 @@ public class ToolIndex private constructor(
     override fun budgetMs(toolName: String): Long = 0L
 
     /**
-     * Delegates to [invoke]`(command)`, ignoring [context].
+     * Runs [command], passing [context] only to a tool that declared it needs one.
      *
-     * A generated tool is never handed an [AgentContext]: `AgentToolDef.invoke` takes a receiver
-     * and a command and nothing else, because a tool reaches the world through the toolset it is
-     * a member of - which the host constructed with whatever that tool mutates. Threading a
-     * context through here would suggest generated tools can read one, and the first tool that
-     * tried would find no way to.
+     * A **generated** tool is never handed an [AgentContext]: `AgentToolDef.invoke` takes a
+     * receiver and a command and nothing else, because a tool reaches the world through the
+     * toolset it is a member of - which the host constructed with whatever that tool mutates.
+     * Threading a context into every tool would suggest generated tools can read one, and the
+     * first one that tried would find no way to.
+     *
+     * The exception is a
+     * [dev.wildware.udea.agent.tools.ContextualToolDef], and there is exactly one reason to be
+     * one: the tool has to run *outside* the barrier drain it was called in, which needs
+     * [AgentContext.answerLater]. See that interface for why the engine's time tools are in
+     * that position and nothing else is.
      */
-    override fun invoke(command: AgentCommand, context: AgentContext): AgentResult = invoke(command)
-
-    /** Runs [command] against the toolset bound to it. */
-    public fun invoke(command: AgentCommand): AgentResult {
-        val entry = entries[command.name] ?: return AgentResult.failed(
-            AgentErrorKind.NO_SUCH_TOOL,
-            "no tool named ${command.name} is registered; call the tools listing to see what is",
-        )
-        return render(command, invokeUnchecked(entry, command))
+    override fun invoke(command: AgentCommand, context: AgentContext): AgentResult {
+        val entry = entries[command.name] ?: return noSuchTool(command)
+        return render(command, invokeUnchecked(entry, command, context))
     }
+
+    /**
+     * Runs [command] with no context. For a caller outside the dispatch path.
+     *
+     * @throws UnsupportedOperationException if the tool is a
+     *   [dev.wildware.udea.agent.tools.ContextualToolDef], which cannot run without one.
+     */
+    public fun invoke(command: AgentCommand): AgentResult {
+        val entry = entries[command.name] ?: return noSuchTool(command)
+        return render(command, invokeUnchecked(entry, command, null))
+    }
+
+    private fun noSuchTool(command: AgentCommand): AgentResult = AgentResult.failed(
+        AgentErrorKind.NO_SUCH_TOOL,
+        "no tool named ${command.name} is registered; call the tools listing to see what is",
+    )
 
     /**
      * The one unchecked cast on the agent surface, and the reason [AgentToolDef.owner] exists.
@@ -93,8 +111,13 @@ public class ToolIndex private constructor(
      * caller.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun invokeUnchecked(entry: Entry, command: AgentCommand): Any? =
-        (entry.def as AgentToolDef<Any>).invoke(entry.receiver, command)
+    private fun invokeUnchecked(entry: Entry, command: AgentCommand, context: AgentContext?): Any? {
+        val def = entry.def
+        if (def is ContextualToolDef<*> && context != null) {
+            return (def as ContextualToolDef<Any>).invoke(entry.receiver, command, context)
+        }
+        return (def as AgentToolDef<Any>).invoke(entry.receiver, command)
+    }
 
     /**
      * The tool's return value as a JSON document.
@@ -177,11 +200,44 @@ public class ToolIndex private constructor(
                             "${module.moduleName}; a tool name is the agent's whole address for " +
                             "it and cannot be shared"
                     }
+                    checkDescription(def, module)
                     val receiver = OwnerBinding.resolve(def.owner, instances, "the tool", def.name)
                     entries[def.name] = Entry(def, receiver, module.moduleName)
                 }
             }
             return ToolIndex(entries)
+        }
+
+        /**
+         * The same rule `UDEA0008` applies at the symbol, applied here to a tool that never
+         * passed a KSP round.
+         *
+         * The compile-time gate can only see an `@AgentTool`. The engine's own toolsets are
+         * hand-written [dev.wildware.udea.agent.AgentToolDef]s (see
+         * `dev.wildware.udea.agent.tools.EngineToolDef` for why), and so is any tool a game
+         * writes by hand - the contract explicitly allows it. A description gate that only
+         * covered the generated half would be a gate with a documented way round it, and the
+         * description is the entire basis on which a model decides whether to call a tool: a
+         * tool named well and described badly is worse than no tool, because it gets called for
+         * the wrong reason and its answer is trusted.
+         *
+         * The rule id is [UdeaRules.AGENT_TOOL_DESCRIPTION]'s, quoted rather than re-invented,
+         * so one defect has one name whether it surfaces in the IDE, in CI or here (spec 5).
+         */
+        private fun checkDescription(def: AgentToolDef<*>, module: ToolModule) {
+            val description = def.description.trim()
+            check(description.length >= UdeaRules.MIN_TOOL_DESCRIPTION) {
+                "${UdeaRules.AGENT_TOOL_DESCRIPTION.id}: ${module.moduleName}'s tool " +
+                    "${def.name} has a ${description.length}-character description, under the " +
+                    "${UdeaRules.MIN_TOOL_DESCRIPTION} a usable one takes; say what it does and " +
+                    "when to reach for it, because that text is all the model has"
+            }
+            for (arg in def.args) {
+                check(arg.description.isNotBlank()) {
+                    "${UdeaRules.AGENT_ARG_DESCRIPTION.id}: ${def.name}'s argument ${arg.name} " +
+                        "has no description, so its JSON Schema property tells the model nothing"
+                }
+            }
         }
     }
 

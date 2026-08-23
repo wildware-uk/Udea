@@ -33,6 +33,10 @@ class DigestContentTest {
             document,
             """"ready":true""",
             """"frame":1""",
+            // Both names. `simFrame` is the one `game-bridge-mcp`'s summarise() copies into
+            // every command result the agent sees; a document carrying only `tick` drops the
+            // simulation tick out of every one of them and forces a full /state per step.
+            """"simFrame":412""",
             """"tick":412""",
             """"paused":false""",
             """"timeScale":1""",
@@ -121,11 +125,32 @@ class DigestContentTest {
 
         val document = fixture.build()
 
-        assertTrue(document.contains("\"truncated\":true"), document)
+        // Outside the `game` object, under a name a game cannot collide with: a game that
+        // published a scalar of its own called `truncated` and then overflowed would otherwise
+        // produce two `truncated` keys in one object, and JSON.parse keeps the last silently.
+        assertTrue(document.contains("\"gameTruncated\":true"), document)
         assertFalse(
             document.contains("\"extra${DigestBudgets.GAME_SCALAR_LIMIT}\""),
             "scalars past the cap must not be written",
         )
+    }
+
+    @Test
+    fun `a game scalar named truncated does not produce two keys in one object`() {
+        val fixture = DigestFixture()
+        fixture.game.publishTruncatedScalar = true
+        fixture.game.extraScalars = DigestBudgets.GAME_SCALAR_LIMIT
+
+        val document = fixture.build()
+
+        val gameBlock = document.substringAfter("\"game\":{").substringBefore('}')
+        assertEquals(
+            1,
+            Regex("\"truncated\":").findAll(gameBlock).count(),
+            "the game block carried the key twice, which is a malformed document: $gameBlock",
+        )
+        assertTrue(gameBlock.contains("\"truncated\":false"), "the game's own value must survive")
+        assertTrue(document.contains("\"gameTruncated\":true"), document)
     }
 
     @Test

@@ -22,7 +22,8 @@ import dev.wildware.udea.render.FrameSurface
  *
  * It buys a second property the agent epic needs: the capture is [FrameBuffer]-sized, so it
  * does not change when a human resizes the window, and an `Offscreen` capture and a `Windowed`
- * capture of the same scene are the same picture.
+ * capture of the same scene are the same *shape and framing*. Not the same bytes -- see
+ * [WindowConfig] for the four wall-clock inputs that stop that from being true today.
  *
  * ## The clear is opaque
  *
@@ -65,7 +66,7 @@ internal class GlFrameSurface(
         batch.projectionMatrix = projection
 
         // Letterboxed rather than stretched. The offscreen framebuffer has a fixed size so that
-        // two captures of the same tick are the same picture; blitting it to a window of a
+        // two captures of the same tick are the same shape; blitting it to a window of a
         // different aspect ratio without preserving that aspect would mean the human sees a
         // squashed game whenever the window is not exactly 16:9, and would make "what the
         // player sees" and "what the agent captures" different shapes.

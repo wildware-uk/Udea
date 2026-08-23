@@ -42,6 +42,19 @@ public class FrameCaptureSlot internal constructor(
 
     private val lock = ReentrantLock()
     private val settled = lock.newCondition()
+
+    /**
+     * Signalled when a request joins [queue].
+     *
+     * Exists so [awaitQueued] can *wait* rather than poll. A poller spinning on
+     * [queuedRequests] takes and releases this same non-fair [ReentrantLock] as fast as it can,
+     * and a non-fair lock lets a running thread barge ahead of one that is parked — so on a
+     * loaded machine the poller can hold the enqueuing thread out long enough to cross a
+     * multi-second deadline while nothing is actually wrong. That is exactly how
+     * `FrameCaptureSlotTest` flaked with "only 0 of 1 requests were queued" and then passed on
+     * a re-run.
+     */
+    private val enqueued = lock.newCondition()
     private val queue = ArrayDeque<Pending>()
     private var closed = false
 
@@ -79,6 +92,7 @@ public class FrameCaptureSlot internal constructor(
         val outcome = lock.withLock {
             if (closed) throw CaptureStalledException("$request: the render pipeline is closed")
             queue.addLast(pending)
+            enqueued.signalAll()
 
             var remaining = timeoutMillis * NANOS_PER_MILLI
             var settledOutcome = pending.outcome
@@ -100,6 +114,28 @@ public class FrameCaptureSlot internal constructor(
             is Outcome.Done -> outcome.result
             is Outcome.Failed -> throw outcome.cause
         }
+    }
+
+    /**
+     * Waits until at least [count] requests are queued, or [timeoutMillis] passes.
+     *
+     * Published for the same reason [queuedRequests] is — a caller, and a test, has to be able
+     * to tell "the render thread has not drawn a frame yet" apart from "the request was
+     * dropped" — but as a *wait* rather than a value to poll. Polling a value guarded by this
+     * class's own lock is what made `FrameCaptureSlotTest` flaky: the poller and the enqueuing
+     * thread contend for one non-fair lock, and the poller can win it repeatedly.
+     *
+     * @return true if the count was reached; false if the deadline passed first.
+     */
+    internal fun awaitQueued(count: Int, timeoutMillis: Long): Boolean = lock.withLock {
+        require(count > 0) { "count must be positive, was $count" }
+        var remaining = timeoutMillis * NANOS_PER_MILLI
+        while (queue.size < count) {
+            if (closed) return false
+            if (remaining <= 0L) return false
+            remaining = enqueued.awaitNanos(remaining)
+        }
+        true
     }
 
     /**
@@ -156,6 +192,8 @@ public class FrameCaptureSlot internal constructor(
             }
             queue.clear()
             settled.signalAll()
+            // ...and anything waiting for a request to *arrive*, which will now never happen.
+            enqueued.signalAll()
         }
     }
 

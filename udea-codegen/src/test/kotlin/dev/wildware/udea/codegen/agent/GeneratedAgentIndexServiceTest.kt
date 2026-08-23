@@ -4,6 +4,7 @@ import dev.wildware.udea.agent.StateModule
 import dev.wildware.udea.agent.ToolModule
 import dev.wildware.udea.codegen.fixtures.HealthAgentState
 import dev.wildware.udea.codegen.fixtures.MatchClockAgentState
+import dev.wildware.udea.codegen.fixtures.PlaygroundSetOverlaysTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundSetStanceTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundSpawnBlueprintTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundTagEntityTool
@@ -32,11 +33,16 @@ class GeneratedAgentIndexServiceTest {
         // Ascending name, which is the order the merged manifest and the dispatch map are both
         // built in, so no consumer has to sort.
         assertEquals(
-            listOf(PlaygroundSetStanceTool, PlaygroundSpawnBlueprintTool, PlaygroundTagEntityTool),
+            listOf(
+                PlaygroundSetOverlaysTool,
+                PlaygroundSetStanceTool,
+                PlaygroundSpawnBlueprintTool,
+                PlaygroundTagEntityTool,
+            ),
             modules.single().tools,
         )
         assertEquals(
-            listOf("set_stance", "spawn_blueprint", "tag_entity"),
+            listOf("set_overlays", "set_stance", "spawn_blueprint", "tag_entity"),
             modules.single().tools.map { it.name },
         )
     }

@@ -1,6 +1,7 @@
 package dev.wildware.udea.codegen.agent
 
 import dev.wildware.udea.agent.AgentToolDef
+import dev.wildware.udea.codegen.fixtures.PlaygroundSetOverlaysTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundSetStanceTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundSpawnBlueprintTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundTagEntityTool
@@ -24,6 +25,7 @@ class GeneratedToolSchemaTest {
         PlaygroundSpawnBlueprintTool,
         PlaygroundSetStanceTool,
         PlaygroundTagEntityTool,
+        PlaygroundSetOverlaysTool,
     )
 
     @Test
@@ -111,15 +113,31 @@ class GeneratedToolSchemaTest {
     }
 
     @Test
-    fun `a list argument publishes an items schema and says how to separate the values`() {
+    fun `a list argument is published as the comma-separated string the query string carries`() {
+        // `array` here would be the schema instructing a model to do something the transport
+        // cannot do. A tool call reaches the game as `GET /command?...`, and `game-bridge-mcp`
+        // puts each argument on it with `String(v)` unless it is an object - a JSON array is
+        // one, so an `array` argument arrives as the text `["carry","mid"]` for the
+        // dispatcher's comma split to tear in half. ToolArgumentEncodingTest drives that
+        // encoding for real; this pins the schema that keeps it from ever happening.
         val labels = TestJson.obj(
             TestJson.obj(TestJson.obj(TestJson.parse(PlaygroundTagEntityTool.inputSchema))["properties"])["labels"],
         )
 
-        assertEquals("array", labels["type"])
-        assertEquals("string", TestJson.obj(labels["items"])["type"])
+        assertEquals("string", labels["type"])
+        assertTrue("items" !in labels.keys, "a string property has no items: $labels")
         // The separator has nowhere else to live: a list travels as one query parameter.
         assertTrue("comma separated" in labels["description"] as String, labels.toString())
+    }
+
+    @Test
+    fun `no argument anywhere is published as an array`() {
+        // The rule and not the instance: a list argument added later must not reintroduce the
+        // one JSON Schema type a query string cannot carry.
+        val arrays = tools.flatMap { tool -> tool.args.map { "${tool.name}.${it.name}" to it.type } }
+            .filter { (_, type) -> type == "array" }
+
+        assertEquals(emptyList(), arrays, "arguments typed `array` cannot survive the bridge")
     }
 
     @Test

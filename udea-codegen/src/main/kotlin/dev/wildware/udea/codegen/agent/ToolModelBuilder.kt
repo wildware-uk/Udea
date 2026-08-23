@@ -1,13 +1,16 @@
 package dev.wildware.udea.codegen.agent
 
+import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.Visibility
 import com.squareup.kotlinpoet.ClassName
 import dev.wildware.udea.codegen.AnnotationNames
 import dev.wildware.udea.codegen.replicator.describe
@@ -47,6 +50,22 @@ internal class ToolModelBuilder(private val logger: KSPLogger) {
                     "coroutine context to resume into; make the function blocking and let the " +
                     "agent host decide what to wait for.",
                 function,
+            )
+            failed = true
+        }
+        // The dispatcher is a *sibling file*: `PlaygroundTagEntityTool.kt` calls
+        // `receiver.tagEntity(...)` from outside the class that declares it. A private or
+        // protected member passes every other check here and then fails in `compileKotlin`,
+        // pointed at a file in `build/generated` that the author did not write - which is the
+        // one outcome this processor's failure policy rules out.
+        inaccessible(function)?.let { hidden ->
+            logger.error(
+                "@AgentTool ${function.simpleName.asString()} cannot be reached from generated " +
+                    "code: ${hidden.simpleName.asString()} is ${hidden.getVisibility().name.lowercase()}. " +
+                    "The dispatcher is emitted as a separate file in the same package and " +
+                    "listed in this module's public ToolModule index, so a tool and the toolset " +
+                    "declaring it must be public or internal.",
+                hidden,
             )
             failed = true
         }
@@ -95,6 +114,7 @@ internal class ToolModelBuilder(private val logger: KSPLogger) {
             functionName = function.simpleName.asString(),
             objectName = AgentNaming.toolObjectName(ownerName.simpleName, function.simpleName.asString()),
             args = args,
+            internal = isInternal(function),
         )
     }
 
@@ -167,11 +187,39 @@ internal class ToolModelBuilder(private val logger: KSPLogger) {
 
         // "A Kotlin parameter with a default value is emitted as optional regardless" - the
         // schema has to describe the call an agent can actually make, and it can omit any
-        // parameter the function will fill in for itself.
-        val optional = parameter.hasDefault || arg?.booleanArgument("required") == false
+        // parameter the function will fill in for itself. A **nullable** parameter is optional
+        // for a second reason and it is the dispatcher's, not the author's: the generated code
+        // answers an absent nullable argument with `null` and never throws, so publishing
+        // `required: true` for one would be the manifest promising a value the tool does not
+        // insist on.
         val nullable = type.isMarkedNullable
+        val optional = nullable || parameter.hasDefault || arg?.booleanArgument("required") == false
         val defaultText = arg?.stringArgument("default").orEmpty().ifEmpty { null }
 
+        if (nullable && defaultText != null) {
+            logger.error(
+                "parameter '$parameterName' of @AgentTool ${function.simpleName.asString()} is " +
+                    "nullable and declares @Arg(default = \"$defaultText\"). The two say " +
+                    "different things about the same call: the manifest would advertise the " +
+                    "default, and the generated dispatcher passes `null` for an absent nullable " +
+                    "argument, so the default would never once be used. Drop the default, or " +
+                    "drop the `?` and let the default be the value an agent gets.",
+                parameter,
+            )
+            return null
+        }
+        if (nullable && parameter.hasDefault) {
+            logger.error(
+                "parameter '$parameterName' of @AgentTool ${function.simpleName.asString()} is " +
+                    "nullable and has a Kotlin default. KSP cannot read a default's expression, " +
+                    "and the generated dispatcher always passes an explicit value - `null`, when " +
+                    "the argument is absent - so a `= 5` here would be silently overwritten " +
+                    "with `null` on every call that omitted it. Remove the `= ...`: a nullable " +
+                    "parameter is already published as optional.",
+                parameter,
+            )
+            return null
+        }
         if (optional && !nullable && defaultText == null) {
             logger.error(
                 "parameter '$parameterName' of @AgentTool ${function.simpleName.asString()} is " +
@@ -266,6 +314,40 @@ internal class ToolModelBuilder(private val logger: KSPLogger) {
         val TOOLSET_KINDS = setOf(ClassKind.CLASS, ClassKind.OBJECT)
     }
 }
+
+/**
+ * The declaration that stops [declaration] being reachable from a generated sibling file, or
+ * `null` when it and every type enclosing it is public or internal.
+ *
+ * Generated agent code always lives in its own file: a tool dispatcher calls the annotated
+ * function from outside the class, and a digest writer reads the property from outside it. So
+ * `private`, `protected`, a local declaration and Java package-private are all a build that
+ * fails inside `build/generated` unless they are refused here, at the annotation.
+ */
+internal fun inaccessible(declaration: KSDeclaration): KSDeclaration? {
+    var current: KSDeclaration? = declaration
+    while (current != null) {
+        if (current.getVisibility() !in REACHABLE_FROM_GENERATED) return current
+        current = current.parentDeclaration
+    }
+    return null
+}
+
+/**
+ * True when [declaration] or a type enclosing it is `internal`, which the generated file has to
+ * match: a `public object` whose `invoke` takes an internal receiver does not compile, and one
+ * that named an internal function would leak it.
+ */
+internal fun isInternal(declaration: KSDeclaration): Boolean {
+    var current: KSDeclaration? = declaration
+    while (current != null) {
+        if (current.getVisibility() == Visibility.INTERNAL) return true
+        current = current.parentDeclaration
+    }
+    return false
+}
+
+private val REACHABLE_FROM_GENERATED = setOf(Visibility.PUBLIC, Visibility.INTERNAL)
 
 /** The named `String` argument of an annotation, or `null` if it was not written. */
 internal fun KSAnnotation.stringArgument(name: String): String? =

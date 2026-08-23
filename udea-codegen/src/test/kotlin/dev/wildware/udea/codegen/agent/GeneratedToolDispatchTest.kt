@@ -4,6 +4,7 @@ import dev.wildware.udea.agent.AgentCommand
 import dev.wildware.udea.agent.BadArgumentException
 import dev.wildware.udea.codegen.fixtures.MatchPhase
 import dev.wildware.udea.codegen.fixtures.Playground
+import dev.wildware.udea.codegen.fixtures.PlaygroundSetOverlaysTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundSetStanceTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundSpawnBlueprintTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundTagEntityTool
@@ -94,6 +95,29 @@ class GeneratedToolDispatchTest {
         assertEquals(3 + 3, result)
     }
 
+    @Test
+    fun `a boolean list element accepts 1 and 0, exactly as a scalar boolean argument does`() {
+        // `AgentCommand.bool` takes true/false/1/0 and `ArgKind.BOOLEAN.expectation` - the text
+        // put into the exception - says so. An element that went through
+        // `toBooleanStrictOrNull` instead refused `1` with an error naming `1` as acceptable.
+        val result = PlaygroundSetOverlaysTool.invoke(
+            Playground(),
+            Query("visible" to "1,0,true", "holds" to "0,0,0"),
+        )
+
+        assertEquals(2, result, "1 and true are both on; 0 is off")
+    }
+
+    @Test
+    fun `a list argument with a declared default uses it element by element`() {
+        // The default is the text an agent would have sent, so it goes through the same split
+        // and the same element conversion - which is what made it checkable at build time.
+        val result = PlaygroundSetOverlaysTool.invoke(Playground(), Query("visible" to "true"))
+
+        assertEquals(1, result, "one overlay on, and the folded default 0,0,0 sums to zero")
+        assertEquals("0,0,0", PlaygroundSetOverlaysTool.args.single { it.name == "holds" }.default)
+    }
+
     // --- every failure is a BadArgumentException naming the argument ----------------------------------
 
     @Test
@@ -178,7 +202,19 @@ class GeneratedToolDispatchTest {
     // --- what the tool publishes about itself --------------------------------------------------
 
     @Test
+    fun `a boolean list element that is neither is reported with the four values that are`() {
+        val failure = assertFailsWith<BadArgumentException> {
+            PlaygroundSetOverlaysTool.invoke(Playground(), Query("visible" to "true,yes"))
+        }
+
+        assertEquals("visible", failure.argument)
+        assertEquals("yes", failure.supplied)
+        assertTrue("1" in failure.expected && "0" in failure.expected, failure.expected)
+    }
+
+    @Test
     fun `the published name is snake_case whether derived or declared`() {
+        assertEquals("set_overlays", PlaygroundSetOverlaysTool.name)
         assertEquals("spawn_blueprint", PlaygroundSpawnBlueprintTool.name)
         assertEquals("set_stance", PlaygroundSetStanceTool.name)
         assertEquals("tag_entity", PlaygroundTagEntityTool.name)

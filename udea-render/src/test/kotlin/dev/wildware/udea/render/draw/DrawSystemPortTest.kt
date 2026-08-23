@@ -193,10 +193,13 @@ class DrawSystemPortTest {
     }
 
     @Test
-    fun `steady state rendering allocates no per-frame comparator or pose`() {
-        // The claim is structural rather than measured: the comparator, the Pose and the
-        // projection Matrix4 are fields, so rendering twice must not change their identity.
-        // A `sortedBy` or a `Vector3(...)` inside the draw loop would fail this.
+    fun `the draw count per frame does not drift over a run`() {
+        // Named for what it measures. It used to be called "steady state rendering allocates no
+        // per-frame comparator or pose", which it could not tell you: it counts draw calls, and
+        // a `sortedBy` or a `Vector3(...)` in the draw loop leaves the draw count alone. The
+        // allocation claim is measured in `RenderAllocationTest`, which now exists; what is
+        // worth checking here is that a system does not start dropping or duplicating draws as
+        // a run goes on.
         repeat(20) { spawnSprite(x = it.toFloat(), y = 0f) }
         sim.step()
         val pipeline = buildPipeline()
@@ -209,6 +212,39 @@ class DrawSystemPortTest {
         assertFalse(batch.mismatchedBeginEnd)
     }
 
+    @Test
+    fun `a debug label is placed against the target it draws on, not against the window`() {
+        // The regression: `camera.project(v)` is the one-argument overload, defined as
+        // `project(v, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight())` -- the *window*.
+        // Two lines earlier the batch projection is set to the target's extent. In
+        // RenderMode.Offscreen those differ by construction (GlCaptureTest boots a 320x240
+        // window over a 64x32 framebuffer), so every label was placed at a wrong scale and
+        // landed off the captured frame. This fixture makes the window deliberately half the
+        // target's size, so the one-argument form yields exactly half the right coordinates and
+        // cannot come back green.
+        gl?.uninstall()
+        gl = HeadlessGl.installed(width = 320, height = 180)
+
+        val entity = spawnSprite(x = 0f, y = 0f)
+        with(world) {
+            entity.configure {
+                it += DebugLabels(mutableListOf(DebugLabel("hello", ctx.clock.tick + 100L)))
+            }
+        }
+        sim.step()
+
+        buildPipeline().render(1f)
+
+        // The camera is centred on the origin over a 640x360 target, so world (0, 0) projects to
+        // the middle of the target: (320, 180). The offsets are the renderer's own.
+        val id = font.drawn.first()
+        assertEquals(320f + 40f, id.x, absoluteTolerance = 0.01f, "label x: ${font.drawn}")
+        assertEquals(180f - 20f, id.y, absoluteTolerance = 0.01f, "label y: ${font.drawn}")
+        // And the window it is *not* projected through, spelled out: half these numbers is what
+        // the one-argument overload would have produced.
+        assertTrue(id.x > 320f, "the label was placed through Gdx.graphics: ${font.drawn}")
+    }
+
     // --- fixture -------------------------------------------------------------------------
 
     private lateinit var background: BackgroundRenderSystem
@@ -216,6 +252,8 @@ class DrawSystemPortTest {
     private lateinit var animations: AnimationRenderSystem
     private lateinit var particles: ParticleRenderSystem
     private lateinit var debug: DebugOverlayRenderSystem
+
+    private val font = NoOpFont()
 
     private fun buildPipeline(background: TextureRegion? = null) = RenderRegistry().apply {
         // `frameTime` unqualified here would resolve to RenderRegistry's own property: inside
@@ -245,7 +283,7 @@ class DrawSystemPortTest {
         register(
             RenderPhase.Debug,
             { resources ->
-                DebugOverlayRenderSystem(resources, rig, interpolator, netIds, NoOpFont())
+                DebugOverlayRenderSystem(resources, rig, interpolator, netIds, font)
                     .also { debug = it }
             },
         )
@@ -298,12 +336,25 @@ class DrawSystemPortTest {
         com.badlogic.gdx.utils.Array(arrayOf<TextureRegion>(SizedRegion(1, 1))),
         true,
     ) {
+        /** Every string drawn this run, with the position it was drawn at. */
+        val drawn = ArrayList<DrawnText>()
+
         override fun draw(
             batch: com.badlogic.gdx.graphics.g2d.Batch,
             str: CharSequence,
             x: Float,
             y: Float,
-        ): com.badlogic.gdx.graphics.g2d.GlyphLayout = com.badlogic.gdx.graphics.g2d.GlyphLayout()
+        ): com.badlogic.gdx.graphics.g2d.GlyphLayout {
+            // `toString()` because the renderer reuses one StringBuilder for every label, so
+            // holding the CharSequence would record whatever the *last* label happened to be.
+            drawn += DrawnText(str.toString(), x, y)
+            return com.badlogic.gdx.graphics.g2d.GlyphLayout()
+        }
+    }
+
+    /** One `font.draw` call: what text, and where on the target it landed. */
+    private class DrawnText(val text: String, val x: Float, val y: Float) {
+        override fun toString(): String = "'$text' at ($x, $y)"
     }
 
     private companion object {

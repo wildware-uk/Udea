@@ -17,7 +17,7 @@ package dev.wildware.udea.core.identity
  * ring slot would be 256KB per snapshot — 180MB across a full ring, against a 64MB budget for
  * the whole thing. So this records only what the roster cannot reconstruct:
  *
- * - a **live** index's generation is already in its [NetId], in the snapshot's rows;
+ * - a **rostered** index's generation is already in its [NetId], in the snapshot's rows;
  * - a **free** index's generation is not, so it is recorded here alongside the index;
  * - an index at or above [nextFresh] has never been allocated, so its generation is zero.
  *
@@ -25,9 +25,15 @@ package dev.wildware.udea.core.identity
  *
  * ## Invariant
  *
- * [freeIndices] never contains a live index. `NetIdIndex.saveInto` cannot produce one, and
- * `NetIdIndex.bind` relies on it: after a `restoreFrom` the roster's indices are exactly the
- * ones that are neither free nor fresh, so binding them never has to search the free ring.
+ * [freeIndices] never contains an index of the snapshot's roster, and `NetIdIndex.bind` relies
+ * on it: after a `restoreFrom` the roster's indices are exactly the ones that are neither free
+ * nor fresh, so binding them never has to search the free ring.
+ *
+ * "Not in the roster" is the test, and it is wider than "not live at capture time". An
+ * outstanding `NetIdIndex.reserve` is live but has no roster row — the entity does not exist
+ * yet — so `NetIdIndex.saveInto` records it *here*, with a bumped generation, and a restore
+ * recycles it instead of stranding it. See that method for why leaving it out leaks the index
+ * for good.
  */
 public class HandleState(initialFreeCapacity: Int = DEFAULT_FREE_CAPACITY) {
 

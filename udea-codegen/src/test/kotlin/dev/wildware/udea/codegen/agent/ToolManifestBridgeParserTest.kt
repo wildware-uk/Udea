@@ -59,7 +59,7 @@ class ToolManifestBridgeParserTest {
         }
 
         assertEquals(emptyList(), dropped, "tools the bridge would silently drop")
-        assertEquals(3, kept, "the fixture module publishes three tools")
+        assertEquals(4, kept, "the fixture module publishes four tools")
     }
 
     @Test
@@ -110,7 +110,7 @@ class ToolManifestBridgeParserTest {
             .flatMap { TestJson.arr(TestJson.obj(it)["tools"]) }
             .map { TestJson.obj(it)["name"] }
 
-        assertEquals(listOf("set_stance", "spawn_blueprint", "tag_entity"), names)
+        assertEquals(listOf("set_overlays", "set_stance", "spawn_blueprint", "tag_entity"), names)
     }
 
     @Test

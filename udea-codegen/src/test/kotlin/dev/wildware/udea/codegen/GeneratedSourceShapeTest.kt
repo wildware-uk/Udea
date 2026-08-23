@@ -33,6 +33,7 @@ class GeneratedSourceShapeTest {
                 "dev/wildware/udea/codegen/fixtures/PlacementReplicator.kt",
                 // The agent surface. One object per @AgentTool and one per class publishing
                 // @AgentState, all isolating outputs like a Replicator.
+                "dev/wildware/udea/codegen/fixtures/PlaygroundSetOverlaysTool.kt",
                 "dev/wildware/udea/codegen/fixtures/PlaygroundSetStanceTool.kt",
                 "dev/wildware/udea/codegen/fixtures/PlaygroundSpawnBlueprintTool.kt",
                 "dev/wildware/udea/codegen/fixtures/PlaygroundTagEntityTool.kt",
@@ -148,6 +149,8 @@ class GeneratedSourceShapeTest {
                 "HealthAgentState.kt" to "override val owner: KClass<*> = Health::class",
                 "MatchClockAgentState.kt" to "import kotlin.reflect.KClass",
                 "MatchClockAgentState.kt" to "override val owner: KClass<*> = MatchClock::class",
+                "PlaygroundSetOverlaysTool.kt" to "import kotlin.reflect.KClass",
+                "PlaygroundSetOverlaysTool.kt" to "override val owner: KClass<*> = Playground::class",
                 "PlaygroundSetStanceTool.kt" to "import kotlin.reflect.KClass",
                 "PlaygroundSetStanceTool.kt" to "override val owner: KClass<*> = Playground::class",
                 "PlaygroundSpawnBlueprintTool.kt" to "import kotlin.reflect.KClass",

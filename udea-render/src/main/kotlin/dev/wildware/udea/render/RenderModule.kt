@@ -18,9 +18,11 @@ import dev.wildware.udea.render.interp.InterpSnapshotSystem
  *
  * It is not a hole in "presentation is not a Fleks system" (spec 3.3), because it is the
  * opposite kind of thing: it draws nothing, holds no GL type, and writes only
- * [dev.wildware.udea.render.interp.Interp], which nothing simulated reads. `CameraRigTest`
- * pins that — a world ticked with the interpolation machinery present is value-for-value
- * identical to one ticked without it.
+ * [dev.wildware.udea.render.interp.Interp], which nothing simulated reads. `InterpSnapshotPurityTest`
+ * pins that — two worlds whose *only* difference is this system, ticked in step, come out
+ * value-for-value identical in both their components and the shared RNG stream. (The claim
+ * used to be credited to `CameraRigTest`, which puts this system in both of its fixtures and
+ * so says nothing about it.)
  *
  * A game that never renders can leave this module out and pay nothing for it; a
  * `RenderMode.Headless` server that includes it pays one family scan per tick over a family

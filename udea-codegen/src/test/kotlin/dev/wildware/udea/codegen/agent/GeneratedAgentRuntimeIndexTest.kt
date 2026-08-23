@@ -35,7 +35,10 @@ class GeneratedAgentRuntimeIndexTest {
         val index = ToolIndex.builder().discover().toolset(playground).build()
 
         assertEquals(listOf("CodegenFixtures"), index.moduleNames)
-        assertEquals(listOf("set_stance", "spawn_blueprint", "tag_entity"), index.tools.map { it.name })
+        assertEquals(
+            listOf("set_overlays", "set_stance", "spawn_blueprint", "tag_entity"),
+            index.tools.map { it.name },
+        )
 
         val result = index.invoke(
             AgentCommand("spawn_blueprint", mapOf("blueprint" to "creep_melee", "count" to "3")),

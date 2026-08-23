@@ -59,6 +59,19 @@ public class Lwjgl3Backend private constructor(
 
     private val built = AtomicReference<RenderPipeline?>(null)
 
+    /**
+     * Claimed by [create] **before** it allocates anything, and never cleared.
+     *
+     * Separate from [built] because [built] is cleared by [close], and "has this backend ever
+     * created a pipeline" and "does it hold one now" are different questions: a second [create]
+     * has to be refused in both states. Checking [built] after the fact -- which is what
+     * shipped -- refused the second call only once it had already allocated a second
+     * `SpriteBatch` and `FrameBuffer`, leaked both, and re-run `registry.build`, which calls
+     * `onBind(world, ctx)` again on the *same retained system instances* and so replaced the
+     * live pipeline's bound Families on its way to throwing.
+     */
+    private val claimed = java.util.concurrent.atomic.AtomicBoolean(false)
+
     /** The pipeline, once [create] has run. `null` before that. */
     public val pipeline: RenderPipeline? get() = built.get()
 
@@ -70,10 +83,14 @@ public class Lwjgl3Backend private constructor(
      * the calling thread waits. Constructing them on the caller's thread is the classic
      * version of this bug: it appears to work, and then fails on a driver that checks.
      *
-     * @throws IllegalStateException if called more than once. One host, one pipeline; a second
-     *   would leak the first's batch and framebuffer and quietly render into the wrong one.
+     * @throws IllegalStateException if called more than once. One host, one pipeline. The slot
+     *   is claimed before the first allocation rather than after the last, so a refused second
+     *   call allocates nothing and rebinds nothing.
      */
     override fun create(game: UdeaGame): PresentationBackend {
+        check(claimed.compareAndSet(false, true)) {
+            "$this already built a pipeline; one backend serves one GameHost"
+        }
         val pipeline = gl.submit {
             val batch = SpriteBatch()
             val buffer = FrameBuffer(
@@ -102,6 +119,12 @@ public class Lwjgl3Backend private constructor(
             "$this already built a pipeline; one backend serves one GameHost"
         }
         gl.onResize { width, height -> pipeline.resize(width, height) }
+        // If the render loop dies -- a renderer threw, the window was closed, the driver went
+        // away -- every queued capture must be told, or each one burns its full 10s deadline and
+        // reports "the render thread drew no frame that satisfied it": a timeout message for
+        // something that was an exception seconds earlier. `GlThread` records the failure and
+        // exits; this is how the failure reaches the waiters.
+        gl.onShutdown { built.get()?.capture?.close() }
 
         return PresentationBackend(pipeline, pipeline.capture)
     }

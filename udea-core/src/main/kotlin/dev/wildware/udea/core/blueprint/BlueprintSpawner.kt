@@ -35,13 +35,21 @@ import dev.wildware.udea.core.serviceKey
  * drain the id resolves to `null` — the entity genuinely does not exist yet — and
  * `NetIdIndex.forEachLive` skips it, so a snapshot taken in between holds no row for it.
  *
- * ## Threading
+ * ## Threading: simulation thread only
  *
- * [spawn] and [spawnAll] may be called from an MCP request thread: [SimBarrier.submit] is
- * thread-safe. [NetIdIndex] is **not**, so the reservation is taken under this class's own lock
- * and every other id operation still belongs to the simulation thread. That is a narrow promise
- * on purpose — reserving is the one id operation a tool call has to do before the tick boundary,
- * because it is the one whose answer the caller is waiting for.
+ * Every method here, [spawn] and [spawnAll] included, belongs to the simulation thread. A tool
+ * call arriving on an MCP request thread is marshalled onto the loop thread before it reaches
+ * this class — which is the contract `SnapshotTimeTravel` already states for `rewind` and for
+ * every world read, and an agent host has to implement it for those anyway.
+ *
+ * It is stated here because the temptation is real and the mistake is silent. [SimBarrier.submit]
+ * *is* thread-safe, so it looks as though a spawn could be queued from anywhere; but [spawn] must
+ * also [NetIdIndex.reserve] the id it hands back, and `NetIdIndex` is explicitly not thread-safe
+ * — the simulation thread calls `allocate`, `free`, `attach`, `bind` and `forEachLive` on the
+ * same instance every tick. Guarding the reservation with a lock private to this class would not
+ * help: a lock only one of two racing parties takes is not mutual exclusion, and the interleaving
+ * hands one index to two entities, which is the exact aliasing the generation counter exists to
+ * prevent.
  */
 public class BlueprintSpawner(
     private val barrier: SimBarrier,
@@ -57,11 +65,25 @@ public class BlueprintSpawner(
     private val placement: SpawnPlacement? = null,
 ) {
 
-    /** Guards [NetIdIndex.reserve] only, because that is the one call [spawn] makes off-thread. */
-    private val reservationLock = Any()
-
-    /** Entities created by an applied spawn action. What a test or an agent polls. */
+    /**
+     * Entities created by an applied spawn action.
+     *
+     * Simulation-thread state, like everything else here: read it from a system, a
+     * [BarrierAction] or a test that drives the host itself. A plain `Long` and not `@Volatile`
+     * on purpose — nothing off the simulation thread may read it, so there is no cross-thread
+     * edge to establish and no impression of one to give.
+     */
     public var spawnedCount: Long = 0L
+        private set
+
+    /**
+     * Requests dropped because their reservation was gone by the time the batch was applied.
+     *
+     * Non-zero only after a rewind unwound a spawn that was still queued. Counted rather than
+     * only logged, because "the entity I asked for is missing" is otherwise indistinguishable
+     * from a blueprint that configures nothing.
+     */
+    public var droppedSpawns: Long = 0L
         private set
 
     /**
@@ -103,7 +125,7 @@ public class BlueprintSpawner(
         }
         if (requests.isEmpty()) return emptyList()
 
-        val ids = synchronized(reservationLock) { List(requests.size) { netIds.reserve() } }
+        val ids = List(requests.size) { netIds.reserve() }
         barrier.submit(SpawnAction(requests, ids))
         return ids
     }
@@ -133,7 +155,8 @@ public class BlueprintSpawner(
     }
 
     override fun toString(): String =
-        "BlueprintSpawner(spawned=$spawnedCount, placement=${placement != null})"
+        "BlueprintSpawner(spawned=$spawnedCount, dropped=$droppedSpawns, " +
+            "placement=${placement != null})"
 
     /**
      * Creates the entity and applies the four steps of the old loop, in its order.
@@ -166,16 +189,36 @@ public class BlueprintSpawner(
                 "spawn ${requests.size} blueprints from ${requests[0].blueprint.id}"
             }
 
+        /**
+         * Applies every request in the batch, and lets a dead reservation cost only its own.
+         *
+         * The reservation is checked *before* the entity is created, not discovered by a
+         * throwing `attach` afterwards. Two things went wrong when it was: the entity created
+         * on line one existed with no [NetId], so `SnapshotService` — which walks
+         * `NetIdIndex.forEachLive` — could neither capture it nor ever destroy it on a restore,
+         * leaving a permanent orphan that every system kept ticking; and the throw escaped into
+         * `SimBarrier.drain`, which logs and moves to the next *action*, so the rest of this
+         * batch was never created at all and nothing counted the loss.
+         *
+         * A reservation is only ever gone because a rewind unwound the submission, which is a
+         * legitimate outcome and not a defect — so it is dropped, counted and logged, and the
+         * requests either side of it still land. `attach` is still the call that binds the id:
+         * the caller was handed that exact id at submit time and may already have stored it.
+         */
         override fun apply(world: World, ctx: GameContext) {
             var index = 0
             while (index < requests.size) {
-                val entity = create(world, requests[index])
-                // `attach` and not `allocate`: the caller was handed this exact id when the
-                // spawn was submitted and may already have stored it. It throws if the
-                // reservation is gone — a rewind past the submission unwinds it — which the
-                // barrier logs with this action's label and the tick.
-                netIds.attach(entity, ids[index])
-                spawnedCount++
+                val id = ids[index]
+                if (netIds.isOutstandingReservation(id)) {
+                    netIds.attach(create(world, requests[index]), id)
+                    spawnedCount++
+                } else {
+                    droppedSpawns++
+                    ctx.log.warn(
+                        "dropping spawn of ${requests[index].blueprint.id} at ${ctx.clock.tick}: " +
+                            "its reservation $id is gone, so a rewind unwound the submission",
+                    )
+                }
                 index++
             }
         }

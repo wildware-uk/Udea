@@ -6,6 +6,44 @@
       "name": "playground",
       "tools": [
         {
+          "name": "set_overlays",
+          "description": "Turn the debug overlays on or off in the order the HUD lists them. Reach for this before a screenshot that has to show collision shapes or pathing.",
+          "args": [
+            {
+              "name": "visible",
+              "type": "string",
+              "description": "One true/false (or 1/0) per overlay, in HUD order: collision, pathing, ids.",
+              "required": true,
+              "default": null
+            },
+            {
+              "name": "holds",
+              "type": "string",
+              "description": "Ticks each overlay stays up for; 0 leaves it up until it is turned off.",
+              "required": false,
+              "default": "0,0,0"
+            }
+          ],
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "visible": {
+                "type": "string",
+                "description": "One true/false (or 1/0) per overlay, in HUD order: collision, pathing, ids. Several values, comma separated."
+              },
+              "holds": {
+                "type": "string",
+                "description": "Ticks each overlay stays up for; 0 leaves it up until it is turned off. Several values, comma separated. (default 0,0,0)"
+              }
+            },
+            "required": [
+              "visible"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
           "name": "set_stance",
           "description": "Change one entity's movement stance. Reach for this when a test needs a unit crouched or sprinting without driving it through the input system.",
           "args": [
@@ -127,13 +165,10 @@
             },
             {
               "name": "labels",
-              "type": "array",
+              "type": "string",
               "description": "Labels to attach; each must be lower_snake_case.",
               "required": true,
-              "default": null,
-              "items": {
-                "type": "string"
-              }
+              "default": null
             }
           ],
           "inputSchema": {
@@ -145,11 +180,8 @@
                 "description": "The entity to label, as its NetId packed word."
               },
               "labels": {
-                "type": "array",
-                "description": "Labels to attach; each must be lower_snake_case. Several values, comma separated.",
-                "items": {
-                  "type": "string"
-                }
+                "type": "string",
+                "description": "Labels to attach; each must be lower_snake_case. Several values, comma separated."
               }
             },
             "required": [

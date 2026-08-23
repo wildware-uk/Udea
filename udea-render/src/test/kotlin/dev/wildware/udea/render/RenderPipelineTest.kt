@@ -58,9 +58,13 @@ class RenderPipelineTest {
         pipeline.render(0.5f)
 
         assertEquals(listOf(targets.screen), overlay.targets)
-        // The type makes the interesting half of this unwritable: there is no expression that
-        // hands an OverlaySystem the offscreen target, which is exactly the guarantee.
         assertSame(targets.screen, overlay.targets.single())
+        // The interesting half of the guarantee -- that there is no *route* by which an
+        // OverlaySystem could hold the offscreen target -- is not assertable from here, and
+        // this comment used to claim it as if it were. `OverlayResourcesTest` asserts it: the
+        // overlay factory takes `OverlayResources`, and nothing reachable from one is a
+        // capturable target. Until that split existed, the claim was false: `overlay(...)` took
+        // the same `RenderResources` a RenderSystem gets, `offscreen` and all.
     }
 
     @Test

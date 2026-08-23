@@ -189,6 +189,204 @@ class AgentDiagnosticsTest {
     }
 
     @Test
+    fun `a nullable parameter with a declared default is refused, since the default is dead`(
+        @TempDir dir: File,
+    ) {
+        // The manifest would publish `default: "5"` and the schema would end `(default 5)`,
+        // while the dispatcher's nullable branch hard-codes `null` for an absent argument. An
+        // agent that did exactly what it was told would get null, and nothing would report it.
+        val run = run(
+            dir,
+            """
+            package fixtures
+
+            import dev.wildware.udea.annotations.AgentTool
+            import dev.wildware.udea.annotations.Arg
+
+            class Tools {
+                @AgentTool(description = "Reset the arena to its starting layout before a run.")
+                fun reset(
+                    @Arg(description = "the seed to reset to", required = false, default = "5")
+                    seed: Int?,
+                ) {
+                }
+            }
+            """,
+        )
+
+        val error = run.errorDiagnostics.single()
+        assertFalse(run.succeeded)
+        assertTrue("nullable" in error.message, error.message)
+        assertTrue("never once be used" in error.message, error.message)
+        assertEquals(at("seed: Int?"), error.position)
+    }
+
+    @Test
+    fun `a nullable parameter with a Kotlin default is refused, since null would overwrite it`(
+        @TempDir dir: File,
+    ) {
+        // KSP cannot tell `= 5` from `= null`, and the dispatcher passes an explicit value
+        // either way - so the one that is a trap has to take the one that is harmless with it.
+        val run = run(
+            dir,
+            """
+            package fixtures
+
+            import dev.wildware.udea.annotations.AgentTool
+            import dev.wildware.udea.annotations.Arg
+
+            class Tools {
+                @AgentTool(description = "Reset the arena to its starting layout before a run.")
+                fun reset(
+                    @Arg(description = "the seed to reset to", required = false)
+                    seed: Int? = 5,
+                ) {
+                }
+            }
+            """,
+        )
+
+        val error = run.errorDiagnostics.single()
+        assertFalse(run.succeeded)
+        assertTrue("silently overwritten" in error.message, error.message)
+        assertEquals(at("seed: Int? = 5"), error.position)
+    }
+
+    @Test
+    fun `a nullable parameter is published as optional, which is what the dispatcher does`(
+        @TempDir dir: File,
+    ) {
+        // The complement: nullable and legal, and `required` has to say so. The dispatcher
+        // answers an absent nullable argument with `null` and never throws, so a manifest
+        // marking it required would promise a value the tool does not insist on.
+        val run = run(
+            dir,
+            """
+            package fixtures
+
+            import dev.wildware.udea.annotations.AgentTool
+            import dev.wildware.udea.annotations.Arg
+
+            class Tools {
+                @AgentTool(description = "Reset the arena to its starting layout before a run.")
+                fun reset(@Arg(description = "the seed to reset to") seed: Int?) {
+                }
+            }
+            """,
+        )
+
+        assertEquals(emptyList(), run.errors)
+        val generated = run.generatedSource("ToolsResetTool.kt")
+        assertTrue("required" in generated && "false" in generated, generated)
+    }
+
+    // --- visibility: generated code lives in a sibling file ------------------------------------
+
+    @Test
+    fun `a private tool function is refused at the function, not in a generated file`(
+        @TempDir dir: File,
+    ) {
+        // Every other check passes, and then `compileKotlin` fails inside
+        // build/generated/ksp/.../ToolsResetTool.kt with "Cannot access 'reset'" - a file the
+        // author did not write, about a rule the annotation never stated.
+        val run = run(
+            dir,
+            """
+            package fixtures
+
+            import dev.wildware.udea.annotations.AgentTool
+
+            class Tools {
+                @AgentTool(description = "Reset the arena to its starting layout before a run.")
+                private fun reset() {
+                }
+            }
+            """,
+        )
+
+        val error = run.errorDiagnostics.single()
+        assertFalse(run.succeeded)
+        assertTrue("private" in error.message, error.message)
+        assertTrue("public or internal" in error.message, error.message)
+        assertEquals(at("private fun reset"), error.position)
+        assertFalse(run.generatedFiles.any { it.name == "ToolsResetTool.kt" }, "${run.generatedFiles}")
+    }
+
+    @Test
+    fun `a private toolset class is refused at the class`(@TempDir dir: File) {
+        val run = run(
+            dir,
+            """
+            package fixtures
+
+            import dev.wildware.udea.annotations.AgentTool
+
+            class Outer {
+                private class Tools {
+                    @AgentTool(description = "Reset the arena to its starting layout before a run.")
+                    fun reset() {
+                    }
+                }
+            }
+            """,
+        )
+
+        val error = run.errorDiagnostics.single()
+        assertFalse(run.succeeded)
+        assertTrue("Tools is private" in error.message, error.message)
+        assertEquals(at("private class Tools"), error.position)
+    }
+
+    @Test
+    fun `an internal toolset is accepted, and the generated object matches its visibility`(
+        @TempDir dir: File,
+    ) {
+        // Internal is the normal shape for a debug toolset, and a `public object` whose
+        // `invoke` took an internal receiver would not compile either. The fixture source set
+        // carries the compiled proof; this is the rule.
+        val run = run(
+            dir,
+            """
+            package fixtures
+
+            import dev.wildware.udea.annotations.AgentTool
+
+            internal class Tools {
+                @AgentTool(description = "Reset the arena to its starting layout before a run.")
+                fun reset() {
+                }
+            }
+            """,
+        )
+
+        assertEquals(emptyList(), run.errors)
+        assertTrue("internal object ToolsResetTool" in run.generatedSource("ToolsResetTool.kt"))
+    }
+
+    @Test
+    fun `a private AgentState property is refused at the property`(@TempDir dir: File) {
+        val run = run(
+            dir,
+            """
+            package fixtures
+
+            import dev.wildware.udea.annotations.AgentState
+
+            class Match {
+                @AgentState
+                private var score: Int = 0
+            }
+            """,
+        )
+
+        val error = run.errorDiagnostics.single()
+        assertFalse(run.succeeded)
+        assertTrue("private" in error.message, error.message)
+        assertTrue("public or internal" in error.message, error.message)
+        assertEquals(at("private var score"), error.position)
+    }
+
+    @Test
     fun `a default that will not parse fails at the parameter, not on the first call`(
         @TempDir dir: File,
     ) {
@@ -397,11 +595,14 @@ class AgentDiagnosticsTest {
             """,
         )
 
-        val error = run.errors.single()
+        val error = run.errorDiagnostics.single()
         assertFalse(run.succeeded)
-        assertTrue(error.startsWith(UdeaRules.AGENT_NAME_COLLISION.id), error)
-        assertTrue("fixtures.Match" in error, error)
-        assertTrue("fixtures.Scoreboard" in error, error)
+        assertTrue(error.message.startsWith(UdeaRules.AGENT_NAME_COLLISION.id), error.message)
+        assertTrue("fixtures.Match" in error.message, error.message)
+        assertTrue("fixtures.Scoreboard" in error.message, error.message)
+        // Reported at the *second* declaring class, which is the one an author can move. A
+        // message naming two canonical names and no file at all is what this asserts against.
+        assertEquals(at("class Scoreboard"), error.position)
     }
 
     @Test

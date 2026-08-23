@@ -12,6 +12,7 @@ import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.render.FrameTime
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderPhase
+import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
 
 /**
@@ -40,10 +41,33 @@ import dev.wildware.udea.render.RenderSystem
  * fade.
  */
 public class UiLayer(
+    /**
+     * The pipeline's batch and disposal list.
+     *
+     * Here for two reasons, both of which were defects in the shipped version:
+     *
+     * - the default [stageFactory] needs the pipeline's `Batch`. `Stage(Viewport)` **constructs
+     *   and owns its own `SpriteBatch`** -- the three-argument constructor exists precisely to
+     *   avoid that -- so the shipped default `{ Stage(it) }` reintroduced the second batch and
+     *   the second vertex-buffer flush per frame that `RenderTargets` and `RenderPipeline` both
+     *   name as the thing they fixed;
+     * - without it there was no route to the pipeline's disposal list at all, so this class's
+     *   own KDoc claim that it is "registered in `RenderTargets.owned` by whoever builds the
+     *   pipeline" could not happen: `Lwjgl3Backend` hard-codes `owned = listOf(buffer, batch)`.
+     *   [RenderResources.own] is that route, and the `init` block below takes it.
+     */
+    resources: RenderResources,
     /** Wall seconds per frame. A stage's actions are wall-timed and never simulated. */
     private val frameTime: FrameTime,
-    /** Builds the stage. Injected so a test can drive one with no GL context behind it. */
-    stageFactory: (ScreenViewport) -> Stage = { Stage(it) },
+    /**
+     * Builds the stage.
+     *
+     * Defaulted to the **two**-argument `Stage` constructor, sharing the pipeline's batch.
+     * Injected so a test can hand in a stage over a recording batch -- though the default is
+     * now the same shape as that, which is the point: the tested configuration and the shipped
+     * one differ only in which `Batch` implementation is behind them.
+     */
+    stageFactory: (ScreenViewport) -> Stage = { Stage(it, resources.batch) },
 ) : RenderSystem, Disposable {
 
     /** The UI viewport: one world unit per pixel, so scene2d lays out in pixels. */
@@ -62,6 +86,12 @@ public class UiLayer(
     private var viewportHeight: Int = 0
 
     init {
+        // The pipeline disposes what it owns, in reverse construction order. Registered here
+        // rather than left to the caller because a stage that is not in that list is a stage
+        // nobody disposes -- which is what the KDoc on `dispose` used to describe as if it
+        // were already true.
+        resources.own(this)
+
         // Carried forward from GameScreen's init (`UdeaGameManager.kt:184`), because it is a
         // real fix rather than incidental: without it, a text field keeps keyboard focus after
         // the player clicks away from it, and every subsequent key press is swallowed by an
@@ -109,9 +139,12 @@ public class UiLayer(
     /**
      * Disposes the stage and whatever screen is mounted.
      *
-     * Registered in [dev.wildware.udea.render.RenderTargets.owned] by whoever builds the
-     * pipeline, so the pipeline's reverse-order disposal covers it. The old tree disposed a
+     * Registered through [RenderResources.own] in this class's `init`, so the pipeline's
+     * reverse-order disposal covers it and no caller has to remember. The old tree disposed a
      * stage in three different places and none of them in a `finally`.
+     *
+     * Idempotent: [Stage.dispose] is safe to call twice, and a double shutdown path is likelier
+     * than a defect.
      */
     override fun dispose() {
         hide()

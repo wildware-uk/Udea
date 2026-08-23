@@ -96,8 +96,16 @@ public class AgentBridge(
 
     private val ticks = AtomicLong(0)
 
-    /** How many commands are queued and not yet drained. */
-    public val pendingCommands: Int get() = queued.get()
+    /**
+     * How many commands are queued and not yet drained. Never above [queueCapacity].
+     *
+     * [submit] reserves a slot before it checks, so between the increment and the compensating
+     * decrement on an overflow the raw counter genuinely sits one above the cap - and a reader
+     * sampling it in that window would see a depth that is not a state the queue can be in. The
+     * clamp is not cosmetic: this number is what a client backs off on, and a health surface
+     * reporting `257/256` is reporting a bug it does not have.
+     */
+    public val pendingCommands: Int get() = queued.get().coerceAtMost(queueCapacity)
 
     // --- the off-thread half -------------------------------------------------------------
 
@@ -138,10 +146,17 @@ public class AgentBridge(
     /** The most recent command answers, oldest first. Allocating; for tools and tests. */
     public fun commandResults(): List<CommandResult> = results.toList()
 
-    /** Renders the recent command answers into [json] as a named array member. */
-    public fun renderCommandResults(json: Json, name: String, limit: Int) {
-        results.renderInto(json, name, limit)
-    }
+    /**
+     * Renders the recent command answers into [json] as a named array member.
+     *
+     * @param ceiling the document length this section may not push past. A tool answer is a
+     *   document the *tool* rendered, and [AgentResult] puts no bound on its size at all - so a
+     *   game whose tool replies with a thousand-entity list would otherwise carry that list into
+     *   every `/state` poll for as long as the answer stayed in the ring.
+     * @return whether an answer was dropped for want of room.
+     */
+    public fun renderCommandResults(json: Json, name: String, limit: Int, ceiling: Int): Boolean =
+        results.renderInto(json, name, limit, ceiling)
 
     // --- the simulation-thread half ------------------------------------------------------
 
@@ -204,9 +219,18 @@ public class AgentBridge(
         ticks.set(tick)
     }
 
-    /** Appends a game event. Shorthand for `events.record`. */
-    public fun event(message: String) {
-        events.record(message)
+    /**
+     * Appends a game event, stamped with [tick]. Shorthand for `events.record`.
+     *
+     * The tick is passed rather than read from [tick] because the two differ by one exactly
+     * where it matters: `publishTick` runs at the end of a host iteration, so during the
+     * barrier drain at the top of tick N this bridge still reports N-1. An audit line that
+     * dated a mutation to the tick before the one it happened on would be worse than an
+     * undated one, because it looks right.
+     */
+    @JvmOverloads
+    public fun event(message: String, tick: Long = AgentEventRing.UNSTAMPED) {
+        events.record(message, tick)
     }
 
     override fun toString(): String =
@@ -299,13 +323,38 @@ internal class CommandResultRing(private val capacity: Int) {
         out
     }
 
-    /** Renders the newest [limit] answers, oldest of those first. Allocation-free. */
-    fun renderInto(json: Json, name: String, limit: Int) {
+    /**
+     * Renders the newest [limit] answers, oldest of those first, within [ceiling] characters.
+     *
+     * Allocation-free. Returns whether anything was dropped for want of room.
+     *
+     * ## The budget is spent newest-first, even though the document is written oldest-first
+     *
+     * Two passes, and the first one is the whole point. Writing straight through in document
+     * order spends the budget on the **oldest** answers and drops the newest, which inverts what
+     * a caller needs: the `game-bridge-mcp` confirmation loop polls `/state` until
+     * `completedCommandId` covers the id it submitted and then reads that id out of
+     * `commandResults`. One verbose earlier answer - a `field_not_writable` refusal carries a
+     * paragraph of prose - is enough to starve the newest entry out, and the caller then reads a
+     * document that confirms its command finished and does not say what it answered.
+     *
+     * That was not hypothetical: it is what a live `/state` did on the Phase 1 demo, confirming
+     * `completedCommandId: 11` beside a `commandResults` holding 8, 9 and 10.
+     *
+     * So [fitting] counts backwards from the newest and returns how many fit; the render then
+     * walks that many oldest-first. Dropping is still all-or-nothing per entry and the entries
+     * that go are the oldest, which is the direction a reader can survive - an answer already
+     * read once is worth less than the one being waited on.
+     */
+    fun renderInto(json: Json, name: String, limit: Int, ceiling: Int): Boolean {
         require(limit >= 0) { "limit must not be negative, was $limit" }
         synchronized(this) {
+            val considered = if (limit < held) limit else held
+            // The array's own two characters are already owed before the first entry is costed.
+            val fits = fitting(considered, ceiling - json.length - ARRAY_OVERHEAD)
             json.key(name)
             json.beginArray()
-            walk(limit) { id, result ->
+            walk(fits) { id, result ->
                 json.beginObject()
                 json.put("id", id)
                 when (result) {
@@ -326,7 +375,47 @@ internal class CommandResultRing(private val capacity: Int) {
                 json.endObject()
             }
             json.endArray()
+            return fits < considered
         }
+    }
+
+    /**
+     * How many of the newest [considered] entries fit in [budget] characters.
+     *
+     * Counts backwards from the newest, so the answer is always a *suffix* of the ring: the
+     * entries admitted are contiguous and end at the newest one. Stops at the first entry that
+     * does not fit rather than skipping it and trying an older, smaller one - admitting an entry
+     * past a refused one would leave a hole in the middle of the sequence, and a reader that saw
+     * ids 8 and 11 with no 9 or 10 could not tell a dropped answer from one that never ran.
+     *
+     * Caller holds the monitor.
+     */
+    private fun fitting(considered: Int, budget: Int): Int {
+        var spent = 0
+        var admitted = 0
+        var cursor = writeIndex
+        while (admitted < considered) {
+            cursor--
+            if (cursor < 0) cursor += capacity
+            val result = values[cursor] ?: break
+            val cost = when (result) {
+                is AgentResult.Ok -> result.json.length + ENTRY_OVERHEAD
+                is AgentResult.Failed -> result.error.message.length * 2 +
+                    result.error.kind.id.length + ENTRY_OVERHEAD
+            }
+            if (spent + cost > budget) break
+            spent += cost
+            admitted++
+        }
+        return admitted
+    }
+
+    private companion object {
+        /** The fixed part of one rendered answer, plus slack. */
+        const val ENTRY_OVERHEAD: Int = 40
+
+        /** The `[]` and the key's own punctuation, owed before any entry is costed. */
+        const val ARRAY_OVERHEAD: Int = 4
     }
 
     /** Oldest-first walk over the newest [limit] entries. Caller holds the monitor. */

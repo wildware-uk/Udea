@@ -39,19 +39,28 @@ internal class AgentDispatcher(
 ) {
 
     fun run(command: AgentCommand, world: World, ctx: GameContext) {
-        val result = invoke(command, world, ctx)
+        if (!tools.contains(command.name)) {
+            bridge.complete(
+                command.id,
+                AgentResult.failed(
+                    AgentErrorKind.NO_SUCH_TOOL,
+                    "no tool named ${command.name} is registered; call the tools listing to see " +
+                        "what is",
+                ),
+            )
+            return
+        }
+        val context = AgentContext(world, ctx, command, deferred, bridge)
+        val result = invoke(command, context)
+        // A tool that must run outside this drain - anything that steps the simulation, since
+        // `SimBarrier.drain` refuses to re-enter - has already registered its own completion
+        // through `AgentContext.answerLater`. Completing here as well would put two answers in
+        // the ring under one id, and the caller would read whichever was written last.
+        if (context.answersLater) return
         bridge.complete(command.id, result)
     }
 
-    private fun invoke(command: AgentCommand, world: World, ctx: GameContext): AgentResult {
-        if (!tools.contains(command.name)) {
-            return AgentResult.failed(
-                AgentErrorKind.NO_SUCH_TOOL,
-                "no tool named ${command.name} is registered; call the tools listing to see what is",
-            )
-        }
-
-        val context = AgentContext(world, ctx, command, deferred)
+    private fun invoke(command: AgentCommand, context: AgentContext): AgentResult {
         val startedAt = clock.nowNanos()
         val result = try {
             tools.invoke(command, context)

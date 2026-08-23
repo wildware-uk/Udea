@@ -50,7 +50,9 @@ internal object ToolEmitter {
         )
         .addType(
             TypeSpec.objectBuilder(tool.objectName)
-                .addModifiers(KModifier.PUBLIC)
+                // Matched to the annotated function rather than always public: see
+                // [ToolModel.internal].
+                .addModifiers(if (tool.internal) KModifier.INTERNAL else KModifier.PUBLIC)
                 .addSuperinterface(AgentNames.AGENT_TOOL_DEF.parameterizedBy(tool.owner))
                 .addKdoc(
                     "The `%L` tool, generated from [%T.%L].\n\n" +
@@ -187,9 +189,12 @@ internal object ToolEmitter {
     private fun value(tool: ToolModel, arg: ToolArgModel, fallback: String?): CodeBlock {
         if (arg.list) {
             // A list travels as one query parameter, comma separated, because that is all a
-            // query string offers. Blank elements are kept rather than dropped: dropping them
-            // would make `a,,b` silently mean `a,b`, and a silent reinterpretation of a model's
-            // input is the failure this whole file is arranged to avoid.
+            // query string offers - which is why the published schema types it `string` and
+            // says so in the description rather than typing it `array`, a shape the bridge
+            // would deliver here as the JSON text `["a","b"]` for this split to mangle.
+            // Blank elements are kept rather than dropped: dropping them would make `a,,b`
+            // silently mean `a,b`, and a silent reinterpretation of a model's input is the
+            // failure this whole file is arranged to avoid.
             return CodeBlock.builder()
                 .add("command.str(%S%L).split(',').map·{ %N ->\n", arg.name, textFallback(fallback), RAW)
                 .indent()
@@ -252,7 +257,23 @@ internal object ToolEmitter {
             ArgKind.LONG -> CodeBlock.of("%N.toLongOrNull()", source)
             ArgKind.FLOAT -> CodeBlock.of("%N.toFloatOrNull()", source)
             ArgKind.DOUBLE -> CodeBlock.of("%N.toDoubleOrNull()", source)
-            ArgKind.BOOLEAN -> CodeBlock.of("%N.toBooleanStrictOrNull()", source)
+            // The same mapping `AgentCommand.bool` applies, and not `toBooleanStrictOrNull`:
+            // a scalar Boolean argument accepts 1 and 0, `ArgKind.BOOLEAN.expectation` tells
+            // the agent so, and `ArgDefaults.literal` folds them for a default. An element of
+            // a `List<Boolean>` that refused them would throw an error naming the two values
+            // it had just rejected. An `if` chain and not a `when`: `GeneratedSourceShapeTest`
+            // bans `when` in generated code outside the field index, the old generator's
+            // `when (value) { is Float -> … }` is what that ban is aimed at, and widening it
+            // for a two-branch value mapping would be paying for this in the wrong currency.
+            ArgKind.BOOLEAN -> return CodeBlock.builder()
+                .add("if (%1N == %2S || %1N == %3S) {\n", source, "true", "1")
+                .indent().add("true\n").unindent()
+                .add("} else if (%1N == %2S || %1N == %3S) {\n", source, "false", "0")
+                .indent().add("false\n").unindent()
+                .add("} else {\n")
+                .indent().add(failure).add("\n").unindent()
+                .add("}")
+                .build()
             ArgKind.STRING -> return CodeBlock.of("%N", source)
             // `entries` is a compiler-synthesised array, not reflection, and the constant
             // *name* is the wire form rather than the ordinal: an agent reading "Sprinting"

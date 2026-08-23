@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -202,23 +203,33 @@ class FrameCaptureSlotTest {
     /**
      * Waits until [expected] requests are queued.
      *
-     * Polls a state the slot publishes rather than sleeping: a fixed sleep is the flake this
-     * whole class of test is famous for, and the standards ban wall-clock waits in tests
-     * outright.
+     * Waits on the slot's own condition rather than polling [FrameCaptureSlot.queuedRequests].
+     * This helper used to spin on that property, and it flaked once during the wave with "only
+     * 0 of 1 requests were queued" before passing on a re-run — with a five-second deadline,
+     * which is not a slow thread. The cause is that reading `queuedRequests` takes the slot's
+     * lock, the lock is non-fair, and a thread spinning on `Thread.onSpinWait()` between
+     * acquisitions barges ahead of the worker parked trying to enqueue. The poller could
+     * therefore starve the thread it was waiting for, for as long as it kept polling. Waiting
+     * on a condition cannot: the waiter parks, and the enqueue signals it.
      */
     private fun awaitQueued(expected: Int = 1) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-        while (System.nanoTime() < deadline) {
-            if (slot.queuedRequests >= expected) return
-            Thread.onSpinWait()
-        }
-        error("only ${slot.queuedRequests} of $expected requests were queued")
+        val queued = slot.awaitQueued(expected, timeoutMillis = TimeUnit.SECONDS.toMillis(5))
+        assertTrue(queued, "only ${slot.queuedRequests} of $expected requests were queued")
     }
 
+    /**
+     * Drains one frame and waits for the request it served to be handed back to its caller.
+     *
+     * The second wait is over an `AtomicReference` the worker writes *after* it has released the
+     * slot's lock, so nothing here contends with anything; a bounded spin is the right shape.
+     * It fails rather than returning quietly, so a request that is never settled reports itself
+     * instead of surfacing as a confusing `null` in whatever the caller asserted next.
+     */
     private fun drainUntilSettled(result: AtomicReference<CaptureResult?>) {
         awaitQueued()
         slot.drain(target)
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
         while (result.get() == null && System.nanoTime() < deadline) Thread.onSpinWait()
+        assertNotNull(result.get(), "the drained frame never reached the waiting caller")
     }
 }

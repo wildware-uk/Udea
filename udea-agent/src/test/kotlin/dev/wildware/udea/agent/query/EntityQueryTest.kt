@@ -6,6 +6,7 @@ import dev.wildware.udea.core.identity.NetId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -298,18 +299,105 @@ class EntityQueryTest {
 
     @Test
     fun `the engine refuses a re-entrant run rather than corrupting the page`() {
+        // Entered from *inside* a run, which is the only thing the guard is about. The version
+        // of this test that ran two sequential queries passed with the check deleted, and its
+        // own comment conceded it - a test that cannot fail for the property it is named after.
         val harness = QueryHarness()
-        harness.spawn()
-        val json = dev.wildware.udea.agent.Json()
+        harness.spawn(health = 42f)
+        val probe = ReentrantRead(harness.index.requireByName("Health"))
+        val index = AgentComponentIndex(listOf(probe))
+        val engine = EntityQueryEngine(index, harness.netIds, harness.world)
+        probe.onRead = { engine.run(EntityQuery(), dev.wildware.udea.agent.Json()) }
 
-        val query = EntityQueryParser.parse(harness.index)
-        harness.engine.run(query, json)
+        val projected = EntityQuery(
+            fields = listOf(Projection.Field(FieldRef(probe, probe.fieldIndexOf("current"), "current"))),
+        )
+        val outer = dev.wildware.udea.agent.Json()
+        engine.run(projected, outer)
 
-        // Sanity: a second sequential run is fine; only nesting is refused, and that path is
-        // unreachable without a projection that calls back into the engine.
-        json.reset()
-        harness.engine.run(query, json)
-        assertTrue(json.toString().contains("\"total\":1"))
+        val nested = assertNotNull(probe.thrown, "the nested run was never attempted")
+        assertTrue(nested is IllegalStateException, "expected IllegalStateException, got $nested")
+        assertTrue(
+            nested.message.orEmpty().contains("not re-entrant"),
+            "the refusal must say why: ${nested.message}",
+        )
+        // The outer run still produced its own page: the guard refuses the *inner* call and
+        // does not corrupt the page the outer one was filling.
+        assertTrue(outer.toString().contains("\"current\":42"), outer.toString())
+
+        // And the `finally` reset `running`, so the engine is usable afterwards. Without it the
+        // guard would turn one nested call into a permanently dead query surface.
+        probe.onRead = null
+        val after = dev.wildware.udea.agent.Json()
+        engine.run(EntityQuery(), after)
+        assertTrue(after.toString().contains("\"total\":1"), after.toString())
+    }
+
+    /**
+     * An [AgentComponentType] that runs an arbitrary block the first time a field is read.
+     *
+     * The only way into [EntityQueryEngine.run] from inside itself: the engine reaches a
+     * projection through `AgentComponentType.read`, so a component is where a re-entrant caller
+     * would actually come from - a game's own component wrapper, or a lazily computed field.
+     */
+    private class ReentrantRead(
+        private val delegate: AgentComponentType,
+    ) : AgentComponentType by delegate {
+
+        /** Run once, on the first read. Null disables it. */
+        var onRead: (() -> Unit)? = null
+
+        /** What the nested call threw, or null if it was never made or did not throw. */
+        var thrown: Throwable? = null
+            private set
+
+        override fun read(
+            world: com.github.quillraven.fleks.World,
+            entity: com.github.quillraven.fleks.Entity,
+            fieldIndex: Int,
+        ): Any? {
+            val block = onRead
+            if (block != null) {
+                onRead = null
+                thrown = runCatching(block).exceptionOrNull()
+            }
+            return delegate.read(world, entity, fieldIndex)
+        }
+    }
+
+    @Test
+    fun `two components carrying a position are refused rather than resolved by name order`() {
+        // A game grows a second lowered transform - an interpolation or previous-frame copy -
+        // and both carry position.x and position.y. Taking the alphabetically first gave every
+        // `near` filter and every `pos` projection whichever sorted first, silently, which is
+        // the opposite of the rule this class enforces for an ambiguous field name.
+        val index = AgentComponentIndex(
+            listOf(
+                dev.wildware.udea.agent.transformAccess(),
+                dev.wildware.udea.agent.transformAliasAccess("PreviousTransform"),
+            ),
+        )
+
+        assertEquals(null, index.position, "an ambiguous position must not be guessed")
+        val failure = assertFailsWith<AgentToolException> { index.requirePosition() }
+
+        assertEquals(AgentErrorKind.BAD_QUERY, failure.error.kind)
+        assertTrue(failure.error.message.contains("Transform"), failure.error.message)
+        assertTrue(failure.error.message.contains("PreviousTransform"), failure.error.message)
+        assertTrue(failure.error.message.contains("nominate"), failure.error.message)
+    }
+
+    @Test
+    fun `the host settles an ambiguous position by nominating one`() {
+        val index = AgentComponentIndex(
+            listOf(
+                dev.wildware.udea.agent.transformAccess(),
+                dev.wildware.udea.agent.transformAliasAccess("PreviousTransform"),
+            ),
+            positionComponent = "PreviousTransform",
+        )
+
+        assertEquals("PreviousTransform", index.requirePosition().component.name)
     }
 
     @Test

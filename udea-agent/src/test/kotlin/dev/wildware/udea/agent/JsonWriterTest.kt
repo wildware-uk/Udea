@@ -4,6 +4,7 @@ import java.util.Locale
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -171,5 +172,36 @@ class JsonWriterTest {
             value(46.0f)
             value(-3.25f)
         }
+    }
+
+    @Test
+    fun `truncation never splits a surrogate pair`() {
+        // An emoji is two chars, and a cut at a fixed index can land between them. The lone
+        // high surrogate survives in the builder and becomes '?' when the document is UTF-8
+        // encoded onto the wire, so the agent reads a corrupted tail instead of the truncation
+        // mark's honest signal. EVENT_CHARS is applied to arbitrary game-authored strings, so
+        // this is reachable from game code alone.
+        val fire = "\uD83D\uDD25"
+        val text = "x".repeat(9) + fire + "tail"
+
+        val rendered = Json().obj { key("m"); value(text, 11) }.toString()
+
+        assertEquals("""{"m":"xxxxxxxxx~"}""", rendered)
+        // The proof that matters is what reaches the wire: no replacement character, which is
+        // what a lone surrogate becomes.
+        assertFalse(
+            String(rendered.toByteArray(Charsets.UTF_8), Charsets.UTF_8).contains('\uFFFD'),
+            "a lone surrogate reached the wire: $rendered",
+        )
+    }
+
+    @Test
+    fun `a truncation that lands after a whole surrogate pair keeps it`() {
+        val fire = "\uD83D\uDD25"
+        val text = "x".repeat(8) + fire + "tail"
+
+        val rendered = Json().obj { key("m"); value(text, 11) }.toString()
+
+        assertEquals("\"m\":\"xxxxxxxx$fire~\"", rendered.trim('{', '}'))
     }
 }

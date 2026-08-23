@@ -83,11 +83,33 @@ public class GameLoop(
             field = value
         }
 
-    /** While true, [frame] renders but never steps. [stepTicks] still advances the sim. */
+    /**
+     * While true, [frame] and [tickIfRunning] render or spin but never step. [stepTicks] still
+     * advances the sim: it is the single-step primitive, and single-stepping a paused loop is
+     * the point of it.
+     *
+     * `@Volatile` because the writer and the reader are routinely different threads. A headless
+     * `GameHost.run()` reads this every tick on the simulation thread while an agent's
+     * `TimeControl.pause()` writes it from an MCP request thread; without the modifier the JIT
+     * may hoist the read out of that loop and the pause would never be observed — the agent
+     * would be told the game is frozen while it ran on at full speed.
+     */
+    @Volatile
     public var paused: Boolean = false
 
     /** Unsimulated time carried between frames, in [UNITS_PER_TICK]ths of a tick. */
     private var accumulator: Long = 0L
+
+    /**
+     * The thread inside `sim.step()` right now, or `null` between ticks.
+     *
+     * Published so [pauseAtBoundary] can tell "paused" from "will stop after the tick already
+     * in flight". Written on every tick, which is why it is a bare volatile reference and not a
+     * lock: two volatile writes per tick cost nothing measurable, whereas a monitor on the step
+     * would put the simulation thread and every tool call in the same queue.
+     */
+    @Volatile
+    private var tickingThread: Thread? = null
 
     /**
      * How far the next render sits between the last simulated tick and the next one.
@@ -123,7 +145,7 @@ public class GameLoop(
             accumulator += subTickUnits(wallDelta.coerceAtMost(MAX_WALL_DELTA) * timeScale)
 
             while (accumulator >= UNITS_PER_TICK && ticks < maxCatchUp) {
-                sim.step()
+                runStep()
                 accumulator -= UNITS_PER_TICK
                 ticks++
             }
@@ -153,9 +175,72 @@ public class GameLoop(
      */
     public fun stepTicks(n: Int) {
         require(n >= 0) { "step count must not be negative, was $n" }
-        paused = true
-        repeat(n) { sim.step() }
+        pauseAtBoundary()
+        repeat(n) { runStep() }
         totalTicks += n
+    }
+
+    /**
+     * Runs one tick unless [paused], and reports whether it did.
+     *
+     * The primitive behind a free-running headless host: `GameHost.run()` used to call
+     * `Simulation.step()` directly, which meant the loop's pause and its [totalTicks] were both
+     * fiction there — `TimeControl.pause()` returned with the simulation still running at full
+     * speed, and `rewind` then forced a `SimBarrier` drain on the caller's thread while systems
+     * were mid-update on the simulation thread. Going through the loop makes the agent's handle
+     * on time the real one.
+     *
+     * [paused] is read twice on purpose. The first read is the fast path. The second happens
+     * *after* [tickingThread] is published, which is what closes the window where a pauser sees
+     * no tick in flight at the same moment this thread is about to start one: both writes and
+     * both reads are volatile, so of the two orderings at least one side observes the other.
+     *
+     * @return true if a tick ran.
+     */
+    public fun tickIfRunning(): Boolean {
+        if (paused) return false
+        tickingThread = Thread.currentThread()
+        try {
+            if (paused) return false
+            sim.step()
+        } finally {
+            tickingThread = null
+        }
+        totalTicks++
+        return true
+    }
+
+    /**
+     * Pauses and returns only once no tick is in flight.
+     *
+     * What makes a forced `SimBarrier.drain` — a snapshot restore — safe on a host whose
+     * simulation runs on another thread. Setting [paused] alone does not: the tick already
+     * inside `world.update` keeps running, and a restore applied beside it tears the world in a
+     * way `SimBarrier`'s re-entrancy guard cannot see, because that guard is per-object state
+     * and not a cross-thread one.
+     *
+     * Returns immediately when the caller is itself the ticking thread, which is the
+     * single-threaded case and also a `BarrierAction` that pauses the loop: waiting there would
+     * be waiting for itself.
+     */
+    public fun pauseAtBoundary() {
+        paused = true
+        val self = Thread.currentThread()
+        while (true) {
+            val owner = tickingThread ?: return
+            if (owner === self) return
+            Thread.onSpinWait()
+        }
+    }
+
+    /** One tick, with the ticking thread published for [pauseAtBoundary]'s benefit. */
+    private fun runStep() {
+        tickingThread = Thread.currentThread()
+        try {
+            sim.step()
+        } finally {
+            tickingThread = null
+        }
     }
 
     /** Wall time carried into the next frame, in seconds. Diagnostics only; not sim state. */

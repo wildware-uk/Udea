@@ -8,6 +8,8 @@ import dev.wildware.udea.core.fixtures.testGameContext
 import dev.wildware.udea.core.gameContext
 import dev.wildware.udea.core.loop.GameLoop
 import dev.wildware.udea.core.loop.WorldSimulation
+import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.render.interp.InterpSnapshotSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -61,18 +63,36 @@ class PureSimulationTest {
     }
 
     @Test
-    fun `the world's system list contains no presentation system`() {
-        val ctx = testGameContext(seed = 5L)
-        val world = configureWorld {
-            injectables { gameContext(ctx) }
-            systems { add(CountingSimSystem()) }
-        }
+    fun `the shipped render module contributes no drawing system to the world`() {
+        // Built from the real definition, including RenderModule, rather than from a two-line
+        // fixture. The previous version of this configured a world holding one CountingSimSystem
+        // and asserted `none { it is RenderSystem || it is OverlaySystem }` over it -- true of
+        // any world that compiles, since neither interface extends IntervalSystem and
+        // `systems { add(...) }` takes nothing else. It could not fail, which is what §8 calls
+        // a test that cannot fail. The property worth checking is that the *shipped*
+        // configuration contributes nothing that draws, and that is what runs here.
+        val game = UdeaGameDef(modules = listOf(RenderModule())).build()
 
-        // Not "we did not add one": nothing that draws can *be* in this list, because a
-        // RenderSystem is not an IntervalSystem and Fleks takes nothing else (spec 3.3).
         assertTrue(
-            world.systems.none { it is RenderSystem || it is OverlaySystem },
-            "a presentation system reached the world's system list: ${world.systems}",
+            game.world.systems.isNotEmpty(),
+            "the world has no systems at all, so this asserts nothing",
+        )
+        assertTrue(
+            game.world.systems.any { it is InterpSnapshotSystem },
+            "RenderModule's one simulation system is missing, so this is not the shipped " +
+                "configuration: ${game.world.systems.map { it::class.simpleName }}",
+        )
+        assertTrue(
+            game.world.systems.none { it is RenderSystem || it is OverlaySystem },
+            "a presentation system reached the world's system list: ${game.world.systems}",
+        )
+        // And the other half of spec 3.3: what the module *does* contribute holds no GL and
+        // draws nothing, so a RenderMode.Headless server can include it. The bytecode gate
+        // (`udeaVerifyHeadless`) makes the same statement about udea-core; this is the one
+        // module in the tree allowed to fail it, so the check here is over the instance.
+        assertTrue(
+            game.world.systems.filterIsInstance<InterpSnapshotSystem>().size == 1,
+            "the interpolation system was registered more than once",
         )
     }
 

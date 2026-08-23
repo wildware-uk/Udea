@@ -26,6 +26,18 @@ internal data class ToolModel(
     val objectName: String,
     /** In declaration order, which is the order the generated call passes them. */
     val args: List<ToolArgModel>,
+    /**
+     * True when the function or a type enclosing it is `internal`, so the generated object has
+     * to be `internal` too.
+     *
+     * Not cosmetic: a `public object` whose `invoke` takes an internal receiver is
+     * "public function exposes its internal parameter type", and one calling an internal
+     * function does not compile at all. The `ToolModule` index still lists it, because a
+     * property initialiser may name an internal declaration even where the property's own type
+     * may not - which is what lets a game keep its debug toolset out of its published API and
+     * still have an agent drive it.
+     */
+    val internal: Boolean,
 )
 
 /**
@@ -39,7 +51,7 @@ internal data class ToolArgModel(
     /** The Kotlin parameter name, which is also the JSON Schema property name. */
     val name: String,
     val kind: ArgKind,
-    /** True when the parameter is `List<kind>`; the schema type becomes `array`. */
+    /** True when the parameter is `List<kind>`; see [jsonType] for what that publishes. */
     val list: Boolean,
     /** The enum type, when [kind] is [ArgKind.ENUM]. */
     val enumType: ClassName?,
@@ -57,8 +69,22 @@ internal data class ToolArgModel(
     /** True when the Kotlin parameter type is nullable, so an absent argument means `null`. */
     val nullable: Boolean,
 ) {
-    /** The JSON Schema type name: `array` for a list, otherwise the element kind's own. */
-    val jsonType: String get() = if (list) "array" else kind.jsonType
+    /**
+     * The JSON Schema type name, which for a list is `string` — the wire form, not a compromise.
+     *
+     * A tool call reaches the game as a query string (`GET /command?cmd=tag_entity&labels=…`),
+     * and a query string carries text and nothing else. `game-bridge-mcp` puts each argument
+     * on it with `qs.set(k, typeof v === "object" ? JSON.stringify(v) : String(v))`, and a
+     * JSON array **is** an object — so publishing `array` here would instruct a model to send
+     * `["a","b"]`, the bridge would stringify it, and the dispatcher would be handed JSON text
+     * to split on commas: `["a` and `"b"]`, delivered as `ok:true`.
+     *
+     * Typing it `string` makes the schema describe the call that can actually be made, and it
+     * is the schema that enforces it: a client validating `inputSchema` will not hand the
+     * bridge an array in the first place. The separator lives in `description`, which is the
+     * only place JSON Schema leaves for it.
+     */
+    val jsonType: String get() = if (list) "string" else kind.jsonType
 }
 
 /**
@@ -75,6 +101,12 @@ internal data class AgentStateModel(
     val owner: ClassName,
     /** The generated object's simple name, e.g. `MatchClockAgentState`. */
     val objectName: String,
+    /**
+     * True when the declaring class is `internal`, so the generated writer must be too - a
+     * `public object : AgentStateSource<InternalMatch>` does not compile. See
+     * [ToolModel.internal], which is the same rule for the same reason.
+     */
+    val internal: Boolean,
     /** Sorted by effective name, so the digest's key order is a function of the sources alone. */
     val entries: List<AgentStateEntry>,
 )

@@ -36,8 +36,24 @@ import dev.wildware.udea.agent.AgentToolException
  * path, so the position is the component carrying **`position.x`** and **`position.y`**. It is
  * resolved once, here, at construction; a query that needs it when no component has it gets a
  * typed error naming the convention rather than an empty result.
+ *
+ * When *two* components carry it - a `Transform` beside an interpolation or previous-frame
+ * transform, both lowered by the same convention - nothing is guessed. A host settles it with
+ * `positionComponent`; a host that has not gets the same typed `bad_query` naming both, which
+ * is the rule this class already applies to an ambiguous field name.
  */
-public class AgentComponentIndex(types: List<AgentComponentType>) {
+public class AgentComponentIndex(
+    types: List<AgentComponentType>,
+    /**
+     * The component that carries the authoritative position, when more than one does.
+     *
+     * Two components lowered by the same `Replicator` convention - a `Transform` beside an
+     * interpolation or previous-frame transform - both carry `position.x` and `position.y`, and
+     * there is nothing in either to say which one a `near` filter means. Naming one here is how
+     * a host settles it; leaving it null when only one component matches is the normal case.
+     */
+    positionComponent: String? = null,
+) {
 
     private val ordered: List<AgentComponentType> = types.sortedBy { it.name }
 
@@ -82,7 +98,14 @@ public class AgentComponentIndex(types: List<AgentComponentType>) {
      * per-query scan would put a string comparison per component on the path a proximity filter
      * runs 500 times.
      */
-    public val position: PositionRef? = resolvePosition(ordered)
+    public val position: PositionRef? = resolvePosition(ordered, positionComponent)
+
+    /**
+     * Every component carrying a lowered position, when there is more than one and no host
+     * nomination settled it. Empty otherwise. Named in [requirePosition]'s refusal.
+     */
+    private val positionCandidates: List<String> =
+        if (position != null) emptyList() else candidatePositions(ordered).map { it.component.name }
 
     /**
      * [position], or a typed failure.
@@ -90,12 +113,27 @@ public class AgentComponentIndex(types: List<AgentComponentType>) {
      * @throws AgentToolException `bad_query` explaining the convention, because "near returned
      *   nothing" and "this world has no positions" are different problems with different fixes.
      */
-    public fun requirePosition(): PositionRef =
-        position ?: throw AgentToolException(
+    public fun requirePosition(): PositionRef {
+        position?.let { return it }
+        // Two answers is a different problem from none, and it is the one that used to be
+        // silent: picking the alphabetically first of `Transform` and `PreviousTransform` gave
+        // every `near` filter and every `pos` projection whichever sorted first, with no
+        // diagnostic - the exact opposite of the rule this class enforces for an ambiguous
+        // field name ten lines up.
+        if (positionCandidates.size > 1) {
+            throw AgentToolException(
+                AgentErrorKind.BAD_QUERY,
+                "${positionCandidates.joinToString()} all carry $POSITION_X and $POSITION_Y, so " +
+                    "there is no one place this world keeps a position; the host must nominate " +
+                    "one when it builds the component index",
+            )
+        }
+        throw AgentToolException(
             AgentErrorKind.BAD_QUERY,
             "no registered component has the lowered fields $POSITION_X and $POSITION_Y, so " +
                 "proximity and the pos projection have nothing to measure against",
         )
+    }
 
     /**
      * Resolves [path] against [scope] by the two rules in the class KDoc.
@@ -158,13 +196,34 @@ public class AgentComponentIndex(types: List<AgentComponentType>) {
         const val POSITION_X: String = "position.x"
         const val POSITION_Y: String = "position.y"
 
-        fun resolvePosition(types: List<AgentComponentType>): PositionRef? {
+        fun candidatePositions(types: List<AgentComponentType>): List<PositionRef> {
+            var found: MutableList<PositionRef>? = null
             for (component in types) {
                 val x = component.fieldIndexOf(POSITION_X)
                 val y = component.fieldIndexOf(POSITION_Y)
-                if (x >= 0 && y >= 0) return PositionRef(component, x, y)
+                if (x < 0 || y < 0) continue
+                val into = found ?: ArrayList<PositionRef>(1).also { found = it }
+                into.add(PositionRef(component, x, y))
             }
-            return null
+            return found ?: emptyList()
+        }
+
+        /**
+         * The one position component, or null when there is none - or when there is more than
+         * one and [nominated] did not settle it. Never a guess: [requirePosition] turns the
+         * ambiguous case into a typed refusal naming every candidate.
+         */
+        fun resolvePosition(types: List<AgentComponentType>, nominated: String?): PositionRef? {
+            val candidates = candidatePositions(types)
+            if (nominated != null) {
+                return candidates.firstOrNull { it.component.name.equals(nominated, ignoreCase = true) }
+                    ?: throw IllegalArgumentException(
+                        "the nominated position component $nominated does not carry both " +
+                            "$POSITION_X and $POSITION_Y; candidates: " +
+                            candidates.joinToString { it.component.name }.ifEmpty { "none" },
+                    )
+            }
+            return candidates.singleOrNull()
         }
     }
 }

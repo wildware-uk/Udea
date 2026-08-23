@@ -93,9 +93,15 @@ public class RenderRegistry(
      * There is no phase parameter, on purpose. An overlay that could pick its phase could
      * pick one a capture reads, and the exclusion the types are enforcing would go back to
      * being a convention.
+     *
+     * @param factory takes [OverlayResources] and **not** [RenderResources]. That is the whole
+     *   of spec 3.7's structural guarantee at this level: [OverlayResources] carries the
+     *   [ScreenTarget] and has no capturable target on it, so an overlay cannot reach one even
+     *   by holding on to what it was constructed with. Handing both sides the same object --
+     *   which is what shipped in wave 1 -- left the guarantee resting on frame ordering alone.
      */
     public fun overlay(
-        factory: (RenderResources) -> OverlaySystem,
+        factory: (OverlayResources) -> OverlaySystem,
         constrain: RenderConstraints.() -> Unit = {},
     ): RenderHandle = add(RenderPhase.Overlay, Entry.Kind.Overlay(factory), constrain)
 
@@ -116,10 +122,14 @@ public class RenderRegistry(
         targets: RenderTargets,
     ): RenderPipeline {
         val resources = RenderResources(targets.batch, targets.offscreen)
+        // A second, deliberately poorer set for the overlay side: the batch and the window, and
+        // no capturable target anywhere on it (spec 3.7).
+        val overlayResources = OverlayResources(targets.batch, targets.screen)
         val instances: List<Bound> = entries.map { entry ->
             when (val kind = entry.kind) {
                 is Entry.Kind.Scene -> Bound.Scene(requireNotAFleksSystem(kind.make(resources)))
-                is Entry.Kind.Overlay -> Bound.Overlay(requireNotAFleksSystem(kind.make(resources)))
+                is Entry.Kind.Overlay ->
+                    Bound.Overlay(requireNotAFleksSystem(kind.make(overlayResources)))
             }
         }
 
@@ -145,7 +155,7 @@ public class RenderRegistry(
             overlays,
             timer,
             capture,
-            targets.owned + resources.owned(),
+            targets.owned + resources.owned() + overlayResources.owned(),
         )
     }
 
@@ -206,7 +216,7 @@ public class RenderRegistry(
     ) {
         sealed interface Kind {
             class Scene(val make: (RenderResources) -> RenderSystem) : Kind
-            class Overlay(val make: (RenderResources) -> OverlaySystem) : Kind
+            class Overlay(val make: (OverlayResources) -> OverlaySystem) : Kind
         }
     }
 

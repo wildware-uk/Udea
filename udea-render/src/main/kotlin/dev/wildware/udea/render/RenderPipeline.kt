@@ -93,19 +93,30 @@ public class RenderPipeline internal constructor(
 
         targets.surface.begin()
 
-        // Indexed loops: this is the per-frame path and an iterator per phase per frame is
-        // garbage the collector has to deal with in the middle of drawing.
-        for (index in systems.indices) {
-            systems[index].render(targets.offscreen, alpha)
+        // `finally`, so a renderer that throws does not leave the offscreen framebuffer bound
+        // for the rest of the process. Without it the exception propagates through
+        // `GameLoop.frame` into `GlThread`, which records the failure and exits with the FBO
+        // still bound and the window never presented again.
+        //
+        // The capture drain is deliberately *inside* the `try` and not the `finally`: a frame
+        // that threw half-way through drawing is a half-drawn frame, and serving it would hand
+        // an agent a picture of a partial world it would then reason about. Waiters are woken by
+        // `FrameCaptureSlot.close`, which `Lwjgl3Backend` wires to the render loop's exit.
+        try {
+            // Indexed loops: this is the per-frame path and an iterator per phase per frame is
+            // garbage the collector has to deal with in the middle of drawing.
+            for (index in systems.indices) {
+                systems[index].render(targets.offscreen, alpha)
+            }
+
+            // ---- capture point (spec 3.7) ----
+            // Inside the bound region, because glReadPixels reads the *bound* framebuffer:
+            // drained after endAndPresent() it would read the window, which is the surface the
+            // agent activity overlay draws on two lines below.
+            capture?.drain(targets.offscreen)
+        } finally {
+            targets.surface.endAndPresent()
         }
-
-        // ---- capture point (spec 3.7) ----
-        // Inside the bound region, because glReadPixels reads the *bound* framebuffer: drained
-        // after endAndPresent() it would read the window, which is the surface the agent
-        // activity overlay draws on two lines below.
-        capture?.drain(targets.offscreen)
-
-        targets.surface.endAndPresent()
 
         for (index in overlays.indices) {
             overlays[index].render(targets.screen, dtSeconds)

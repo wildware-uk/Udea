@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -111,6 +112,51 @@ class CaptureOrderingTest {
         assertTrue(failure.get() is CaptureStalledException, "was ${failure.get()}")
     }
 
+    @Test
+    fun `a renderer that throws still unbinds the surface, and serves no half-drawn frame`() {
+        // Two claims in one frame, and they pull in opposite directions on purpose.
+        //
+        // The surface must be unbound: without a `finally` the offscreen framebuffer stays
+        // bound for the rest of the process, the window is never presented again, and the
+        // exception goes on to kill the render loop with the FBO still live.
+        //
+        // The capture must *not* be served: a frame that threw part-way through drawing is a
+        // half-drawn frame, and handing it back would give an agent a picture of a partial
+        // world to reason about. Waiters are released by `FrameCaptureSlot.close`, which
+        // `Lwjgl3Backend` wires to the render loop's exit -- see `OffscreenBackendTest`.
+        val pixels = FakePixelSource(log)
+        val registry = RenderRegistry(ManualFrameClock())
+        registry.scene(RenderPhase.World, "world", log)
+        registry.register(RenderPhase.Debug, { ThrowingRenderSystem() })
+        registry.overlayScene("agentPanel", log)
+        val pipeline = registry.build(
+            world(),
+            ctx,
+            testTargets(surface = RecordingSurface(log), pixels = pixels),
+        )
+        val result = requestOnAnotherThread(pipeline.capture!!)
+        awaitQueued(pipeline.capture!!)
+        log.clear()
+
+        assertFailsWith<IllegalStateException> { pipeline.render(0f) }
+
+        assertEquals(
+            listOf("surface:begin", "draw:world@0.0", "surface:endAndPresent"),
+            log.calls,
+            "the offscreen surface was left bound by a renderer that threw",
+        )
+        assertEquals(emptyList(), pixels.requests, "a half-drawn frame was served to a capture")
+        assertNull(result.get())
+    }
+
+    /** Throws out of a frame, standing in for any renderer that hits a bad asset or a null. */
+    private class ThrowingRenderSystem : dev.wildware.udea.render.RenderSystem {
+        override fun render(
+            target: dev.wildware.udea.render.OffscreenTarget,
+            alpha: Float,
+        ): Unit = error("a renderer threw in the middle of a frame")
+    }
+
     // --- helpers -------------------------------------------------------------------------
 
     private fun requestOnAnotherThread(slot: FrameCaptureSlot): AtomicReference<CaptureResult?> {
@@ -121,13 +167,18 @@ class CaptureOrderingTest {
         return result
     }
 
+    /**
+     * Waits on the slot's own condition rather than polling `queuedRequests`.
+     *
+     * Same reasoning as `FrameCaptureSlotTest.awaitQueued`: reading that property takes the
+     * slot's non-fair lock, and a thread spinning on it can barge ahead of the worker parked
+     * trying to enqueue — so the poller starves the thread it is waiting for.
+     */
     private fun awaitQueued(slot: FrameCaptureSlot) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-        while (System.nanoTime() < deadline) {
-            if (slot.queuedRequests >= 1) return
-            Thread.onSpinWait()
-        }
-        error("no capture request was queued")
+        assertTrue(
+            slot.awaitQueued(count = 1, timeoutMillis = TimeUnit.SECONDS.toMillis(5)),
+            "no capture request was queued",
+        )
     }
 
     private fun awaitSettled(result: AtomicReference<CaptureResult?>): Boolean {

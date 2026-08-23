@@ -32,7 +32,8 @@ import dev.wildware.udea.render.interp.Pose
  * place — that part was right and is kept. [Family.sort] sorts the family's own entity bag with
  * no copy, so a frame allocates neither an array nor a comparator: both are made once, at bind.
  * The naive port — collect into a `List` and `sortedBy` it — allocates two objects per frame per
- * pass, which `RenderAllocationTest` exists to catch.
+ * pass, which `RenderAllocationTest` catches: that exact mutation — collect into an
+ * `ArrayList`, `sortWith` it — takes both of its assertions red.
  */
 public class SpriteRenderSystem(
     private val resources: RenderResources,

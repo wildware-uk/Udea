@@ -116,12 +116,20 @@ class LoopDrivenCaptureTest {
         host.time.resume()
         host.run(30)
 
+        // The only assertion that can distinguish a refilling ring from a dead one. `rewind(30)`
+        // landing at 570 proves nothing on its own: `dropAfter(570)` deliberately keeps the slot
+        // at 570, so the second rewind finds it and steps forward zero times whether or not a
+        // single tick was captured in between — and the ring is non-empty for the same reason.
+        // The newest slot being the tick just reached is false the moment capture stops.
+        assertEquals(
+            Tick(TICKS.toLong()),
+            host.time.listSnapshots().last().tick,
+            "the ring must have refilled up to $TICKS while the host stepped forward out of " +
+                "the first rewind",
+        )
+
         val second = assertIs<RewindResult.Rewound>(host.time.rewind(30))
         assertEquals(Tick((TICKS - 30).toLong()), second.tick)
-        assertTrue(
-            host.time.listSnapshots().isNotEmpty(),
-            "the ring must have refilled while the host stepped forward out of the first rewind",
-        )
     }
 
     @Test

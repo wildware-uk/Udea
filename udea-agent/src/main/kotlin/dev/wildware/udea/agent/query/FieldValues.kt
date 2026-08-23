@@ -45,6 +45,49 @@ internal object FieldValues {
         else -> value.toString()
     }
 
+    /**
+     * [text] coerced to the type [current] already holds, or `null` when it will not convert.
+     *
+     * The field's declared type is not available here - `Replicator` carries field *names* and
+     * a mask, not a type table - so the value that is already in the slot is what says what the
+     * slot holds. That is exact for every type this surface can write, and it is why
+     * `set_component_field` reads before it writes rather than guessing from the text: `"1"` is
+     * a perfectly good Int, Long, Float and String, and writing the wrong one of those into a
+     * component is a corruption nothing downstream reports.
+     *
+     * Returns `null` rather than throwing so the caller can name the tool, the field and the
+     * supplied text in one typed `bad_argument` - which is the whole of what fixes the call.
+     */
+    fun parse(current: Any?, text: String): Any? = when (current) {
+        is Float -> text.toFloatOrNull()
+        is Double -> text.toDoubleOrNull()
+        is Int -> text.toIntOrNull()
+        is Long -> text.toLongOrNull()
+        is Short -> text.toShortOrNull()
+        is Byte -> text.toByteOrNull()
+        is Boolean -> when (text) {
+            "true", "1" -> true
+            "false", "0" -> false
+            else -> null
+        }
+        is String -> text
+        is NetId -> text.toIntOrNull()?.let(NetId::ofRaw)
+        is Tick -> text.toLongOrNull()?.let(::Tick)
+        // An enum constant by name, never by ordinal: an ordinal is a number that silently
+        // means something else the moment a constant is inserted.
+        is Enum<*> -> current.javaClass.enumConstants.firstOrNull { it.name == text }
+        // Null tells us nothing about the slot, and neither does a reference-typed value we
+        // have no constructor for.
+        else -> null
+    }
+
+    /** What [current] is, for a `bad_argument` message. `nothing` when the slot reads null. */
+    fun typeNameOf(current: Any?): String = when (current) {
+        null -> "nothing this surface can type a write against"
+        is Enum<*> -> "one of ${current.javaClass.enumConstants.joinToString { it.name }}"
+        else -> current.javaClass.simpleName
+    }
+
     /** Writes [value] as a JSON value, using the narrowest honest representation. */
     fun renderInto(json: Json, value: Any?) {
         when (value) {

@@ -11,7 +11,10 @@ import dev.wildware.udea.core.physics.PhysicsBody
  * A mutable out-parameter rather than a returned value because [Interpolator.interpolate] is
  * called once per drawn entity per frame — several thousand times a second in a MOBA team
  * fight — and a per-entity allocation there is garbage generated in the middle of drawing.
- * `RenderAllocationTest` is what keeps that claim honest.
+ *
+ * `RenderAllocationTest` measures it: a hundred frames of a populated pipeline allocate zero
+ * heap bytes, and drawing two hundred entities allocates no more per frame than drawing twenty.
+ * Read its KDoc for what that measurement is blind to — it is narrower than it sounds.
  */
 public class Pose(
     public var x: Float = 0f,

@@ -1,6 +1,7 @@
 package dev.wildware.udea.agent.state
 
 import dev.wildware.udea.agent.AgentBridge
+import dev.wildware.udea.agent.AgentResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -101,6 +102,50 @@ class DigestCadenceTest {
 
         assertEquals(2L, fixture.digest.builds)
         assertFalse(fixture.bridge.readSinceLastPublish())
+    }
+
+    @Test
+    fun `a completed command makes the digest due with the tick held still`() {
+        // The Phase 1 workflow is pause, spawn, step, screenshot, rewind, inspect - and two of
+        // those six happen with the simulation paused, where the tick does not move at all. On
+        // the tick interval alone the digest is never due again, so a command that ran and
+        // completed never reaches a document: the caller polls /state until it times out, the
+        // frames-advanced fallback reads `frame` out of the same frozen document, and a healthy
+        // game is reported as frozen.
+        val fixture = DigestFixture(rebuildIntervalTicks = 100)
+        fixture.bridge.publishTick(412)
+        fixture.digest.publishIfDue()
+        assertEquals(1L, fixture.digest.builds)
+
+        fixture.bridge.snapshot()
+        fixture.bridge.complete(77L, AgentResult.EMPTY)
+        // The tick is held exactly where it was. Nothing else has changed.
+        fixture.digest.publishIfDue()
+
+        assertEquals(2L, fixture.digest.builds, "a completed command is news whatever the tick does")
+        assertTrue(
+            fixture.bridge.snapshot().contains("\"completedCommandId\":77"),
+            fixture.bridge.snapshot(),
+        )
+        assertEquals(77L, fixture.digest.lastPublishedCommandId)
+    }
+
+    @Test
+    fun `a command that has already been published does not make the digest due again`() {
+        val fixture = DigestFixture(rebuildIntervalTicks = 100)
+        fixture.bridge.publishTick(412)
+        fixture.bridge.complete(77L, AgentResult.EMPTY)
+        fixture.digest.publishIfDue()
+        assertEquals(1L, fixture.digest.builds)
+
+        // Fifty polls of a paused game with no new command: the id is already in the document,
+        // so the gate is back to the tick interval and an unwatched paused game stays free.
+        repeat(50) {
+            fixture.bridge.snapshot()
+            fixture.digest.publishIfDue()
+        }
+
+        assertEquals(1L, fixture.digest.builds)
     }
 
     @Test

@@ -117,10 +117,17 @@ internal class MutableGameState : GameStateSource {
     /** Extra scalars, so the cap can be exercised. */
     var extraScalars: Int = 0
 
+    /** Publishes a scalar literally called `truncated`, which the digest's own flag once collided with. */
+    var publishTruncatedScalar: Boolean = false
+
+    /** The stem of an extra scalar's name. Realistic names are what break the byte ceiling. */
+    var extraScalarNamePrefix: String = "extra"
+
     override fun publish(sink: GameStateSink) {
+        if (publishTruncatedScalar) sink.put("truncated", false)
         sink.put("score", score)
         sink.put("phase", phase)
         sink.put("deferredRan", deferredRan)
-        for (index in 0 until extraScalars) sink.put("extra$index", index)
+        for (index in 0 until extraScalars) sink.put("$extraScalarNamePrefix$index", index)
     }
 }

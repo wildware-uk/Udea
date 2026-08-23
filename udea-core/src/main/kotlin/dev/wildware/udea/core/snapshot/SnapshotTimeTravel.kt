@@ -114,16 +114,18 @@ public class SnapshotTimeTravel(
     /**
      * Puts [tick] in the ring unless it is already there. Allocation-free.
      *
-     * Idempotent per tick on purpose. An agent that pauses and then asks for a snapshot has no
-     * way to know whether the loop already captured this tick, and the ring refuses a
-     * non-advancing commit — so without this, `snapshot()` would throw for a reason the caller
-     * could neither predict nor act on. Capturing twice at one tick would produce two identical
-     * slots anyway: the world cannot change between them, because nothing steps in between.
+     * Idempotent per tick on purpose, and capturing twice at one tick would produce two
+     * identical slots anyway: the world cannot change between them, because nothing steps in
+     * between.
      *
-     * It is also what makes a rewind's step-forward safe. `TimeControl.rewind` restores a
-     * keyframe and then runs bare steps through the loop, and those steps capture like any
-     * other — the first of them re-offers the very tick the restore landed on, which
-     * [SnapshotRing.dropAfter] deliberately kept.
+     * The caller it exists for is `TimeControl.snapshot()`, and only that one. A rewind's
+     * step-forward does **not** need it: `SnapshotService.applyNow` sets the clock to the
+     * restored tick, and the first `Simulation.step` after it drains, updates, advances the
+     * clock and only *then* calls [captureIfDue] — so that step offers `restoredTick + 1`, and
+     * the restored tick is never re-offered by the loop at all. What does re-offer a held tick
+     * is an agent calling `snapshot()` at a tick the cadence already captured, which it has no
+     * way to predict; without this guard that call would hit [SnapshotRing.commit]'s refusal to
+     * accept a non-advancing commit and throw for a reason the caller could not act on.
      *
      * @return true if a new slot entered the ring.
      */

@@ -80,14 +80,37 @@ public abstract class UdeaVerifyReleaseTask : DefaultTask() {
     }
 
     /**
-     * Every entry name in [archive].
+     * Every entry name in [archive], **including the entries of jars nested inside it**.
      *
      * A file that is not a zip is a hard failure rather than a skip: silently ignoring an
      * artifact this task was pointed at is how a gate stops gating.
+     *
+     * ## Why it descends
+     *
+     * A plain jar is what `:moba` packages today, and for that the top level is the whole answer.
+     * It will not stay that way: a distribution zip carries the runtime classpath as jars under `lib`,
+     * and a fat or shaded jar carries dependencies whole. In both shapes every agent class sits
+     * one level down, so a scanner that read only the top level would report a clean release for
+     * an artifact that contains the entire remote-control surface - and would do it *silently*,
+     * on the day the packaging changed, which is the worst possible moment for this gate to
+     * quietly stop working. Nested names are reported as `outer.jar!/inner.jar!/entry` so the
+     * failure message says which jar to look in.
+     *
+     * Depth is capped by [MAX_NESTING]: a self-referential archive is a real thing, and a release
+     * gate that hangs is a release gate somebody switches off.
      */
     private fun entriesOf(archive: File): List<String> =
         try {
-            ZipFile(archive).use { zip -> zip.entries().asSequence().map { it.name }.toList() }
+            ZipFile(archive).use { zip ->
+                zip.entries().asSequence().flatMap { entry ->
+                    if (isNestedArchive(entry.name)) {
+                        val nested = zip.getInputStream(entry).use { nestedEntries(it, entry.name, 1) }
+                        sequenceOf(entry.name) + nested
+                    } else {
+                        sequenceOf(entry.name)
+                    }
+                }.toList()
+            }
         } catch (e: ZipException) {
             throw GradleException(
                 "udeaVerifyRelease could not read ${archive.absolutePath} as an archive. A " +
@@ -95,4 +118,39 @@ public abstract class UdeaVerifyReleaseTask : DefaultTask() {
                 e,
             )
         }
+
+    /** Entry names inside a nested archive, prefixed with the path that reached it. */
+    private fun nestedEntries(stream: java.io.InputStream, prefix: String, depth: Int): Sequence<String> {
+        if (depth > MAX_NESTING) return emptySequence()
+        val collected = ArrayList<String>()
+        java.util.zip.ZipInputStream(stream).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                val name = "$prefix!/${entry.name}"
+                collected.add(name)
+                if (isNestedArchive(entry.name)) {
+                    // The stream must not be closed by the recursive read - it is still positioned
+                    // inside the outer archive - so the inner reader is handed a non-closing view.
+                    collected.addAll(nestedEntries(NonClosing(zip), name, depth + 1))
+                }
+            }
+        }
+        return collected.asSequence()
+    }
+
+    private fun isNestedArchive(name: String): Boolean =
+        name.endsWith(".jar", ignoreCase = true) || name.endsWith(".war", ignoreCase = true)
+
+    /** A view that refuses `close`, so a nested reader cannot close the archive it is inside. */
+    private class NonClosing(private val delegate: java.io.InputStream) : java.io.InputStream() {
+        override fun read(): Int = delegate.read()
+        override fun read(b: ByteArray, off: Int, len: Int): Int = delegate.read(b, off, len)
+        override fun available(): Int = delegate.available()
+        override fun close() = Unit
+    }
+
+    private companion object {
+        /** How far down the gate will follow nested archives before giving up. */
+        const val MAX_NESTING = 4
+    }
 }

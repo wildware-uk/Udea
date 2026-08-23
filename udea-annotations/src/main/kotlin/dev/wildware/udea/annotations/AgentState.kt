@@ -27,9 +27,13 @@ package dev.wildware.udea.annotations
  * The bridge contract (`game-bridge-mcp`, `GET /state`) says of `game`: "scalar fields are
  * included in the digest. Nested objects and arrays are not." A non-scalar here would not be
  * a value that renders oddly — it would be a value that vanishes from every digest an agent
- * ever reads, silently. So the allowed types are `Int`, `Long`, `Float`, `Double`,
- * `Boolean`, `String` and enums (published by constant name), and anything else is a build
- * error at the property.
+ * ever reads, silently. So the allowed types are `Int`, `Long`, `Float`, `Boolean`, `String`
+ * and enums (published by constant name), and anything else is a build error at the property.
+ *
+ * `Double` is not among them, and it is the one exclusion worth stating: `GameStateSink`
+ * publishes floats and rounds them to four decimal places, so accepting a `Double` would mean
+ * generating a `.toFloat()` nobody wrote. Declare the property `Float` and the narrowing is
+ * something a reader can see.
  *
  * Entity data is deliberately not reachable this way: that is `describe_entity` over
  * `Replicator.getField`, and keeping it out of the digest is the whole point of the

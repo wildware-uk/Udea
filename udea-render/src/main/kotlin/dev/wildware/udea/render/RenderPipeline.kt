@@ -148,6 +148,17 @@ public class RenderPipeline internal constructor(
     public val isDisposed: Boolean get() = disposed
 
     /**
+     * The surface the game is drawn on, and the only one a capture reads.
+     *
+     * Published because the size of a capture is a property of this target and of nothing else
+     * -- not of the window, which [resize] deliberately does not propagate here. A caller that
+     * has to validate a capture region (the agent's `render.screenshot_region`) needs the same
+     * number the drain will check it against, and getting it from `Gdx.graphics` instead would
+     * be reading the window and clamping to the wrong rectangle.
+     */
+    public val offscreen: OffscreenTarget get() = targets.offscreen
+
+    /**
      * Tells every [Resizable] system, and [RenderTargets.screen], that the window has changed.
      *
      * @param width new window width in pixels; must be positive.

@@ -83,13 +83,17 @@ class AgentGameLoopTest {
         loop.pump(ZERO_DELTA)
         val first = bridge.snapshot()
 
-        bridge.submit(AgentCommand("time.snapshot"))
+        // The submitted id, not a literal `1`. Command ids come from a counter shared by every
+        // bridge in the JVM, so the literal only held while this happened to be the first command
+        // any test in this module submitted - which stopped being true the moment another test
+        // class submitted one, and made this test fail on test *ordering*.
+        val submitted = assertIs<AgentSubmission.Accepted>(bridge.submit(AgentCommand("time.snapshot")))
         loop.pump(ZERO_DELTA)
         val second = bridge.snapshot()
 
         assertTrue(second.contains(""""paused":true"""), "the document reports the pause: $second")
         assertTrue(
-            second.contains(""""completedCommandId":1"""),
+            second.contains(""""completedCommandId":${submitted.commandId}"""),
             "the answer has to reach a document, not just the counter: $second",
         )
         assertTrue(first != second, "a frozen document is what a caller reads as a dead game")

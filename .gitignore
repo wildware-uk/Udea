@@ -65,3 +65,12 @@ scripts/cache/
 # Extract locally with scripts/extract-art.py; the manifest is committed, the pixels are not.
 moba/src/main/resources/assets/sprites/
 moba/raw-assets/
+
+# `gamebridge.json` — the launch declaration `game-bridge-mcp` reads, written into the repository
+# root by `:moba:udeaGenerateLaunchDeclaration` (which `assemble` and `run` both depend on).
+#
+# Generated, and **OS-specific**: `UdeaAgentPlugin` writes `.\gradlew.bat` on Windows and
+# `./gradlew` everywhere else. Committing one machine's copy hands every other platform a launch
+# command that cannot run, and `launch_instance` fails with a confusing "cannot start" rather than
+# anything pointing at the cause. Run any Gradle build once and it appears.
+gamebridge.json

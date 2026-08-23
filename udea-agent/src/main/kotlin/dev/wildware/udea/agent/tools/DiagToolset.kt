@@ -3,11 +3,11 @@ package dev.wildware.udea.agent.tools
 import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.AgentResult
 import dev.wildware.udea.agent.AgentTimings
-import dev.wildware.udea.agent.AgentToolDef
 import dev.wildware.udea.agent.state.ArchetypeVisitor
 import dev.wildware.udea.agent.state.DigestBudgets
 import dev.wildware.udea.agent.state.EntityCensus
 import dev.wildware.udea.agent.state.StateDigest
+import dev.wildware.udea.annotations.AgentTool
 import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.loop.SimBarrier
 
@@ -44,7 +44,14 @@ public class DiagToolset(
     private val barrier: SimBarrier? = null,
 ) {
 
-    private fun frameReport(): AgentResult = AgentResult.ok {
+    @AgentTool(
+        name = "diag.frame_report",
+        description = "One snapshot of the engine's own health: tick, frame, command " +
+            "queue depth, event ring occupancy, digest cost against its budget and " +
+            "barrier drain counters. Reach for it first when the game feels wrong but " +
+            "nothing has failed.",
+    )
+    public fun frameReport(): AgentResult = AgentResult.ok {
         put("tick", clock.tick.value)
         put("frame", bridge.frame)
         put("pendingCommands", bridge.pendingCommands)
@@ -79,7 +86,13 @@ public class DiagToolset(
         }
     }
 
-    private fun systemTimings(): AgentResult = AgentResult.ok {
+    @AgentTool(
+        name = "diag.system_timings",
+        description = "Every timer the engine has recorded into, including the state " +
+            "digest build - which is what the agent surface costs the game you are " +
+            "debugging. Read it when a tool call seems to be slowing the simulation down.",
+    )
+    public fun systemTimings(): AgentResult = AgentResult.ok {
         put("tick", clock.tick.value)
         put("registered", timings.size)
         // Stated rather than implied: a caller that expected a line per Fleks system needs to
@@ -101,7 +114,13 @@ public class DiagToolset(
         }
     }
 
-    private fun entityCounts(): AgentResult = AgentResult.ok {
+    @AgentTool(
+        name = "diag.entity_counts",
+        description = "How many entities exist, broken down by archetype. The total is " +
+            "the same entityCount the state digest publishes, so use it to see what a " +
+            "population change is actually made of.",
+    )
+    public fun entityCounts(): AgentResult = AgentResult.ok {
         // The same number the Tier-0 digest publishes as `entityCount`, from the same census,
         // so the two can never disagree about how big the world is.
         put("entityCount", census.entityCount)
@@ -117,7 +136,13 @@ public class DiagToolset(
      * three numbers below are the ones that answer "is this run about to die" without pulling
      * in a management interface a headless CI container may not have.
      */
-    private fun memory(): AgentResult {
+    @AgentTool(
+        name = "diag.memory",
+        description = "Heap used, committed and maximum, as the JVM reports it. Use it " +
+            "to tell a leak apart from a slow tick before spending a session on the " +
+            "wrong one.",
+    )
+    public fun memory(): AgentResult {
         val runtime = Runtime.getRuntime()
         val total = runtime.totalMemory()
         val free = runtime.freeMemory()
@@ -130,43 +155,4 @@ public class DiagToolset(
     }
 
     override fun toString(): String = "DiagToolset(${timings.size} timer(s))"
-
-    public companion object {
-
-        /** The four tools, ascending by name. Registered by [engineToolModule]. */
-        public fun tools(): List<AgentToolDef<DiagToolset>> = listOf(
-            EngineToolDef<DiagToolset>(
-                name = "diag.entity_counts",
-                description = "How many entities exist, broken down by archetype. The total is " +
-                    "the same entityCount the state digest publishes, so use it to see what a " +
-                    "population change is actually made of.",
-                owner = DiagToolset::class,
-            ) { toolset, _ -> toolset.entityCounts() },
-
-            EngineToolDef<DiagToolset>(
-                name = "diag.frame_report",
-                description = "One snapshot of the engine's own health: tick, frame, command " +
-                    "queue depth, event ring occupancy, digest cost against its budget and " +
-                    "barrier drain counters. Reach for it first when the game feels wrong but " +
-                    "nothing has failed.",
-                owner = DiagToolset::class,
-            ) { toolset, _ -> toolset.frameReport() },
-
-            EngineToolDef<DiagToolset>(
-                name = "diag.memory",
-                description = "Heap used, committed and maximum, as the JVM reports it. Use it " +
-                    "to tell a leak apart from a slow tick before spending a session on the " +
-                    "wrong one.",
-                owner = DiagToolset::class,
-            ) { toolset, _ -> toolset.memory() },
-
-            EngineToolDef<DiagToolset>(
-                name = "diag.system_timings",
-                description = "Every timer the engine has recorded into, including the state " +
-                    "digest build - which is what the agent surface costs the game you are " +
-                    "debugging. Read it when a tool call seems to be slowing the simulation down.",
-                owner = DiagToolset::class,
-            ) { toolset, _ -> toolset.systemTimings() },
-        )
-    }
 }

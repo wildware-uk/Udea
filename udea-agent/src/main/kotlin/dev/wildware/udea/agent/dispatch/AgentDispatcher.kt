@@ -8,6 +8,8 @@ import dev.wildware.udea.agent.AgentErrorKind
 import dev.wildware.udea.agent.AgentResult
 import dev.wildware.udea.agent.AgentToolException
 import dev.wildware.udea.agent.BadArgumentException
+import dev.wildware.udea.agent.activity.AgentOutcome
+import dev.wildware.udea.agent.activity.AnchorRule
 import dev.wildware.udea.core.GameContext
 
 /**
@@ -39,7 +41,18 @@ internal class AgentDispatcher(
 ) {
 
     fun run(command: AgentCommand, world: World, ctx: GameContext) {
+        // Recorded before the name is even checked, and before the tool runs: the activity ring
+        // is what a human watching the window reads, and a call that wedged, threw or named a
+        // tool that does not exist is exactly the call they need to see. A ring written only on
+        // success shows nothing during the one call worth watching.
+        val slot = bridge.activity.begin(
+            command,
+            ctx.clock.tick.value,
+            command.session,
+            anchorRuleFor(command.name),
+        )
         if (!tools.contains(command.name)) {
+            bridge.activity.complete(slot, command.id, AgentOutcome.UNKNOWN, 0L)
             bridge.complete(
                 command.id,
                 AgentResult.failed(
@@ -56,8 +69,35 @@ internal class AgentDispatcher(
         // `SimBarrier.drain` refuses to re-enter - has already registered its own completion
         // through `AgentContext.answerLater`. Completing here as well would put two answers in
         // the ring under one id, and the caller would read whichever was written last.
+        //
+        // The activity entry is left RUNNING for exactly the same reason, and that is honest
+        // rather than a gap: `time.rewind` really has not finished, and the overlay showing it
+        // in flight is the only signal a human gets that the instance is mid-rewind.
         if (context.answersLater) return
+        bridge.activity.complete(slot, command.id, outcomeOf(result), lastElapsedNanos)
         bridge.complete(command.id, result)
+    }
+
+    /**
+     * The anchor rule for [toolName], derived once from its declared arguments and cached.
+     *
+     * Cached because the derivation walks the argument list, and the answer depends only on the
+     * declaration - which cannot change while the process runs. A `HashMap` and not a
+     * `ConcurrentHashMap`: dispatch is single-threaded by construction, running inside a
+     * `SimBarrier` drain on the simulation thread, and a concurrent map here would be advertising
+     * a second writer that does not exist.
+     */
+    private fun anchorRuleFor(toolName: String): AnchorRule =
+        anchorRules.getOrPut(toolName) { AnchorRule.of(tools.declaredArgs(toolName)) }
+
+    private val anchorRules = HashMap<String, AnchorRule>()
+
+    /** Wall nanoseconds the most recent [invoke] took. Written there, read once by [run]. */
+    private var lastElapsedNanos: Long = 0L
+
+    private fun outcomeOf(result: AgentResult): AgentOutcome = when (result) {
+        is AgentResult.Ok -> AgentOutcome.OK
+        is AgentResult.Failed -> AgentOutcome.FAILED
     }
 
     private fun invoke(command: AgentCommand, context: AgentContext): AgentResult {
@@ -78,7 +118,8 @@ internal class AgentDispatcher(
                 "${command.name} threw ${failure.javaClass.simpleName}: ${failure.message ?: "no message"}",
             )
         }
-        reportIfSlow(command, clock.nowNanos() - startedAt)
+        lastElapsedNanos = clock.nowNanos() - startedAt
+        reportIfSlow(command, lastElapsedNanos)
         return result
     }
 

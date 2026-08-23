@@ -1,12 +1,12 @@
 package dev.wildware.udea.agent.tools
 
 import dev.wildware.udea.agent.AgentBridge
-import dev.wildware.udea.agent.AgentCommand
 import dev.wildware.udea.agent.AgentErrorKind
 import dev.wildware.udea.agent.AgentResult
-import dev.wildware.udea.agent.AgentToolDef
 import dev.wildware.udea.agent.Json
 import dev.wildware.udea.agent.dispatch.AgentContext
+import dev.wildware.udea.annotations.AgentTool
+import dev.wildware.udea.annotations.Arg
 import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.loop.GameLoop
 import dev.wildware.udea.core.loop.RewindFailure
@@ -60,25 +60,50 @@ public class TimeToolset(
     private val bridge: AgentBridge,
 ) {
 
-    private fun pause(): AgentResult {
+    @AgentTool(
+        name = "time.pause",
+        description = "Freeze the simulation. Rendering continues, so screenshots still " +
+            "work and the frame counter still moves - wait on tick, never on frame, to " +
+            "tell a paused game from a stalled one.",
+    )
+    public fun pause(): AgentResult {
         control.pause()
         return state()
     }
 
-    private fun resume(): AgentResult {
+    @AgentTool(
+        name = "time.resume",
+        description = "Unfreeze the simulation and let it step at its normal rate again. " +
+            "Reach for it after a paused investigation, or after time.step or time.rewind, " +
+            "both of which leave the loop paused.",
+    )
+    public fun resume(): AgentResult {
         control.resume()
         return state()
     }
 
     /**
-     * Steps exactly [AgentCommand] `ticks` ticks and reports the tick either side.
+     * Steps exactly [ticks] ticks and reports the tick either side.
      *
      * Reporting both is what lets a caller assert exactness without polling: `after - before`
      * is the number that was actually run, and a caller that only saw `after` would have to
      * have remembered `before` from a separate read that may have raced a running loop.
      */
-    private fun step(command: AgentCommand, context: AgentContext): AgentResult? {
-        val ticks = command.int("ticks", 1)
+    @AgentTool(
+        name = "time.step",
+        description = "Advance the simulation by exactly this many ticks with no " +
+            "rendering, and report the tick before and after. This is the tool to reach " +
+            "for whenever an assertion has to be about a named tick rather than a moment.",
+    )
+    public fun step(
+        context: AgentContext,
+        @Arg(
+            description = "Ticks to advance. One tick is one 1/60s simulation step.",
+            required = false,
+            default = "1",
+        )
+        ticks: Int,
+    ): AgentResult? {
         if (ticks < 0) {
             return AgentResult.failed(
                 AgentErrorKind.BAD_ARGUMENT,
@@ -90,8 +115,16 @@ public class TimeToolset(
         return null
     }
 
-    private fun setTimeScale(command: AgentCommand): AgentResult {
-        val scale = command.float("scale")
+    @AgentTool(
+        name = "time.set_time_scale",
+        description = "Set how many fixed steps run per host frame. It never changes dt " +
+            "- the 1/60s step is invariant - so slowing time down does not change any " +
+            "physics result, only how much of it you see per second.",
+    )
+    public fun setTimeScale(
+        @Arg(description = "Simulated seconds per wall second, from 0 to 8.")
+        scale: Float,
+    ): AgentResult {
         if (scale < 0f || scale > GameLoop.MAX_TIME_SCALE) {
             return AgentResult.failed(
                 AgentErrorKind.BAD_ARGUMENT,
@@ -106,7 +139,13 @@ public class TimeToolset(
         return state()
     }
 
-    private fun snapshot(): AgentResult {
+    @AgentTool(
+        name = "time.snapshot",
+        description = "Capture the world as it stands into the snapshot ring and return " +
+            "its tick and size. It does not pause: a capture is an observation, so use " +
+            "it to mark a state you intend to come back to.",
+    )
+    public fun snapshot(): AgentResult {
         val info = try {
             control.snapshot()
         } catch (missing: IllegalStateException) {
@@ -116,17 +155,60 @@ public class TimeToolset(
         return AgentResult.ok { renderSnapshot(info) }
     }
 
-    private fun listSnapshots(): AgentResult {
+    /**
+     * The snapshot ring, one page at a time. See [ResultPage] for why this is paged at all.
+     *
+     * This is the tool that made the hole visible: a full ring is hundreds of entries, the
+     * whole list is several kilobytes, and `commandResults` drops a result that does not fit
+     * rather than shortening it - so before paging, `time.list_snapshots` on a busy game could
+     * not answer at all. `totalBytes` is over the **whole** ring and not the page, because
+     * "how much history am I holding" is the question the number is for.
+     */
+    @AgentTool(
+        name = "time.list_snapshots",
+        description = "List the snapshots the ring is holding with each one's tick, kind and " +
+            "byte size, one page at a time. Read it before time.rewind to see how far the " +
+            "history actually reaches; follow nextOffset for the rest.",
+    )
+    public fun listSnapshots(
+        @Arg(description = "How many snapshots to skip, from the oldest.", required = false, default = "0")
+        offset: Int,
+        @Arg(
+            description = "Most snapshots to return. A page also stops early when it runs out " +
+                "of the bytes a command result is guaranteed in the state document.",
+            required = false,
+            default = "16",
+        )
+        limit: Int,
+    ): AgentResult {
         val held = control.listSnapshots()
-        return AgentResult.ok {
-            put("count", held.size)
-            put("totalBytes", held.sumOf(SnapshotInfo::sizeBytes))
-            arr("snapshots") { held.forEach { info -> element { renderSnapshot(info) } } }
-        }
+        val totalBytes = held.sumOf(SnapshotInfo::sizeBytes)
+        return ResultPage.render(
+            name = "snapshots",
+            offset = offset,
+            limit = limit,
+            total = held.size,
+            prelude = {
+                // `count` was the field before paging and is kept beside `total`, which is the
+                // page vocabulary: a caller written against the old shape still reads the same
+                // number rather than silently reading `returned`, which is a different one.
+                put("count", held.size)
+                put("totalBytes", totalBytes)
+            },
+        ) { json, index -> json.obj { renderSnapshot(held[index]) } }
     }
 
-    private fun rewind(command: AgentCommand, context: AgentContext): AgentResult? {
-        val ticks = command.int("ticks")
+    @AgentTool(
+        name = "time.rewind",
+        description = "Restore the world to a tick in the past and leave it paused. The " +
+            "landing is exact at any distance. Use it to re-examine the moment before a " +
+            "bug rather than reproducing it again.",
+    )
+    public fun rewind(
+        context: AgentContext,
+        @Arg(description = "How many ticks back from now to land on.")
+        ticks: Int,
+    ): AgentResult? {
         if (ticks < 0) {
             return AgentResult.failed(
                 AgentErrorKind.BAD_ARGUMENT,
@@ -142,8 +224,17 @@ public class TimeToolset(
      * agent surface uses - deliberately not a raised time scale, which would still render a
      * frame per step and be bounded by the GPU.
      */
-    private fun fastForward(command: AgentCommand, context: AgentContext): AgentResult? {
-        val ticks = command.int("ticks")
+    @AgentTool(
+        name = "time.fast_forward",
+        description = "Run the simulation forwards as fast as the machine will, with no " +
+            "rendering at all, and leave it paused. Use it to reach a late-game state " +
+            "in milliseconds instead of raising the time scale, which still renders.",
+    )
+    public fun fastForward(
+        context: AgentContext,
+        @Arg(description = "How many ticks to run.")
+        ticks: Int,
+    ): AgentResult? {
         if (ticks < 0) {
             return AgentResult.failed(
                 AgentErrorKind.BAD_ARGUMENT,
@@ -227,90 +318,5 @@ public class TimeToolset(
          */
         public val NO_SNAPSHOT_RING: AgentErrorKind =
             AgentErrorKind(RewindFailure.NoSnapshotRing.code)
-
-        /** The eight tools, ascending by name. Registered by [engineToolModule]. */
-        public fun tools(): List<AgentToolDef<TimeToolset>> = listOf(
-            EngineContextToolDef<TimeToolset>(
-                name = "time.fast_forward",
-                description = "Run the simulation forwards as fast as the machine will, with no " +
-                    "rendering at all, and leave it paused. Use it to reach a late-game state " +
-                    "in milliseconds instead of raising the time scale, which still renders.",
-                owner = TimeToolset::class,
-                args = listOf(agentArg("ticks", "integer", "How many ticks to run.")),
-            ) { toolset, command, context -> toolset.fastForward(command, context) },
-
-            EngineToolDef<TimeToolset>(
-                name = "time.list_snapshots",
-                description = "List every snapshot the ring is holding with its tick, retention " +
-                    "window and byte size. Read it before time.rewind to see how far back the " +
-                    "history actually reaches.",
-                owner = TimeToolset::class,
-            ) { toolset, _ -> toolset.listSnapshots() },
-
-            EngineToolDef<TimeToolset>(
-                name = "time.pause",
-                description = "Freeze the simulation. Rendering continues, so screenshots still " +
-                    "work and the frame counter still moves - wait on tick, never on frame, to " +
-                    "tell a paused game from a stalled one.",
-                owner = TimeToolset::class,
-            ) { toolset, _ -> toolset.pause() },
-
-            EngineToolDef<TimeToolset>(
-                name = "time.resume",
-                description = "Unfreeze the simulation and let it step at its normal rate again. " +
-                    "Reach for it after a paused investigation, or after time.step or time.rewind, " +
-                    "both of which leave the loop paused.",
-                owner = TimeToolset::class,
-            ) { toolset, _ -> toolset.resume() },
-
-            EngineContextToolDef<TimeToolset>(
-                name = "time.rewind",
-                description = "Restore the world to a tick in the past and leave it paused. The " +
-                    "landing is exact at any distance. Use it to re-examine the moment before a " +
-                    "bug rather than reproducing it again.",
-                owner = TimeToolset::class,
-                args = listOf(
-                    agentArg("ticks", "integer", "How many ticks back from now to land on."),
-                ),
-            ) { toolset, command, context -> toolset.rewind(command, context) },
-
-            EngineToolDef<TimeToolset>(
-                name = "time.set_time_scale",
-                description = "Set how many fixed steps run per host frame. It never changes dt " +
-                    "- the 1/60s step is invariant - so slowing time down does not change any " +
-                    "physics result, only how much of it you see per second.",
-                owner = TimeToolset::class,
-                args = listOf(
-                    agentArg(
-                        "scale", "number",
-                        "Simulated seconds per wall second, from 0 to ${GameLoop.MAX_TIME_SCALE}.",
-                    ),
-                ),
-            ) { toolset, command -> toolset.setTimeScale(command) },
-
-            EngineToolDef<TimeToolset>(
-                name = "time.snapshot",
-                description = "Capture the world as it stands into the snapshot ring and return " +
-                    "its tick and size. It does not pause: a capture is an observation, so use " +
-                    "it to mark a state you intend to come back to.",
-                owner = TimeToolset::class,
-            ) { toolset, _ -> toolset.snapshot() },
-
-            EngineContextToolDef<TimeToolset>(
-                name = "time.step",
-                description = "Advance the simulation by exactly this many ticks with no " +
-                    "rendering, and report the tick before and after. This is the tool to reach " +
-                    "for whenever an assertion has to be about a named tick rather than a moment.",
-                owner = TimeToolset::class,
-                args = listOf(
-                    agentArg(
-                        "ticks", "integer",
-                        "Ticks to advance. One tick is one 1/60s simulation step.",
-                        required = false,
-                        default = "1",
-                    ),
-                ),
-            ) { toolset, command, context -> toolset.step(command, context) },
-        )
     }
 }

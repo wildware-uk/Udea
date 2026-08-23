@@ -192,6 +192,59 @@
           }
         }
       ]
+    },
+    {
+      "name": "sim",
+      "tools": [
+        {
+          "name": "sim.advance",
+          "description": "Advance this timeline by a number of ticks after the current tick has finished, and answer with what actually ran. Use it when an assertion has to be about a named tick rather than a moment.",
+          "args": [
+            {
+              "name": "ticks",
+              "type": "integer",
+              "description": "Ticks to advance. One tick is one 1/60s simulation step.",
+              "required": false,
+              "default": "1"
+            }
+          ],
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "ticks": {
+                "type": "integer",
+                "description": "Ticks to advance. One tick is one 1/60s simulation step. (default 1)"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "sim.describe",
+          "description": "Report what this timeline is holding without changing it. Reach for it before advancing, to find out how far the history already reaches.",
+          "args": [
+            {
+              "name": "verbose",
+              "type": "boolean",
+              "description": "Include the per-request breakdown as well as the count.",
+              "required": false,
+              "default": "false"
+            }
+          ],
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "verbose": {
+                "type": "boolean",
+                "description": "Include the per-request breakdown as well as the count. (default false)"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
     }
   ]
 }

@@ -1,0 +1,6 @@
+# The compiled vendored client and its toolchain. Both are reproducible from `vendor/*.ts` and
+# `package-lock.json` by `npm ci && npm run build`, and `dist/` in particular must never be
+# committed: a checked-in build of a vendored source is a second copy that can disagree with
+# the one `verify-vendor` hashes.
+node_modules/
+dist/

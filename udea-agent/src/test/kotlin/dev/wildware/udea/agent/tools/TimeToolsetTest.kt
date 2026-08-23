@@ -156,7 +156,12 @@ class TimeToolsetTest {
 
         assertEquals(TimeToolset.NO_SNAPSHOT_RING, snapshotError.kind)
         assertEquals(RewindFailure.NoSnapshotRing.code, rewindError.kind.id)
-        assertEquals("""{"count":0,"totalBytes":0,"snapshots":[]}""", harness.ok("time.list_snapshots"))
+        // An empty ring is still a page: `hasMore:false` is what tells a caller it has seen
+        // everything, and its absence is what an unpaged answer could never say.
+        assertEquals(
+            """{"count":0,"totalBytes":0,"total":0,"offset":0,"snapshots":[],"returned":0,"hasMore":false}""",
+            harness.ok("time.list_snapshots"),
+        )
     }
 
     @Test

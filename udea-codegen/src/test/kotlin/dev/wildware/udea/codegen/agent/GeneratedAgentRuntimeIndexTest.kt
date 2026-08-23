@@ -9,6 +9,7 @@ import dev.wildware.udea.codegen.fixtures.Health
 import dev.wildware.udea.codegen.fixtures.MatchClock
 import dev.wildware.udea.codegen.fixtures.MatchPhase
 import dev.wildware.udea.codegen.fixtures.Playground
+import dev.wildware.udea.codegen.fixtures.Timeline
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -32,11 +33,16 @@ class GeneratedAgentRuntimeIndexTest {
     @Test
     fun `a discovered tool module dispatches to the toolset a host registered`() {
         val playground = Playground()
-        val index = ToolIndex.builder().discover().toolset(playground).build()
+        // Two toolsets, because that is the shape a host is actually in: one `ServiceLoader`
+        // index naming tools from several declaring classes, and a receiver resolved per tool.
+        val index = ToolIndex.builder().discover().toolset(playground).toolset(Timeline()).build()
 
         assertEquals(listOf("CodegenFixtures"), index.moduleNames)
         assertEquals(
-            listOf("set_overlays", "set_stance", "spawn_blueprint", "tag_entity"),
+            listOf(
+                "set_overlays", "set_stance", "sim.advance", "sim.describe",
+                "spawn_blueprint", "tag_entity",
+            ),
             index.tools.map { it.name },
         )
 
@@ -54,13 +60,18 @@ class GeneratedAgentRuntimeIndexTest {
         // Not an identity check for its own sake: `owner` is what lets an index hold
         // `AgentToolDef<*>` and still find the right receiver, and an emitter that wrote the
         // wrong class here would fail only at a call, with a ClassCastException.
-        val tools = ToolIndex.builder().discover().toolset(Playground()).build().tools
+        val tools = ToolIndex.builder()
+            .discover()
+            .toolset(Playground())
+            .toolset(Timeline())
+            .build()
+            .tools
 
         assertTrue(tools.isNotEmpty(), "nothing was discovered, so nothing below is checked")
         assertEquals(
-            listOf(Playground::class),
-            tools.map { it.owner }.distinct(),
-            "every fixture tool is declared on Playground",
+            listOf(Playground::class, Timeline::class),
+            tools.map { it.owner }.distinct().sortedBy { it.simpleName },
+            "each fixture tool is bound to the class that declared it",
         )
     }
 

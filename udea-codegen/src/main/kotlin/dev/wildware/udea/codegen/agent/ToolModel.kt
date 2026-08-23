@@ -18,8 +18,29 @@ internal data class ToolModel(
     val description: String,
     /** The declaring class or object: the toolset, and the receiver the dispatcher calls on. */
     val owner: ClassName,
-    /** The toolset name the manifest groups this tool under: the owner's name, snake_cased. */
+    /**
+     * The toolset name the manifest groups this tool under: the prefix of a `toolset.tool`
+     * name, or the owner's own name snake_cased when the name carries none.
+     */
     val toolset: String,
+    /**
+     * The name of the `AgentContext` parameter the function declared, or `null`.
+     *
+     * A tool is normally never handed one: it reaches the world through the toolset it is a
+     * member of, which the host constructed with whatever that tool mutates. There is exactly
+     * one thing a receiver cannot supply, and it is the reason this slot exists - a tool that
+     * has to run **outside** the `SimBarrier` drain it was called in. `Simulation.step` drains
+     * the barrier and `SimBarrier.drain` refuses to re-enter, so `time.step`, `time.rewind`
+     * and `time.fast_forward` cannot do their work where they are called; the only way to run
+     * after the tick and still answer for it is `AgentContext.answerLater`, which lives on the
+     * context and nowhere else.
+     *
+     * When this is set the emitted object implements `ContextualToolDef` rather than plain
+     * `AgentToolDef`, which is what `ToolIndex` checks before passing a context in. The
+     * parameter is **not** an argument: it carries no schema property and no `args[]` entry,
+     * because there is nothing an agent could put in it.
+     */
+    val contextParameter: String?,
     /** The Kotlin function to call. */
     val functionName: String,
     /** The generated object's simple name, e.g. `PlaygroundSpawnBlueprintTool`. */

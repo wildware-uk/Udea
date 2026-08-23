@@ -2,6 +2,7 @@ package dev.wildware.udea.agent.dispatch
 
 import dev.wildware.udea.agent.AgentCommand
 import dev.wildware.udea.agent.AgentResult
+import dev.wildware.udea.agent.AgentToolArg
 
 /**
  * Every tool this simulation can run, and how to run one.
@@ -43,12 +44,35 @@ public interface ToolRegistry {
     /** Runs [command] against [context] and returns what it produced. */
     public fun invoke(command: AgentCommand, context: AgentContext): AgentResult
 
+    /**
+     * The published arguments of [toolName], or an empty list for a tool this registry has never
+     * heard of.
+     *
+     * ## Why the dispatcher needs the declaration and not just the call
+     *
+     * The activity overlay (spec 3.7) anchors a world-space marker to what a call was *about* -
+     * a ring on the entity it inspected, a pin where a spawn landed. That anchor is derived from
+     * the tool's **declared** arguments, by
+     * [dev.wildware.udea.agent.activity.AnchorRule], and not from a table of tool names: half
+     * the tool surface is generated from `@AgentTool` in a game module the engine has never
+     * heard of, so a name table here could not be complete even in principle, and the overlay
+     * would silently stop marking every tool added after it was written.
+     *
+     * Declared on the registry rather than reached for through a cast to
+     * [dev.wildware.udea.agent.dispatch.ToolIndex] because the dispatcher takes this interface
+     * precisely so it can be driven by a hand-written registry in a test - and a cast would make
+     * the anchor path the one part of dispatch those tests could not reach.
+     */
+    public fun declaredArgs(toolName: String): List<AgentToolArg>
+
     public companion object {
         /** A registry with no tools. Every call answers `no_such_tool`. */
         public val EMPTY: ToolRegistry = object : ToolRegistry {
             override fun contains(toolName: String): Boolean = false
 
             override fun budgetMs(toolName: String): Long = 0L
+
+            override fun declaredArgs(toolName: String): List<AgentToolArg> = emptyList()
 
             override fun invoke(command: AgentCommand, context: AgentContext): AgentResult =
                 AgentResult.failed(

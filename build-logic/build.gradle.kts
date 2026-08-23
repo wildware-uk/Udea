@@ -4,6 +4,45 @@ plugins {
 
 group = "dev.wildware.udea.build"
 
+/**
+ * `udea-gradle`'s plugin sources, compiled a second time so that THIS build can apply them.
+ *
+ * A Gradle plugin that lives in a subproject cannot be applied to a sibling subproject of the
+ * same build: the plugin has to be on the settings-level classpath, and `:udea-gradle` is not
+ * built until after every build script has been evaluated. That is why `UdeaAgentPlugin` sat
+ * unreachable - a real class with no id and no applier - while the working Phase 1 demo lived in
+ * a test source set.
+ *
+ * The alternatives were worse. Moving the plugin into `build-logic` contradicts spec 4, which
+ * gives `udea-gradle` this job and expects it to be publishable for real games. `includeBuild`ing
+ * `udea-gradle` is circular: its own build script applies the `udea.gradle-plugin` convention from
+ * here. Copying the wiring into a convention plugin is the duplication that produces two
+ * implementations which disagree.
+ *
+ * So there is one source file and two compilations of it. `:udea-gradle:jar` remains the artifact
+ * a game outside this repository consumes; this compilation is how `:moba` gets it. The cost is
+ * real and worth stating: anything these sources reference must be resolvable from `build-logic`'s
+ * classpath too, so `udea-gradle` cannot start using `:udea-assets-compiler` types from
+ * `UdeaAgentPlugin` without splitting the file. `UdeaAgentPluginIdTest` pins the id and the
+ * implementation class against `udea-gradle`'s own `META-INF/gradle-plugins` descriptor, so the
+ * two declarations cannot drift.
+ */
+val udeaGradleSources: File = rootDir.resolve("../udea-gradle/src/main/kotlin")
+
+sourceSets.main {
+    kotlin.srcDir(udeaGradleSources)
+}
+
+gradlePlugin {
+    plugins {
+        register("udeaAgent") {
+            id = "dev.wildware.udea.agent"
+            implementationClass = "dev.wildware.udea.gradle.UdeaAgentPlugin"
+            description = "gamebridge.json, the debug-only agent source set, and the run wiring."
+        }
+    }
+}
+
 dependencies {
     implementation(libs.kotlin.gradle.plugin)
 
@@ -54,7 +93,7 @@ val outerBuildInputs: FileCollection = files(
     fileTree(rootDir.resolve("..")) {
         include("*/build.gradle.kts")
         include("build.gradle.kts")
-        include("udea-gradle/src/**/*.kt")
+        include("udea-gradle/src/**")
         include("moba/src/**/*.kt")
     },
 )

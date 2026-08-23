@@ -32,6 +32,23 @@ internal object AgentNames {
     /** One generated tool: name, description, schema and a direct-call dispatcher. */
     val AGENT_TOOL_DEF: ClassName = ClassName(PACKAGE, "AgentToolDef")
 
+    /**
+     * An [AGENT_TOOL_DEF] that also takes the [AGENT_CONTEXT] of the command being served.
+     *
+     * Emitted only for a tool that declared an `AgentContext` parameter. `ToolIndex` checks for
+     * this type and passes the context only to a tool that asked for one, so the ordinary
+     * generated surface is untouched.
+     */
+    val CONTEXTUAL_TOOL_DEF: ClassName = ClassName("$PACKAGE.tools", "ContextualToolDef")
+
+    /**
+     * What a tool is handed when it runs: the world, the engine services, and `answerLater`.
+     *
+     * Named here because a `@AgentTool` function may declare it as a parameter to say it must
+     * run outside the barrier drain it was called in. See `ToolModel.contextParameter`.
+     */
+    val AGENT_CONTEXT: ClassName = ClassName("$PACKAGE.dispatch", "AgentContext")
+
     /** One entry of the bridge's `tools[].args[]`: `{name, type, description, required, default}`. */
     val AGENT_TOOL_ARG: ClassName = ClassName(PACKAGE, "AgentToolArg")
 

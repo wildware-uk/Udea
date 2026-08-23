@@ -84,11 +84,14 @@ internal class ToolModelBuilder(private val logger: KSPLogger) {
         }
         val declaredName = annotation.stringArgument("name").orEmpty()
         val name = declaredName.ifEmpty { AgentNaming.snakeCase(function.simpleName.asString()) }
-        if (!AgentNaming.NAME_FORMAT.matches(name)) {
+        if (!AgentNaming.isLegalName(name)) {
             logger.error(
                 "@AgentTool name '$name' is not a legal MCP tool name. It must match " +
                     "${AgentNaming.NAME_FORMAT.pattern} - lower_snake_case, which is what a " +
-                    "model expects to type and what the manifest's uniqueness check keys on.",
+                    "model expects to type and what the manifest's uniqueness check keys on - " +
+                    "or ${AgentNaming.QUALIFIED_NAME_FORMAT.pattern}, which names the toolset " +
+                    "as well and is how the engine's own world.*, time.*, events.* and diag.* " +
+                    "tools are addressed.",
                 function,
             )
             failed = true
@@ -97,8 +100,32 @@ internal class ToolModelBuilder(private val logger: KSPLogger) {
         val description = annotation.stringArgument("description").orEmpty().trim()
         if (!checkDescription(description, function, name)) failed = true
 
+        // The context parameter is taken out before the arguments are described: it is not an
+        // argument at all - see `contextParameter` below - so publishing it would advertise a
+        // property no agent can supply, and describing it would demand an @Arg for it.
+        val contexts = function.parameters.filter(::isContextParameter)
+        if (contexts.size > 1) {
+            logger.error(
+                "@AgentTool ${function.simpleName.asString()} declares ${contexts.size} " +
+                    "AgentContext parameters. One command has one context; drop the extras.",
+                contexts[1],
+            )
+            failed = true
+        }
+        val context = contexts.firstOrNull()
+        if (context != null && context.hasDefault) {
+            logger.error(
+                "@AgentTool ${function.simpleName.asString()}'s AgentContext parameter has a " +
+                    "Kotlin default. The generated dispatcher always passes the context of the " +
+                    "command being served, so the default could never be used; remove the `= ...`.",
+                context,
+            )
+            failed = true
+        }
+
         val args = ArrayList<ToolArgModel>(function.parameters.size)
         for (parameter in function.parameters) {
+            if (isContextParameter(parameter)) continue
             val arg = describeArgument(function, parameter)
             if (arg == null) failed = true else args += arg
         }
@@ -110,7 +137,8 @@ internal class ToolModelBuilder(private val logger: KSPLogger) {
             name = name,
             description = description,
             owner = ownerName,
-            toolset = AgentNaming.snakeCase(ownerName.simpleName),
+            toolset = AgentNaming.toolsetOf(name, ownerName.simpleName),
+            contextParameter = context?.name?.asString(),
             functionName = function.simpleName.asString(),
             objectName = AgentNaming.toolObjectName(ownerName.simpleName, function.simpleName.asString()),
             args = args,
@@ -308,6 +336,17 @@ internal class ToolModelBuilder(private val logger: KSPLogger) {
                 .toList(),
         )
     }
+
+    /**
+     * Whether [parameter] is the [AgentNames.AGENT_CONTEXT] a tool asked for.
+     *
+     * Matched on the fully-qualified type name and not on an annotation, because there is
+     * exactly one type this can be and asking an author to annotate it would be asking them to
+     * say the same thing twice.
+     */
+    private fun isContextParameter(parameter: KSValueParameter): Boolean =
+        parameter.type.resolve().declaration.qualifiedName?.asString() ==
+            AgentNames.AGENT_CONTEXT.canonicalName
 
     private companion object {
         const val LIST_FQN = "kotlin.collections.List"

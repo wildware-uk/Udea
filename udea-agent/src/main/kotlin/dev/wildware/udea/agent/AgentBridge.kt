@@ -1,5 +1,7 @@
 package dev.wildware.udea.agent
 
+import dev.wildware.udea.agent.activity.AgentActivityRing
+import dev.wildware.udea.agent.activity.AgentNarration
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -38,6 +40,22 @@ public class AgentBridge(
     public val queueCapacity: Int = DEFAULT_QUEUE_CAPACITY,
     /** Recent game events, bounded and non-destructive to read. */
     public val events: AgentEventRing = AgentEventRing(),
+    /**
+     * Recent **agent** tool calls, for the human-facing activity overlay (spec 3.7).
+     *
+     * Separate from [events] and not merged into it, because the two have opposite audiences.
+     * [events] is the game telling the agent what happened and is rendered into `/state`; this
+     * is the agent telling a human what *it* did, and is rendered into nothing the agent can
+     * read. Merging them would put the agent's own narration into the document the agent polls,
+     * which is precisely the feedback loop spec 3.7 exists to prevent.
+     */
+    public val activity: AgentActivityRing = AgentActivityRing(),
+    /**
+     * The agent's current one-line caption, set by `agent.say`. Also invisible to the agent.
+     *
+     * Wall-timed and never snapshotted: see [AgentNarration].
+     */
+    public val narration: AgentNarration = AgentNarration(),
     /** How many command answers are kept for the digest to render. */
     resultCapacity: Int = DEFAULT_RESULT_CAPACITY,
 ) {

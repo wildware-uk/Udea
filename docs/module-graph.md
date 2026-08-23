@@ -39,7 +39,7 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 | `udea-net` | `udea.kotlin-library` | Transports, baselines, relevancy, prediction, RPC | `common/network/*`, both `Network*System`s, KryoNet | `udea-core` (api) | `moba` |
 | `udea-render` | `udea.kotlin-library-gl` | The only module that touches GL | `SpriteBatchSystem` et al., `GameScreen`'s rendering half | `udea-core` (api), `udea-assets`, gdx + gdx-backend-lwjgl3 | `moba` |
 | `udea-agent` | `udea.kotlin-library` | MCP surface + test harness — same code path | FruitGameKTX's `DebugBridge` pattern, generalised | `udea-core` (api) | `udea-agent-host` |
-| `udea-agent-host` | `udea.kotlin-library` | HTTP server. Debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` | `udea-agent` (api) | *(nothing — deliberately not `moba`)* |
+| `udea-agent-host` | `udea.kotlin-library` | HTTP server. Debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` | `udea-agent` (api); `udea-render` + gdx **`testImplementation` only** | *(nothing — deliberately not `moba`)* |
 | `udea-gradle` | `udea.gradle-plugin` | Tasks, verifiers, `gamebridge.json` emission | old `gradle-plugin` (which leaked `gradleApi` onto the game runtime) | `udea-assets-compiler`, `udea-diagnostics`, `gradleApi()` (`compileOnly`) | *(nothing — applied as a plugin, never depended on)* |
 | `moba` | `udea.kotlin-library` | The example game | `example` | `udea-core`, `udea-gas`, `udea-net`, `udea-assets`, `udea-render` (all `implementation`) | — |
 
@@ -54,6 +54,16 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
   runtime classpath through `implementation(gradleApi())`; here `gradleApi()` is
   `compileOnly` and nothing depends on the project.
 - `moba` (or any shipping runtime classpath) → `udea-agent-host`.
+
+`udea-agent-host`'s test-only edge onto `udea-render` is the exception that proves both rules.
+Its render toolset is declared against a `RenderControl` port; `udea-render` implements the other
+half as `PresentationControl`; and **neither module may name the other** — an arrow from the
+renderer to the host would put the agent surface on `moba`'s runtime classpath (`UDEA-REL-002`),
+and an arrow from the host to the renderer would put GL on a headless module (`UDEA-MG-002`, and
+the bytecode scan). The adapter therefore belongs to whatever assembles a host out of both, which
+is a game module or a launcher. Today that is the `udeaPhase1OffscreenDemo` entry point in test
+sources, because `UdeaAgentPlugin` has no plugin id and `moba` has no run task; when those land
+the adapter moves there and this edge goes away.
 
 ---
 

@@ -134,6 +134,16 @@ internal class TestToolRegistry : ToolRegistry {
 
     override fun budgetMs(toolName: String): Long = budgets[toolName] ?: 0L
 
+    /**
+     * Empty: a tool registered here is a lambda, so it has no declared arguments to publish.
+     *
+     * Stated rather than left to a default on the interface. A registry that answered with
+     * something plausible would give the activity ring an anchor rule derived from arguments
+     * that do not exist, and the overlay would then be labelling calls after a guess.
+     */
+    override fun declaredArgs(toolName: String): List<dev.wildware.udea.agent.AgentToolArg> =
+        emptyList()
+
     override fun invoke(command: AgentCommand, context: AgentContext): AgentResult {
         calls += command.name
         return tools.getValue(command.name).invoke(context)

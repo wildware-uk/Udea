@@ -27,6 +27,25 @@ public object AgentHostErrors {
     public val NO_ARTIFACT_STORE: AgentErrorKind = AgentErrorKind("no_artifact_store")
 
     /**
+     * A capture was asked for and no frame came back.
+     *
+     * Deliberately distinct from [NO_RENDER_CONTEXT]: that one means the toolset is not live in
+     * this process and the remedy is to stop calling it, this one means the toolset *is* live and
+     * this particular frame did not arrive - the render loop died, the driver refused the read.
+     * An agent that could not tell them apart would give up on screenshots after one bad frame.
+     */
+    public val CAPTURE_FAILED: AgentErrorKind = AgentErrorKind("capture_failed")
+
+    /**
+     * `afterTick` names a tick the simulation has not reached.
+     *
+     * A separate kind because the remedy is a specific other tool call - `time.step` to that
+     * tick, then screenshot - rather than a different argument value, which is what
+     * `bad_argument` would suggest.
+     */
+    public val TICK_NOT_REACHED: AgentErrorKind = AgentErrorKind("tick_not_reached")
+
+    /**
      * This process has no GL context, so the render toolset is not live.
      *
      * The exact token matters: `RenderUnavailable.NoRenderContext.code` is the same string, and a

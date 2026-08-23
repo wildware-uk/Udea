@@ -1,12 +1,19 @@
 package dev.wildware.udea.agent.host
 
 import dev.wildware.udea.agent.AgentCommand
+import dev.wildware.udea.agent.AgentErrorKind
 import dev.wildware.udea.agent.AgentResult
 import dev.wildware.udea.agent.AgentToolArg
 import dev.wildware.udea.agent.AgentToolDef
 import dev.wildware.udea.agent.ToolModule
-import dev.wildware.udea.core.host.CaptureOutcome
+import dev.wildware.udea.agent.dispatch.AgentContext
+import dev.wildware.udea.agent.tools.ContextualToolDef
 import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.core.identity.NetId
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlin.reflect.KClass
 
 /**
@@ -18,12 +25,25 @@ import kotlin.reflect.KClass
  * encode, and the `FrameCaptureSlot` that fulfils a request *after* the frame is rendered and
  * before the buffer is swapped, which is what makes `screenshot(afterTick = T)` reproducible
  * rather than whenever-the-HTTP-thread-asked. None of that can live in this module: it has no GL
- * on its classpath and would fail `udeaVerifyHeadless` for naming a GL type.
+ * on its classpath and would fail `udeaVerifyHeadless` for naming a GL type. The arrow cannot
+ * point the other way either - `ReleaseRules.CLASSPATH_RULE` fails any release build that
+ * resolves `:udea-agent-host`, so a renderer that depended on this module would put the agent
+ * surface in the shipped game. Whoever assembles a host out of both writes the adapter; see
+ * `PresentationControl` in `udea-render` for the other half.
  *
- * So this is the seam. A renderer implements it; this module declares the tools, decides what
- * `Headless` answers, and files the bytes in the artifact store. `afterTick` is carried across
- * the seam rather than resolved here, because only the implementation knows where a frame
- * boundary is.
+ * ## Why capture hands back a `Future` and does not just return the bytes
+ *
+ * A tool runs inside a `SimBarrier` drain, and on an `Offscreen` or `Windowed` host the thread
+ * running that drain **is** the render thread: `Lwjgl3Backend` hands the frame callback to the GL
+ * thread, and `GameLoop.frame` ticks and then renders on it. A `capture()` that blocked until the
+ * next frame would be waiting for the thread it is running on. `ToolRegistry` states the rule in
+ * as many words - *it must not block, sleep or wait on another thread*.
+ *
+ * So the implementation queues the request and returns; the frame drawn later in the same
+ * `GameHost.frame` call settles the future; and the tool collects it from
+ * [AgentContext.answerLater], which runs after the tick and before the state document is
+ * published. One frame, no blocking, and the command still completes with a real answer rather
+ * than a promise.
  */
 public interface RenderControl {
 
@@ -34,24 +54,47 @@ public interface RenderControl {
     public val framebufferHeight: Int
 
     /**
-     * Captures the frame, or the region of it, as encoded image bytes.
+     * Queues a capture and returns immediately.
      *
      * @param region `null` for the whole framebuffer. Already validated against the framebuffer
      *   by the caller, so an implementation may read it as given.
-     * @param afterTick capture the first frame rendered after this simulation tick, or `null` for
-     *   the next frame. An implementation that cannot schedule captures may ignore it; it must
-     *   not block waiting for the tick, because the simulation thread is the caller.
+     * @param afterTick serve the first frame drawn once this simulation tick has finished, or
+     *   `null` for the next frame. An implementation must **not** block waiting for it.
+     * @return a future the renderer settles at the capture point of the frame that serves it. A
+     *   failure arrives as an [ExecutionException]; its cause's message is reported to the agent.
      */
-    public fun capture(region: PixelRegion?, afterTick: Long?): CaptureOutcome
+    public fun capture(region: PixelRegion?, afterTick: Long?): Future<CaptureFrame>
 
-    /** Points the camera at world [x],[y] with the given [zoom]. */
+    /** Points the camera at world [x],[y] with the given [zoom], and stops following. */
     public fun setCamera(x: Float, y: Float, zoom: Float)
 
     /** Follows the entity with this network id, or stops following when [netId] is `null`. */
-    public fun followEntity(netId: Long?)
+    public fun followEntity(netId: NetId?)
 
     /** Sets debug draw on or off, or toggles when [enabled] is `null`. Returns the new state. */
     public fun toggleDebugDraw(enabled: Boolean?): Boolean
+}
+
+/**
+ * One captured frame, as it crosses the port.
+ *
+ * Carries the dimensions and the tick **the renderer stamped it with** rather than the ones this
+ * module assumed. The difference matters for exactly the reason the tool exists: an agent that
+ * asked for `afterTick = 200` and quietly got the frame drawn at tick 199 would compare it
+ * against the wrong expectation, and a result that echoed the *request* back could never tell it.
+ */
+public class CaptureFrame(
+    /** Width of [image] in pixels. */
+    public val width: Int,
+    /** Height of [image] in pixels. */
+    public val height: Int,
+    /** The simulation tick the frame was drawn at, as the renderer read the clock. */
+    public val tick: Long,
+    /** PNG bytes, colour type 6, every alpha byte 255. */
+    public val image: ByteArray,
+) {
+    override fun toString(): String =
+        "CaptureFrame(${width}x$height at tick $tick, ${image.size} bytes)"
 }
 
 /** A rectangle of the framebuffer, in pixels from the bottom-left, as GL counts them. */
@@ -85,13 +128,19 @@ public class PixelRegion(
  * actionable. `completedCommandId` still advances, so a caller polling for the answer is released
  * by the command finishing rather than by it succeeding.
  *
- * ## What is real here and what is not
+ * ## How a screenshot completes
  *
- * Real: the declarations, the `Headless` behaviour, region validation with a clamped-bounds error
- * message, and the hand-off of bytes to [AgentArtifacts]. Not here: the pixels. A host that wires
- * `control = null` - which is every host today, because no renderer implements [RenderControl]
- * yet - gets the same typed `no_render_context` a `Headless` process does, which is honest: there
- * is no context this toolset can reach.
+ * `screenshot` and `screenshot_region` are [ContextualToolDef]s: they queue the capture, hand the
+ * future to [AgentContext.answerLater], and the answer is assembled after the tick that queued it
+ * - by which point the frame that serves it has been drawn, because `GameLoop.frame` renders
+ * after it ticks. The command completes with the artifact id, so `completedCommandId` still means
+ * "the picture exists", not "the picture was asked for".
+ *
+ * `afterTick` naming a tick that has **not been simulated yet** is refused rather than queued.
+ * The request would be legitimate - the renderer holds it across frames quite happily - but the
+ * answer could not be assembled without blocking the thread that draws those frames. Refusing it
+ * with the current tick in the message tells an agent exactly what to do instead (`time.step`,
+ * then screenshot), which is worth more than a capture that arrives silently late.
  */
 public class RenderToolset(
     /** Reported by `/health`; the reason `Headless` refuses. */
@@ -102,8 +151,15 @@ public class RenderToolset(
     private val artifacts: AgentArtifacts? = null,
 ) {
 
-    /** Captures the whole framebuffer. */
-    public fun screenshot(afterTick: Long?): AgentResult = capture(null, afterTick)
+    /**
+     * Captures the whole framebuffer.
+     *
+     * @return `null` once the capture has been queued, which is the idiom `AgentContext` fixes
+     *   for a tool that answers later: the dispatcher skips its own completion, and a value here
+     *   would be a second answer to one command id.
+     */
+    public fun screenshot(afterTick: Long?, context: AgentContext): AgentResult? =
+        capture(null, afterTick, context)
 
     /**
      * Captures a region, in framebuffer pixels from the bottom-left.
@@ -113,25 +169,43 @@ public class RenderToolset(
      * a 640x480 image back would compare it against the wrong expectation and conclude the game
      * had changed.
      */
-    public fun screenshotRegion(x: Int, y: Int, w: Int, h: Int, afterTick: Long?): AgentResult {
-        val renderer = control ?: return unavailable()
-        if (mode == RenderMode.Headless) return unavailable()
+    public fun screenshotRegion(
+        x: Int,
+        y: Int,
+        w: Int,
+        h: Int,
+        afterTick: Long?,
+        context: AgentContext,
+    ): AgentResult? {
+        val renderer = live() ?: return unavailable()
         val width = renderer.framebufferWidth
         val height = renderer.framebufferHeight
         if (w <= 0 || h <= 0 || x < 0 || y < 0 || x + w > width || y + h > height) {
             return AgentResult.failed(
-                dev.wildware.udea.agent.AgentErrorKind.BAD_ARGUMENT,
+                AgentErrorKind.BAD_ARGUMENT,
                 "screenshot_region($x, $y, $w, $h) is not inside the framebuffer; the largest " +
                     "region here is (0, 0, $width, $height)",
             )
         }
-        return capture(PixelRegion(x, y, w, h), afterTick)
+        return capture(PixelRegion(x, y, w, h), afterTick, context)
     }
 
     /** Points the camera. */
     public fun setCamera(x: Float, y: Float, zoom: Float): AgentResult {
-        val renderer = control ?: return unavailable()
-        if (mode == RenderMode.Headless) return unavailable()
+        val renderer = live() ?: return unavailable()
+        if (!x.isFinite() || !y.isFinite()) {
+            return AgentResult.failed(
+                AgentErrorKind.BAD_ARGUMENT,
+                "set_camera needs a finite world position, was ($x, $y)",
+            )
+        }
+        if (!(zoom > 0f) || !zoom.isFinite()) {
+            return AgentResult.failed(
+                AgentErrorKind.BAD_ARGUMENT,
+                "set_camera zoom is a positive multiplier, was $zoom; zero or less collapses the " +
+                    "projection and draws a frame of nothing",
+            )
+        }
         renderer.setCamera(x, y, zoom)
         return AgentResult.ok {
             put("x", x)
@@ -142,55 +216,132 @@ public class RenderToolset(
 
     /** Follows an entity, or stops following when [netId] is negative. */
     public fun followEntity(netId: Long): AgentResult {
-        val renderer = control ?: return unavailable()
-        if (mode == RenderMode.Headless) return unavailable()
-        val target = netId.takeIf { it >= 0 }
-        renderer.followEntity(target)
-        return AgentResult.ok { put("following", target ?: -1L) }
+        val renderer = live() ?: return unavailable()
+        if (netId < 0L) {
+            renderer.followEntity(null)
+            return AgentResult.ok { put("following", -1L) }
+        }
+        // `NetId.ofRaw` refuses a word with reserved bits set, which is what an agent that
+        // invented an id rather than reading one out of a query would hand over. Turned into a
+        // typed bad_argument here rather than left to throw: the dispatcher would report it as
+        // `tool_threw`, which reads as an engine defect instead of a wrong argument.
+        val id = runCatching { NetId.ofRaw(netId.toInt()) }.getOrNull()
+        if (id == null || netId > Int.MAX_VALUE) {
+            return AgentResult.failed(
+                AgentErrorKind.BAD_ARGUMENT,
+                "$netId is not a NetId this engine can hold; pass the packed value an entity " +
+                    "query returned, or -1 to stop following",
+            )
+        }
+        renderer.followEntity(id)
+        return AgentResult.ok { put("following", netId) }
     }
 
     /** Turns debug draw on, off, or over. */
     public fun toggleDebugDraw(enabled: Boolean?): AgentResult {
-        val renderer = control ?: return unavailable()
-        if (mode == RenderMode.Headless) return unavailable()
+        val renderer = live() ?: return unavailable()
         return AgentResult.ok { put("debugDraw", renderer.toggleDebugDraw(enabled)) }
     }
 
-    private fun capture(region: PixelRegion?, afterTick: Long?): AgentResult {
-        val renderer = control ?: return unavailable()
-        if (mode == RenderMode.Headless) return unavailable()
+    /**
+     * Queues the capture now and answers for it after the tick.
+     *
+     * The two halves are deliberately split across [AgentContext.answerLater]: the request has to
+     * be queued *before* the frame is drawn, and the answer can only be assembled *after* it. Both
+     * happen on the simulation thread, one tick apart, with the render in between.
+     */
+    private fun capture(
+        region: PixelRegion?,
+        afterTick: Long?,
+        context: AgentContext,
+    ): AgentResult? {
+        val renderer = live() ?: return unavailable()
         val store = artifacts ?: return AgentResult.failed(
             AgentHostErrors.NO_ARTIFACT_STORE,
             "this instance has no artifact store, so a capture has nowhere to go",
         )
-        return when (val outcome = renderer.capture(region, afterTick)) {
-            is CaptureOutcome.Unavailable -> AgentResult.failed(
-                // The renderer's own token, not a translated one: `RenderUnavailable.code` is
-                // stable across renames precisely so that it can be reported verbatim.
-                dev.wildware.udea.agent.AgentErrorKind(outcome.reason.code),
-                "the renderer could not capture a frame: ${outcome.reason.code}",
+        val now = context.tick.value
+        if (afterTick != null && afterTick >= now) {
+            return AgentResult.failed(
+                AgentHostErrors.TICK_NOT_REACHED,
+                "afterTick=$afterTick has not been simulated yet: the clock is about to run tick " +
+                    "$now, and the frame that would serve this capture is drawn by the same " +
+                    "thread this call is on. Run time.step first, then screenshot.",
             )
+        }
 
-            is CaptureOutcome.Captured -> {
-                val id = store.put(outcome.image, AgentArtifacts.PNG)
-                    ?: return AgentResult.failed(
-                        AgentHostErrors.NO_ARTIFACT_STORE,
-                        "the capture succeeded but could not be written to ${store.root}",
-                    )
-                val artifact = store.get(id)
-                // Path first, id second: the path is ~10 tokens and covers the same-machine case,
-                // and the id is what a remote agent hands to GET /artifact. Bytes never travel in
-                // a digest.
-                AgentResult.ok {
-                    put("artifactId", id.value)
-                    put("path", artifact?.path?.toString())
-                    put("w", region?.w ?: renderer.framebufferWidth)
-                    put("h", region?.h ?: renderer.framebufferHeight)
-                    put("tick", afterTick ?: -1L)
-                }
-            }
+        val pending = runCatching { renderer.capture(region, afterTick) }.getOrElse { failure ->
+            return AgentResult.failed(
+                AgentHostErrors.CAPTURE_FAILED,
+                "the renderer refused the capture request: ${failure.message ?: failure}",
+            )
+        }
+
+        context.answerLater { file(pending, store, region) }
+        // The `answerLater` idiom, the same one `TimeToolset.step` uses: the dispatcher skips its
+        // own completion when a tool has deferred its answer, so returning anything here would be
+        // a second answer under one command id.
+        return null
+    }
+
+    /**
+     * Collects a settled capture and files it. Runs after the tick that queued it.
+     *
+     * The wait is bounded and short. On a host whose renderer and simulation share a thread - every
+     * `Offscreen` and `Windowed` host - the future is already complete by the time this runs, so
+     * the deadline is never approached; it exists for a host that pumps its agent loop on a
+     * separate thread, and for the case where the render loop has died, where waiting forever
+     * would wedge the game loop instead of reporting.
+     */
+    private fun file(
+        pending: Future<CaptureFrame>,
+        store: AgentArtifacts,
+        region: PixelRegion?,
+    ): AgentResult {
+        val frame = try {
+            pending.get(CAPTURE_GRACE_MILLIS, TimeUnit.MILLISECONDS)
+        } catch (_: TimeoutException) {
+            pending.cancel(false)
+            return AgentResult.failed(
+                AgentHostErrors.CAPTURE_FAILED,
+                "no frame was drawn for this capture within ${CAPTURE_GRACE_MILLIS}ms; the " +
+                    "render loop has stopped drawing",
+            )
+        } catch (failed: ExecutionException) {
+            val cause = failed.cause ?: failed
+            return AgentResult.failed(
+                AgentHostErrors.CAPTURE_FAILED,
+                "the renderer could not capture a frame: ${cause.message ?: cause}",
+            )
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            return AgentResult.failed(
+                AgentHostErrors.CAPTURE_FAILED,
+                "the simulation thread was interrupted while collecting a capture",
+            )
+        }
+
+        val id = store.put(frame.image, AgentArtifacts.PNG)
+            ?: return AgentResult.failed(
+                AgentHostErrors.NO_ARTIFACT_STORE,
+                "the capture succeeded but could not be written to ${store.root}",
+            )
+        val artifact = store.get(id)
+        // Path first, id second: the path is ~10 tokens and covers the same-machine case,
+        // and the id is what a remote agent hands to GET /artifact. Bytes never travel in
+        // a digest.
+        return AgentResult.ok {
+            put("artifactId", id.value)
+            put("path", artifact?.path?.toString())
+            put("w", frame.width)
+            put("h", frame.height)
+            put("tick", frame.tick)
+            put("region", region?.toString())
         }
     }
+
+    /** The renderer, or `null` when this process has no live render context. */
+    private fun live(): RenderControl? = if (mode == RenderMode.Headless) null else control
 
     private fun unavailable(): AgentResult = AgentResult.failed(
         AgentHostErrors.NO_RENDER_CONTEXT,
@@ -204,6 +355,18 @@ public class RenderToolset(
     )
 
     override fun toString(): String = "RenderToolset($mode, control=${control != null})"
+
+    private companion object {
+
+        /**
+         * How long the deferred answer waits for a frame that should already have been drawn.
+         *
+         * Half a second: long enough to absorb a stalled frame on a loaded machine, short enough
+         * that a host which shares its thread between simulation and rendering - where crossing
+         * this is a defect, not a delay - reports rather than freezing the game for a human.
+         */
+        const val CAPTURE_GRACE_MILLIS: Long = 500L
+    }
 }
 
 /**
@@ -247,8 +410,31 @@ public abstract class RenderToolDef(
     override val owner: KClass<*> = RenderToolset::class
 }
 
+/**
+ * Base for the two capture declarations, which need the [AgentContext] of the command.
+ *
+ * See [ContextualToolDef]: a capture is queued during the tick and answered after it, and
+ * `answerLater` lives on the context. The two-argument [invoke] is unreachable through
+ * `ToolIndex` and refuses rather than capturing without being able to answer.
+ */
+public abstract class CaptureToolDef(
+    override val name: String,
+    override val description: String,
+    override val args: List<AgentToolArg>,
+    override val inputSchema: String,
+) : ContextualToolDef<RenderToolset> {
+
+    override val owner: KClass<*> = RenderToolset::class
+
+    override fun invoke(receiver: RenderToolset, command: AgentCommand): Any? =
+        throw UnsupportedOperationException(
+            "$name answers after the tick and needs the AgentContext of the command it is " +
+                "serving; call the three-argument invoke, which is what ToolIndex does",
+        )
+}
+
 /** `render.screenshot`. */
-public object ScreenshotTool : RenderToolDef(
+public object ScreenshotTool : CaptureToolDef(
     name = "render.screenshot",
     description = "Capture the whole frame as a PNG and file it in the artifact store. Reach for " +
         "it whenever a number cannot tell you what the screen looks like - before and after a " +
@@ -259,21 +445,29 @@ public object ScreenshotTool : RenderToolDef(
         AgentToolArg(
             "afterTick",
             "integer",
-            "Capture the first frame rendered after this simulation tick, making the capture " +
-                "reproducible. Omit to capture the next frame.",
+            "Capture the first frame drawn once this already-simulated tick has finished, and " +
+                "report the tick the frame was actually drawn at. A tick still in the future is " +
+                "refused: step to it first. Omit to capture the next frame.",
             required = false,
             default = "",
         ),
     ),
     inputSchema = """{"type":"object","properties":{"afterTick":{"type":"integer","description":""" +
-        """"Capture the first frame after this tick. Omit for the next frame."}},"required":[]}""",
+        """"Capture the first frame after this tick, which must already have been simulated. """ +
+        """Omit for the next frame."}},"required":[]}""",
 ) {
-    override fun invoke(receiver: RenderToolset, command: AgentCommand): Any? =
-        receiver.screenshot(if ("afterTick" in command) command.long("afterTick") else null)
+    override fun invoke(
+        receiver: RenderToolset,
+        command: AgentCommand,
+        context: AgentContext,
+    ): Any? = receiver.screenshot(
+        afterTick = if ("afterTick" in command) command.long("afterTick") else null,
+        context = context,
+    )
 }
 
 /** `render.screenshot_region`. */
-public object ScreenshotRegionTool : RenderToolDef(
+public object ScreenshotRegionTool : CaptureToolDef(
     name = "render.screenshot_region",
     description = "Capture a rectangle of the frame as a PNG, in framebuffer pixels measured from " +
         "the bottom-left. Use it to watch one part of the screen - a health bar, a minimap - " +
@@ -288,7 +482,8 @@ public object ScreenshotRegionTool : RenderToolDef(
         AgentToolArg(
             "afterTick",
             "integer",
-            "Capture the first frame rendered after this tick. Omit for the next frame.",
+            "Capture the first frame drawn once this already-simulated tick has finished. Omit " +
+                "for the next frame.",
             required = false,
             default = "",
         ),
@@ -296,16 +491,20 @@ public object ScreenshotRegionTool : RenderToolDef(
     inputSchema = """{"type":"object","properties":{"x":{"type":"integer","description":"Left edge."},""" +
         """"y":{"type":"integer","description":"Bottom edge."},"w":{"type":"integer","description":"Width."},""" +
         """"h":{"type":"integer","description":"Height."},"afterTick":{"type":"integer",""" +
-        """"description":"Capture after this tick."}},"required":["x","y","w","h"]}""",
+        """"description":"Capture after this already-simulated tick."}},"required":["x","y","w","h"]}""",
 ) {
-    override fun invoke(receiver: RenderToolset, command: AgentCommand): Any? =
-        receiver.screenshotRegion(
-            x = command.int("x"),
-            y = command.int("y"),
-            w = command.int("w"),
-            h = command.int("h"),
-            afterTick = if ("afterTick" in command) command.long("afterTick") else null,
-        )
+    override fun invoke(
+        receiver: RenderToolset,
+        command: AgentCommand,
+        context: AgentContext,
+    ): Any? = receiver.screenshotRegion(
+        x = command.int("x"),
+        y = command.int("y"),
+        w = command.int("w"),
+        h = command.int("h"),
+        afterTick = if ("afterTick" in command) command.long("afterTick") else null,
+        context = context,
+    )
 }
 
 /** `render.set_camera`. */
@@ -313,8 +512,8 @@ public object SetCameraTool : RenderToolDef(
     name = "render.set_camera",
     description = "Move the camera to a world position and zoom level. Reach for it when what you " +
         "want to look at is off screen, or too small to judge, before taking a screenshot. It " +
-        "changes presentation only and cannot affect the simulation. Answers no_render_context in " +
-        "Headless.",
+        "stops the camera following an entity, changes presentation only, and cannot affect the " +
+        "simulation. Answers no_render_context in Headless.",
     args = listOf(
         AgentToolArg("x", "number", "World x to centre on.", required = true, default = null),
         AgentToolArg("y", "number", "World y to centre on.", required = true, default = null),

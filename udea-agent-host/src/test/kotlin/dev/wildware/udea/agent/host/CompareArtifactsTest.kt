@@ -171,8 +171,13 @@ class CompareArtifactsTest {
         val a = assertNotNull(store.put(png(solid(4, 4, -1))))
         val b = assertNotNull(store.put(png(solid(4, 4, -1))))
 
+        // `toggle_debug_draw` rather than `screenshot`: the two capture tools answer through
+        // `AgentContext.answerLater`, so calling one needs a real dispatch. That path is covered
+        // by `HeadlessRenderToolsTest`, which drives all five tools through an `AgentRuntime`;
+        // what this test is about is that the *diff* needs no render context, and this line is
+        // here to show a render tool refusing beside it.
         val render = RenderToolset(dev.wildware.udea.core.host.RenderMode.Headless)
-        val refused = render.screenshot(null)
+        val refused = render.toggleDebugDraw(null)
         assertTrue(refused is AgentResult.Failed)
         assertEquals("no_render_context", refused.error.kind.id)
 

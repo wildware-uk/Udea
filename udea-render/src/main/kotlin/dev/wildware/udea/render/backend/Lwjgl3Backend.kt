@@ -141,6 +141,24 @@ public class Lwjgl3Backend private constructor(
     }
 
     /**
+     * Hands the frame cadence to [frame], which is called on the render thread with the wall
+     * delta, once per frame, instead of [GameHost.frame].
+     *
+     * The overload exists for one caller and it is worth naming: an agent host has to bracket
+     * every frame with `AgentRuntime.beforeFrame()` and `afterFrame(...)`, or commands reach the
+     * bridge queue and are never dispatched — `AgentGameLoop.pump` is exactly that bracket around
+     * `host.frame`. Driving with `host::frame` and pumping the runtime from another thread would
+     * put tool dispatch on a thread that is not the one rendering, which is the arrangement the
+     * whole capture path is built to avoid.
+     *
+     * @param frame called with real seconds since the previous frame. It must not block: it is
+     *   the render loop.
+     */
+    public fun drive(frame: (Float) -> Unit) {
+        gl.driveWith(frame)
+    }
+
+    /**
      * Runs [block] on the render thread and returns its result.
      *
      * The door for the GL work a host legitimately has outside a frame: uploading a texture,

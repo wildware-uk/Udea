@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
@@ -217,6 +218,90 @@ class CameraRigTest {
     }
 
     /** A world, a simulation, a NetId index and a rig wired the way a game wires them. */
+    // --- the control surface: what `render.set_camera` and `render.follow_entity` reach ------
+
+    /**
+     * A placement asked for from another thread lands at the next frame, and not before it.
+     *
+     * The "not before" half is the point. `render.set_camera` arrives on the simulation thread,
+     * which on an `Offscreen` or `Windowed` host is also the render thread — but a host that
+     * pumps its agent loop separately is a legitimate arrangement, and writing the camera from
+     * that thread would tear the projection matrix a frame is being drawn with. Queuing it makes
+     * the question moot at the cost of one uncontended CAS per frame.
+     */
+    @Test
+    fun `a requested placement is applied at the next frame and not before`() {
+        val fixture = Fixture()
+
+        fixture.rig.requestLookAt(x = 12f, y = -4f, zoom = 2f)
+
+        assertEquals(0f, fixture.rig.camera.position.x, "the camera moved before a frame was drawn")
+
+        fixture.rig.advance(target, alpha = 1f)
+
+        assertEquals(12f, fixture.rig.camera.position.x)
+        assertEquals(-4f, fixture.rig.camera.position.y)
+        assertEquals(2f, fixture.rig.camera.zoom)
+    }
+
+    /**
+     * Placing the camera stops it following.
+     *
+     * Without this, an agent that asked to look at a corner of the map while the rig was tracking
+     * a unit would see the camera snap straight back on the same frame that applied its request —
+     * a tool that reports success and visibly does nothing, which is worse than a refusal.
+     */
+    @Test
+    fun `a placement stops the rig following`() {
+        val fixture = Fixture()
+        fixture.spawnFollowed(x = 40f, velocityX = 0f)
+        fixture.sim.step()
+        fixture.rig.advance(target, alpha = 1f)
+        assertTrue(fixture.rig.camera.position.x > 1f, "the rig never reached its target")
+
+        fixture.rig.requestLookAt(x = 0f, y = 0f, zoom = 1f)
+        fixture.rig.advance(target, alpha = 1f)
+        fixture.rig.advance(target, alpha = 1f)
+
+        assertEquals(null, fixture.rig.target, "the placement did not stop the follow")
+        assertEquals(0f, fixture.rig.camera.position.x, "the follow dragged the camera back")
+    }
+
+    /** A follow request is applied at the next frame, and a null one stops following. */
+    @Test
+    fun `a requested follow target is applied at the next frame`() {
+        val fixture = Fixture()
+        val entity = fixture.world.entity { it += PhysicsBody(x = 25f, y = 0f) }
+        val netId = fixture.netIds.allocate(entity)
+        fixture.rig.followHalfLife = 0f
+
+        fixture.rig.requestFollow(netId)
+        fixture.rig.advance(target, alpha = 1f)
+
+        assertEquals(netId, fixture.rig.target)
+        assertTrue(abs(fixture.rig.camera.position.x - 25f) < 0.001f)
+
+        fixture.rig.requestFollow(null)
+        fixture.rig.advance(target, alpha = 1f)
+
+        assertEquals(null, fixture.rig.target, "a null follow request must stop following")
+    }
+
+    /** A zoom of zero collapses the projection; it is refused where it is asked for. */
+    @Test
+    fun `a placement with a non-positive zoom is refused`() {
+        val fixture = Fixture()
+
+        assertFailsWith<IllegalArgumentException> { fixture.rig.requestLookAt(0f, 0f, 0f) }
+        assertFailsWith<IllegalArgumentException> { fixture.rig.requestLookAt(0f, 0f, -1f) }
+        assertFailsWith<IllegalArgumentException> {
+            fixture.rig.requestLookAt(Float.NaN, 0f, 1f)
+        }
+
+        fixture.rig.advance(target, alpha = 1f)
+        assertEquals(1f, fixture.rig.camera.zoom, "a refused placement reached the camera anyway")
+    }
+
     private class Fixture(frameSeconds: Float = 1f / 60f) {
 
         val ctx: GameContext = testGameContext(seed = 42L)

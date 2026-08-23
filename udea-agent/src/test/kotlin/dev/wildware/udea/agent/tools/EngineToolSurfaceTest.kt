@@ -1,10 +1,13 @@
 package dev.wildware.udea.agent.tools
 
 import dev.wildware.udea.agent.AgentCommand
+import dev.wildware.udea.agent.AgentToolArg
 import dev.wildware.udea.agent.AgentToolDef
 import dev.wildware.udea.agent.ToolModule
 import dev.wildware.udea.agent.dispatch.ToolIndex
 import dev.wildware.udea.diagnostics.UdeaRules
+import java.io.File
+import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -15,15 +18,18 @@ import kotlin.test.assertTrue
  *
  * Issue #67 has two halves. The **aggregation** half is the cross-module merge and the refusal
  * of a name published twice, which no KSP round can make because a round sees one module. The
- * **description** half is the gate on what reaches the model - and it is applied here at index
- * construction as well as in the processor, because the engine's own toolsets and any tool a
- * game writes by hand never pass through a KSP round at all, and a gate with a documented way
- * round it is not a gate.
+ * **description** half is the gate on what reaches the model - and it is applied at index
+ * construction as well as in the processor, because a tool a *game* writes by hand never passes
+ * through a KSP round at all, and a gate with a documented way round it is not a gate.
+ *
+ * Every engine tool is now generated, so this file's hand-written `AgentToolDef`s exist for one
+ * reason only: they are the thing the runtime gate is *for*. Deleting them would leave the gate
+ * with no test that could fail.
  */
 class EngineToolSurfaceTest {
 
     @Test
-    fun `the four engine modules merge into one index with no name published twice`() {
+    fun `the engine modules merge into one index with no name published twice`() {
         val harness = ToolsetHarness()
 
         val index = ToolIndex.builder()
@@ -72,12 +78,44 @@ class EngineToolSurfaceTest {
         )
     }
 
+    /**
+     * The gap `EngineToolModules` cannot close by compiling.
+     *
+     * Its lists are hand-written, so naming a tool object that does not exist fails the build -
+     * but adding a new `@AgentTool` and *forgetting* to list it compiles perfectly and produces
+     * a capability the generated manifest advertises and the index cannot serve. The generated
+     * manifest resource is the other side of that, written by the same KSP pass with no chance
+     * to forget, so it is what the modules are checked against.
+     */
+    @Test
+    fun `every generated engine tool is in a module a host can register`() {
+        val manifest = File("build/generated/ksp/main/resources/udea/UdeaAgent-agent-tools.json")
+        assertTrue(manifest.isFile, "no generated manifest at ${manifest.absolutePath}; run kspKotlin")
+
+        // Deliberately a regex over the document rather than a parser: this test's job is to
+        // notice a *missing* name, and a JSON model in a test that has no parser to share would
+        // be a second implementation of the thing being checked.
+        val published = TOOL_NAME.findAll(manifest.readText()).map { it.groupValues[1] }.toSortedSet()
+        val registered = EngineToolModules.ALL.flatMap { module -> module.tools.map { it.name } }
+            .toSortedSet()
+
+        assertEquals(
+            published,
+            registered,
+            "the generated manifest and EngineToolModules disagree; a tool in one and not the " +
+                "other is either advertised and unreachable, or reachable and undiscoverable",
+        )
+    }
+
     @Test
     fun `two modules publishing one tool name are refused, naming both`() {
         // The check no KSP round can make: a round sees one module, so this is the first place
         // the whole classpath is visible at once.
         val harness = ToolsetHarness()
-        val shadow = module("ShadowModule", WorldToolset.tools().filter { it.name == "world.query_entities" })
+        val shadow = module(
+            "ShadowModule",
+            EngineToolModules.World.tools.filter { it.name == "world.query_entities" },
+        )
 
         val failure = assertFailsWith<IllegalStateException> {
             ToolIndex.builder()
@@ -93,16 +131,10 @@ class EngineToolSurfaceTest {
     }
 
     @Test
-    fun `a tool whose description is too short is refused under UDEA0008`() {
+    fun `a hand-written tool whose description is too short is refused under UDEA0008`() {
         val thin = module(
             "ThinModule",
-            listOf(
-                EngineToolDef<WorldToolset>(
-                    name = "world.thin",
-                    description = "spawns stuff",
-                    owner = WorldToolset::class,
-                ) { _, _ -> null },
-            ),
+            listOf(HandWrittenTool("world.thin", "spawns stuff")),
         )
         val harness = ToolsetHarness()
 
@@ -119,16 +151,15 @@ class EngineToolSurfaceTest {
     }
 
     @Test
-    fun `an argument with no description is refused under UDEA0009`() {
+    fun `a hand-written argument with no description is refused under UDEA0009`() {
         val thin = module(
             "UndescribedArgModule",
             listOf(
-                EngineToolDef<WorldToolset>(
-                    name = "world.undescribed",
-                    description = "Does a thing and says clearly when you would want to do it.",
-                    owner = WorldToolset::class,
-                    args = listOf(agentArg("id", "integer", "")),
-                ) { _, _ -> null },
+                HandWrittenTool(
+                    "world.undescribed",
+                    "Does a thing and says clearly when you would want to do it.",
+                    listOf(AgentToolArg("id", "integer", "", required = true, default = null)),
+                ),
             ),
         )
         val harness = ToolsetHarness()
@@ -171,7 +202,7 @@ class EngineToolSurfaceTest {
         for (tool in EngineToolModules.ALL.flatMap { it.tools }) {
             val schema = tool.inputSchema
             assertTrue(schema.startsWith("{"), "${tool.name}: inputSchema must be an object")
-            assertTrue(schema.contains("\"\$schema\":\"${ToolSchema.DIALECT}\""), "${tool.name}: $schema")
+            assertTrue(schema.contains("\"\$schema\":\"$SCHEMA_DIALECT\""), "${tool.name}: $schema")
             assertTrue(schema.contains("\"additionalProperties\":false"), "${tool.name}: $schema")
             for (arg in tool.args) {
                 assertTrue(schema.contains("\"${arg.name}\":{"), "${tool.name} omits ${arg.name}: $schema")
@@ -188,10 +219,27 @@ class EngineToolSurfaceTest {
         }
     }
 
+    /**
+     * The `AgentContext` parameter never reaches the model.
+     *
+     * `time.step` declares one and takes exactly one *argument*. If the emitter published the
+     * context as a property, the schema would demand something no agent can send and every call
+     * would be refused by a strict client before it left the bridge.
+     */
+    @Test
+    fun `a declared AgentContext is not published as an argument`() {
+        val step = EngineToolModules.Time.tools.single { it.name == "time.step" }
+
+        assertEquals(listOf("ticks"), step.args.map { it.name })
+        assertTrue(!step.inputSchema.contains("context"), step.inputSchema)
+    }
+
     @Test
     fun `a contextual tool refuses to run without the context it declared it needs`() {
         val harness = ToolsetHarness()
         val def = EngineToolModules.Time.tools.single { it.name == "time.step" }
+
+        assertTrue(def is ContextualToolDef<*>, "time.step must be generated as a ContextualToolDef")
 
         @Suppress("UNCHECKED_CAST")
         val typed = def as AgentToolDef<TimeToolset>
@@ -208,6 +256,20 @@ class EngineToolSurfaceTest {
         override val tools: List<AgentToolDef<*>> = tools
     }
 
+    /**
+     * A tool written by hand rather than generated - which the contract allows a game to do, and
+     * which is the only thing the runtime description gate can still catch.
+     */
+    private class HandWrittenTool(
+        override val name: String,
+        override val description: String,
+        override val args: List<AgentToolArg> = emptyList(),
+    ) : AgentToolDef<WorldToolset> {
+        override val owner: KClass<*> = WorldToolset::class
+        override val inputSchema: String = "{}"
+        override fun invoke(receiver: WorldToolset, command: AgentCommand): Any? = null
+    }
+
     private companion object {
         /**
          * Words a description must add beyond the ones already in the tool's own name.
@@ -216,5 +278,17 @@ class EngineToolSurfaceTest {
          * description that is the name spelled out tells the model nothing it did not have.
          */
         const val MIN_NEW_WORDS: Int = 10
+
+        /** The dialect `udea-codegen` writes into every generated `inputSchema`. */
+        const val SCHEMA_DIALECT: String = "https://json-schema.org/draft/2020-12/schema"
+
+        /**
+         * `"name": "world.query_entities"` in the generated manifest's `tools[]`.
+         *
+         * The dot is what makes this a *tool* name and not a toolset's or an argument's: the
+         * manifest carries `"name": "world"` for the toolset and `"name": "id"` for an
+         * argument, and matching those would have the test compare two different sets.
+         */
+        val TOOL_NAME = Regex("\"name\"\\s*:\\s*\"([a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*)\"")
     }
 }

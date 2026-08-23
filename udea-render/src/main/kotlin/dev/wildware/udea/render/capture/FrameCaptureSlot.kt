@@ -6,6 +6,10 @@ import dev.wildware.udea.core.host.CaptureOutcome
 import dev.wildware.udea.core.host.FrameCapture
 import dev.wildware.udea.core.host.RenderUnavailable
 import dev.wildware.udea.render.OffscreenTarget
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -14,26 +18,43 @@ import kotlin.concurrent.withLock
  *
  * ## Why a slot and not a method call
  *
- * A capture request arrives on the agent host's thread and can only be served on the render
- * thread, at one exact moment in the frame: after the last [dev.wildware.udea.render.RenderSystem]
- * has drawn and before the offscreen surface is unbound. `glReadPixels` reads the *bound*
- * framebuffer, so a capture served anywhere else reads either a half-drawn frame or the window
- * the agent activity overlay is about to draw on (spec 3.7). Making the request a queued value
- * rather than a call means the moment is enforced by the pipeline once, instead of being a rule
- * every caller has to know.
+ * A capture request arrives on some other thread and can only be served on the render thread, at
+ * one exact moment in the frame: after the last [dev.wildware.udea.render.RenderSystem] has drawn
+ * and before the offscreen surface is unbound. `glReadPixels` reads the *bound* framebuffer, so a
+ * capture served anywhere else reads either a half-drawn frame or the window the agent activity
+ * overlay is about to draw on (spec 3.7). Making the request a queued value rather than a call
+ * means the moment is enforced by the pipeline once, instead of being a rule every caller has to
+ * know.
+ *
+ * ## Why the answer is a future and not a return value
+ *
+ * [submit] never blocks, and that is not a convenience — it is what makes the agent's render
+ * toolset possible at all. A tool call runs *inside* a `SimBarrier` drain, and on an `Offscreen`
+ * or `Windowed` host the thread running that drain **is** the render thread (`Lwjgl3Backend`
+ * hands `GameHost.frame` to the GL thread, and `GameLoop.frame` ticks and then renders on it). A
+ * `screenshot` tool that blocked waiting for the next frame would be waiting for itself:
+ * `ToolRegistry` states the rule in as many words — *it must not block, sleep or wait on another
+ * thread: whatever it waits for cannot happen, because the thread that would do it is this one*.
+ *
+ * So the tool submits, returns, and the pipeline's own drain — later in the same
+ * `GameHost.frame` call — completes the future. [capture] is the blocking form, kept for callers
+ * that genuinely are on another thread (`GameHost.screenshot`, and the tests that drive a frame
+ * by hand); calling it from the render thread deadlocks until its deadline, which is why it is
+ * not what the toolset uses.
  *
  * ## What it does not do
  *
- * It does not name files, hold a `lastPath`, or announce anything. The old `ScreenCapture` did
- * all three and callers had to parse an event-log line to find their own screenshot. Bytes go
- * back to the caller that asked for them; the artifact store is the agent host's.
+ * It does not name files, hold a `lastPath`, or announce anything. The old `ScreenCapture` did all
+ * three and callers had to parse an event-log line to find their own screenshot. Bytes go back to
+ * the caller that asked for them; the artifact store is the agent host's.
  *
  * ## Threading
  *
- * [capture] blocks the calling thread; [drain] runs on the render thread. Both are guarded by
- * one lock, and a waiter is always woken by exactly one of: its request being fulfilled, its
- * request failing, or [close]. A waiter that is never woken would hang an agent's command loop,
- * so [capture] also has a deadline and reports crossing it rather than waiting forever.
+ * [submit] and [capture] are safe from any thread; [drain] and [close] run on the render thread.
+ * The queue is guarded by one lock, and **no future is completed while that lock is held**: a
+ * completion runs whatever dependent stage the caller attached (`thenApply`, `whenComplete`) on
+ * the completing thread, and running a caller's code under this class's lock is how a capture
+ * callback that touched the slot again would deadlock the render thread.
  */
 public class FrameCaptureSlot internal constructor(
     private val pixels: PixelSource,
@@ -41,7 +62,6 @@ public class FrameCaptureSlot internal constructor(
 ) : FrameCapture {
 
     private val lock = ReentrantLock()
-    private val settled = lock.newCondition()
 
     /**
      * Signalled when a request joins [queue].
@@ -58,6 +78,16 @@ public class FrameCaptureSlot internal constructor(
     private val queue = ArrayDeque<Pending>()
     private var closed = false
 
+    /**
+     * Requests served by the frame being drained, held between the lock being released and their
+     * futures being completed.
+     *
+     * A field rather than a local so the per-frame path allocates nothing: [drain] runs every
+     * frame, and the overwhelmingly common case leaves this empty. Only the render thread ever
+     * touches it, and only inside one [drain] call.
+     */
+    private val settling = ArrayList<Pending>(INITIAL_SETTLING_CAPACITY)
+
     /** Captures completed since construction. A health signal for `/health`, not state. */
     public var completedCaptures: Long = 0L
         private set
@@ -71,7 +101,39 @@ public class FrameCaptureSlot internal constructor(
     public val queuedRequests: Int get() = lock.withLock { queue.size }
 
     /**
-     * Requests a frame and waits for it.
+     * Queues [request] and returns immediately with the future the render thread will settle.
+     *
+     * The future completes with a [CaptureResult] at the capture point of the first frame that
+     * satisfies the request, or completes exceptionally with a [CaptureStalledException] if the
+     * pipeline is torn down first or an [IllegalArgumentException] if the region does not fit the
+     * surface.
+     *
+     * It carries no deadline of its own. A caller that needs one applies it to the future
+     * ([capture] is that caller); a caller on the render thread must not, because the frame that
+     * would settle it is the one it is inside.
+     */
+    public fun submit(request: CaptureRequest): CompletableFuture<CaptureResult> {
+        val future = CompletableFuture<CaptureResult>()
+        val refused = lock.withLock {
+            if (closed) {
+                true
+            } else {
+                queue.addLast(Pending(request, future))
+                enqueued.signalAll()
+                false
+            }
+        }
+        // Outside the lock: see the class KDoc on why a completion never runs under it.
+        if (refused) {
+            future.completeExceptionally(
+                CaptureStalledException("$request: the render pipeline is closed"),
+            )
+        }
+        return future
+    }
+
+    /**
+     * Requests a frame and waits for it. **Never call this from the render thread.**
      *
      * @param request what to read and, optionally, which tick to wait for.
      * @param timeoutMillis how long to wait before giving up. The default is generous
@@ -87,32 +149,24 @@ public class FrameCaptureSlot internal constructor(
         timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
     ): CaptureResult {
         require(timeoutMillis > 0) { "timeout must be positive, was $timeoutMillis" }
-        val pending = Pending(request)
-
-        val outcome = lock.withLock {
-            if (closed) throw CaptureStalledException("$request: the render pipeline is closed")
-            queue.addLast(pending)
-            enqueued.signalAll()
-
-            var remaining = timeoutMillis * NANOS_PER_MILLI
-            var settledOutcome = pending.outcome
-            while (settledOutcome == null) {
-                if (remaining <= 0L) {
-                    queue.remove(pending)
-                    throw CaptureStalledException(
-                        "$request was not served within ${timeoutMillis}ms: the render thread " +
-                            "drew no frame that satisfied it",
-                    )
-                }
-                remaining = settled.awaitNanos(remaining)
-                settledOutcome = pending.outcome
-            }
-            settledOutcome
-        }
-
-        return when (outcome) {
-            is Outcome.Done -> outcome.result
-            is Outcome.Failed -> throw outcome.cause
+        val future = submit(request)
+        try {
+            return future.get(timeoutMillis, TimeUnit.MILLISECONDS)
+        } catch (_: TimeoutException) {
+            // Withdrawn, so a frame drawn a moment later does not read pixels for a caller that
+            // has already been told it failed - and so the queue does not grow one dead entry
+            // per timed-out capture.
+            withdraw(future)
+            throw CaptureStalledException(
+                "$request was not served within ${timeoutMillis}ms: the render thread " +
+                    "drew no frame that satisfied it",
+            )
+        } catch (failed: ExecutionException) {
+            throw failed.cause ?: CaptureStalledException("$request failed without a cause")
+        } catch (interrupted: InterruptedException) {
+            withdraw(future)
+            Thread.currentThread().interrupt()
+            throw CaptureStalledException("$request: the waiting thread was interrupted", interrupted)
         }
     }
 
@@ -163,7 +217,7 @@ public class FrameCaptureSlot internal constructor(
         lock.withLock {
             // The overwhelmingly common case, and it must stay inside the lock: `ArrayDeque`
             // is not thread-safe, so an unsynchronised `isEmpty()` fast path would be reading
-            // a field another thread is writing in `capture`.
+            // a field another thread is writing in `submit`.
             if (queue.isEmpty()) return
 
             val tick = clock.tick
@@ -174,9 +228,13 @@ public class FrameCaptureSlot internal constructor(
                 iterator.remove()
                 pending.outcome = serve(pending.request, target, tick)
                 if (pending.outcome is Outcome.Done) completedCaptures++
+                settling += pending
             }
-            settled.signalAll()
         }
+        // The pixels are read under the lock -- they have to be, the bound framebuffer is only
+        // this frame's inside it -- but the futures are completed out here, because completing
+        // one runs whatever the caller chained onto it on this thread. See the class KDoc.
+        settle()
     }
 
     /**
@@ -189,12 +247,31 @@ public class FrameCaptureSlot internal constructor(
                 pending.outcome = Outcome.Failed(
                     CaptureStalledException("${pending.request}: the render pipeline was closed"),
                 )
+                settling += pending
             }
             queue.clear()
-            settled.signalAll()
             // ...and anything waiting for a request to *arrive*, which will now never happen.
             enqueued.signalAll()
         }
+        settle()
+    }
+
+    /** Completes everything [drain] or [close] settled, with the lock released. */
+    private fun settle() {
+        for (index in settling.indices) {
+            val pending = settling[index]
+            when (val outcome = pending.outcome) {
+                is Outcome.Done -> pending.future.complete(outcome.result)
+                is Outcome.Failed -> pending.future.completeExceptionally(outcome.cause)
+                null -> error("a settled request has no outcome: ${pending.request}")
+            }
+        }
+        settling.clear()
+    }
+
+    /** Takes a request back off the queue, for a caller that has stopped waiting for it. */
+    private fun withdraw(future: CompletableFuture<CaptureResult>) {
+        lock.withLock { queue.removeAll { it.future === future } }
     }
 
     private fun serve(request: CaptureRequest, target: OffscreenTarget, tick: Tick): Outcome =
@@ -220,8 +297,11 @@ public class FrameCaptureSlot internal constructor(
             Outcome.Failed(CaptureStalledException("$request failed while reading pixels", failure))
         }
 
-    private class Pending(val request: CaptureRequest) {
-        /** Written under the lock by the render thread, read under it by the waiter. */
+    private class Pending(
+        val request: CaptureRequest,
+        val future: CompletableFuture<CaptureResult>,
+    ) {
+        /** Written under the lock by the render thread; read by it again in `settle`. */
         var outcome: Outcome? = null
     }
 
@@ -245,6 +325,9 @@ public class FrameCaptureSlot internal constructor(
         const val DEFAULT_TIMEOUT_MILLIS: Long = 10_000L
 
         const val NANOS_PER_MILLI: Long = 1_000_000L
+
+        /** Two overlapping captures is already an unusual frame; four is a generous ceiling. */
+        const val INITIAL_SETTLING_CAPACITY: Int = 4
     }
 }
 

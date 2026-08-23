@@ -60,6 +60,14 @@ public class DebugOverlayRenderSystem(
      * `resources.own(...)` gives it the pipeline's lifetime.
      */
     private val font: BitmapFont,
+    /**
+     * The shared switch this system draws under.
+     *
+     * Defaulted so every existing registration still compiles, and shared so that a host which
+     * passes the same instance to several debug renderers gets one answer out of
+     * `render.toggle_debug_draw` rather than one per renderer. See [DebugDraw].
+     */
+    private val debug: DebugDraw = DebugDraw(),
 ) : RenderSystem {
 
     private var bound: Bound? = null
@@ -72,8 +80,17 @@ public class DebugOverlayRenderSystem(
     public var drawnCount: Int = 0
         private set
 
-    /** While false the labels still expire but nothing is drawn. The old F1 toggle, typed. */
-    public var enabled: Boolean = true
+    /**
+     * While false the labels still expire but nothing is drawn. The old F1 toggle, typed.
+     *
+     * Backed by the shared [DebugDraw] rather than by a field of its own, so that flipping it
+     * here and flipping it through the agent's `render.toggle_debug_draw` are the same act.
+     */
+    public var enabled: Boolean
+        get() = debug.enabled
+        set(value) {
+            debug.enabled = value
+        }
 
     override fun onBind(world: World, ctx: GameContext) {
         bound = Bound(world, world.family { all(PhysicsBody, DebugLabels) }, ctx.clock)

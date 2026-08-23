@@ -1,11 +1,11 @@
 package dev.wildware.udea.agent.tools
 
 import dev.wildware.udea.agent.AgentBridge
-import dev.wildware.udea.agent.AgentCommand
 import dev.wildware.udea.agent.AgentErrorKind
 import dev.wildware.udea.agent.AgentEventRing
 import dev.wildware.udea.agent.AgentResult
-import dev.wildware.udea.agent.AgentToolDef
+import dev.wildware.udea.annotations.AgentTool
+import dev.wildware.udea.annotations.Arg
 import dev.wildware.udea.core.SimClock
 
 /**
@@ -37,10 +37,20 @@ public class EventsToolset(
     private val clock: SimClock,
 ) {
 
-    private fun recentEvents(command: AgentCommand): AgentResult {
-        val limit = command.int("limit", DEFAULT_LIMIT).coerceIn(1, bridge.events.capacity)
-        val contains = command.args["contains"]
-        val collected = collect(limit, contains, sinceTick = Long.MIN_VALUE)
+    @AgentTool(
+        name = "events.recent_events",
+        description = "Read recent game events with the tick each happened on, without " +
+            "consuming them. Use it to find out what the game thinks just happened, " +
+            "including the audit line every agent mutation writes.",
+    )
+    public fun recentEvents(
+        @Arg(description = "How many of the newest entries to return.", required = false, default = "40")
+        limit: Int,
+        @Arg(description = "Return only entries whose message contains this text.", required = false)
+        contains: String?,
+    ): AgentResult {
+        val capped = limit.coerceIn(1, bridge.events.capacity)
+        val collected = collect(capped, contains, sinceTick = Long.MIN_VALUE)
         return AgentResult.ok {
             put("tick", clock.tick.value)
             put("held", bridge.events.size)
@@ -59,7 +69,13 @@ public class EventsToolset(
         }
     }
 
-    private fun clearEvents(): AgentResult {
+    @AgentTool(
+        name = "events.clear_events",
+        description = "Empty the event ring so the next read shows only what happened " +
+            "after this call. Reach for it before running a scenario you want to assert " +
+            "against cleanly.",
+    )
+    public fun clearEvents(): AgentResult {
         val dropped = bridge.events.size
         bridge.events.clear()
         return AgentResult.ok {
@@ -71,28 +87,45 @@ public class EventsToolset(
     }
 
     /**
-     * Matches [AgentCommand] `contains` within a tick window, and answers either way.
+     * Matches [contains] within a tick window, and answers either way.
      *
-     * A miss is [AgentErrorKind] `event_not_found` and not an exception, because "it did not
+     * A miss is [EVENT_NOT_FOUND] and not an exception, because "it did not
      * happen" is the answer to a legitimate question - half of the assertions an agent makes
      * are that something did *not* occur - and an exception would reach it as `tool_threw`,
      * which reads like the engine broke.
      */
-    private fun assertEvent(command: AgentCommand): AgentResult {
-        val contains = command.str("contains")
+    @AgentTool(
+        name = "events.assert_event",
+        description = "Check whether an event containing this text was recorded inside a " +
+            "tick window, and return the matching entry or a typed miss. This is how a " +
+            "session asserts that something happened without string-matching a state dump.",
+    )
+    public fun assertEvent(
+        @Arg(description = "Substring the event message must contain.")
+        contains: String,
+        @Arg(description = "How many ticks back from now to search.", required = false, default = "60")
+        within: Int,
+        // Nullable, so "not given" and "tick 0" stay different things. A default of `now -
+        // within` cannot be written as an @Arg default: it is a value only the call knows.
+        @Arg(
+            description = "Absolute tick to search from, overriding within. Use it to assert " +
+                "against a tick a previous tool call returned.",
+            required = false,
+        )
+        since: Long?,
+    ): AgentResult {
         val now = clock.tick.value
-        val within = command.int("within", DEFAULT_WINDOW)
         if (within < 0) {
             return AgentResult.failed(
                 AgentErrorKind.BAD_ARGUMENT,
                 "events.assert_event got within=$within; a window is a count of ticks back from now",
             )
         }
-        val since = command.long("since", now - within)
-        val matches = collect(bridge.events.capacity, contains, since)
+        val from = since ?: (now - within)
+        val matches = collect(bridge.events.capacity, contains, from)
         val matched = matches.lastOrNull() ?: return AgentResult.failed(
             EVENT_NOT_FOUND,
-            "no event containing \"$contains\" was recorded between tick $since and tick $now; " +
+            "no event containing \"$contains\" was recorded between tick $from and tick $now; " +
                 "${bridge.events.size} event(s) are held and " +
                 "${bridge.events.totalRecorded} have been recorded in total",
         )
@@ -101,7 +134,7 @@ public class EventsToolset(
             put("tick", matched.tick)
             put("message", matched.message)
             put("occurrences", matches.size)
-            put("searchedFromTick", since)
+            put("searchedFromTick", from)
         }
     }
 
@@ -142,60 +175,5 @@ public class EventsToolset(
 
         /** Ticks back from now that `assert_event` searches when the caller names no window. */
         public const val DEFAULT_WINDOW: Int = 60
-
-        /** The three tools, ascending by name. Registered by [engineToolModule]. */
-        public fun tools(): List<AgentToolDef<EventsToolset>> = listOf(
-            EngineToolDef<EventsToolset>(
-                name = "events.assert_event",
-                description = "Check whether an event containing this text was recorded inside a " +
-                    "tick window, and return the matching entry or a typed miss. This is how a " +
-                    "session asserts that something happened without string-matching a state dump.",
-                owner = EventsToolset::class,
-                args = listOf(
-                    agentArg("contains", "string", "Substring the event message must contain."),
-                    agentArg(
-                        "within", "integer",
-                        "How many ticks back from now to search.",
-                        required = false,
-                        default = DEFAULT_WINDOW.toString(),
-                    ),
-                    agentArg(
-                        "since", "integer",
-                        "Absolute tick to search from, overriding within. Use it to assert " +
-                            "against a tick a previous tool call returned.",
-                        required = false,
-                    ),
-                ),
-            ) { toolset, command -> toolset.assertEvent(command) },
-
-            EngineToolDef<EventsToolset>(
-                name = "events.clear_events",
-                description = "Empty the event ring so the next read shows only what happened " +
-                    "after this call. Reach for it before running a scenario you want to assert " +
-                    "against cleanly.",
-                owner = EventsToolset::class,
-            ) { toolset, _ -> toolset.clearEvents() },
-
-            EngineToolDef<EventsToolset>(
-                name = "events.recent_events",
-                description = "Read recent game events with the tick each happened on, without " +
-                    "consuming them. Use it to find out what the game thinks just happened, " +
-                    "including the audit line every agent mutation writes.",
-                owner = EventsToolset::class,
-                args = listOf(
-                    agentArg(
-                        "limit", "integer",
-                        "How many of the newest entries to return.",
-                        required = false,
-                        default = DEFAULT_LIMIT.toString(),
-                    ),
-                    agentArg(
-                        "contains", "string",
-                        "Return only entries whose message contains this text.",
-                        required = false,
-                    ),
-                ),
-            ) { toolset, command -> toolset.recentEvents(command) },
-        )
     }
 }

@@ -1,5 +1,6 @@
 package dev.wildware.udea.agent
 
+import dev.wildware.udea.agent.activity.AgentSessionId
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -21,6 +22,21 @@ public class AgentCommand(
     public val args: Map<String, String> = emptyMap(),
     /** Monotonic within one process. What [AgentBridge.completedCommandId] reports. */
     public val id: Long = nextId(),
+    /**
+     * Who issued it, for the human-facing activity overlay (spec 3.7).
+     *
+     * Carried on the command rather than looked up later because there is no later: the HTTP
+     * thread is the only thread that knows which client sent this, and by the time the
+     * simulation thread runs the tool the request is gone. `AgentHost` derives it from a
+     * reserved `session` query key, falling back to the remote address.
+     *
+     * Defaulted, so every existing construction site - `SimHarness`, the barrier tests, the
+     * codegen fixtures - keeps compiling and lands under [AgentSessionId.LOCAL]. It is
+     * deliberately **not** an entry in [args]: a tool must never be able to read it, or an
+     * agent could branch on which session it is, and the overlay's whole premise is that the
+     * agent cannot see the overlay's inputs.
+     */
+    public val session: AgentSessionId = AgentSessionId.LOCAL,
 ) {
 
     /**

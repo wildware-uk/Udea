@@ -12,6 +12,7 @@ import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.interp.Interpolator
 import dev.wildware.udea.render.interp.Pose
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.exp
 
 /**
@@ -102,6 +103,21 @@ public class CameraRig(
 
     private var boundWorld: World? = null
 
+    /**
+     * A camera placement asked for by another thread, applied at the top of the next frame.
+     *
+     * The agent's `render.set_camera` arrives on the simulation thread, inside a `SimBarrier`
+     * drain; on an `Offscreen` or `Windowed` host that is also the render thread, but a host
+     * whose agent loop runs on a thread of its own is a legitimate arrangement and writing
+     * [camera] from it would tear the projection matrix a frame is being drawn with. An
+     * [AtomicReference] consumed in [advance] costs one uncontended CAS per frame and makes the
+     * question moot: the camera only ever moves at a frame boundary, whoever asked.
+     */
+    private val pendingLook = AtomicReference<LookAt?>(null)
+
+    /** A follow target asked for by another thread. See [pendingLook]; `Follow` wraps a null id. */
+    private val pendingFollow = AtomicReference<Follow?>(null)
+
     private val pose = Pose()
 
     /** The last size this rig configured its viewport for, so it reconfigures only on change. */
@@ -127,6 +143,15 @@ public class CameraRig(
      * Everything [render] does except binding the GL viewport.
      */
     internal fun advance(target: OffscreenTarget, alpha: Float) {
+        // Before the bound-world check, and updated even without one: `render.set_camera` is a
+        // presentation command and must land whether or not this rig has been bound to a world.
+        // A placement that silently did nothing until a world arrived would read to an agent as
+        // a camera that ignores it.
+        if (applyRequests()) {
+            fitTo(target)
+            bounds?.clamp(camera, viewport)
+            camera.update()
+        }
         val world = boundWorld ?: return
         fitTo(target)
 
@@ -164,6 +189,65 @@ public class CameraRig(
         bounds?.clamp(camera, viewport)
         camera.update()
     }
+
+    /**
+     * Asks for the camera to be placed at ([x], [y]) with this [zoom], from any thread.
+     *
+     * Applied at the top of the next frame, and it **stops following**: a placement that left
+     * the follow target alone would be undone by the same frame that applied it, and an agent
+     * that asked to look at a corner of the map would see the camera snap back to the unit it
+     * was tracking. `render.follow_entity` is how following is resumed.
+     *
+     * @param zoom orthographic zoom, larger showing more world. Must be positive and finite:
+     *   `camera.zoom = 0` collapses the projection matrix and draws a frame of nothing, which
+     *   an agent would read as "the game went black".
+     */
+    public fun requestLookAt(x: Float, y: Float, zoom: Float) {
+        require(x.isFinite() && y.isFinite()) { "camera position must be finite, was ($x, $y)" }
+        require(zoom > 0f && zoom.isFinite()) { "camera zoom must be a positive number, was $zoom" }
+        pendingLook.set(LookAt(x, y, zoom))
+    }
+
+    /**
+     * Asks the rig to follow [netId], or to stop following when it is `null`, from any thread.
+     *
+     * Stopping leaves the camera exactly where it is rather than resetting it: an agent that
+     * stops following has usually just found the thing it wants to look at.
+     */
+    public fun requestFollow(netId: NetId?) {
+        pendingFollow.set(Follow(netId))
+    }
+
+    /**
+     * Consumes whatever another thread asked for. Render thread only.
+     *
+     * @return true if anything was applied, so the caller knows to update the camera.
+     */
+    private fun applyRequests(): Boolean {
+        var applied = false
+        val follow = pendingFollow.getAndSet(null)
+        if (follow != null) {
+            target = follow.netId
+            applied = true
+        }
+        val look = pendingLook.getAndSet(null)
+        if (look != null) {
+            // Placing the camera by hand and following are two answers to "where does the camera
+            // go", and the frame can only have one. See `requestLookAt`.
+            target = null
+            camera.position.x = look.x
+            camera.position.y = look.y
+            camera.zoom = look.zoom
+            applied = true
+        }
+        return applied
+    }
+
+    /** One queued placement. See [pendingLook]. */
+    private class LookAt(val x: Float, val y: Float, val zoom: Float)
+
+    /** One queued follow request; [netId] is null for "stop following". See [pendingFollow]. */
+    private class Follow(val netId: NetId?)
 
     /**
      * Sizes the viewport to the target it is drawing into.

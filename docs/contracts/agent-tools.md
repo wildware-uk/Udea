@@ -123,7 +123,7 @@ receiver. The host owns the instance and therefore owns the pairing; that is als
 ## A tool that must run outside the barrier drain (`udea-agent`, additive)
 
 Nothing above changes. This is a second interface *beside* `AgentToolDef`, declared in
-`udea-agent` and never emitted by `udea-codegen`, so a generated tool is unaffected:
+`udea-agent`, so a tool that does not ask for a context is unaffected:
 
 ```kotlin
 public interface ContextualToolDef<in T> : AgentToolDef<T> {
@@ -131,12 +131,29 @@ public interface ContextualToolDef<in T> : AgentToolDef<T> {
 }
 ```
 
-`ToolIndex.invoke` passes the context to a tool of this type and to nothing else. There is
-exactly one reason to be one, and the engine's `time.step`, `time.fast_forward` and
-`time.rewind` are the only tools in that position today: **they run the simulation**, and a tool
-call executes inside a `SimBarrier` drain, and `Simulation.step` drains the barrier, and
-`SimBarrier.drain` refuses to re-enter. `TimeControl.rewind` states the same requirement from
-the other side - it forces a drain of its own, safe only with the loop stopped between frames.
+A `@AgentTool` function asks for one by declaring an `AgentContext` parameter; `udea-codegen`
+leaves that parameter out of the published schema - there is nothing an agent could put in it -
+and emits an object implementing this interface, whose two-argument `invoke` throws. (Amended:
+this interface was originally specified as one `udea-codegen` never emits, on the assumption
+that only hand-written engine tools would need a context. Routing the engine's own toolsets
+through the same KSP pass as a game's removed that assumption without changing a signature, a
+tool name, a schema or the manifest.)
+
+`ToolIndex.invoke` passes the context to a tool of this type and to nothing else. The original
+reason to be one was that the engine's `time.step`, `time.fast_forward` and `time.rewind`
+**run the simulation**, and a tool call executes inside a `SimBarrier` drain, and
+`Simulation.step` drains the barrier, and `SimBarrier.drain` refuses to re-enter.
+`TimeControl.rewind` states the same requirement from the other side - it forces a drain of its
+own, safe only with the loop stopped between frames.
+
+(Amended: there is a second reason, and `render.screenshot` and `render.screenshot_region` are
+in that position. A capture must be queued *before* the frame that serves it is drawn and
+answered *after* it, and on an `Offscreen` or `Windowed` host the thread running the drain is
+the render thread - so the tool cannot wait for that frame where it is called, for the same
+reason a stepping tool cannot step there. It queues, returns, and answers from
+`answerLater`, which runs after `GameLoop.frame` has rendered. As with the amendment above, no
+signature, tool name, schema or manifest shape changes: the interface, the dispatch rule and the
+meaning of `completedCommandId` are exactly as specified.)
 
 Such a tool calls `AgentContext.answerLater { … }`, which runs the work after the tick (outside
 any drain, before the state document is published) and completes the command with what it
@@ -149,9 +166,15 @@ reported as frozen.
 
 `UDEA0008` and `UDEA0009` are compile errors at the `@AgentTool` symbol. They can only see a
 tool that passed through a KSP round, and this contract explicitly allows a hand-written
-`AgentToolDef` - which is what the engine's own `world`/`time`/`events`/`diag` toolsets are, and
-what any game may write. So `ToolIndex.Builder.build` applies the same two rules to every tool it
-indexes, refusing under the same rule ids. One defect, one name, wherever it surfaces.
+`AgentToolDef`, which any game may write. So `ToolIndex.Builder.build` applies the same two rules
+to every tool it indexes, refusing under the same rule ids. One defect, one name, wherever it
+surfaces.
+
+(Amended: the engine's own `world`/`time`/`events`/`diag` toolsets were the example of a
+hand-written `AgentToolDef` here. They are generated now - a tool name may carry its own toolset,
+`@AgentTool(name = "world.query_entities")`, which is what made that possible - so the runtime
+gate covers a game's hand-written tools alone. It is not redundant: the contract still allows
+one, and a gate whose only test subject has been removed is a gate nothing can fail.)
 
 ## `@AgentState` is not in the `Replicator` field space
 

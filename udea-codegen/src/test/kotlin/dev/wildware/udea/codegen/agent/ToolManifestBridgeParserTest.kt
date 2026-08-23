@@ -59,7 +59,7 @@ class ToolManifestBridgeParserTest {
         }
 
         assertEquals(emptyList(), dropped, "tools the bridge would silently drop")
-        assertEquals(4, kept, "the fixture module publishes four tools")
+        assertEquals(6, kept, "the fixture module publishes six tools")
     }
 
     @Test
@@ -110,7 +110,16 @@ class ToolManifestBridgeParserTest {
             .flatMap { TestJson.arr(TestJson.obj(it)["tools"]) }
             .map { TestJson.obj(it)["name"] }
 
-        assertEquals(listOf("set_overlays", "set_stance", "spawn_blueprint", "tag_entity"), names)
+        // Grouped by toolset and then by name, which is why the `sim.*` pair is contiguous
+        // here and interleaved in the ServiceLoader index: the manifest is what a model reads,
+        // and a model reads a toolset at a time.
+        assertEquals(
+            listOf(
+                "set_overlays", "set_stance", "spawn_blueprint", "tag_entity",
+                "sim.advance", "sim.describe",
+            ),
+            names,
+        )
     }
 
     @Test

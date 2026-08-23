@@ -37,6 +37,12 @@ public object UdeaStdlibPin {
         public val reason: String,
     )
 
+    /** Compile classpath of `UdeaAgentPlugin`'s debug source set, at its default name. */
+    public const val AGENT_SOURCE_SET_COMPILE_CLASSPATH: String = "agentCompileClasspath"
+
+    /** Runtime classpath of `UdeaAgentPlugin`'s debug source set, at its default name. */
+    public const val AGENT_SOURCE_SET_RUNTIME_CLASSPATH: String = "agentRuntimeClasspath"
+
     /**
      * The classpaths a module compiles against, runs on, and tests on.
      *
@@ -52,6 +58,15 @@ public object UdeaStdlibPin {
         "testRuntimeClasspath",
         "testFixturesCompileClasspath",
         "testFixturesRuntimeClasspath",
+        // The debug-only source set `UdeaAgentPlugin` creates on a game module (`:moba` today).
+        // It exists so `udea-agent-host` reaches the agent entry point without ever touching
+        // `runtimeClasspath`, which is what `ReleaseRules.CLASSPATH_RULE` scans and what the jar
+        // is packaged from. These two are classpaths the module compiles and runs against like
+        // any other, so they are pinned rather than exempted - and adding them here was not
+        // optional: `udeaVerifyKotlinPin` failed `:moba` the moment the source set appeared,
+        // which is precisely the "the next source set somebody adds" case this list exists for.
+        AGENT_SOURCE_SET_COMPILE_CLASSPATH,
+        AGENT_SOURCE_SET_RUNTIME_CLASSPATH,
     )
 
     /**

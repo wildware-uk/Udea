@@ -2,6 +2,7 @@ package dev.wildware.udea.agent.host
 
 import dev.wildware.udea.agent.dispatch.AgentRuntime
 import dev.wildware.udea.core.host.GameHost
+import dev.wildware.udea.core.loop.barrier
 import java.util.concurrent.locks.LockSupport
 
 /**
@@ -95,7 +96,31 @@ public class AgentGameLoop(
      * frame callback, a test — drives exactly the same sequence rather than a copy of it.
      */
     public fun pump(wallDelta: Float) {
-        runtime.beforeFrame()
+        val posted = runtime.beforeFrame()
+        // Commands run *before* the frame is drawn, not after it.
+        //
+        // `AgentRuntime` drains the barrier in one of two places: inside a tick when the loop
+        // steps, and inside `afterFrame(0)` when it does not. The second is after `host.frame`
+        // has already rendered - and that is exactly the ordering `render.screenshot` cannot
+        // live with. A capture tool queues a request that the *next* render serves and then
+        // answers through `AgentContext.answerLater`, which runs in the same `afterFrame`, a
+        // few lines after the drain. Drained there, the sequence is: queue the capture, then
+        // assemble the answer, and the frame that would have served it is not drawn until the
+        // next iteration. The answer arrives with nothing to report, and on an Offscreen host
+        // it cannot even wait for one, because the thread that would draw that frame is this
+        // one.
+        //
+        // Draining here puts a paused iteration in the same order a stepping one already had -
+        // command, then render, then answer - so a screenshot completes in the iteration that
+        // asked for it whether or not the simulation is moving. It is the same boundary either
+        // way: nothing is mid-tick between two frames, which is the property `SimBarrier`
+        // guarantees and the reason `afterFrame(0)` was allowed to drain at all.
+        //
+        // Guarded on `posted` so an idle host does not take a barrier drain per frame for
+        // nothing, and left in place in `afterFrame` too: that drain now finds an empty batch,
+        // and removing the belt because the braces hold is how the paused case broke the first
+        // time.
+        if (posted > 0) host.ctx.barrier.drain(host.world, host.ctx)
         host.frame(wallDelta)
         runtime.afterFrame(host.loop.lastFrameTicks)
         frames++

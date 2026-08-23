@@ -38,6 +38,10 @@ class GeneratedSourceShapeTest {
                 "dev/wildware/udea/codegen/fixtures/PlaygroundSpawnBlueprintTool.kt",
                 "dev/wildware/udea/codegen/fixtures/PlaygroundTagEntityTool.kt",
                 "dev/wildware/udea/codegen/fixtures/QuantisedProbeReplicator.kt",
+                // The two shapes that let the engine's own toolsets be generated: a
+                // toolset-qualified name, and an AgentContext parameter (a ContextualToolDef).
+                "dev/wildware/udea/codegen/fixtures/TimelineAdvanceTool.kt",
+                "dev/wildware/udea/codegen/fixtures/TimelineDescribeTool.kt",
                 // The module-level outputs. There is exactly one aggregating group per module:
                 // the `ServiceLoader` index this module contributes, and the protocol constant
                 // a packet header carries.
@@ -157,6 +161,10 @@ class GeneratedSourceShapeTest {
                 "PlaygroundSpawnBlueprintTool.kt" to "override val owner: KClass<*> = Playground::class",
                 "PlaygroundTagEntityTool.kt" to "import kotlin.reflect.KClass",
                 "PlaygroundTagEntityTool.kt" to "override val owner: KClass<*> = Playground::class",
+                "TimelineAdvanceTool.kt" to "import kotlin.reflect.KClass",
+                "TimelineAdvanceTool.kt" to "override val owner: KClass<*> = Timeline::class",
+                "TimelineDescribeTool.kt" to "import kotlin.reflect.KClass",
+                "TimelineDescribeTool.kt" to "override val owner: KClass<*> = Timeline::class",
             ),
             exempted.sortedBy { "${it.first}${it.second}" },
             "the reflection exemption has widened; every line it now covers is listed here",

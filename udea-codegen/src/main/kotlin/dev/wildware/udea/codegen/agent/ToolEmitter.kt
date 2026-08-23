@@ -53,7 +53,16 @@ internal object ToolEmitter {
                 // Matched to the annotated function rather than always public: see
                 // [ToolModel.internal].
                 .addModifiers(if (tool.internal) KModifier.INTERNAL else KModifier.PUBLIC)
-                .addSuperinterface(AgentNames.AGENT_TOOL_DEF.parameterizedBy(tool.owner))
+                // A tool that asked for the context of the command it is serving implements the
+                // wider interface, which is what `ToolIndex` checks for before passing one in.
+                // See `ToolModel.contextParameter` for the single reason a tool needs one.
+                .addSuperinterface(
+                    if (tool.contextParameter == null) {
+                        AgentNames.AGENT_TOOL_DEF.parameterizedBy(tool.owner)
+                    } else {
+                        AgentNames.CONTEXTUAL_TOOL_DEF.parameterizedBy(tool.owner)
+                    },
+                )
                 .addKdoc(
                     "The `%L` tool, generated from [%T.%L].\n\n" +
                         "Its schema and its argument coercion come from one model, so the " +
@@ -112,18 +121,63 @@ internal object ToolEmitter {
                         .initializer("%T::class", tool.owner)
                         .build(),
                 )
-                .addFunction(
-                    FunSpec.builder("invoke")
-                        .addModifiers(KModifier.OVERRIDE)
-                        .addParameter("receiver", tool.owner)
-                        .addParameter("command", AgentNames.AGENT_COMMAND)
-                        .returns(ANY.copy(nullable = true))
-                        .addCode(dispatch(tool))
-                        .build(),
-                )
+                .addFunctions(invocations(tool))
                 .build(),
         )
         .build()
+
+    /**
+     * The one or two `invoke` overrides.
+     *
+     * A context-free tool has the one `AgentToolDef` declares. A tool that asked for a context
+     * has both, and the two-argument one **throws**: it is unreachable through `ToolIndex`,
+     * which calls the three-argument overload for a `ContextualToolDef`, and a tool in this
+     * position needs a context to do its work at all. Running half of it and answering as
+     * though it had run is the one outcome worse than refusing - `time.step` would confirm
+     * without having stepped.
+     */
+    private fun invocations(tool: ToolModel): List<FunSpec> {
+        val contextual = tool.contextParameter ?: return listOf(
+            FunSpec.builder("invoke")
+                .addModifiers(KModifier.OVERRIDE)
+                .addParameter("receiver", tool.owner)
+                .addParameter("command", AgentNames.AGENT_COMMAND)
+                .returns(ANY.copy(nullable = true))
+                .addCode(dispatch(tool, contextArgument = null))
+                .build(),
+        )
+        return listOf(
+            FunSpec.builder("invoke")
+                .addKdoc(
+                    "Unreachable through `ToolIndex`, which calls the three-argument overload " +
+                        "for a `ContextualToolDef`. It throws rather than running [%T.%L] " +
+                        "without the context it declared: answering as though the work had " +
+                        "happened is worse than refusing.\n",
+                    tool.owner,
+                    tool.functionName,
+                )
+                .addModifiers(KModifier.OVERRIDE)
+                .addParameter("receiver", tool.owner)
+                .addParameter("command", AgentNames.AGENT_COMMAND)
+                .returns(ANY.copy(nullable = true))
+                .addStatement(
+                    "throw %T(%S)",
+                    UnsupportedOperationException::class,
+                    "${tool.name} needs the AgentContext of the command it is serving; call " +
+                        "the three-argument invoke, which is what ToolIndex does for a " +
+                        "ContextualToolDef",
+                )
+                .build(),
+            FunSpec.builder("invoke")
+                .addModifiers(KModifier.OVERRIDE)
+                .addParameter("receiver", tool.owner)
+                .addParameter("command", AgentNames.AGENT_COMMAND)
+                .addParameter("context", AgentNames.AGENT_CONTEXT)
+                .returns(ANY.copy(nullable = true))
+                .addCode(dispatch(tool, contextArgument = contextual))
+                .build(),
+        )
+    }
 
     private fun argsInitializer(tool: ToolModel): CodeBlock {
         if (tool.args.isEmpty()) return CodeBlock.of("emptyList()")
@@ -148,13 +202,21 @@ internal object ToolEmitter {
             .build()
     }
 
-    private fun dispatch(tool: ToolModel): CodeBlock {
+    private fun dispatch(tool: ToolModel, contextArgument: String?): CodeBlock {
         val body = CodeBlock.builder()
         for (arg in tool.args) body.add(coerce(tool, arg))
         body.add("return receiver.%N(", tool.functionName)
-        tool.args.forEachIndexed { position, arg ->
-            if (position > 0) body.add(", ")
+        // Named arguments throughout, so the context is passed in whatever position the author
+        // declared it without this emitter having to reproduce the parameter order.
+        var written = 0
+        if (contextArgument != null) {
+            body.add("%N·=·context", contextArgument)
+            written++
+        }
+        for (arg in tool.args) {
+            if (written > 0) body.add(", ")
             body.add("%1N·=·%1N", arg.name)
+            written++
         }
         body.add(")\n")
         return body.build()

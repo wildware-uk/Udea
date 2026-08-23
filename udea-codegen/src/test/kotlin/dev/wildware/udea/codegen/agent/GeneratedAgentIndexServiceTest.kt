@@ -8,6 +8,8 @@ import dev.wildware.udea.codegen.fixtures.PlaygroundSetOverlaysTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundSetStanceTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundSpawnBlueprintTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundTagEntityTool
+import dev.wildware.udea.codegen.fixtures.TimelineAdvanceTool
+import dev.wildware.udea.codegen.fixtures.TimelineDescribeTool
 import java.util.ServiceLoader
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,13 +38,21 @@ class GeneratedAgentIndexServiceTest {
             listOf(
                 PlaygroundSetOverlaysTool,
                 PlaygroundSetStanceTool,
+                // A toolset-qualified name sorts as the whole string, dot included, so `sim.*`
+                // lands between `set_stance` and `spawn_blueprint` rather than in a block of
+                // its own. The index is ordered, not grouped; the *manifest* is what groups.
+                TimelineAdvanceTool,
+                TimelineDescribeTool,
                 PlaygroundSpawnBlueprintTool,
                 PlaygroundTagEntityTool,
             ),
             modules.single().tools,
         )
         assertEquals(
-            listOf("set_overlays", "set_stance", "spawn_blueprint", "tag_entity"),
+            listOf(
+                "set_overlays", "set_stance", "sim.advance", "sim.describe",
+                "spawn_blueprint", "tag_entity",
+            ),
             modules.single().tools.map { it.name },
         )
     }

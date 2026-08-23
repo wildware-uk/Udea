@@ -6,6 +6,8 @@ import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.AgentCommand
 import dev.wildware.udea.agent.AgentSubmission
 import dev.wildware.udea.agent.AgentThreads
+import dev.wildware.udea.agent.activity.AgentSessionId
+import dev.wildware.udea.agent.activity.AgentSessions
 import dev.wildware.udea.agent.Json
 import dev.wildware.udea.core.host.RenderMode
 import java.io.IOException
@@ -182,8 +184,8 @@ public class AgentHost private constructor(
             )
             return
         }
-        val args = query.filterKeys { it != COMMAND_KEY }
-        val submission = bridge.submit(AgentCommand(name, args))
+        val args = query.filterKeys { it != COMMAND_KEY && it != SESSION_KEY }
+        val submission = bridge.submit(AgentCommand(name, args, session = sessionOf(exchange, query)))
         respond(
             exchange,
             // 200 for a rejection too - see the KDoc.
@@ -204,6 +206,25 @@ public class AgentHost private constructor(
                 put("frame", bridge.frame)
             },
         )
+    }
+
+    /**
+     * Who is calling, for the human-facing activity overlay (spec 3.7).
+     *
+     * `?session=` when the caller named itself, and the remote address otherwise, so two agents
+     * driving one instance are two colours in the overlay even when neither has been taught to
+     * send the parameter. It is stripped from the arguments a tool sees, exactly as `cmd` is:
+     * a tool that could read it could branch on which session it is, and a tool that could
+     * *write* it could impersonate another one in a human's panel.
+     *
+     * The label is interned rather than kept, and the table is bounded, because the value comes
+     * from outside - the same reason the command queue is capped.
+     */
+    private fun sessionOf(exchange: HttpExchange, query: Map<String, String>): AgentSessionId {
+        val named = query[SESSION_KEY]
+        if (!named.isNullOrBlank()) return config.sessions.intern(named)
+        val remote = exchange.remoteAddress ?: return AgentSessionId.LOCAL
+        return config.sessions.intern(remote.address?.hostAddress ?: return AgentSessionId.LOCAL)
     }
 
     /**
@@ -370,6 +391,16 @@ public class AgentHost private constructor(
         /** The query key carrying the command name. `cmd`, never `name`. */
         public const val COMMAND_KEY: String = "cmd"
 
+        /**
+         * The reserved query key naming the calling session.
+         *
+         * Reserved in the same sense as [COMMAND_KEY]: stripped from the arguments the tool
+         * receives, so a tool can neither read nor forge it. A caller that omits it is
+         * identified by its remote address instead, which is enough to keep two concurrent
+         * agents apart in the overlay.
+         */
+        public const val SESSION_KEY: String = "session"
+
         /** `HttpServer`'s connection backlog. Zero means the system default. */
         private const val BACKLOG: Int = 0
 
@@ -532,6 +563,14 @@ public class AgentHostConfig(
     public val registry: AgentRegistry = AgentRegistry(),
     /** Reported as `cwd` in the registry entry: which checkout this build came from. */
     public val workingDirectory: Path = Path.of("").toAbsolutePath(),
+    /**
+     * The session label table the overlay colours and names sessions from (spec 3.7).
+     *
+     * Shared with whatever draws the overlay, so the id recorded on a command and the label
+     * printed beside it are the same table's. A host that draws no overlay still interns, which
+     * costs one map entry per distinct caller and keeps the wiring identical in both cases.
+     */
+    public val sessions: AgentSessions = AgentSessions(),
 ) {
     init {
         require(port >= 0 && port <= AgentHostGate.MAX_PORT) {

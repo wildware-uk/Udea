@@ -8,7 +8,9 @@
 # `build-logic` for every module that emits a protocol), and the allocation budgets (spec 4 of
 # the engineering standards) via `udeaSnapshotBudget` and `udeaBenchTickLoop`.
 #
-# Still to land here as its own step: the `game-bridge-mcp` conformance run (agent).
+# The `game-bridge-mcp` conformance run is the `bridge-conformance` job at the foot of this
+# file: its own job and not a step, because it needs a JVM and Node at once and it needs a game
+# process left running while something else drives it.
 
 name: CI
 
@@ -626,3 +628,112 @@ jobs:
             status=1
           fi
           exit "$status"
+
+  bridge-conformance:
+    # Issue #81. The `game-bridge-mcp` TypeScript client, vendored verbatim in
+    # `.github/conformance/vendor`, driven against a LIVE headless instance.
+    #
+    # Its own job rather than a step in `build`, for two reasons. It needs a JVM *and* Node, and
+    # it needs a process left running while something else talks to it - which is a shape the
+    # `build` job's single Gradle invocation has no room for. Ubuntu only: this asserts an HTTP
+    # contract and a JSON document, neither of which is platform-dependent, and paying for a
+    # second OS here buys a slower merge rather than a different answer.
+    #
+    # Spec 7 names silent drift from this contract as a top risk, and the reason is that the
+    # bridge fails *quietly*: `normaliseManifest` drops a tool it cannot read rather than
+    # reporting it, so a manifest regression makes a capability invisible; `commandAndSync`
+    # degrades from `completedCommandId` to frame-watching, so losing that field turns command
+    # confirmation into a race that reads as a flaky test. Neither is visible from Kotlin,
+    # because neither is in Kotlin.
+    name: game-bridge-mcp conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: .github/conformance/package-lock.json
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      # Compiled before the instance is started so that a compile failure is a compile failure
+      # rather than a game that appears to be unreachable.
+      - name: Compile the vendored client
+        shell: bash
+        working-directory: .github/conformance
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run verify-vendor
+          npm run build
+
+      # Backgrounded, and its log kept: when the contract fails, the first question is always
+      # whether the game was healthy, and the answer is in here.
+      - name: Boot a headless instance with the agent surface bound
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :udea-agent-host:udeaPhase1Demo -Pudea.agent.port=7820 --console=plain \
+            > agent-instance.log 2>&1 &
+          echo "$!" > agent-instance.pid
+
+      - name: Wait for GET /health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 120); do
+            if curl -sf -m 2 http://127.0.0.1:7820/health > /dev/null; then
+              echo "health: $(curl -s http://127.0.0.1:7820/health)"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::the instance never answered GET /health on port 7820"
+          tail -50 agent-instance.log
+          exit 1
+
+      - name: Drive the real client against it
+        shell: bash
+        working-directory: .github/conformance
+        env:
+          UDEA_AGENT_PORT: "7820"
+        run: node --test test/bridge-contract.test.mjs
+
+      # The close half of the contract, and it has to be its own step because it needs the
+      # instance *gone*. `close` is the one command with no confirmation to wait for - nothing
+      # will ever report it completed - so the port going quiet is the only success signal
+      # `waitForSilence` has, and a host that leaves its HTTP server bound after the game stops
+      # leaves the bridge listing an instance it will keep failing against.
+      - name: Stop the instance and assert the port goes silent
+        shell: bash
+        env:
+          UDEA_AGENT_PORT: "7820"
+        run: |
+          set -euo pipefail
+          ( cd .github/conformance && node scripts/expect-silence.mjs ) &
+          silence=$!
+          sleep 1
+          kill "$(cat agent-instance.pid)" 2>/dev/null || true
+          wait "$silence"
+
+      - name: Upload the instance log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-conformance-instance-log
+          path: agent-instance.log
+          if-no-files-found: warn
+          retention-days: 7

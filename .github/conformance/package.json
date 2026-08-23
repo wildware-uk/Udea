@@ -1,0 +1,19 @@
+{
+  "name": "udea-bridge-conformance",
+  "private": true,
+  "type": "module",
+  "description": "Drives the vendored game-bridge-mcp client against a live headless Udea instance.",
+  "scripts": {
+    "verify-vendor": "node scripts/verify-vendor.mjs",
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run verify-vendor && npm run build && node --test test/bridge-contract.test.mjs",
+    "test:silence": "node scripts/expect-silence.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.7.3",
+    "@types/node": "22.10.2"
+  },
+  "engines": {
+    "node": ">=20.11"
+  }
+}

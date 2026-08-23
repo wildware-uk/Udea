@@ -66,6 +66,16 @@ public class ToolIndex private constructor(
     override fun budgetMs(toolName: String): Long = 0L
 
     /**
+     * The declared arguments of [toolName], straight off the `AgentToolDef` the index resolved.
+     *
+     * No copy and no reflection: `AgentToolDef.args` is already the published list, in
+     * declaration order, and it is what `/tools` serves. The overlay's anchor rule is derived
+     * from it once per tool at first use, never per call.
+     */
+    override fun declaredArgs(toolName: String): List<dev.wildware.udea.agent.AgentToolArg> =
+        entries[toolName]?.def?.args ?: emptyList()
+
+    /**
      * Runs [command], passing [context] only to a tool that declared it needs one.
      *
      * A **generated** tool is never handed an [AgentContext]: `AgentToolDef.invoke` takes a

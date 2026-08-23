@@ -18,6 +18,20 @@ internal object AnnotationNames {
     const val SIM: String = "$PACKAGE.Sim"
     const val Q: String = "$PACKAGE.Q"
 
+    /**
+     * `@Rpc`, and it is the one annotation this object addresses that is **not** in
+     * `udea-annotations` (issue #109).
+     *
+     * The four names above are the frozen component-field vocabulary of spec 5. An RPC is not
+     * a field - no mask bit, no `FieldStore` column, no snapshot presence - and it cannot be
+     * declared at all by a module without `udea-net` on its classpath, because the function it
+     * marks is only reachable over a `Transport`. It lives beside the runtime that executes it
+     * for the same reason `writeFixed` does. The *authority vocabulary* it carries is still
+     * `udea-annotations`' `Authority`, so the guard, the mask stripping and the agent surface
+     * read one enum.
+     */
+    const val RPC: String = "dev.wildware.udea.net.rpc.Rpc"
+
     const val AGENT_TOOL: String = "$PACKAGE.AgentTool"
     const val ARG: String = "$PACKAGE.Arg"
 
@@ -77,9 +91,23 @@ internal object CoreNames {
  */
 internal object NetNames {
     private const val BITS = "dev.wildware.udea.net.bits"
+    private const val WIRE = "dev.wildware.udea.net.wire"
 
     val WRITE_FIXED: MemberName = MemberName(BITS, "writeFixed")
     val READ_FIXED: MemberName = MemberName(BITS, "readFixed")
+
+    /**
+     * `CreateOnlyFields`, implemented **only** by a replicator that has a
+     * `@Net(lifetime = OnCreate)` field (issue #114).
+     *
+     * Conditional for the reason the quantiser is: naming a `udea-net` type puts `udea-net` on
+     * the generated file's compile classpath, and a module whose components are all
+     * `lifetime = Always` must not acquire that edge for a mask that would be empty. The
+     * runtime reads the mask through `LifetimePolicy`, which degrades to "nothing is
+     * create-only" for a replicator that does not declare one — so the absence is not a hole,
+     * it is the accurate answer.
+     */
+    val CREATE_ONLY_FIELDS: ClassName = ClassName(WIRE, "CreateOnlyFields")
 }
 
 /**

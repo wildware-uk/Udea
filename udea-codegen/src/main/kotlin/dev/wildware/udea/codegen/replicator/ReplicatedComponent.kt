@@ -111,6 +111,10 @@ internal data class Quantisation(val bits: Int, val min: Float, val max: Float) 
  * @param enumConstants non-null when the field is an enum: its constants in ordinal order,
  *   which is the mapping the wire actually carries.
  * @param quantisation non-null when the property carried `@Q`; only ever set on a `Float`.
+ * @param createOnly `true` for `@Net(lifetime = OnCreate)`: the field rides a `Create` and a
+ *   full resend and is stripped from every delta (issue #114). Only ever `true` when [net] is,
+ *   because a `@Sim` field never reaches a packet of any kind and "written once on a wire it
+ *   is never on" is not a statement about anything.
  */
 internal data class ReplicatedField(
     val path: List<String>,
@@ -122,6 +126,7 @@ internal data class ReplicatedField(
     val enumEntries: ClassName?,
     val enumConstants: List<String>?,
     val quantisation: Quantisation?,
+    val createOnly: Boolean = false,
 ) {
     /** The Kotlin property path; also the entry in `Replicator.fieldNames`. */
     val name: String = path.joinToString(".")
@@ -140,10 +145,19 @@ internal data class ReplicatedField(
      * Both were invisible to a token of `q:12` / `enum:32`, which is the same defect in two
      * places: a lock that pins the layout and not the meaning.
      */
-    val wireDescription: String = when {
-        quantisation != null -> quantisation.wireToken
-        enumConstants != null -> "${storage.wireToken}:${storage.wireBits}:${enumConstants.joinToString(",")}"
-        else -> "${storage.wireToken}:${storage.wireBits}"
+    val wireDescription: String = buildString {
+        when {
+            quantisation != null -> append(quantisation.wireToken)
+            enumConstants != null ->
+                append("${storage.wireToken}:${storage.wireBits}:${enumConstants.joinToString(",")}")
+            else -> append("${storage.wireToken}:${storage.wireBits}")
+        }
+        // Lifetime is part of the token for the same reason the `@Q` range is: it moves no bit
+        // in any single packet and changes what the *stream* means. A peer that thinks `teamId`
+        // is `Always` expects it in deltas; a peer that thinks it is `OnCreate` never sends it
+        // there. Both decode every packet the other sends without complaint and disagree about
+        // the value for the rest of the match, so it has to reach `protoHash`.
+        if (createOnly) append(":oncreate")
     }
 }
 
@@ -169,4 +183,14 @@ internal data class ReplicatedComponent(
     val typeName: String = className.simpleNames.joinToString(".")
 
     val netFields: List<ReplicatedField> get() = fields.filter { it.net }
+
+    /**
+     * The `@Net(lifetime = OnCreate)` fields, in bit-index order.
+     *
+     * Empty for all but a handful of components, and that emptiness is load-bearing: the
+     * generated object only implements `udea-net`'s `CreateOnlyFields` when this is non-empty,
+     * so a module with no create-only field never gains a reference to `udea-net` it did not
+     * already have.
+     */
+    val createOnlyFields: List<ReplicatedField> get() = fields.filter { it.createOnly }
 }

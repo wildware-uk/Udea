@@ -2,6 +2,7 @@ package dev.wildware.moba.ability
 
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
+import dev.wildware.udea.annotations.Lifetime
 import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
 import dev.wildware.udea.annotations.Sim
@@ -25,8 +26,17 @@ public class Combatant(
      *
      * `@Net` because a client colours a unit by its side before it can draw one, and because it
      * is what a restore needs to make a rebuilt entity a combatant again rather than a shell.
+     *
+     * `lifetime = OnCreate` (issue #114) because a unit's side is decided at spawn and never
+     * changes: `UnitBlueprint.dress` and `RespawnSystem` are the only writers in this game and
+     * both write it at construction. Before the generator read the argument, the declaration
+     * was decorative and this field rode a delta on every tick capture-and-diff saw it move -
+     * which, for a value that never moves, is a bug that costs nothing until a rewind writes
+     * the whole world back and every unit's team looks like a change. It now rides the Create
+     * and every full resend, and no Update, which `CombatantLifetimeTest` proves against the
+     * generated `CombatantReplicator` rather than against a hand-written stand-in.
      */
-    @Net public var teamId: Int = Teams.NEUTRAL,
+    @Net(lifetime = Lifetime.OnCreate) public var teamId: Int = Teams.NEUTRAL,
 ) : Component<Combatant> {
 
     override fun type(): ComponentType<Combatant> = Combatant

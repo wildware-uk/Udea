@@ -20,11 +20,12 @@ import kotlin.test.assertTrue
  * changed; `writeFull` does emit it; a full resend after a baseline loss re-includes it; the mask
  * is a subset of `netMask`.
  *
- * **Not** proven, and not implemented: `udea-codegen` emitting `CREATE_ONLY_MASK`. The generator
- * lives in a module this work does not own, so the mask here comes from a hand-written
- * [CreateOnlyFields] declaration on the fixture replicator. Until the generator implements that
- * interface, every generated replicator reports an empty create-only mask and this enforcement,
- * although real, applies to nothing in a shipped build.
+ * Not proven *here*: that `udea-codegen` emits the mask. It now does - `ComponentModelBuilder`
+ * reads the `@Net(lifetime = ...)` argument and `ReplicatorEmitter` adds `CreateOnlyFields` to
+ * any component that declares one - so this enforcement applies to shipped code rather than only
+ * to the hand-written [CreateOnlyFields] on the fixture replicator below. The generator side is
+ * covered by `udea-codegen`'s `GeneratedLifetimeTest`, and the game side by `moba`'s
+ * `CombatantLifetimeTest`, which pins `Combatant.teamId` to a create.
  */
 class LifetimeMaskTest {
 

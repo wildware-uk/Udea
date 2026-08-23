@@ -35,20 +35,28 @@ dependencies {
     implementation(libs.gdx)
 
     /*
-     * The wire `SessionEndToEndTest` drives, on the test classpath only.
+     * The wire, and why this line is no longer `testImplementation`.
      *
      * Issue #80 shipped with an in-process double standing in for the transport, because
      * `:udea-net` had no wire when it was written. It has one now, and a seam left un-joined is
      * a seam nobody has ever run: the double would have passed on the day the real transport
      * dropped every datagram, which its own KDoc admitted.
      *
-     * `testImplementation` and not `implementation`: nothing this module *ships* names a
-     * transport. The session identity is deliberately a `SessionPeers.record` call and a list of
-     * JVM arguments so that a launcher can wire the two together without either module
-     * depending on the other, and putting `:udea-net` on the runtime classpath here would
-     * quietly turn that choice into a lie.
+     * This used to be `testImplementation`, on the reasoning that "nothing this module *ships*
+     * names a transport". That has stopped being true, and deliberately: `host/net/` ships the
+     * `net.*` toolset, which stands a server and n clients up in one process over
+     * `NetHarness`/`SimulatedTransport` and reports a `DesyncReport`. `:udea-net` was real,
+     * tested and *unreachable from an agent* - twenty test files drove it from Kotlin and no
+     * tool called any of it - and a capability nothing can reach is not shipped.
+     *
+     * What the old reasoning was protecting is untouched. `:udea-net` is headless, so this adds
+     * no GL and no native to anything. The session-identity seam is still a `SessionPeers.record`
+     * call and a list of JVM arguments, so a *launcher* still joins two processes without either
+     * module knowing the other. And this module remains debug-only: `UDEA-REL-001` keeps its
+     * classes out of every shipped artifact and `UDEA-REL-002` keeps it off every release runtime
+     * classpath, which is the gate that lets it hold a dependency `moba` also holds.
      */
-    testImplementation(project(":udea-net"))
+    implementation(project(":udea-net"))
 }
 
 // --- the Phase 1 exit demo -------------------------------------------------------------------

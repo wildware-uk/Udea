@@ -153,6 +153,10 @@ public class ReplicationClient(
             serverTick = serverTick,
             baselineTick = Tick.ZERO,
             hasBaseline = false,
+            // Not "ack = 0 means nothing": zero is a real sequence, and a server that reads it
+            // as one promotes the baseline of everything its first packet carried. See
+            // `PacketHeader`'s KDoc.
+            hasAck = remoteSeq >= 0,
         ).write(writer)
         if (input.newest != null) {
             val payload = frames.beginMessage(MessageType.Input)

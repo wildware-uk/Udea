@@ -3,6 +3,7 @@ package dev.wildware.moba
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import com.github.quillraven.fleks.Family
+import dev.wildware.moba.ability.AbilityRpcChannel
 import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.MobaBlueprints
 import dev.wildware.udea.annotations.Replicated
@@ -161,6 +162,15 @@ public class PlayerControlSystem(
     private val input: IntentState,
     /** The one activation path in this game. The AI uses the same object. */
     private val activation: AbilityActivation,
+    /**
+     * Where a press is sent when this process is a **connected client** (issue #109).
+     *
+     * `null` - the default, and what single-player and every test that does not care runs -
+     * means the press is simply activated locally, which is the behaviour this system has
+     * always had. Nullable rather than a no-op default channel, because a channel that
+     * silently swallowed calls would make a wiring mistake invisible.
+     */
+    private val channel: AbilityRpcChannel? = null,
 ) : SimSystem() {
 
     /** Resolved once at construction; `world.family { }` per tick is a lookup on a hot path. */
@@ -251,6 +261,14 @@ public class PlayerControlSystem(
     ): Boolean {
         if (slot >= abilities.slotCount) return false
         if (!abilities.instanceAt(slot).isGranted) return false
+        // `@Rpc(authority = OwnerPredicted)` means both halves of this line, not one of them:
+        // the press goes to the server, which re-checks that this connection owns `self` in
+        // generated code before it fires anything, **and** it is run locally so the swing
+        // appears on the tick the key went down instead of a round trip later. What the client
+        // sends is the *press*; what it never sends is the resulting state. That is the whole
+        // difference from `NetworkClientSystem.kt:57`, which uploaded component state for
+        // every owned entity at render rate and thereby had nothing to reconcile against.
+        channel?.activateAbility(self, slot)
         return activation.activate(self, abilities, attributes, effects, slot, now) ===
             ActivationResult.Activated
     }

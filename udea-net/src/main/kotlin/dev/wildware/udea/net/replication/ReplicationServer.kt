@@ -99,6 +99,23 @@ public class ReplicationServer(
         return states.getOrPut(peer.raw) { ClientReplicationState(peer) }
     }
 
+    /**
+     * Drops [peer]: it stops being broadcast to, and its baselines are forgotten.
+     *
+     * Without this a disconnected client is still packed and sent a datagram every tick for the
+     * life of the process, and - worse - [addClient] is a `getOrPut`, so a peer id the transport
+     * recycles for the *next* connection inherits the dead one's acked baseline ticks. The new
+     * client would then be delta-encoded against state belonging to somebody who has left, which
+     * decodes cleanly and is wrong in every field. A transport that reuses slots (`UdpTransport`
+     * does) makes that the normal case rather than the rare one.
+     *
+     * @return true when [peer] was registered.
+     */
+    public fun removeClient(peer: PeerId): Boolean {
+        jitterBuffers.remove(peer.raw)
+        return states.remove(peer.raw) != null
+    }
+
     /** The replication state for [peer]. */
     public fun stateOf(peer: PeerId): ClientReplicationState =
         states[peer.raw] ?: error("$peer is not a registered client")
@@ -123,7 +140,11 @@ public class ReplicationServer(
         val header = PacketHeader.read(src)
         if (header.protoHash != protocol.protoHash) return
         state.onReceived(header.seq)
-        state.applyAck(header.ack, header.ackBits)
+        // A client that has received nothing yet still sends input, and its ack field is
+        // padding. Applying it would acknowledge this server's sequence 0 - promoting the
+        // baseline of every entity that packet carried to a state the client may never have
+        // received. Under a perfect link that is invisible; under loss it is permanent.
+        if (header.hasAck) state.applyAck(header.ack, header.ackBits)
 
         val walker = FrameReader(source, offset, length, src.bitPosition)
         while (true) {
@@ -162,6 +183,7 @@ public class ReplicationServer(
             serverTick = current.tick,
             baselineTick = state.lastAckedTick,
             hasBaseline = hasBaseline,
+            hasAck = state.remoteSeq >= 0,
         ).write(writer)
 
         val payload = frames.beginMessage(MessageType.Snapshot)

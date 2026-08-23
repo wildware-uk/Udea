@@ -45,6 +45,7 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
         val enumEntries: ClassName?,
         val enumConstants: List<String>?,
         val quantisation: Quantisation?,
+        val createOnly: Boolean,
     ) {
         val name: String = path.joinToString(".")
     }
@@ -106,6 +107,7 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
                 enumEntries = candidate.enumEntries,
                 enumConstants = candidate.enumConstants,
                 quantisation = candidate.quantisation,
+                createOnly = candidate.createOnly,
             )
         }
         return ReplicatedComponent(
@@ -147,6 +149,13 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
 
         val type = property.type.resolve()
 
+        // Issue #114. Declared since Phase 0 and read by nothing until now, which made the
+        // annotation decorative: a team id set at spawn rode a delta on every tick that
+        // capture-and-diff happened to see it move. `udea-net`'s `LifetimePolicy` already
+        // refuses to put such a field in an `Update`; what was missing is any generated
+        // replicator ever *saying* it has one.
+        val createOnly = net && property.lifetimeIsOnCreate()
+
         val quantisation = if (property.hasAnnotation(AnnotationNames.Q)) {
             if (!type.isFloat()) {
                 logger.error(
@@ -179,6 +188,7 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
                         enumEntries = lowering.enumEntries,
                         enumConstants = lowering.enumConstants,
                         quantisation = quantisation,
+                        createOnly = createOnly,
                     )
                 }
             }
@@ -199,6 +209,11 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
                             enumEntries = component.enumEntries,
                             enumConstants = component.enumConstants,
                             quantisation = null,
+                            // The lifetime is declared on the property, and a composite is
+                            // lowered to one field per component, so every component of a
+                            // `lifetime = OnCreate` vector is create-only. Anything else would
+                            // let half a spawn position ride deltas.
+                            createOnly = createOnly,
                         )
                     }
                 }
@@ -321,5 +336,33 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
 
 private inline fun <reified T> KSAnnotation.argument(name: String): T? =
     arguments.firstOrNull { it.name?.asString() == name }?.value as? T
+
+/**
+ * Whether this property's `@Net` declares `lifetime = OnCreate`.
+ *
+ * The argument is compared **by the enum constant's simple name**, read off whatever KSP hands
+ * back for an enum-valued argument — a `KSType`, a `KSClassDeclaration` or, on a Java-view
+ * declaration, a plain string. Resolving it to `dev.wildware.udea.annotations.Lifetime` instead
+ * would put a hard dependency from the processor onto the annotation module's classes at
+ * *processing* time, which `AnnotationNames`' whole design avoids: `udea-codegen` runs inside
+ * the compiler and addresses annotations by name.
+ *
+ * Absent means [dev.wildware.udea.annotations.Lifetime.Always], which is the annotation's own
+ * default. Defaulting the *other* way would silently stop replicating a field.
+ */
+private fun KSPropertyDeclaration.lifetimeIsOnCreate(): Boolean {
+    val net = annotations.firstOrNull {
+        it.annotationType.resolve().declaration.qualifiedName?.asString() == AnnotationNames.NET
+    } ?: return false
+    val argument = net.arguments.firstOrNull { it.name?.asString() == LIFETIME_ARGUMENT }?.value
+        ?: return false
+    return argument.toString().substringAfterLast('.') == ON_CREATE
+}
+
+/** The `@Net` argument that carries the lifetime. */
+private const val LIFETIME_ARGUMENT = "lifetime"
+
+/** `dev.wildware.udea.annotations.Lifetime.OnCreate`, by simple name. */
+private const val ON_CREATE = "OnCreate"
 
 private fun KSType.isFloat(): Boolean = declaration.qualifiedName?.asString() == "kotlin.Float"

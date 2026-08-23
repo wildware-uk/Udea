@@ -9,6 +9,7 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import dev.wildware.udea.codegen.agent.AgentPass
 import dev.wildware.udea.codegen.agent.AgentStateModel
@@ -23,6 +24,9 @@ import dev.wildware.udea.codegen.replicator.ComponentModelBuilder
 import dev.wildware.udea.codegen.replicator.ReplicatedComponent
 import dev.wildware.udea.codegen.replicator.ReplicatorEmitter
 import dev.wildware.udea.codegen.replicator.TypeIds
+import dev.wildware.udea.codegen.rpc.RpcEmitter
+import dev.wildware.udea.codegen.rpc.RpcFunction
+import dev.wildware.udea.codegen.rpc.RpcModelBuilder
 import java.io.OutputStreamWriter
 import java.nio.charset.StandardCharsets
 
@@ -61,6 +65,7 @@ internal class UdeaSymbolProcessor(
 
     private val models = ComponentModelBuilder(logger)
     private val agent = AgentPass(logger)
+    private val rpcs = RpcModelBuilder(logger)
 
     /**
      * KSP calls `process` once per round. Nothing here defers a symbol, so the module-level
@@ -85,7 +90,13 @@ internal class UdeaSymbolProcessor(
         // an error. Bailing out on `components.isEmpty()` alone would have silently generated
         // no tools for exactly the module the agent epic cares about most.
         val agentIsEmpty = agent.isEmpty(resolver)
-        if (components.isEmpty() && agentIsEmpty) return emptyList()
+        // The RPC surface shares a round with the other two and nothing else: a module may
+        // declare `@Rpc` functions and no components, or the reverse. Bailing out before this
+        // on `components.isEmpty()` alone would have silently generated no guards for a module
+        // whose only networking is RPCs, which is the failure mode the agent pass already
+        // taught this method once.
+        val rpcFunctions = rpcFunctions(resolver)
+        if (components.isEmpty() && agentIsEmpty && rpcFunctions.isEmpty()) return emptyList()
         // Validated once, here, and not at each writer. `udea.moduleName` gates the lock, the
         // protoHash, both ServiceLoader indexes and the tool manifest, and a module whose name
         // is malformed can produce none of them - so a check inside one writer and a bare
@@ -93,6 +104,11 @@ internal class UdeaSymbolProcessor(
         // misconfiguration was a failure at all. Tools-only modules took the silent path:
         // dispatchers compiled, nothing indexed them, and no diagnostic said so.
         if (!checkModuleName()) return emptyList()
+        // Before the component id space is resolved, because an `RpcDescriptor` depends on
+        // nothing in it: an RPC index is assigned at runtime from the sorted name list that
+        // `RpcRegistry` builds, so a module can emit its guards even while its component list
+        // is being argued about.
+        writeRpcFiles(rpcFunctions)
         if (components.isEmpty()) {
             if (emittedModuleFiles) return emptyList()
             val agentResult = agent.run(resolver)
@@ -190,6 +206,44 @@ internal class UdeaSymbolProcessor(
             emittedModuleFiles = true
         }
         return emptyList()
+    }
+
+    /**
+     * Every `@Rpc` function in this round, sorted by fully-qualified name.
+     *
+     * Sorted for the reason the component list is: the set of emitted files and their contents
+     * must depend on the sources alone and not on the order KSP happened to hand them over.
+     */
+    private fun rpcFunctions(resolver: Resolver): List<KSFunctionDeclaration> =
+        resolver.getSymbolsWithAnnotation(AnnotationNames.RPC)
+            .filterIsInstance<KSFunctionDeclaration>()
+            .sortedBy { it.qualifiedName?.asString() ?: it.simpleName.asString() }
+            .toList()
+
+    /**
+     * One `RpcDescriptor` object per `@Rpc` function.
+     *
+     * **Isolating**, like a `Replicator`: the descriptor is a pure function of the one file
+     * that declared the function, so adding an RPC reprocesses that file and not the module.
+     *
+     * A function the builder refused emits nothing, which is the whole point - a half-emitted
+     * descriptor is an unguarded one, and an unguarded RPC is the defect this feature exists
+     * to remove rather than a degraded version of it.
+     */
+    private fun writeRpcFiles(functions: List<KSFunctionDeclaration>) {
+        for (declaration in functions) {
+            val model: RpcFunction = rpcs.build(declaration) ?: continue
+            val containingFile = declaration.containingFile
+            if (containingFile == null) {
+                logger.error(
+                    "@Rpc ${model.qualifiedName} has no source file; only a function compiled " +
+                        "from source in this module can have an RpcDescriptor generated.",
+                    declaration,
+                )
+                continue
+            }
+            writeIsolating(RpcEmitter.emit(model), containingFile)
+        }
     }
 
     /**

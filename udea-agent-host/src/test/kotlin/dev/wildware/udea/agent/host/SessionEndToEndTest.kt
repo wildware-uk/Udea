@@ -34,10 +34,18 @@ import kotlin.test.assertTrue
  * far side. Two ints crossing a real wire format, not an object reference crossing a method
  * call - which is what makes [SessionLink.bytesCarried] a number worth asserting on.
  *
- * **Still not real:** there is no `net.start_host` / `net.spawn_session` tool, so a launcher
- * cannot yet start this pair from the agent surface; and `LoopbackTransport` is in-memory, so no
- * socket is bound and no UDP is spoken. What this proves is that the session shape and the wire
- * fit together - not that a datagram left the machine.
+ * **Still not real:** `LoopbackTransport` is in-memory, so no socket is bound and no UDP is
+ * spoken. What this proves is that the session shape and the wire fit together - not that a
+ * datagram left the machine.
+ *
+ * **What is no longer missing.** This used to say there was no `net.spawn_session` tool, so a
+ * launcher could not start a pair from the agent surface at all. There is one now:
+ * `dev.wildware.udea.agent.host.net.NetToolset` and `NetSessionEndToEndTest`, which stands a
+ * server and two clients up over HTTP alone and reads authoritative state back. The two tests
+ * are complementary and neither replaces the other - this one is about **two processes** with
+ * two ports and two roles, which is what a session id exists to group; that one is about **one
+ * process** driving both ends of a replicated session, which is what an agent debugging a desync
+ * actually wants.
  */
 class SessionEndToEndTest {
 

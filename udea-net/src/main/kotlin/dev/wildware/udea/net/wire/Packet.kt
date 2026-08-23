@@ -25,6 +25,17 @@ import dev.wildware.udea.net.bits.writeVarInt
  *
  * `baselineTick` is present in the bytes even when [hasBaseline] is false — a fixed header
  * shape costs one byte in the full-state case and buys a parser with no branch in it.
+ *
+ * ## Why [hasAck] is a flag and not `ack == 0`
+ *
+ * Sequence zero is a real sequence. A peer that has received nothing yet still has to send —
+ * a client's first input must not wait on the first snapshot — and if "nothing acked" is
+ * encoded as `ack = 0` the receiver reads it as "I have your packet 0". On the server that ack
+ * *promotes the baseline* of every entity packet 0 carried, so if packet 0 was the one the link
+ * dropped, the server then delta-encodes those entities forever against a state the client has
+ * never held. It converges under a perfect link (packet 0 arrived anyway) and never converges
+ * under loss, which is exactly the shape of a bug that ships. Bit 1 of the flags byte, which
+ * was already in the wire and unassigned, says whether the ack fields mean anything at all.
  */
 public data class PacketHeader(
 
@@ -48,6 +59,15 @@ public data class PacketHeader(
 
     /** False for a full-state packet: the payload stands alone. */
     public val hasBaseline: Boolean,
+
+    /**
+     * Whether [ack]/[ackBits] carry a real acknowledgement.
+     *
+     * False on a packet from a peer that has not yet received one, whose `ack` is padding. See
+     * the class KDoc: this is not a nicety, it is the difference between converging under loss
+     * and not.
+     */
+    public val hasAck: Boolean = true,
 ) {
 
     /** Writes the header. Always the same fields in the same order. */
@@ -56,7 +76,10 @@ public data class PacketHeader(
         out.writeBits(seq and SEQ_MASK, SEQ_BITS)
         out.writeBits(ack and SEQ_MASK, SEQ_BITS)
         out.writeInt(ackBits)
-        out.writeBits(if (hasBaseline) FLAG_HAS_BASELINE else 0, FLAG_BITS)
+        out.writeBits(
+            (if (hasBaseline) FLAG_HAS_BASELINE else 0) or (if (hasAck) FLAG_HAS_ACK else 0),
+            FLAG_BITS,
+        )
         out.writeVarInt(serverTick.value.toInt())
         out.writeVarInt(if (hasBaseline) baselineTick.value.toInt() else 0)
     }
@@ -67,11 +90,14 @@ public data class PacketHeader(
         public const val SEQ_BITS: Int = 16
         public const val SEQ_MASK: Int = (1 shl SEQ_BITS) - 1
 
-        /** Width of the flags byte. Only bit 0 is assigned. */
+        /** Width of the flags byte. Bits 0 and 1 are assigned; the other six are spare. */
         public const val FLAG_BITS: Int = 8
 
         /** Bit 0: the payload is a delta against [baselineTick]. */
         public const val FLAG_HAS_BASELINE: Int = 1
+
+        /** Bit 1: [ack]/[ackBits] are a real acknowledgement rather than padding. */
+        public const val FLAG_HAS_ACK: Int = 2
 
         /** Reads a header written by [write]. */
         public fun read(src: BitReader): PacketHeader {
@@ -83,13 +109,14 @@ public data class PacketHeader(
             val serverTick = Tick(src.readVarInt().toLong() and 0xFFFF_FFFFL)
             val baselineTick = Tick(src.readVarInt().toLong() and 0xFFFF_FFFFL)
             val hasBaseline = flags and FLAG_HAS_BASELINE != 0
+            val hasAck = flags and FLAG_HAS_ACK != 0
             if (hasBaseline && baselineTick >= serverTick) {
                 throw MalformedBitStream(
                     "packet claims a baseline at $baselineTick for server tick $serverTick; " +
                         "a baseline must be strictly older than the tick it is a baseline for",
                 )
             }
-            return PacketHeader(protoHash, seq, ack, ackBits, serverTick, baselineTick, hasBaseline)
+            return PacketHeader(protoHash, seq, ack, ackBits, serverTick, baselineTick, hasBaseline, hasAck)
         }
 
         /**
@@ -122,6 +149,18 @@ public enum class MessageType(public val id: Int) {
 
     /** Server to client: the connection is refused, with the differences spelled out. */
     ProtocolRefusal(4),
+
+    /**
+     * One typed remote procedure call (issue #109): `varint rpcIndex | arguments`.
+     *
+     * One call per frame. The frame is the containment boundary, and what it contains here is
+     * an argument decode driven by an integer a remote peer chose, so sharing a length prefix
+     * between two calls would let a truncated one take the next one down with it.
+     *
+     * A client-to-server frame of this type still carries no component state: an RPC payload
+     * is arguments the generator wrote a codec for, never a `FieldStore` row.
+     */
+    Rpc(5),
     ;
 
     public companion object {

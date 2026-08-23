@@ -21,10 +21,13 @@ import dev.wildware.udea.core.replication.Replicator
  * the generator can implement without a contract change, and [LifetimePolicy] degrades to
  * "nothing is create-only" for every replicator that does not declare one.
  *
- * That degradation is the honest part and the dangerous part: until `udea-codegen` emits this,
- * a generated `Replicator` reports an empty create-only mask and every field keeps riding
- * deltas exactly as it does today. The enforcement below is real and tested; the generator
- * side of #114 is not done.
+ * `udea-codegen` now implements it: `ComponentModelBuilder` reads `@Net(lifetime = ...)` and
+ * `ReplicatorEmitter` adds this superinterface and a `createOnlyMask` **only** to a component
+ * that actually declares a create-only field, so a module whose components are all
+ * `lifetime = Always` gains no reference to `udea-net` for a mask that would say nothing. The
+ * degradation below is therefore the accurate answer for such a component rather than a hole:
+ * `moba`'s `Combatant.teamId` is the first field in a shipped build to use it, and
+ * `CombatantLifetimeTest` proves the stripping against the generated replicator.
  */
 public interface CreateOnlyFields {
 

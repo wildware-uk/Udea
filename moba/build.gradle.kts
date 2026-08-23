@@ -269,6 +269,18 @@ tasks.register<JavaExec>("runMatchShot") {
     )
 }
 
+/**
+ * `moba.netproof`: one server, two clients, the real 27-unit level, and three hashes that must
+ * agree. Run by name rather than wired into `check`, because it prints a transcript that is the
+ * point of running it; the assertion it embodies is covered by `MobaNetAgreementTest`.
+ */
+tasks.register<JavaExec>("runNetProof") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.netproof: server + 2 clients, perfect / 150ms+5% loss / TRELLO_8."
+    mainClass.set("dev.wildware.moba.net.MobaNetProof")
+    classpath = sourceSets.main.get().runtimeClasspath
+}
+
 tasks.register<JavaExec>("runClient") {
     group = ApplicationPlugin.APPLICATION_GROUP
     description = "moba.client: a visible LWJGL3 window."
@@ -465,6 +477,40 @@ val udeaBenchStartup = tasks.register<UdeaBenchStartupTask>("udeaBenchStartup") 
  * gate in the sense that both are wired into `check`, and two tasks in the sense that one of
  * them can run anywhere.
  */
+/**
+ * The three-process UDP proof is asked for by name, and is not a gate on `check`.
+ *
+ * Same reasoning as `runShot` and `runMatchShot` above, for a different scarce resource. It forks
+ * three JVMs that each seed the whole 27-unit level and then tick against a **wall clock** at
+ * 60Hz over real sockets. Under `./gradlew build` those three compete with every other Gradle
+ * worker on the machine, miss their tick deadlines, and the reading drifts - so wiring it into
+ * `check` would buy a proof that is red on a loaded laptop and green on an idle one, which is
+ * worth less than no proof at all.
+ *
+ * The claim itself is not left unguarded. `MobaNetProof` and the loopback session run the same
+ * replication path deterministically, on one thread with a manual clock, inside `check`. What
+ * this adds is the part that only separate processes can show, and it is run by name:
+ *
+ * ```
+ * ./gradlew :moba:runUdpProof
+ * ```
+ */
+tasks.register<Test>("runUdpProof") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba: the 27-unit battle over real UDP, three OS processes, perfect and lossy."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("dev.wildware.moba.net.MobaUdpTwoProcessTest") }
+    testLogging { showStandardStreams = true }
+    outputs.upToDateWhen { false }
+}
+
+tasks.test {
+    // See `runUdpProof`: wall-clock timing across three forked JVMs, which `check` cannot give it.
+    filter { excludeTestsMatching("dev.wildware.moba.net.MobaUdpTwoProcessTest") }
+}
+
 tasks.test {
     // Where `MobaAssetsTest` finds this module's sources. A relative path would resolve against
     // the project directory under Gradle and against the daemon's working directory under an

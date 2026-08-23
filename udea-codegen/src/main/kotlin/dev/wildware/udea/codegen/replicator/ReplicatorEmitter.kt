@@ -15,6 +15,7 @@ import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.UNIT
 import dev.wildware.udea.codegen.CoreNames
+import dev.wildware.udea.codegen.NetNames
 
 /**
  * Turns a [ReplicatedComponent] into the `Replicator<T>` object for it.
@@ -50,6 +51,15 @@ internal object ReplicatorEmitter {
             .addModifiers(KModifier.PUBLIC)
             .addKdoc(kdoc(component))
             .addSuperinterface(CoreNames.REPLICATOR.parameterizedBy(component.className))
+
+        // Issue #114. Opted into rather than always present: implementing it names a udea-net
+        // type, and a component with no `lifetime = OnCreate` field would be declaring an empty
+        // mask at the cost of a module dependency. `LifetimePolicy` already reads an absent
+        // declaration as "nothing is create-only", which is the true answer for such a
+        // component rather than a fallback.
+        if (component.createOnlyFields.isNotEmpty()) {
+            builder.addSuperinterface(NetNames.CREATE_ONLY_FIELDS)
+        }
 
         builder.addProperty(
             PropertySpec.builder("FIELD_COUNT", INT, KModifier.PUBLIC, KModifier.CONST)
@@ -91,6 +101,19 @@ internal object ReplicatorEmitter {
                 .initializer("%T.lowest(FIELD_COUNT)", CoreNames.MASK_OPS)
                 .build(),
         )
+        if (component.createOnlyFields.isNotEmpty()) {
+            builder.addProperty(
+                PropertySpec.builder("createOnlyMask", CoreNames.FIELD_MASK, KModifier.OVERRIDE)
+                    .addKdoc(
+                        "`@Net(lifetime = OnCreate)` fields: a Create and a full resend carry " +
+                            "them, every Update strips them (issue #114). A subset of " +
+                            "[netMask], because a create-only field is still a `@Net` " +
+                            "field - it just never rides a delta.",
+                    )
+                    .initializer(maskInitializer(component.createOnlyFields))
+                    .build(),
+            )
+        }
 
         builder.addFunction(capture(component))
         builder.addFunction(diff(component))
@@ -135,7 +158,11 @@ internal object ReplicatorEmitter {
                 "| %L | `%L` | %L | %L |\n",
                 field.index,
                 field.name,
-                if (field.net) "`@Net` — net and all" else "`@Sim` — all only",
+                when {
+                    field.createOnly -> "`@Net(OnCreate)` — create only"
+                    field.net -> "`@Net` — net and all"
+                    else -> "`@Sim` — all only"
+                },
                 wireDescription(field),
             )
         }
@@ -173,13 +200,16 @@ internal object ReplicatorEmitter {
                 .build()
         }
 
-    private fun netMaskInitializer(component: ReplicatedComponent): CodeBlock {
-        val net = component.netFields
-        if (net.isEmpty()) return CodeBlock.of("%T.EMPTY", CoreNames.MASK_OPS)
+    private fun netMaskInitializer(component: ReplicatedComponent): CodeBlock =
+        maskInitializer(component.netFields)
+
+    /** `MaskOps.of(FIELD_A, FIELD_B)`, or `MaskOps.EMPTY` for no fields at all. */
+    private fun maskInitializer(fields: List<ReplicatedField>): CodeBlock {
+        if (fields.isEmpty()) return CodeBlock.of("%T.EMPTY", CoreNames.MASK_OPS)
         return CodeBlock.builder()
             .add("%T.of(", CoreNames.MASK_OPS)
             .apply {
-                net.forEachIndexed { i, field ->
+                fields.forEachIndexed { i, field ->
                     if (i > 0) add(", ")
                     add("%L", field.constant)
                 }

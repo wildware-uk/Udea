@@ -4,6 +4,7 @@ import java.io.File
 import java.security.MessageDigest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.io.TempDir
 
@@ -85,6 +86,19 @@ class GeneratedFileDeterminismTest {
     }
 
     @Test
+    fun `the machine-specific scan matches a real path and not the schema dialect URL`() {
+        // A scanner that matches nothing passes vacuously forever, and this one was narrowed
+        // to let a URL through — so both halves of that narrowing are pinned here.
+        assertTrue(MACHINE_PATH.containsMatchIn("C:" + File.separator + "Users" + File.separator + "someone"))
+        assertTrue(MACHINE_PATH.containsMatchIn("/Users/someone/project"))
+        assertTrue(MACHINE_PATH.containsMatchIn("/home/someone/project"))
+        assertFalse(
+            MACHINE_PATH.containsMatchIn("https://json-schema.org/draft/2020-12/schema"),
+            "the dialect URL a generated inputSchema declares is not a machine path",
+        )
+    }
+
+    @Test
     fun `nothing machine-specific reaches a generated file`() {
         val offenders = mutableListOf<String>()
         val userName = System.getProperty("user.name").orEmpty()
@@ -105,7 +119,16 @@ class GeneratedFileDeterminismTest {
     private companion object {
         const val UPDATE_PROPERTY = "udea.updateGeneratedHashes"
 
-        val MACHINE_PATH = Regex("""[A-Za-z]:[\\/]|/home/|/Users/""")
+        /**
+         * A Windows drive letter or a Unix home directory.
+         *
+         * The lookbehind is what keeps a URL out of it: a generated `inputSchema` names the
+         * JSON Schema dialect it is written in, and `https://` ends in `s:/` — one letter, a
+         * colon and a slash, which is a drive path if you do not look at the character before
+         * it. Matching that would have made the only two choices "drop this check" or "stop
+         * declaring the dialect", and both are worse than a lookbehind.
+         */
+        val MACHINE_PATH = Regex("""(?<![A-Za-z])[A-Za-z]:[\\/]|/home/|/Users/""")
         val TIMESTAMP = Regex("""\b(19|20)\d{2}-\d{2}-\d{2}\b|\b\d{2}:\d{2}:\d{2}\b""")
 
         /**

@@ -56,6 +56,30 @@ public interface RenderSystem {
 }
 
 /**
+ * Implemented by a [RenderSystem] or [OverlaySystem] that owns a viewport.
+ *
+ * Separate from [RenderSystem] rather than a default method on it because most renderers have
+ * nothing to do on a resize, and an empty override on every one of them is the sort of noise
+ * that hides the two that matter. [RenderPipeline.resize] finds the implementors once, at
+ * build time.
+ *
+ * Note the window size reaches a system through here and not through `Gdx.graphics`. The old
+ * `BackgroundDrawSystem` sized itself from `Gdx.graphics.width/height` inside its draw call
+ * (`BackgroundDrawSystem.kt:32`), which is why it could not be tested and why it ignored the
+ * viewport's letterboxing.
+ */
+public interface Resizable {
+
+    /**
+     * The window is now [width] x [height] pixels.
+     *
+     * Called on the render thread, outside a frame. A world viewport keeps its aspect ratio
+     * here; a UI viewport recentres.
+     */
+    public fun resize(width: Int, height: Int)
+}
+
+/**
  * A system that draws on the human's screen and must never appear in a capture (spec 3.7).
  *
  * The agent activity overlay is the reason this type exists: a corner panel showing what the

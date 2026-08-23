@@ -62,7 +62,12 @@ class UdeaRulesTest {
         assertEquals("UDEA0005", UdeaRules.SIM_ON_VAL.id)
         assertEquals("UDEA0006", UdeaRules.UNSUPPORTED_FIELD_TYPE.id)
         assertEquals("UDEA0007", UdeaRules.MALFORMED_QUANTIZATION.id)
-        assertEquals(7, UdeaRules.all.size)
+        assertEquals("UDEA0008", UdeaRules.AGENT_TOOL_DESCRIPTION.id)
+        assertEquals("UDEA0009", UdeaRules.AGENT_ARG_DESCRIPTION.id)
+        assertEquals("UDEA0010", UdeaRules.AGENT_TOOL_UNSUPPORTED_TYPE.id)
+        assertEquals("UDEA0011", UdeaRules.AGENT_STATE_NON_SCALAR.id)
+        assertEquals("UDEA0012", UdeaRules.AGENT_NAME_COLLISION.id)
+        assertEquals(12, UdeaRules.all.size)
         assertTrue(UdeaRules.all.all { it.defaultSeverity == Severity.Error })
     }
 

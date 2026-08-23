@@ -41,6 +41,16 @@ dependencies {
     // Nothing in src/main depends on udea-net, so this adds no edge to the module graph.
     testImplementation(project(":udea-net"))
 
+    // Test-only, and the same seam as udea-net above: the generated tool dispatchers are
+    // written against udea-agent's own `AgentToolDef`, `ToolModule`, `AgentCommand`,
+    // `BadArgumentException`, `AgentStateSource`, `StateModule` and `GameStateSink` - all of
+    // them real declarations in udea-agent's src/main, none of them stand-ins this module
+    // invented. That is what lets GeneratedAgentIndexServiceTest load the generated indexes
+    // through a real ServiceLoader and drive them through the real `ToolIndex` and
+    // `AgentStateIndex`, which is the only form of proof this mechanism accepts.
+    // Nothing in src/main depends on udea-agent, so this adds no edge to the module graph.
+    testImplementation(project(":udea-agent"))
+
     // KSP2's standalone runner. ProcessorLoggingTest and ProcessorFailureTest drive the
     // processor directly over throwaway sources, which is the only way to observe a build
     // that must FAIL. Version comes from the catalog, never a literal.
@@ -78,6 +88,12 @@ val projectComponents: Provider<String> =
 ksp {
     arg("udea.moduleName", MODULE_NAME)
     arg("udea.netModuleService", "dev.wildware.udea.net.NetModule")
+    // The agent surface's two ServiceLoader services, declared by udea-agent and on this
+    // module's test compile *and* runtime classpath. Naming them here is what makes the
+    // generated indexes compile and load through a real ServiceLoader, which is the only form
+    // of proof this mechanism accepts.
+    arg("udea.toolModuleService", "dev.wildware.udea.agent.ToolModule")
+    arg("udea.stateModuleService", "dev.wildware.udea.agent.StateModule")
     arg(UdeaNetComponents.KSP_OPTION, projectComponents.get())
 }
 

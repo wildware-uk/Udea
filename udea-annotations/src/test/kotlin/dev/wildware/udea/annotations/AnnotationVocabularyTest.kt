@@ -32,6 +32,9 @@ class AnnotationVocabularyTest {
         "dev.wildware.udea.annotations.Q" to setOf(AnnotationTarget.PROPERTY),
         "dev.wildware.udea.annotations.AgentTool" to setOf(AnnotationTarget.FUNCTION),
         "dev.wildware.udea.annotations.Arg" to setOf(AnnotationTarget.VALUE_PARAMETER),
+        // Agent-only, and deliberately not part of the Replicator field space: see AgentState's
+        // KDoc. It shares this table because the targeting and retention contract is the same.
+        "dev.wildware.udea.annotations.AgentState" to setOf(AnnotationTarget.PROPERTY),
     )
 
     private val expectedEnums = setOf("Authority", "Lifetime", "Visibility")
@@ -154,6 +157,9 @@ class AnnotationVocabularyTest {
         @Sim
         var lastGroundedTick: Long = 0L
 
+        @AgentState(name = "match_state")
+        val phase: String = "warmup"
+
         @AgentTool(name = "nudge", description = "fixture")
         fun nudge(@Arg(description = "how far", required = false) distance: Float): Float = distance
     }
@@ -163,6 +169,7 @@ class AnnotationVocabularyTest {
         // The fixture above proves targeting at compile time; this keeps it reachable so it
         // is compiled and cannot be dropped as dead code by a future cleanup.
         assertEquals(1.5f, TargetFixture().nudge(1.5f))
+        assertEquals("warmup", TargetFixture().phase)
     }
 
     private companion object {

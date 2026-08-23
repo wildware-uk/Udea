@@ -8,9 +8,7 @@
 # `build-logic` for every module that emits a protocol), and the allocation budgets (spec 4 of
 # the engineering standards) via `udeaSnapshotBudget` and `udeaBenchTickLoop`.
 #
-# Still to land here as their own steps: the `game-bridge-mcp` conformance run (agent), and a
-# plugin-disabled build that actually degrades something - the leg below exists, but the
-# switch it flips is inert and says so.
+# Still to land here as its own step: the `game-bridge-mcp` conformance run (agent).
 
 name: CI
 
@@ -216,27 +214,25 @@ jobs:
     # queueing behind one compiler plugin. `docs/compiler-plugin.md` has the degrade
     # procedure.
     #
-    # ## What this leg proves today, plainly: NOT that
+    # ## What this leg proves, and how it came to prove it
     #
-    # `-Pudea.compilerPlugin.enabled=false` is read by `udea.kotlin-library` and consumed by
-    # nothing. No module applies a `KotlinCompilerPluginSupportPlugin`, nothing adds
-    # `udea-compiler-plugin` to a `kotlinCompilerPluginClasspath`, and no `-Xplugin` argument
-    # is produced anywhere outside the plugin's own kctfork test harness. So this job compiles
-    # byte for byte what the `build` job already compiled: **the outer switch is inert, and a
-    # green tick here is not evidence that flipping it degrades anything.** The mitigation
-    # spec 7 describes becomes real when `udea-gradle` applies the plugin, and not before.
+    # Until issue #164 it proved almost nothing. `-Pudea.compilerPlugin.enabled=false` was read
+    # by `udea.kotlin-library` and consumed by nobody: no module applied a
+    # `KotlinCompilerPluginSupportPlugin`, so this job compiled byte for byte what the `build`
+    # job compiled and reported 128 of 131 tasks up to date, which was itself the proof it had
+    # changed nothing.
     #
-    # It is kept, rather than deleted, for one honest reason: it proves
-    # `-Pudea.compilerPlugin.enabled=false` is *accepted* on every module (`UdeaBuildFlags`
-    # rejects anything but `true`/`false`, so a typo in the degrade procedure fails loudly
-    # rather than silently meaning "enabled"). The `Say what this leg does not prove` step
-    # below annotates every run so the tick is not read as more than that, and
-    # `CompilerPluginSwitchTest` in `build-logic` fails the moment the wiring lands, which is
-    # when this comment, `docs/compiler-plugin.md` and the flag all have to change together.
+    # `UdeaCompilerPluginSupport` in `build-logic` now applies the plugin to every `udea-*`
+    # module and to `moba`, and reads the flag in `isApplicable`. With the flag off, no
+    # `udea-compiler-plugin` jar reaches a `kotlinCompilerPluginClasspath` and no `-Xplugin`
+    # argument is produced anywhere - and `udeaVerifyCompilerPlugin`, which runs on `check` for
+    # every module, FAILS if one still does. So a green tick here now means the degrade path
+    # works. The `checkers-fire` job below is the other half: it proves that the source which
+    # compiles clean here is a hard build failure with the plugin on.
     #
     # **This job must be a required status check on `master`.** That is a repository setting,
     # not something a workflow file can assert; see `docs/compiler-plugin.md`.
-    name: build with the K2 plugin disabled (switch currently inert)
+    name: build with the K2 plugin disabled
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -262,31 +258,16 @@ jobs:
         run: ./gradlew :udea-compiler-plugin:udeaVerifyPluginOptional --stacktrace
 
       # Every module, `moba` included, with the plugin switched off before any -Xplugin
-      # argument is produced. `:udea-compiler-plugin:test` is excluded deliberately: that suite
-      # applies the plugin to its own throwaway compilations, so it neither proves nor
-      # disproves anything about a plugin-off build of the engine.
+      # argument is produced. No `-x` any more: the exclusion this step used to carry
+      # (`:udea-compiler-plugin:test`) was justified by the outer switch doing nothing, and a
+      # workflow that carries an exclusion nobody has retested is a workflow that hides the
+      # next breakage. `udeaVerifyCompilerPlugin` is named explicitly as well as reached
+      # through `check`, so this leg keeps asserting the absence even if `check` is narrowed.
       - name: Build everything with the plugin disabled
         shell: bash
         run: >-
-          ./gradlew build -Pudea.compilerPlugin.enabled=false
+          ./gradlew build udeaVerifyCompilerPlugin -Pudea.compilerPlugin.enabled=false
           --stacktrace
-          -x :udea-compiler-plugin:test
-
-      # Loud on every run, pass or fail. A green tick on a job whose name contains "disabled"
-      # reads as "the degrade path works"; it does not, yet, and the annotation says so where
-      # the tick is looked at.
-      - name: Say what this leg does not prove
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          message="udea.compilerPlugin.enabled is read but consumed by nothing: no module applies the K2 plugin yet, so this leg compiles the same thing the build job did. It proves the flag is accepted, not that disabling the plugin degrades anything. See docs/compiler-plugin.md 'The plugin is optional'."
-          echo "::warning title=plugin-disabled leg is currently inert::${message}"
-          {
-            echo "### plugin-disabled: what this leg proves"
-            echo
-            echo "${message}"
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test reports
         if: failure()
@@ -297,6 +278,119 @@ jobs:
             **/build/reports/tests/**
             **/build/reports/udea/**
           retention-days: 7
+
+  checkers-fire:
+    # Issue #164's acceptance, as a job: **a `@Net val` in a real `udea-*` module fails the
+    # build with the correct rule id at the correct symbol, and the same source compiles
+    # cleanly with the plugin disabled.**
+    #
+    # Everything else about the K2 plugin is proved one level in from here.
+    # `:udea-compiler-plugin:test` drives a real `K2JVMCompiler` over throwaway sources, which
+    # proves the checkers work when the plugin is loaded; `udeaVerifyCompilerPlugin` reads the
+    # resolved plugin classpath, which proves the jar is where Gradle says it is. Neither
+    # answers the question this job asks - whether a defect written into a real module's real
+    # source set actually stops a real build. For the whole of Phase 0 the answer was no, and
+    # every gate was green.
+    #
+    # The fixture is written here rather than checked in for the obvious reason: it must not
+    # compile. `udea-gradle` is the module used because it is a `udea-*` module on the
+    # `udea.kotlin-library` convention whose compile classpath already carries
+    # `udea-annotations` (through `udea-assets-compiler` -> `udea-assets`), so the probe needs
+    # no dependency added for its own sake.
+    #
+    # The line and column are computed from the fixture rather than hard-coded. Presence alone
+    # is not enough, and `docs/compiler-plugin.md` says why: a rule that fires on the right
+    # symbol and one that fires on the enclosing file pass the same test without a position
+    # assertion, and only one of them is the Phase 0 demo criterion.
+    #
+    # **This job must be a required status check on `master`.**
+    name: the FIR checkers fail a real build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: A broken component fails a real build, and compiles clean without the plugin
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe=udea-gradle/src/main/kotlin/dev/wildware/udea/gradle/CheckerProbe.kt
+          logs=$(mktemp -d)
+          # Deleted whatever happens, so a failing run cannot leave a source that will not
+          # compile behind for a later step or for an artifact upload. The compiler output goes
+          # to a temporary directory for the same reason: it must not land in the workspace,
+          # where an artifact glob would pick it up as if it were a build report.
+          trap 'rm -f "$probe"; rm -rf "$logs"' EXIT
+
+          cat > "$probe" <<'KOTLIN'
+          package dev.wildware.udea.gradle
+
+          import dev.wildware.udea.annotations.Net
+          import dev.wildware.udea.annotations.Q
+          import dev.wildware.udea.annotations.Replicated
+
+          @Replicated
+          internal class CheckerProbe(
+              @Net val health: Int = 0,
+              @Q(bits = 8, min = 0f, max = 1f) var slots: Int = 0,
+          )
+          KOTLIN
+
+          # Where each diagnostic must land: the property NAME, not the class, not the file.
+          health_line=$(grep -n 'val health' "$probe" | cut -d: -f1)
+          health_col=$(awk '/val health/ { print index($0, "health"); exit }' "$probe")
+          slots_line=$(grep -n 'var slots' "$probe" | cut -d: -f1)
+          slots_col=$(awk '/var slots/ { print index($0, "slots"); exit }' "$probe")
+          echo "expecting UDEA0001 at ${health_line}:${health_col}, UDEA0003 at ${slots_line}:${slots_col}"
+
+          if ./gradlew :udea-gradle:compileKotlin --console=plain > "$logs/enabled.log" 2>&1; then
+            echo "::error::a @Net val and a @Q Int compiled cleanly in udea-gradle, so the K2 plugin is not applied to a real compilation and the FIR checkers cannot fail a build"
+            tail -n 40 "$logs/enabled.log"
+            exit 1
+          fi
+
+          status=0
+          for expectation in "UDEA0001 ${health_line}:${health_col}" "UDEA0003 ${slots_line}:${slots_col}"; do
+            rule=${expectation%% *}
+            position=${expectation#* }
+            if ! grep -q "CheckerProbe.kt:${position} ${rule}:" "$logs/enabled.log"; then
+              echo "::error::expected ${rule} at CheckerProbe.kt:${position}; the compiler reported:"
+              grep -E '^e: ' "$logs/enabled.log" || echo "(no error diagnostics at all)"
+              status=1
+            fi
+          done
+          [ "$status" -eq 0 ] || exit 1
+
+          # The same source, the same module, the flag flipped. This is the half that makes the
+          # degrade procedure in docs/compiler-plugin.md a procedure rather than a hope.
+          if ! ./gradlew :udea-gradle:compileKotlin -Pudea.compilerPlugin.enabled=false --console=plain > "$logs/disabled.log" 2>&1; then
+            echo "::error::-Pudea.compilerPlugin.enabled=false did not remove the checkers: the same source still fails to compile"
+            grep -E '^e: ' "$logs/disabled.log" || tail -n 40 "$logs/disabled.log"
+            exit 1
+          fi
+
+          {
+            echo "### The FIR checkers fail a real build"
+            echo
+            echo "| Rule | Symbol | Reported at |"
+            echo "| --- | --- | --- |"
+            echo "| UDEA0001 | CheckerProbe.health | ${health_line}:${health_col} |"
+            echo "| UDEA0003 | CheckerProbe.slots | ${slots_line}:${slots_col} |"
+            echo
+            echo "The same file compiles clean under -Pudea.compilerPlugin.enabled=false."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   kotlin-upgrade-probe:
     # Spec 3.2's version policy: the K2 plugin is the most Kotlin-version-fragile thing in the

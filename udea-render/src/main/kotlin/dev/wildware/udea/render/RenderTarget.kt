@@ -1,6 +1,8 @@
 package dev.wildware.udea.render
 
+import com.badlogic.gdx.graphics.g2d.Batch
 import com.badlogic.gdx.utils.Disposable
+import dev.wildware.udea.render.capture.PixelSource
 
 /**
  * Somewhere a frame can be drawn.
@@ -51,9 +53,23 @@ public class OffscreenTarget internal constructor(
  * never reads this target, overlay pixels cannot reach an agent.
  */
 public class ScreenTarget internal constructor(
-    override val width: Int,
-    override val height: Int,
+    width: Int,
+    height: Int,
 ) : RenderTarget {
+
+    /**
+     * Current window width. A `var` with an internal setter because this target *is* the
+     * window: a human dragging an edge changes it, and an overlay laying itself out against a
+     * size captured at startup would drift off the screen. [OffscreenTarget] is deliberately
+     * the opposite — its size is the framebuffer's and never moves, which is what keeps two
+     * captures comparable.
+     */
+    override var width: Int = width
+        internal set
+
+    /** Current window height. See [width]. */
+    override var height: Int = height
+        internal set
 
     override fun toString(): String = "ScreenTarget(${width}x$height)"
 }
@@ -84,14 +100,40 @@ public class RenderTargets internal constructor(
     /** Where the human's window is drawn, after the capture. Never read by a capture. */
     public val screen: ScreenTarget,
     /**
+     * The one sprite batch, shared by every renderer and by the blit.
+     *
+     * Typed as LibGDX's `Batch` **interface** rather than `SpriteBatch`, which is what makes
+     * every ported drawing system testable with no GL context at all: a test hands the
+     * pipeline a recording batch and asserts what was drawn, where, and in what order.
+     *
+     * One, not three. `GameScreen` constructed a batch (`UdeaGameManager.kt:143`) and then
+     * `BackgroundDrawSystem.kt:23` and `DebugDrawSystem.kt:26` each constructed another, so a
+     * frame flushed three separate vertex buffers and disposal was wherever somebody
+     * remembered.
+     */
+    public val batch: Batch,
+    /**
+     * Binds [offscreen] before the frame and blits it to [screen] afterwards.
+     *
+     * [FrameSurface.None] for a pipeline with no framebuffer behind it -- the ordering tests,
+     * and any host that draws straight to the window. The LWJGL3 backend passes a real one.
+     */
+    internal val surface: FrameSurface = FrameSurface.None,
+    /**
+     * How a capture reads pixels back, or `null` when this pipeline cannot be captured.
+     *
+     * `null` is what makes `GameHost.screenshot` answer `no_capture_backend` instead of
+     * returning a blank image: a pipeline with no way to read pixels says so.
+     */
+    internal val pixels: PixelSource? = null,
+    /**
      * GL resources whose lifetime the pipeline owns, in construction order.
      *
-     * Empty until the drawing ports land; the ordering and disposal behaviour is already
-     * exercised, so the batch inherits it rather than introducing it.
+     * Disposed by [RenderPipeline.dispose] in reverse.
      */
     internal val owned: List<Disposable> = emptyList(),
 ) {
 
-    override fun toString(): String =
-        "RenderTargets(offscreen=$offscreen, screen=$screen, owned=${owned.size})"
+    override fun toString(): String = "RenderTargets(offscreen=$offscreen, screen=$screen, " +
+        "surface=$surface, capturable=${pixels != null}, owned=${owned.size})"
 }

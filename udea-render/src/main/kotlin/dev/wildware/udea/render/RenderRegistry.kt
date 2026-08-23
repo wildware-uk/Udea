@@ -3,6 +3,7 @@ package dev.wildware.udea.render
 import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.core.GameContext
+import dev.wildware.udea.render.capture.FrameCaptureSlot
 
 /**
  * Where a game declares what it draws, and in what order.
@@ -33,9 +34,32 @@ import dev.wildware.udea.core.GameContext
  * with the phase ordinal, and so says nothing) or a contradiction (it disagrees, and one of
  * the two has to lose silently). Both are worth failing on, at the registration site.
  */
-public class RenderRegistry {
+public class RenderRegistry(
+    /**
+     * Where presentation's wall time comes from. Injected so a test can drive it by hand;
+     * `FrameClock.Wall` is the only production value.
+     */
+    clock: FrameClock = FrameClock.Wall,
+) {
 
     private val entries = ArrayList<Entry>()
+
+    private val timer = FrameTimer(clock)
+
+    /**
+     * The per-frame wall delta, for the renderers entitled to one.
+     *
+     * Available *before* [build] because a system that animates on wall time takes it as a
+     * constructor parameter, and the constructors run inside [build]:
+     *
+     * ```
+     * registry.register(RenderPhase.World) { ParticleRenderSystem(batch, registry.frameTime) }
+     * ```
+     *
+     * One instance per registry, republished once per frame by the pipeline, so two renderers
+     * cannot end up measuring the same frame differently.
+     */
+    public val frameTime: FrameTime get() = timer
 
     /**
      * Registers a [RenderSystem] to run in [phase].
@@ -51,7 +75,7 @@ public class RenderRegistry {
      */
     public fun register(
         phase: RenderPhase,
-        factory: () -> RenderSystem,
+        factory: (RenderResources) -> RenderSystem,
         constrain: RenderConstraints.() -> Unit = {},
     ): RenderHandle {
         require(phase.isCapturable) {
@@ -71,7 +95,7 @@ public class RenderRegistry {
      * being a convention.
      */
     public fun overlay(
-        factory: () -> OverlaySystem,
+        factory: (RenderResources) -> OverlaySystem,
         constrain: RenderConstraints.() -> Unit = {},
     ): RenderHandle = add(RenderPhase.Overlay, Entry.Kind.Overlay(factory), constrain)
 
@@ -90,12 +114,12 @@ public class RenderRegistry {
         world: World,
         ctx: GameContext,
         targets: RenderTargets,
-        clock: FrameClock = FrameClock.Wall,
     ): RenderPipeline {
+        val resources = RenderResources(targets.batch, targets.offscreen)
         val instances: List<Bound> = entries.map { entry ->
             when (val kind = entry.kind) {
-                is Entry.Kind.Scene -> Bound.Scene(requireNotAFleksSystem(kind.make()))
-                is Entry.Kind.Overlay -> Bound.Overlay(requireNotAFleksSystem(kind.make()))
+                is Entry.Kind.Scene -> Bound.Scene(requireNotAFleksSystem(kind.make(resources)))
+                is Entry.Kind.Overlay -> Bound.Overlay(requireNotAFleksSystem(kind.make(resources)))
             }
         }
 
@@ -112,7 +136,17 @@ public class RenderRegistry {
         }
 
         for (index in systems.indices) systems[index].onBind(world, ctx)
-        return RenderPipeline(targets, systems, overlays, FrameTimer(clock))
+        val capture = targets.pixels?.let { FrameCaptureSlot(it, ctx.clock) }
+        // targets.owned first: a system's own resources were built against the batch and the
+        // framebuffer, so reverse-order disposal has to release them before those.
+        return RenderPipeline(
+            targets,
+            systems,
+            overlays,
+            timer,
+            capture,
+            targets.owned + resources.owned(),
+        )
     }
 
     /** Registration indices belonging to [phase], in the order they must run. */
@@ -171,8 +205,8 @@ public class RenderRegistry {
         val after: List<RenderHandle>,
     ) {
         sealed interface Kind {
-            class Scene(val make: () -> RenderSystem) : Kind
-            class Overlay(val make: () -> OverlaySystem) : Kind
+            class Scene(val make: (RenderResources) -> RenderSystem) : Kind
+            class Overlay(val make: (RenderResources) -> OverlaySystem) : Kind
         }
     }
 

@@ -76,8 +76,18 @@ public class NetIdIndex(
     /** `entity.id -> NetId.raw`. Grows only when a larger Fleks entity id is first seen. */
     private var reverse = IntArray(entityCapacity) { NONE_RAW }
 
-    /** How many ids are currently live. */
+    /** How many ids are currently live. Includes ids [reserve]d but not yet [attach]ed. */
     public var liveCount: Int = 0
+        private set
+
+    /**
+     * Ids taken by [reserve] that no entity has been [attach]ed to yet.
+     *
+     * Non-zero only between a `BlueprintSpawner.spawn` and the barrier drain that applies it.
+     * A number that stays non-zero across ticks means a spawn was submitted and its action
+     * never ran — the id is live, resolves to nothing, and will never be handed out again.
+     */
+    public var reservedCount: Int = 0
         private set
 
     /**
@@ -89,18 +99,7 @@ public class NetIdIndex(
     public fun allocate(entity: Entity): NetId {
         require(netIdOf(entity).isNone) { "Entity $entity already has a NetId" }
 
-        val index = when {
-            freeSize > 0 -> {
-                val recycled = freeRing[freeHead]
-                freeHead++
-                if (freeHead == capacity) freeHead = 0
-                freeSize--
-                recycled
-            }
-
-            nextFresh < capacity -> nextFresh++
-            else -> throw NetIdExhaustedException(capacity)
-        }
+        val index = takeIndex()
 
         entities[index] = entity
         liveFlags[index] = true
@@ -111,6 +110,83 @@ public class NetIdIndex(
         ensureReverseCapacity(entity.id)
         reverse[entity.id] = id.raw
         return id
+    }
+
+    /**
+     * Takes the next id with no entity behind it yet, to be completed by [attach].
+     *
+     * The half of [allocate] a between-tick mutation needs. `BlueprintSpawner.spawn` has to
+     * hand its caller a [NetId] *at submit time* — an agent that spawns a blueprint and names
+     * it in the next tool call cannot wait for a barrier drain to learn what it spawned — but
+     * it must not create the entity until that drain, or the world would be mutated in the
+     * middle of a tick, which is the one thing `SimBarrier` exists to prevent.
+     *
+     * Between the two calls the index is **live**: [allocate] will never hand it out again and
+     * neither will [reserve]. It resolves to `null`, exactly as a stale id does, and
+     * [forEachLive] skips it — so a snapshot taken while a spawn is queued simply does not
+     * contain the entity that does not exist yet, rather than containing a row with no
+     * component data.
+     *
+     * @throws NetIdExhaustedException when [capacity] ids are already live.
+     */
+    public fun reserve(): NetId {
+        val index = takeIndex()
+
+        entities[index] = null
+        liveFlags[index] = true
+        liveCount++
+        reservedCount++
+        if (index >= highWater) highWater = index + 1
+
+        return NetId.of(index, generations[index])
+    }
+
+    /**
+     * Completes a [reserve] by putting [entity] behind [netId].
+     *
+     * Distinct from [bind], which reinstates an id a snapshot recorded and therefore requires
+     * the index to be *free*. This requires it to be an outstanding reservation, which is what
+     * makes "the id I was handed" and "the id this entity got" the same id by construction
+     * rather than by the caller remembering to pass the right one.
+     *
+     * @throws IllegalStateException if [netId] is not an outstanding reservation — already
+     *   attached, freed, stale, or never reserved. Loud, because the alternative is a spawned
+     *   entity with no identity and an id an agent is holding that will never resolve.
+     * @throws IllegalArgumentException if [entity] already holds an id.
+     */
+    public fun attach(entity: Entity, netId: NetId) {
+        require(!netId.isNone) { "NetId.NONE names no reservation and cannot be attached to" }
+        val index = netId.index
+        require(index < capacity) { "NetId index $index exceeds this index's capacity $capacity" }
+        check(liveFlags[index] && generations[index] == netId.generation && entities[index] == null) {
+            "$netId is not an outstanding reservation; reserve() it before attaching an entity"
+        }
+        require(netIdOf(entity).isNone) { "Entity $entity already has a NetId" }
+
+        entities[index] = entity
+        reservedCount--
+        ensureReverseCapacity(entity.id)
+        reverse[entity.id] = netId.raw
+    }
+
+    /**
+     * The next index to hand out: recycled if one is waiting, otherwise fresh.
+     *
+     * Shared by [allocate] and [reserve] so the two can never disagree about the FIFO
+     * recycling order — which is the property the generation counter's staleness guarantee is
+     * measured against.
+     */
+    private fun takeIndex(): Int = when {
+        freeSize > 0 -> {
+            val recycled = freeRing[freeHead]
+            freeHead++
+            if (freeHead == capacity) freeHead = 0
+            freeSize--
+            recycled
+        }
+
+        nextFresh < capacity -> nextFresh++
+        else -> throw NetIdExhaustedException(capacity)
     }
 
     /**
@@ -132,6 +208,11 @@ public class NetIdIndex(
             if (entityId >= 0 && entityId < reverse.size && reverse[entityId] == netId.raw) {
                 reverse[entityId] = NONE_RAW
             }
+        } else {
+            // A live index with no entity is an outstanding `reserve`. Freeing one is how a
+            // spawn that will never be applied gives its index back; the counter has to follow
+            // or `reservedCount` would report a queued spawn forever.
+            reservedCount--
         }
 
         entities[index] = null
@@ -283,6 +364,11 @@ public class NetIdIndex(
         }
         reverse.fill(NONE_RAW)
         liveCount = 0
+        // A restore replaces the whole population, and a reservation names an entity in a
+        // future that has just been unwound. Its index goes back to the snapshot's free queue
+        // below, so the id an in-flight spawn is holding reads stale from here on — which is
+        // what `attach` refuses loudly rather than binding into a world that never asked for it.
+        reservedCount = 0
 
         freeHead = 0
         freeTail = state.freeCount % capacity

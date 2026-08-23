@@ -6,6 +6,7 @@ import dev.wildware.udea.core.EngineConfig
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.NetRole
 import dev.wildware.udea.core.gameContext
+import dev.wildware.udea.core.loop.TimeTravelFactory
 import dev.wildware.udea.core.loop.WorldSimulation
 
 /**
@@ -26,6 +27,23 @@ public class UdeaGameDef(
     public val role: NetRole = NetRole.Standalone,
     /** Fleks' initial entity capacity. Grows on demand; sizing it right avoids the regrow. */
     public val entityCapacity: Int = DEFAULT_ENTITY_CAPACITY,
+    /**
+     * Builds the snapshot ring the simulation records into, or `null` for a game with no
+     * history.
+     *
+     * This field **is** the "does this game record?" decision. A definition without one
+     * produces a `WorldSimulation` whose `travel` is `null`: no ring is allocated, capture
+     * costs one null check per tick, and every `TimeControl` time-travel call answers
+     * `no_snapshot_ring`. A dedicated server therefore does not pay for a 64MB ring nobody
+     * reads, and it does not pay because the ring was never built rather than because someone
+     * remembered to configure it away.
+     *
+     * A factory and not a [dev.wildware.udea.core.loop.TimeTravel], because a ring needs the
+     * `World` and the `GameContext` that [build] is what creates. `snapshotTimeTravel(...)` in
+     * `dev.wildware.udea.core.snapshot` is the one the engine ships; it takes the generated
+     * `ComponentRegistry`, which is why the kernel cannot supply this itself.
+     */
+    public val timeTravel: TimeTravelFactory? = null,
 ) {
 
     init {
@@ -90,7 +108,11 @@ public class UdeaGameDef(
             }
         }
 
-        return UdeaGame(ctx, world, WorldSimulation(ctx, world), manifest)
+        // Built after the world and before the first tick, so the simulation holds its ring
+        // for its whole life and there is no window in which a game is half wired for history.
+        val travel = timeTravel?.create(ctx, world)
+
+        return UdeaGame(ctx, world, WorldSimulation(ctx, world, travel = travel), manifest)
     }
 
     override fun toString(): String =

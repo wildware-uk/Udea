@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 class KotlinPinCheckTest {
 
     private fun fixture(root: File, extraBuildScript: String): GradleFixture =
-        GradleFixture(root).withVersionCatalog().project(
+        GradleFixture(root).withVersionCatalog().withCompilerPluginProject().project(
             "udea-core",
             """
             plugins { id("udea.kotlin-library") }

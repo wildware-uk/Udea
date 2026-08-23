@@ -17,6 +17,19 @@ internal object AnnotationNames {
     const val NET: String = "$PACKAGE.Net"
     const val SIM: String = "$PACKAGE.Sim"
     const val Q: String = "$PACKAGE.Q"
+
+    const val AGENT_TOOL: String = "$PACKAGE.AgentTool"
+    const val ARG: String = "$PACKAGE.Arg"
+
+    /**
+     * `@AgentState`, and it is deliberately not in the group above.
+     *
+     * The four names above address the `Replicator` field space; this one does not touch it.
+     * A property annotated with it gets no `fieldNames` entry, no `FieldMask` bit and no
+     * `FieldStore` slot, because the frozen contract makes those three the same index and a
+     * property owning one of them without the others cannot exist there.
+     */
+    const val AGENT_STATE: String = "$PACKAGE.AgentState"
 }
 
 /**
@@ -83,4 +96,10 @@ internal object GeneratedNames {
 
     /** `Moba` becomes `MobaNetModule`. */
     fun netModule(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}NetModule")
+
+    /** `Moba` becomes `MobaToolModule`: this module's `@AgentTool` index. */
+    fun toolModule(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}ToolModule")
+
+    /** `Moba` becomes `MobaStateModule`: this module's `@AgentState` index. */
+    fun stateModule(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}StateModule")
 }

@@ -31,8 +31,10 @@ dependencies {
  *
  * Several gates here are source scans of the repository rather than assertions about
  * `build-logic`'s own classes: `ModuleGraphRulesTest` re-derives the headless module set from
- * `settings.gradle.kts`, `CompilerPluginSwitchTest` walks the build scripts and `udea-gradle`
- * looking for compiler-plugin wiring, `UdeaProtocolLockTest` reads `udea-codegen`'s lock and
+ * `settings.gradle.kts`, `CompilerPluginSwitchTest` walks `build-logic`'s own sources,
+ * `ci.yml` and `docs/compiler-plugin.md` checking the K2 wiring is still applied and still
+ * described truthfully, `UdeaCompilerPluginWiringTest` reads `udea-compiler-plugin`'s build
+ * script and its CLI contract, `UdeaProtocolLockTest` reads `udea-codegen`'s lock and
  * the emitter that writes its header, and `UdeaNetComponentsTest` reads the component
  * registry. Gradle cannot see any of that, so without declaring it the task stays
  * `UP-TO-DATE` across exactly the edits it exists to notice — a gate that passes from cache
@@ -43,6 +45,9 @@ val outerBuildInputs: FileCollection = files(
     rootDir.resolve("../net-components.lock"),
     rootDir.resolve("../udea-codegen/net-protocol.lock"),
     rootDir.resolve("../udea-codegen/src/main/kotlin/dev/wildware/udea/codegen/protocol/ProtocolLock.kt"),
+    rootDir.resolve(
+        "../udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/UdeaCompilerPlugin.kt",
+    ),
     rootDir.resolve("../.github/workflows/ci.yml"),
     rootDir.resolve("../docs/compiler-plugin.md"),
     rootDir.resolve("../docs/module-graph.md"),

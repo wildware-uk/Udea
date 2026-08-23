@@ -32,9 +32,20 @@ public annotation class AgentTool(
  * still appears in the schema; `@Arg` only supplies the model-facing text and the
  * required flag.
  *
- * @param description one line describing the argument for the model.
+ * @param description one line describing the argument for the model. A blank description is
+ *   a build error: a JSON Schema property with no `description` tells the model nothing about
+ *   what to put in it.
  * @param required whether the schema marks the argument required. Defaults to `true`; a
  *   Kotlin parameter with a default value is emitted as optional regardless.
+ * @param default the value used when an optional argument is absent, written as the text an
+ *   agent would have sent. Empty means "no default".
+ *
+ *   It has to be written here, rather than read off the Kotlin parameter's own default,
+ *   because KSP can see *that* a parameter has a default but never the expression that
+ *   produces it. The generated dispatcher therefore always passes an explicit value, and this
+ *   is the one place both it and the published manifest can read that value from — so an
+ *   optional, non-nullable argument without a `default` is a build error rather than a
+ *   manifest that advertises a default the tool does not actually have.
  *
  * Retention is [AnnotationRetention.BINARY]: it feeds schema generation at build time only.
  */
@@ -44,4 +55,5 @@ public annotation class AgentTool(
 public annotation class Arg(
     val description: String = "",
     val required: Boolean = true,
+    val default: String = "",
 )

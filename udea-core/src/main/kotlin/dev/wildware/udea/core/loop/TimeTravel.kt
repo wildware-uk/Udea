@@ -1,5 +1,7 @@
 package dev.wildware.udea.core.loop
 
+import com.github.quillraven.fleks.World
+import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.SceneId
 import dev.wildware.udea.core.Tick
 
@@ -24,6 +26,25 @@ public interface TimeTravel {
 
     /** Captures the world as it stands and stores it in the ring. */
     public fun captureNow(): SnapshotInfo
+
+    /**
+     * Captures this tick if the cadence says it is due, and allocates nothing when it is.
+     *
+     * The per-tick entry point: [Simulation.step] calls it once, after the clock has advanced,
+     * on every tick of every simulation that was built with a ring. [captureNow] cannot take
+     * that job because it returns a [SnapshotInfo] — one object per captured tick, on the one
+     * path `SnapshotBudgets.LOOP_ALLOCATED_BYTES` gates at zero bytes.
+     *
+     * Whether a tick is due is the implementation's to decide, not the loop's, so that the
+     * cadence, the ring and the retention windows are configured in one place instead of the
+     * loop holding half of the policy. `SnapshotTimeTravel` reads
+     * `EngineConfig.snapshotIntervalTicks`.
+     *
+     * @return true if a new snapshot entered the ring. False means the tick was not due, the
+     *   cadence is off, or the ring already held this tick — never that a capture failed: a
+     *   capture that cannot complete throws, because it is a defect and not a condition.
+     */
+    public fun captureIfDue(): Boolean
 
     /** Every snapshot the ring is holding, oldest first. */
     public fun listSnapshots(): List<SnapshotInfo>
@@ -72,28 +93,34 @@ public fun interface AssetGraphHistory {
  *
  * Both windows describe *captured* ticks.
  *
- * **Nothing in an assembled game drives a capture cadence.** `Simulation.step` does not
- * capture, `GameHost` does not, and no system does; the only callers of
- * [TimeTravel.captureNow] in the tree are tests. So in a game as it stands today the ring is
- * empty, `listSnapshots` returns nothing and every rewind answers `tick_out_of_ring` — the
- * mechanism works and is measured, and nobody has been made responsible for running it.
- * `EngineConfig` used to carry a `snapshotIntervalTicks` knob that read as though somebody
- * had; it was deleted, because a configured cadence with no consumer is a claim, not a
- * feature.
+ * ## Who drives capture
  *
- * Phase 1 owns the fix, and it is a specific one: [TimeTravel] needs an allocation-free
- * `captureIfDue` (today's [TimeTravel.captureNow] returns a [SnapshotInfo], so it cannot sit
- * on the zero-allocation tick path), `WorldSimulation` needs to hold a [TimeTravel] and call
- * it after the tick, and the cadence knob comes back on `EngineConfig` in that same commit.
- * Until then, how densely the dense window is populated is entirely up to whoever calls
- * [TimeTravel.captureNow]: a ring fed at 20Hz holds one slot every third tick, and a rewind
- * lands by stepping forward from the nearest one exactly as it does outside the window.
+ * [WorldSimulation.step] does, once per tick, through [TimeTravel.captureIfDue], on the
+ * cadence `EngineConfig.snapshotIntervalTicks` names — every third tick, which is spec 3.3's
+ * 20Hz against a 60Hz simulation. So the dense window holds one slot in three rather than one
+ * per tick, and a rewind to a tick in between lands by restoring the nearest keyframe and
+ * stepping forward, exactly as it does outside the window.
+ *
+ * ## When capture is active
+ *
+ * Only when the game was built with a [TimeTravelFactory]. A [dev.wildware.udea.core.module.UdeaGameDef]
+ * without one produces a simulation whose `travel` is `null`: no ring is ever allocated, the
+ * per-tick cost is one null check, and `TimeControl` answers every time-travel call with
+ * [RewindFailure.NoSnapshotRing]. That is the answer to "does a dedicated server with no
+ * observer pay for a 64MB ring every match" — it does not, and it does not because the ring
+ * does not exist, rather than because something remembered to switch it off.
+ *
+ * A host that wants history attaches one; the agent surface is the obvious caller, and so is
+ * a server that wants rollback for prediction in Phase 4. Setting
+ * `EngineConfig.snapshotIntervalTicks = 0` on a game that *does* have a ring turns the loop's
+ * cadence off while leaving `TimeControl.snapshot()` working, for a host that places keyframes
+ * itself.
  */
 public enum class SnapshotKind {
 
     /**
-     * Every *captured* tick within the dense window — every tick, when something captures
-     * every tick. What Phase 4's prediction rollback restores from.
+     * Every *captured* tick within the dense window — one in three at the default cadence.
+     * What Phase 4's prediction rollback restores from.
      */
     Dense,
 
@@ -213,4 +240,25 @@ public sealed interface RewindResult {
         /** Human-readable detail. Never parsed; [RewindFailure.code] is the contract. */
         public val detail: String,
     ) : RewindResult
+}
+
+/**
+ * Builds the [TimeTravel] a simulation captures into, once its world exists.
+ *
+ * A factory and not an instance, for the same reason [dev.wildware.udea.core.host.PresentationFactory]
+ * is one: a snapshot ring needs the `World` and the `GameContext`, and neither exists until
+ * `UdeaGameDef.build()` has run. Handing the definition a factory keeps [WorldSimulation]'s
+ * ring a constructor argument rather than a field something sets afterwards — a simulation
+ * either has history for its whole life or never has any, and there is no window in which it
+ * is half wired.
+ *
+ * It lives here rather than in `dev.wildware.udea.core.snapshot` because `UdeaGameDef` names
+ * it, and the kernel's module package must not depend on the ring: the concrete factory is
+ * `snapshotTimeTravel(...)` over there, and a host that has a generated `ComponentRegistry`
+ * is what supplies it.
+ */
+public fun interface TimeTravelFactory {
+
+    /** Builds the ring for [world], which has just been configured against [ctx]. */
+    public fun create(ctx: GameContext, world: World): TimeTravel
 }

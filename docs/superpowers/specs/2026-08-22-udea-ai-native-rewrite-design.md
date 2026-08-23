@@ -266,7 +266,7 @@ separate question, better answered after watching this work for real.
 
 | Module | Purpose | Replaces |
 |---|---|---|
-| `udea-annotations` | Zero-dependency leaf: `@Net`, `@Sim`, `@Q`, `@Replicated`, `@AgentTool`, `@Arg` | Two conflicting `UdeaNetworked` declarations on one classpath |
+| `udea-annotations` | Zero-dependency leaf: `@Net`, `@Sim`, `@Q`, `@Replicated`, `@AgentTool`, `@Arg`, `@AgentState` | Two conflicting `UdeaNetworked` declarations on one classpath |
 | `udea-diagnostics` | Zero-dependency leaf: `UdeaDiagnostic`, `Severity`, `SourceSpan`, `Fix`, rule ids, the JSON report | Ad-hoc `println`/exception reporting scattered across the old generators |
 | `udea-codegen` | The KSP2 processor + KotlinPoet emitters; owns id assignment | `NetworkGenerator`, `UdeaDslProcessor`, `@CreateDsl` |
 | `udea-compiler-plugin` | The K2 FIR/IR plugin: checkers, KDoc propagation, gated declaration synthesis | new (D8) |

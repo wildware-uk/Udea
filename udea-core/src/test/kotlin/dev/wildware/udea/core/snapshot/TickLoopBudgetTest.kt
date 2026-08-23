@@ -1,5 +1,6 @@
 package dev.wildware.udea.core.snapshot
 
+import dev.wildware.udea.core.EngineConfig
 import dev.wildware.udea.core.ModuleFiles
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.alloc.AllocationProbe
@@ -54,7 +55,7 @@ class TickLoopBudgetTest {
     fun `the final three hundred ticks allocate zero bytes, capture included`() {
         assertTrue(AllocationProbe.isSupported, "this JVM has no thread allocation counters")
 
-        val sim = SnapshotWorld()
+        val sim = SnapshotWorld(driveCapture = true)
         sim.spawn(SnapshotBudgets.LOOP_ENTITIES)
 
         // Warm the *ring*, not only the JIT. A ring whose sparse window is not yet full is
@@ -62,13 +63,19 @@ class TickLoopBudgetTest {
         // would measure the ring filling up rather than the loop's steady state, and a run
         // that stopped at 600 ticks would never reach the state a real session spends its
         // life in.
-        repeat(RING_WARMUP_TICKS) { stepAndMaybeCapture(sim) }
+        repeat(RING_WARMUP_TICKS) { sim.step() }
+        assertEquals(
+            (RING_WARMUP_TICKS / CAPTURE_INTERVAL_TICKS).toLong(),
+            sim.travel.capturedTicks,
+            "the loop must have captured on its own cadence; a zero here would mean this gate " +
+                "is measuring a loop with no capture in it at all",
+        )
         val slotsBefore = sim.ring.slotCount
         val heldBefore = sim.ring.size
         assertTrue(heldBefore > 0, "the ring should be holding the warm-up's snapshots")
 
         val allocated = AllocationProbe.bytesAllocated {
-            repeat(STEADY_STATE_TICKS) { stepAndMaybeCapture(sim) }
+            repeat(STEADY_STATE_TICKS) { sim.step() }
         }
 
         println(
@@ -171,41 +178,23 @@ class TickLoopBudgetTest {
         )
     }
 
-    /** Builds a fresh world and runs the whole scenario, returning nanoseconds elapsed. */
+    /**
+     * Builds a fresh world and runs the whole scenario, returning nanoseconds elapsed.
+     *
+     * `driveCapture = true`, so what is timed is `WorldSimulation.step` with the engine's own
+     * capture inside it — barrier drain, systems, clock, `TimeTravel.captureIfDue`, and through
+     * it `acquire -> captureInto -> commit` with the ring's retention, eviction, pool and byte
+     * budget. This benchmark used to stand a copy of that cadence up beside the loop because no
+     * production code drove one; gating the loop on a path production does not take is what
+     * makes a budget decorative.
+     */
     private fun runOnce(): Long {
-        val sim = SnapshotWorld()
+        val sim = SnapshotWorld(driveCapture = true)
         sim.spawn(SnapshotBudgets.LOOP_ENTITIES)
 
         val before = System.nanoTime()
-        repeat(SnapshotBudgets.LOOP_TICKS) { stepAndMaybeCapture(sim) }
+        repeat(SnapshotBudgets.LOOP_TICKS) { sim.step() }
         return System.nanoTime() - before
-    }
-
-    /**
-     * One tick of the assembled loop, capturing into the **ring** on the configured cadence.
-     *
-     * Through `acquire -> captureInto -> commit` and not into a caller-owned `WorldSnapshot`,
-     * because the ring is the only place a snapshot ever goes in production —
-     * `SnapshotTimeTravel.captureNow` is the one capture path the engine has — and a slot that
-     * never enters the ring skips retention, eviction, the pool and the byte budget, which is
-     * most of the per-tick work and all of the per-tick allocation risk. Gating the loop on a
-     * path production does not take is what makes a budget decorative.
-     *
-     * Keyed on the *clock* tick rather than a loop counter, so the cadence is a property of the
-     * simulation and lines up with the ring's `tick % sparseInterval` keyframe test.
-     *
-     * The cadence is [CAPTURE_INTERVAL_TICKS], a constant here. It used to read
-     * `ctx.config.snapshotIntervalTicks`, which made this gate look like it was measuring a
-     * configured engine cadence; that knob had no production consumer and has been deleted,
-     * so the number this benchmark chooses is the benchmark's own — see the "who drives
-     * capture" note on `SnapshotKind`.
-     */
-    private fun stepAndMaybeCapture(sim: SnapshotWorld) {
-        sim.step()
-        if (sim.tick.value % CAPTURE_INTERVAL_TICKS != 0L) return
-        val slot = sim.ring.acquire()
-        sim.service.captureInto(slot)
-        sim.ring.commit(slot)
     }
 
     /** `build/reports/udea/tick-loop.json`, published by CI as the gate's artifact. */
@@ -262,12 +251,13 @@ class TickLoopBudgetTest {
 
     private companion object {
         /**
-         * The 20Hz dense cadence from spec 3.3, at 60Hz: capture every third tick.
+         * The cadence the engine actually runs at: `EngineConfig.snapshotIntervalTicks`.
          *
-         * This benchmark's own number, deliberately, because no production code picks one
-         * yet. When Phase 1 gives capture an owner, this should read that owner's cadence.
+         * Read from the production default rather than restated, so that changing the engine's
+         * cadence moves this gate's expectation with it instead of leaving the gate asserting
+         * a number nothing uses.
          */
-        const val CAPTURE_INTERVAL_TICKS = 3L
+        const val CAPTURE_INTERVAL_TICKS: Int = EngineConfig.DEFAULT_SNAPSHOT_INTERVAL_TICKS
 
         const val WARMUP_RUNS: Int = 3
         const val MEASURED_RUNS: Int = 5

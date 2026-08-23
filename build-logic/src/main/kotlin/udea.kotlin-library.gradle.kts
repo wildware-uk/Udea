@@ -1,4 +1,6 @@
 import dev.wildware.udea.build.UdeaBuildFlags
+import dev.wildware.udea.build.UdeaCompilerPluginSupport
+import dev.wildware.udea.build.UdeaCompilerPluginWiring
 import dev.wildware.udea.build.UdeaKotlinPin
 import dev.wildware.udea.build.UdeaStdlibPin
 import dev.wildware.udea.build.UdeaVersions
@@ -44,15 +46,26 @@ tasks.withType<Test>().configureEach {
 }
 
 /**
- * `-Pudea.compilerPlugin.enabled=false` (spec 7). Read here, in the convention every module
- * is on, so that the CI job proving the build is green with the K2 plugin disabled needs no
- * change to this file when `udea-compiler-plugin` gains a plugin to apply. Deliberately a
- * no-op today beyond validating the value and publishing it — see [UdeaBuildFlags].
+ * The K2 compiler plugin, and the switch that removes it (spec 7).
+ *
+ * Applied here, in the convention every `udea-*` module and `moba` is on, because a gate a
+ * module opts into is a gate a new module forgets. [UdeaCompilerPluginSupport] decides which
+ * of those modules actually get it and reads `-Pudea.compilerPlugin.enabled` itself; with the
+ * flag off it declares no compilation applicable, so no `udea-compiler-plugin` jar reaches a
+ * `kotlinCompilerPluginClasspath` and no `-Xplugin` argument is produced. That is what makes
+ * the `plugin-disabled` CI leg a leg that can fail.
+ *
+ * The flag is still published as an extra property: `udea-compiler-plugin`'s own build script
+ * and any module that wants to describe its own compilation can read it without re-parsing a
+ * Gradle property, and [UdeaBuildFlags.compilerPluginEnabled] rejects a mistyped value here,
+ * on every module, whether or not the plugin ends up applied to it.
  */
 extensions.extraProperties[UdeaBuildFlags.COMPILER_PLUGIN_ENABLED] =
     UdeaBuildFlags.compilerPluginEnabled(
         providers.gradleProperty(UdeaBuildFlags.COMPILER_PLUGIN_ENABLED).orNull,
     )
+
+apply<UdeaCompilerPluginSupport>()
 
 // --- kotlin-stdlib pin (spec 7) ------------------------------------------------------
 
@@ -189,4 +202,96 @@ val udeaVerifyKotlinPin by tasks.registering {
 
 tasks.named("check") {
     dependsOn(udeaVerifyKotlinPin)
+}
+
+// --- udeaVerifyCompilerPlugin (issue #164) ---------------------------------------------
+//
+// Applying a compiler plugin is invisible. A build where `isApplicable` quietly started
+// returning false, or where the dependency substitution stopped being registered, compiles
+// exactly as green and only slightly faster than one where the FIR checkers ran - which is
+// the state issue #164 found this repository in, for a whole phase. So the wiring gets a gate
+// in the same build that does the wiring, and it asserts both directions: the plugin IS on the
+// classpath of a module `UdeaCompilerPluginWiring.appliesTo` accepts, and it is NOT on the
+// classpath of one it rejects. `-Pudea.compilerPlugin.enabled=false` rejects every module, so
+// the `plugin-disabled` CI leg now proves the flag removes the plugin rather than proving the
+// flag parses.
+
+/** Whether the K2 plugin should be applied to this module at all, for the gate below. */
+val compilerPluginEnabled: Boolean =
+    extensions.extraProperties[UdeaBuildFlags.COMPILER_PLUGIN_ENABLED] as Boolean
+
+/**
+ * Names of this module's per-compilation `kotlinCompilerPluginClasspath*` configurations.
+ *
+ * Accumulated through a [SetProperty] for the same reason [resolvedStdlibs] is: which
+ * compilations exist depends on plugins the module applies after this convention, and
+ * `java-test-fixtures` adds a third.
+ */
+val pluginClasspathNames: SetProperty<String> = objects.setProperty(String::class.java)
+
+/**
+ * `componentIdentifier.displayName` of everything resolved on those classpaths.
+ *
+ * Unfiltered on purpose - the opposite of the stdlib collection above, which excludes project
+ * components so the check does not build what it is checking. Here the *project* component is
+ * the whole answer: `project :udea-compiler-plugin` means the substitution held, and a Maven
+ * coordinate in its place means a published jar is compiling this module.
+ */
+val pluginClasspathComponents: ListProperty<String> = objects.listProperty(String::class.java)
+
+configurations.matching { UdeaCompilerPluginWiring.isCompilationPluginClasspath(it.name) }.all {
+    pluginClasspathNames.add(name)
+    pluginClasspathComponents.addAll(
+        incoming.artifactView { isLenient = true }.artifacts.resolvedArtifacts.map { artifacts ->
+            artifacts.map { it.id.componentIdentifier.displayName }.distinct().sorted()
+        },
+    )
+}
+
+/**
+ * Fails when the compiler-plugin classpath disagrees with [UdeaCompilerPluginWiring.appliesTo].
+ *
+ * The rule itself is [UdeaCompilerPluginWiring.classpathViolation], where
+ * `UdeaCompilerPluginWiringTest` executes each of its failure branches; a `doLast` block is not
+ * reachable from any test.
+ */
+val udeaVerifyCompilerPlugin by tasks.registering {
+    group = "verification"
+    description =
+        "Fails if the K2 compiler plugin is missing from a compilation that must have it, or " +
+            "present on one that must not."
+
+    val classpaths = pluginClasspathNames
+    val components = pluginClasspathComponents
+    val enabled = compilerPluginEnabled
+    val projectPath = project.path
+    val report = layout.buildDirectory.file("reports/udea/compiler-plugin.txt")
+
+    inputs.property("compilerPluginEnabled", enabled)
+    inputs.property("pluginClasspaths", classpaths)
+    inputs.property("pluginClasspathComponents", components)
+    outputs.file(report)
+
+    doLast {
+        val names = classpaths.get()
+        val resolved = components.get().distinct().sorted()
+        report.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(
+                (
+                    listOf(
+                        "project=$projectPath",
+                        "${UdeaBuildFlags.COMPILER_PLUGIN_ENABLED}=$enabled",
+                        "applied=${UdeaCompilerPluginWiring.appliesTo(projectPath, enabled)}",
+                    ) + names.sorted().map { "classpath $it" } + resolved.map { "resolved $it" }
+                    ).joinToString(separator = "\n", postfix = "\n"),
+            )
+        }
+        UdeaCompilerPluginWiring.classpathViolation(projectPath, enabled, names, resolved)
+            ?.let { throw GradleException(it) }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(udeaVerifyCompilerPlugin)
 }

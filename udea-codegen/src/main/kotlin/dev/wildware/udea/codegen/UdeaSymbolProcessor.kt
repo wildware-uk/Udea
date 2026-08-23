@@ -10,6 +10,10 @@ import com.squareup.kotlinpoet.FileSpec
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
+import dev.wildware.udea.codegen.agent.AgentPass
+import dev.wildware.udea.codegen.agent.AgentStateModel
+import dev.wildware.udea.codegen.agent.ToolManifest
+import dev.wildware.udea.codegen.agent.ToolModel
 import dev.wildware.udea.codegen.protocol.LockedComponent
 import dev.wildware.udea.codegen.protocol.LockedField
 import dev.wildware.udea.codegen.protocol.NetProtocolEmitter
@@ -56,6 +60,7 @@ internal class UdeaSymbolProcessor(
 ) : SymbolProcessor {
 
     private val models = ComponentModelBuilder(logger)
+    private val agent = AgentPass(logger)
 
     /**
      * KSP calls `process` once per round. Nothing here defers a symbol, so the module-level
@@ -72,7 +77,20 @@ internal class UdeaSymbolProcessor(
             // builds of the same sources must produce byte-identical output.
             .sortedBy { it.qualifiedName?.asString() ?: it.simpleName.asString() }
             .toList()
-        if (components.isEmpty()) return emptyList()
+        // The agent surface and the replication surface share a round and nothing else: a
+        // module may declare tools and publish no components, or the reverse, and neither is
+        // an error. Bailing out on `components.isEmpty()` alone would have silently generated
+        // no tools for exactly the module the agent epic cares about most.
+        val agentIsEmpty = agent.isEmpty(resolver)
+        if (components.isEmpty() && agentIsEmpty) return emptyList()
+        if (components.isEmpty()) {
+            if (emittedModuleFiles) return emptyList()
+            val agentResult = agent.run(resolver)
+            writeAgentFiles(agentResult)
+            writeAgentModuleFiles(agentResult, agentSourceFiles(agentResult))
+            emittedModuleFiles = true
+            return emptyList()
+        }
 
         val local = components.mapNotNull { it.qualifiedName?.asString() }
 
@@ -151,6 +169,10 @@ internal class UdeaSymbolProcessor(
             sourceFiles += containingFile
         }
 
+        val agentResult = if (agentIsEmpty) AgentPass.Result(emptyList(), emptyList()) else agent.run(resolver)
+        writeAgentFiles(agentResult)
+        sourceFiles += agentSourceFiles(agentResult)
+
         val moduleName = options.moduleName
         if (moduleName != null && !emittedModuleFiles) {
             if (!CodegenOptions.MODULE_NAME_FORMAT.matches(moduleName)) {
@@ -162,6 +184,7 @@ internal class UdeaSymbolProcessor(
                 )
             } else {
                 writeModuleFiles(moduleName, emitted, sourceFiles)
+                writeAgentModuleFiles(agentResult, sourceFiles)
                 emittedModuleFiles = true
             }
         }
@@ -196,7 +219,7 @@ internal class UdeaSymbolProcessor(
         emitted: List<Pair<ReplicatedComponent, Int>>,
         sourceFiles: List<KSFile>,
     ) {
-        val dependencies = Dependencies(aggregating = true, *sourceFiles.toTypedArray())
+        val dependencies = aggregating(sourceFiles)
         val lock = ProtocolLock.build(emitted.map { (component, id) -> locked(component, id) })
 
         writeAggregating(NetProtocolEmitter.emit(moduleName, lock), dependencies)
@@ -234,6 +257,18 @@ internal class UdeaSymbolProcessor(
         }
     }
 
+    /**
+     * The **only** aggregating dependency in the processor.
+     *
+     * Every module-level output genuinely depends on every source in the module — adding a
+     * component shifts every later type id, adding a tool changes the index and the manifest —
+     * so claiming otherwise would be a correctness bug rather than an optimisation. Keeping it
+     * to one construction site is what stops a fourth module-level output from quietly being
+     * written with a fifth opinion about what it depends on.
+     */
+    private fun aggregating(sourceFiles: List<KSFile>): Dependencies =
+        Dependencies(aggregating = true, *sourceFiles.toTypedArray())
+
     private fun writeAggregating(file: FileSpec, dependencies: Dependencies) {
         codeGenerator.createNewFile(
             dependencies = dependencies,
@@ -241,6 +276,102 @@ internal class UdeaSymbolProcessor(
             fileName = file.name,
         ).use { stream ->
             OutputStreamWriter(stream, StandardCharsets.UTF_8).use(file::writeTo)
+        }
+    }
+
+    /**
+     * The per-declaration agent files: one object per `@AgentTool` and one per class declaring
+     * `@AgentState`.
+     *
+     * Isolating, like a `Replicator`: each is a pure function of the single source file that
+     * declared it, so adding a tool reprocesses that tool and not the module.
+     */
+    private fun agentSourceFiles(result: AgentPass.Result): List<KSFile> =
+        result.tools.map(AgentPass.Emitted<ToolModel>::containingFile) +
+            result.states.map(AgentPass.Emitted<AgentStateModel>::containingFile)
+
+    private fun writeAgentFiles(result: AgentPass.Result) {
+        for (tool in result.tools) writeIsolating(tool.file, tool.containingFile)
+        for (state in result.states) writeIsolating(state.file, state.containingFile)
+    }
+
+    /**
+     * The module-level agent outputs: the two `ServiceLoader` indexes and the manifest fragment.
+     *
+     * Each index is gated on the build telling the processor its service interface is on the
+     * module's classpath, exactly as the `NetModule` index is: generated code may only
+     * implement an interface that exists, and a module that declares tools for a game which
+     * does not ship the agent surface must still compile.
+     *
+     * The manifest fragment is **not** gated. It is data, not code — the CI diff against the
+     * checked-in golden is the only thing that turns a reworded description into a reviewable
+     * change, and gating it on a runtime dependency would silence that for every module that
+     * has not yet grown one.
+     */
+    private fun writeAgentModuleFiles(result: AgentPass.Result, sourceFiles: List<KSFile>) {
+        val moduleName = options.moduleName ?: return
+        if (!CodegenOptions.MODULE_NAME_FORMAT.matches(moduleName)) return
+        if (result.isEmpty) return
+        val dependencies = aggregating(sourceFiles)
+
+        if (result.tools.isNotEmpty()) {
+            codeGenerator.createNewFileByPath(
+                dependencies = dependencies,
+                path = ToolManifest.resourcePath(moduleName),
+                extensionName = "",
+            ).use { stream ->
+                stream.write(
+                    ToolManifest.render(moduleName, result.tools.map(AgentPass.Emitted<ToolModel>::model))
+                        .toByteArray(StandardCharsets.UTF_8),
+                )
+            }
+        }
+
+        writeServiceIndex(
+            service = options.toolModuleService.takeIf { result.tools.isNotEmpty() },
+            index = GeneratedNames.toolModule(moduleName),
+            moduleName = moduleName,
+            property = ServiceIndexEmitter.TOOLS,
+            // Ascending tool name: the order the merged manifest and the dispatch table are
+            // both built in, so no consumer has to sort.
+            members = result.tools
+                .map(AgentPass.Emitted<ToolModel>::model)
+                .sortedBy(ToolModel::name)
+                .map { ClassName(it.owner.packageName, it.objectName) },
+            dependencies = dependencies,
+        )
+        writeServiceIndex(
+            service = options.stateModuleService.takeIf { result.states.isNotEmpty() },
+            index = GeneratedNames.stateModule(moduleName),
+            moduleName = moduleName,
+            property = ServiceIndexEmitter.STATES,
+            members = result.states
+                .map(AgentPass.Emitted<AgentStateModel>::model)
+                .sortedBy { it.owner.canonicalName }
+                .map { ClassName(it.owner.packageName, it.objectName) },
+            dependencies = dependencies,
+        )
+    }
+
+    private fun writeServiceIndex(
+        service: String?,
+        index: ClassName,
+        moduleName: String,
+        property: ServiceIndexEmitter.Member,
+        members: List<ClassName>,
+        dependencies: Dependencies,
+    ) {
+        val serviceName = ClassName.bestGuess(service ?: return)
+        writeAggregating(
+            ServiceIndexEmitter.emit(serviceName, index, moduleName, property, members),
+            dependencies,
+        )
+        codeGenerator.createNewFileByPath(
+            dependencies = dependencies,
+            path = ServiceIndexEmitter.resourcePath(serviceName),
+            extensionName = "",
+        ).use { stream ->
+            stream.write(ServiceIndexEmitter.resourceContent(index).toByteArray(StandardCharsets.UTF_8))
         }
     }
 

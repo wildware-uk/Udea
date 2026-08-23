@@ -204,10 +204,10 @@ class RenderPipelineTest {
         overlays: List<OverlaySystem> = emptyList(),
         clock: FrameClock = ManualFrameClock(),
     ): RenderPipeline {
-        val registry = RenderRegistry()
+        val registry = RenderRegistry(clock)
         for (system in systems) registry.register(RenderPhase.World, { system })
         for (overlay in overlays) registry.overlay({ overlay })
-        return registry.build(world(), ctx, targets, clock)
+        return registry.build(world(), ctx, targets)
     }
 
     private val ctx: GameContext = testGameContext(seed = 11L)

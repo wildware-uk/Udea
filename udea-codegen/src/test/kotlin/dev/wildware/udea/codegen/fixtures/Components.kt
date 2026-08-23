@@ -1,5 +1,6 @@
 package dev.wildware.udea.codegen.fixtures
 
+import dev.wildware.udea.annotations.AgentState
 import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Q
 import dev.wildware.udea.annotations.Replicated
@@ -27,13 +28,34 @@ import dev.wildware.udea.core.identity.NetId
 public class Health(
     /** `@Net` — replicated and snapshotted. */
     @Net public var maximum: Float = 100f,
-    /** `@Net` — replicated and snapshotted. */
-    @Net public var current: Float = 100f,
+    /**
+     * `@Net` **and** `@AgentState`: replicated on the wire *and* published as a digest scalar.
+     *
+     * The two annotations mean two unrelated things and neither knows about the other. This
+     * property owns field index 1 of `HealthReplicator` — a `fieldNames` entry, a `FieldMask`
+     * bit and a `FieldStore` slot, all the same index, as the frozen contract requires — and
+     * separately owns the `game` block key `health`. `AgentStateIsolationTest` pins that the
+     * digest key changes nothing about the replicator.
+     */
+    @Net @AgentState(name = "health") public var current: Float = 100f,
     /** `@Net` — replicated and snapshotted. */
     @Net public var invulnerable: Boolean = false,
     /** `@Sim` — snapshotted only; the client is never told when the server last hit us. */
     @Sim public var lastDamageTick: Long = 0L,
-)
+) {
+    /**
+     * `@AgentState` **only**, and the load-bearing half of the fixture.
+     *
+     * It is published to the agent and is not replicated, not snapshotted and not restored by
+     * a rewind, so it must take **no** index in `HealthReplicator` at all: no `fieldNames`
+     * entry, no mask bit, no store slot. A generator that let `@AgentState` into the field
+     * space would put a name in `fieldNames` with no bit and no slot behind it, and
+     * `desync_report` — which walks set bits and indexes `fieldNames` with them — would report
+     * the wrong field's name for every divergence past this index.
+     */
+    @AgentState(name = "deaths")
+    public var deaths: Int = 0
+}
 
 /** How an entity is moving. Stored and sent as its ordinal. */
 public enum class Stance { Standing, Crouching, Sprinting }

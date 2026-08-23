@@ -157,6 +157,89 @@ public object UdeaRules {
             "inverted or non-finite range, or an argument that is not a compile-time constant",
     )
 
+    /**
+     * The shortest description [AGENT_TOOL_DESCRIPTION] accepts.
+     *
+     * Not a style preference. The description is the only text a model has when it decides
+     * whether to reach for a tool, so a tool named well and described badly is worse than no
+     * tool: it gets called for the wrong reason and its result is trusted. Twenty characters
+     * is roughly "what it does, and when" and is short enough that no honest description
+     * fails it.
+     */
+    public const val MIN_TOOL_DESCRIPTION: Int = 20
+
+    /**
+     * An `@AgentTool` whose description is blank or shorter than [MIN_TOOL_DESCRIPTION].
+     *
+     * Spec section 6 makes description quality a Phase 1 exit criterion, and the reference
+     * implementation this generalises asserted it in a *test* that regex-parsed Kotlin source
+     * (`FruitGameKTX`'s `DebugManifestTest`). Here it is an error at the symbol, so the tool
+     * cannot reach an agent undescribed in the first place.
+     */
+    public val AGENT_TOOL_DESCRIPTION: UdeaRule = UdeaRule(
+        id = "UDEA0008",
+        defaultSeverity = Severity.Error,
+        description = "@AgentTool has no description, or one shorter than " +
+            "$MIN_TOOL_DESCRIPTION characters; the description is what the model reasons over",
+    )
+
+    /**
+     * A parameter of an `@AgentTool` function with no `@Arg` description.
+     *
+     * Same defect as [AGENT_TOOL_DESCRIPTION] one level down: the argument's description is
+     * the only thing telling a model what to put in it, and a JSON Schema property with no
+     * `description` is a guess the model has to make.
+     */
+    public val AGENT_ARG_DESCRIPTION: UdeaRule = UdeaRule(
+        id = "UDEA0009",
+        defaultSeverity = Severity.Error,
+        description = "an @AgentTool parameter carries no @Arg description, so its JSON Schema " +
+            "property tells the model nothing",
+    )
+
+    /**
+     * An `@AgentTool` parameter whose type has no JSON Schema mapping and no coercion from
+     * the query string a tool call arrives as.
+     *
+     * The mapping is closed on purpose. The generator this replaces answered an unrecognised
+     * type with a blind serialisation fallback, which turned an unsupported parameter into a
+     * runtime failure instead of a build failure.
+     */
+    public val AGENT_TOOL_UNSUPPORTED_TYPE: UdeaRule = UdeaRule(
+        id = "UDEA0010",
+        defaultSeverity = Severity.Error,
+        description = "an @AgentTool parameter has a type with no JSON Schema mapping",
+    )
+
+    /**
+     * `@AgentState` on a property that is not a scalar.
+     *
+     * The bridge contract for `GET /state` says of the `game` block: "scalar fields are
+     * included in the digest. Nested objects and arrays are not." So a non-scalar here is not
+     * a value that renders oddly, it is a value that vanishes from every digest an agent ever
+     * reads, with nothing anywhere reporting it. Scalars-only has to hold by construction.
+     */
+    public val AGENT_STATE_NON_SCALAR: UdeaRule = UdeaRule(
+        id = "UDEA0011",
+        defaultSeverity = Severity.Error,
+        description = "@AgentState annotates a non-scalar property, which the digest's game " +
+            "block silently drops",
+    )
+
+    /**
+     * Two `@AgentTool`s, or two `@AgentState` properties, resolving to one effective name.
+     *
+     * A name is what a caller addresses, so a collision is not a merge: one of the two
+     * declarations becomes unreachable and which one depends on iteration order. Reported
+     * rather than resolved, naming both declarations.
+     */
+    public val AGENT_NAME_COLLISION: UdeaRule = UdeaRule(
+        id = "UDEA0012",
+        defaultSeverity = Severity.Error,
+        description = "two agent declarations resolve to the same effective name, so one of " +
+            "them is unreachable",
+    )
+
     /** Every registered rule, in id order. */
     public val all: List<UdeaRule> = listOf(
         NET_ON_VAL,
@@ -166,6 +249,11 @@ public object UdeaRules {
         SIM_ON_VAL,
         UNSUPPORTED_FIELD_TYPE,
         MALFORMED_QUANTIZATION,
+        AGENT_TOOL_DESCRIPTION,
+        AGENT_ARG_DESCRIPTION,
+        AGENT_TOOL_UNSUPPORTED_TYPE,
+        AGENT_STATE_NON_SCALAR,
+        AGENT_NAME_COLLISION,
     ).sortedBy { it.id }
 
     private val byId: Map<String, UdeaRule> = all.associateBy { it.id }

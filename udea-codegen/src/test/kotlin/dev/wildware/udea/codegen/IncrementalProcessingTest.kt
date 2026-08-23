@@ -73,13 +73,19 @@ class IncrementalProcessingTest {
 
     @Test
     fun `only the module-level outputs are aggregating`() {
-        val body = functionBody("writeModuleFiles")
-
-        assertTrue("aggregating = true" in body, body)
-        assertTrue(
-            "aggregating = false" !in body,
-            "the module index genuinely depends on every component; it must not claim otherwise",
-        )
+        // One construction site, in `aggregating`, and every module-level writer goes through
+        // it. A second writer with its own `Dependencies(...)` is a second opinion about what
+        // a module-level output depends on, and the one that is wrong costs a full reprocess
+        // on every keystroke without changing a byte of output.
+        assertTrue("aggregating = true" in functionBody("aggregating"), processorSource)
+        for (writer in listOf("writeModuleFiles", "writeAgentModuleFiles")) {
+            val body = functionBody(writer)
+            assertTrue("aggregating(sourceFiles)" in body, "$writer does not use the one helper: $body")
+            assertTrue(
+                "aggregating = false" !in body,
+                "$writer genuinely depends on every source in the module; it must not claim otherwise",
+            )
+        }
     }
 
     @Test

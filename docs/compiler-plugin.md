@@ -86,42 +86,80 @@ pinned version, and gets a real `CompilerMessageSourceLocation` back.
 
 ---
 
-## The plugin is optional. One switch proves it; the other is not wired yet
+## The plugin is optional, and both switches prove it
 
 Two switches, outer and inner:
 
 | Switch | Effect | State |
 |---|---|---|
-| `-Pudea.compilerPlugin.enabled=false` (Gradle) | *intended:* no `-Xplugin` argument is produced at all | **inert.** `udea.kotlin-library` reads and validates the value; nothing consumes it |
+| `-Pudea.compilerPlugin.enabled=false` (Gradle) | no `udea-compiler-plugin` jar reaches a `kotlinCompilerPluginClasspath`, so no `-Xplugin` argument is produced at all | live, and asserted by `udeaVerifyCompilerPlugin` on every module |
 | `-P plugin:dev.wildware.udea:enabled=false` (compiler) | the plugin loads and registers **zero** extensions | live, and asserted by `UdeaCompilerPluginRegistrarTest` |
 
-**Read the outer row literally.** No module applies a `KotlinCompilerPluginSupportPlugin`,
-nothing puts `udea-compiler-plugin` on a `kotlinCompilerPluginClasspath`, and no `-Xplugin`
-argument naming it exists outside this module's own kctfork harness. There is nothing for the
-Gradle property to switch off, so passing `-Pudea.compilerPlugin.enabled=false` today produces
-a byte-for-byte identical build. The property is honoured early on purpose — spec 7's degrade
-procedure and the CI leg are in place before the wiring, so landing the wiring is one change
-rather than three — but until `udea-gradle` applies the plugin, **the outer half of "the
-plugin is optional" is a plan, not a proven property.**
+### How the outer switch is wired
 
-`CompilerPluginSwitchTest` in `build-logic` is the tripwire: it fails the day any build script
-gains that wiring, so the flag, this section and the CI leg's comment all have to be corrected
-together rather than one of them quietly going stale.
+`UdeaCompilerPluginSupport` in `build-logic` is a `KotlinCompilerPluginSupportPlugin`, applied
+by the `udea.kotlin-library` convention that every `udea-*` module and `moba` is on. It reads
+the flag in `isApplicable`, so with the flag off it declares no compilation applicable and the
+Kotlin Gradle plugin adds nothing to anything.
 
-Two CI legs, and what each actually enforces:
+Two details are worth knowing before changing it:
 
+- **it lives in `build-logic`, not in `udea-gradle`.** `udea-gradle` is a subproject of the
+  build being configured, and Gradle cannot apply a plugin implemented by a sibling project.
+  `udea-gradle` stays the home of the plugin a *consumer game* applies. Issue #164 asked for
+  either, and only one of them is possible;
+- **the plugin artifact is substituted, not resolved.** `getPluginArtifact()` can only name
+  Maven coordinates, and `udea-compiler-plugin` is published nowhere, so
+  `UdeaCompilerPluginSupport.apply` substitutes `dev.wildware.udea:udea-compiler-plugin` to
+  `project(":udea-compiler-plugin")` on every compiler-plugin classpath. The coordinate's
+  version is the unpublishable `substituted-to-project` on purpose: if the substitution ever
+  stops being registered the build fails by name instead of quietly resolving a stale jar out
+  of `mavenLocal()`.
+
+Three `udea-*` modules are deliberately excluded, all for one reason — they are the plugin's
+own runtime classpath, so applying it to them asks Gradle to build a jar in order to build
+itself: `udea-compiler-plugin`, `udea-annotations` and `udea-diagnostics`. None of them
+declares a `@Replicated` component, so nothing is lost.
+`UdeaCompilerPluginWiringTest` re-derives that list from `udea-compiler-plugin/build.gradle.kts`
+and fails if a fourth project dependency is added without widening it.
+
+**The IDE still does not load the plugin, and that is settled.** Issue #43's spike returned
+NO-GO (see [The synthesis gate](#the-synthesis-gate)): IntelliJ's `KotlinK2BundledCompilerPlugins`
+is a closed enum of eleven bundled registrars. Applying the plugin through Gradle changes
+nothing about that — it fails the **build**, which is where a defect has to be caught. Do not
+try to make the IDE load it; the per-developer registry key at the end of the synthesis section
+is the only lever, and it must not become a prerequisite for anything.
+
+### What each gate enforces
+
+- **`udeaVerifyCompilerPlugin`** (on `check`, so every `./gradlew build` runs it) reads the
+  module's resolved `kotlinCompilerPluginClasspath*` and fails if it disagrees with
+  `UdeaCompilerPluginWiring.appliesTo`: the plugin missing from a module that must have it, the
+  plugin present on one that must not, or the plugin resolved from a repository instead of from
+  `:udea-compiler-plugin`. Applying a compiler plugin is invisible, and a wiring that silently
+  stopped applying compiles exactly as green as one that works — which is the state this
+  repository was in for the whole of Phase 0. This is the gate that notices.
 - **`plugin-disabled`** builds every module, `moba` included, with
-  `-Pudea.compilerPlugin.enabled=false`. While the outer switch is inert this compiles what
-  the `build` job already compiled, so what it proves is narrower than its name: that the
-  property is *accepted* everywhere, and that `UdeaBuildFlags` rejects a mistyped value rather
-  than silently reading it as "enabled". Every run annotates itself with that caveat so the
-  tick is not mistaken for a working degrade path. **This job must be configured as a required
-  status check on `master`.** A workflow file cannot assert that; it is a repository
-  branch-protection setting and has to be set once by hand.
+  `-Pudea.compilerPlugin.enabled=false`, and names `udeaVerifyCompilerPlugin` explicitly. With
+  the wiring live it is a real degrade-path test rather than a second copy of the `build` job.
+  **This job must be configured as a required status check on `master`.** A workflow file
+  cannot assert that; it is a repository branch-protection setting, set once by hand.
+- **`checkers-fire`** writes a `@Net val` and a `@Q`-annotated `Int` into `udea-gradle`'s real
+  source set, asserts the build fails with `UDEA0001` and `UDEA0003` at the computed
+  `line:column` of each property name, then asserts the same file compiles clean with the flag
+  off. It is the only gate that answers "does a defect in a real module stop a real build?", and
+  for a whole phase the answer was no while every other gate was green. To run it by hand, write
+  such a component into any `udea-*` module and compile it. **Required status check on
+  `master`.**
 - **`udeaVerifyPluginOptional`** (`./gradlew :udea-compiler-plugin:udeaVerifyPluginOptional`)
   fails if any production source under a `udea-*` module or `moba` references a
   `dev.wildware.udea.compiler.` type. Test sources are exempt. An empty scan is a failure, not
   a pass — a check that walks nothing stays green forever.
+
+`CompilerPluginSwitchTest` in `build-logic` is the tripwire on all of this going away: it fails
+if nothing implements a `KotlinCompilerPluginSupportPlugin`, if the convention stops applying
+it, if the flag stops gating it, or if this document and `ci.yml` drift back to describing a
+switch that does nothing.
 
 ### The degrade procedure
 
@@ -229,5 +267,4 @@ load-bearing.
 | No `@Q(bits)`-out-of-range or `min >= max` checker | The rule id exists — `UdeaRules.MALFORMED_QUANTIZATION` is `UDEA0007`, and `udea-codegen` raises it three times from `ComponentModelBuilder`. The remaining blocker is FIR-side: a checker would have to constant-evaluate the `@Q` arguments to know `bits` or `min`/`max` at all, which is what `UdeaRules.kt`'s own note on the rule says. KSP sees the literals and already raises both. |
 | No "`@Net`/`@Sim` on a property of a non-`@Replicated` class" checker | No registered id for it. The `val` rules do fire outside `@Replicated`, so the silent-failure case is not entirely uncovered. |
 | No authority-vocabulary warning (`OwnerPredicted` on a class with no owner concept) | There is no owner concept in the tree yet, so the check has nothing to test against. |
-| `-Pudea.compilerPlugin.enabled=false` switches nothing off | Nothing applies the plugin to a `udea-*` or `moba` compilation yet, so the outer switch is inert and the `plugin-disabled` CI leg duplicates the `build` job. The wiring belongs in `udea-gradle`; `CompilerPluginSwitchTest` fails the moment it lands. |
 | The `kotlin-upgrade-probe` CI leg does not actually build against an RC | `UdeaVersions.KOTLIN` is a hard-coded constant and `udea.kotlin-build-tool` fails configuration if the running KGP differs. Making it overridable is a `build-logic` change. |

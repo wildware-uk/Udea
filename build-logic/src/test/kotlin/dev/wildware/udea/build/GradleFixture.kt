@@ -92,6 +92,27 @@ class GradleFixture(private val root: File) {
     fun jarFrom(): String = "tasks.named<Jar>(\"jar\") { from(layout.projectDirectory.dir(\"packaged\")) }"
 
     /**
+     * Declares a stand-in `:udea-compiler-plugin` project.
+     *
+     * `udea.kotlin-library` applies [UdeaCompilerPluginSupport], which substitutes the K2
+     * plugin's Maven coordinate to that project on every compiler-plugin classpath. A fixture
+     * that applies the convention without it fails with "Project with path
+     * ':udea-compiler-plugin' not found", which is the wiring working, not the fixture being
+     * wrong - so the fixture grows the project rather than the wiring growing a special case
+     * for builds that do not have it.
+     *
+     * A bare `java` project is enough: nothing here compiles Kotlin, so the stub jar is only
+     * ever substituted in, never loaded by a compiler.
+     */
+    fun withCompilerPluginProject(): GradleFixture =
+        project(
+            UdeaCompilerPluginWiring.ARTIFACT_NAME,
+            """
+            plugins { `java` }
+            """.trimIndent(),
+        )
+
+    /**
      * Makes the project's real version catalog available to the fixture as `libs`.
      *
      * `udea.kotlin-library` reads the catalog through `udeaLibrary(...)`, so a fixture that

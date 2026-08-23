@@ -25,15 +25,27 @@ package dev.wildware.udea.codegen
  *   `null` is legal only for a module that emits no protocol identity at all, where the ids
  *   never leave the module; the processor refuses the combination rather than falling back.
  *   The build reads the list from the reviewed `net-components.lock` in the repository root.
+ * @param toolModuleService the fully-qualified name of the `ToolModule` service interface,
+ *   when this module's runtime classpath has it. Gated for the same reason as
+ *   [netModuleService]: generated code may only implement an interface that exists, and a
+ *   module contributing `@AgentTool` functions to a game that does not ship the agent surface
+ *   at all is a normal configuration, not an error.
+ * @param stateModuleService the fully-qualified name of the `StateModule` service interface,
+ *   on the same terms. Separate from [toolModuleService] because a module may publish match
+ *   state without declaring a single tool, and the reverse.
  */
 internal data class CodegenOptions(
     val moduleName: String?,
     val netModuleService: String?,
     val projectComponents: List<String>?,
+    val toolModuleService: String?,
+    val stateModuleService: String?,
 ) {
     companion object {
         const val MODULE_NAME: String = "udea.moduleName"
         const val NET_MODULE_SERVICE: String = "udea.netModuleService"
+        const val TOOL_MODULE_SERVICE: String = "udea.toolModuleService"
+        const val STATE_MODULE_SERVICE: String = "udea.stateModuleService"
 
         /**
          * The whole-project component list, comma separated.
@@ -68,6 +80,8 @@ internal data class CodegenOptions(
                 ?.map(String::trim)
                 ?.filter(String::isNotEmpty)
                 ?.takeIf(List<String>::isNotEmpty),
+            toolModuleService = options[TOOL_MODULE_SERVICE]?.takeIf(String::isNotBlank),
+            stateModuleService = options[STATE_MODULE_SERVICE]?.takeIf(String::isNotBlank),
         )
     }
 }

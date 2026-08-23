@@ -29,7 +29,8 @@ public interface Simulation {
      * Advances the simulation by exactly one tick.
      *
      * Contract for every implementation: the [SimBarrier] drain happens first, before any
-     * system runs, and the clock advances last.
+     * system runs, the clock advances last, and any snapshot the tick owes is taken after
+     * that — so a captured tick names the state the *next* tick will simulate from.
      */
     public fun step()
 }
@@ -51,7 +52,25 @@ public interface Simulation {
  * 2. **run the systems** — `world.update(dt)` is pure simulation *by construction*, because
  *    presentation is not a Fleks system at all;
  * 3. **advance the clock** — [SimClock.tick] names the tick that is *about to be* simulated,
- *    so it moves only once that tick is finished.
+ *    so it moves only once that tick is finished;
+ * 4. **capture, if the tick is due one** — [TimeTravel.captureIfDue], at the cadence
+ *    `EngineConfig.snapshotIntervalTicks` names.
+ *
+ * ## Why capture is here and not a [BarrierAction]
+ *
+ * The barrier exists to order *mutations* so that no system sees a torn world. A capture is a
+ * read, and putting a read in the mutation queue would give it two properties it must not
+ * have: it would land one tick late, and it would be ordered arbitrarily against whatever
+ * tool call or scene swap happened to be queued beside it, so which side of a scene swap a
+ * keyframe recorded would depend on submission order. Worse, `SnapshotTimeTravel` forces a
+ * barrier drain from inside a rewind, so a queued capture would fire in the middle of a
+ * restore.
+ *
+ * The property the barrier was wanted for is had directly here instead, and had more
+ * strongly: this line runs on the simulation thread, after the last system of the tick has
+ * returned and after the clock has advanced. There is no iteration in flight, no drain in
+ * flight and no half-applied mutation — that *is* the tick boundary, and it is the same
+ * boundary a drain runs at.
  */
 public class WorldSimulation(
     /** The context the world was configured with. */
@@ -64,6 +83,19 @@ public class WorldSimulation(
      * what this simulation drains; a context without one gets a private queue.
      */
     public val barrier: SimBarrier = ctx.getOrNull(SimBarrier.KEY) ?: SimBarrier(),
+    /**
+     * The snapshot ring this simulation records into, or `null` for one that keeps no history.
+     *
+     * A constructor argument, so a simulation either records for its whole life or never
+     * records at all. `UdeaGameDef` builds it from the [TimeTravelFactory] it was given, which
+     * is the only reason the factory exists — the ring needs the [World] and the ctx, and
+     * neither is available before the world is configured.
+     *
+     * `null` is not a degraded mode. It is a dedicated server with no observer: no ring is
+     * allocated, the per-tick cost is one null check, and `TimeControl` answers every
+     * time-travel call with [RewindFailure.NoSnapshotRing].
+     */
+    public val travel: TimeTravel? = null,
 ) : Simulation {
 
     override val tickRate: Int get() = ctx.clock.tickRate
@@ -82,5 +114,9 @@ public class WorldSimulation(
         world.update(dt)
         ctx.clock.advance()
         stepCount++
+        // A safe call and not an `if`, so the no-ring case is one null check and the ring case
+        // is one virtual call. Neither allocates: `captureIfDue` returns a primitive precisely
+        // so this line can sit on the path `TickLoopBudgetTest` gates at zero bytes.
+        travel?.captureIfDue()
     }
 }

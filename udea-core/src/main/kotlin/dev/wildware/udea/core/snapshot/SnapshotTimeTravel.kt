@@ -3,6 +3,7 @@ package dev.wildware.udea.core.snapshot
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.Tick
+import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.loop.AssetGraphHistory
 import dev.wildware.udea.core.loop.RestoreOutcome
 import dev.wildware.udea.core.loop.RewindFailure
@@ -10,6 +11,9 @@ import dev.wildware.udea.core.loop.SimBarrier
 import dev.wildware.udea.core.loop.SnapshotInfo
 import dev.wildware.udea.core.loop.TimeControl
 import dev.wildware.udea.core.loop.TimeTravel
+import dev.wildware.udea.core.loop.TimeTravelFactory
+import dev.wildware.udea.core.loop.barrier
+import dev.wildware.udea.core.module.CoreModule
 
 /**
  * The snapshot ring, wired up as the time-travel half of [TimeControl].
@@ -45,13 +49,70 @@ public class SnapshotTimeTravel(
     private val world: World,
     private val ctx: GameContext,
     private val barrier: SimBarrier,
+    /**
+     * How often [captureIfDue] takes a keyframe, in ticks. `0` turns the loop cadence off.
+     *
+     * Defaulted from the context so that the knob has exactly one production reader and it is
+     * this line. `EngineConfig`'s KDoc names it; if this default is ever replaced by a literal,
+     * the field goes back to being a claim rather than a configuration.
+     */
+    private val captureIntervalTicks: Int = ctx.config.snapshotIntervalTicks,
     private val assetGraph: AssetGraphHistory = AssetGraphHistory.Unchanged,
 ) : TimeTravel {
+
+    init {
+        require(captureIntervalTicks >= 0) {
+            "captureIntervalTicks must not be negative, was $captureIntervalTicks"
+        }
+    }
+
+    /** Ticks [captureIfDue] has actually put a new snapshot into the ring on. */
+    public var capturedTicks: Long = 0L
+        private set
 
     override val currentTick: Tick get() = ctx.clock.tick
 
     /**
      * Captures the current tick, or reports the snapshot already held for it.
+     *
+     * The agent-facing capture, behind `TimeControl.snapshot()`. It allocates a [SnapshotInfo],
+     * because that value is the whole reason a caller asks; the loop calls [captureIfDue],
+     * which does not.
+     */
+    override fun captureNow(): SnapshotInfo {
+        val tick = currentTick
+        capture(tick)
+        return checkNotNull(ring.infoOf(tick)) {
+            "the ring dropped the snapshot it was just handed at $tick"
+        }
+    }
+
+    /**
+     * Captures when `tick % `[captureIntervalTicks]` == 0`, allocating nothing when it does.
+     *
+     * `WorldSimulation.step` calls this on every tick of every simulation that has a ring, so
+     * every branch below sits on the path `SnapshotBudgets.LOOP_ALLOCATED_BYTES` gates at zero
+     * bytes: the modulo is on a raw `Long`, the held-already guard is [SnapshotRing.holds]
+     * rather than [SnapshotRing.infoOf], and nothing here builds a [SnapshotInfo].
+     *
+     * Keyed on the clock rather than on a counter of its own, for two reasons. A counter would
+     * drift the moment a rewind moved the clock backwards, so the ticks captured after a
+     * rewind would stop lining up with the ones captured before it and a re-run would place
+     * its keyframes somewhere else. And [SnapshotRing]'s own keyframe retention test is
+     * `tick % sparseInterval`, so a cadence expressed in the same terms means a captured tick
+     * either is a keyframe forever or never was one.
+     */
+    override fun captureIfDue(): Boolean {
+        if (captureIntervalTicks == 0) return false
+        val tick = currentTick
+        if (tick.value % captureIntervalTicks != 0L) return false
+        if (!capture(tick)) return false
+        capturedTicks++
+        return true
+    }
+
+    /**
+     * Puts [tick] in the ring unless it is already there. Allocation-free.
      *
      * Idempotent per tick on purpose. An agent that pauses and then asks for a snapshot has no
      * way to know whether the loop already captured this tick, and the ring refuses a
@@ -59,29 +120,26 @@ public class SnapshotTimeTravel(
      * could neither predict nor act on. Capturing twice at one tick would produce two identical
      * slots anyway: the world cannot change between them, because nothing steps in between.
      *
-     * The idempotence guard is [SnapshotRing.holds] and not [SnapshotRing.infoOf]: `infoOf`
-     * builds a [SnapshotInfo], and asking it whether a tick is held would put one object per
-     * captured tick on the path spec 7 budgets at zero. The single `SnapshotInfo` this returns
-     * is the value the caller asked for, not a probe.
+     * It is also what makes a rewind's step-forward safe. `TimeControl.rewind` restores a
+     * keyframe and then runs bare steps through the loop, and those steps capture like any
+     * other — the first of them re-offers the very tick the restore landed on, which
+     * [SnapshotRing.dropAfter] deliberately kept.
+     *
+     * @return true if a new slot entered the ring.
      */
-    override fun captureNow(): SnapshotInfo {
-        val tick = currentTick
-        if (!ring.holds(tick)) {
-            val slot = ring.acquire()
-            try {
-                service.captureInto(slot)
-            } catch (failure: Throwable) {
-                // The slot never entered the ring, so returning it leaves the history exactly
-                // as it was. Rethrown: a capture that cannot complete is a defect, not a
-                // condition.
-                ring.release(slot)
-                throw failure
-            }
-            ring.commit(slot)
+    private fun capture(tick: Tick): Boolean {
+        if (ring.holds(tick)) return false
+        val slot = ring.acquire()
+        try {
+            service.captureInto(slot)
+        } catch (failure: Throwable) {
+            // The slot never entered the ring, so returning it leaves the history exactly as
+            // it was. Rethrown: a capture that cannot complete is a defect, not a condition.
+            ring.release(slot)
+            throw failure
         }
-        return checkNotNull(ring.infoOf(tick)) {
-            "the ring dropped the snapshot it was just handed at $tick"
-        }
+        ring.commit(slot)
+        return true
     }
 
     override fun listSnapshots(): List<SnapshotInfo> = ring.listSnapshots()
@@ -135,4 +193,39 @@ public class SnapshotTimeTravel(
     }
 
     override fun toString(): String = "SnapshotTimeTravel(tick=$currentTick, ring=$ring)"
+}
+
+/**
+ * The [TimeTravelFactory] a host hands `UdeaGameDef` to give a game history.
+ *
+ * A function rather than a constructor call at the wiring site, because the ring, the capture
+ * service and the time-travel facade are three objects that only ever appear together and two
+ * of them need the `World` — which does not exist until the definition has built one. Supplying
+ * this is the whole of the "does this game record?" decision; see the "when capture is active"
+ * note on [dev.wildware.udea.core.loop.SnapshotKind].
+ *
+ * [registry] is generated per game, and that is exactly why the kernel cannot wire this itself:
+ * `CoreModule` has no [ComponentRegistry] to invent. A host that has one calls this; one that
+ * does not gets a simulation with no ring and pays nothing for it.
+ *
+ * The [NetIdIndex] and the [SimBarrier] are taken off the context rather than from the caller,
+ * because `CoreModule` owns both and a snapshot built against a *different* id index would
+ * capture a roster the world does not have. `UdeaGameDef` builds its `CoreModule` itself, so
+ * asking a caller for them would be asking it to reach into a definition for values it cannot
+ * get wrong.
+ */
+public fun snapshotTimeTravel(
+    registry: ComponentRegistry,
+    ringConfig: RingConfig = RingConfig(),
+    assetGraph: AssetGraphHistory = AssetGraphHistory.Unchanged,
+): TimeTravelFactory = TimeTravelFactory { ctx, world ->
+    val netIds: NetIdIndex = ctx[CoreModule.NET_IDS]
+    SnapshotTimeTravel(
+        service = SnapshotService(registry, world, ctx, netIds),
+        ring = SnapshotRing(registry, ringConfig, ctx.log),
+        world = world,
+        ctx = ctx,
+        barrier = ctx.barrier,
+        assetGraph = assetGraph,
+    )
 }

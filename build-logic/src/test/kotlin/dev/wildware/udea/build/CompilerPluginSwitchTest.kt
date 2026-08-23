@@ -2,121 +2,141 @@ package dev.wildware.udea.build
 
 import java.io.File
 import kotlin.test.Test
-import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * The tripwire under `-Pudea.compilerPlugin.enabled=false`.
+ * That `-Pudea.compilerPlugin.enabled` still switches something off.
  *
  * Spec 7 makes this flag the mitigation for D8: a Kotlin release that breaks the K2 plugin
- * must degrade to checkers-off rather than blocking every phase. `udea.kotlin-library` reads
- * the flag and publishes it, and **nothing consumes it** — no module applies a
- * `KotlinCompilerPluginSupportPlugin`, nothing puts `udea-compiler-plugin` on a
- * `kotlinCompilerPluginClasspath`, and no `-Xplugin` argument naming it is produced outside
- * the plugin's own kctfork harness. So the `plugin-disabled` CI job compiles exactly what the
- * `build` job compiled, and its green tick proves the flag is *accepted*, not that flipping
- * it changes anything.
+ * must degrade to checkers-off rather than blocking every phase. For the whole of Phase 0 the
+ * flag was read by `udea.kotlin-library`, stored in `extraProperties` and consumed by nobody,
+ * so the `plugin-disabled` CI leg compiled byte for byte what the `build` job compiled. This
+ * class was then a tripwire on that documented absence, written to fail the day wiring landed.
  *
- * That is written down in `ci.yml` and in `docs/compiler-plugin.md`, and a written-down claim
- * about the absence of something rots the moment somebody adds it. This is the test that
- * stops it rotting: it fails on the day the wiring lands, which is the day the flag has to
- * become real and both documents have to stop saying "inert".
+ * The wiring landed (issue #164), so the tripwire is inverted: it now fails if the wiring
+ * *goes away* — if nothing implements a `KotlinCompilerPluginSupportPlugin`, if the convention
+ * every module is on stops applying it, if the flag stops gating it, or if `ci.yml` and
+ * `docs/compiler-plugin.md` drift back to describing a switch that does nothing.
  *
- * The alternative — deleting the CI leg — was rejected because the leg does prove one thing
- * (`UdeaBuildFlags` rejects a mistyped value on every module), and because a missing gate is
- * not a gate someone remembers to add back.
+ * What it deliberately does not do is assert that a compilation really loads the plugin. No
+ * source scan can know that. `udeaVerifyCompilerPlugin` answers it on every module of every
+ * build by reading the resolved plugin classpath, and the `checkers-fire` CI leg answers the
+ * question one level further out, by compiling a broken component and reading the rule id back.
  */
 class CompilerPluginSwitchTest {
 
     private val repoRoot = File("..").canonicalFile
 
-    /**
-     * Everything a real wiring would have to say somewhere. Names, not behaviour: this is a
-     * tripwire on a documented absence, and it only has to notice.
-     */
-    private val wiringMarkers = listOf(
-        "KotlinCompilerPluginSupportPlugin",
-        "kotlinCompilerPluginClasspath",
-        "SubpluginOption",
-        "-Xplugin",
-    )
+    private val convention =
+        repoRoot.resolve("build-logic/src/main/kotlin/udea.kotlin-library.gradle.kts")
 
-    /**
-     * Where wiring could plausibly live. `udea-compiler-plugin`'s own sources are excluded:
-     * the plugin declares its own CLI contract and its test harness passes `-Xplugin` to
-     * kctfork, and neither of those applies the plugin to a `udea-*` module's compilation.
-     *
-     * `udea-gradle/src` is scanned explicitly, and that is the point of the list rather than
-     * a `maxDepth(2)` walk. `udea-gradle` is the module `docs/compiler-plugin.md` names as
-     * the wiring's future home, and its sources sit seven directories down: a real
-     * `KotlinCompilerPluginSupportPlugin` implemented there and applied through
-     * `id("dev.wildware.udea")` carries none of the markers in any *build script*, so a
-     * tripwire that read only build scripts would stay green through exactly the change it
-     * exists to notice. `moba/src` is here for the same reason — it is the one game module.
-     */
-    private fun buildScripts(): List<File> =
-        (
-            repoRoot.resolve("build-logic/src/main/kotlin").walkTopDown() +
-                repoRoot.resolve("udea-gradle/src").walkTopDown() +
-                repoRoot.resolve("moba/src").walkTopDown() +
-                repoRoot.walkTopDown().maxDepth(2)
-            )
+    private val ci = repoRoot.resolve(".github/workflows/ci.yml")
+
+    private val docs = repoRoot.resolve("docs/compiler-plugin.md")
+
+    /** Every Kotlin source and build script `build-logic` could hold the wiring in. */
+    private fun buildLogicSources(): List<File> =
+        repoRoot.resolve("build-logic/src/main/kotlin")
+            .walkTopDown()
             .filter { it.isFile }
-            .filter { it.name.endsWith(".gradle.kts") || it.name.endsWith(".kt") }
-            .filterNot { it.invariantSeparatorsPath.contains("/build/") }
-            .filterNot { it.invariantSeparatorsPath.contains("/udea-compiler-plugin/") }
-            .distinct()
+            .filter { it.name.endsWith(".kt") || it.name.endsWith(".gradle.kts") }
             .toList()
 
     @Test
-    fun `the outer switch is still inert, and the moment it is not this test says so`() {
-        val scripts = buildScripts()
+    fun `something implements a KotlinCompilerPluginSupportPlugin`() {
+        val sources = buildLogicSources()
         assertTrue(
-            scripts.any { it.name == "udea.kotlin-library.gradle.kts" },
+            sources.any { it.name == "udea.kotlin-library.gradle.kts" },
             "the scan found no convention plugins under $repoRoot, so it is checking nothing",
         )
-        // And that it reaches the module the docs name as the wiring's home. Without this the
-        // scan could silently stop covering udea-gradle - which is what it did, when the walk
-        // was depth-limited to build scripts and udea-gradle's sources sit seven levels down.
+        val wiring = sources.filter { "KotlinCompilerPluginSupportPlugin" in it.readText() }
         assertTrue(
-            scripts.any { it.invariantSeparatorsPath.contains("/udea-gradle/src/") },
-            "the scan reached no udea-gradle source; a KotlinCompilerPluginSupportPlugin " +
-                "implemented there and applied via id(\"dev.wildware.udea\") would carry none " +
-                "of the markers in any build script, so this tripwire must read that module",
-        )
-        val wired = scripts.filter { file ->
-            val text = file.readText()
-            wiringMarkers.any { it in text }
-        }
-        assertEquals(
-            emptyList(),
-            wired.map { it.relativeTo(repoRoot).invariantSeparatorsPath },
-            "the K2 plugin is now applied to a real compilation, so " +
-                "-P${UdeaBuildFlags.COMPILER_PLUGIN_ENABLED} must actually toggle it: make " +
-                "UdeaBuildFlags.compilerPluginEnabled gate that wiring, then delete the " +
-                "\"the switch is inert\" paragraphs from .github/workflows/ci.yml and from " +
-                "docs/compiler-plugin.md. Until all three are done, the plugin-disabled CI " +
-                "leg is a green tick for something nobody has checked.",
+            wiring.isNotEmpty(),
+            "no build-logic source implements a KotlinCompilerPluginSupportPlugin any more. " +
+                "Without one, nothing puts udea-compiler-plugin on a kotlinCompilerPluginClasspath, " +
+                "no -Xplugin argument is produced, and -P${UdeaBuildFlags.COMPILER_PLUGIN_ENABLED} " +
+                "is back to being a flag that reads and discards a value.",
         )
     }
 
     @Test
-    fun `ci and the docs both describe the switch as inert while it is`() {
-        // The two places a reader meets the claim. If one is updated and the other is not,
-        // the repository disagrees with itself about whether a CI tick means anything.
-        val ci = repoRoot.resolve(".github/workflows/ci.yml")
-        val docs = repoRoot.resolve("docs/compiler-plugin.md")
+    fun `the convention every module is on applies it, so a new module cannot forget`() {
+        // The same reasoning the root build script gives for applying the legacy and
+        // module-graph gates centrally: a gate a module opts into is a gate a new module
+        // forgets, and the person who owns the module is the wrong person to be able to
+        // switch off the rule.
+        assertTrue(convention.isFile, "not found: $convention")
+        assertTrue(
+            "apply<UdeaCompilerPluginSupport>()" in convention.readText(),
+            "udea.kotlin-library no longer applies UdeaCompilerPluginSupport, so whichever " +
+                "modules still compile with the K2 plugin do so by accident",
+        )
+    }
+
+    @Test
+    fun `the wiring is gated by the flag rather than unconditional`() {
+        val support = repoRoot.resolve(
+            "build-logic/src/main/kotlin/dev/wildware/udea/build/UdeaCompilerPluginSupport.kt",
+        )
+        assertTrue(support.isFile, "not found: $support")
+        val text = support.readText()
+        assertTrue(
+            "udeaCompilerPluginEnabled()" in text && "isApplicable" in text,
+            "UdeaCompilerPluginSupport.isApplicable no longer consults the " +
+                "${UdeaBuildFlags.COMPILER_PLUGIN_ENABLED} flag, so the degrade procedure in " +
+                "docs/compiler-plugin.md would leave the plugin applied",
+        )
+    }
+
+    @Test
+    fun `the check that the classpath matches the promise is wired into check`() {
+        // `udeaVerifyCompilerPlugin` is the only thing that notices the wiring silently
+        // stopping. It has to be on `check`, or it is a task nobody runs.
+        val text = convention.readText()
+        assertTrue("udeaVerifyCompilerPlugin" in text, "the classpath gate is gone from $convention")
+        assertTrue(
+            Regex("""tasks\.named\("check"\)\s*\{\s*\n\s*dependsOn\(udeaVerifyCompilerPlugin\)""")
+                .containsMatchIn(text),
+            "udeaVerifyCompilerPlugin is registered but no longer wired into `check`",
+        )
+    }
+
+    @Test
+    fun `ci and the docs describe a switch that works, not an inert one`() {
+        // The two places a reader meets the claim. While the switch was inert both said so and
+        // this test asserted they did; now that it is not, the same test asserts they have
+        // stopped, so the repository cannot disagree with itself in either direction.
         assertTrue(ci.isFile, "ci.yml not found at $ci")
         assertTrue(docs.isFile, "docs/compiler-plugin.md not found at $docs")
-        assertTrue(
+        assertFalse(
             "inert" in ci.readText(),
-            "ci.yml no longer says the plugin-disabled leg's switch is inert, but " +
-                "CompilerPluginSwitchTest still finds no wiring - one of the two is wrong",
+            "ci.yml still describes the plugin-disabled leg's switch as inert, but the wiring " +
+                "is in place and udeaVerifyCompilerPlugin proves it",
+        )
+        assertFalse(
+            "inert" in docs.readText(),
+            "docs/compiler-plugin.md still describes the outer switch as inert, but the wiring " +
+                "is in place",
+        )
+    }
+
+    @Test
+    fun `the plugin-disabled CI leg runs the gate that can notice the plugin`() {
+        // Without this the leg is back to compiling the same bytes the `build` job compiled.
+        // `udeaVerifyCompilerPlugin` is on `check` and therefore on `build`, but naming it
+        // here means the leg still asserts the absence even if `check` is narrowed later.
+        val text = ci.readText()
+        assertTrue(
+            "udeaVerifyCompilerPlugin" in text,
+            "ci.yml no longer names udeaVerifyCompilerPlugin, so nothing in the workflow " +
+                "asserts that -P${UdeaBuildFlags.COMPILER_PLUGIN_ENABLED}=false removes anything",
         )
         assertTrue(
-            "inert" in docs.readText(),
-            "docs/compiler-plugin.md no longer says the outer switch is inert, but " +
-                "CompilerPluginSwitchTest still finds no wiring - one of the two is wrong",
+            "checkers-fire" in text,
+            "ci.yml no longer has the leg that compiles a broken component in a real module " +
+                "and reads the rule id back; without it, a checker could stop firing entirely " +
+                "and every other gate would stay green",
         )
     }
 }

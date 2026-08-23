@@ -8,6 +8,14 @@ dependencies {
     api(project(":udea-core"))
     implementation(project(":udea-assets"))
 
+    // The gdx desktop natives. Runtime-only because nothing compiles against them: the
+    // LWJGL3 backend loads `gdx64.dll`/`libgdx64.so` through `SharedLibraryLoader` at
+    // context creation, and without this artifact `Lwjgl3Application` dies in its own
+    // constructor with an UnsatisfiedLinkError rather than anywhere a stack trace explains.
+    // `natives-desktop` is a classifier, which `gradle/libs.versions.toml` cannot express,
+    // so the variant is selected here.
+    runtimeOnly(variantOf(libs.gdx.platform) { classifier("natives-desktop") })
+
     // Test-only, deliberately. `udeaVerifyHeadless` reports through the one UdeaDiagnostic
     // (spec 5) so its output has the same rule ids, spans and cap as every other producer;
     // nothing in the shipped module needs diagnostics, so it must not reach the runtime
@@ -111,6 +119,11 @@ tasks.test {
     // The gate is `udeaVerifyHeadless`'s job; running it twice per `check` buys nothing.
     filter { excludeTestsMatching(gateTestClass) }
 
+    // The GL tests belong to `udeaGlTest`, in a JVM of their own: they boot a real LWJGL3
+    // application, which populates `Gdx.gl`/`Gdx.graphics`/`Gdx.app` for the whole process and
+    // would make `PureSimulationTest`'s "no context existed" assertion meaningless here.
+    filter { excludeTestsMatching("dev.wildware.udea.render.gl.*") }
+
     // HeadlessScanTest reads the same designated list, so it needs the same hand-off.
     systemProperty(headlessModulesProperty, headlessModules.joinToString(","))
 
@@ -125,6 +138,41 @@ tasks.test {
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
+// --- udeaGlTest (issues #118, #121) ------------------------------------------------------
+//
+// The tests that need a real LWJGL3 context, in a JVM of their own.
+//
+// Not a preference. `PureSimulationTest` proves the simulation runs with no context by
+// asserting `Gdx.gl`, `Gdx.graphics` and `Gdx.app` are null -- and those are JVM-wide statics
+// that `Lwjgl3Application` populates on start and does not fully clear on exit. Run in one
+// JVM, a backend test that had already booted a window would make that assertion fail, or
+// (worse, depending on order) make it pass while proving nothing. Two JVMs makes the claim
+// true again in both directions.
+//
+// It buys a second thing: a driver that segfaults takes down a JVM that contains only the
+// tests that asked for a driver.
+
+val glTestPackage = "dev.wildware.udea.render.gl"
+
+val udeaGlTest = tasks.register<Test>("udeaGlTest") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Runs the render tests that need a real LWJGL3 context and a display."
+
+    val testSourceSet = sourceSets.test.get()
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("$glTestPackage.*") }
+
+    // A machine with no display cannot run these, and they say so out loud and skip. Set this
+    // on any CI job that *does* have one, so that a backend which quietly stops booting fails
+    // the build instead of hiding behind a skip forever.
+    systemProperty(
+        "udea.render.requireGl",
+        providers.gradleProperty("udea.render.requireGl").getOrElse("false"),
+    )
+}
+
 tasks.check {
-    dependsOn(udeaVerifyHeadless)
+    dependsOn(udeaVerifyHeadless, udeaGlTest)
 }

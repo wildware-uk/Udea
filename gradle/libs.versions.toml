@@ -46,6 +46,12 @@ kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 fleks = { module = "io.github.quillraven.fleks:Fleks", version.ref = "fleks" }
 gdx = { module = "com.badlogicgames.gdx:gdx", version.ref = "gdx" }
 gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", version.ref = "gdx" }
+# The gdx desktop native library (gdx64.dll / libgdx64.so / libgdx64.dylib). Consumed with a
+# `natives-desktop` classifier, which a version catalog cannot express, so udea-render asks
+# for the variant explicitly. Runtime-only and udea-render-only: it is a native loader, and
+# UDEA-MG-002 bans `com.badlogicgames.gdx:*-platform` from every headless module for exactly
+# that reason.
+gdx-platform = { module = "com.badlogicgames.gdx:gdx-platform", version.ref = "gdx" }
 asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
 junit5-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }

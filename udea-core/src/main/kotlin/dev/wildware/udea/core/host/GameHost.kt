@@ -5,6 +5,7 @@ import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.loop.GameLoop
 import dev.wildware.udea.core.loop.Presentation
+import dev.wildware.udea.core.loop.TimeControl
 import dev.wildware.udea.core.module.UdeaGame
 import dev.wildware.udea.core.module.UdeaGameDef
 
@@ -69,8 +70,23 @@ public class GameHost(
     /** The presentation, or `null` in [RenderMode.Headless]. */
     public val presentation: Presentation? get() = backend?.presentation
 
-    /** The fixed-step loop. Public because `TimeControl` drives it for the agent. */
+    /** The fixed-step loop. Public because [time] drives it for the agent. */
     public val loop: GameLoop = GameLoop.forWorld(game.simulation, presentation)
+
+    /**
+     * Pause, step, rewind and the snapshot ring, as the agent surface sees them.
+     *
+     * Built here because this is the first place both halves exist: the loop is this class's,
+     * and the ring came out of `UdeaGameDef.build()` attached to the simulation that records
+     * into it. Assembling it anywhere else would let a host hand an agent a [TimeControl] over
+     * a *different* ring than the one the loop fills — `listSnapshots` would answer empty
+     * while the simulation captured happily into a ring nobody could reach.
+     *
+     * A host built from a definition with no `timeTravel` factory still gets a working
+     * [TimeControl]: it pauses and steps, and every time-travel call answers
+     * [dev.wildware.udea.core.loop.RewindFailure.NoSnapshotRing].
+     */
+    public val time: TimeControl = TimeControl(loop, game.simulation.travel)
 
     /** Shorthand for the built game's context. */
     public val ctx: GameContext get() = game.ctx

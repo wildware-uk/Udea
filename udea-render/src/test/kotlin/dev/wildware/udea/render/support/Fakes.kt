@@ -1,9 +1,11 @@
 package dev.wildware.udea.render.support
 
+import com.badlogic.gdx.graphics.g2d.Batch
 import com.badlogic.gdx.utils.Disposable
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.render.FrameClock
+import dev.wildware.udea.render.FrameSurface
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.OverlaySystem
 import dev.wildware.udea.render.RenderConstraints
@@ -13,6 +15,7 @@ import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.RenderTargets
 import dev.wildware.udea.render.ScreenTarget
+import dev.wildware.udea.render.capture.PixelSource
 
 /**
  * Observable stand-ins for the things a pipeline drives.
@@ -133,11 +136,51 @@ internal fun RenderRegistry.overlayScene(
 ): RenderHandle = overlay({ RecordingOverlaySystem(name, log) }, constrain)
 
 /** Targets of a plausible window size, built without a GL context. */
-internal fun testTargets(owned: List<Disposable> = emptyList()): RenderTargets = RenderTargets(
-    offscreen = OffscreenTarget(WIDTH, HEIGHT),
-    screen = ScreenTarget(WIDTH, HEIGHT),
+internal fun testTargets(
+    owned: List<Disposable> = emptyList(),
+    batch: Batch = RecordingBatch().batch,
+    surface: FrameSurface = FrameSurface.None,
+    pixels: PixelSource? = null,
+    width: Int = WIDTH,
+    height: Int = HEIGHT,
+): RenderTargets = RenderTargets(
+    offscreen = OffscreenTarget(width, height),
+    screen = ScreenTarget(width, height),
+    batch = batch,
+    surface = surface,
+    pixels = pixels,
     owned = owned,
 )
+
+/**
+ * A [FrameSurface] that records its two calls, so a test can assert the capture point sits
+ * between them -- which is the whole of the spec 3.7 guarantee at the pipeline level.
+ */
+internal class RecordingSurface(private val log: FrameLog) : FrameSurface {
+    override fun begin() {
+        log.record("surface:begin")
+    }
+
+    override fun endAndPresent() {
+        log.record("surface:endAndPresent")
+    }
+}
+
+/** A [PixelSource] that returns a recognisable byte per request and records what it was asked. */
+internal class FakePixelSource(private val log: FrameLog? = null) : PixelSource {
+
+    val requests = ArrayList<String>()
+
+    override fun readPng(x: Int, y: Int, width: Int, height: Int): ByteArray {
+        requests += "$x,$y,$width,$height"
+        log?.record("capture:read")
+        return ByteArray(width * height) { PIXEL_BYTE }
+    }
+
+    companion object {
+        const val PIXEL_BYTE: Byte = 7
+    }
+}
 
 private const val WIDTH = 1280
 private const val HEIGHT = 720

@@ -12,6 +12,7 @@ import com.squareup.kotlinpoet.STRING
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
 import dev.wildware.udea.codegen.CoreNames
+import dev.wildware.udea.codegen.agent.AgentNames
 
 /**
  * Emits one module-level index class per service, plus the `META-INF/services` line that
@@ -59,6 +60,20 @@ internal object ServiceIndexEmitter {
         propertyName = "replicators",
         elementType = CoreNames.REPLICATOR.parameterizedBy(STAR),
         kdoc = "Every `Replicator` generated for this module, in ascending component type id order.",
+    )
+
+    /** The `AgentToolDef<*>` list a `ToolModule` exposes. */
+    val TOOLS: Member = Member(
+        propertyName = "tools",
+        elementType = AgentNames.AGENT_TOOL_DEF.parameterizedBy(STAR),
+        kdoc = "Every `@AgentTool` generated for this module, in ascending tool name order.",
+    )
+
+    /** The `AgentStateSource<*>` list a `StateModule` exposes. */
+    val STATES: Member = Member(
+        propertyName = "states",
+        elementType = AgentNames.AGENT_STATE_SOURCE.parameterizedBy(STAR),
+        kdoc = "Every `@AgentState` source generated for this module, by declaring type name.",
     )
 
     /** The one list property an index service exposes. */

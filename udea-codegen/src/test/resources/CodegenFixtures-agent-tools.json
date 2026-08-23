@@ -1,0 +1,165 @@
+{
+  "module": "CodegenFixtures",
+  "protocol": 1,
+  "toolsets": [
+    {
+      "name": "playground",
+      "tools": [
+        {
+          "name": "set_stance",
+          "description": "Change one entity's movement stance. Reach for this when a test needs a unit crouched or sprinting without driving it through the input system.",
+          "args": [
+            {
+              "name": "target",
+              "type": "integer",
+              "description": "The entity to change, as its NetId packed word.",
+              "required": true,
+              "default": null
+            },
+            {
+              "name": "stance",
+              "type": "string",
+              "description": "The stance to apply.",
+              "required": true,
+              "default": null,
+              "enum": [
+                "Standing",
+                "Crouching",
+                "Sprinting"
+              ]
+            },
+            {
+              "name": "sticky",
+              "type": "boolean",
+              "description": "Whether to keep the stance across a rewind.",
+              "required": false,
+              "default": "true"
+            }
+          ],
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "integer",
+                "description": "The entity to change, as its NetId packed word."
+              },
+              "stance": {
+                "type": "string",
+                "description": "The stance to apply.",
+                "enum": [
+                  "Standing",
+                  "Crouching",
+                  "Sprinting"
+                ]
+              },
+              "sticky": {
+                "type": "boolean",
+                "description": "Whether to keep the stance across a rewind. (default true)"
+              }
+            },
+            "required": [
+              "target",
+              "stance"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "spawn_blueprint",
+          "description": "Create entities from a blueprint at the world origin. Use it to set up a scenario before stepping the simulation; it is the only way to add entities without loading a scene.",
+          "args": [
+            {
+              "name": "blueprint",
+              "type": "string",
+              "description": "Blueprint id, as declared in the asset graph, e.g. 'creep_melee'.",
+              "required": true,
+              "default": null
+            },
+            {
+              "name": "count",
+              "type": "integer",
+              "description": "How many to create, 1..64.",
+              "required": false,
+              "default": "1"
+            },
+            {
+              "name": "scale",
+              "type": "number",
+              "description": "Uniform scale applied to each spawned entity; omit to leave it alone.",
+              "required": false,
+              "default": null
+            }
+          ],
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "blueprint": {
+                "type": "string",
+                "description": "Blueprint id, as declared in the asset graph, e.g. 'creep_melee'."
+              },
+              "count": {
+                "type": "integer",
+                "description": "How many to create, 1..64. (default 1)"
+              },
+              "scale": {
+                "type": "number",
+                "description": "Uniform scale applied to each spawned entity; omit to leave it alone. (optional; omit for none)"
+              }
+            },
+            "required": [
+              "blueprint"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "tag_entity",
+          "description": "Attach labels to an entity so later queries can select it by name. Useful for marking the entity a scenario is about before stepping many ticks.",
+          "args": [
+            {
+              "name": "target",
+              "type": "integer",
+              "description": "The entity to label, as its NetId packed word.",
+              "required": true,
+              "default": null
+            },
+            {
+              "name": "labels",
+              "type": "array",
+              "description": "Labels to attach; each must be lower_snake_case.",
+              "required": true,
+              "default": null,
+              "items": {
+                "type": "string"
+              }
+            }
+          ],
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "integer",
+                "description": "The entity to label, as its NetId packed word."
+              },
+              "labels": {
+                "type": "array",
+                "description": "Labels to attach; each must be lower_snake_case. Several values, comma separated.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "target",
+              "labels"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
+    }
+  ]
+}

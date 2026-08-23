@@ -1,6 +1,8 @@
 package dev.wildware.udea.render
 
+import com.badlogic.gdx.utils.Disposable
 import dev.wildware.udea.core.loop.Presentation
+import dev.wildware.udea.render.capture.FrameCaptureSlot
 
 /**
  * One frame, in order: everything capturable, then the capture point, then the overlay.
@@ -27,14 +29,14 @@ import dev.wildware.udea.core.loop.Presentation
  * [OverlaySystem]s draw, into [RenderTargets.screen]. So the agent activity overlay lands
  * after the point at which a frame can be captured, on a target no capture reads (spec 3.7).
  *
- * The blit and the capture themselves belong to later issues; the ordering they depend on is
- * here, tested, and the phase enum is what encodes it.
+ * The bind and the blit are [FrameSurface]'s, injected so that this class -- the one that
+ * owns the ordering -- stays drivable with no GL context behind it.
  *
  * ## Ownership
  *
- * The pipeline owns the GL resources handed to it in [RenderTargets.owned] -- the one
- * `SpriteBatch`, the one `ShapeRenderer` -- and [dispose] releases them in reverse
- * construction order. In the old tree `GameScreen` constructed a batch and a shape renderer
+ * The pipeline owns every GL resource handed to it -- the offscreen framebuffer, the one
+ * `Batch`, and whatever a system claimed through [RenderResources.own] -- and [dispose]
+ * releases them in reverse construction order. In the old tree `GameScreen` constructed a batch and a shape renderer
  * (`UdeaGameManager.kt:143-144`) and then `BackgroundDrawSystem.kt:22` and
  * `DebugDrawSystem.kt:26` each built another: three batches, three lifetimes, disposal
  * wherever somebody remembered.
@@ -49,6 +51,20 @@ public class RenderPipeline internal constructor(
     /** Overlay systems, already ordered. Drawn after the capture point. */
     private val overlays: List<OverlaySystem>,
     private val timer: FrameTimer,
+    /**
+     * The capture request slot, or `null` when [RenderTargets] carries no way to read pixels.
+     *
+     * Nullable rather than an always-present slot that always fails, because the two answers
+     * differ for the caller: `GameHost` turns `null` into `no_capture_backend`, which is a
+     * wiring fault it can name, rather than a capture that times out and looks like a stall.
+     */
+    public val capture: FrameCaptureSlot?,
+    /**
+     * GL resources this pipeline owns, in construction order: the framebuffer, the batch, and
+     * whatever a system registered through [RenderResources.own]. Released in reverse by
+     * [dispose].
+     */
+    private val owned: List<Disposable>,
 ) : Presentation {
 
     private var disposed: Boolean = false
@@ -70,15 +86,27 @@ public class RenderPipeline internal constructor(
         check(!disposed) { "RenderPipeline has been disposed and cannot draw" }
         require(alpha in 0f..1f) { "alpha must be in [0, 1], was $alpha" }
 
+        // One clock reading per frame, taken before anything draws. A renderer that animates
+        // on wall time reads it through FrameTime; an overlay is handed it below. Two readings
+        // would let the world and the overlay disagree about how long the frame was.
+        val dtSeconds = timer.advance()
+
+        targets.surface.begin()
+
         // Indexed loops: this is the per-frame path and an iterator per phase per frame is
         // garbage the collector has to deal with in the middle of drawing.
         for (index in systems.indices) {
             systems[index].render(targets.offscreen, alpha)
         }
 
-        // ---- capture point: a FrameCapture reads targets.offscreen here (spec 3.7) ----
+        // ---- capture point (spec 3.7) ----
+        // Inside the bound region, because glReadPixels reads the *bound* framebuffer: drained
+        // after endAndPresent() it would read the window, which is the surface the agent
+        // activity overlay draws on two lines below.
+        capture?.drain(targets.offscreen)
 
-        val dtSeconds = timer.nextFrameSeconds()
+        targets.surface.endAndPresent()
+
         for (index in overlays.indices) {
             overlays[index].render(targets.screen, dtSeconds)
         }
@@ -96,13 +124,45 @@ public class RenderPipeline internal constructor(
     public fun dispose() {
         if (disposed) return
         disposed = true
-        for (index in targets.owned.indices.reversed()) {
-            targets.owned[index].dispose()
+        // Waiters first: a caller blocked in `capture` must be told the pipeline has gone
+        // before its GL resources are released, or it waits out its whole deadline on a
+        // pipeline that can no longer draw the frame it is waiting for.
+        capture?.close()
+        for (index in owned.indices.reversed()) {
+            owned[index].dispose()
         }
     }
 
     /** True once [dispose] has run. [render] fails after that. */
     public val isDisposed: Boolean get() = disposed
+
+    /**
+     * Tells every [Resizable] system, and [RenderTargets.screen], that the window has changed.
+     *
+     * @param width new window width in pixels; must be positive.
+     * @param height new window height in pixels; must be positive.
+     *
+     * The [OffscreenTarget] is deliberately *not* resized. It is the framebuffer the game is
+     * drawn into and every capture is read from, and letting a window drag change it would put
+     * the window manager's opinion into every screenshot an agent diffs.
+     *
+     * A minimised window reports `0 x 0` on some platforms; that is not a size and is ignored,
+     * because a viewport told it is zero pixels wide divides by it.
+     */
+    public fun resize(width: Int, height: Int) {
+        check(!disposed) { "RenderPipeline has been disposed and cannot resize" }
+        if (width <= 0 || height <= 0) return
+
+        targets.screen.width = width
+        targets.screen.height = height
+        for (index in resizables.indices) {
+            resizables[index].resize(width, height)
+        }
+    }
+
+    /** Resolved once at construction: a `filterIsInstance` per resize is a per-event scan. */
+    private val resizables: List<Resizable> =
+        (systems.filterIsInstance<Resizable>() + overlays.filterIsInstance<Resizable>())
 
     public companion object {
 

@@ -65,6 +65,16 @@ internal class SnapshotWorld(
      * for.
      */
     val registry: ComponentRegistry = TestComponents.registry(),
+    /**
+     * Hands the ring to [WorldSimulation] so that `step()` captures on the engine's cadence,
+     * exactly as an assembled game does.
+     *
+     * Off by default. Most tests here drive capture by hand because they are about the ring,
+     * the store or the hasher and want to choose which ticks are in it; turning it on for all
+     * of them would replace those choices with the engine's. `TickLoopBudgetTest` turns it on,
+     * because "the loop allocates nothing with capture wired in" is a claim about the wiring.
+     */
+    driveCapture: Boolean = false,
 ) {
 
     val netIds: NetIdIndex = NetIdIndex(capacity = idCapacity, entityCapacity = idCapacity)
@@ -99,11 +109,14 @@ internal class SnapshotWorld(
 
     val ring: SnapshotRing = SnapshotRing(registry, ringConfig, ctx.log)
 
-    val simulation: WorldSimulation = WorldSimulation(ctx, world, barrier)
+    val travel: SnapshotTimeTravel = SnapshotTimeTravel(service, ring, world, ctx, barrier)
+
+    // Declared after `travel`, because a simulation takes its ring as a constructor argument:
+    // there is no window in which a game is half wired for history, in production or here.
+    val simulation: WorldSimulation =
+        WorldSimulation(ctx, world, barrier, travel = if (driveCapture) travel else null)
 
     val loop: GameLoop = GameLoop(simulation)
-
-    val travel: SnapshotTimeTravel = SnapshotTimeTravel(service, ring, world, ctx, barrier)
 
     val time: TimeControl = TimeControl(loop, travel)
 

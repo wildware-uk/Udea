@@ -1,0 +1,30 @@
+# udea net-components.lock — THE COMPONENT TYPE ID SPACE.
+#
+# Every `@Replicated` component in the build, sorted. A component's position in this list is
+# its `ComponentTypeId`, and that id is on the wire in every packet and in every recorded
+# replay, so inserting a name renumbers its successors and breaks both.
+#
+# Why a file and not a scan: a KSP run only ever sees one Gradle module. A processor that
+# numbers the symbols in front of it hands out 0, 1, 2, … *per module*, so two modules both
+# mint ComponentTypeId(0) and two peers decode each other's packets as the wrong component
+# type — silently, because each module's net-protocol.lock is internally consistent and the
+# connect-time protoHash therefore reports agreement. Spec 5 puts every id in one sorted-FQN
+# assignment; the build hands that list to every module as `udea.projectComponents`.
+#
+# Adding a `@Replicated` component without adding it here is a build failure at the symbol.
+# That failure is the point: an id is a promise to every client and every replay, so it is
+# made in a reviewed diff rather than by a processor counting what it happened to be shown.
+#
+# Names may be listed before the component exists. Ids come from every name in the space,
+# including a component that currently fails to compile, so that one broken component cannot
+# renumber all of its successors on the wire while somebody fixes it.
+#
+# Today the only source set contributing components is udea-codegen's own fixture source set,
+# which is what exercises the generator end to end (issue #29). moba and udea-gas add their
+# names here as they gain components.
+dev.wildware.udea.codegen.fixtures.AiBlackboard
+dev.wildware.udea.codegen.fixtures.Combat
+dev.wildware.udea.codegen.fixtures.Health
+dev.wildware.udea.codegen.fixtures.Movement
+dev.wildware.udea.codegen.fixtures.Placement
+dev.wildware.udea.codegen.fixtures.QuantisedProbe

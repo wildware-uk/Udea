@@ -37,9 +37,35 @@ public enum class FieldKind(
      * A reference-typed field. Deeply immutable by [FieldStore.setObject]'s contract, and it
      * must have a `hashCode` that is stable across JVMs — [WorldHasher] folds it into the
      * determinism hash, and `Any.hashCode` on an ordinary class is an address.
+     *
+     * That obligation is **checked**, not documented: [ColumnarFieldStore.setObject] refuses a
+     * value that is neither a platform type with a specified `hashCode` nor a declared
+     * [StableHash]. See [StableHash] for why it has to be checked there and not here.
      */
     Object(ColumnGroup.Objects),
 }
+
+/**
+ * A reference type whose `hashCode` is a function of its value and nothing else.
+ *
+ * [WorldHasher] folds an [FieldKind.Object] column's `hashCode` straight into the determinism
+ * hash. `Any.hashCode` on an ordinary class is an identity hash — an address, freshly random
+ * in every process — so a single component field holding one would make two processes report
+ * a divergence for a world that is bit-identical, on every run, with the report pointing at
+ * the field as though the *simulation* had diverged. That is worse than no gate.
+ *
+ * Declaring it is the opt-in. A marker interface rather than a check in [ComponentSchema.of]
+ * because a schema knows only that a field is an `Object`, never what type it will hold:
+ * `Replicator.fieldNames` is the only per-field metadata the frozen contract carries, so the
+ * declared type is not available at construction and the value is the only thing that can be
+ * checked. [ColumnarFieldStore.setObject] does it, once per stored value.
+ *
+ * Not needed for `String`, or for a boxed primitive: the platform specifies `hashCode` for
+ * both. Deliberately **not** granted to enums — `java.lang.Enum` does not override `hashCode`,
+ * so an enum constant hashes to its address like anything else, and an enum-typed field must
+ * either implement this or be lowered to its `ordinal` as an [FieldKind.Int].
+ */
+public interface StableHash
 
 /** The four backing arrays a [ColumnarFieldStore] pools. */
 internal enum class ColumnGroup { Ints, Longs, Floats, Objects }

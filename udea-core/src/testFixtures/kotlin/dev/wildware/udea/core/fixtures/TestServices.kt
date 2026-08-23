@@ -113,17 +113,17 @@ public class RecordingPhysicsWorld(
     }
 
     /**
-     * The same three lines a Box2D backend writes: destroy everything, then walk the shared
-     * [PhysicsRebuildPlan]. Not `delegate.rebuildFrom`, because that would call the delegate's
-     * own `createBody` and this class would record none of the creations it is here to record.
+     * The same three lines a Box2D backend writes: destroy everything, then hand the shared
+     * [PhysicsRebuildPlan] this class's own `createBody` — which is why it is not
+     * `delegate.rebuildFrom`, that would record none of the creations this class exists to
+     * record. `plan.rebuild` rather than a loop over `plan.bodies`, so this fake inherits the
+     * handle invalidation a real backend inherits.
      */
     override fun rebuildFrom(world: World, netIds: NetIdIndex) {
         rebuildCount++
         created.clear()
         destroyAllBodies()
-        for (planned in PhysicsRebuildPlan.of(world, netIds).bodies) {
-            planned.component.handle = createBody(planned.def)
-        }
+        PhysicsRebuildPlan.of(world, netIds).rebuild(::createBody)
     }
 
     /** Forgets the counters, so a test can measure one phase of a longer run. */

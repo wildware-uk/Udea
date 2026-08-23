@@ -74,6 +74,13 @@ public class SimBarrier(initialCapacity: Int = DEFAULT_CAPACITY) {
     /** The batch being applied. Empty between drains, so the swap is always safe. */
     private var batch = ArrayList<BarrierAction>(initialCapacity)
 
+    /**
+     * True between the start and the end of a [drain]. Read and written only from the
+     * simulation thread — [submit] is the thread-safe half of this class, [drain] is not — so
+     * it is a plain field rather than an atomic.
+     */
+    private var draining = false
+
     /** Actions applied by the most recent [drain]. The metric an agent polls. */
     public var drainedThisTick: Int = 0
         private set
@@ -113,14 +120,31 @@ public class SimBarrier(initialCapacity: Int = DEFAULT_CAPACITY) {
      * ones or stall the loop — the alternative is a tool call that leaves the queue
      * half-applied, which is exactly the torn state this class exists to prevent.
      *
+     * Re-entering is a **failure**, not a nested drain. A caller that reaches `drain` from
+     * inside an action or a system — `SnapshotTimeTravel` reaches it from a rewind tool call,
+     * and a tool call is exactly the thing that arrives as a [BarrierAction] — would otherwise
+     * swap `batch` and `inbox` underneath the drain already running, so the outer call's batch
+     * becomes the live inbox and its `finally` clears it: every action submitted since it
+     * started is silently destroyed, [pendingCount] reports zero and [failedActions] reports
+     * zero. Refusing turns that into an [IllegalStateException] that names the problem, and
+     * forces a caller wanting a drain to state that it is at a real tick boundary.
+     *
      * An `Error` is **not** contained: `OutOfMemoryError`, `StackOverflowError` and
      * `LinkageError` leave the world in precisely the undefined state that argument is about,
      * so absorbing one and continuing to tick over it would defeat the reason the catch
      * exists. `AssertionError` propagates for a second reason — swallowing it would let an
      * assertion written inside a [BarrierAction] pass silently, which is a test that cannot
      * fail, manufactured by production code.
+     *
+     * @throws IllegalStateException if called from inside a drain that is already running.
      */
     public fun drain(world: World, ctx: GameContext): Int {
+        check(!draining) {
+            "SimBarrier.drain is already running: submit() the work instead of re-entering. A " +
+                "nested drain swaps the batch the outer one is walking and silently destroys " +
+                "every action queued since it started."
+        }
+        draining = true
         synchronized(lock) {
             val swap = batch
             batch = inbox
@@ -152,6 +176,10 @@ public class SimBarrier(initialCapacity: Int = DEFAULT_CAPACITY) {
             // torn state this class exists to prevent. The Error still propagates; only the
             // buffer is cleaned up on the way out.
             running.clear()
+            // Cleared here rather than after the loop for the same reason the buffer is: an
+            // escaping `Error` must not leave the barrier believing a drain is still running,
+            // or the next one an embedder attempts refuses for a reason that has gone away.
+            draining = false
         }
 
         drainedThisTick = size

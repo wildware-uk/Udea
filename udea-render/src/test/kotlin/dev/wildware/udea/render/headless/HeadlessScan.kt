@@ -54,27 +54,51 @@ internal object HeadlessScan {
     const val RULE_ID: String = "UDEA-MG-002-BYTECODE"
 
     /**
-     * The modules that must stay free of GL (issue #117 scope).
+     * The system property `udea-render`'s build script hands the designated list over in.
      *
-     * `udea-render` is not here, and that is the whole shape of the design: it is the one
+     * Must equal `ModuleGraphRules.HEADLESS_MODULES_PROPERTY` in `build-logic`, which is
+     * where the list is decided. A mismatch is not silent: [HEADLESS_MODULES] throws.
+     */
+    const val MODULES_PROPERTY: String = "udea.headless.modules"
+
+    /**
+     * The modules that must stay free of GL: read from the build, never written down here.
+     *
+     * `udea-render` is not in it, and that is the whole shape of the design: it is the one
      * module allowed to see GL, so the identical class that fails this scan in `udea-core`
      * passes it after being moved.
+     *
+     * The list itself is `ModuleGraphRules.HEADLESS_PROJECTS`, which is also what the
+     * configuration-level rule `UDEA-MG-002` governs. Two copies of it is what this replaces:
+     * they disagreed in both directions, so a GL backend on `udea-agent-host` or
+     * `udea-diagnostics` passed the dependency rule *and* the bytecode scan while
+     * `docs/module-graph.md` called them "the same rule, one level down".
+     *
+     * @throws IllegalStateException when the property is missing or empty. A scan with no
+     *   modules passes forever, so a broken hand-off has to be louder than a green tick.
      */
-    val HEADLESS_MODULES: List<String> = listOf(
-        "udea-annotations",
-        "udea-agent",
-        "udea-assets",
-        "udea-core",
-        "udea-gas",
-        "udea-net",
-    )
+    val HEADLESS_MODULES: List<String> by lazy {
+        val raw = System.getProperty(MODULES_PROPERTY)
+        checkNotNull(raw) {
+            "-D$MODULES_PROPERTY was not set. The designated headless modules come from " +
+                "ModuleGraphRules.HEADLESS_PROJECTS via udea-render's build script; run this " +
+                "through Gradle (`:udea-render:udeaVerifyHeadless`) or set the property. A " +
+                "scan that defaulted to a list written down here is the drift this replaced."
+        }
+        val modules = raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        check(modules.isNotEmpty()) {
+            "-D$MODULES_PROPERTY was set to '$raw', which names no modules. The gate is broken, " +
+                "not the tree: a scan of nothing passes forever."
+        }
+        modules
+    }
 
     /**
      * Runs the scan over [modules].
      *
      * @throws IllegalStateException if a module contributed no class files at all. An empty
      *   scan is a broken gate, not a clean module: it would pass forever while the module
-     *   quietly grew GL. (The same reasoning as `UdeaLeafCheck`'s empty-classpath branch.)
+     *   quietly grew GL. (The same reasoning as `DependencyRules.vacuity`.)
      */
     fun run(
         modules: List<String> = HEADLESS_MODULES,

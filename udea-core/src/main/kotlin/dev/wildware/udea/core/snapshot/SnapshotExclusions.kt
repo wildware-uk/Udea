@@ -53,6 +53,22 @@ public enum class SnapshotExclusion(
      * Restoring transport state would desynchronise the peer rather than the local world.
      */
     Sockets("a transport peer did not rewind, so local socket state must not either"),
+
+    /**
+     * Untouched — and the headline exclusion of the physics design (spec 3.4), which is why it
+     * belongs in this list rather than only in `PhysicsWorld.rebuildFrom`'s prose.
+     *
+     * Contact manifolds, warm-start impulses and joint accumulated impulses are never captured.
+     * Nothing authoritative lives in them: the components are the truth and the solver is
+     * derived, so `PhysicsWorld.rebuildFrom` destroys every body after a restore and builds
+     * them again from `PhysicsBody` and the `ShapeComponent`s. It registers no
+     * [ExcludedSubsystem] because that rebuild *is* the defined state.
+     *
+     * What an agent sees, and can now be told why: a contact that was resolving before a rewind
+     * restarts from scratch after it, so a stack of debris may settle slightly differently.
+     * That is the trade, not a bug to fix by snapshotting the solver.
+     */
+    Box2DSolverState("solver state is derived; bodies are rebuilt from components after a restore"),
 }
 
 /**

@@ -141,6 +141,63 @@ class KDocHarvestExtensionTest : UdeaCheckerTest() {
     }
 
     @Test
+    fun `a second compilation into one index path replaces it - the index is per-compilation`() {
+        // The scope of the determinism claim, pinned so it cannot be over-read. `KDocIndexSink`
+        // starts empty for every compilation and its output is a pure function of what *that*
+        // compilation harvested, so two modules aimed at one `kdocIndex` path leave only the
+        // second module's entries - and an incremental recompile of one file leaves that file
+        // and nothing else.
+        //
+        // This is a real constraint on the `udeaHarvestKdoc` Gradle step that has not been
+        // written yet (`docs/compiler-plugin.md`, "Still to land"): it must give each
+        // compilation its own output path and merge them, because the plugin cannot merge.
+        // Merging in the sink by re-reading the file on disk would be worse than this, not
+        // better: a declaration whose KDoc was deleted, or which was deleted outright, would
+        // keep its entry for ever, and the index would then depend on what happened to be on
+        // disk rather than on the sources - which is the determinism this test's neighbour
+        // asserts.
+        val other = source(
+            "Other.kt",
+            """
+            package udea.fixtures
+
+            /** Belongs to the second compilation only. */
+            class Other
+            """,
+        )
+
+        // Two separate roots writing one index: the shape of two modules whose build both
+        // point `kdocIndex` at the same file.
+        val index = File(UdeaCompileTesting.newWorkDir(), "build/udea/shared-kdoc-index.json")
+
+        fun harvestInto(source: TestSource) {
+            val root = UdeaCompileTesting.newWorkDir()
+            val run = UdeaCompileTesting.compile(
+                sources = listOf(source),
+                pluginOptions = mapOf(
+                    UdeaCompilerPlugin.OPTION_KDOC_INDEX to index.absolutePath,
+                    UdeaCompilerPlugin.OPTION_REPO_ROOT to root.absolutePath,
+                ),
+                workDir = root,
+            )
+            assertEquals(emptyList(), run.otherMessages, "the fixture must compile:\n" + run.describe())
+        }
+
+        harvestInto(documented)
+        assertTrue("udea.fixtures.Ability" in index.readText(), index.readText())
+
+        harvestInto(other)
+        val after = index.readText()
+
+        assertTrue("udea.fixtures.Other" in after, after)
+        assertFalse(
+            "udea.fixtures.Ability" in after,
+            "the sink writes what one compilation harvested; if this now merges, the Gradle " +
+                "step's contract has changed and KDocIndexSink's KDoc must say so:\n" + after,
+        )
+    }
+
+    @Test
     fun `without the kdocIndex option nothing is harvested and nothing is written`() {
         // The harvester is opt-in, so an ordinary build - and the plugin-disabled build - pays
         // nothing for it and cannot depend on it.

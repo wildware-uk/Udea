@@ -176,6 +176,53 @@ class SimBarrierTest {
     }
 
     @Test
+    fun `a nested drain is refused instead of silently destroying the queue`() {
+        // The shape spec 5 prescribes for an agent mutation is a BarrierAction, and
+        // SnapshotTimeTravel.restoreNearestAtOrBefore calls barrier.drain() directly and by
+        // design. Put those two together and drain re-enters. What that used to do: the inner
+        // call swaps `batch` and `inbox`, so the list the outer call is walking becomes the
+        // live inbox, and the outer `finally { running.clear() }` empties it — every action
+        // submitted since the drain started is gone, pendingCount() says 0 and failedActions
+        // says 0. It also applies `queued` inside the very drain the KDoc promises it cannot
+        // land in.
+        val log = CapturingLog()
+        val f = fixture(log)
+        val queued = SpawnAction("submitted-before-the-nested-drain")
+        val lost = SpawnAction("submitted-after-the-nested-drain")
+        var reachedTheLine = false
+        val reentrant = object : BarrierAction {
+            override val label: String = "re-enters-the-drain"
+            override fun apply(world: World, ctx: GameContext) {
+                f.barrier.submit(queued)
+                f.barrier.drain(world, ctx)
+                reachedTheLine = true
+                f.barrier.submit(lost)
+            }
+        }
+
+        f.barrier.submit(reentrant)
+        f.sim.step()
+
+        assertEquals(1L, f.barrier.failedActions, "re-entering is a failure, not a nested drain")
+        assertTrue(!reachedTheLine, "the action aborted at the re-entry rather than carrying on")
+        assertNull(queued.appliedAtTick, "nothing lands inside the drain that is already running")
+        assertEquals(1, f.barrier.pendingCount(), "and nothing queued was destroyed")
+
+        val (message, cause) = log.errors.single()
+        assertTrue("re-enters-the-drain" in message, "the label must name the culprit: $message")
+        assertTrue(
+            "already running" in assertNotNull(cause).message.orEmpty(),
+            "the cause must say what went wrong: ${cause.message}",
+        )
+
+        f.sim.step()
+
+        assertEquals(Tick(1), queued.appliedAtTick, "the queued action lands on the next tick")
+        assertNull(lost.appliedAtTick, "and the line after the failed drain never ran")
+        assertEquals(0, f.barrier.pendingCount())
+    }
+
+    @Test
     fun `a throwing action is logged with its label and does not stop the drain or the tick`() {
         val log = CapturingLog()
         val f = fixture(log)

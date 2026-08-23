@@ -179,4 +179,77 @@ class DependencyRulesTest {
         assertTrue("compileClasspath" in report, report)
         assertTrue("org.lwjgl:lwjgl" in report, report)
     }
+
+    // --- the vacuity guard --------------------------------------------------------------------
+
+    @Test
+    fun `a budget rule over a classpath that resolved nothing fails rather than passing`() {
+        // The worst failure a gate has is silence: an allowOnly rule compares a resolved set
+        // against an allow list, and an empty set has no offenders either. Reachable in
+        // practice - gradle.properties carries kotlin.stdlib.default.dependency = true, and
+        // flipping it empties udea-annotations' runtimeClasspath.
+        val empty = ResolvedGraph(root = ":udea-annotations", edges = emptyList())
+
+        val problem = DependencyRules.vacuity(
+            ":udea-annotations",
+            "runtimeClasspath",
+            empty,
+            listOf(ModuleGraphRules.ANNOTATIONS_ARE_A_LEAF),
+        )
+
+        assertNotNull(problem)
+        assertTrue("UDEA-MG-001" in problem, problem)
+        assertTrue("passes forever" in problem, problem)
+        assertEquals(
+            emptyList(),
+            DependencyRules.violations(
+                ":udea-annotations",
+                "runtimeClasspath",
+                empty,
+                listOf(ModuleGraphRules.ANNOTATIONS_ARE_A_LEAF),
+            ),
+            "and the violation check alone would have said the module was clean",
+        )
+    }
+
+    @Test
+    fun `a budget rule with something on the classpath is not vacuous`() {
+        val resolved = ResolvedGraph(
+            root = ":udea-annotations",
+            edges = listOf(DependencyEdge(":udea-annotations", "org.jetbrains.kotlin:kotlin-stdlib")),
+        )
+        assertNull(
+            DependencyRules.vacuity(
+                ":udea-annotations",
+                "runtimeClasspath",
+                resolved,
+                listOf(ModuleGraphRules.ANNOTATIONS_ARE_A_LEAF),
+            ),
+        )
+    }
+
+    @Test
+    fun `a deny-list rule over an empty classpath is the answer it wanted, not a vacuity`() {
+        // "Nothing resolved" is a real pass for a ban: the module genuinely brings in no GL.
+        assertNull(
+            DependencyRules.vacuity(
+                ":udea-core",
+                "runtimeClasspath",
+                ResolvedGraph(root = ":udea-core", edges = emptyList()),
+                listOf(ModuleGraphRules.NO_GL_OUTSIDE_RENDER),
+            ),
+        )
+    }
+
+    @Test
+    fun `a rule that does not apply to this project cannot make it vacuous`() {
+        assertNull(
+            DependencyRules.vacuity(
+                ":moba",
+                "runtimeClasspath",
+                ResolvedGraph(root = ":moba", edges = emptyList()),
+                listOf(ModuleGraphRules.ANNOTATIONS_ARE_A_LEAF),
+            ),
+        )
+    }
 }

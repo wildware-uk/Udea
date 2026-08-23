@@ -39,6 +39,17 @@ public class PhysicsBody(
      * [PhysicsWorld.rebuildFrom] and reassigned by it. Anything that persists a handle across
      * a restore is holding a dangling reference, which is why the handle lives here — on the
      * component the rebuild rewrites — rather than in a map somebody else keeps.
+     *
+     * *Every* handle is invalidated, including on entities the rebuild creates no body for —
+     * [PhysicsRebuildPlan.rebuild] owns that, so the sentence above is true for an entity with
+     * no `NetId` too, and not only for the ones the plan covers.
+     *
+     * **Never `@Net` or `@Sim`.** It is the one field on this component that must not be
+     * captured: [BodyHandle] is a value class over `Int`, so an annotation here would lower to
+     * an ordinary int column, sail through every type-level guard, and be restored *before*
+     * `rebuildFrom` reassigns it — handing out handles to bodies that no longer exist, or, on a
+     * backend that recycles indices, to somebody else's. `NoBox2DInCoreTest` fails if an
+     * annotation appears on a `BodyHandle` property anywhere in this module.
      */
     public var handle: BodyHandle = BodyHandle.NONE
 
@@ -121,13 +132,24 @@ public class Capsule(
  * is level data, sized once and read many times, and a `List<Vector2>` would be one allocation
  * per vertex plus a LibGDX type in a kernel signature.
  */
-public class Chain(public var vertices: FloatArray = FloatArray(0)) : Component<Chain>, ShapeComponent {
+public class Chain(vertices: FloatArray = FloatArray(0)) : Component<Chain>, ShapeComponent {
 
-    init {
-        require(vertices.size % 2 == 0) {
-            "a chain needs an even number of floats (x, y pairs), got ${vertices.size}"
+    /**
+     * `x0, y0, x1, y1, ...`. Assigning an odd-length array throws.
+     *
+     * The check is on the *setter*, not only in an `init` block: this is a `var`, and a
+     * constructor-only check is bypassed by every write that matters. `chain.vertices =
+     * FloatArray(3)` is one, and a snapshot restore is the other — `Replicator.apply` writes
+     * component fields in place by assignment, so a restore takes exactly the same route as
+     * game code. Without the setter check, [pointCount] computes `3 / 2 = 1`, the backend
+     * builds a one-point chain and the trailing coordinate is dropped with no error anywhere:
+     * a silent wrong answer, which standards section 1 puts at the top of what a failure must
+     * never be.
+     */
+    public var vertices: FloatArray = evenPairs(vertices)
+        set(value) {
+            field = evenPairs(value)
         }
-    }
 
     /** How many points the chain has. */
     public val pointCount: Int get() = vertices.size / 2
@@ -140,6 +162,14 @@ public class Chain(public var vertices: FloatArray = FloatArray(0)) : Component<
 
     public companion object : ComponentType<Chain>() {
         public const val ORDER: Int = 3
+
+        /** Returns [vertices] if it is a whole number of `(x, y)` pairs, or throws. */
+        private fun evenPairs(vertices: FloatArray): FloatArray {
+            require(vertices.size % 2 == 0) {
+                "a chain needs an even number of floats (x, y pairs), got ${vertices.size}"
+            }
+            return vertices
+        }
     }
 }
 

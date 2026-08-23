@@ -10,6 +10,8 @@ import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -169,6 +171,60 @@ class PhysicsRebuildTest {
             physics.bodyCount,
             "an entity with no stable identity has no reproducible place in the order",
         )
+    }
+
+    @Test
+    fun `a skipped entity's handle is invalidated, not left dangling at a destroyed body`() {
+        // The entity the test above skips, in the state it is actually in at runtime: a
+        // server-only projectile or a piece of debris (spec 3.4's whole remaining use for a
+        // solver) that a system created a body for directly, with no NetId. `rebuildFrom`
+        // destroys every body but only rewrites the handles the plan covers, so this one is
+        // the entity whose `handle` can outlive the body it names.
+        val fixture = Fixture(bodyCount = 4)
+        val orphan = PhysicsBody(x = 99f)
+        fixture.world.entity { it += orphan }
+        val physics = NoOpPhysicsWorld()
+        orphan.handle = physics.createBody(BodyDef(orphan, NetId.NONE, emptyList()))
+        val stale = orphan.handle
+        assertTrue(stale.isValid, "the orphan starts out holding a live body")
+
+        physics.rebuildFrom(fixture.world, fixture.netIds)
+
+        assertEquals(
+            BodyHandle.NONE,
+            orphan.handle,
+            "the rebuild destroyed this body, so the component must not still name one: " +
+                "TeleportSystem gates on handle.isValid and would throw NoSuchBodyException out " +
+                "of onTick, and a backend that recycles indices would alias someone else's body",
+        )
+        assertFalse(orphan.handle.isValid)
+        assertFailsWith<NoSuchBodyException>("the stale handle really does name nothing") {
+            physics.poseOf(stale, BodyPose())
+        }
+        assertEquals(
+            4,
+            fixture.ids.count { fixture.bodyOf(it).handle.isValid },
+            "and clearing every handle first did not clear the planned ones after",
+        )
+    }
+
+    @Test
+    fun `every backend inherits the invalidation, because the shared plan owns it`() {
+        // The structural half of the test above: the guarantee has to live in
+        // PhysicsRebuildPlan rather than in NoOpPhysicsWorld, or the next backend re-implements
+        // the loop and re-introduces the dangling handle. SpyPhysicsWorld is a second
+        // implementation writing the same three lines a Box2D backend would.
+        val fixture = Fixture(bodyCount = 3)
+        val orphan = PhysicsBody(x = 7f)
+        fixture.world.entity { it += orphan }
+        val physics = SpyPhysicsWorld()
+        orphan.handle = physics.createBody(BodyDef(orphan, NetId.NONE, emptyList()))
+
+        physics.rebuildFrom(fixture.world, fixture.netIds)
+
+        assertEquals(BodyHandle.NONE, orphan.handle)
+        assertEquals(4, PhysicsRebuildPlan.of(fixture.world, fixture.netIds).componentCount)
+        assertEquals(3, PhysicsRebuildPlan.of(fixture.world, fixture.netIds).size)
     }
 
     @Test

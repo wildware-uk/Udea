@@ -55,9 +55,6 @@ public object WorldHasher {
     /** FNV-1a 64-bit prime. */
     private const val PRIME: Long = 0x100000001b3L
 
-    /** The hash of a world with no entities at all. */
-    public val EMPTY: Long = OFFSET_BASIS
-
     /**
      * Hashes one captured world in canonical order. Allocation-free.
      *

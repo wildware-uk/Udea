@@ -13,6 +13,10 @@ import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.module.UdeaModule
 import dev.wildware.udea.core.physics.PhysicsBody
 import dev.wildware.udea.core.scene.MarkerScene
+import java.lang.reflect.Modifier
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -29,6 +33,11 @@ import kotlin.test.assertTrue
  * covers the compiled classes of this module as well.
  */
 class HeadlessHostTest {
+
+    private companion object {
+        /** Enough ticks that the loop is unmistakably running before the stop is sent. */
+        const val TICKS_BEFORE_STOP: Int = 100
+    }
 
     /** Moves every body a little, so ten thousand ticks are ten thousand ticks of work. */
     private class DriftSystem : SimSystem() {
@@ -53,6 +62,19 @@ class HeadlessHostTest {
     private class DriftModule : UdeaModule {
         override fun simulation(registry: SimRegistry) {
             registry.add(SimPhase.Movement, { DriftSystem() })
+        }
+    }
+
+    /** Counts a latch down once per tick, so another thread can wait for real progress. */
+    private class TickLatchSystem(private val ticked: CountDownLatch) : SimSystem() {
+        override fun onTick() {
+            ticked.countDown()
+        }
+    }
+
+    private class TickLatchModule(private val ticked: CountDownLatch) : UdeaModule {
+        override fun simulation(registry: SimRegistry) {
+            registry.add(SimPhase.Cleanup, { TickLatchSystem(ticked) })
         }
     }
 
@@ -102,6 +124,48 @@ class HeadlessHostTest {
 
         assertTrue(!host.running, "run() returned because stop() was called")
         assertEquals(1L, host.tick.value, "and it returned after the tick in flight, not mid-tick")
+    }
+
+    @Test
+    fun `stop() from another thread ends the run, and running is volatile so it can`() {
+        // run()'s KDoc says stop() may come from "an agent on another thread", and that claim
+        // is only true if the loop re-reads the field. `while (running) step()` over a plain
+        // var is a loop the JIT is entitled to hoist the read out of, and then a dedicated
+        // server's stop tool call never returns and the process hangs with no error at all.
+        // Asserted structurally as well as functionally: whether a *particular* JIT hoists on a
+        // *particular* run is not something a test can pin, but the modifier is.
+        assertTrue(
+            Modifier.isVolatile(GameHost::class.java.getDeclaredField("running").modifiers),
+            "GameHost.running must be @Volatile: run() reads it every tick and stop() is " +
+                "documented as callable from another thread",
+        )
+
+        val ticked = CountDownLatch(TICKS_BEFORE_STOP)
+        val scene = MarkerScene(SceneId("arena"), seed = 5L, entityCount = 3)
+        val def = UdeaGameDef(listOf(TickLatchModule(ticked)))
+        def.core.scenes.register(scene)
+        val host = GameHost(RenderMode.Headless, def)
+        host.ctx.scenes.requestScene(scene.id)
+
+        // The run happens on its own thread and the stop comes from this one, which is the
+        // arrangement a dedicated server has: the loop owns a thread, the tool call arrives on
+        // another. The latch is counted down from inside a system, so "it is really running"
+        // is established with a happens-before rather than by sleeping and hoping.
+        val runner = thread(name = "host-runner") { host.run() }
+        assertTrue(
+            ticked.await(10L, TimeUnit.SECONDS),
+            "the host never reached $TICKS_BEFORE_STOP ticks on its own thread",
+        )
+
+        host.stop()
+        runner.join(TimeUnit.SECONDS.toMillis(10))
+
+        assertTrue(!runner.isAlive, "run() never returned after a cross-thread stop()")
+        assertTrue(!host.running)
+        assertTrue(
+            host.tick.value >= TICKS_BEFORE_STOP,
+            "it stopped where the other thread asked, at ${host.tick.value}",
+        )
     }
 
     @Test

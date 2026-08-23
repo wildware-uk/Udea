@@ -223,6 +223,44 @@ class ColumnarFieldStoreTest {
         assertNotEquals(a.schema, b.schema, "two schema instances, to prove the layout is not shared state")
     }
 
+    @Test
+    fun `an Object field whose hashCode is an address is refused at the call site`() {
+        // WorldHasher folds an Object column's hashCode into the determinism hash. An identity
+        // hashCode there makes a bit-identical world hash differently in every process, and the
+        // gate then reports a divergence that does not exist -- pointing at a field, as though
+        // the simulation had diverged. Nothing else in the tree checks this obligation, so
+        // without it a component declaring one field wrong silently poisons the gate.
+        val store = ColumnarFieldStore(TestComponents.linkSchema, initialSlots = 4)
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            store.setObject(0, LinkReplicator.SQUAD, IdentityHashed())
+        }
+
+        assertTrue(failure.message!!.contains("identity hash"), failure.message!!)
+        assertTrue(failure.message!!.contains("StableHash"), failure.message!!)
+    }
+
+    @Test
+    fun `a String, a boxed primitive, a declared StableHash and null are all accepted`() {
+        val store = ColumnarFieldStore(TestComponents.linkSchema, initialSlots = 4)
+
+        store.setObject(0, LinkReplicator.SQUAD, "squad.red")
+        assertEquals("squad.red", store.getObject(0, LinkReplicator.SQUAD))
+        store.setObject(0, LinkReplicator.SQUAD, 42)
+        assertEquals(42, store.getObject(0, LinkReplicator.SQUAD))
+        val declared = ValueHashed("x")
+        store.setObject(0, LinkReplicator.SQUAD, declared)
+        assertEquals(declared, store.getObject(0, LinkReplicator.SQUAD))
+        store.setObject(0, LinkReplicator.SQUAD, null)
+        assertEquals(null, store.getObject(0, LinkReplicator.SQUAD))
+    }
+
+    /** An ordinary class: `hashCode` is `Object.hashCode`, which is an address. */
+    private class IdentityHashed
+
+    /** Opted in, and its `hashCode` really is a function of its value. */
+    private data class ValueHashed(val name: String) : StableHash
+
     private companion object {
 
         /** Enough rows to force several regrows from an eight-slot store. */

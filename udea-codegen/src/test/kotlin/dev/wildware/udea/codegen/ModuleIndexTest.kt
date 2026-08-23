@@ -4,6 +4,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.io.TempDir
 
@@ -41,16 +42,31 @@ class ModuleIndexTest {
         """.trimIndent(),
     )
 
+    /**
+     * @param components the project's id space, which the build reads from the reviewed
+     *   `net-components.lock` and which the processor requires of any module emitting a
+     *   protocol. Supplied here whenever `udea.moduleName` is, exactly as the build does, so
+     *   these tests run the configuration a real module runs in and not a fallback.
+     */
     private fun run(
         workDir: File,
         options: Map<String, String>,
         sources: Map<String, String> = sources(),
-    ): ProcessorHarness.Run = ProcessorHarness.run(workDir, sources, options)
+        components: List<String> = DEFAULT_COMPONENTS,
+    ): ProcessorHarness.Run = ProcessorHarness.run(
+        workDir,
+        sources,
+        if (CodegenOptions.MODULE_NAME in options) {
+            options + (CodegenOptions.PROJECT_COMPONENTS to components.joinToString(","))
+        } else {
+            options
+        },
+    )
 
     // --- the index and its service file ------------------------------------------------------
 
     @Test
-    fun `a module emits one index object naming its replicators statically`(@TempDir workDir: File) {
+    fun `a module emits one index class naming its replicators statically`(@TempDir workDir: File) {
         val run = run(
             workDir,
             mapOf(
@@ -61,7 +77,10 @@ class ModuleIndexTest {
 
         assertEquals(emptyList(), run.errors)
         val index = run.generatedSource("MobaNetModule.kt")
-        assertTrue("object MobaNetModule : NetModule" in index, index)
+        // A class, not an object: ServiceLoader constructs a classpath provider through its
+        // public no-arg constructor, which a Kotlin object does not have.
+        // `GeneratedNetModuleServiceTest` is the leg that actually loads one.
+        assertTrue("public class MobaNetModule : NetModule" in index, index)
         assertTrue("moduleName: String = \"Moba\"" in index, index)
         // Ascending type id, which is ascending name: Aardvark is 0 and Zebra is 1.
         assertTrue(
@@ -129,7 +148,7 @@ class ModuleIndexTest {
         assertTrue(Regex("""const val HASH: Int = 0x[0-9a-f]{4}""").containsMatchIn(protocol), protocol)
         assertTrue("const val COMPONENT_COUNT: Int = 2" in protocol, protocol)
 
-        val lock = run.generatedResources.getValue("udea/net-protocol.lock")
+        val lock = run.generatedResources.getValue(LOCK)
         assertTrue("component 0 fixtures.Aardvark" in lock, lock)
         assertTrue("component 1 fixtures.Zebra" in lock, lock)
         assertTrue("field 0 snout f32:32" in lock, lock)
@@ -154,6 +173,7 @@ class ModuleIndexTest {
                     class Mongoose(@Net var alertness: Float = 0f)
                 """.trimIndent(),
             ),
+            components = listOf("fixtures.Aardvark", "fixtures.Mongoose", "fixtures.Zebra"),
         )
 
         assertTrue("component 1 fixtures.Zebra" in original.generatedResources.getValue(LOCK))
@@ -162,6 +182,89 @@ class ModuleIndexTest {
             hashOf(original.generatedSource("MobaNetProtocol.kt")) ==
                 hashOf(extended.generatedSource("MobaNetProtocol.kt")),
             "adding a component must move the protocol hash",
+        )
+    }
+
+    @Test
+    fun `widening a quantised range moves the protocol hash, though no bit moves`(
+        @TempDir before: File,
+        @TempDir after: File,
+    ) {
+        // The wire break with no bit-level symptom. `@Q(bits = 12, ...)` costs 12 bits either
+        // way; `min` and `max` are what those 12 bits *mean*, because writeFixed maps
+        // [min, max] onto 0 until 2^bits. A lock that recorded only `q:12` hashed identically
+        // across this change, so a server and a client built either side of it agreed on
+        // connect and then decoded every rotation through a different affine map.
+        val narrow = quantised(min = "-3.1416f", max = "3.1416f")
+        val wide = quantised(min = "-100f", max = "100f")
+
+        val original = run(before, OPTIONS, narrow, SPIN)
+        val changed = run(after, OPTIONS, wide, SPIN)
+
+        assertEquals(emptyList(), changed.errors)
+        assertNotEquals(
+            original.generatedResources.getValue(LOCK),
+            changed.generatedResources.getValue(LOCK),
+            "the lock must record the range, not only the width",
+        )
+        assertNotEquals(
+            hashOf(original.generatedSource("MobaNetProtocol.kt")),
+            hashOf(changed.generatedSource("MobaNetProtocol.kt")),
+            "a @Q range change reinterprets every packet and must move protoHash",
+        )
+    }
+
+    @Test
+    fun `reordering an enum's constants moves the protocol hash, though no bit moves`(
+        @TempDir before: File,
+        @TempDir after: File,
+    ) {
+        // Capture writes `.ordinal` and apply reads `entries[ordinal]`, so the constant *order*
+        // is the mapping on the wire. Both spellings below are `enum:32`; the generated
+        // read-side range check only catches a shrunk enum, never a permuted one.
+        val original = run(before, OPTIONS, enumerated("Standing, Crouching, Sprinting"), POSTURE)
+        val permuted = run(after, OPTIONS, enumerated("Crouching, Standing, Sprinting"), POSTURE)
+
+        assertEquals(emptyList(), permuted.errors)
+        assertNotEquals(
+            original.generatedResources.getValue(LOCK),
+            permuted.generatedResources.getValue(LOCK),
+            "the lock must record the constants, not only that the field is an enum",
+        )
+        assertNotEquals(
+            hashOf(original.generatedSource("MobaNetProtocol.kt")),
+            hashOf(permuted.generatedSource("MobaNetProtocol.kt")),
+            "reordering enum constants remaps every ordinal and must move protoHash",
+        )
+    }
+
+    private fun quantised(min: String, max: String): Map<String, String> = mapOf(
+        "Components.kt" to """
+            package fixtures
+
+            import dev.wildware.udea.annotations.Net
+            import dev.wildware.udea.annotations.Q
+            import dev.wildware.udea.annotations.Replicated
+
+            @Replicated
+            class Spin(@Net @Q(bits = 12, min = $min, max = $max) var rotation: Float = 0f)
+        """.trimIndent(),
+    )
+
+    private fun enumerated(constants: String): Map<String, String> {
+        val first = constants.substringBefore(',').trim()
+        return mapOf(
+            "Components.kt" to """
+                package fixtures
+
+                import dev.wildware.udea.annotations.Net
+                import dev.wildware.udea.annotations.Replicated
+
+                enum class Stance { $constants }
+
+                @Replicated
+                class Posture(@Net var stance: Stance = Stance.$first)
+            """.trimIndent(),
         )
     }
 
@@ -219,7 +322,14 @@ class ModuleIndexTest {
             ?: error("no HASH constant in:\n$protocolSource")
 
     private companion object {
-        const val LOCK = "udea/net-protocol.lock"
+        const val LOCK = "udea/Moba-net-protocol.lock"
+
+        val OPTIONS = mapOf(CodegenOptions.MODULE_NAME to "Moba")
+
+        /** The id space for [sources]; the single-module case, where it equals the module. */
+        val DEFAULT_COMPONENTS = listOf("fixtures.Aardvark", "fixtures.Zebra")
+        val SPIN = listOf("fixtures.Spin")
+        val POSTURE = listOf("fixtures.Posture")
 
         /** Four or more consecutive digits: a timestamp, a hash or a round number. */
         val VARYING = Regex("""\d{4,}""")

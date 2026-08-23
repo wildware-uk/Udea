@@ -47,12 +47,29 @@ class UdeaVerifyHeadlessTest {
     }
 
     @Test
-    fun `the designated list is the one the issue names`() {
+    fun `the designated list is every udea module except udea-render`() {
         // A module quietly dropped from the list is indistinguishable from a module that
-        // passes, so the list itself is asserted rather than assumed.
+        // passes, so the list itself is asserted -- and asserted against a source neither
+        // `HeadlessScan` nor the build script derives from, or this would only be checking
+        // that a copy equals itself. `settings.gradle.kts` is what actually decides which
+        // modules exist; `udea-render` is the one allowed to see GL (spec 4), so every other
+        // `udea-*` module must be scanned.
+        val settings = RepoLayout.repoRoot.resolve("settings.gradle.kts")
+        assertTrue(settings.isFile, "settings.gradle.kts not found at $settings")
+        val included = Regex("""^include\("(udea-[a-z0-9-]+)"\)""", RegexOption.MULTILINE)
+            .findAll(settings.readText())
+            .map { it.groupValues[1] }
+            .toSortedSet()
+        assertTrue(
+            included.size > 5,
+            "the settings scan found only $included - the regex has stopped matching, so this " +
+                "test would be comparing against nothing",
+        )
         assertEquals(
-            listOf("udea-agent", "udea-annotations", "udea-assets", "udea-core", "udea-gas", "udea-net"),
+            (included - "udea-render").toList(),
             HeadlessScan.HEADLESS_MODULES.sorted(),
+            "udea-render's build script and ModuleGraphRules.HEADLESS_PROJECTS must between " +
+                "them designate every udea-* module but udea-render",
         )
     }
 }

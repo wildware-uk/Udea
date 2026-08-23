@@ -3,6 +3,7 @@ package dev.wildware.udea.core.physics
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.UdeaGameDef
 import kotlin.random.Random
 import kotlin.test.Test
@@ -123,5 +124,36 @@ class PhysicsStepTest {
         physics.clearEvents()
         host.run(5)
         assertEquals(1, physics.teleportCount, "and it does not re-fire on later ticks")
+    }
+
+    @Test
+    fun `a teleport queued after a rebuild does not kill the tick over a body with no NetId`() {
+        // The end of the chain the dangling handle starts: an entity with a PhysicsBody and no
+        // NetId (debris, a server-only projectile) survives a restore, something teleports it,
+        // and TeleportSystem's `handle.isValid` gate decides whether the tick lives. If the
+        // rebuild leaves the destroyed body's handle in place the gate says yes, `teleport`
+        // throws NoSuchBodyException out of onTick and out of world.update, and the loop dies.
+        val physics = SpyPhysicsWorld()
+        val host = host(physics)
+        val entity = host.world.entity {
+            it += PhysicsBody(x = 0f, y = 0f)
+            it += Box()
+        }
+        val body = with(host.world) { entity[PhysicsBody] }
+        body.handle = physics.createBody(BodyDef(body, NetId.NONE, emptyList()))
+
+        physics.rebuildFrom(host.world, host.ctx[CoreModule.NET_IDS])
+        with(host.world) { entity.configure { it += Teleport(x = 3f, y = 4f) } }
+
+        host.run(1)
+
+        assertEquals(1L, host.tick.value, "the tick completed instead of throwing out of onTick")
+        assertEquals(0, physics.teleportCount, "there is no body to teleport, so none was tried")
+        assertEquals(3f, body.x, "and the component still moved: the command is authoritative")
+        assertEquals(4f, body.y)
+        assertNull(
+            with(host.world) { entity.getOrNull(Teleport) },
+            "and the command was consumed rather than left to re-fire",
+        )
     }
 }

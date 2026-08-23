@@ -31,7 +31,7 @@ import java.nio.charset.StandardCharsets
  * | output | one per | dependency |
  * |---|---|---|
  * | `…Replicator` | `@Replicated` component | **isolating** — the component's own file |
- * | `…NetProtocol`, `…NetModule`, `net-protocol.lock` | module | **aggregating** — every source |
+ * | `…NetProtocol`, `…NetModule`, `<Module>-net-protocol.lock` | module | **aggregating** — every source |
  *
  * An isolating output is invalidated only by an edit to the one file it came from, so editing
  * one component reprocesses one component. The generator this replaces marked *every* file
@@ -74,10 +74,63 @@ internal class UdeaSymbolProcessor(
             .toList()
         if (components.isEmpty()) return emptyList()
 
-        // Ids come from **every** discovered component, including ones that fail to build.
+        val local = components.mapNotNull { it.qualifiedName?.asString() }
+
+        // **The id space is the whole project, not this module.** A KSP run sees one Gradle
+        // module, so assigning from `local` alone hands out 0, 1, 2, … per module and two
+        // modules mint the same ComponentTypeId — after which two peers decode each other's
+        // packets as the wrong component type, silently, with the connect-time protoHash
+        // reporting agreement. Spec 5 puts every id in one sorted-FQN assignment, and the
+        // build passes that list in as `udea.projectComponents` rather than the processor
+        // scanning for it.
+        //
+        // Absent, the id space is the module's own components — and that is legal in exactly
+        // one configuration: a module that emits no protocol identity. `udea.moduleName` is
+        // what turns the lock, the protoHash and the `ServiceLoader` index on, so a module
+        // that sets it is a participant in the project's wire contract and must be numbered
+        // from the project's id space. Silently falling back there is the defect itself: the
+        // module's lock would be internally consistent, its protoHash would agree with a peer
+        // built the same way, and the ids would still collide with another module's.
+        //
+        // Ids come from **every** name in the space, including components that fail to build.
         // Otherwise one broken component silently renumbers all its successors on the wire,
         // and the id a developer sees while fixing the build is not the id they ship.
-        val ids = TypeIds.assignIds(components.mapNotNull { it.qualifiedName?.asString() })
+        if (options.moduleName != null && options.projectComponents == null) {
+            logger.error(
+                "this module emits a wire protocol (${CodegenOptions.MODULE_NAME} is " +
+                    "'${options.moduleName}') but the build did not set " +
+                    "${CodegenOptions.PROJECT_COMPONENTS}, so its component type ids would be " +
+                    "numbered from its own ${local.size} component(s) starting at 0. Another " +
+                    "module numbered the same way mints the same ids, and two peers then decode " +
+                    "each other's packets as the wrong component type while protoHash reports " +
+                    "agreement. Add this module's components to the project's " +
+                    "'net-components.lock' and let the build pass the list in.",
+            )
+            return emptyList()
+        }
+        val idSpace = options.projectComponents ?: local
+        val ids = TypeIds.assignIds(idSpace)
+
+        // A component this module compiles but the project list does not name would otherwise
+        // fall out of `ids` and crash generation with a NoSuchElementException naming nothing.
+        // It means the list is stale — a component was added and the build was not re-run, or
+        // the module is not on the path the list was computed from — and the consequence is an
+        // id space two modules disagree about, so it is a located error and not a fallback.
+        val missing = local.filterNot(ids::containsKey)
+        if (missing.isNotEmpty()) {
+            for (declaration in components) {
+                val name = declaration.qualifiedName?.asString() ?: continue
+                if (name !in missing) continue
+                logger.error(
+                    "$name is compiled by this module but is not in ${CodegenOptions.PROJECT_COMPONENTS}, " +
+                        "which lists the ${idSpace.size} @Replicated components the build assigns " +
+                        "component type ids from. The list is stale: regenerate it, or the ids " +
+                        "this module emits will not be the ids the rest of the project agreed on.",
+                    declaration,
+                )
+            }
+            return emptyList()
+        }
 
         val emitted = ArrayList<Pair<ReplicatedComponent, Int>>(components.size)
         val sourceFiles = ArrayList<KSFile>(components.size)
@@ -149,7 +202,7 @@ internal class UdeaSymbolProcessor(
         writeAggregating(NetProtocolEmitter.emit(moduleName, lock), dependencies)
         codeGenerator.createNewFileByPath(
             dependencies = dependencies,
-            path = "udea/${ProtocolLock.FILE_NAME}",
+            path = ProtocolLock.resourcePath(moduleName),
             extensionName = "",
         ).use { stream ->
             stream.write(ProtocolLock.render(lock).toByteArray(StandardCharsets.UTF_8))

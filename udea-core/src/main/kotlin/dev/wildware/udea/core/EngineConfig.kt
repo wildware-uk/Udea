@@ -9,24 +9,28 @@ package dev.wildware.udea.core
  *
  * Cadences are expressed in **ticks**, not hertz, because the tick is the only unit the
  * simulation has (spec 5, "Time"). The hertz figures from spec 3.3 are the defaults.
+ *
+ * **Every field here has a consumer.** It used to carry six more — a snapshot cadence, an
+ * input-send cadence, a keyframe cadence, a rewind window, a ring byte budget and a capture
+ * budget — and not one of them was read by anything outside this file. A configuration knob
+ * with no consumer is worse than a missing feature: it reads as though the cadence is
+ * configured, so `snapshotIntervalTicks = 6` looks like a decision and changes nothing, and
+ * an assembled game's snapshot ring stays empty while the type says otherwise. Three of the
+ * six had a *real* owner elsewhere and were duplicated here in name only —
+ * `RingConfig.denseTicks`, `RingConfig.sparseInterval` and `RingConfig.budgetBytes` are the
+ * ones `SnapshotRing` actually reads, and `SnapshotBudgets` owns the capture ceiling.
+ *
+ * The snapshot cadence is the one worth naming, because its absence is a functional hole and
+ * not only a tidiness one: nothing in an assembled game drives `TimeTravel.captureNow`, so
+ * the ring is empty and every rewind returns `tick_out_of_ring`. See the "who drives capture"
+ * note on `TimeTravel`. When Phase 1 gives that an owner, the knob comes back **in the same
+ * commit as its consumer**, which is the only order that keeps this KDoc true.
  */
 public data class EngineConfig(
     /** Simulation frequency. 60Hz fixed (spec 3.3). */
     public val tickRate: Int = SimClock.DEFAULT_TICK_RATE,
-    /** Snapshot every Nth tick. 3 at 60Hz is the 20Hz dense cadence. */
-    public val snapshotIntervalTicks: Int = 3,
-    /** Input send every Nth tick. 2 at 60Hz is the 30Hz input rate. */
-    public val inputSendIntervalTicks: Int = 2,
-    /** Sparse keyframe cadence backing agent rewind. 60 at 60Hz is one per second. */
-    public val keyframeIntervalTicks: Int = 60,
-    /** How far back agent rewind may reach. */
-    public val rewindWindowTicks: Int = 60 * SimClock.DEFAULT_TICK_RATE,
     /** Ceiling on ticks simulated in one real frame, so a stall cannot spiral. */
     public val maxCatchUpTicks: Int = 5,
-    /** Hard ceiling on the snapshot ring (spec 7: ring under 64MB). */
-    public val snapshotRingBudgetBytes: Long = 64L * 1024 * 1024,
-    /** Hard ceiling on snapshot capture cost (spec 7: capture under 1ms at 1000 entities). */
-    public val captureBudgetNanos: Long = 1_000_000,
     /**
      * Seed for every simulation random stream. Two contexts built with different seeds
      * diverge; two built with the same seed replay identically.
@@ -35,24 +39,6 @@ public data class EngineConfig(
 ) {
     init {
         require(tickRate > 0) { "tickRate must be positive, was $tickRate" }
-        require(snapshotIntervalTicks > 0) {
-            "snapshotIntervalTicks must be positive, was $snapshotIntervalTicks"
-        }
-        require(inputSendIntervalTicks > 0) {
-            "inputSendIntervalTicks must be positive, was $inputSendIntervalTicks"
-        }
-        require(keyframeIntervalTicks > 0) {
-            "keyframeIntervalTicks must be positive, was $keyframeIntervalTicks"
-        }
-        require(rewindWindowTicks >= 0) {
-            "rewindWindowTicks must not be negative, was $rewindWindowTicks"
-        }
         require(maxCatchUpTicks > 0) { "maxCatchUpTicks must be positive, was $maxCatchUpTicks" }
-        require(snapshotRingBudgetBytes > 0) {
-            "snapshotRingBudgetBytes must be positive, was $snapshotRingBudgetBytes"
-        }
-        require(captureBudgetNanos > 0) {
-            "captureBudgetNanos must be positive, was $captureBudgetNanos"
-        }
     }
 }

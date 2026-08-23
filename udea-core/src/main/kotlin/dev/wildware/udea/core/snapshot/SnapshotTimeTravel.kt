@@ -58,22 +58,29 @@ public class SnapshotTimeTravel(
      * non-advancing commit — so without this, `snapshot()` would throw for a reason the caller
      * could neither predict nor act on. Capturing twice at one tick would produce two identical
      * slots anyway: the world cannot change between them, because nothing steps in between.
+     *
+     * The idempotence guard is [SnapshotRing.holds] and not [SnapshotRing.infoOf]: `infoOf`
+     * builds a [SnapshotInfo], and asking it whether a tick is held would put one object per
+     * captured tick on the path spec 7 budgets at zero. The single `SnapshotInfo` this returns
+     * is the value the caller asked for, not a probe.
      */
     override fun captureNow(): SnapshotInfo {
-        ring.infoOf(currentTick)?.let { return it }
-
-        val slot = ring.acquire()
-        try {
-            service.captureInto(slot)
-        } catch (failure: Throwable) {
-            // The slot never entered the ring, so returning it leaves the history exactly as
-            // it was. Rethrown: a capture that cannot complete is a defect, not a condition.
-            ring.release(slot)
-            throw failure
+        val tick = currentTick
+        if (!ring.holds(tick)) {
+            val slot = ring.acquire()
+            try {
+                service.captureInto(slot)
+            } catch (failure: Throwable) {
+                // The slot never entered the ring, so returning it leaves the history exactly
+                // as it was. Rethrown: a capture that cannot complete is a defect, not a
+                // condition.
+                ring.release(slot)
+                throw failure
+            }
+            ring.commit(slot)
         }
-        ring.commit(slot)
-        return checkNotNull(ring.infoOf(slot.tick)) {
-            "the ring dropped the snapshot it was just handed at ${slot.tick}"
+        return checkNotNull(ring.infoOf(tick)) {
+            "the ring dropped the snapshot it was just handed at $tick"
         }
     }
 
@@ -102,8 +109,25 @@ public class SnapshotTimeTravel(
         }
 
         val restoredTick = slot.tick
-        service.restore(slot, barrier)
+        val action = service.restore(slot, barrier)
         barrier.drain(world, ctx)
+        if (action.failure != null) {
+            // `SimBarrier.drain` catches, logs and carries on past a throwing action by design,
+            // so without this the world would be half-restored — the clock possibly never
+            // moved — and `TimeControl.rewind` would still report `Rewound(tick = target)`,
+            // handing an agent a tick it is not at. Asked of the action rather than of
+            // `barrier.failedActions`, which also counts whatever unrelated tool call happened
+            // to be queued behind this restore.
+            //
+            // The ring is left exactly as it is: the slots after `restoredTick` record a future
+            // that may or may not have been unwound, and guessing which would be worse than
+            // saying the restore failed.
+            return RestoreOutcome.Refused(
+                failure = RewindFailure.RestoreFailed,
+                snapshotScene = slot.scene,
+                activeScene = ctx.scenes.activeSceneId,
+            )
+        }
 
         // Everything after the restored tick is a future that has just been unwound.
         ring.dropAfter(restoredTick)

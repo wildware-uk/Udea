@@ -34,15 +34,55 @@ class WorldHasherTest {
     }
 
     @Test
-    fun `the hash does not depend on the order entities were inserted in`() {
-        val ascending = fixedWorld()
-        val shuffled = fixedWorld(order = listOf(2, 0, 3, 1))
+    fun `the hash does not depend on the order entities were created in`() {
+        // At the capture level, because a store-level version of this test cannot fail:
+        // `WorldFieldStore.appendRow` refuses a descending NetId, so a hand-built fixture can
+        // only ever be handed its rows in ascending order and would be asserting hash(X) ==
+        // hash(X). Two live worlds can genuinely reach one roster by different routes.
+        //
+        // Both worlds destroy the same two ids and recycle them, in opposite orders. They end
+        // up holding the same six NetIds with the same state, having created their entities in
+        // different sequences, so Fleks' entity ids, its family bags and the id free list all
+        // differ between them.
+        val registry = TestComponents.registry()
+        val forwards = SnapshotWorld(registry = registry)
+        val backwards = SnapshotWorld(registry = registry)
+        val forwardRoster = forwards.churn(forwards.spawn(6), freeOrder = listOf(1, 4))
+        val backwardRoster = backwards.churn(backwards.spawn(6), freeOrder = listOf(4, 1), decoys = 2)
 
         assertEquals(
-            WorldHasher.hash(ascending),
-            WorldHasher.hash(shuffled),
-            "capture sorts by NetId, so two processes holding the same set must agree",
+            forwardRoster.toSet(),
+            backwardRoster.toSet(),
+            "the two worlds must end up holding the same ids, or this compares two worlds",
         )
+        assertNotEquals(
+            forwards.entityIdsInRosterOrder(forwardRoster),
+            backwards.entityIdsInRosterOrder(backwardRoster),
+            "the two worlds must differ underneath, or there is nothing for the hash to ignore",
+        )
+        assertEquals(
+            WorldHasher.hash(forwards.service.capture()),
+            WorldHasher.hash(backwards.service.capture()),
+            "capture walks ascending NetId, so two worlds holding the same roster must agree " +
+                "however they got there",
+        )
+    }
+
+    @Test
+    fun `the hash is the world's contents and not the store's growth history`() {
+        // Same rows, two very different allocation histories: one store grew its arrays four
+        // times getting here, the other never grew at all. A hash that folded a capacity, a
+        // slot count that was not `slotsUsedAt`, or anything past the last row would separate
+        // two worlds that are equal, and every divergence report after that would be noise.
+        val tight = fixedWorld(initialRows = 1)
+        val roomy = fixedWorld(initialRows = 64)
+
+        assertNotEquals(
+            tight.sizeBytes(),
+            roomy.sizeBytes(),
+            "the two stores must actually differ in capacity, or this proves nothing",
+        )
+        assertEquals(WorldHasher.hash(tight), WorldHasher.hash(roomy))
     }
 
     @Test
@@ -105,12 +145,17 @@ class WorldHasherTest {
     }
 
     @Test
-    fun `an empty world hashes to the documented empty value`() {
+    fun `two empty worlds over the same registry hash alike, and unlike a populated one`() {
+        // There is deliberately no `WorldHasher.EMPTY` constant. The hash folds the row count
+        // and then every registered type id and slot count, so no `WorldFieldStore` hashes to
+        // the bare FNV offset basis and a constant claiming to be "the hash of an empty world"
+        // would name a value the hasher never produces. `hash(WorldFieldStore(registry))` is
+        // the sentinel, and it is per registry — which is the honest shape, because an empty
+        // world over two different component sets is two different worlds.
         val empty = WorldFieldStore(registry, initialRows = 4)
-        assertNotEquals(WorldHasher.EMPTY, WorldHasher.hash(empty))
-        // Not EMPTY itself: the hash folds the row count and every component type's id, so an
-        // empty world is still distinguishable from a world with no component types at all.
+
         assertEquals(WorldHasher.hash(empty), WorldHasher.hash(WorldFieldStore(registry, 16)))
+        assertNotEquals(WorldHasher.hash(empty), WorldHasher.hash(fixedWorld()))
     }
 
     @Test
@@ -126,20 +171,21 @@ class WorldHasherTest {
     /**
      * Four entities, fixed values, no randomness and no wall clock.
      *
-     * [order] is the sequence rows are built in; the ids are sorted first, because a capture
-     * always appends in ascending [NetId] order.
+     * Rows are appended in ascending [NetId] because that is the only order
+     * [WorldFieldStore.appendRow] accepts — which is why "the hash ignores creation order" is
+     * asserted against two live worlds above and not here.
      */
     private fun fixedWorld(
-        order: List<Int> = listOf(0, 1, 2, 3),
         vitalsOn: Int = 0,
         generation: Int = 0,
+        initialRows: Int = 8,
     ): WorldFieldStore {
         val movement = registry.indexOf(MovementReplicator.typeId)
         val vitals = registry.indexOf(VitalsReplicator.typeId)
         val link = registry.indexOf(LinkReplicator.typeId)
 
-        val fields = WorldFieldStore(registry, initialRows = 8)
-        for (index in order.sorted()) {
+        val fields = WorldFieldStore(registry, initialRows = initialRows)
+        for (index in 0 until ENTITIES) {
             val netId = NetId.of(index, if (index == 0) generation else 0)
             val row = fields.appendRow(netId)
 
@@ -171,6 +217,9 @@ class WorldHasherTest {
     }
 
     private companion object {
+        /** Rows in [fixedWorld]. */
+        const val ENTITIES: Int = 4
+
         /** Golden. Update deliberately, never to make a failing build green. */
         const val GOLDEN: Long = 1_050_174_046_482_073_810L
     }

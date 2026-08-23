@@ -170,6 +170,51 @@ class ModuleGraphRulesTest {
     }
 
     @Test
+    fun `the headless set is every udea module in settings_gradle_kts except udea-render`() {
+        // The gap this closes: `HEADLESS_PROJECTS` used to be a hand-written subset, and a
+        // module added to `settings.gradle.kts` joined neither the dependency rule nor the
+        // bytecode scan. Deriving the expectation from the settings file makes including a
+        // new `udea-*` module a red test rather than a silent hole in UDEA-MG-002.
+        val settings = File("../settings.gradle.kts").canonicalFile
+        assertTrue(settings.isFile, "settings.gradle.kts not found at ${settings.absolutePath}")
+        val included = Regex("""^include\("(udea-[a-z0-9-]+)"\)""", RegexOption.MULTILINE)
+            .findAll(settings.readText())
+            .map { ":" + it.groupValues[1] }
+            .toSortedSet()
+        assertTrue(
+            included.size > 5,
+            "the settings scan found only $included - the regex has stopped matching, so this " +
+                "test would pass against nothing",
+        )
+        assertEquals(
+            (included - ":udea-render").toList(),
+            ModuleGraphRules.HEADLESS_PROJECTS.sorted(),
+            "udea-render is the one module allowed to see GL (spec 4), so every other udea-* " +
+                "module must be in ModuleGraphRules.HEADLESS_PROJECTS",
+        )
+    }
+
+    @Test
+    fun `UDEA-MG-002 governs exactly the headless set`() {
+        // The dependency rule and the bytecode scan are "the same rule, one level down"
+        // (docs/module-graph.md). They are only that while both read HEADLESS_PROJECTS.
+        assertEquals(
+            ModuleGraphRules.HEADLESS_PROJECTS,
+            ModuleGraphRules.NO_GL_OUTSIDE_RENDER.projects,
+        )
+    }
+
+    @Test
+    fun `UDEA-MG-002 covers the modules that were previously in neither gate`() {
+        // Each of these was outside both the dependency rule and the bytecode scan, so
+        // `implementation(libs.gdx.backend.lwjgl3)` on any of them stayed green twice over.
+        listOf(":udea-agent-host", ":udea-diagnostics", ":udea-gradle", ":udea-compiler-plugin").forEach {
+            val violations = violate(it, "compileClasspath", graph(it, "com.badlogicgames.gdx:gdx-backend-lwjgl3"))
+            assertEquals(RuleId("UDEA-MG-002"), violations.single().ruleId, "$it is not guarded")
+        }
+    }
+
+    @Test
     fun `every rule id is unique`() {
         val ids = ModuleGraphRules.ALL.map { it.id }
         assertEquals(ids.size, ids.toSet().size, "duplicate rule id in ModuleGraphRules.ALL: $ids")

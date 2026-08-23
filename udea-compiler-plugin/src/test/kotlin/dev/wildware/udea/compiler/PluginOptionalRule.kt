@@ -71,7 +71,7 @@ object PluginOptionalRule {
      *
      * An **empty scan is a failure**, not a pass. A check that walks nothing and compares it
      * against an empty expectation stays green forever while the thing it guards rots - the
-     * same trap `UdeaLeafCheck` names in `build-logic`.
+     * same trap `DependencyRules.vacuity` names in `build-logic`.
      */
     fun violation(scannedFiles: Int, references: List<Reference>): String? {
         if (scannedFiles == 0) {

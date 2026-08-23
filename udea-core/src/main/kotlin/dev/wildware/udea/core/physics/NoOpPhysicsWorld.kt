@@ -20,10 +20,22 @@ import dev.wildware.udea.core.identity.NetIdIndex
  *
  * ## Why it is production code and not a test double
  *
- * It is the default `ctx.physics` for a world built from `CoreModule`, which is the only
- * physics `udea-core` can supply: Box2D natives and the `Box2DPhysicsWorld` backend live in
- * their own module, since a kernel that imported `com.badlogic.gdx.physics.box2d` would fail
- * its own no-GL gate. A game swaps the real world in from its module's `context` hook.
+ * It is the default `ctx.physics` for a world built from `CoreModule`, and a game swaps another
+ * implementation in from its module's `context` hook. A dedicated server, a CI run and a
+ * benchmark all want a `ctx.physics` that is present and cheap.
+ *
+ * ## It is also, today, the *only* implementation
+ *
+ * There is no Box2D backend in this tree — no module imports `com.badlogic.gdx.physics.box2d`,
+ * and none is planned for Phase 0. So "physics" in a udea build currently means: bodies are
+ * tracked, handles resolve, rebuilds are deterministic, and **nothing ever moves under its own
+ * forces, nothing collides, no raycast hits and no contact fires**. A test that asserts a body
+ * fell, bounced or overlapped is asserting against a solver that is not there.
+ *
+ * That is deliberate and it is not a placeholder for correctness: a game whose movement is
+ * `CharacterMover`'s job (spec 3.4) needs no solver for anything a player controls. It *is* a
+ * placeholder for debris, server-only projectiles and sensor queries, which will not work until
+ * a real backend lands.
  *
  * Not thread-safe: like the rest of the kernel it belongs to one simulation on one thread.
  */
@@ -34,8 +46,8 @@ public class NoOpPhysicsWorld : PhysicsWorld {
 
     private var nextHandle: Int = 0
 
-    /** Bodies created since construction. A rebuild counter a test can assert against. */
-    public var createdCount: Long = 0L
+    /** Bodies created since construction. `internal`: a rebuild counter this module's tests assert against. */
+    internal var createdCount: Long = 0L
         private set
 
     /** [rebuildFrom] calls since construction. */
@@ -102,12 +114,12 @@ public class NoOpPhysicsWorld : PhysicsWorld {
         record.awake = awake
     }
 
-    /** True when [handle] is awake. There is no solver to sleep it, so only [setAwake] moves it. */
-    public fun isAwake(handle: BodyHandle): Boolean =
+    /** True when [handle] is awake — `internal`, and not on [PhysicsWorld]: only [setAwake] moves it. */
+    internal fun isAwake(handle: BodyHandle): Boolean =
         (bodies[handle.raw] ?: throw NoSuchBodyException(handle)).awake
 
-    /** The fixture orders [handle] was built with, so a rebuild's shape order is checkable. */
-    public fun shapeOrdersOf(handle: BodyHandle): List<Int> =
+    /** The fixture orders [handle] was built with. `internal`: a rebuild's shape order, checkable. */
+    internal fun shapeOrdersOf(handle: BodyHandle): List<Int> =
         (bodies[handle.raw] ?: throw NoSuchBodyException(handle)).shapeOrders
 
     /** Never hits: there is nothing to cast against. [hit] is left untouched. */
@@ -135,14 +147,14 @@ public class NoOpPhysicsWorld : PhysicsWorld {
     /** Registered listeners. Held so [removeContactListener] can answer truthfully. */
     private val listeners = LinkedHashSet<ContactListener>()
 
-    /** How many contact listeners are registered. */
-    public val contactListenerCount: Int get() = listeners.size
+    /** How many contact listeners are registered. `internal`: nothing outside the module asks. */
+    internal val contactListenerCount: Int get() = listeners.size
 
     override fun rebuildFrom(world: World, netIds: NetIdIndex) {
         destroyAllBodies()
-        for (planned in PhysicsRebuildPlan.of(world, netIds).bodies) {
-            planned.component.handle = createBody(planned.def)
-        }
+        // `plan.rebuild` rather than a loop over `plan.bodies`: the shared walk also clears the
+        // handle of every entity the plan skips, which is the half a hand-written loop forgets.
+        PhysicsRebuildPlan.of(world, netIds).rebuild(::createBody)
         rebuildCount++
     }
 

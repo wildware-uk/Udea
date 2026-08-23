@@ -55,6 +55,8 @@ internal object FieldLowering {
             val type: ClassName,
             /** Non-null when [storage] is [FieldStorage.ENUM]; the class the ordinal decodes through. */
             val enumEntries: ClassName?,
+            /** Non-null when [storage] is [FieldStorage.ENUM]; the constants in ordinal order. */
+            val enumConstants: List<String>?,
         ) : Result
 
         /** The type lowers to one field per element of [components], in name order. */
@@ -74,6 +76,7 @@ internal object FieldLowering {
         val storage: FieldStorage,
         val type: ClassName,
         val enumEntries: ClassName?,
+        val enumConstants: List<String>?,
     )
 
     /** How the directly storable types are spelled in a diagnostic. */
@@ -90,6 +93,7 @@ internal object FieldLowering {
                 storage = storage,
                 type = type.toClassName(),
                 enumEntries = if (storage == FieldStorage.ENUM) type.toClassName() else null,
+                enumConstants = if (storage == FieldStorage.ENUM) enumConstants(type) else null,
             )
         }
         return composite(type)
@@ -118,6 +122,25 @@ internal object FieldLowering {
             }
         }
     }
+
+    /**
+     * An enum's constants **in declaration order**, which is ordinal order and therefore wire
+     * order: capture writes `.ordinal` and apply reads `entries[ordinal]`.
+     *
+     * They are recorded in `net-protocol.lock` for the same reason a field's bit width is.
+     * Reordering two constants changes what every ordinal on the wire means while leaving the
+     * bit layout untouched, so a lock that recorded only `enum:32` would hash identically
+     * before and after — and the connect-time `protoHash` check would report agreement while
+     * a server saying "crouching" made a client render "standing".
+     */
+    private fun enumConstants(type: KSType): List<String> =
+        (type.declaration as? KSClassDeclaration)
+            ?.declarations
+            ?.filterIsInstance<KSClassDeclaration>()
+            ?.filter { it.classKind == ClassKind.ENUM_ENTRY }
+            ?.map { it.simpleName.asString() }
+            ?.toList()
+            .orEmpty()
 
     private fun composite(type: KSType): Result {
         val declaration = type.declaration as? KSClassDeclaration
@@ -163,6 +186,7 @@ internal object FieldLowering {
                 storage = storage,
                 type = componentType.toClassName(),
                 enumEntries = if (storage == FieldStorage.ENUM) componentType.toClassName() else null,
+                enumConstants = if (storage == FieldStorage.ENUM) enumConstants(componentType) else null,
             )
         }
         // Returned in declaration order and NOT sorted here: FieldOrder assigns every index in

@@ -20,6 +20,22 @@ import java.nio.charset.StandardCharsets
  *
  * The write is atomic: content goes to a sibling temp file and is moved into place, so a
  * cancelled build cannot leave KSP a half-written index to parse.
+ *
+ * ### The index is per compilation, and the build step has to know that
+ *
+ * [entries] starts empty for every compilation and [write] replaces the target with exactly
+ * what *this* compilation harvested. Two compilations pointed at one `kdocIndex` path
+ * therefore leave only the second one's entries, and an incremental recompile of a single
+ * changed file leaves an index describing that file alone. The determinism argument above
+ * holds for one whole-module compilation; it says nothing about combining several.
+ *
+ * That is a constraint on the `udeaHarvestKdoc` step in `udea-gradle` (still to land, see
+ * `docs/compiler-plugin.md`): **it must give each compilation its own output path and merge
+ * them**, because the sink cannot. Merging here by re-reading the file would be worse rather
+ * than better - a declaration whose KDoc was deleted, or which was deleted outright, would
+ * keep its entry for ever, and the output would become a function of what happened to be on
+ * disk instead of a function of the sources. `KDocHarvestExtensionTest` pins the actual
+ * behaviour so this paragraph cannot quietly become untrue.
  */
 internal class KDocIndexSink(
     indexPath: String,

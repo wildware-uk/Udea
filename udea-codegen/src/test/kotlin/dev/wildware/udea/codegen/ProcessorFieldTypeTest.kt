@@ -86,6 +86,67 @@ class ProcessorFieldTypeTest {
     }
 
     @Test
+    fun `a real Java vector lowers, and its public static constants are not fields`(
+        @TempDir workDir: File,
+    ) {
+        // The shape the KDoc claims to cover and no other fixture reproduces. `Vector2` and
+        // `Vector3` are Java classes with public *fields* — which KSP surfaces as properties
+        // only through the Java view — plus `public static final Vector2 X, Y, Zero`, which
+        // are properties of the same type and would lower into an infinite regress if the
+        // JAVA_STATIC filter ever stopped applying. Every lowering fixture in the repository
+        // is a Kotlin class with `var x/var y`, so nothing proved this path resolves at all.
+        val run = ProcessorHarness.run(
+            workDir,
+            mapOf(
+                "Fixture.kt" to """
+                    package fixtures
+
+                    import dev.wildware.udea.annotations.Net
+                    import dev.wildware.udea.annotations.Replicated
+
+                    @Replicated
+                    class Body(
+                        @Net val position: JavaVector2 = JavaVector2(),
+                    )
+                """.trimIndent(),
+            ),
+            javaSources = mapOf(
+                "fixtures/JavaVector2.java" to """
+                    package fixtures;
+
+                    /** Shaped like LibGDX's Vector2: public mutable fields, public constants. */
+                    public class JavaVector2 {
+                        public static final JavaVector2 X = new JavaVector2();
+                        public static final JavaVector2 Zero = new JavaVector2();
+
+                        public float x;
+                        public float y;
+
+                        private float hidden;
+
+                        public JavaVector2() {
+                        }
+                    }
+                """.trimIndent(),
+            ),
+        )
+
+        assertEquals(emptyList(), run.errors)
+        val generated = run.generatedSource("BodyReplicator.kt").replace(Regex("""\s+"""), " ")
+        assertTrue(
+            """listOf("position.x", "position.y")""" in generated,
+            "a Java class with public float x, y must lower like any other vector: $generated",
+        )
+        for (constant in listOf("position.X", "position.Zero", "position.hidden")) {
+            assertFalse(
+                constant in generated,
+                "$constant is a static or private field and must not become a replicated " +
+                    "one: $generated",
+            )
+        }
+    }
+
+    @Test
     fun `a composite's components are ordered by name, not by how the vector declares them`(
         @TempDir workDir: File,
     ) {

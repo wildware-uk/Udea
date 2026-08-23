@@ -37,8 +37,36 @@ internal object ProtocolLock {
     /** Bumped when the *file format* changes, which is itself a protocol change. */
     const val FORMAT_VERSION: Int = 1
 
-    /** The name the file is checked in under, at the repository root. */
+    /** The name the file is checked in under, at the root of the module that owns it. */
     const val FILE_NAME: String = "net-protocol.lock"
+
+    /**
+     * The Gradle task that rewrites a checked-in lock from the generated protocol, and the one
+     * that fails when the two disagree.
+     *
+     * Named in [HEADER] and in the hand-edit failure below, and they have to be mechanisms
+     * that exist: the header once told the reader to run tasks that had never been registered
+     * anywhere in this build, which is worse than saying nothing — it reads as though the
+     * drift check were somebody else's problem, already solved. They are registered now, by
+     * `registerNetProtocolLock` in `build-logic`, for every module that emits a protocol
+     * rather than for the one module that happened to have a test watching its own generated
+     * resources. `UdeaProtocolLockTest` reads this file and fails if these two strings stop
+     * being the task names it registers, so the instruction cannot rot back into fiction.
+     */
+    const val WRITE_TASK: String = "udeaWriteProtocolLock"
+    const val CHECK_TASK: String = "udeaCheckProtocolLock"
+
+    /**
+     * `udea/Moba-net-protocol.lock` — where the generated copy lands in a module's resources.
+     *
+     * **Module-qualified, for the reason the generated object already is** (`GeneratedNames`:
+     * "so two modules' objects can never collide"). A module-agnostic `udea/net-protocol.lock`
+     * puts two different files at one classpath resource path as soon as two modules
+     * contribute components, and which jar wins is a property of classpath order — so a
+     * release check or a runtime reader would see one module's protocol and believe it was
+     * the build's.
+     */
+    fun resourcePath(moduleName: String): String = "udea/$moduleName-$FILE_NAME"
 
     private const val FORMAT_KEY = "lockFormat"
     private const val HASH_KEY = "protoHash"
@@ -54,11 +82,12 @@ internal object ProtocolLock {
     private val HEADER: List<String> = listOf(
         "# udea net-protocol.lock — THE WIRE CONTRACT.",
         "#",
-        "# Component ids, field order and field widths are what a running server and a",
-        "# connected client agree on. Changing anything below breaks every client already",
-        "# speaking this protocol and every recorded replay. Regenerate deliberately with",
-        "# `gradlew udeaWriteProtocolLock` and review the diff; `udeaCheckProtocolLock` fails",
-        "# the build when the generated output and this file disagree.",
+        "# Component ids, field order, field widths, quantisation ranges and enum constant",
+        "# order are what a running server and a connected client agree on. Changing anything",
+        "# below breaks every client already speaking this protocol and every recorded replay.",
+        "# `gradlew $CHECK_TASK` compares this file against the protocol the build",
+        "# generated and fails when they disagree; rewrite it deliberately, and review the",
+        "# diff, with `gradlew $WRITE_TASK`.",
         "#",
         "# Ids are assigned from the sorted list of fully-qualified component names, so",
         "# inserting a component renumbers its successors. protoHash is a u16 over the",
@@ -214,17 +243,29 @@ internal object ProtocolLock {
             problems += "$FILE_NAME is format $formatVersion, but this build writes format " +
                 "$FORMAT_VERSION; regenerate it"
         }
+        // A missing hash is not a lenient case. Deleting the one line that can fail a hand
+        // edit is the cheapest way to make the check stop complaining, and without this the
+        // file would parse, recompute its own hash from whatever it now says, and report
+        // agreement — the exact outcome the hash exists to prevent.
+        if (declaredHash == null) {
+            problems += "no $HASH_KEY line in $FILE_NAME; without it nothing can tell a " +
+                "hand edit from the generated protocol. Rewrite the file with " +
+                "`gradlew $WRITE_TASK`."
+        }
         problems += collisions(components)
 
         if (problems.isNotEmpty()) return Parse.Failure(problems)
 
         val recomputed = hash(canonicalBody(components.sortedBy(LockedComponent::id)))
-        if (declaredHash != null && declaredHash != recomputed) {
+        // Non-null: a missing hash line is already a problem above, and problems return.
+        val declared = checkNotNull(declaredHash)
+        if (declared != recomputed) {
             return Parse.Failure(
                 listOf(
-                    "$HASH_KEY in $FILE_NAME is ${formatHash(declaredHash)} but its content " +
+                    "$HASH_KEY in $FILE_NAME is ${formatHash(declared)} but its content " +
                         "hashes to ${formatHash(recomputed)}; the file was edited by hand. " +
-                        "Regenerate it with `gradlew udeaWriteProtocolLock`.",
+                        "Rewrite it from the generated protocol with " +
+                        "`gradlew $WRITE_TASK` rather than editing it.",
                 ),
             )
         }

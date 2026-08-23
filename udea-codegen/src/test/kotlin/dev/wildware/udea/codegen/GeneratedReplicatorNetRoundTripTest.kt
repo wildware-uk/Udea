@@ -2,16 +2,26 @@ package dev.wildware.udea.codegen
 
 import dev.wildware.udea.codegen.fixtures.AiBlackboard
 import dev.wildware.udea.codegen.fixtures.AiBlackboardReplicator
+import dev.wildware.udea.codegen.fixtures.Combat
+import dev.wildware.udea.codegen.fixtures.CombatReplicator
 import dev.wildware.udea.codegen.fixtures.Health
 import dev.wildware.udea.codegen.fixtures.HealthReplicator
 import dev.wildware.udea.codegen.fixtures.Movement
 import dev.wildware.udea.codegen.fixtures.MovementReplicator
+import dev.wildware.udea.codegen.fixtures.Placement
+import dev.wildware.udea.codegen.fixtures.PlacementReplicator
+import dev.wildware.udea.codegen.fixtures.QuantisedProbe
+import dev.wildware.udea.codegen.fixtures.QuantisedProbeReplicator
 import dev.wildware.udea.codegen.fixtures.Stance
+import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.fixtures.ArrayBitWriter
 import dev.wildware.udea.core.fixtures.ArrayFieldStore
+import dev.wildware.udea.core.fixtures.Vec2
+import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.replication.FieldStore
 import dev.wildware.udea.core.replication.MaskOps
 import dev.wildware.udea.core.replication.Replicator
+import dev.wildware.udea.net.NetRegistry
 import dev.wildware.udea.net.bits.BitBufferReader
 import dev.wildware.udea.net.bits.BitBufferWriter
 import kotlin.test.Test
@@ -88,26 +98,27 @@ class GeneratedReplicatorNetRoundTripTest {
     }
 
     @Test
-    fun `every generated replicator round-trips field-identically through the real bit stream`() {
-        assertNetRoundTrip(
-            HealthReplicator,
-            Health(maximum = 1f, current = -0.5f, invulnerable = true, lastDamageTick = Long.MIN_VALUE),
-        ) { Health() }
+    fun `every generated replicator round-trips through the real bit stream`() {
+        // Driven from a list, and the list is audited against the generated `ServiceLoader`
+        // index below, so a seventh fixture component cannot be added without appearing here.
+        // This used to name Health, Movement and AiBlackboard while claiming "every": the
+        // three components with no composite, no NetId and no quantised field — that is,
+        // exactly the three whose encoding is least likely to be wrong.
+        for (subject in subjects) {
+            subject.assertRoundTrips()
+        }
+    }
 
-        assertNetRoundTrip(
-            MovementReplicator,
-            Movement(
-                stance = Stance.Sprinting,
-                speed = -12.25f,
-                jumpsRemaining = 3,
-                groundedTicks = Long.MAX_VALUE,
-            ),
-        ) { Movement() }
-
-        assertNetRoundTrip(
-            AiBlackboardReplicator,
-            AiBlackboard(patrolIndex = 7, aggression = 0.5f, alerted = true, lastSeenTick = -3L),
-        ) { AiBlackboard() }
+    @Test
+    fun `the round trip above covers every replicator this module generates`() {
+        // The coverage claim, made checkable rather than restated in a test name. The index is
+        // generated from the fixture source set, so it is the one list that cannot fall behind
+        // the components.
+        assertEquals(
+            NetRegistry.replicators().map { it.typeId.raw },
+            subjects.map { it.replicator.typeId.raw }.sorted(),
+            "a fixture component is generated but never driven through the bit stream",
+        )
     }
 
     @Test
@@ -286,21 +297,116 @@ class GeneratedReplicatorNetRoundTripTest {
 
     // --- helpers ------------------------------------------------------------------------------
 
-    private fun <T> assertNetRoundTrip(replicator: Replicator<T>, source: T, fresh: () -> T) {
-        val store = ArrayFieldStore(1, replicator.fieldNames.size)
-        replicator.capture(source, store, 0)
-
-        val writer = BitBufferWriter(datagram)
-        replicator.write(store, 0, replicator.allMask, writer)
-
-        val received = ArrayFieldStore(1, replicator.fieldNames.size)
-        val mask = replicator.read(BitBufferReader(datagram, 0, writer.byteLength), received, 0)
-        assertEquals(replicator.allMask, mask)
-
-        val restored = fresh()
-        replicator.apply(received, 0, restored, mask)
-        assertFieldIdentical(replicator, source, restored)
+    /**
+     * Every fixture component, with a source value chosen to exercise its own field kinds.
+     *
+     * The list is audited against the generated `ServiceLoader` index, so it is a coverage
+     * claim the build can check rather than one a test name asserts.
+     */
+    private val subjects: List<Subject<*>> by lazy {
+        listOf(
+            Subject(
+                HealthReplicator,
+                Health(maximum = 1f, current = -0.5f, invulnerable = true, lastDamageTick = Long.MIN_VALUE),
+            ) { Health() },
+            Subject(
+                MovementReplicator,
+                Movement(
+                    stance = Stance.Sprinting,
+                    speed = -12.25f,
+                    jumpsRemaining = 3,
+                    groundedTicks = Long.MAX_VALUE,
+                ),
+            ) { Movement() },
+            Subject(
+                AiBlackboardReplicator,
+                AiBlackboard(patrolIndex = 7, aggression = 0.5f, alerted = true, lastSeenTick = -3L),
+            ) { AiBlackboard() },
+            Subject(
+                PlacementReplicator,
+                Placement(
+                    position = Vec2(1.5f, -2.25f),
+                    rotation = 1.25f,
+                    settledAt = Tick(9_001L),
+                ),
+                // `rotation` is @Q(bits = 12, min = -3.1416f, max = 3.1416f); nothing else here
+                // is quantised, so position.x/position.y must still come back bit-identical.
+                epsilons = mapOf("rotation" to epsilon(12, -3.1416f, 3.1416f)),
+            ) { Placement() },
+            Subject(
+                QuantisedProbeReplicator,
+                QuantisedProbe(fraction = 0.6f, angle = -1.75f, pool = 1234.5f, axis = 512.25f),
+                epsilons = mapOf(
+                    "fraction" to epsilon(8, 0f, 1f),
+                    "angle" to epsilon(12, -3.1416f, 3.1416f),
+                    "pool" to epsilon(14, 0f, 5000f),
+                    "axis" to epsilon(16, -1024f, 1024f),
+                ),
+            ) { QuantisedProbe() },
+            Subject(
+                CombatReplicator,
+                Combat(
+                    target = NetId.ofRaw(NetId.NONE.raw),
+                    chargeFraction = 0.375f,
+                    lastAttacker = NetId.NONE,
+                ),
+            ) { Combat() },
+        )
     }
+
+
+    /**
+     * One fixture component driven end to end, with the tolerance its declaration earns.
+     *
+     * [epsilons] is per *field name*, and empty for a component with no `@Q`: an unquantised
+     * field must survive bit-identically, and a quantised one must survive to the maximum
+     * error its own `@Q(bits, min, max)` implies — `(max - min) / (2^bits - 1) / 2`, the same
+     * number the generated KDoc states. A blanket tolerance would let a broken f32 encoding
+     * through; no tolerance at all would make a quantised component untestable here, which is
+     * how three of the six came to be left out.
+     */
+    private inner class Subject<T>(
+        val replicator: Replicator<T>,
+        val source: T,
+        val epsilons: Map<String, Float> = emptyMap(),
+        val fresh: () -> T,
+    ) {
+        fun assertRoundTrips() {
+            val store = ArrayFieldStore(1, replicator.fieldNames.size)
+            replicator.capture(source, store, 0)
+
+            val writer = BitBufferWriter(datagram)
+            replicator.write(store, 0, replicator.allMask, writer)
+
+            val received = ArrayFieldStore(1, replicator.fieldNames.size)
+            val mask = replicator.read(BitBufferReader(datagram, 0, writer.byteLength), received, 0)
+            assertEquals(replicator.allMask, mask, replicator.toString())
+
+            val restored = fresh()
+            replicator.apply(received, 0, restored, mask)
+
+            for (index in replicator.fieldNames.indices) {
+                val name = replicator.fieldNames[index]
+                val expected = replicator.getField(source, index)
+                val actual = replicator.getField(restored, index)
+                val epsilon = epsilons[name]
+                if (epsilon == null) {
+                    assertEquals(expected, actual, "$replicator.$name did not survive the round trip")
+                } else {
+                    val error = kotlin.math.abs((expected as Float) - (actual as Float))
+                    assertTrue(
+                        error <= epsilon,
+                        "$replicator.$name came back $actual instead of $expected, an error of " +
+                            "$error over the $epsilon its @Q declaration allows",
+                    )
+                }
+            }
+        }
+    }
+
+    /** `(max - min) / (2^bits - 1) / 2` — what `@Q(bits, min, max)` costs in accuracy. */
+    private fun epsilon(bits: Int, min: Float, max: Float): Float =
+        (((max.toDouble() - min.toDouble()) / ((1L shl bits) - 1L)) / 2.0).toFloat()
 
     /**
      * Field-by-field through `getField`, so the assertion does not depend on the component

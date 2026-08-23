@@ -78,6 +78,76 @@ public object UdeaStdlibPin {
         ),
     )
 
+    /**
+     * A resolvable configuration that is deliberately outside the pin because it is not a
+     * classpath of *this project* at all.
+     *
+     * @param pattern the configuration name, with `*` allowed at either end.
+     * @param reason why forcing the project's stdlib onto it would be wrong. Blank fails
+     *   [UdeaStdlibPinTest].
+     */
+    public data class ToolClasspath(
+        public val pattern: String,
+        public val reason: String,
+    ) {
+        private val regex: Regex = Regex(
+            pattern.split('*').joinToString(".*") { Regex.escape(it) },
+        )
+
+        /** True when [configurationName] is this tool classpath. */
+        public fun matches(configurationName: String): Boolean = regex.matches(configurationName)
+    }
+
+    /**
+     * Every resolvable configuration that is a *tool* classpath rather than a classpath the
+     * project compiles or runs against.
+     *
+     * This list is what makes [PINNED_CONFIGURATIONS] checkable instead of merely declarative.
+     * Before it existed, the pin forced six configuration names and the check inspected the
+     * same six, so a resolvable classpath outside that list — the next source set somebody
+     * adds — escaped the force *and* the check at once, silently. That is exactly the bug the
+     * pin was introduced to fix: the previous pin covered compile and runtime only, and
+     * `udea-codegen`'s tests quietly resolved 2.3.20. Whoever added `testFixtures` to
+     * `udea-core` only got it covered by remembering to type two more names.
+     *
+     * With this list, every resolvable configuration must be one of: pinned, exempt with a
+     * reason, or a tool classpath with a reason. Anything else fails `udeaVerifyKotlinPin`
+     * and has to be classified, which is a decision someone makes rather than one that makes
+     * itself.
+     */
+    public val TOOL_CONFIGURATIONS: List<ToolClasspath> = listOf(
+        ToolClasspath(
+            "kotlin*",
+            "the Kotlin Gradle plugin's own tooling (the compiler, the build tools API, the " +
+                "commonizer, compiler-plugin classpaths). Forcing the project's stdlib onto the " +
+                "compiler that compiles the project is a rule meant to protect the compiler " +
+                "breaking it instead.",
+        ),
+        ToolClasspath(
+            "*KotlinScriptDefExtensions",
+            "script-definition extensions for the Kotlin plugin, loaded by the compiler, not " +
+                "by this project.",
+        ),
+        ToolClasspath(
+            "ksp*",
+            "KSP's processor and plugin classpaths run inside the compiler; udea-codegen's own " +
+                "exemptions record why that JVM needs a newer stdlib than the project.",
+        ),
+        ToolClasspath(
+            "annotationProcessor",
+            "javac's annotation-processor path, a tool classpath with no Kotlin stdlib on it.",
+        ),
+        ToolClasspath(
+            "*AnnotationProcessor",
+            "javac's annotation-processor path for a non-main source set; same reasoning.",
+        ),
+        ToolClasspath(
+            "*DependenciesMetadata",
+            "the Kotlin plugin's multiplatform metadata views of the dependency declarations. " +
+                "They resolve no JVM artifact, so there is no stdlib on them to pin.",
+        ),
+    )
+
     /** The exemptions recorded for [projectPath]. */
     public fun exemptionsFor(projectPath: String): List<Exemption> =
         EXEMPTIONS.filter { it.projectPath == projectPath }
@@ -90,4 +160,22 @@ public object UdeaStdlibPin {
         val excused = exemptionsFor(projectPath).map { it.configuration }.toSet()
         return PINNED_CONFIGURATIONS - excused
     }
+
+    /**
+     * The resolvable configurations in [resolvableNames] that nothing has classified.
+     *
+     * A classified configuration is one of: in [PINNED_CONFIGURATIONS] (pinned, or exempt
+     * from the pin with a reason), or matched by a [TOOL_CONFIGURATIONS] entry. Anything else
+     * resolves whatever Gradle's highest-wins picks, with neither the force nor the check
+     * looking at it — which is the drift the pin exists to prevent, escaping through a
+     * configuration nobody listed.
+     *
+     * @param resolvableNames every configuration of the module with `canBeResolved = true`.
+     */
+    public fun unclassified(resolvableNames: Collection<String>): List<String> =
+        resolvableNames
+            .filterNot { it in PINNED_CONFIGURATIONS }
+            .filterNot { name -> TOOL_CONFIGURATIONS.any { it.matches(name) } }
+            .distinct()
+            .sorted()
 }

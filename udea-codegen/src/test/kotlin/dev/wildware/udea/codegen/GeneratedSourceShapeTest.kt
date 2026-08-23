@@ -30,8 +30,10 @@ class GeneratedSourceShapeTest {
                 "dev/wildware/udea/codegen/fixtures/MovementReplicator.kt",
                 "dev/wildware/udea/codegen/fixtures/PlacementReplicator.kt",
                 "dev/wildware/udea/codegen/fixtures/QuantisedProbeReplicator.kt",
-                // The one module-level output: the protocol constant. There is exactly one
-                // aggregating group per module, and this is it.
+                // The module-level outputs. There is exactly one aggregating group per module:
+                // the `ServiceLoader` index this module contributes, and the protocol constant
+                // a packet header carries.
+                "dev/wildware/udea/generated/CodegenFixturesNetModule.kt",
                 "dev/wildware/udea/generated/CodegenFixturesNetProtocol.kt",
             ),
             GeneratedSources.relativePaths(),

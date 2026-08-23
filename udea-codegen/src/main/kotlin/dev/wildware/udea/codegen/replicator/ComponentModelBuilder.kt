@@ -43,6 +43,7 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
         val storage: FieldStorage,
         val declaredType: ClassName,
         val enumEntries: ClassName?,
+        val enumConstants: List<String>?,
         val quantisation: Quantisation?,
     ) {
         val name: String = path.joinToString(".")
@@ -103,6 +104,7 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
                 storage = candidate.storage,
                 declaredType = candidate.declaredType,
                 enumEntries = candidate.enumEntries,
+                enumConstants = candidate.enumConstants,
                 quantisation = candidate.quantisation,
             )
         }
@@ -175,6 +177,7 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
                         storage = lowering.storage,
                         declaredType = lowering.type,
                         enumEntries = lowering.enumEntries,
+                        enumConstants = lowering.enumConstants,
                         quantisation = quantisation,
                     )
                 }
@@ -194,6 +197,7 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
                             storage = component.storage,
                             declaredType = component.type,
                             enumEntries = component.enumEntries,
+                            enumConstants = component.enumConstants,
                             quantisation = null,
                         )
                     }

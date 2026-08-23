@@ -26,6 +26,50 @@ public object ModuleGraphRules {
     public val CONFIGURATIONS: Set<String> = LegacyDependencyRules.CONFIGURATIONS
 
     /**
+     * Every module that must stay free of GL: the whole `udea-*` tree except `udea-render`.
+     *
+     * This is the **single source of truth** for the headless rule at both enforcement
+     * levels. [NO_GL_OUTSIDE_RENDER] (`UDEA-MG-002`) reads it for the dependency check, and
+     * `udea-render`'s build script reads it for `udeaVerifyHeadless`, which passes it to
+     * `HeadlessScan` through [HEADLESS_MODULES_PROPERTY]. `docs/module-graph.md` calls the
+     * bytecode scan "the same rule one level down", and two hand-maintained lists cannot be
+     * that: before this existed they disagreed in both directions, and `udea-agent-host`,
+     * `udea-diagnostics`, `udea-gradle` and `udea-compiler-plugin` were in neither, so a GL
+     * backend on any of them passed both gates.
+     *
+     * Membership is *not* a judgement call: `udea-render` is the one module allowed to see
+     * GL (spec 4, spec 3.5), so everything else in the tree belongs here.
+     * `ModuleGraphRulesTest` derives the same set from `settings.gradle.kts` and fails if
+     * this list has drifted from it, which is what makes a newly included module a build
+     * failure rather than a silent gap.
+     */
+    public val HEADLESS_PROJECTS: Set<String> = setOf(
+        ":udea-agent",
+        ":udea-agent-host",
+        ":udea-annotations",
+        ":udea-assets",
+        ":udea-assets-compiler",
+        ":udea-codegen",
+        ":udea-compiler-plugin",
+        ":udea-core",
+        ":udea-diagnostics",
+        ":udea-gas",
+        ":udea-gradle",
+        ":udea-net",
+    )
+
+    /**
+     * The system property `udea-render`'s build script uses to hand [HEADLESS_PROJECTS] to
+     * the bytecode scan.
+     *
+     * A system property rather than a copied list: `udea-render`'s test sources cannot see
+     * `build-logic`, and the only alternative to passing the set in is writing it out twice.
+     * `HeadlessScan` fails loudly when the property is absent, so a broken hand-off is a red
+     * gate rather than a scan of nothing.
+     */
+    public const val HEADLESS_MODULES_PROPERTY: String = "udea.headless.modules"
+
+    /**
      * `udea-annotations` is on the compile classpath of the engine, the game, the KSP
      * processor and the K2 compiler plugin simultaneously, so anything it drags in is
      * dragged everywhere at once — including into the compiler's own classloader.
@@ -60,15 +104,7 @@ public object ModuleGraphRules {
             "the headless path is gone. gdx-math (com.badlogicgames.gdx:gdx) is deliberately still " +
             "allowed - Vector2 is not GL.",
         specSection = "4, 3.5",
-        projects = setOf(
-            ":udea-core",
-            ":udea-gas",
-            ":udea-net",
-            ":udea-agent",
-            ":udea-assets",
-            ":udea-assets-compiler",
-            ":udea-codegen",
-        ),
+        projects = HEADLESS_PROJECTS,
         configurations = setOf("compileClasspath", "runtimeClasspath"),
         banned = listOf(
             CoordinatePattern("com.badlogicgames.gdx:gdx-backend-lwjgl3"),

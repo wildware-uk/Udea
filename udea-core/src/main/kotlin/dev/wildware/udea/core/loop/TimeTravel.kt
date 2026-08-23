@@ -67,10 +67,34 @@ public fun interface AssetGraphHistory {
     }
 }
 
-/** Whether a ring slot is inside the dense rollback window or the sparse rewind window. */
+/**
+ * Whether a ring slot is inside the dense rollback window or the sparse rewind window.
+ *
+ * Both windows describe *captured* ticks.
+ *
+ * **Nothing in an assembled game drives a capture cadence.** `Simulation.step` does not
+ * capture, `GameHost` does not, and no system does; the only callers of
+ * [TimeTravel.captureNow] in the tree are tests. So in a game as it stands today the ring is
+ * empty, `listSnapshots` returns nothing and every rewind answers `tick_out_of_ring` — the
+ * mechanism works and is measured, and nobody has been made responsible for running it.
+ * `EngineConfig` used to carry a `snapshotIntervalTicks` knob that read as though somebody
+ * had; it was deleted, because a configured cadence with no consumer is a claim, not a
+ * feature.
+ *
+ * Phase 1 owns the fix, and it is a specific one: [TimeTravel] needs an allocation-free
+ * `captureIfDue` (today's [TimeTravel.captureNow] returns a [SnapshotInfo], so it cannot sit
+ * on the zero-allocation tick path), `WorldSimulation` needs to hold a [TimeTravel] and call
+ * it after the tick, and the cadence knob comes back on `EngineConfig` in that same commit.
+ * Until then, how densely the dense window is populated is entirely up to whoever calls
+ * [TimeTravel.captureNow]: a ring fed at 20Hz holds one slot every third tick, and a rewind
+ * lands by stepping forward from the nearest one exactly as it does outside the window.
+ */
 public enum class SnapshotKind {
 
-    /** Every tick within the dense window. What Phase 4's prediction rollback restores from. */
+    /**
+     * Every *captured* tick within the dense window — every tick, when something captures
+     * every tick. What Phase 4's prediction rollback restores from.
+     */
     Dense,
 
     /** Every `sparseInterval`th tick further back. What an agent's sixty-second rewind lands on. */
@@ -113,6 +137,21 @@ public enum class RewindFailure(
      * rewind through. A headless loop test is the normal case.
      */
     NoSnapshotRing("no_snapshot_ring"),
+
+    /**
+     * The keyframe was found and submitted, and applying it threw.
+     *
+     * The only failure here that does **not** leave the world untouched: [SimBarrier.drain]
+     * catches, logs and continues past a throwing [BarrierAction] by design, so a restore that
+     * died half way leaves a world that is neither the snapshot nor the tick it came from, and
+     * whose clock may never have been moved. Reporting it is the whole point — the alternative
+     * is `RewindResult.Rewound(tick = target)` for a world that is not at `target`, and an
+     * agent that then reasons about a tick it is not at.
+     *
+     * Not recoverable by asking for less. The log line named by `SimBarrier` carries the
+     * failing action and the exception.
+     */
+    RestoreFailed("restore_failed"),
 }
 
 /** What [TimeTravel.restoreNearestAtOrBefore] did. */
@@ -121,7 +160,13 @@ public sealed interface RestoreOutcome {
     /** The world now holds the snapshot taken at [restoredTick]. */
     public data class Restored(public val restoredTick: Tick) : RestoreOutcome
 
-    /** Nothing was applied and the world is untouched. */
+    /**
+     * The rewind did not land.
+     *
+     * The world is untouched for every [RewindFailure] except [RewindFailure.RestoreFailed],
+     * which means the restore was applied and threw part way through and the world is in an
+     * undefined state.
+     */
     public data class Refused(
         public val failure: RewindFailure,
         /** The scene the snapshot belongs to, when [failure] is a scene mismatch. */
@@ -152,7 +197,17 @@ public sealed interface RewindResult {
         public val assetGraphChangedSince: Boolean,
     ) : RewindResult
 
-    /** Nothing happened and the world is untouched. */
+    /**
+     * The rewind did not land, and [failure] says why.
+     *
+     * The world is untouched for every failure except [RewindFailure.RestoreFailed] — see
+     * that constant.
+     *
+     * **The loop is left as it was found**, again except for [RewindFailure.RestoreFailed],
+     * where the world is half-restored and staying paused is the safe answer. A refused
+     * rewind is a question that was asked and answered; halting a running game as a side
+     * effect of asking it would make probing the ring a destructive act.
+     */
     public data class Failed(
         public val failure: RewindFailure,
         /** Human-readable detail. Never parsed; [RewindFailure.code] is the contract. */

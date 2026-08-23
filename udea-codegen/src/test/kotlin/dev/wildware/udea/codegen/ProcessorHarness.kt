@@ -29,11 +29,27 @@ internal object ProcessorHarness {
      * @param options the KSP processor options the Udea Gradle plugin would have set. Empty
      *   by default, which is the "generate Replicators only" configuration; a test that wants
      *   the module-level index passes `udea.moduleName` here exactly as the plugin would.
+     * @param javaSources file name to Java source text, compiled into the same module. Field
+     *   lowering claims to cover LibGDX's `Vector2`/`Vector3`, and those are Java classes with
+     *   public *fields* and public static constants — a shape no Kotlin fixture reproduces,
+     *   because KSP's view of a Java field is not its view of a Kotlin property. Without this,
+     *   the headline widening is only ever asserted against a Kotlin stand-in.
      */
-    fun run(workDir: File, sources: Map<String, String>, options: Map<String, String> = emptyMap()): Run {
+    fun run(
+        workDir: File,
+        sources: Map<String, String>,
+        options: Map<String, String> = emptyMap(),
+        javaSources: Map<String, String> = emptyMap(),
+    ): Run {
         val sourceRoot = File(workDir, "sources")
         for ((name, text) in sources) {
             val file = File(sourceRoot, name)
+            file.parentFile.mkdirs()
+            file.writeText(text)
+        }
+        val javaRoot = File(workDir, "java")
+        for ((name, text) in javaSources) {
+            val file = File(javaRoot, name)
             file.parentFile.mkdirs()
             file.writeText(text)
         }
@@ -43,6 +59,7 @@ internal object ProcessorHarness {
         val config = KSPJvmConfig.Builder().apply {
             moduleName = "harness"
             sourceRoots = listOf(sourceRoot)
+            if (javaSources.isNotEmpty()) javaSourceRoots = listOf(javaRoot)
             projectBaseDir = workDir
             this.outputBaseDir = outputBase
             cachesDir = File(workDir, "caches")

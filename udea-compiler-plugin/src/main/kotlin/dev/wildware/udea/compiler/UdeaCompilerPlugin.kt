@@ -1,11 +1,19 @@
 package dev.wildware.udea.compiler
 
 /**
- * The names that the K2 plugin and its Gradle wiring have to agree on, in one place.
+ * The names that the K2 plugin and its Gradle wiring will have to agree on, in one place.
  *
- * `udea-gradle` cannot see these constants (it must not depend on a
- * `kotlin-compiler-embeddable` consumer), so it repeats the strings; this object is the
- * authority they are checked against.
+ * There is no wiring yet: `udea-gradle` is a placeholder, nothing applies this plugin to a
+ * `udea-*` or `moba` compilation, and the only consumer of these constants outside this
+ * module is this module's own kctfork harness. So nothing is "checked against" this object
+ * today — it is the vocabulary the wiring must use when `udea-gradle` grows a
+ * `KotlinCompilerPluginSupportPlugin`, and it exists first so the CLI contract is minted once
+ * rather than re-derived from a string literal in a build script.
+ *
+ * `udea-gradle` will not be able to see these constants when it does (it must not depend on a
+ * `kotlin-compiler-embeddable` consumer), so it will repeat the strings, and the parity check
+ * between the two is work that comes with the wiring. `docs/compiler-plugin.md` records the
+ * gap, and `CompilerPluginSwitchTest` in `build-logic` fails the day it closes.
  */
 public object UdeaCompilerPlugin {
 

@@ -55,6 +55,16 @@ internal class SnapshotWorld(
      * `Replicator.apply` calls, which is an ordering the default recording double cannot see.
      */
     physicsWorld: PhysicsWorld = RecordingPhysicsWorld(),
+    /**
+     * The component registry this world captures through.
+     *
+     * Injectable so two worlds can share one, which `DivergenceReport.compare` requires:
+     * `WorldFieldStore.diffInto` refuses stores built from different registries, and it is
+     * right to — a registry is a static description of component *types*, so two worlds
+     * sharing one share nothing simulated and no ordering that a determinism gate is looking
+     * for.
+     */
+    val registry: ComponentRegistry = TestComponents.registry(),
 ) {
 
     val netIds: NetIdIndex = NetIdIndex(capacity = idCapacity, entityCapacity = idCapacity)
@@ -85,8 +95,6 @@ internal class SnapshotWorld(
         }
     }
 
-    val registry: ComponentRegistry = TestComponents.registry()
-
     val service: SnapshotService = SnapshotService(registry, world, ctx, netIds)
 
     val ring: SnapshotRing = SnapshotRing(registry, ringConfig, ctx.log)
@@ -109,23 +117,15 @@ internal class SnapshotWorld(
      */
     fun spawn(count: Int): List<NetId> {
         val ids = ArrayList<NetId>(count)
-        repeat(count) { index ->
+        repeat(count) {
             val entity = world.entity {
-                it += Movement(
-                    position = Vec2(index * 0.5f, index * -0.25f),
-                    velocity = Vec2(
-                        1f + (index % 7) * 0.125f,
-                        -1f + (index % 5) * 0.25f,
-                    ),
-                )
-                it += Vitals(
-                    health = 100f - (index % 13),
-                    shieldCharges = index % 4,
-                    invulnerable = index % 11 == 0,
-                )
-                it += Link(squad = if (index % 2 == 0) SQUAD_RED else SQUAD_BLUE)
+                it += Movement()
+                it += Vitals()
+                it += Link()
             }
-            ids += netIds.allocate(entity)
+            val netId = netIds.allocate(entity)
+            populate(entity, netId.index)
+            ids += netId
         }
         // A second pass, because a link can only point at an id that has been allocated.
         for (index in ids.indices) {
@@ -134,6 +134,65 @@ internal class SnapshotWorld(
             with(world) { entity[Link] }.target = ids[(index + 1) % ids.size]
         }
         return ids
+    }
+
+    /**
+     * Frees the ids at [freeOrder]'s positions and spawns that many replacements.
+     *
+     * The replacements take the recycled ids straight back off the free list, and every one of
+     * them is populated from the **id it was given** rather than from the order it was created
+     * in — which is what lets two worlds handed opposite [freeOrder]s end up holding an
+     * identical roster with identical state, while their Fleks entity ids, their family bags
+     * and their id free lists differ. That difference is the only thing a "the hash ignores
+     * creation order" test has to work with.
+     *
+     * @return the roster after the churn, indexed by [NetId.index] exactly as [spawn]'s is.
+     */
+    fun churn(ids: List<NetId>, freeOrder: List<Int>, decoys: Int = 0): List<NetId> {
+        val roster = ids.toMutableList()
+        for (position in freeOrder) destroy(roster[position])
+        // Fleks entities that never get a NetId: created and removed again, they shuffle Fleks'
+        // own entity-id recycling without touching the roster, the ids or a single captured
+        // field. Without them the two churns are mirror images and Fleks hands the recycled
+        // entity ids back in exactly the order that cancels the difference out.
+        val scratch = List(decoys) { world.entity { } }
+        for (decoy in scratch) world -= decoy
+        repeat(freeOrder.size) {
+            val entity = world.entity {
+                it += Movement()
+                it += Vitals()
+                it += Link()
+            }
+            val netId = netIds.allocate(entity)
+            populate(entity, netId.index)
+            roster[netId.index] = netId
+        }
+        return roster
+    }
+
+    /**
+     * The Fleks entity id behind each of [roster], in roster order.
+     *
+     * The "underneath" a capture is supposed to hide. A test that asserts two worlds hash the
+     * same has to show they differ somewhere first, or it is asserting hash(X) == hash(X).
+     */
+    fun entityIdsInRosterOrder(roster: List<NetId>): List<Int> =
+        roster.map { checkNotNull(netIds.resolveOrNull(it)) { "$it is not live" }.id }
+
+    /** Writes the state [spawn] gives the entity holding the id at [index]. */
+    private fun populate(entity: Entity, index: Int) {
+        with(world) {
+            val movement = entity[Movement]
+            movement.position.x = index * 0.5f
+            movement.position.y = index * -0.25f
+            movement.velocity.x = 1f + (index % 7) * 0.125f
+            movement.velocity.y = -1f + (index % 5) * 0.25f
+            val vitals = entity[Vitals]
+            vitals.health = 100f - (index % 13)
+            vitals.shieldCharges = index % 4
+            vitals.invulnerable = index % 11 == 0
+            entity[Link].squad = if (index % 2 == 0) SQUAD_RED else SQUAD_BLUE
+        }
     }
 
     /** The `x` of [netId]'s [Movement], for tests that need one scalar out of the world. */

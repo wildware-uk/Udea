@@ -114,7 +114,31 @@ configurations.matching { it.name in pinnedConfigurationNames }.all {
 }
 
 /**
- * Fails if this module resolves a `kotlin-stdlib` other than the catalog's Kotlin version.
+ * Every configuration of this module with `canBeResolved = true`, as plain strings.
+ *
+ * Snapshotted in `afterEvaluate` so that classpaths created by plugins the module applies
+ * itself — `java-test-fixtures`, KSP — are already present, and so that `canBeResolved` is
+ * read after the creating plugin has finished setting it.
+ */
+val resolvableConfigurationNames: SetProperty<String> = objects.setProperty(String::class.java)
+
+afterEvaluate {
+    resolvableConfigurationNames.set(
+        configurations.filter { it.isCanBeResolved }.map { it.name }.toSortedSet(),
+    )
+}
+
+/**
+ * Fails if this module resolves a `kotlin-stdlib` other than the catalog's Kotlin version,
+ * or has a resolvable classpath nobody has classified.
+ *
+ * The second half is what makes the first half honest. The force above and the collection
+ * above it both key on [UdeaStdlibPin.PINNED_CONFIGURATIONS], so the version check can only
+ * ever inspect classpaths the pin already covers — it is structurally unable to see the
+ * drift on any other one. `UdeaKotlinPin.coverageViolation` closes that by requiring every
+ * resolvable configuration to be pinned, exempt, or a declared tool classpath, so the next
+ * source set somebody adds has to be classified instead of escaping in silence, which is
+ * exactly how `udea-codegen`'s tests came to resolve 2.3.20 under a 2.2.10 pin.
  *
  * The rule lives in [UdeaKotlinPin], where `UdeaKotlinPinTest` executes its failure paths;
  * a `doLast` block is not reachable from any test. Deleting the `eachDependency` pin above
@@ -127,6 +151,7 @@ val udeaVerifyKotlinPin by tasks.registering {
     description = "Fails if a module resolves a kotlin-stdlib other than the catalog Kotlin version."
 
     val stdlibs = resolvedStdlibs
+    val resolvable = resolvableConfigurationNames
     val pinned = UdeaVersions.KOTLIN
     val projectPath = project.path
     // `project.path`, not the enclosing task block's `path`, which is the task's own path.
@@ -137,18 +162,27 @@ val udeaVerifyKotlinPin by tasks.registering {
 
     inputs.property("pinnedKotlinVersion", pinned)
     inputs.property("resolvedStdlibs", stdlibs)
+    inputs.property("resolvableConfigurations", resolvable)
     inputs.property("exemptions", exemptions)
     outputs.file(report)
 
     doLast {
         val resolved = stdlibs.get().distinct().sorted()
+        val unclassified = UdeaStdlibPin.unclassified(resolvable.get())
         report.get().asFile.apply {
             parentFile.mkdirs()
             writeText(
-                (listOf("pinned=$pinned") + resolved + exemptions.map { "exempt $it" })
-                    .joinToString(separator = "\n", postfix = "\n"),
+                (
+                    listOf("pinned=$pinned") + resolved + exemptions.map { "exempt $it" } +
+                        unclassified.map { "unclassified $it" }
+                    ).joinToString(separator = "\n", postfix = "\n"),
             )
         }
+        // Coverage first: "this module has a classpath nobody pinned" is *why* the version
+        // check can stay silent, so reporting the silence before the cause would send the
+        // reader to the wrong place.
+        UdeaKotlinPin.coverageViolation(projectPath, resolvable.get(), unclassified)
+            ?.let { throw GradleException(it) }
         UdeaKotlinPin.violation(projectPath, pinned, resolved)?.let { throw GradleException(it) }
     }
 }

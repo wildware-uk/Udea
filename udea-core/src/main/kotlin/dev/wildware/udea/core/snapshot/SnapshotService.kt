@@ -120,10 +120,17 @@ public class SnapshotService(
      *
      * The mutation is named rather than a lambda, so a desync triage that asks why the world
      * changed between two ticks gets "restore snapshot t100" and not an anonymous closure.
+     *
+     * @return the submitted action, whose [RestoreAction.failure] is how a caller finds out
+     *   whether the restore actually landed. [SimBarrier.drain] catches and logs a throwing
+     *   action and carries on by design, so a caller that only looked at the barrier returning
+     *   would believe a half-applied restore had succeeded — and `SimBarrier.failedActions` is
+     *   no substitute, because it also counts unrelated actions that were queued behind this
+     *   one.
      */
-    public fun restore(snapshot: WorldSnapshot, barrier: SimBarrier) {
+    public fun restore(snapshot: WorldSnapshot, barrier: SimBarrier): RestoreAction {
         require(snapshot.isFilled) { "cannot restore an empty snapshot slot" }
-        barrier.submit(RestoreAction(snapshot))
+        return RestoreAction(snapshot).also(barrier::submit)
     }
 
     /**
@@ -267,11 +274,36 @@ public class SnapshotService(
     }
 
     /** The named mutation [restore] queues. */
-    private inner class RestoreAction(private val snapshot: WorldSnapshot) : BarrierAction {
+    /**
+     * One queued restore, and whether it landed.
+     *
+     * [failure] exists because the barrier is deliberately forgiving: it logs a throwing
+     * action and drains the rest, so "the drain returned" says nothing about this action.
+     * Recording the throwable here — and rethrowing it, so the barrier still logs and counts
+     * it — is what lets `SnapshotTimeTravel` answer `RewindFailure.RestoreFailed` instead of
+     * telling an agent it is at a tick it never reached.
+     */
+    public inner class RestoreAction internal constructor(
+        private val snapshot: WorldSnapshot,
+    ) : BarrierAction {
+
+        /** What [applyNow] threw, or `null` while the restore has not run or did not throw. */
+        public var failure: Throwable? = null
+            private set
+
         override val label: String get() = "restore snapshot ${snapshot.tick}"
 
         override fun apply(world: World, ctx: GameContext) {
-            applyNow(snapshot)
+            failure = null
+            try {
+                applyNow(snapshot)
+            } catch (thrown: Throwable) {
+                // Recorded and rethrown, never swallowed: the barrier still logs it with this
+                // label and still counts it in `failedActions`, and the caller still gets a
+                // typed refusal instead of a rewind that never happened.
+                failure = thrown
+                throw thrown
+            }
         }
     }
 

@@ -153,8 +153,43 @@ public class ColumnarFieldStore(
     override fun getTick(slot: Int, field: Int): Tick =
         Tick(longs[cellOfKind(slot, field, FieldKind.Tick)])
 
+    /**
+     * Stores [value], having checked that its `hashCode` is a function of its value.
+     *
+     * The check is here because here is where the value first exists: a [ComponentSchema]
+     * knows only that a field is an [FieldKind.Object], never what type it will hold. One
+     * `instanceof` chain per stored object field, no allocation, and it turns "a component
+     * with an identity-hashCode Object field makes the determinism gate report a divergence
+     * that is not there" from an invisible property into a failure at the call site that
+     * caused it.
+     *
+     * @throws IllegalArgumentException if [value] is neither a platform type with a specified
+     *   `hashCode` nor a declared [StableHash].
+     */
     override fun setObject(slot: Int, field: Int, value: Any?) {
-        objects[cellOfKind(slot, field, FieldKind.Object)] = value
+        val cell = cellOfKind(slot, field, FieldKind.Object)
+        require(hasStableHashCode(value)) {
+            "${schema.typeName}.${schema.nameOf(field)} was given a ${value!!::class.java.name}, " +
+                "whose hashCode is an identity hash. WorldHasher folds an Object column's " +
+                "hashCode into the determinism hash, so this world would hash differently in " +
+                "every process and the gate would report a divergence that does not exist. " +
+                "Declare the type as StableHash, or lower the field to a primitive kind."
+        }
+        objects[cell] = value
+    }
+
+    /**
+     * Whether [value]'s `hashCode` is specified by its value rather than by its address.
+     *
+     * `null` is fine: [hashableBits] folds a fixed sentinel for it. Enums are **not** — see
+     * [StableHash].
+     */
+    private fun hasStableHashCode(value: Any?): Boolean = when (value) {
+        null, is String, is StableHash,
+        is Int, is Long, is Short, is Byte, is Char, is Boolean, is Float, is Double,
+        -> true
+
+        else -> false
     }
 
     override fun getObject(slot: Int, field: Int): Any? =

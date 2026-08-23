@@ -58,6 +58,11 @@ public fun Project.registerDependencyVerification(
                         "the configuration list rather than the module.",
                 )
             }
+            val vacuous = scanned.entries.sortedBy { it.key }
+                .firstNotNullOfOrNull { (configuration, graph) ->
+                    DependencyRules.vacuity(projectPath, configuration, graph, rules)
+                }
+            if (vacuous != null) throw GradleException(vacuous)
             val violations = scanned.entries.sortedBy { it.key }
                 .flatMap { (configuration, graph) ->
                     DependencyRules.violations(projectPath, configuration, graph, rules)

@@ -77,6 +77,13 @@ public class TimeControl(
     /**
      * Captures the world as it stands and stores it in the ring.
      *
+     * Deliberately does **not** pause, unlike [rewind]: a capture is an observation, and an
+     * agent asking what the world looks like has not asked for the game to stop. It reads the
+     * world without draining anything, so it needs a tick boundary and not a stopped loop —
+     * and the loop is single-threaded, so "on the simulation thread" *is* a tick boundary.
+     * Call it from a [BarrierAction] or from a paused loop; calling it from inside a system
+     * would capture a half-stepped world.
+     *
      * @throws IllegalStateException if this control has no [TimeTravel]. Unlike a rewind,
      *   which can reasonably be asked for a tick the ring no longer holds, asking a
      *   history-less loop to record history is a wiring mistake and not a runtime condition.
@@ -102,6 +109,21 @@ public class TimeControl(
      *
      * Failures are returned, never thrown — every one of them is a reasonable answer to a
      * reasonable question. See [RewindFailure].
+     *
+     * The loop is paused **before** the restore, not after it. `SnapshotTimeTravel` forces a
+     * `SimBarrier` drain from here rather than waiting for the next `Simulation.step`, and the
+     * only thing that makes a forced drain safe is that the loop is stopped at a tick boundary
+     * when it happens. Pausing on the way out — which is what `stepTicks` used to be the first
+     * thing to do it — left that guarantee resting on the accident that a tool call arrives
+     * between frames.
+     *
+     * **A refused rewind leaves the loop as it found it.** The pause exists to make the drain
+     * safe, so it is taken only around the attempt and handed back on every failure that
+     * touched nothing: an agent that probes with `rewind(10000)`, or asks for a scene the ring
+     * no longer covers, gets an answer and a still-running game rather than a silently halted
+     * one. [RewindFailure.RestoreFailed] is the exception and stays paused on purpose — the
+     * apply threw part way through, so the world is in an undefined state and resuming it
+     * would run systems over half-restored components.
      */
     public fun rewind(ticks: Int): RewindResult {
         require(ticks >= 0) { "rewind distance must not be negative, was $ticks" }
@@ -119,8 +141,19 @@ public class TimeControl(
             )
         }
 
+        // Before anything can restore or step, and before the forced drain inside
+        // `restoreNearestAtOrBefore`: see the note above.
+        val wasPaused = loop.paused
+        loop.paused = true
+
         return when (val outcome = ring.restoreNearestAtOrBefore(target)) {
-            is RestoreOutcome.Refused -> RewindResult.Failed(outcome.failure, describe(outcome, target))
+            is RestoreOutcome.Refused -> {
+                // Nothing was applied, so nothing about the running game has changed and the
+                // pause it was taken under is not part of the answer. A half-applied restore
+                // is the one case where it is.
+                if (outcome.failure != RewindFailure.RestoreFailed) loop.paused = wasPaused
+                RewindResult.Failed(outcome.failure, describe(outcome, target))
+            }
             is RestoreOutcome.Restored -> {
                 val steps = target.ticksSince(outcome.restoredTick).toInt()
                 loop.stepTicks(steps)
@@ -163,5 +196,10 @@ public class TimeControl(
 
         RewindFailure.NoSnapshotRing ->
             "this TimeControl was built without a snapshot ring"
+
+        RewindFailure.RestoreFailed ->
+            "applying the snapshot at or before $target threw; the world is in an undefined " +
+                "state and is not at $target. See the SimBarrier log line for the action and " +
+                "the exception"
     }
 }

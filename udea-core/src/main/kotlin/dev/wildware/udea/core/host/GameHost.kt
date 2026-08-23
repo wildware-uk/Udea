@@ -83,7 +83,16 @@ public class GameHost(
     /** Ticks run since construction. */
     public val totalTicks: Long get() = loop.totalTicks
 
-    /** False once [stop] is called. [run] returns when it goes false. */
+    /**
+     * False once [stop] is called. [run] returns when it goes false.
+     *
+     * `@Volatile` because [run]'s loop reads it every tick and [stop] may be called from
+     * another thread — an agent host, an MCP request handler, a supervisor. Without it the JIT
+     * is entitled to hoist the read out of the loop, and a cross-thread `stop()` would never be
+     * observed: `run()` would spin forever with no error and no way to interrupt it.
+     * `HeadlessHostTest` pins both the modifier and a real cross-thread stop.
+     */
+    @Volatile
     public var running: Boolean = true
         private set
 
@@ -93,10 +102,22 @@ public class GameHost(
      * The primitive behind fast-forward, CI runs and the agent's `step(n)`: no real time is
      * consulted, so a 10 000-tick run costs what the simulation costs and nothing else, and it
      * produces the same world on a fast machine and a slow one.
+     *
+     * **Leaves the loop's pause state exactly as it found it.** `GameLoop.stepTicks` pauses —
+     * it is the primitive behind `TimeControl.step`, where a stopped clock afterwards is the
+     * point and `resume()` is right there. Here it is not: a host that fast-forwards a loading
+     * sequence with `run(300)` and then hands the frame cadence back to its render backend
+     * would draw at full rate over a simulation frozen forever, with nothing thrown and no
+     * counter moving. So the pause is saved and restored rather than left set.
      */
     public fun run(ticks: Int) {
         require(ticks >= 0) { "tick count must not be negative, was $ticks" }
-        loop.stepTicks(ticks)
+        val wasPaused = loop.paused
+        try {
+            loop.stepTicks(ticks)
+        } finally {
+            loop.paused = wasPaused
+        }
     }
 
     /**
@@ -117,7 +138,12 @@ public class GameHost(
         while (running) game.simulation.step()
     }
 
-    /** Makes [run] return after the tick in flight. Safe to call from a system. */
+    /**
+     * Makes [run] return after the tick in flight.
+     *
+     * Safe from a system, from a [dev.wildware.udea.core.loop.BarrierAction], and from another
+     * thread — [running] is volatile, so the loop sees the write on its next read.
+     */
     public fun stop() {
         running = false
     }

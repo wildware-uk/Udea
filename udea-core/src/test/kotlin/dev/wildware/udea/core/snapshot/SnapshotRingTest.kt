@@ -153,6 +153,73 @@ class SnapshotRingTest {
     }
 
     @Test
+    fun `an exhausted ring reports itself once and then costs nothing per commit`() {
+        // The dense window alone is over budget, so `enforceBudget` can neither degrade (the
+        // interval already reaches `denseTicks`) nor evict (the eviction loop breaks on a dense
+        // slot). That is a permanent over-budget state reached on a real machine — the
+        // 1000-entity ring runs at 95% of the 64MB ceiling — and it is on the commit path,
+        // which SnapshotBudgets gates at zero bytes.
+        assertTrue(AllocationProbe.isSupported, "this JVM has no thread allocation counters")
+        val log = CountingLog()
+        val ring = SnapshotRing(
+            registry,
+            RingConfig(denseTicks = 8, sparseWindowTicks = 8, sparseInterval = 8, budgetBytes = 1L),
+            log,
+        )
+        var tick = 0
+
+        repeat(64) { commitAt(ring, ++tick) }
+
+        assertTrue(ring.isExhausted, "a ring that can neither degrade nor evict is exhausted")
+        assertTrue(ring.totalBytes > ring.budgetBytes, "the scenario must leave it over budget")
+        assertEquals(
+            1,
+            log.warnings,
+            "an exhausted ring logged ${log.warnings} times over 64 commits; it must latch and " +
+                "say so once, or a permanently exhausted ring writes a line every tick forever",
+        )
+
+        val allocated = AllocationProbe.bytesAllocated { commitAt(ring, ++tick) }
+
+        assertEquals(
+            0L,
+            allocated,
+            "a commit into an exhausted ring allocated $allocated bytes; the refusal branch is " +
+                "building its message on every tick",
+        )
+        assertEquals(1, log.warnings, "and it must not start logging again either")
+    }
+
+    @Test
+    fun `holds answers whether a tick is held without allocating`() {
+        // `SnapshotTimeTravel.captureNow` asks this on every capture to stay idempotent per
+        // tick. Answering it with `infoOf(tick) != null` builds a SnapshotInfo per captured
+        // tick, on the path spec 7 budgets at zero.
+        assertTrue(AllocationProbe.isSupported, "this JVM has no thread allocation counters")
+        val ring = SnapshotRing(registry)
+        fill(ring, TICKS)
+        val oldest = ring.oldestTick()!!
+        val newest = ring.newestTick()!!
+
+        assertTrue(ring.holds(newest), "the newest tick is held")
+        assertTrue(ring.holds(oldest), "the oldest tick is held")
+        assertTrue(!ring.holds(newest + 1L), "a tick the ring never saw is not held")
+        assertTrue(!ring.holds(oldest - 1L), "a tick the ring has evicted is not held")
+        assertTrue(
+            !ring.holds(Tick(TICKS - RingConfig.DEFAULT_DENSE_TICKS - 1L)),
+            "an interior tick that fell out of the dense window without landing on a keyframe " +
+                "is not held, and holds must not report the nearest one instead",
+        )
+
+        val allocated = AllocationProbe.bytesAllocated {
+            ring.holds(newest)
+            ring.holds(newest + 1L)
+        }
+
+        assertEquals(0L, allocated, "holds allocated $allocated bytes")
+    }
+
+    @Test
     fun `clear returns every held slot to the pool, as a scene swap must`() {
         val ring = SnapshotRing(registry)
         fill(ring, 400)
@@ -264,6 +331,20 @@ class SnapshotRingTest {
             slot.fields.storeAt(movement).setFloat(at, MovementReplicator.POSITION_X, tick.toFloat())
         }
         ring.commit(slot)
+    }
+
+    /** A [Log] that counts, so "warns once" is an assertion rather than an eyeball on stderr. */
+    private class CountingLog : Log {
+        var warnings: Int = 0
+            private set
+
+        override fun debug(message: String): Unit = Unit
+        override fun info(message: String): Unit = Unit
+        override fun error(message: String, cause: Throwable?): Unit = Unit
+
+        override fun warn(message: String) {
+            warnings++
+        }
     }
 
     private companion object {

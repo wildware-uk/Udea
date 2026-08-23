@@ -1,3 +1,5 @@
+import dev.wildware.udea.build.ModuleGraphRules
+
 plugins {
     id("udea.kotlin-library-gl")
 }
@@ -35,15 +37,24 @@ dependencies {
 // It runs as a Test task rather than a bespoke one so that the scan itself has unit tests
 // that can fail (`HeadlessScanTest`), which a `doLast` block would not.
 
-/** Modules that must stay free of GL. Mirrored by `HeadlessScan.HEADLESS_MODULES`. */
-val headlessModules = listOf(
-    "udea-agent",
-    "udea-annotations",
-    "udea-assets",
-    "udea-core",
-    "udea-gas",
-    "udea-net",
-)
+/**
+ * Modules that must stay free of GL, read from the one place that decides it.
+ *
+ * `ModuleGraphRules.HEADLESS_PROJECTS` is also what `UDEA-MG-002` -- the configuration-level
+ * half of this rule -- governs, so the two levels cannot drift apart. Before this was
+ * derived, the list here and `HeadlessScan.HEADLESS_MODULES` disagreed in both directions:
+ * the gate compiled modules it never scanned, scanned modules it never compiled (reading
+ * whatever stale `build/classes` happened to be present), and four modules were in neither.
+ */
+val headlessModules: List<String> =
+    ModuleGraphRules.HEADLESS_PROJECTS.map { it.removePrefix(":") }.sorted()
+
+/**
+ * How [headlessModules] reaches `HeadlessScan`, which lives in this module's test sources
+ * and therefore cannot see `build-logic`. `HeadlessScan` fails loudly when this is absent,
+ * so a broken hand-off is a red gate rather than a scan of nothing.
+ */
+val headlessModulesProperty: String = ModuleGraphRules.HEADLESS_MODULES_PROPERTY
 
 /**
  * The compiled output the scan reads. Declared as an input so the gate is up-to-date-checked.
@@ -62,9 +73,15 @@ val headlessModuleClasses = files(
     },
 )
 
-/** Build scripts the module-graph tests read; without these they would be checked stale. */
+/**
+ * Build scripts the module-graph tests read; without these they would be checked stale.
+ *
+ * `settings.gradle.kts` is in here because `UdeaVerifyHeadlessTest` re-derives the designated
+ * module set from it: including a new `udea-*` module has to make the gate out of date, or
+ * the assertion that the set is complete is checked against a cached pass.
+ */
 val moduleBuildScripts = fileTree(rootDir) {
-    include("udea-*/build.gradle.kts", "moba/build.gradle.kts")
+    include("udea-*/build.gradle.kts", "moba/build.gradle.kts", "settings.gradle.kts")
 }
 
 val gateTestClass = "dev.wildware.udea.render.headless.UdeaVerifyHeadlessTest"
@@ -79,16 +96,23 @@ val udeaVerifyHeadless = tasks.register<Test>("udeaVerifyHeadless") {
     classpath = testSourceSet.runtimeClasspath
     useJUnitPlatform()
     filter { includeTestsMatching(gateTestClass) }
+    systemProperty(headlessModulesProperty, headlessModules.joinToString(","))
 
     dependsOn(headlessModules.map { ":$it:classes" })
     inputs.files(headlessModuleClasses)
         .withPropertyName("headlessModuleClasses")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(moduleBuildScripts)
+        .withPropertyName("moduleBuildScripts")
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 tasks.test {
     // The gate is `udeaVerifyHeadless`'s job; running it twice per `check` buys nothing.
     filter { excludeTestsMatching(gateTestClass) }
+
+    // HeadlessScanTest reads the same designated list, so it needs the same hand-off.
+    systemProperty(headlessModulesProperty, headlessModules.joinToString(","))
 
     // HeadlessScanTest and RenderModuleGraphTest read the compiled output and the build
     // scripts of modules this one does not depend on.

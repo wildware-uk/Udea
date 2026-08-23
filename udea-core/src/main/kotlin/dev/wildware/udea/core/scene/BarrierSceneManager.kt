@@ -39,6 +39,14 @@ import dev.wildware.udea.core.loop.SimBarrier
  * 6. [Scene.populate], synchronously.
  *
  * Nothing here touches `Gdx`, and nothing here is asynchronous.
+ *
+ * ## When populate throws
+ *
+ * The old scene is gone by then, and a `Scene` is a program rather than a value, so it cannot be
+ * put back. The guarantee is the other one available: **the whole new scene, or no scene at
+ * all.** A throwing [Scene.populate] re-empties the world, leaves [activeSceneId] `null`,
+ * increments [failedSwapCount] and rethrows so the barrier logs it with the action's label and
+ * the tick.
  */
 public class BarrierSceneManager(
     private val barrier: SimBarrier,
@@ -63,23 +71,59 @@ public class BarrierSceneManager(
 
     private val listeners = ArrayList<(SceneId, Tick) -> Unit>()
 
+    /**
+     * The scene the world currently holds, or `null` when it holds no scene at all.
+     *
+     * `null` before the first load, and `null` again after a swap whose [Scene.populate] threw:
+     * see [failedSwapCount]. It is cleared *before* the teardown and set only once populate has
+     * returned, so it never names a scene the world is not actually holding — the id is what
+     * `SnapshotTimeTravel` gates a restore on, and a stale one would let a snapshot taken in the
+     * old scene be applied to a world that no longer contains it.
+     */
     override var activeSceneId: SceneId? = null
         private set
 
-    /** The scene a queued swap will install, or `null` when none is queued. */
+    /**
+     * The scene a queued swap will install, or `null` when none is queued.
+     *
+     * Stays set after a failed swap, so the pair (`activeSceneId == null`,
+     * `requestedSceneId == x`) says exactly what happened: the world is empty and x is what it
+     * was trying to become.
+     */
     public var requestedSceneId: SceneId? = null
         private set
 
-    /** The tick the most recent swap landed on. `null` before the first one. */
-    public var swappedAtTick: Tick? = null
+    /**
+     * The tick the most recent swap landed on. `null` before the first one.
+     *
+     * `internal`: the tick a swap landed on is asserted by this module's own tests and read by
+     * nothing outside it. A consumer that needs it — a swap already tells a listener the tick —
+     * widens it in the commit that adds the consumer.
+     */
+    internal var swappedAtTick: Tick? = null
         private set
 
     /** Swaps applied since construction. What a test or an agent polls to see one has landed. */
     public var swapCount: Long = 0L
         private set
 
-    /** Every scene this manager can resolve by id, in registration order. */
-    public val registeredSceneIds: Set<SceneId> get() = known.keys
+    /**
+     * Swaps whose [Scene.populate] threw, leaving the world empty rather than half built.
+     *
+     * Non-zero means a scene load failed and nothing is loaded: the barrier logs the cause and
+     * carries on ticking, so this counter plus a `null` [activeSceneId] is what a host or an
+     * agent reads to find out that the world is deliberately empty rather than accidentally so.
+     */
+    public var failedSwapCount: Long = 0L
+        private set
+
+    /**
+     * Every scene this manager can resolve by id, in registration order.
+     *
+     * `internal` until something outside `udea-core` lists scenes — an agent `list_scenes` tool
+     * is the obvious first caller, and it does not exist yet.
+     */
+    internal val registeredSceneIds: Set<SceneId> get() = known.keys
 
     /**
      * Makes [scene] resolvable by [requestScene].
@@ -114,8 +158,8 @@ public class BarrierSceneManager(
         }
     }
 
-    /** Every teardown step, in the order a swap runs them. */
-    public val teardownStepNames: List<String>
+    /** Every teardown step, in the order a swap runs them. `internal`: only tests read it. */
+    internal val teardownStepNames: List<String>
         get() = (beforeClear + afterClear).map { it.name }
 
     /** Registers [scene] if it is new, then queues a swap to it. */
@@ -168,24 +212,69 @@ public class BarrierSceneManager(
         }
 
         private fun swap(world: World, ctx: GameContext) {
-            for (step in beforeClear) step.tearDown(world, ctx)
+            // Cleared before anything is torn down, and set again only once populate has
+            // returned. Between those two points there is genuinely no scene, and saying so is
+            // the difference between an empty world and a world that lies about what it holds:
+            // `SnapshotTimeTravel` refuses a restore whose recorded scene does not match this,
+            // so leaving the old id in place while the old scene is being destroyed would let
+            // an arena snapshot be applied to a jungle world.
+            activeSceneId = null
 
-            ctx.physics.destroyAllBodies()
-            // `clearRecycled = true` so a scene loaded twice mints the same entity ids both
-            // times: without it the second load draws from the recycled queue the first one
-            // filled, and two runs of the same scene stop agreeing on entity identity.
-            world.removeAll(clearRecycled = true)
-            netIds.reset()
+            try {
+                for (step in beforeClear) step.tearDown(world, ctx)
 
-            for (step in afterClear) step.tearDown(world, ctx)
+                ctx.physics.destroyAllBodies()
+                // `clearRecycled = true` so a scene loaded twice mints the same entity ids
+                // both times: without it the second load draws from the recycled queue the
+                // first one filled, and two runs of the same scene stop agreeing on entity
+                // identity.
+                world.removeAll(clearRecycled = true)
+                netIds.reset()
 
-            scene.populate(SceneScope(world, ctx, netIds, scene.seed))
+                for (step in afterClear) step.tearDown(world, ctx)
+
+                scene.populate(SceneScope(world, ctx, netIds, scene.seed))
+            } catch (failure: Throwable) {
+                empty(world, ctx)
+                failedSwapCount++
+                throw failure
+            }
 
             activeSceneId = scene.id
             requestedSceneId = null
             swappedAtTick = ctx.clock.tick
             swapCount++
             for (listener in listeners) listener(scene.id, ctx.clock.tick)
+        }
+
+        /**
+         * Empties the world after any part of a swap threw, so that what is left is
+         * byte-for-byte a freshly cleared world: no bodies, no entities, no recycled ids, no
+         * NetIds — with [activeSceneId] still `null`, which makes every snapshot restore
+         * refuse instead of binding a snapshot to the wrong scene.
+         *
+         * A swap cannot be all-or-nothing in the sense of putting the old scene back — by the
+         * time most of these failures are possible the old scene is gone, and a `Scene` is a
+         * program rather than a value that can be re-materialised. So the guarantee is the
+         * other one available: **either the whole new scene, or no scene at all.** Half a
+         * scene is the state every system would have to tolerate and no system is written to,
+         * and it persists indefinitely, because the barrier logs a failing action and keeps
+         * ticking.
+         *
+         * The whole swap is covered and not only [Scene.populate]. A `SceneTeardownStep` that
+         * throws before the world is cleared is the case that used to escape: the exception
+         * left the *outgoing* scene's entities in the world with [activeSceneId] already
+         * `null` and [failedSwapCount] not incremented — a world that both lies about what it
+         * holds and reports no failure, which is precisely the state the class KDoc claims is
+         * impossible.
+         *
+         * The cause is rethrown by the caller: the barrier logs it with this action's [label]
+         * and the tick, which is the only place a stack trace can usefully surface from.
+         */
+        private fun empty(world: World, ctx: GameContext) {
+            ctx.physics.destroyAllBodies()
+            world.removeAll(clearRecycled = true)
+            netIds.reset()
         }
     }
 }

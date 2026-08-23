@@ -43,8 +43,17 @@ public enum class RenderMode {
      * Whether a frame can be captured at all in this mode.
      *
      * The one predicate worth deriving: it is what separates "the screenshot tool is live"
-     * from "the screenshot tool returns [RenderUnavailable.NoRenderContext]", and deriving it
-     * here means a fourth mode cannot be added without answering the question.
+     * from "the screenshot tool returns [RenderUnavailable.NoRenderContext]".
+     *
+     * An exhaustive `when` with no `else`, which is what makes the sentence above true. Written
+     * as `this != Headless` it does the opposite of what it claims: a fourth constant would
+     * compile, silently report `true`, and send `GameHost.screenshot` past its
+     * [RenderUnavailable.NoRenderContext] branch into a backend factory nobody wired for it.
+     * Like this, adding a constant fails to compile here until somebody answers the question.
      */
-    public val hasRenderContext: Boolean get() = this != Headless
+    public val hasRenderContext: Boolean
+        get() = when (this) {
+            Headless -> false
+            Offscreen, Windowed -> true
+        }
 }

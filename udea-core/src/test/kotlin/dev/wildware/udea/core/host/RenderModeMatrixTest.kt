@@ -109,6 +109,48 @@ class RenderModeMatrixTest {
     }
 
     @Test
+    fun `run(n) then frame() keeps simulating - a fast-forward must not freeze the loop`() {
+        // The sequence a Windowed or Offscreen host actually performs: fast-forward a loading
+        // sequence, then hand the frame cadence back to the render backend. `GameLoop.stepTicks`
+        // pauses — it is TimeControl.step's primitive, where a stopped clock is the point and
+        // resume() is right there — so a host that left the pause set would render at full rate
+        // over a simulation frozen forever, with nothing thrown and no counter moving.
+        val factory = CountingPresentation()
+        val host = host(RenderMode.Offscreen, factory)
+
+        host.run(300)
+        assertEquals(300L, host.totalTicks, "the fast-forward ran")
+
+        repeat(10) { host.frame(1f / 60f) }
+
+        assertTrue(
+            host.totalTicks > 300L,
+            "the loop never stepped again after run(300): totalTicks is still ${host.totalTicks}",
+        )
+        assertEquals(host.totalTicks, host.tick.value, "and the clock moved with it")
+        assertEquals(10, factory.framesDrawn, "while the presentation drew every frame regardless")
+        assertEquals(25, worldState(host).size, "over a world that is still there")
+    }
+
+    @Test
+    fun `run(n) restores the pause it found rather than clearing it`() {
+        // The other half: a host paused on purpose — an agent inspecting a frozen world, which
+        // is what TimeControl leaves behind — must still be paused after a step(n), or the
+        // agent's next frame silently resumes the simulation underneath it.
+        val host = host(RenderMode.Offscreen, CountingPresentation())
+        host.loop.paused = true
+
+        host.run(5)
+
+        assertTrue(host.loop.paused, "run(n) must not clear a pause somebody else set")
+        assertEquals(5L, host.totalTicks, "it still advanced exactly five ticks")
+
+        host.frame(1f / 60f)
+
+        assertEquals(5L, host.totalTicks, "and a frame over a paused loop steps nothing")
+    }
+
+    @Test
     fun `a screenshot in Headless returns the typed no_render_context error`() {
         val host = host(RenderMode.Headless, CountingPresentation())
 

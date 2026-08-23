@@ -59,4 +59,45 @@ class UdeaKotlinPinTest {
         val message = assertNotNull(UdeaKotlinPin.violation(":udea-codegen", pinned, emptyList()))
         assertTrue("broken" in message, message)
     }
+
+    // --- the coverage half --------------------------------------------------------------------
+
+    @Test
+    fun `an unclassified resolvable configuration is named, with all three ways to classify it`() {
+        val message = assertNotNull(
+            UdeaKotlinPin.coverageViolation(
+                ":udea-core",
+                resolvable = listOf("compileClasspath", "integrationTestCompileClasspath"),
+                unclassified = listOf("integrationTestCompileClasspath"),
+            ),
+        )
+        assertTrue("integrationTestCompileClasspath" in message, message)
+        assertTrue("PINNED_CONFIGURATIONS" in message, message)
+        assertTrue("Exemption" in message, message)
+        assertTrue("ToolClasspath" in message, message)
+    }
+
+    @Test
+    fun `a module whose configurations are all classified passes`() {
+        assertNull(
+            UdeaKotlinPin.coverageViolation(
+                ":udea-core",
+                resolvable = listOf("compileClasspath", "runtimeClasspath"),
+                unclassified = emptyList(),
+            ),
+        )
+    }
+
+    @Test
+    fun `no resolvable configurations at all is a broken hand-off, not a classified module`() {
+        // `resolvableConfigurationNames` is a SetProperty whose unset value is the empty set,
+        // so an afterEvaluate block that never ran leaves this gate passing forever with
+        // nothing to classify. The sibling `violation` refuses an empty input for exactly the
+        // same reason; this gate was the one place in the file that did not.
+        val message = assertNotNull(
+            UdeaKotlinPin.coverageViolation(":udea-core", resolvable = emptyList(), unclassified = emptyList()),
+        )
+        assertTrue("broken" in message, message)
+        assertTrue("passes forever" in message, message)
+    }
 }

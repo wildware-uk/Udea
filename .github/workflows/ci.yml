@@ -2,11 +2,15 @@
 #
 # Later epics add *jobs or matrix legs here*; they do not create a second workflow, and they
 # record their numbers in the single `docs/budgets.md` rather than a second budgets document.
-# Gates already scheduled to land in this file: the golden-file diffs and the
-# `net-protocol.lock` drift check (codegen), the allocation budgets (spec 4 of the engineering
-# standards), the `game-bridge-mcp` conformance run (agent), and the plugin-disabled build
-# spec 7 asks for, which already has its switch in `build-logic` via
-# `-Pudea.compilerPlugin.enabled=false`.
+# Gates that have landed and run inside the `build` job, because they are wired into `check`
+# and therefore need no step of their own: the golden-file diffs and the `net-protocol.lock`
+# drift check (`udeaCheckProtocolLock`, registered by `registerNetProtocolLock` in
+# `build-logic` for every module that emits a protocol), and the allocation budgets (spec 4 of
+# the engineering standards) via `udeaSnapshotBudget` and `udeaBenchTickLoop`.
+#
+# Still to land here as their own steps: the `game-bridge-mcp` conformance run (agent), and a
+# plugin-disabled build that actually degrades something - the leg below exists, but the
+# switch it flips is inert and says so.
 
 name: CI
 
@@ -212,9 +216,27 @@ jobs:
     # queueing behind one compiler plugin. `docs/compiler-plugin.md` has the degrade
     # procedure.
     #
+    # ## What this leg proves today, plainly: NOT that
+    #
+    # `-Pudea.compilerPlugin.enabled=false` is read by `udea.kotlin-library` and consumed by
+    # nothing. No module applies a `KotlinCompilerPluginSupportPlugin`, nothing adds
+    # `udea-compiler-plugin` to a `kotlinCompilerPluginClasspath`, and no `-Xplugin` argument
+    # is produced anywhere outside the plugin's own kctfork test harness. So this job compiles
+    # byte for byte what the `build` job already compiled: **the outer switch is inert, and a
+    # green tick here is not evidence that flipping it degrades anything.** The mitigation
+    # spec 7 describes becomes real when `udea-gradle` applies the plugin, and not before.
+    #
+    # It is kept, rather than deleted, for one honest reason: it proves
+    # `-Pudea.compilerPlugin.enabled=false` is *accepted* on every module (`UdeaBuildFlags`
+    # rejects anything but `true`/`false`, so a typo in the degrade procedure fails loudly
+    # rather than silently meaning "enabled"). The `Say what this leg does not prove` step
+    # below annotates every run so the tick is not read as more than that, and
+    # `CompilerPluginSwitchTest` in `build-logic` fails the moment the wiring lands, which is
+    # when this comment, `docs/compiler-plugin.md` and the flag all have to change together.
+    #
     # **This job must be a required status check on `master`.** That is a repository setting,
     # not something a workflow file can assert; see `docs/compiler-plugin.md`.
-    name: build with the K2 plugin disabled
+    name: build with the K2 plugin disabled (switch currently inert)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -249,6 +271,22 @@ jobs:
           ./gradlew build -Pudea.compilerPlugin.enabled=false
           --stacktrace
           -x :udea-compiler-plugin:test
+
+      # Loud on every run, pass or fail. A green tick on a job whose name contains "disabled"
+      # reads as "the degrade path works"; it does not, yet, and the annotation says so where
+      # the tick is looked at.
+      - name: Say what this leg does not prove
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          message="udea.compilerPlugin.enabled is read but consumed by nothing: no module applies the K2 plugin yet, so this leg compiles the same thing the build job did. It proves the flag is accepted, not that disabling the plugin degrades anything. See docs/compiler-plugin.md 'The plugin is optional'."
+          echo "::warning title=plugin-disabled leg is currently inert::${message}"
+          {
+            echo "### plugin-disabled: what this leg proves"
+            echo
+            echo "${message}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test reports
         if: failure()
@@ -441,10 +479,20 @@ jobs:
           fi
           echo "no-op build executed nothing"
 
-      # The timing threshold. `UDEA_KSP_*_BUDGET_MS` default to the committed baseline plus the
-      # 20% the issue allows; override them on a workflow dispatch to prove the gate can fail.
-      # Every run writes both numbers to the job summary, pass or fail, so the trend is
-      # readable without opening a log.
+      # The timing threshold. The defaults are NOT baseline+20%, and saying so would be a lie
+      # a reader could act on: the committed baselines in `docs/budgets.md` are 34 285 ms cold
+      # and 10 767 ms for a one-component edit, measured on a 32-core workstation with a warm
+      # configuration-cache entry, while this job is a 2-core `ubuntu-latest` runner with a
+      # cold one. Baseline+20% (41 142 / 12 920) would fail on machine class rather than on a
+      # regression. The 90 000 / 40 000 below are deliberately loose holding values - roughly
+      # 2.6x and 3.7x the workstation numbers - chosen so the gate that carries the real
+      # weight is the hard one above, which no threshold can fake. `docs/budgets.md` says the
+      # same thing and records what has to happen before +20% becomes the rule: a baseline
+      # measured *here*, from the step summary these runs write.
+      #
+      # Override them on a workflow dispatch to prove the gate can fail. Every run writes both
+      # numbers to the job summary, pass or fail, so the trend is readable without opening a
+      # log.
       - name: Time a cold KSP pass and a one-component edit
         shell: bash
         env:

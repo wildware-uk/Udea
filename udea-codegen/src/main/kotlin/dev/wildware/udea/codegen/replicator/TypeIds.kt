@@ -25,6 +25,13 @@ internal object TypeIds {
     /**
      * Dense ids for [qualifiedNames], assigned `0, 1, 2, …` in ascending name order.
      *
+     * **[qualifiedNames] is the id space, and the id space is the whole project.** This
+     * function cannot tell a project-wide list from one module's, so the caller owes it the
+     * former: `UdeaSymbolProcessor` passes `udea.projectComponents`, which the build computes
+     * from resolved artifacts. Handing it the symbols of a single KSP run gives every module
+     * its own dense `0..n-1`, which is not an id space at all — it is several, all claiming
+     * the same numbers.
+     *
      * Pure: no IO, no clock, no dependence on the order the caller discovered the names in.
      * Two builds that compile the same set of components produce the same map, which is what
      * makes `net-protocol.lock` diffable and what makes a build cache sound.

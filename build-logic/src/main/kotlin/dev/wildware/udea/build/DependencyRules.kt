@@ -173,6 +173,38 @@ public object DependencyRules {
             .sortedWith(compareBy({ it.ruleId.value }, { it.coordinate }))
 
     /**
+     * The message to fail on when a rule was evaluated against a classpath that resolved
+     * *nothing*, or `null` when every applicable rule had something to look at.
+     *
+     * The worst failure a dependency gate has is silence. An `allowOnly` rule — the leaf
+     * budgets, `UDEA-MG-001` and `UDEA-MG-004` — compares a resolved set against an allow
+     * list, and an empty resolved set has no offenders either, so the gate passes forever
+     * while the module quietly accumulates dependencies. That branch is reachable in
+     * practice: `gradle.properties` carries `kotlin.stdlib.default.dependency = true`, and
+     * flipping it empties the leaf's `runtimeClasspath`.
+     *
+     * Only `allowOnly` rules are checked. A deny list over an empty classpath is a module
+     * that genuinely brings in nothing banned, which is the answer the rule wanted.
+     *
+     * [ResolvedGraph.components] always contains the root project itself, so "resolved
+     * nothing" is a component set of exactly the root.
+     */
+    public fun vacuity(
+        projectPath: String,
+        configuration: String,
+        graph: ResolvedGraph,
+        rules: List<DependencyRule>,
+    ): String? {
+        val budgets = rules.filter { it.appliesTo(projectPath, configuration) && it.allowOnly != null }
+        if (budgets.isEmpty()) return null
+        if (graph.components().any { it != graph.root }) return null
+        return "$projectPath resolved nothing on $configuration, so " +
+            budgets.joinToString { it.id.value } + " inspected an empty classpath - the check " +
+            "is broken, not the tree. A budget rule that compares an empty set against an " +
+            "allow list passes forever while the module quietly accumulates dependencies."
+    }
+
+    /**
      * The build-failure message for [violations], or `null` when there are none.
      *
      * @param heading names the gate that failed, so the message says which task to re-run.

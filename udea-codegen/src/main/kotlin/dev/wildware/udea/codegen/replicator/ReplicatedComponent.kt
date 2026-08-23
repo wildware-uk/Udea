@@ -29,7 +29,13 @@ internal enum class FieldStorage(
     LONG("Long", "i64", 64),
     FLOAT("Float", "f32", 32),
 
-    /** An enum, stored and sent as its ordinal. */
+    /**
+     * An enum, stored and sent as its ordinal.
+     *
+     * The ordinal alone is not the whole wire contract: the *constant list* is, because
+     * `capture` writes `.ordinal` and `apply` reads `entries[ordinal]`. [ReplicatedField]
+     * folds the constants into the lock token for that reason.
+     */
     ENUM("Int", "enum", 32),
 
     /** [dev.wildware.udea.codegen.CoreNames.NET_ID], sent as its packed 32-bit word. */
@@ -64,8 +70,21 @@ internal data class Quantisation(val bits: Int, val min: Float, val max: Float) 
     val epsilon: Float
         get() = (((max.toDouble() - min.toDouble()) / ((1L shl bits) - 1L)) / 2.0).toFloat()
 
-    /** `q:12` — the token `net-protocol.lock` records for a quantised field. */
-    val wireToken: String get() = "q"
+    /**
+     * `q:12:-3.1416:3.1416` — the token `net-protocol.lock` records for a quantised field.
+     *
+     * **The range is part of the token, not decoration.** `bits` alone fixes how many bits a
+     * field costs; `min` and `max` fix what those bits *mean*, because `writeFixed` maps
+     * `[min, max]` onto `0 until 2^bits` and `readFixed` maps it back. Widening `@Q(bits =
+     * 12, min = -3.1416f, max = 3.1416f)` to `@Q(bits = 12, min = -100f, max = 100f)` leaves
+     * the bit layout of every packet untouched and changes what every one of those packets
+     * means — so a token of `q:12` would leave `protoHash` identical across a full-scale wire
+     * break, with the connect-time check reporting agreement.
+     *
+     * The bounds are rendered with `Float.toString`, which is round-trip exact and locale
+     * independent, so the token stays a pure function of the declaration.
+     */
+    val wireToken: String get() = "q:$bits:$min:$max"
 }
 
 /**
@@ -89,6 +108,8 @@ internal data class Quantisation(val bits: Int, val min: Float, val max: Float) 
  * @param declaredType the type at the end of [path], used for the `setField` cast.
  * @param enumEntries non-null when the field is an enum, in which case the ordinal is what
  *   is stored and this is the class the ordinal is decoded back through.
+ * @param enumConstants non-null when the field is an enum: its constants in ordinal order,
+ *   which is the mapping the wire actually carries.
  * @param quantisation non-null when the property carried `@Q`; only ever set on a `Float`.
  */
 internal data class ReplicatedField(
@@ -99,14 +120,31 @@ internal data class ReplicatedField(
     val storage: FieldStorage,
     val declaredType: TypeName,
     val enumEntries: ClassName?,
+    val enumConstants: List<String>?,
     val quantisation: Quantisation?,
 ) {
     /** The Kotlin property path; also the entry in `Replicator.fieldNames`. */
     val name: String = path.joinToString(".")
 
-    /** `q:12` for a quantised field, otherwise the storage kind's own token and width. */
-    val wireDescription: String =
-        quantisation?.let { "${it.wireToken}:${it.bits}" } ?: "${storage.wireToken}:${storage.wireBits}"
+    /**
+     * What `net-protocol.lock` records for this field, and therefore what `protoHash` covers.
+     *
+     * The rule is that **every declaration a peer must agree on appears here**, not merely
+     * the field's width. Two changes make that more than the bit count:
+     *
+     * - a `@Q` range change reinterprets every packet without moving a single bit, so the
+     *   bounds are in the token (`q:12:-3.1416:3.1416`);
+     * - reordering an enum's constants remaps every ordinal without moving a single bit, so
+     *   the constants are in the token (`enum:32:Standing,Crouching,Sprinting`).
+     *
+     * Both were invisible to a token of `q:12` / `enum:32`, which is the same defect in two
+     * places: a lock that pins the layout and not the meaning.
+     */
+    val wireDescription: String = when {
+        quantisation != null -> quantisation.wireToken
+        enumConstants != null -> "${storage.wireToken}:${storage.wireBits}:${enumConstants.joinToString(",")}"
+        else -> "${storage.wireToken}:${storage.wireBits}"
+    }
 }
 
 /**

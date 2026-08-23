@@ -112,7 +112,12 @@ class IncrementalProcessingTest {
                 class Beta(@Net var b: Float = 0f)
             """.trimIndent(),
         )
-        val options = mapOf(CodegenOptions.MODULE_NAME to "Moba")
+        val options = mapOf(
+            CodegenOptions.MODULE_NAME to "Moba",
+            // As the build supplies it: a module emitting a protocol is numbered from the
+            // project's id space, never from the symbols in front of the processor.
+            CodegenOptions.PROJECT_COMPONENTS to "fixtures.Alpha,fixtures.Beta",
+        )
 
         val a = ProcessorHarness.run(first, sources, options)
         val b = ProcessorHarness.run(second, sources, options)
@@ -148,10 +153,17 @@ class IncrementalProcessingTest {
                     class One(@Net var a: Int = 0)
                 """.trimIndent(),
             ),
-            mapOf(CodegenOptions.MODULE_NAME to "Moba"),
+            mapOf(
+                CodegenOptions.MODULE_NAME to "Moba",
+                CodegenOptions.PROJECT_COMPONENTS to "fixtures.One",
+            ),
         )
 
         assertTrue(run.generatedFiles.any { it.name == "MobaNetProtocol.kt" })
-        assertTrue("udea/net-protocol.lock" in run.generatedResources)
+        assertTrue(
+            "udea/Moba-net-protocol.lock" in run.generatedResources,
+            "the lock is module-qualified so two modules cannot land on one resource path; " +
+                "got ${run.generatedResources.keys}",
+        )
     }
 }

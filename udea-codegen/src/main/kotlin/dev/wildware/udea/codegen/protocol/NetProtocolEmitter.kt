@@ -15,9 +15,12 @@ import dev.wildware.udea.codegen.GeneratedNames
  * `u16 protoHash`, and a `const val` is the only form of it a packet header can afford.
  *
  * One object per module rather than one for the whole build, because each module's KSP run
- * only sees its own components; the Udea Gradle plugin merges the locks and is what makes the
- * game's own module's hash the authoritative one. The module name is carried in the class
- * name rather than in the package, so two modules' objects can never collide.
+ * only sees its own components. That is also the unit of `net-protocol.lock`: one file per
+ * module, at `udea/<Module>-net-protocol.lock`, each listing that module's components under
+ * their **project-wide** ids (`udea.projectComponents`, see `CodegenOptions`). The id space is
+ * global even though the files are per-module, so the project's protocol is the ordered union
+ * of the locks and no two of them can describe the same id. The module name is carried in the
+ * class name rather than in the package, so two modules' objects can never collide.
  */
 internal object NetProtocolEmitter {
 

@@ -15,8 +15,11 @@ import dev.wildware.udea.core.loop.SnapshotKind
  */
 public data class RingConfig(
     /**
-     * How far back every tick is kept: the rollback window. 120 ticks is ~2s at 60Hz, which
-     * is what Phase 4's prediction rollback restores from.
+     * How far back every captured tick is kept: the rollback window. 120 ticks is ~2s at 60Hz,
+     * which is what Phase 4's prediction rollback restores from.
+     *
+     * "Every captured tick", not "every tick": the ring keeps what it is given, and nothing in
+     * the engine yet drives a capture cadence — see [SnapshotKind.Dense].
      */
     public val denseTicks: Int = DEFAULT_DENSE_TICKS,
     /**
@@ -90,7 +93,7 @@ public class SnapshotRing(
     private val log: Log = Log.NoOp,
 ) {
 
-    /** How far back every tick is kept. Fixed: rollback correctness depends on it. */
+    /** How far back every captured tick is kept. Fixed: rollback correctness depends on it. */
     public val denseTicks: Int = config.denseTicks
 
     /** How far back keyframes are kept. Fixed: this is the reach [degrade] must never spend. */
@@ -105,6 +108,18 @@ public class SnapshotRing(
 
     /** How many times [degrade] has fired. Non-zero means this machine missed the budget. */
     public var degradeCount: Int = 0
+        private set
+
+    /**
+     * True once [sparseInterval] has reached [denseTicks] with the ring still over budget.
+     *
+     * Latched, and it is the reason [enforceBudget] stops calling [degrade] at all past that
+     * point. Without it a ring whose *dense* window alone exceeds the budget takes the refusal
+     * branch on every single captured tick — and that branch interpolates a warn string, so a
+     * permanently exhausted ring would allocate and log once per tick forever, on the one path
+     * [SnapshotBudgets.LOOP_ALLOCATED_BYTES] gates at zero bytes. `SnapshotRingTest` measures it.
+     */
+    public var isExhausted: Boolean = false
         private set
 
     /** Held slots, ascending by tick. */
@@ -180,11 +195,38 @@ public class SnapshotRing(
         recomputeTotalBytes()
     }
 
+    /**
+     * Whether the ring already holds a snapshot at [tick]. Allocation-free.
+     *
+     * The cheap half of [infoOf], and the reason it exists separately: `SnapshotTimeTravel`
+     * asks this question on every capture to stay idempotent per tick, and [infoOf] answers it
+     * by building a [SnapshotInfo] — one object per captured tick, on the path
+     * [SnapshotBudgets.LOOP_ALLOCATED_BYTES] gates at zero. Binary search rather than a scan,
+     * because [held] is ascending by tick and can be a full sparse window long.
+     */
+    public fun holds(tick: Tick): Boolean = indexOfTick(tick) >= 0
+
     /** What the ring holds at [tick], or `null` when it holds nothing there. Allocates. */
     public fun infoOf(tick: Tick): SnapshotInfo? {
-        if (held.isEmpty()) return null
-        val slot = held.firstOrNull { it.tick == tick } ?: return null
-        return infoFor(slot, held[held.size - 1].tick)
+        val index = indexOfTick(tick)
+        if (index < 0) return null
+        return infoFor(held[index], held[held.size - 1].tick)
+    }
+
+    /** The position of [tick] in [held], or `-1`. Binary search: [held] is ascending. */
+    private fun indexOfTick(tick: Tick): Int {
+        var low = 0
+        var high = held.size - 1
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            val candidate = held[mid].tick
+            when {
+                candidate < tick -> low = mid + 1
+                candidate > tick -> high = mid - 1
+                else -> return mid
+            }
+        }
+        return -1
     }
 
     /**
@@ -243,10 +285,16 @@ public class SnapshotRing(
      */
     public fun degrade(): Boolean {
         if (sparseInterval >= denseTicks) {
-            log.warn(
-                "snapshot ring is over its ${budgetBytes}-byte budget at $totalBytes bytes and " +
-                    "cannot degrade further: sparseInterval is already $sparseInterval",
-            )
+            // Once, on the false -> true edge. Every later commit would report the same thing,
+            // and building the message is itself an allocation on the tick path.
+            if (!isExhausted) {
+                isExhausted = true
+                log.warn(
+                    "snapshot ring is over its ${budgetBytes}-byte budget at $totalBytes bytes " +
+                        "and cannot degrade further: sparseInterval is already $sparseInterval. " +
+                        "This is reported once; SnapshotRing.isExhausted stays true.",
+                )
+            }
             return false
         }
         sparseInterval *= 2
@@ -333,8 +381,14 @@ public class SnapshotRing(
         recomputeTotalBytes()
         if (totalBytes <= budgetBytes) return
 
-        if (degrade()) {
-            if (totalBytes <= budgetBytes) return
+        // Not `degrade()` unconditionally: there is nothing left to give up once the interval
+        // has reached the dense window, and asking again on every commit is what turned a
+        // one-off degradation ladder into a per-tick log line and a per-tick interpolated
+        // string. Past that point `degrade` is called exactly once, to latch and report.
+        if (sparseInterval < denseTicks) {
+            if (degrade() && totalBytes <= budgetBytes) return
+        } else if (!isExhausted) {
+            degrade()
         }
 
         while (held.size > 1 && totalBytes > budgetBytes) {

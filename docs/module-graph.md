@@ -107,12 +107,29 @@ processor and the K2 plugin at once, so a dependency added here is added to all 
 two of them are loaded inside the Kotlin compiler, where an extra jar is a classloader
 conflict rather than an inconvenience.
 
+This rule and `UDEA-MG-004` are *budgets* — they say what is allowed rather than what is
+banned — and a budget over a classpath that resolved nothing has no offenders either, so it
+would pass forever while the module quietly accumulated dependencies. `DependencyRules.vacuity`
+therefore fails any budget rule whose classpath resolved only the project itself. The branch is
+reachable: `gradle.properties` carries `kotlin.stdlib.default.dependency = true`, and flipping
+it empties this module's `runtimeClasspath`. `udea-annotations` used to enforce its own budget a
+second time, in a `udeaVerifyAnnotationsLeaf` task with a private allow list and no rule id;
+that task is gone and its one unique branch is the vacuity guard above.
+
 ## `UDEA-MG-002` — only `udea-render` may see a GL backend or a native
 
-**Spec §4, §3.5.** Banned on `compileClasspath` and `runtimeClasspath` of `udea-core`,
-`udea-gas`, `udea-net`, `udea-agent`, `udea-assets`, `udea-assets-compiler`, `udea-codegen`:
-`com.badlogicgames.gdx:gdx-backend-lwjgl3`, `org.lwjgl:*`,
+**Spec §4, §3.5.** Banned on `compileClasspath` and `runtimeClasspath` of **every `udea-*`
+module except `udea-render`**: `com.badlogicgames.gdx:gdx-backend-lwjgl3`, `org.lwjgl:*`,
 `com.badlogicgames.gdx:*-platform`.
+
+The module set is not written out here, or anywhere twice. It is
+`ModuleGraphRules.HEADLESS_PROJECTS` in `build-logic`, and `ModuleGraphRulesTest` derives the
+same set from `settings.gradle.kts` and fails if the two have drifted — so including a new
+`udea-*` module puts it under this rule automatically instead of leaving a gap somebody has
+to notice. It used to be two hand-written lists (this rule's, and the bytecode scan's below)
+that disagreed in both directions, with `udea-agent-host`, `udea-diagnostics`, `udea-gradle`
+and `udea-compiler-plugin` in neither: a GL backend on any of those passed both gates while
+this document called them the same rule.
 
 `com.badlogicgames.gdx:gdx` is deliberately **not** banned — `Vector2` and the rest of
 gdx-math are headless. The ban is on GL and on native loaders, not on maths.
@@ -126,7 +143,11 @@ gone.
 
 `udeaVerifyModuleGraph` above reads *dependencies*. `udeaVerifyHeadless` — a task in
 `udea-render`, backed by `HeadlessScan` — reads the *compiled classes* of every headless
-module and fails if one names a GL type. It reports under `UDEA-MG-002-BYTECODE`, an
+module and fails if one names a GL type. "Every headless module" is the same
+`ModuleGraphRules.HEADLESS_PROJECTS` the dependency rule uses: `udea-render`'s build script
+reads it from `build-logic` and hands it to the scan as a system property, and the scan fails
+loudly rather than scanning nothing if that hand-off breaks. That is what makes "the same
+rule, one level down" a fact about the code rather than a claim about it. It reports under `UDEA-MG-002-BYTECODE`, an
 extension of this rule rather than an id of its own, because a GL dependency and a GL type
 reference are one defect at two enforcement levels and a CI filter should only have to know
 one number.

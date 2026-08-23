@@ -14,7 +14,7 @@ import com.squareup.kotlinpoet.TypeSpec
 import dev.wildware.udea.codegen.CoreNames
 
 /**
- * Emits one module-level index object per service, plus the `META-INF/services` line that
+ * Emits one module-level index class per service, plus the `META-INF/services` line that
  * makes `ServiceLoader` find it.
  *
  * **This is what replaces the magic package.** The generator being retired listed a module's
@@ -25,13 +25,23 @@ import dev.wildware.udea.codegen.CoreNames
  * of them deterministic, and the timestamped name alone is why KSP incremental processing had
  * to be disabled repository-wide.
  *
- * What replaces all four is one generated object and one text file:
+ * What replaces all four is one generated class and one text file:
  *
- * - the object is a plain `object … : <service>` listing its members as *statically named*
- *   declarations, so the JVM resolves them at class-load time with no reflection and R8 keeps
- *   them because they are genuinely referenced;
+ * - the class lists its members as *statically named* declarations, so the JVM resolves them
+ *   at class-load time with no reflection and R8 keeps them because they are genuinely
+ *   referenced;
  * - the resource is the standard `META-INF/services` line, which `ServiceLoader` reads
  *   without scanning a classpath and which R8 keeps with a one-line rule.
+ *
+ * ## Why a class and not an `object`
+ *
+ * `ServiceLoader` instantiates a provider found on the **classpath** through its public no-arg
+ * constructor, and honours a static `provider()` method only for a provider in a *named*
+ * module. A Kotlin `object` has a private constructor and an `INSTANCE` field, so an index
+ * emitted as `object MobaNetModule : NetModule` fails to load with a `ServiceConfigurationError`
+ * caused by `NoSuchMethodException` — at run time, on the first packet, with a green build.
+ * The single instance it looks like it wants is `ServiceLoader`'s own caching, and the members
+ * it names are `object`s either way, so nothing about static naming is given up.
  *
  * Both names are pure functions of the module name. Nothing here reads a clock.
  *
@@ -61,12 +71,12 @@ internal object ServiceIndexEmitter {
     /** `META-INF/services/dev.wildware.udea.net.NetModule` — where `ServiceLoader` looks. */
     fun resourcePath(service: ClassName): String = "META-INF/services/${service.canonicalName}"
 
-    /** The single line that resource contains: the implementing object's binary name. */
+    /** The single line that resource contains: the implementing class's binary name. */
     fun resourceContent(index: ClassName): String = "${index.canonicalName}\n"
 
     /**
      * @param service the service interface the index implements, e.g. `NetModule`.
-     * @param index the object being generated, e.g. `MobaNetModule`.
+     * @param index the class being generated, e.g. `MobaNetModule`.
      * @param moduleName the value of the generated `moduleName` property.
      * @param property the list property the service declares.
      * @param members the declarations to list, already in the order they should appear.
@@ -83,14 +93,17 @@ internal object ServiceIndexEmitter {
             moduleName,
         )
         .addType(
-            TypeSpec.objectBuilder(index.simpleName)
+            // A class, not an object: ServiceLoader instantiates a classpath provider through
+            // its public no-arg constructor and cannot touch an object's private one.
+            TypeSpec.classBuilder(index.simpleName)
                 .addModifiers(KModifier.PUBLIC)
                 .addSuperinterface(service)
                 .addKdoc(
                     "This module's [%T], found through `%L`.\n\n" +
                         "Every member below is named statically, so resolution costs a " +
                         "class-load and no reflection, and R8 keeps them because they are " +
-                        "genuinely referenced.\n",
+                        "genuinely referenced. `ServiceLoader` constructs this class itself, " +
+                        "which is why it is a class and not an `object`.\n",
                     service,
                     resourcePath(service),
                 )

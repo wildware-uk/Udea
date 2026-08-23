@@ -26,6 +26,37 @@ dependencies {
     testRuntimeOnly(libs.junit5.platform.launcher)
 }
 
+/**
+ * The files in the *outer* build that these tests read.
+ *
+ * Several gates here are source scans of the repository rather than assertions about
+ * `build-logic`'s own classes: `ModuleGraphRulesTest` re-derives the headless module set from
+ * `settings.gradle.kts`, `CompilerPluginSwitchTest` walks the build scripts and `udea-gradle`
+ * looking for compiler-plugin wiring, `UdeaProtocolLockTest` reads `udea-codegen`'s lock and
+ * the emitter that writes its header, and `UdeaNetComponentsTest` reads the component
+ * registry. Gradle cannot see any of that, so without declaring it the task stays
+ * `UP-TO-DATE` across exactly the edits it exists to notice — a gate that passes from cache
+ * is a gate that has stopped running.
+ */
+val outerBuildInputs: FileCollection = files(
+    rootDir.resolve("../settings.gradle.kts"),
+    rootDir.resolve("../net-components.lock"),
+    rootDir.resolve("../udea-codegen/net-protocol.lock"),
+    rootDir.resolve("../udea-codegen/src/main/kotlin/dev/wildware/udea/codegen/protocol/ProtocolLock.kt"),
+    rootDir.resolve("../.github/workflows/ci.yml"),
+    rootDir.resolve("../docs/compiler-plugin.md"),
+    rootDir.resolve("../docs/module-graph.md"),
+    fileTree(rootDir.resolve("..")) {
+        include("*/build.gradle.kts")
+        include("build.gradle.kts")
+        include("udea-gradle/src/**/*.kt")
+        include("moba/src/**/*.kt")
+    },
+)
+
 tasks.test {
     useJUnitPlatform()
+    inputs.files(outerBuildInputs)
+        .withPropertyName("outerBuildSources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

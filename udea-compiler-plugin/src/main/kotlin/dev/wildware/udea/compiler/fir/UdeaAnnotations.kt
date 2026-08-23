@@ -10,7 +10,10 @@ import org.jetbrains.kotlin.name.Name
  * The plugin binds by name rather than by class: `udea-annotations` is on the *compiled
  * module's* classpath, not on the plugin's, so there is no `Net::class` to reference here.
  * `AnnotationVocabularyTest` in `udea-annotations` freezes these fully qualified names, and
- * `UdeaAnnotationsTest` asserts the strings below are still the ones it freezes.
+ * `UdeaAnnotationsTest` asserts the strings below are still the
+ * ones it freezes *and* that each one still loads — a name-based binding fails silently when
+ * the declaration moves, so an assertion that only compared two copies of the same literal
+ * would be checking nothing.
  */
 internal object UdeaAnnotations {
 

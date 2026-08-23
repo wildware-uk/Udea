@@ -60,9 +60,7 @@ internal class SpyPhysicsWorld(
         rebuildCount++
         events += "rebuild"
         destroyAllBodies()
-        for (planned in PhysicsRebuildPlan.of(world, netIds).bodies) {
-            planned.component.handle = createBody(planned.def)
-        }
+        PhysicsRebuildPlan.of(world, netIds).rebuild(::createBody)
     }
 
     /** Events since the last [clearEvents], so a test can measure one tick of a longer run. */

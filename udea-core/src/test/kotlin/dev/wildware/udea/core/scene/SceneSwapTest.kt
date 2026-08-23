@@ -3,6 +3,7 @@ package dev.wildware.udea.core.scene
 import dev.wildware.udea.core.SceneId
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.core.loop.SimBarrier
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.UdeaGameDef
 import kotlin.test.Test
@@ -159,6 +160,142 @@ class SceneSwapTest {
         val failure = runCatching { host.ctx.scenes.requestScene(SceneId("nowhere")) }.exceptionOrNull()
         assertTrue(failure is IllegalArgumentException, "expected a loud failure, got $failure")
         assertTrue("nowhere" in failure.message.orEmpty(), "${failure.message}")
+    }
+
+    @Test
+    fun `a scene whose populate throws leaves no scene at all, not half of one`() {
+        val a = MarkerScene(arena, seed = 11L, entityCount = 5, withBodies = true)
+        val boom = ExplodingScene(jungle, spawnedBeforeFailure = 3)
+        val def = UdeaGameDef(listOf(SceneProbeModule(-1L, null)))
+        def.core.scenes.register(a)
+        def.core.scenes.register(boom)
+        val host = GameHost(RenderMode.Headless, def)
+        host.ctx.scenes.requestScene(arena)
+        host.run(1)
+        assertEquals(5, host.world.numEntities, "the good scene loaded")
+
+        host.ctx.scenes.requestScene(jungle)
+        host.run(1)
+
+        assertEquals(1, boom.attempts, "populate really ran and really threw")
+        assertEquals(
+            0,
+            host.world.numEntities,
+            "the three entities the scene managed to spawn must not be left behind: a world " +
+                "holding a fragment of a scene is the torn state this class exists to prevent, " +
+                "and the barrier logs and keeps ticking, so it would persist for the whole run",
+        )
+        assertEquals(0, host.ctx.physics.bodyCount, "and the bodies it built went with them")
+        assertEquals(0, host.ctx[CoreModule.NET_IDS].liveCount, "and the ids it minted")
+        assertNull(
+            host.ctx.scenes.activeSceneId,
+            "and nothing may claim to be loaded: SnapshotTimeTravel gates a restore on this id, " +
+                "so a stale 'arena' here would let an arena snapshot be applied to this world",
+        )
+        assertEquals(jungle, def(host).requestedSceneId, "what it was trying to become is still readable")
+        assertEquals(1L, def(host).failedSwapCount)
+        assertEquals(1L, def(host).swapCount, "a swap that did not land is not a swap")
+        assertEquals(
+            1L,
+            host.ctx[SimBarrier.KEY].failedActions,
+            "the cause was rethrown so the barrier logs it with the action's label and tick",
+        )
+    }
+
+    @Test
+    fun `a teardown step that throws before the world is cleared also leaves no scene`() {
+        // The half of the guarantee that used to escape. `activeSceneId` is cleared before the
+        // first teardown step runs, so a step that threw there left the OUTGOING scene's
+        // entities in the world under a null scene id, with failedSwapCount still 0 - a world
+        // that both lies about what it holds and reports no failure. Only populate was wrapped.
+        val a = MarkerScene(arena, seed = 11L, entityCount = 5, withBodies = true)
+        val b = MarkerScene(jungle, seed = 12L, entityCount = 4)
+        val def = UdeaGameDef(listOf(SceneProbeModule(-1L, null)))
+        def.core.scenes.register(a)
+        def.core.scenes.register(b)
+        val host = GameHost(RenderMode.Headless, def)
+        host.ctx.scenes.requestScene(arena)
+        host.run(1)
+        assertEquals(5, host.world.numEntities, "the good scene loaded")
+        val exploding = ExplodingTeardownStep(SceneTeardownStage.BeforeWorldCleared)
+        def(host).addTeardown(exploding)
+
+        host.ctx.scenes.requestScene(jungle)
+        host.run(1)
+
+        assertEquals(1, exploding.attempts, "the step really ran and really threw")
+        assertEquals(
+            0,
+            host.world.numEntities,
+            "the outgoing scene's entities are still in the world; a teardown that throws is " +
+                "the one path that could leave a populated world under a null scene id",
+        )
+        assertEquals(0, host.ctx.physics.bodyCount)
+        assertEquals(0, host.ctx[CoreModule.NET_IDS].liveCount)
+        assertNull(host.ctx.scenes.activeSceneId)
+        assertEquals(
+            1L,
+            def(host).failedSwapCount,
+            "a host reads this counter with a null activeSceneId to learn the world is " +
+                "deliberately empty; not incrementing it makes the two disagree",
+        )
+        assertEquals(
+            1L,
+            host.ctx[SimBarrier.KEY].failedActions,
+            "the cause was rethrown so the barrier logs it with the action's label and tick",
+        )
+    }
+
+    /** A teardown step that throws, standing in for a physics or ring release that fails. */
+    private class ExplodingTeardownStep(
+        override val stage: SceneTeardownStage,
+    ) : SceneTeardownStep {
+        override val name: String get() = "exploding teardown"
+        var attempts: Int = 0
+            private set
+
+        override fun tearDown(
+            world: com.github.quillraven.fleks.World,
+            ctx: dev.wildware.udea.core.GameContext,
+        ) {
+            attempts++
+            error("the teardown step could not release its resource")
+        }
+    }
+
+    @Test
+    fun `the loop keeps ticking over the empty world and the next scene loads normally`() {
+        val a = MarkerScene(arena, seed = 11L, entityCount = 5, withBodies = true)
+        val boom = ExplodingScene(jungle, spawnedBeforeFailure = 3)
+        val def = UdeaGameDef(listOf(SceneProbeModule(-1L, null)))
+        def.core.scenes.register(a)
+        def.core.scenes.register(boom)
+        val host = GameHost(RenderMode.Headless, def)
+        host.ctx.scenes.requestScene(arena)
+        host.run(1)
+        val firstVisit = a.spawned.toList()
+
+        host.ctx.scenes.requestScene(jungle)
+        host.run(20)
+
+        val afterFailure = host.world.system<SceneProbeSystem>().samples.filter { it.tick.value >= 1L }
+        assertEquals(
+            listOf(0),
+            afterFailure.map { it.entityCount }.distinct(),
+            "every tick after the failure saw an empty world, not a shrinking or growing one",
+        )
+        assertEquals(listOf(null), afterFailure.map { it.scene }.distinct())
+
+        host.ctx.scenes.requestScene(arena)
+        host.run(1)
+
+        assertEquals(5, host.world.numEntities, "the world recovers: a failed load is not fatal")
+        assertEquals(arena, def(host).activeSceneId)
+        assertEquals(
+            firstVisit.map { it.index },
+            a.spawned.map { it.index },
+            "and the failed swap left the id space clean enough to lay the scene out identically",
+        )
     }
 
     private fun def(host: GameHost): BarrierSceneManager = host.ctx.scenes as BarrierSceneManager

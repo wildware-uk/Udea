@@ -50,7 +50,7 @@ below is the gate that keeps it honest.
 | **Owner** | codegen epic (issue #35). Owns `ksp.incremental`, the isolating/aggregating split and this threshold — not the 90s gate above. |
 | **Gate** | `ksp-incremental-budget` job in `.github/workflows/ci.yml` |
 | **Hard gate** | a second identical `./gradlew :udea-codegen:testClasses` must execute **no** `:udea-codegen:` task |
-| **Threshold** | 20% over the committed baseline, via `UDEA_KSP_COLD_BUDGET_MS` and `UDEA_KSP_EDIT_BUDGET_MS` |
+| **Threshold** | `UDEA_KSP_COLD_BUDGET_MS` = 90 000, `UDEA_KSP_EDIT_BUDGET_MS` = 40 000 — holding values, ~2.6x and ~3.7x the workstation baselines below, **not** baseline + 20% (see *Why the thresholds are not baseline + 20%*) |
 | **Measured on** | developer workstation, Windows 11, 32 logical cores, Corretto 17.0.8, Gradle 8.13, other builds running concurrently |
 
 | Scenario | Command | Measured |
@@ -64,6 +64,26 @@ The committed CI thresholds are **provisional**: they were measured on a worksta
 job runs on `ubuntu-latest`, so the first green run's numbers — which the job writes to the
 step summary every time, pass or fail — should replace them. They are deliberately loose
 rather than tight-and-wrong; the gate that carries the real weight is the hard one.
+
+### Why the thresholds are not baseline + 20%
+
+Because 20% of *these* numbers is 20% of the wrong machine. The measurements above come from a
+32-core workstation with a stored configuration-cache entry; the job runs on a two-core
+`ubuntu-latest` runner with none. Baseline + 20% would be 41 142 ms cold and 12 920 ms for the
+edit, and a green run would fail on machine class rather than on a regression — which is how a
+gate gets switched off.
+
+So the two numbers are stated for what they are: **holding values**, 90 000 ms and 40 000 ms,
+about 2.6x and 3.7x the workstation figures, wide enough that a pass means "nothing
+catastrophic" and nothing more. A regression that takes the cold pass from 34s to 89s does get
+through, and that is the accepted cost of not having a CI baseline yet.
+
+The +20% rule is not abandoned, it is **blocked on a measurement**: once the `ksp-incremental-budget`
+job has a handful of green runs, take the cold and edit numbers from its step summary, record
+them here as the CI baseline, and set `UDEA_KSP_COLD_BUDGET_MS` and `UDEA_KSP_EDIT_BUDGET_MS`
+to that baseline + 20%. Until then the hard gate below is the one doing the work, and this
+paragraph exists so nobody reads "within budget" in a step summary as "within 20% of
+baseline".
 
 ### Why the hard gate is the one that matters
 

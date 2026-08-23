@@ -71,6 +71,41 @@ internal class MarkerScene(
     }
 }
 
+/**
+ * A scene that spawns [spawnedBeforeFailure] entities and then throws.
+ *
+ * The failure mode a real `populate` has: an asset that will not resolve, a prefab field that
+ * does not parse, a spawn point off the map — discovered part way through building the world,
+ * after some of it already exists.
+ */
+internal class ExplodingScene(
+    override val id: SceneId,
+    override val seed: Long = 1L,
+    private val spawnedBeforeFailure: Int = 3,
+    /** Gives the doomed entities bodies too, so the failure path has bodies to clean up. */
+    private val withBodies: Boolean = true,
+) : Scene {
+
+    /** Populate attempts, so a test can tell a scene that never ran from one that failed. */
+    var attempts: Int = 0
+        private set
+
+    override fun populate(scope: SceneScope) {
+        attempts++
+        repeat(spawnedBeforeFailure) { index ->
+            scope.spawn {
+                it += Marker(value = index.toFloat(), band = index % 4)
+                if (withBodies) {
+                    it += PhysicsBody(x = index.toFloat())
+                    it += Box()
+                }
+            }
+        }
+        if (withBodies) scope.ctx.physics.rebuildFrom(scope.world, scope.netIds)
+        error("scene $id could not be populated")
+    }
+}
+
 /** Records the world's entity count and active scene at the end of every tick. */
 internal class SceneProbeSystem(private val context: GameContext) : SimSystem() {
 

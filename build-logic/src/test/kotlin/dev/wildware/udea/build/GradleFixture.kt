@@ -91,10 +91,31 @@ class GradleFixture(private val root: File) {
      */
     fun jarFrom(): String = "tasks.named<Jar>(\"jar\") { from(layout.projectDirectory.dir(\"packaged\")) }"
 
+    /**
+     * Makes the project's real version catalog available to the fixture as `libs`.
+     *
+     * `udea.kotlin-library` reads the catalog through `udeaLibrary(...)`, so a fixture that
+     * applies the convention has to have one. Pointing at the repository's own
+     * `gradle/libs.versions.toml` rather than a hand-written stub is deliberate: the
+     * convention is being tested as it will actually run, versions included.
+     */
+    fun withVersionCatalog(): GradleFixture = apply { versionCatalog = true }
+
+    private var versionCatalog = false
+
     /** Materialises `settings.gradle.kts` and the root build script, then runs Gradle. */
     private fun write(rootBuildScript: String) {
+        val catalog = File("../gradle/libs.versions.toml").canonicalFile
         File(root, "settings.gradle.kts").writeText(
             buildString {
+                if (versionCatalog) {
+                    check(catalog.isFile) { "version catalog not found at $catalog" }
+                    appendLine("dependencyResolutionManagement {")
+                    appendLine("    versionCatalogs {")
+                    appendLine("        create(\"libs\") { from(files(\"${catalog.invariantSeparatorsPath}\")) }")
+                    appendLine("    }")
+                    appendLine("}")
+                }
                 appendLine("rootProject.name = \"fixture\"")
                 projects.forEach { appendLine("include(\"$it\")") }
             },

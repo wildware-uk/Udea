@@ -123,6 +123,40 @@ public interface CueSink {
 }
 
 /**
+ * A [CueSink] that observes cues on the way to another one.
+ *
+ * ## Why the engine has to know decorators exist
+ *
+ * Because the sink on `GameContext` is written and the queue behind it is **drained**, and those
+ * are two different jobs done by two different callers. The simulation only ever writes, so a
+ * decorator is invisible to it; a mixer has to reach the concrete `CueQueue` to drain it, and a
+ * decorated sink is not one. This was measured rather than reasoned about: wrapping the context's
+ * sink so the agent event ring could see the fight made `MobaAudio.of` refuse to build at all,
+ * with a message correctly saying that a sink which is not a queue has nothing to drain.
+ *
+ * So a drainer walks [delegate] to the end of the chain instead of casting once, and the refusal
+ * is kept for a chain that genuinely has no queue at the bottom of it - which is a real wiring
+ * mistake and must not be silently absorbed.
+ *
+ * Implementations must not loop: [delegate] is the sink this one was constructed with, and a
+ * decorator that returned itself would hang every walk.
+ */
+public interface CueSinkDecorator : CueSink {
+
+    /** The sink each cue is passed to after this one has seen it. Never this object. */
+    public val delegate: CueSink
+}
+
+/**
+ * Walks a [CueSink] chain to the sink at the bottom of it.
+ *
+ * Returns the receiver unchanged when it is not a [CueSinkDecorator], which is the common case
+ * and the shipped one: only a debug build ever decorates.
+ */
+public tailrec fun CueSink.innermost(): CueSink =
+    if (this is CueSinkDecorator) delegate.innermost() else this
+
+/**
  * Engine logging. An interface rather than a static logger so two simulations in one JVM can
  * be told apart in the output, which is the whole reason the globals had to go.
  */

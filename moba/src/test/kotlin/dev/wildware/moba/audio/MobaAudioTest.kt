@@ -1,8 +1,10 @@
 package dev.wildware.moba.audio
 
+import dev.wildware.moba.CharacterAnimationSystem
 import dev.wildware.moba.CueNames
 import dev.wildware.moba.MobaAssets
 import dev.wildware.moba.MobaCharacters
+import dev.wildware.moba.MobaControls
 import dev.wildware.moba.MobaGame
 import dev.wildware.moba.ability.MobaCues
 import dev.wildware.moba.entry.MobaEntry
@@ -14,6 +16,8 @@ import dev.wildware.udea.core.CueId
 import dev.wildware.udea.core.CueQueue
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.render.input.InjectedIntent
+import dev.wildware.udea.render.input.IntentState
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -127,10 +131,7 @@ class MobaAudioTest {
         val audio = MobaAudio.of(game.host, device)
         assertTrue(device.loads > 0, "the routing table loaded some files")
 
-        val hit = assertNotNull(
-            MobaCharacters.cues.idOf("attack_hit"),
-            "the roster declares an attack_hit notify; that is the frame a blade lands on",
-        )
+        val hit = CueId(MobaCues.MELEE_HIT)
         var hits = 0
         repeat(600) {
             game.host.run(1)
@@ -148,7 +149,7 @@ class MobaAudioTest {
         }
         val hitSound = assertNotNull(
             playingAudio.sounds.bindings[hit],
-            "nothing is bound to the attack_hit notify, so no swing can make a sound",
+            "nothing is bound to MELEE_HIT, so no blow that lands can make a sound",
         )
         val hitSlots = (0 until hitSound.size).map { hitSound.handleAt(it).slot }.toSet()
         val hitPlays = playingDevice.playedSlots.count { it in hitSlots }
@@ -162,52 +163,125 @@ class MobaAudioTest {
                 "slots it played were ${playingDevice.playedSlots.distinct().sorted()} and the " +
                 "hit is $hitSlots",
         )
+        assertEquals(
+            hitPlays.toLong(),
+            playingAudio.audio.playsOf(hit),
+            "the per-cue ledger and the device agree on how many hits were started",
+        )
     }
 
     /**
-     * The cue-id collision, written down so that fixing it is a red test rather than a silent no-op.
+     * The claim this wave is about: the two cue id spaces no longer overlap.
      *
-     * [MobaCues] hand-numbers `1..9` and [CueNames] numbers the animation notifies `0 until size`,
-     * into the same `CueId` space on the same sink. This asserts the overlap that exists today. It
-     * goes red when either namespace changes - a new notify name renumbers the whole notify table -
-     * and the person it goes red on is the person who has to decide what the new routing is.
+     * This test is the old `the ability and notify cue namespaces overlap` inverted. That one
+     * asserted the collision - [MobaCues] hand-numbered `1..9`, [CueNames] numbered the notifies
+     * `0 until size`, both into one sink - and said that whoever separated them would be told here
+     * to finish the routing. This is that finish: neither block holds a written-down id any more,
+     * so the property to pin is that the two are adjacent and disjoint however many ids either
+     * one mints.
      */
     @Test
-    fun `the ability and notify cue namespaces overlap, and the overlap is left silent`() {
-        val notifies = MobaCharacters.cues
+    fun `the ability and notify cue namespaces are disjoint`() {
+        val notifies: CueNames = MobaCharacters.cues
         assertEquals(
             listOf("attack_hit", "attack_hit_2", "attack_hit_3", "attack_hit_4", "fire_arrow", "heal", "swoosh"),
-            (0 until notifies.size).map { assertNotNull(notifies.nameOf(CueId(it))) },
+            notifies.ids.map { assertNotNull(notifies.nameOf(CueId(it))) },
             "the notify table is sorted, so these ids are a function of the bundle",
         )
         assertEquals(
-            setOf(
-                MobaCues.DAMAGE,
-                MobaCues.MELEE_HIT,
-                MobaCues.MELEE_SWOOSH,
-                MobaCues.KNOCKBACK,
-                MobaCues.HEAL,
-                MobaCues.SPIN,
-            ),
-            MobaCueSounds.ambiguousIds(notifies),
-            "every MobaCues id below ${notifies.size} is also a notify id, so a consumer holding " +
-                "a Cue cannot tell which of the two emitted it",
+            emptySet(),
+            MobaCueSounds.collisions(notifies),
+            "an id both blocks mint is a cue whose meaning depends on which one emitted it",
+        )
+        assertEquals(
+            MobaCues.NOTIFY_BASE,
+            notifies.ids.first,
+            "the notify block starts where the ability block ended, so no id is wasted",
+        )
+        assertTrue(
+            MobaCues.ids.max() < notifies.ids.first,
+            "ability ids ${MobaCues.ids} must all fall below notify ids ${notifies.ids}",
         )
 
         val sounds = MobaCueSounds.load(RecordingDevice())
+        assertEquals(emptyList(), sounds.silent, "every authored cue is bound")
+        assertEquals(MobaCues.ids.size, sounds.bindings.size, "all nine, where four were bound")
+        MobaCues.ids.forEach { id ->
+            assertNotNull(sounds.bindings[CueId(id)], "${MobaCues.nameOf(id)} plays nothing")
+        }
+        notifies.ids.forEach { id ->
+            assertNull(
+                sounds.bindings[CueId(id)],
+                "no animation notify is bound in this bundle; see MobaCueSounds for why",
+            )
+        }
+    }
+
+    /**
+     * A notify names the unit that fired it, so its sound can be placed.
+     *
+     * `CharacterAnimationSystem` emitted `NetId.NONE` as every notify cue source, and `CueAudio`
+     * plays an unlocatable cue at the ear - centred and unattenuated. A swing on the far side of
+     * the field therefore sounded exactly like one in your face. The id is on the record the
+     * system keeps as well as on the cue, which is what lets this read it after the queue is gone.
+     */
+    @Test
+    fun `a fired notify carries the unit that fired it`() {
+        val game = Booted()
+        repeat(400) { game.host.run(1) }
+
+        val fired = game.host.world.system<CharacterAnimationSystem>().log.entries
+        assertTrue(fired.isNotEmpty(), "no notify fired in 400 ticks, so there is nothing to place")
+        val located = fired.count { !it.source.isNone }
+        println("[MobaAudioTest] ${fired.size} notify record(s), $located of them with an emitter")
         assertEquals(
-            listOf("damage", "heal", "knockback", "melee_hit", "melee_swoosh", "spin"),
-            sounds.ambiguous,
+            fired.size,
+            located,
+            "every unit in the seeded level has a NetId, so every notify it fires must name it",
         )
-        assertNull(sounds.bindings[CueId(MobaCues.SPIN)], "an ambiguous id plays nothing")
-        assertNotNull(sounds.bindings[CueId(MobaCues.DEATH)], "9 is above the notify range")
-        assertNotNull(sounds.bindings[CueId(MobaCues.ARROW_FIRED)])
-        assertNotNull(sounds.bindings[CueId(MobaCues.ARROW_HIT)])
-        assertNotNull(
-            sounds.bindings[assertNotNull(notifies.idOf("attack_hit"))],
-            "id 0 is claimed by no ability cue, so the hit sound is routable",
+    }
+
+    /**
+     * The count of `Sound.play` calls per cue kind over a headless fight, with the ear on the
+     * player.
+     *
+     * The number this wave asks for, at the resolution that says something: an aggregate `played`
+     * cannot tell a run where all nine cues fired from one where the deaths carried it - which is
+     * precisely what the id collision did, four cues bound out of nine and a healthy-looking
+     * total. A zero here now means a cue nothing *emits*, and the assertion names which.
+     */
+    @Test
+    fun `every authored cue is played at least once over a fight`() {
+        val game = Booted()
+        val device = RecordingDevice()
+        val audio = MobaAudio.of(game.host, device)
+        audio.listenTo(MobaEntry.playerId(game.host))
+        // The elite orc spin is the player unit's slot 1 and no AI unit has one, so a run that
+        // never touches the controls cannot fire it - which is what the per-cue ledger reported
+        // the first time this test ran, and is a *gameplay* fact rather than a routing one. Q, at
+        // the rate a player would mash it, through the same `IntentState` a keyboard writes.
+        val keys = InjectedIntent(MobaControls.BINDINGS.catalog)
+        game.host.ctx[IntentState.KEY].source = keys
+        repeat(TICKS_PER_FIGHT) { tick ->
+            if (tick % SPECIAL_EVERY == 0) keys.tap(MobaControls.ATTACK_2_ACTION)
+            game.host.run(1)
+            audio.frame()
+        }
+        val plays = MobaCues.ids.associate { MobaCues.nameOf(it) to audio.audio.playsOf(CueId(it)) }
+        println(
+            "[MobaAudioTest] $TICKS_PER_FIGHT ticks, ${device.plays} device play(s): " +
+                plays.entries.joinToString(" ") { "${it.key}=${it.value}" },
         )
-        assertEquals(4, sounds.bindings.size)
+        assertEquals(
+            device.plays.toLong(),
+            plays.values.sum(),
+            "every play the device saw is attributed to exactly one cue",
+        )
+        assertEquals(
+            emptyList(),
+            plays.filterValues { it == 0L }.keys.toList(),
+            "these cues are authored, routed and loaded, and were never heard",
+        )
     }
 
     /** Every file the routing names is in the asset tree, at the path `GdxAudioDevice` looks in. */
@@ -246,5 +320,25 @@ class MobaAudioTest {
             candidate = candidate.parentFile
         }
         error("no moba/assets/sounds directory above ${File(".").canonicalFile}")
+    }
+
+    private companion object {
+        /**
+         * Long enough for the seeded battle to resolve.
+         *
+         * The fight is over in about forty seconds of simulated time. The elite orc spin and the
+         * priest heal are the two cues that need most of it: one is on a cooldown and the other
+         * only fires once somebody is hurt enough to be worth healing.
+         */
+        const val TICKS_PER_FIGHT: Int = 2400
+
+        /**
+         * Ticks between presses of the player special.
+         *
+         * A second. `ability/orc_elite_spin` has a cooldown longer than that, so most presses are
+         * refused, which is exactly what a player mashing Q does and is why the count this test
+         * asserts on is "at least one" rather than a number.
+         */
+        const val SPECIAL_EVERY: Int = 60
     }
 }

@@ -4,6 +4,7 @@ import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.Pixmap
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.TextureRegion
+import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.Family
 import com.github.quillraven.fleks.World
 import dev.wildware.moba.ability.CharacterAttributes
@@ -108,6 +109,9 @@ public class HealthbarRenderSystem(
 
     private var units: Family? = null
 
+    /** This frame's bars, back to front. Reused; see [WorldDrawOrder] on allocation. */
+    private val order = WorldDrawOrder()
+
     /**
      * Bars drawn in the last frame.
      *
@@ -131,26 +135,24 @@ public class HealthbarRenderSystem(
         batch.begin()
         try {
             with(world) {
-                units.forEach { entity ->
+                collect(units)
+                var index = 0
+                while (index < order.size) {
+                    val entity = order.entityAt(index)
                     val position = entity[Position]
-                    val unit = entity[GameUnit]
                     val values = entity[Attributes]
-                    val health = values.current(attributes.health)
-                    // A corpse is removed by `DeathSystem` in `Gameplay`, so a unit at or below
-                    // zero is one that died during the tick this frame interpolates. Drawing a
-                    // full-width empty bar over it for one frame reads as a glitch; skipping it
-                    // reads as death.
-                    if (health <= 0f) return@forEach
                     draw(
                         x = position.x,
                         y = position.y,
-                        team = unit.team,
-                        health = health,
+                        team = entity[GameUnit].team,
+                        health = values.current(attributes.health),
                         maxHealth = values.current(attributes.maxHealth),
                         mana = values.current(attributes.mana),
                         maxMana = values.current(attributes.maxMana),
+                        player = entity.has(Player),
                     )
                     drawnCount++
+                    index++
                 }
             }
         } finally {
@@ -162,6 +164,49 @@ public class HealthbarRenderSystem(
         }
     }
 
+    /**
+     * Which units get a bar this frame, back to front.
+     *
+     * ## Why this is a filter and not "every unit"
+     *
+     * It used to be every living unit, and a play agent measured what that looks like when the
+     * fight closes: eleven soldiers inside two sprite widths, eleven bars at exactly the same
+     * height, stacked into stripes that no viewer can attribute to a body. Every one of those
+     * bars was full, so all eleven carried the same information - none.
+     *
+     * So a bar is drawn for a unit that is **hurt**, has **spent mana**, or is **the player** -
+     * which is the set a human is actually reading a bar for. A screen of full bars is noise; a
+     * bar appearing the moment a unit takes a hit is the fight becoming legible.
+     *
+     * Sorted back to front for the same reason the sprites are: two bars that do overlap must
+     * resolve the same way the bodies under them did, or the front unit's health is hidden behind
+     * the one standing behind it. See [WorldDrawOrder].
+     */
+    private fun World.collect(units: Family) {
+        order.begin()
+        val entities = units.entities
+        var index = 0
+        while (index < entities.size) {
+            val entity = entities[index]
+            index++
+            val values = entity[Attributes]
+            val health = values.current(attributes.health)
+            // A corpse is left on the field by `DeathSystem`, so a unit at or below zero is one
+            // that has already died. Drawing a full-width empty bar over a body reads as a
+            // glitch; skipping it reads as death.
+            if (health <= 0f) continue
+            if (!isWorthDrawing(entity, values, health)) continue
+            order.add(entity, DrawLayer.UNIT, entity[Position].y)
+        }
+        order.sort()
+    }
+
+    /** Whether [entity] is hurt, has spent mana, or is the unit the human is driving. */
+    private fun World.isWorthDrawing(entity: Entity, values: Attributes, health: Float): Boolean =
+        health < values.current(attributes.maxHealth) ||
+            values.current(attributes.mana) < values.current(attributes.maxMana) ||
+            entity.has(Player)
+
     @Suppress("LongParameterList")
     private fun draw(
         x: Float,
@@ -171,9 +216,22 @@ public class HealthbarRenderSystem(
         maxHealth: Float,
         mana: Float,
         maxMana: Float,
+        player: Boolean,
     ) {
         val left = x - WIDTH / 2f
         val bottom = y + OFFSET_Y
+        // The player's bar is boxed in the same white-gold the ring under their feet is drawn in,
+        // so "which of these bars is mine" has the same answer as "which of these units is mine".
+        if (player) {
+            batch.color = PLAYER_COLOUR
+            batch.draw(
+                pixel,
+                left - PLAYER_OUTLINE,
+                bottom - PLAYER_OUTLINE,
+                WIDTH + PLAYER_OUTLINE * 2f,
+                HEIGHT + PLAYER_OUTLINE * 2f,
+            )
+        }
         rail(left, bottom, fractionOf(health, maxHealth), colourOf(team))
         // Only a unit that has mana gets a rail for it: an always-empty second bar under every
         // soldier is chrome, and a viewer learns to ignore it exactly when the priest needs them
@@ -239,5 +297,17 @@ public class HealthbarRenderSystem(
 
         /** The mana rail. Blue, and the same blue in every team's colours. */
         internal val MANA_COLOUR: Color = Color(0.30f, 0.36f, 0.90f, 1f)
+
+        /** How far the player's box extends past their rail, in world units. */
+        public const val PLAYER_OUTLINE: Float = 1.2f
+
+        /**
+         * The box around the player's own bar.
+         *
+         * The same object the ring under the player's feet and the chevron over their head are
+         * drawn with - one constant, three readers - so "which of these bars is mine" and "which
+         * of these units is mine" can never come to have different answers.
+         */
+        internal val PLAYER_COLOUR: Color = WorldMarkers.PLAYER_COLOUR
     }
 }

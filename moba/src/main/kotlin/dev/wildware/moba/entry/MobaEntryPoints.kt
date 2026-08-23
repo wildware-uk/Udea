@@ -9,6 +9,7 @@ import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.CoreModule
+import dev.wildware.udea.core.module.UdeaModule
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.render.OverlayResources
 import dev.wildware.udea.render.OverlaySystem
@@ -121,6 +122,21 @@ public object MobaEntry {
     }
 
     /**
+     * The player's net id, or `null` when the world has no player in it right now.
+     *
+     * [playerId]'s refusal is right at boot - a level that lost its player is a broken level and
+     * saying so loudly is worth a crash. It is wrong on a **restart**: a match swap tears the
+     * world down and repopulates it inside one barrier action, and a frame callback that asked
+     * during that window would kill a player's client over a state that lasts one tick. So the
+     * per-frame caller uses this one and the boot caller keeps the check.
+     */
+    public fun playerIdOrNull(host: GameHost): NetId? {
+        val entities = host.world.family { all(Player) }.entities
+        if (entities.size != 1) return null
+        return host.ctx[CoreModule.NET_IDS].netIdOf(entities[0])
+    }
+
+    /**
      * Points [rendering]'s camera at [player] and puts the view on it immediately.
      *
      * `snapToTarget` as well as `requestFollow`, because the first frame of a scene is one of the
@@ -202,6 +218,7 @@ public object MobaEntry {
     public fun runWithGl(
         mode: RenderMode,
         overlay: ((OverlayResources) -> OverlaySystem)? = null,
+        extraModules: List<UdeaModule> = emptyList(),
         attach: (GameHost, Rendering) -> Attachment,
     ) {
         require(mode != RenderMode.Headless) { "RenderMode.Headless has no GL backend" }
@@ -222,7 +239,7 @@ public object MobaEntry {
         // are here rather than inside `MobaBench` for the reason that gate exists: a benchmark
         // that instruments a *copy* of the boot sequence measures the copy. The cost is two
         // `nanoTime` calls per phase, once per process.
-        val definition = StartupTrace.world { MobaGame.definition() }
+        val definition = StartupTrace.world { MobaGame.definition(extraModules) }
         val scene = StartupTrace.world { scene(definition) }
         // Registered before `start`, because `Lwjgl3Backend.start` builds the pipeline out of the
         // registry and a registration after that point reaches nothing.

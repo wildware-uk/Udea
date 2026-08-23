@@ -1,5 +1,6 @@
 package dev.wildware.moba
 
+import dev.wildware.moba.ability.MobaCues
 import dev.wildware.udea.assets.AnimNotify
 import dev.wildware.udea.assets.AssetId
 import dev.wildware.udea.assets.AssetRegistry
@@ -8,6 +9,7 @@ import dev.wildware.udea.assets.SpriteAnimationSet
 import dev.wildware.udea.assets.SpriteSheet
 import dev.wildware.udea.core.CueId
 import dev.wildware.udea.core.Tick
+import dev.wildware.udea.core.identity.NetId
 import kotlin.math.roundToLong
 
 /**
@@ -309,31 +311,64 @@ public object CharacterAnimator {
  *
  * It is deliberately not a hash of the name: a 32-bit hash of an arbitrary string collides, and a
  * collision here means an arrow spawning when a priest heals.
+ *
+ * ## Why the ids do not start at zero
+ *
+ * They used to, and so did [MobaCues]. Both blocks emit into the one `GameContext.cues` sink, so
+ * every id from 1 to 6 named two different events at once - `MobaCues.SPIN` and the `swoosh`
+ * notify were the same number, and a consumer holding a `Cue` could not tell which had happened.
+ * The audio table's answer was to leave six of the nine authored cues silent rather than play the
+ * wrong one, which is what this offset deletes.
+ *
+ * [base] is not a constant here: it is [MobaCues.NOTIFY_BASE], which is wherever the ability
+ * block's own allocator stopped. Neither block holds a written-down id, so minting a tenth
+ * ability cue moves this block up by one and adding a notify name to an animation moves nothing.
+ * The `require` refuses any base that would overlap, so a caller passing one by hand fails at
+ * construction rather than silently aliasing a heal onto a knockback.
  */
-public class CueNames private constructor(private val names: List<String>) {
+public class CueNames private constructor(
+    private val names: List<String>,
+    /** The id of the first name. Ids run `base until base + size`. */
+    public val base: Int,
+) {
+
+    init {
+        require(base >= MobaCues.NOTIFY_BASE) {
+            "notify ids would start at $base, inside the ability cue block " +
+                "${MobaCues.FIRST_ID} until ${MobaCues.NOTIFY_BASE}, so ${MobaCues.nameOf(base)} " +
+                "and '${names.firstOrNull()}' would be the same CueId on the same queue"
+        }
+        require(names.size == names.distinct().size) { "duplicate notify name in $names" }
+    }
 
     /** How many distinct notify names this bundle declares. */
     public val size: Int get() = names.size
 
+    /** The ids this table hands out. Disjoint from [MobaCues.ids] by construction. */
+    public val ids: IntRange get() = base until base + names.size
+
     /** The id for [name], or `null` when no animation in the bundle declares it. */
-    public fun idOf(name: String): CueId? = names.indexOf(name).takeIf { it >= 0 }?.let(::CueId)
+    public fun idOf(name: String): CueId? =
+        names.indexOf(name).takeIf { it >= 0 }?.let { CueId(base + it) }
 
     /** The name behind [id], or `null` when it is not one of this game's notify cues. */
-    public fun nameOf(id: CueId): String? = names.getOrNull(id.raw)
+    public fun nameOf(id: CueId): String? = names.getOrNull(id.raw - base)
 
-    override fun toString(): String = "CueNames($names)"
+    override fun toString(): String = "CueNames($names at $base)"
 
     public companion object {
 
         /** Every notify name declared by any animation in [roster], sorted and de-duplicated. */
-        public fun of(roster: CharacterRoster): CueNames = CueNames(
-            roster.entries
-                .flatMap { entry -> entry.states.values + entry.extras.values }
-                .flatMap { animation -> animation.notifies }
-                .map { it.name }
-                .distinct()
-                .sorted(),
-        )
+        public fun of(roster: CharacterRoster, base: Int = MobaCues.NOTIFY_BASE): CueNames =
+            CueNames(
+                roster.entries
+                    .flatMap { entry -> entry.states.values + entry.extras.values }
+                    .flatMap { animation -> animation.notifies }
+                    .map { it.name }
+                    .distinct()
+                    .sorted(),
+                base,
+            )
     }
 }
 
@@ -342,4 +377,12 @@ public data class NotifyRecord(
     public val character: String,
     public val notify: String,
     public val tick: Tick,
+    /**
+     * The unit that fired it, or [NetId.NONE] for one with no network identity.
+     *
+     * The same id the cue carries. It is here so that "the notify names its emitter" is a
+     * property a test can read off the log rather than off a drained queue - the cue itself is
+     * gone by the time anything asserts on it.
+     */
+    public val source: NetId = NetId.NONE,
 )

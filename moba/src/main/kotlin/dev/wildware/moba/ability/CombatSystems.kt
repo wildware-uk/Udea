@@ -443,7 +443,10 @@ public class AbilityAutopilotSystem(
             val entity: Entity = entities[index]
             // A human's unit is not routed by the AI **and does not fire its own abilities**.
             // `Player` is a marker on the one entity `PlayerControlSystem` steers, and that
-            // system is what activates its slots, on a key press, highest slot first.
+            // system is what activates its slots - one key per slot, read on the same tick:
+            // `attack` fires slot 0 and `attack_2` fires slot 1. It used to be "highest granted
+            // slot that will fire wins", which meant one key silently spent the special and the
+            // second key had nothing left to do.
             //
             // This used to be `mayRetreat = Player !in entity`: the player was exempt from
             // retreating and from nothing else, so the autopilot went on activating the abilities

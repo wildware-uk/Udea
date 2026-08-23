@@ -3,13 +3,19 @@ package dev.wildware.moba
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.Pixmap
 import com.badlogic.gdx.graphics.Texture
+import com.badlogic.gdx.graphics.g2d.Batch
 import com.badlogic.gdx.graphics.g2d.TextureRegion
+import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.Family
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.moba.level.GameUnit
+import dev.wildware.moba.level.Team
 import dev.wildware.udea.assets.AssetId
 import dev.wildware.udea.assets.AssetIndex
+import dev.wildware.udea.assets.SpriteAnimation
 import dev.wildware.udea.assets.SpriteSheet
+import dev.wildware.udea.gas.Abilities
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.identity.NetId
@@ -194,6 +200,22 @@ public class MobaScene private constructor(
                 RenderPhase.World,
                 { resources -> HealthbarRenderSystem(resources, camera, combat.attributes) },
             ) { after(characters) }
+            // The player's own HUD: health, mana, and the two ability slots with their cooldowns.
+            // `RenderPhase.UI` and not `World`, because it is screen space and because the phase
+            // is what puts it above every world pass without a constraint against each one. It is
+            // still before the capture point on purpose - see `MobaHudSystem`.
+            registry.register(
+                RenderPhase.UI,
+                { resources ->
+                    MobaHudSystem(
+                        resources = resources,
+                        frameTime = registry.frameTime,
+                        attributeIds = combat.attributes,
+                        abilityTable = combat.abilities.table,
+                        activation = combat.gas.activation,
+                    )
+                },
+            )
             return MobaScene(registry, camera, debug)
         }
     }
@@ -202,6 +224,26 @@ public class MobaScene private constructor(
 
 /**
  * One animated character per [Position], in world space, through the shared batch.
+ *
+ * ## Three things it does that make a melee readable, and one that makes an ability visible
+ *
+ * - **It y-sorts.** The pass used to walk the family in spawn order, so a unit behind another was
+ *   drawn over it whenever it happened to spawn later, and a rewound world drew the same fight
+ *   differently because the restore repopulated the bag in a different order. See
+ *   [WorldDrawOrder].
+ * - **A corpse is a layer, not a body.** `DeathSystem` leaves the dead on the field and they used
+ *   to occlude the living. [DrawLayer.CORPSE] puts every one of them under every fighting unit.
+ * - **Every unit stands on a team-coloured footprint, and the player's is a ring with a chevron
+ *   over it.** A play agent measured eleven soldiers inside two sprite widths, fully overlapping,
+ *   with nothing at all marking which one the human was driving. Sorting decides which sprite
+ *   wins; it cannot make eleven copies of one sprite countable, and discs on the ground plane
+ *   can. See [WorldMarkers].
+ * - **The special is drawn.** `orc_elite_spin` is eleven frames of `orc_elite_attack02.png`,
+ *   packed, cut into the atlas, and shown by nothing: `CharacterRoster` files it under
+ *   [CharacterEntry.extras] because its id ends `_spin` rather than in one of the five state
+ *   suffixes, and this pass only ever asked for `entry.animation(state)`. So the elite's spin -
+ *   an ability with a `TargetPolicy`, a cue and 150% AoE damage behind it - looked exactly like
+ *   its ordinary sword swing. See [specialOf].
  *
  * ## What replaced what
  *
@@ -277,8 +319,34 @@ internal class CharacterRenderSystem(
     private val sheetSlots: Map<AssetId, AssetIndex> =
         framesBySheet.keys.associateWith { registry.indexOf(it) }
 
+    /** The footprint, the player's ring and the player's chevron. Built once, disposed by the pipeline. */
+    private val markers = WorldMarkers(resources)
+
+    /** This frame's back-to-front order. Reused every frame; see [WorldDrawOrder] on allocation. */
+    private val order = WorldDrawOrder()
+
+    /**
+     * Each roster entry's special animation, by roster index, or `null` where it has none.
+     *
+     * Resolved once, against the roster, because it is a pure function of the bundle: a map
+     * lookup per entity per frame for an answer that cannot change without a new bundle is the
+     * "linear scans as lookups" smell §1 names, one level up.
+     */
+    private val specials: Array<SpriteAnimation?> =
+        Array(roster.size) { at -> roster.at(at).extras[SPECIAL_SUFFIX] }
+
     /** Characters actually drawn by the most recent [render]. A health signal, not state. */
     internal var drawnCount: Int = 0
+        private set
+
+    /**
+     * Units drawn with their special animation in the most recent [render].
+     *
+     * Not decorative, and the same argument [drawnCount] carries: "the spin is never drawn" and
+     * "no orc elite spun during those frames" produce the same PNG, and only one of them is a
+     * renderer defect.
+     */
+    internal var specialCount: Int = 0
         private set
 
     override fun onBind(world: World, ctx: GameContext) {
@@ -292,6 +360,7 @@ internal class CharacterRenderSystem(
         val units = this.units ?: return
         val clock = this.clock ?: return
         drawnCount = 0
+        specialCount = 0
         val now = clock.tick.value
         val tickRate = clock.tickRate
         val batch = resources.batch
@@ -300,32 +369,11 @@ internal class CharacterRenderSystem(
         batch.begin()
         try {
             with(world) {
-                units.forEach { entity ->
-                    val position = entity[Position]
-                    val view = entity[CharacterView]
-                    val animation = roster.at(view.character).animation(view.state)
-                    val frames = framesBySheet[animation.sheet.id] ?: return@forEach
-                    val at =
-                        CharacterAnimator.frameAt(animation, frames.size, now - view.startTick, tickRate)
-                    val frame = frames[at]
-                    // World units per pixel, out of the live graph. One array read per frame, and
-                    // the reason an `assets.patch` is visible in the next capture.
-                    val sheetIndex = sheetSlots.getValue(animation.sheet.id)
-                    val scale = (registry.at(sheetIndex) as SpriteSheet).scale
-                    val width = frame.regionWidth * scale
-                    val height = frame.regionHeight * scale
-                    // A negative width and a shifted origin rather than `TextureRegion.flip`: the
-                    // regions are shared by every entity drawing that sheet, so flipping one in
-                    // place would mirror the whole roster for the rest of the frame.
-                    val drawWidth = if (view.flipX) -width else width
-                    batch.draw(
-                        frame,
-                        position.x - drawWidth / 2f,
-                        position.y - height / 2f,
-                        drawWidth,
-                        height,
-                    )
-                    drawnCount++
+                collect(units)
+                var index = 0
+                while (index < order.size) {
+                    draw(order.entityAt(index), batch, now, tickRate)
+                    index++
                 }
             }
         } finally {
@@ -336,7 +384,183 @@ internal class CharacterRenderSystem(
         }
     }
 
+    /**
+     * Puts this frame's units into [order], back to front.
+     *
+     * Walks `Family.entities` rather than `Family.forEach`: Fleks' `forEach` takes a
+     * `Function2`, so a lambda that captures anything is one allocation per pass per frame - and
+     * a frame budget is measured in bytes, not in whether the allocation is small.
+     */
+    private fun World.collect(units: Family) {
+        order.begin()
+        val entities = units.entities
+        var index = 0
+        while (index < entities.size) {
+            val entity = entities[index]
+            val layer =
+                if (entity[CharacterView].state == UnitState.Death) DrawLayer.CORPSE
+                else DrawLayer.UNIT
+            order.add(entity, layer, entity[Position].y)
+            index++
+        }
+        order.sort()
+    }
+
+    /** One unit: its footprint, its frame, and the player's markers if this is the player. */
+    private fun World.draw(entity: Entity, batch: Batch, now: Long, tickRate: Int) {
+        val position = entity[Position]
+        val view = entity[CharacterView]
+        val entry = roster.at(view.character)
+        val special = specialOf(entity, view)
+        val animation = special ?: entry.animation(view.state)
+        val frames = framesBySheet[animation.sheet.id] ?: return
+        // The special's playhead starts at the activation and not at `view.startTick`: a unit
+        // that was already in `Attack` when the special fired - which is every elite that spins
+        // straight out of a sword swing - would otherwise start the spin part-way through.
+        val startTick = if (special == null) view.startTick else activationTick(entity, view)
+        val at = CharacterAnimator.frameAt(animation, frames.size, now - startTick, tickRate)
+        val frame = frames[at]
+        // World units per pixel, out of the live graph. One array read per frame, and
+        // the reason an `assets.patch` is visible in the next capture.
+        val sheetIndex = sheetSlots.getValue(animation.sheet.id)
+        val scale = (registry.at(sheetIndex) as SpriteSheet).scale
+        val width = frame.regionWidth * scale
+        val height = frame.regionHeight * scale
+        val dead = view.state == UnitState.Death
+        val player = entity.has(Player)
+        // Under the sprite, so a unit standing on its own marker hides the top of it - which is
+        // what makes the disc read as being on the ground rather than painted on the unit.
+        marks(batch, position, height, entity.getOrNull(GameUnit)?.team ?: Team.NONE, dead, player)
+        // A negative width and a shifted origin rather than `TextureRegion.flip`: the
+        // regions are shared by every entity drawing that sheet, so flipping one in
+        // place would mirror the whole roster for the rest of the frame.
+        val drawWidth = if (view.flipX) -width else width
+        batch.color = Color.WHITE
+        batch.draw(
+            frame,
+            position.x - drawWidth / 2f,
+            position.y - height / 2f,
+            drawWidth,
+            height,
+        )
+        if (player) {
+            markers.chevron(batch, position.x, position.y + CHEVRON_TIP_Y, CHEVRON_WIDTH, PLAYER_COLOUR, PLAYER_ALPHA)
+        }
+        batch.color = Color.WHITE
+        drawnCount++
+        if (special != null) specialCount++
+    }
+
+    /** The footprint under one unit, and the ring instead of it when the unit is the player. */
+    @Suppress("LongParameterList")
+    private fun marks(
+        batch: Batch,
+        position: Position,
+        height: Float,
+        team: Int,
+        dead: Boolean,
+        player: Boolean,
+    ) {
+        val y = position.y - height * FOOT_OF_HEIGHT
+        val width = height * FOOTPRINT_OF_HEIGHT
+        val colour = HealthbarRenderSystem.colourOf(team)
+        // A corpse keeps a footprint, faint: it is what stops a body on the ground reading as a
+        // living unit lying down, and it is how a viewer sees where the fight has already been.
+        markers.footprint(batch, position.x, y, width, colour, if (dead) CORPSE_ALPHA else FOOT_ALPHA)
+        if (player) markers.ring(batch, position.x, y, width * PLAYER_RING_SCALE, PLAYER_COLOUR, PLAYER_ALPHA)
+    }
+
+    /**
+     * The special animation [entity] should be showing, or `null` for the plain state animation.
+     *
+     * ## Why this reads the ability and not a sixth [UnitState]
+     *
+     * `CharacterStateSystem` derives one `Attack` state from "any ability instance is active",
+     * deliberately: the picture is then a pure function of restored components and survives a
+     * rewind. Adding `SpinAttack` to [UnitState] would mean a sixth suffix every character in the
+     * bundle has to declare, and `CharacterEntry`'s own `require` refuses a character short of
+     * one - so five of the six characters would stop loading.
+     *
+     * So the *state* stays five-valued and the renderer asks the one further question it needs:
+     * is the unit's **special** slot the one that is active? That is a read of simulation state
+     * on the render thread and writes nothing, which is exactly what a presentation system is
+     * allowed to do (spec 3.3).
+     *
+     * The slot is [PlayerControlSystem.SLOT_SECONDARY] rather than a constant of this file's own,
+     * because there must be exactly one answer to "which slot is the special": `UnitBlueprint.dress`
+     * grants in that order, `PlayerControlSystem` fires that slot on the second attack key, and a
+     * renderer that disagreed would draw the spin over the sword swing.
+     */
+    private fun World.specialOf(entity: Entity, view: CharacterView): SpriteAnimation? {
+        if (view.state != UnitState.Attack) return null
+        val special = specials[Math.floorMod(view.character, specials.size)] ?: return null
+        val abilities = entity.getOrNull(Abilities) ?: return null
+        if (PlayerControlSystem.SLOT_SECONDARY >= abilities.slotCount) return null
+        val instance = abilities.instanceAt(PlayerControlSystem.SLOT_SECONDARY)
+        return if (instance.isGranted && instance.isActive) special else null
+    }
+
+    /** The tick the special slot was activated on, falling back to the state's own start. */
+    private fun World.activationTick(entity: Entity, view: CharacterView): Long {
+        val abilities = entity.getOrNull(Abilities) ?: return view.startTick
+        return abilities.instanceAt(PlayerControlSystem.SLOT_SECONDARY).activatedTick.value
+    }
+
     internal companion object {
+
+        /**
+         * The id suffix of an animation that is a character's special rather than one of the five
+         * states.
+         *
+         * The same convention `UnitState.suffix` is: `character/orc_elite_spin` is the `spin` of
+         * `orc_elite`, and `CharacterRoster` already files anything whose suffix is not a state
+         * under [CharacterEntry.extras] keyed by exactly this string. Naming it here rather than
+         * writing `"spin"` inline is what makes the contract greppable from both ends.
+         */
+        const val SPECIAL_SUFFIX: String = "spin"
+
+        /**
+         * How far below a unit's [Position] its feet are, as a fraction of the drawn frame.
+         *
+         * A fraction and not a constant in world units, because the six characters are authored
+         * at scales from 1.25 to 1.88 and a fixed drop would put the orc's marker at its knees
+         * and the elite's under the ground. The frames are mostly transparent margin - a 100px
+         * sheet at 1.88 draws 188 world units and the character inside it is about 30 - so this
+         * is small.
+         */
+        const val FOOT_OF_HEIGHT: Float = 0.085f
+
+        /** A footprint's width, as a fraction of the drawn frame height. @see FOOT_OF_HEIGHT */
+        const val FOOTPRINT_OF_HEIGHT: Float = 0.17f
+
+        /**
+         * Where the point of the player's chevron sits, in world units above their [Position].
+         *
+         * Clear of the health bar rather than a fraction of the frame, and derived from the bar's
+         * own numbers: a chevron placed by frame height lands at a different height on each of
+         * the six characters, and on the elite it landed *inside* the rail. Both markers are
+         * screen furniture at a fixed size, so both are placed in fixed world units.
+         */
+        const val CHEVRON_TIP_Y: Float =
+            HealthbarRenderSystem.OFFSET_Y + HealthbarRenderSystem.HEIGHT + 1.5f
+
+        /** The chevron's width, in world units. About a third of a unit's shoulders. */
+        const val CHEVRON_WIDTH: Float = 11f
+
+        /** The player's ring, relative to the footprint it replaces: wider, so it reads as a ring. */
+        const val PLAYER_RING_SCALE: Float = 1.35f
+
+        /** A living unit's footprint. Solid enough to count, faint enough not to be a sprite. */
+        const val FOOT_ALPHA: Float = 0.55f
+
+        /** A corpse's footprint. */
+        const val CORPSE_ALPHA: Float = 0.22f
+
+        /** The player's ring and chevron. Fully opaque: it is the one thing that must not be missed. */
+        const val PLAYER_ALPHA: Float = 1f
+
+        /** The ring, the chevron and the box around the player's own rail. @see WorldMarkers */
+        val PLAYER_COLOUR: Color = WorldMarkers.PLAYER_COLOUR
 
         /**
          * Every atlas page uploaded, and every sheet's frames cut out of them.

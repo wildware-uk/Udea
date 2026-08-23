@@ -5,6 +5,8 @@ import dev.wildware.udea.core.Cue
 import dev.wildware.udea.core.SimSystem
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.core.identity.NetIdIndex
+import dev.wildware.udea.core.module.CoreModule
 
 /**
  * Fires each unit's animation notifies on the exact tick its state machine says they land on.
@@ -37,13 +39,18 @@ import dev.wildware.udea.core.identity.NetId
  * connected halfway through the arc rather than the instant the ability fired. Hooking damage
  * onto the cue is a change in a combat system, not in this file.
  *
- * ## Stubbed, and named as such
+ * ## The emitter, which used to be missing
  *
- * The cue carries [NetId.NONE] as its source rather than the unit that swung. `MobaModule` does
- * not publish the `NetIdIndex` on the context, so a system cannot turn a Fleks entity into a
- * `NetId` without a field being added to it - and a wrong source would be worse than an absent
- * one, because a consumer would place the effect on some other unit. [NotifyLog] carries the
- * character name in the meantime, which is enough for a test and not enough for a renderer.
+ * The cue carries the swinging unit's [NetId]. It used to carry [NetId.NONE], on the stated
+ * grounds that `MobaModule` did not publish the `NetIdIndex` on the context - which was not true:
+ * `CoreModule.NET_IDS` is on it, and `UnitBattleSystems`, `Player` and `MobaVfx` all read it the
+ * same way this now does. The consequence was audible rather than theoretical: `CueAudio` places
+ * an unlocatable cue at the ear, so every notify-driven sound played centred and unattenuated no
+ * matter which side of the field it happened on.
+ *
+ * A unit with no net id - `MobaShot` builds roster entries that carry a `CharacterView` and
+ * nothing else - still emits [NetId.NONE], which is the honest answer for an entity that has no
+ * network identity, and plays centred as before.
  */
 public class CharacterAnimationSystem(
     private val roster: CharacterRoster = MobaCharacters.roster,
@@ -53,6 +60,9 @@ public class CharacterAnimationSystem(
 ) : SimSystem() {
 
     private val units = family { all(CharacterView) }
+
+    /** How a unit becomes the [NetId] a cue's consumer positions the effect on. */
+    private val netIds: NetIdIndex = ctx[CoreModule.NET_IDS]
 
     /** The tick this system last ran, so a notify window is `(lastTick, tick]`. */
     private var lastTick: Long = Long.MIN_VALUE
@@ -83,8 +93,9 @@ public class CharacterAnimationSystem(
                 tickRate = ctx.clock.tickRate,
             ) { notify ->
                 val id = cueNames.idOf(notify.name) ?: return@notifiesBetween
-                ctx.cues.emit(Cue(id, Tick(now), NetId.NONE))
-                log.record(NotifyRecord(character.name, notify.name, Tick(now)))
+                val source = netIds.netIdOf(entity)
+                ctx.cues.emit(Cue(id, Tick(now), source))
+                log.record(NotifyRecord(character.name, notify.name, Tick(now), source))
                 emittedCount++
             }
         }

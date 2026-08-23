@@ -8,6 +8,7 @@ import dev.wildware.moba.level.MobaBlueprints
 import dev.wildware.udea.annotations.Replicated
 import dev.wildware.udea.annotations.Sim
 import dev.wildware.udea.core.SimSystem
+import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
 import dev.wildware.udea.core.blueprint.SpawnPosition
 import dev.wildware.udea.core.identity.NetId
@@ -129,20 +130,32 @@ public class Player(
  * left to registration order), so the axis it reads was sampled on this tick rather than the
  * previous one.
  *
- * ## Attack
+ * ## Two keys, two slots
  *
- * The primary attack activates the player's own ability slot through [AbilityActivation] - the
- * same call `dev.wildware.moba.ability.AbilityAutopilotSystem` makes for every AI unit on the
- * field, with the same cost check, the same cooldown effect and the same exec. It used to write
+ * Both attacks activate the player's own ability slot through [AbilityActivation] - the same call
+ * `dev.wildware.moba.ability.AbilityAutopilotSystem` makes for every AI unit on the field, with
+ * the same cost check, the same cooldown effect and the same exec. It used to write
  * `unit.attackReadyTick = 0L`, which reached into a second combat implementation that no longer
  * exists; a player whose swing is a different code path from the soldier beside them is a player
  * playing a different game from the one the server simulates.
  *
- * The highest granted slot that will actually fire wins, so pressing the key uses the soldier's
- * arrow when it is off cooldown and its sword when it is not - which is what the character's two
- * `Slot.A`/`Slot.B` loadout meant. Refusals are counted, not swallowed: [attacksRefused] is what
- * separates "the input never arrived" from "it arrived and the ability was on cooldown", and
- * those two look identical from outside the process.
+ * [MobaControls.ATTACK] fires [SLOT_PRIMARY] and [MobaControls.ATTACK_2] fires [SLOT_SECONDARY],
+ * which are the two slots `UnitBlueprint.dress` grants in that order - slot 0 the basic attack,
+ * slot 1 the special. That mapping is the fix for a control that was bound, packed, and read by
+ * nothing: `attack_2` is declared in `moba/assets/control/controls.udea.kts` on `Q`, it resolves
+ * into [MobaControls.ATTACK_2_ACTION], and no system in the tree ever asked an intent about it.
+ *
+ * What it replaced was **one** key running "highest granted slot that will fire wins". That is a
+ * defensible rule for an autopilot and a bad one for hands: Space silently spent the soldier's
+ * five-second fire arrow whenever it happened to be up, so the player's only key did two
+ * different things depending on state they could not see - and the second key could not have been
+ * given anything to do while the first was eating both slots. Space is now always the sword and Q
+ * is always the arrow.
+ *
+ * A slot the unit was never granted - Q on an orc, which has only a melee - is a refusal and not
+ * a crash. Refusals are counted rather than swallowed, because "the input never arrived" and "it
+ * arrived and the ability was cooling down" look identical from outside the process, and
+ * [MobaHudModel] is what puts that difference on the screen.
  */
 public class PlayerControlSystem(
     private val input: IntentState,
@@ -155,19 +168,28 @@ public class PlayerControlSystem(
 
     private val netIds: NetIdIndex = ctx[CoreModule.NET_IDS]
 
-    /** Abilities actually started by a key press. A signal for a test and a log line. */
+    /** Abilities actually started by a key press, either key. A signal for a test and a log line. */
     public var attacksRequested: Long = 0L
         private set
 
-    /** Presses that reached a unit and fired nothing: on cooldown, out of mana, stunned. */
+    /** Presses that reached a unit and fired nothing: not granted, on cooldown, out of mana. */
     public var attacksRefused: Long = 0L
+        private set
+
+    /** [SLOT_SECONDARY] activations only. What separates "Q is wired" from "a key was pressed". */
+    public var specialsRequested: Long = 0L
+        private set
+
+    /** [SLOT_SECONDARY] presses that fired nothing. Mostly "the special is still cooling down". */
+    public var specialsRefused: Long = 0L
         private set
 
     override fun onTick() {
         val intent = input.intent
         val x = intent.axisX(MobaControls.MOVE_AXIS)
         val y = intent.axisY(MobaControls.MOVE_AXIS)
-        val attacking = intent.isJustPressed(MobaControls.ATTACK_ACTION)
+        val primary = intent.isJustPressed(MobaControls.ATTACK_ACTION)
+        val secondary = intent.isJustPressed(MobaControls.ATTACK_2_ACTION)
         val now = tick
         players.forEach { entity ->
             val player = entity[Player]
@@ -179,26 +201,79 @@ public class PlayerControlSystem(
             // from whoever this unit is targeting. A character that turns to face an enemy while
             // you walk the other way reads as the controls being ignored.
             entity.getOrNull(CharacterView)?.flipX = player.facing < 0f
-            if (!attacking) return@forEach
+            if (!primary && !secondary) return@forEach
             val abilities = entity.getOrNull(Abilities) ?: return@forEach
             val attributes = entity.getOrNull(Attributes) ?: return@forEach
             val effects = entity.getOrNull(GameplayEffects) ?: return@forEach
             val self = netIds.netIdOf(entity)
-            // Highest slot first: the special when it is up, the basic attack when it is not,
-            // which is the order the autopilot uses for exactly the same reason.
-            var slot = abilities.slotCount - 1
-            while (slot >= 0) {
-                if (abilities.instanceAt(slot).isGranted &&
-                    activation.activate(self, abilities, attributes, effects, slot, now) ===
-                    ActivationResult.Activated
-                ) {
+            // Both keys are read on the same tick when both went down on it. A player who mashes
+            // Space and Q together means both, and a rule that dropped one would be a rule they
+            // have to learn by losing a fight.
+            if (primary) {
+                if (fire(self, abilities, attributes, effects, SLOT_PRIMARY, now)) {
                     attacksRequested++
-                    return@forEach
+                } else {
+                    attacksRefused++
                 }
-                slot--
             }
-            attacksRefused++
+            if (secondary) {
+                if (fire(self, abilities, attributes, effects, SLOT_SECONDARY, now)) {
+                    attacksRequested++
+                    specialsRequested++
+                } else {
+                    attacksRefused++
+                    specialsRefused++
+                }
+            }
         }
+    }
+
+    /**
+     * Starts [slot] if the unit has it and it will go, and says whether it went.
+     *
+     * A slot past [Abilities.slotCount], or one the unit was never granted, is `false` rather than
+     * a throw: `UnitBlueprint.dress` grants as many slots as the kind declares abilities, so an
+     * orc has nothing in [SLOT_SECONDARY], and a player who takes one over must get a refusal for
+     * Q rather than an exception out of the middle of `SimPhase.Intent`.
+     *
+     * `=== ActivationResult.Activated` rather than `.isActivated`: every refusal case carries a
+     * reason and is a `data class`, so this is an identity comparison against the one `data
+     * object` and the path that fires allocates nothing.
+     */
+    @Suppress("LongParameterList")
+    private fun fire(
+        self: NetId,
+        abilities: Abilities,
+        attributes: Attributes,
+        effects: GameplayEffects,
+        slot: Int,
+        now: Tick,
+    ): Boolean {
+        if (slot >= abilities.slotCount) return false
+        if (!abilities.instanceAt(slot).isGranted) return false
+        return activation.activate(self, abilities, attributes, effects, slot, now) ===
+            ActivationResult.Activated
+    }
+
+    public companion object {
+
+        /**
+         * The slot [MobaControls.ATTACK] fires. The basic attack.
+         *
+         * `UnitBlueprint.dress` walks `UnitKind.abilities` into slots in declaration order and
+         * every kind in `MobaUnits.kinds` declares its melee first, so slot 0 is the sword on
+         * every unit in this game - which is what makes one constant here correct rather than a
+         * soldier-shaped assumption about the one unit a human happens to drive today.
+         */
+        public const val SLOT_PRIMARY: Int = 0
+
+        /**
+         * The slot [MobaControls.ATTACK_2] fires. The special, where the kind has one.
+         *
+         * The soldier's fire arrow, the priest's heal, the elite orc's spin. An orc, a skeleton
+         * and a wizard have no slot 1 at all, and pressing Q as one of them is a counted refusal.
+         */
+        public const val SLOT_SECONDARY: Int = 1
     }
 }
 

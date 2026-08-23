@@ -225,10 +225,22 @@ class ToolIndexTest {
     private class Def<T : Any>(
         override val name: String,
         override val owner: KClass<*>,
+        /**
+         * What this stand-in accepts, and it has to be the truth.
+         *
+         * A generated tool's `args` is the list its `inputSchema` was rendered from, and
+         * `ToolIndex.invoke` refuses a call naming anything outside it - the schema publishes
+         * `additionalProperties: false` and nothing used to enforce it. A fixture that read
+         * `count` while declaring no arguments would be a fixture asserting that the manifest
+         * may lie, so it declares what it reads.
+         */
+        private val accepts: List<String> = emptyList(),
         private val call: (T, AgentCommand) -> Any?,
     ) : AgentToolDef<T> {
         override val description: String = "A hand-written stand-in for a generated $name."
-        override val args: List<AgentToolArg> = emptyList()
+        override val args: List<AgentToolArg> = accepts.map {
+            AgentToolArg(it, "string", "The $it this stand-in reads.", required = true, default = null)
+        }
         override val inputSchema: String = """{"type":"object","properties":{}}"""
         override fun invoke(receiver: T, command: AgentCommand): Any? = call(receiver, command)
     }
@@ -239,11 +251,11 @@ class ToolIndexTest {
     ) : ToolModule
 
     private companion object {
-        val SPAWN = Def<Spawner>("spawn", Spawner::class) { spawner, command ->
+        val SPAWN = Def<Spawner>("spawn", Spawner::class, listOf("count")) { spawner, command ->
             spawner.spawn(command.int("count"))
         }
 
-        val LABEL = Def<Labeller>("label", Labeller::class) { labeller, command ->
+        val LABEL = Def<Labeller>("label", Labeller::class, listOf("text")) { labeller, command ->
             labeller.label = command.str("text")
         }
 

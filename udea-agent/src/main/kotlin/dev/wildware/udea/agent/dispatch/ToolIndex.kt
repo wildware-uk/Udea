@@ -7,6 +7,7 @@ import dev.wildware.udea.agent.AgentToolDef
 import dev.wildware.udea.agent.Json
 import dev.wildware.udea.agent.OwnerBinding
 import dev.wildware.udea.agent.ToolModule
+import dev.wildware.udea.agent.tools.ArgumentCheck
 import dev.wildware.udea.agent.tools.ContextualToolDef
 import dev.wildware.udea.diagnostics.UdeaRules
 import java.util.ServiceLoader
@@ -25,7 +26,7 @@ import java.util.ServiceLoader
  *
  * ## What it checks, and when
  *
- * Everything is settled in [Builder.build] and nothing on the call path:
+ * Everything about the *wiring* is settled in [Builder.build] and nothing on the call path:
  *
  * - **two modules publishing one tool name** is refused, naming both modules. No single KSP
  *   round can see this - a round sees one module - so it is unenforceable at build time, and
@@ -35,6 +36,14 @@ import java.util.ServiceLoader
  *   manifest had been advertising the whole time;
  * - the name-to-entry map and the receiver are resolved once, so [invoke] is a hash lookup and
  *   a virtual call with no allocation of its own.
+ *
+ * The one thing that *must* be checked per call is the call's own arguments, and [invoke] does
+ * it through [dev.wildware.udea.agent.tools.ArgumentCheck]. Every generated tool publishes
+ * `additionalProperties: false` and nothing enforced it, so a mistyped argument name was
+ * dropped and the call answered `ok:true` with default behaviour - a wrong answer wearing a
+ * success, which is the one failure an agent cannot detect from the reply. It is here rather
+ * than in [AgentDispatcher] because the declared argument set lives on the `AgentToolDef` this
+ * class resolved, so the check is made against the manifest itself.
  */
 public class ToolIndex private constructor(
     private val entries: Map<String, Entry>,
@@ -92,6 +101,7 @@ public class ToolIndex private constructor(
      */
     override fun invoke(command: AgentCommand, context: AgentContext): AgentResult {
         val entry = entries[command.name] ?: return noSuchTool(command)
+        ArgumentCheck.reject(command.name, entry.def.args, command.args.keys)?.let { return it }
         return render(command, invokeUnchecked(entry, command, context))
     }
 
@@ -103,6 +113,7 @@ public class ToolIndex private constructor(
      */
     public fun invoke(command: AgentCommand): AgentResult {
         val entry = entries[command.name] ?: return noSuchTool(command)
+        ArgumentCheck.reject(command.name, entry.def.args, command.args.keys)?.let { return it }
         return render(command, invokeUnchecked(entry, command, null))
     }
 

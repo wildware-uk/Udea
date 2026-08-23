@@ -62,11 +62,12 @@ import dev.wildware.udea.render.camera.CameraRig
  * - **No shadows.** Every old character pack had a `shadows/` folder drawn under the unit and no
  *   shadow sheet was copied into this module's `sprites` tree. Those sheets are character art and
  *   belong beside the character sheets, which this file does not own.
- * - **No draw order or per-entity offset on the character pass.** The old blueprints carried
- *   `spriteRenderer(order = 10, offset = ...)`; [CharacterRenderSystem] walks its family in raw
- *   order, so a unit can be drawn over a unit standing in front of it. [SpriteView.offsetY]
- *   exists here because a flash has to sit on a unit's chest rather than at its feet; the
- *   character pass's own ordering is a `MobaScene` change.
+ * - **Draw order is a shared concern now, and it is [WorldDrawOrder].** The old blueprints
+ *   carried `spriteRenderer(order = 10, offset = ...)`; both halves of that are back, as a
+ *   per-entity [DrawLayer] and a per-entity depth, and [SpriteRenderSystem] and
+ *   [CharacterRenderSystem] sort through the same buffer. [SpriteView.offsetY] stays, because a
+ *   flash has to sit on a unit's chest rather than at its feet, which is a different question
+ *   from which of two things is in front.
  * - **An effect is a real entity in the simulation**, spawned through the barrier, exactly as
  *   `blueprint/effect` was. That means a hit costs a spawn and a `NetId`, and it means a
  *   `world.query_entities` sees flashes. The alternative - a presentation-side particle pool
@@ -379,6 +380,16 @@ internal class SpriteRenderSystem(
     internal var drawnCount: Int = 0
         private set
 
+    /**
+     * This frame's order, back to front.
+     *
+     * The same [WorldDrawOrder] the character pass uses and for the same reason: this family is
+     * walked in spawn order, so which of two overlapping flashes won was decided by which cue
+     * fired first rather than by which is nearer the viewer - and a rewound world, whose bag is
+     * repopulated in a different order, drew the pair the other way round.
+     */
+    private val order = WorldDrawOrder()
+
     override fun onBind(world: World, ctx: GameContext) {
         this.world = world
         this.clock = ctx.clock
@@ -398,11 +409,23 @@ internal class SpriteRenderSystem(
         batch.begin()
         try {
             with(world) {
-                views.forEach { entity ->
+                order.begin()
+                val entities = views.entities
+                var collected = 0
+                while (collected < entities.size) {
+                    val entity = entities[collected]
+                    order.add(entity, DrawLayer.EFFECT, entity[Position].y)
+                    collected++
+                }
+                order.sort()
+                var index = 0
+                while (index < order.size) {
+                    val entity = order.entityAt(index)
+                    index++
                     val view = entity[SpriteView]
                     val animation = registry.find(view.animation) as? SpriteAnimation
-                        ?: return@forEach
-                    val frames = framesBySheet[animation.sheet.id] ?: return@forEach
+                        ?: continue
+                    val frames = framesBySheet[animation.sheet.id] ?: continue
                     val at = CharacterAnimator.frameAt(
                         animation,
                         frames.size,

@@ -16,11 +16,14 @@
 // authorability and it is stated rather than hidden: it goes away with issue #84, exactly as the
 // `character(...)` stats do.
 //
-// The scales are the character scales' neighbours on purpose. `priestScale` is 1.43 for a 100px
-// frame, and these effect frames are 100px too, so a flash drawn at 1.43 is the size of the unit
-// it is drawn on rather than a postage stamp beside it.
-
-val effectScale = 1.43F
+// The scale was 1.43 - a character scale's neighbour, on the reasoning that a 100px effect frame
+// beside a 100px character frame should share it. Measured on a real capture, that reasoning is
+// wrong, and the number below is what a screenshot says rather than what the arithmetic said:
+// a *character* frame is mostly transparent margin and its drawn body is about 30 world units,
+// while an effect frame is filled edge to edge, so 1.43 put a 143-unit flash on a 30-unit
+// soldier. In an eleven-unit melee the flashes covered the fight they were describing. 0.30 is
+// about one body wide, which is the size a hit flash reads as a hit rather than as a screen wipe.
+val effectScale = 0.30F
 
 // --- the priest's heal, the one effect the old game actually spawned ------------------------
 

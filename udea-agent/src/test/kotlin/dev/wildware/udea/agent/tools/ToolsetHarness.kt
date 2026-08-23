@@ -127,6 +127,9 @@ internal class ToolsetHarness(
             clock = host.ctx.clock,
             catalog = BlueprintCatalog.of(listOf(GruntBlueprint, ChampionBlueprint)),
             spawner = spawner,
+            // The same store the event toolset gets, because a host wires one store and both
+            // tools file into it. `NONE` by default, which is what a harness without one has.
+            spill = spill,
         )
         timeTools = TimeToolset(host.time, host.ctx.clock, bridge)
         eventTools = EventsToolset(bridge, host.ctx.clock, spill)

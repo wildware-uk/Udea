@@ -79,6 +79,58 @@ public class EntityQueryEngine(
         }
     }
 
+    /**
+     * Runs [query] and hands each row of the matched page to [row], already rendered.
+     *
+     * ## Why a tool needs the rows and not the document
+     *
+     * [run] renders the whole page as one JSON value, and that is exactly what made
+     * `world.query_entities` unreadable above about twenty rows: a command answer reaches the
+     * agent only through the digest's `commandResults` array, which drops - rather than shortens
+     * - any entry past [dev.wildware.udea.agent.state.DigestBudgets.RESULT_CEILING]. A 27-unit
+     * "every unit's health" answer is some 900 characters, so the tool ran, matched, rendered
+     * and delivered **nothing**. Paging it needs the rows one at a time, because a page is
+     * decided by measuring rows rather than by guessing how many fit.
+     *
+     * The walk and the render both happen inside the re-entrancy guard, which is not an
+     * implementation detail: a projection reaches a game's own `AgentComponentType.read`, and
+     * that is the one place a re-entrant `run` can come from. Rendering outside the guard would
+     * leave that call unrefused and let it overwrite the page being emitted.
+     *
+     * A row that resolves to nothing - an id freed between the walk and the render - is skipped
+     * rather than handed over empty, so a caller never has to filter blanks out of its own page.
+     *
+     * Allocating one `String` per row, once per tool call on the simulation thread and never per
+     * tick. That is the same trade [run] makes by building a document, in a shape a pager can
+     * use.
+     *
+     * @return the unpaged [QuerySummary], so a caller can report how many matched as well as how
+     *   many it was handed.
+     */
+    public fun forEachRow(query: EntityQuery, row: (String) -> Unit): QuerySummary {
+        check(!running) { "EntityQueryEngine.run is not re-entrant; one query at a time" }
+        running = true
+        try {
+            active = query
+            pageSize = 0
+            total = 0
+            netIds.forEachLive(this)
+            val summary = QuerySummary(total, pageSize, total > query.offset + pageSize)
+            val scratch = Json()
+            var position = 0
+            while (position < pageSize) {
+                scratch.reset()
+                renderEntity(query, scratch, page[position])
+                if (scratch.length > 0) row(scratch.toString())
+                position++
+            }
+            return summary
+        } finally {
+            active = EMPTY_QUERY
+            running = false
+        }
+    }
+
     /** Renders the same document [run] does, into a fresh string. For tools and tests. */
     public fun render(query: EntityQuery): String {
         val json = Json()

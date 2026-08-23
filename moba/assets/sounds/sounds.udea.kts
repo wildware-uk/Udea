@@ -134,3 +134,28 @@ soundCue(
         "/sounds/orc/orc_grunt_5.ogg",
     ),
 )
+
+// The priest's heal, and the one cue in this file with no recording behind it.
+//
+// The pack is twenty-four melee and orc recordings - three hits, five swooshes, five hurts, five
+// grunts, four deaths, a big grunt and an elite swoosh - and none of them is a heal. The old game
+// made no heal sound at all: `PriestHealCue` spawned `effects/heal_effect` and nothing else. So
+// this is a **placeholder**, said plainly: two of the airier swooshes at a third of a swing's
+// volume, which reads as a soft magical whoosh rather than as a blade.
+//
+// It is a cue of its own rather than `MobaCues.HEAL` pointed at `melee_swoosh`, for the reason
+// `arrow_fired` is: the day somebody records a heal, one line here changes and no code does - and
+// the mix has to differ, because `ability/heal_over_time` re-emits this cue every fifteen ticks
+// for its whole duration and a swoosh at swing volume four times a second is a siren.
+//
+// `pitchVariance` is high for the same reason: four in a row at one pitch is a machine, and the
+// same recording spread over 0.7x to 1.3x is four different whooshes.
+soundCue(
+    name = "heal",
+    pitchVariance = 0.3F,
+    volume = 0.12F,
+    sounds = listOf(
+        "/sounds/effects/melee_swoosh_2.ogg",
+        "/sounds/effects/melee_swoosh_4.ogg",
+    ),
+)

@@ -13,77 +13,75 @@ import dev.wildware.udea.audio.CueSound
 import dev.wildware.udea.core.CueId
 
 /**
- * Which cue plays which `soundCue`, and the reason six of the nine play nothing.
+ * Which cue plays which `soundCue`, and what is still silent.
  *
- * ## Two cue namespaces, one `CueId` space
+ * ## What this file used to say, and why it no longer does
  *
- * `GameContext.cues` is a single `CueSink` and **two** independent things mint ids into it:
+ * `GameContext.cues` is a single `CueSink` and **two** independent things mint ids into it -
+ * [MobaCues] for the ability cues, [CueNames] for the animation notify names. Both used to start
+ * at zero and count up by hand, so ids `1..6` named two different events each: a consumer holding
+ * a `Cue` could not tell `MobaCues.SPIN` from the `swoosh` notify, or `KNOCKBACK` from
+ * `fire_arrow`. This table's answer was to bind only the four unambiguous ids and route **six of
+ * the nine authored cues to silence**, because binding `SPIN` to the elite orc's shout would have
+ * played that shout on every unit's swing wind-up.
  *
- * - [MobaCues], hand-numbered `1..9` - `DAMAGE`, `MELEE_HIT`, `MELEE_SWOOSH`, `KNOCKBACK`, `HEAL`,
- *   `SPIN`, `ARROW_FIRED`, `ARROW_HIT`, `DEATH` - emitted by the ability execs and by `DeathSystem`;
- * - [CueNames], which numbers the animation notify names `0 until size` from a **sorted** list of
- *   whatever the bundle declares, and which `CharacterAnimationSystem` emits under.
+ * The namespaces are now allocated rather than typed: `MobaCues` mints the ability block and
+ * [CueNames] allocates the notify block from [MobaCues.NOTIFY_BASE], which is wherever that block
+ * ended. Nothing overlaps, so every authored cue below is bound and audible. [collisions] still
+ * computes the overlap - it is a guard now rather than a policy, and `MobaAudioTest` pins it
+ * empty so that a future block minted by hand fails a test instead of going quietly silent.
  *
- * They overlap. Today the bundle declares seven notify names, so notify ids run `0..6` and every
- * `MobaCues` id from `DAMAGE` to `SPIN` is *also* a notify id:
+ * ## Why no animation notify has a sound
  *
- * | id | ability cue | notify |
- * |---|---|---|
- * | 0 | - | `attack_hit` |
- * | 1 | `DAMAGE` | `attack_hit_2` |
- * | 2 | `MELEE_HIT` | `attack_hit_3` |
- * | 3 | `MELEE_SWOOSH` | `attack_hit_4` |
- * | 4 | `KNOCKBACK` | `fire_arrow` |
- * | 5 | `HEAL` | `heal` |
- * | 6 | `SPIN` | `swoosh` |
+ * The notify ids are clean and routable; nothing is bound to one because in this bundle every
+ * notify that can fire names an event an ability cue already emits, and the ability cue is the
+ * better trigger of the two:
  *
- * A consumer holding a `Cue` cannot tell which of the two emitted it, and neither can this table.
- * Binding `SPIN` to the elite orc's shout would therefore play that shout on every unit's *swing
- * wind-up*, and binding `KNOCKBACK` to a grunt would grunt every time an archer looses an arrow.
- * That is an audible defect, so the ambiguous ids are left **silent** and [ambiguous] says which
- * they are. `MobaAudioTest` asserts the overlap, so the day the two namespaces are separated -
- * which is a change to `MobaCues`/`CueNames` and not to this file - that test goes red and
- * whoever separates them is told to finish the job here.
+ * - `attack_hit` and `swoosh` are on the five attack animations, and duplicate `MELEE_HIT` and
+ *   `MELEE_SWOOSH`. `MELEE_HIT` fires only when the blow **connected** - the notify fires on a
+ *   whiff too - and `MeleeAttackExec.HIT_TICK` is the same frame the notify sits on for three of
+ *   the five characters, so binding both would start two copies of one recording on one tick.
+ * - `attack_hit_2`, `attack_hit_3`, `attack_hit_4`, `fire_arrow` and `heal` sit on
+ *   `orc_elite_spin`, `soldier_fire_arrow` and `priest_heal`, which are `CharacterEntry.extras`.
+ *   `CharacterAnimationSystem` plays `CharacterView.state`, and a state is one of the five
+ *   `UnitState`s, so no extra animation is ever the playing one and none of those five notifies
+ *   can fire at all. Binding them would be routing cues nothing emits.
  *
- * ## What that leaves audible
+ * [BY_NOTIFY] is therefore empty rather than deleted: the lookup, the id check and the failure
+ * message are what a notify binding costs, and the day `orc_elite_spin` is a state the elite orc
+ * can be in, its three extra impact frames are one line here.
  *
- * `attack_hit` (notify id 0, which no ability cue claims) is the frame a blade connects on, for
- * every character in the roster, and it is bound to `sounds/melee_hit`. Frame-accurate is the
- * *better* trigger for a hit sound than the ability's damage tick anyway, so this is not a
- * consolation binding. `ARROW_FIRED`, `ARROW_HIT` and `DEATH` are all above the notify range and
- * bind straight through.
+ * ## `heal` has no recording of its own
  *
- * ## `heal` has no recording
- *
- * The pack `docs/art-assets.md` ships is twenty-four orc and melee recordings; there is no heal in
- * it, and there was none in the old game either - the old `PriestHealCue` spawned a particle
- * effect and made no sound. So `HEAL` would be unbound even without the collision above.
+ * The pack `docs/art-assets.md` ships is twenty-four melee and orc recordings and there is no heal
+ * in it. `sounds/heal` is declared over two of the swooshes at well under a swing's volume - a
+ * soft whoosh, which is a placeholder and is labelled as one in `sounds.udea.kts`. The old game
+ * made no heal sound at all: `PriestHealCue` spawned a particle effect and nothing else.
  */
 public class MobaCueSounds private constructor(
     /** The table [dev.wildware.udea.audio.CueAudio] indexes, ready to play. */
     public val bindings: AudioBindings,
-    /** Cue names left silent because both namespaces mint their id. Sorted, for a stable message. */
-    public val ambiguous: List<String>,
+    /** Authored cues with no sound bound to them. Empty is the claim. Sorted, for a message. */
+    public val silent: List<String>,
 ) {
 
-    override fun toString(): String =
-        "MobaCueSounds(${bindings.size} bound, ${ambiguous.size} ambiguous)"
+    override fun toString(): String = "MobaCueSounds(${bindings.size} bound, ${silent.size} silent)"
 
     public companion object {
 
         /**
          * The ability-cue half of the routing, by [MobaCues] id.
          *
-         * Every entry is authored in `moba/assets/sounds/sounds.udea.kts`; the ids in the notify
-         * range are declared here anyway rather than deleted, because they are the routing the
-         * game *wants* and the reason they do not apply is a defect somewhere else. Deleting them
-         * would leave nothing to re-enable when it is fixed.
+         * Every entry is authored in `moba/assets/sounds/sounds.udea.kts`. All nine of them, which
+         * is the change: six were declared here and skipped at load while the two id spaces
+         * overlapped, so the game played four of its nine authored cues.
          */
         internal val BY_ABILITY_CUE: Map<Int, String> = linkedMapOf(
             MobaCues.DAMAGE to "sounds/hurt",
             MobaCues.MELEE_HIT to "sounds/melee_hit",
             MobaCues.MELEE_SWOOSH to "sounds/melee_swoosh",
             MobaCues.KNOCKBACK to "sounds/knockback",
+            MobaCues.HEAL to "sounds/heal",
             MobaCues.SPIN to "sounds/spin",
             MobaCues.ARROW_FIRED to "sounds/arrow_fired",
             MobaCues.ARROW_HIT to "sounds/arrow_hit",
@@ -91,62 +89,48 @@ public class MobaCueSounds private constructor(
         )
 
         /**
-         * The notify half, by animation notify name.
-         *
-         * One entry, and it is the important one: `attack_hit` is on every attack animation in the
-         * roster, at the frame the weapon lands.
+         * The notify half, by animation notify name. Empty, for the reason the class KDoc gives:
+         * every notify this bundle can fire duplicates an ability cue that is the better trigger.
          */
-        internal val BY_NOTIFY: Map<String, String> = linkedMapOf(
-            "attack_hit" to "sounds/melee_hit",
-        )
+        internal val BY_NOTIFY: Map<String, String> = emptyMap()
 
         /**
-         * Cue ids that both [MobaCues] and [notifies] mint, and which are therefore unroutable.
+         * Ids that both [MobaCues] and [notifies] mint. Empty by construction, checked anyway.
          *
-         * Computed rather than written down, so adding a notify name to any animation - which
-         * renumbers the whole notify table - widens this set instead of silently aliasing a new
-         * pair together. It is over the whole ability-cue *namespace* and not over
-         * [BY_ABILITY_CUE], because `HEAL` is ambiguous whether or not anything has recorded a
-         * sound for it, and a set that answered otherwise would say the collision was smaller than
-         * it is.
+         * This used to be the routing policy - an id in here was left silent, because a cue on it
+         * could have come from either namespace. It is a **guard** now: neither block holds a
+         * written-down id, so the only way to get an entry here is for somebody to hand-number a
+         * new block, and this says so at load time rather than aliasing a heal onto a knockback.
          *
-         * [MobaCues] declares one contiguous block from `DAMAGE` to `DEATH` and has no list of its
-         * own to iterate, so the block is walked and each id checked against `nameOf` - a gap or a
-         * renumber there fails here rather than quietly shrinking the set.
+         * Computed over the whole ability namespace rather than over [BY_ABILITY_CUE], because an
+         * id is ambiguous whether or not anything has recorded a sound for it.
          */
-        public fun ambiguousIds(notifies: CueNames = MobaCharacters.cues): Set<Int> {
-            val namespace = MobaCues.DAMAGE..MobaCues.DEATH
-            namespace.forEach { id ->
-                check(!MobaCues.nameOf(id).startsWith(UNNAMED_CUE_PREFIX)) {
-                    "MobaCues has a hole at id $id, so its namespace is no longer the contiguous " +
-                        "range ${MobaCues.DAMAGE}..${MobaCues.DEATH} that ambiguousIds walks; " +
-                        "give MobaCues an explicit id list and read it here"
-                }
-            }
-            return namespace.filterTo(sortedSetOf()) { it < notifies.size }
-        }
-
-        /** What [MobaCues.nameOf] returns for an id it does not define. */
-        private const val UNNAMED_CUE_PREFIX: String = "cue:"
+        public fun collisions(notifies: CueNames = MobaCharacters.cues): Set<Int> =
+            MobaCues.ids.filterTo(sortedSetOf()) { it in notifies.ids }
 
         /**
          * Loads every routable cue's files through [device] and builds the table.
          *
-         * @throws IllegalStateException when a `soundCue` named above is not in [registry]. The
-         *   routing and the asset tree are two files that have to agree, nothing checks them
-         *   against each other at build time, and a missing one would otherwise present as "the
-         *   game went quiet" months later.
+         * @throws IllegalStateException when a `soundCue` named above is not in [registry], or
+         *   when the two cue namespaces overlap. The routing and the asset tree are two files that
+         *   have to agree, nothing checks them against each other at build time, and a missing one
+         *   would otherwise present as "the game went quiet" months later.
          */
         public fun load(
             device: AudioDevice,
             registry: AssetRegistry = MobaAssets.registry,
             notifies: CueNames = MobaCharacters.cues,
         ): MobaCueSounds {
-            val ambiguous = ambiguousIds(notifies)
+            val collisions = collisions(notifies)
+            check(collisions.isEmpty()) {
+                "the ability block and the notify block both mint " +
+                    "${collisions.map(MobaCues::nameOf)}, so a Cue on one of those ids does not " +
+                    "say what happened. MobaCues.NOTIFY_BASE is ${MobaCues.NOTIFY_BASE} and the " +
+                    "notify block is ${notifies.ids}; one of the two was written down by hand."
+            }
             val sounds = ArrayList<CueSound>(BY_ABILITY_CUE.size + BY_NOTIFY.size)
 
             BY_ABILITY_CUE.forEach { (id, assetId) ->
-                if (id in ambiguous) return@forEach
                 sounds += CueSound.load(CueId(id), soundCue(registry, assetId), device)
             }
             BY_NOTIFY.forEach { (name, assetId) ->
@@ -154,13 +138,16 @@ public class MobaCueSounds private constructor(
                     "no animation in this bundle declares a '$name' notify, so MobaCueSounds is " +
                         "routing a cue nothing emits; the notify names are $notifies"
                 }
-                if (id.raw in ambiguous) return@forEach
                 sounds += CueSound.load(id, soundCue(registry, assetId), device)
             }
 
+            val bindings = AudioBindings.of(sounds)
             return MobaCueSounds(
-                bindings = AudioBindings.of(sounds),
-                ambiguous = ambiguous.map(MobaCues::nameOf).sorted(),
+                bindings = bindings,
+                silent = MobaCues.ids
+                    .filter { bindings[CueId(it)] == null }
+                    .map(MobaCues::nameOf)
+                    .sorted(),
             )
         }
 

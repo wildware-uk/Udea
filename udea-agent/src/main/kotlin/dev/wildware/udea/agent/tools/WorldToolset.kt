@@ -13,6 +13,7 @@ import dev.wildware.udea.agent.query.EntityQuery
 import dev.wildware.udea.agent.query.EntityQueryEngine
 import dev.wildware.udea.agent.query.EntityQueryParser
 import dev.wildware.udea.agent.query.FieldValues
+import dev.wildware.udea.agent.query.QuerySummary
 import dev.wildware.udea.annotations.AgentTool
 import dev.wildware.udea.annotations.Arg
 import dev.wildware.udea.core.SimClock
@@ -72,9 +73,35 @@ public class WorldToolset(
      * refusal rather than throwing a `NullPointerException` at whoever asked.
      */
     private val spawner: BlueprintSpawner? = null,
+    /**
+     * Where a query answer too large for one page goes, so a caller can read all of it at once.
+     *
+     * Defaults to [TextSpill.NONE], which is the honest default for a `SimHarness` run or a unit
+     * test: those have nowhere to put bytes, and the answer is then paged rather than
+     * half-promised. A host with an artifact store passes one - `AgentArtifacts.textSpill()` -
+     * and the whole result arrives through `GET /artifact?id=<resultRef>` in a single round trip.
+     * See [queryEntities].
+     */
+    private val spill: TextSpill = TextSpill.NONE,
 ) {
 
     private val queries = EntityQueryEngine(components, netIds, world)
+
+    /**
+     * The last few whole answers this toolset filed, so a repeated query does not file a copy.
+     *
+     * The same bound and the same reason as `EventsToolset.spilled`: an agent that polls
+     * `world.query_entities` while it watches a fight would otherwise write one artifact per
+     * call, and the store is bounded on both axes with oldest-accessed-first eviction - so a
+     * polling loop here is a loop that quietly deletes the screenshots somebody was comparing.
+     *
+     * Keyed by the rendered document, so a world that *changed* is a new artifact and a world
+     * that did not is the handle already issued.
+     */
+    private val spilled = object : LinkedHashMap<String, String>(SPILL_MEMO_ENTRIES, LOAD_FACTOR, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+            size > SPILL_MEMO_ENTRIES
+    }
 
     private val detail = EntityDetail(components, netIds, world)
 
@@ -87,11 +114,56 @@ public class WorldToolset(
 
     // --- reads ---------------------------------------------------------------------------
 
+    /**
+     * The matched page, cut into answers that actually reach the agent.
+     *
+     * ## The defect this shape exists for
+     *
+     * A command answer reaches the caller **only** through the Tier-0 digest's `commandResults`
+     * array, and `AgentBridge.renderCommandResults` costs each entry against
+     * [dev.wildware.udea.agent.state.DigestBudgets.RESULT_CEILING], counting backwards from the
+     * newest and stopping at the first that does not fit. An answer over that size is therefore
+     * not shortened - it is **dropped**, and the caller polling for its own result reads
+     * `commandResultsTruncated: true` and nothing else.
+     *
+     * A 27-unit level answering "every unit's health" renders about 900 characters, so
+     * `world.query_entities with=GameUnit fields=health.current` matched, rendered, and
+     * delivered nothing at all. The tool looked like it worked: a smaller `limit` answered, so
+     * the surface behaved as though the world had twenty-odd entities in it. That is the single
+     * most obvious question an agent asks about a battle, and it was unanswerable.
+     *
+     * ## Two ways out, and both are taken
+     *
+     * [ResultPage] cuts the rows into pages small enough that **every page lands**, publishing
+     * `offset`, `total`, `hasMore` and `nextOffset` - and `nextOffset` is exactly what to send
+     * back as this tool's own `offset`, so following it walks the whole match. That is the
+     * answer that needs nothing from the host.
+     *
+     * It is a small page, though: `MAX_PAGE_BYTES` is 208 characters, because it comes from the
+     * bytes `commandResults` is *guaranteed* rather than the bytes it usually gets. Twenty-seven
+     * rows is ten round trips. So when the whole answer will not fit, the **whole** answer -
+     * every row of the page the query matched, not the fragment being returned - is filed with
+     * [spill] and its handle published as `resultRef`. One `GET /artifact?id=<resultRef>` then
+     * returns all 27 rows from the one call, which is the property this tool was failing.
+     *
+     * With no store wired `resultRef` is simply absent and paging is the whole answer, which is
+     * degraded rather than broken - and is what a `SimHarness` or a unit test gets.
+     *
+     * ## The shape
+     *
+     * `{total, offset, entities:[…], returned, hasMore, nextOffset?}`, with `resultRef` when one
+     * was filed. `total` is every match, unpaged, exactly as before; `returned` is this page.
+     * The old `truncated` boolean is gone and `hasMore` replaces it - it answers the same
+     * question and comes with the offset to act on, where `truncated` left the caller to derive
+     * `offset + returned`, which is wrong the moment the byte budget rather than the limit ends
+     * the page.
+     */
     @AgentTool(
         name = "world.query_entities",
         description = "Find entities by component, by field predicate and by proximity, " +
-            "returning only the fields you name. This is the tool to reach for instead " +
-            "of reading /state: entity detail is deliberately absent from the digest.",
+            "returning only the fields you name, one page at a time. This is the tool to " +
+            "reach for instead of reading /state: entity detail is deliberately absent from " +
+            "the digest. Follow nextOffset for the rest, or fetch resultRef for all of it.",
     )
     public fun queryEntities(
         @Arg(
@@ -135,9 +207,61 @@ public class WorldToolset(
             limit = limit,
             offset = offset,
         )
+        // Allocating one string per matched row, once per tool call on the simulation thread and
+        // never per tick. That is the trade the query engine already made by rendering a
+        // document; this is the same cost in a shape a pager can measure.
+        val rows = ArrayList<String>(query.limit)
+        val summary = queries.forEachRow(query) { rows.add(it) }
+        val whole = wholeAnswer(query, summary, rows)
+        // Measured against the page budget rather than guessed at, and deliberately a little
+        // eager: `whole` carries neither `offset` nor `hasMore`, so a document that only just
+        // fits here would not once ResultPage has added them. Filing an answer that would have
+        // fitted costs one artifact; publishing one that does not fit costs the answer.
+        val reference = if (whole.length + PAGE_FIELD_BYTES <= ResultPage.MAX_PAGE_BYTES) {
+            null
+        } else {
+            spilled[whole] ?: spill.spill(whole)?.also { spilled[whole] = it }
+        }
+        return ResultPage.render(
+            name = "entities",
+            // The query's own offset, not a second one inside the page: `nextOffset` is then
+            // this tool's `offset` argument, and a caller following it walks the whole match
+            // instead of paging inside a page it would have to have asked for twice.
+            offset = query.offset,
+            // `rows.size` and not `query.limit`, because the page can only serve rows that were
+            // rendered: the entity walk already applied the limit, and ResultPage would index
+            // past the end of what it was handed if it believed `total` was reachable from here.
+            limit = rows.size,
+            total = summary.total,
+            prelude = {
+                if (reference != null) put("resultRef", reference)
+            },
+        ) { json, index, _ ->
+            // `index` counts matches from the query's offset; `rows` holds only this page's.
+            json.raw(rows[index - query.offset])
+        }
+    }
+
+    /**
+     * Every row of the matched page as one document - what gets filed when the page cannot hold it.
+     *
+     * The *whole* page and not the fragment being returned, because a handle to the same
+     * truncation the caller already has is worth nothing. It carries `total` and `returned` so
+     * the fetched document says how much of the match it is, and `offset` so it says where the
+     * match started.
+     */
+    private fun wholeAnswer(query: EntityQuery, summary: QuerySummary, rows: List<String>): String {
         val json = Json()
-        queries.run(query, json)
-        return AgentResult.Ok(json.toString())
+        json.beginObject()
+        json.put("total", summary.total)
+        json.put("offset", query.offset)
+        json.put("returned", rows.size)
+        json.key("entities")
+        json.beginArray()
+        for (position in rows.indices) json.raw(rows[position])
+        json.endArray()
+        json.endObject()
+        return json.toString()
     }
 
     @AgentTool(
@@ -413,6 +537,23 @@ public class WorldToolset(
 
         /** This game wired no `BlueprintSpawner`, so nothing can be spawned at all. */
         public val NO_SPAWNER: AgentErrorKind = AgentErrorKind("no_spawner")
+
+        /**
+         * What [ResultPage] adds to a query answer that [wholeAnswer] does not carry.
+         *
+         * `,"offset":N` is already in both; what a page adds on top is `,"hasMore":true` and
+         * `,"nextOffset":N`, which is 15 + 14 characters plus the two numbers. Thirty-two is
+         * that with a little room, and it is used only to decide whether to file the answer -
+         * over-estimating it files an artifact nobody needed, and under-estimating it publishes
+         * a page with no way back to the rows it dropped.
+         */
+        private const val PAGE_FIELD_BYTES: Int = 32
+
+        /** How many whole answers are remembered, so a repeated query files none of them again. */
+        public const val SPILL_MEMO_ENTRIES: Int = 4
+
+        /** `LinkedHashMap`'s default. Named only because the access-order constructor needs it. */
+        private const val LOAD_FACTOR: Float = 0.75f
 
         /**
          * Components whose fields have a *named* owner an agent should go through instead.

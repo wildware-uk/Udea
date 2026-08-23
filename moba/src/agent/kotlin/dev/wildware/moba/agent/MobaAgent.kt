@@ -12,6 +12,8 @@ import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.GameUnitReplicator
 import dev.wildware.moba.level.MobaBlueprints
 import dev.wildware.moba.level.Team
+import dev.wildware.moba.match.MatchState
+import dev.wildware.moba.match.MatchStateReplicator
 import dev.wildware.moba.entry.MobaEntry
 import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.AgentTimings
@@ -143,8 +145,12 @@ public object MobaAgent {
         // argued. In `Headless` it is the *only* source there is, which is the mode the old
         // `Gdx.input.inputProcessor` injection could not serve at all.
         val injected = InjectedIntent(MobaControls.BINDINGS.catalog)
+        // The cue mirror is appended to the game's own module list rather than replacing
+        // anything in it: it decorates `GameContext.cues`, and a module `context` hook is the one
+        // place a decorator can see the value it decorates. See `MobaCueMirrorModule`.
+        val extraModules = listOf(MobaCueMirrorModule(bridge))
         if (mode == RenderMode.Headless) {
-            val host = MobaGame.host(RenderMode.Headless)
+            val host = MobaGame.host(RenderMode.Headless, extraModules = extraModules)
             host.ctx[IntentState.KEY].source = injected
             // No GL context in Headless, so no capture surface exists and `null` is the
             // honest answer: every `render.*` tool then answers `no_render_context`.
@@ -154,7 +160,11 @@ public object MobaAgent {
             session.close("the frame loop ended")
             return
         }
-        MobaEntry.runWithGl(mode, overlay = overlayFor(mode, bridge, sessions)) { host, rendering ->
+        MobaEntry.runWithGl(
+            mode,
+            overlay = overlayFor(mode, bridge, sessions),
+            extraModules = extraModules,
+        ) { host, rendering ->
             // The engine's own adapter, out of `udea-agent-host`'s `src/main`. `moba` used to
             // carry a copy of it in this source set, because a headless agent host could not name
             // `PresentationControl`; the copy is gone with the rule that forced it.
@@ -261,12 +271,20 @@ public object MobaAgent {
 
         val worldTools = WorldToolset(
             world = host.world,
-            components = AgentComponentIndex(listOf(positionAccess(), unitAccess())),
+            components = AgentComponentIndex(
+                listOf(positionAccess(), unitAccess(), matchAccess()),
+            ),
             netIds = host.ctx[CoreModule.NET_IDS],
             bridge = bridge,
             clock = host.ctx.clock,
             catalog = BlueprintCatalog.of(host.ctx[MobaBlueprints.KEY].all),
             spawner = host.ctx.blueprints,
+            // The artifact store, for the same reason `EventsToolset` is given it: twenty-seven
+            // rows of `query_entities` is ~857 characters and a command result is guaranteed only
+            // 256 bytes, so without a spill the whole answer is dropped and the agent that asked
+            // pages it back ten calls at a time. With it, the complete document is filed and its
+            // handle comes back as `resultRef` for one `GET /artifact`.
+            spill = artifacts.textSpill(),
         )
         val tools = EngineToolModules
             .wireAll(
@@ -369,6 +387,24 @@ public object MobaAgent {
         name = "GameUnit",
         replicator = GameUnitReplicator,
         componentType = GameUnit,
+    )
+
+    /**
+     * `MatchState`, so the score is readable without a screenshot.
+     *
+     * With this registered, `world.query_entities with=MatchState` is the whole scoreboard from
+     * outside the process - which match this is, who is alive on each side, who won and on which
+     * tick - read off the **authoritative component** rather than off `MatchService`, which is a
+     * mirror and could in principle be a tick behind it.
+     *
+     * Nothing here is agent-writable, and that is the point rather than an omission: a caller
+     * that could set `winner` could declare itself the victor, and every later reading of the
+     * match would then be a statement about that write rather than about the game.
+     */
+    private fun matchAccess(): AgentComponentType = agentComponent(
+        name = "MatchState",
+        replicator = MatchStateReplicator,
+        componentType = MatchState,
     )
 
     /**

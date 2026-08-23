@@ -35,10 +35,18 @@ public object MobaControls {
     /** Walk. WASD, or the left stick. */
     public const val MOVE: String = "moba/move"
 
-    /** Primary attack. Space, or the south face button. */
+    /** Primary attack. Space, or the south face button. Fires [PlayerControlSystem.SLOT_PRIMARY]. */
     public const val ATTACK: String = "moba/attack"
 
-    /** Secondary attack. Q, or the west face button. */
+    /**
+     * Secondary attack. Q, or the west face button. Fires [PlayerControlSystem.SLOT_SECONDARY].
+     *
+     * This was declared, packed, resolved into [ATTACK_2_ACTION] and **read by nothing** until
+     * [PlayerControlSystem] was given a second slot to point it at. A bound control that no system
+     * asks about is indistinguishable, from the player's side of the window, from a key that is
+     * not bound at all - so what proves this is wired is `MobaHudTest`, over the activation and
+     * the cooldown it produces, rather than anything about the presence of the binding.
+     */
     public const val ATTACK_2: String = "moba/attack_2"
 
     /**

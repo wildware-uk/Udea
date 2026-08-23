@@ -2,6 +2,8 @@ package dev.wildware.moba.entry
 
 import dev.wildware.moba.MobaGame
 import dev.wildware.moba.audio.MobaAudio
+import dev.wildware.moba.match.MatchService
+import dev.wildware.moba.match.NewMatchSignal
 import dev.wildware.udea.core.host.RenderMode
 
 /**
@@ -45,6 +47,13 @@ public object MobaClient {
             rendering.onRenderThread { built = MobaAudio.forHost(host) }
             val audio = checkNotNull(built) { "MobaAudio was not built on the render thread" }
             audio.listenTo(player)
+            // A restart is a scene swap, and a swap resets the id allocator without resetting the
+            // generation counters - so the id captured above reads *stale* from match two onward.
+            // The symptom is not an error: the camera stops following and the view sits where the
+            // last match left it, which reads exactly like the game freezing at the moment it
+            // restarted. `NewMatchSignal` fires once per match, including the first, and one
+            // signal per consumer because `poll` consumes the edge.
+            val newMatch = NewMatchSignal(host.ctx[MatchService.KEY])
             // `host.frame` *and* `audio.frame`, which is the one line that separates a client from
             // a silent one. It is not only "you can hear it now": nothing in the shipped build
             // emptied `GameContext.cues`, so `CueQueue` filled its 1024 slots in about two seconds
@@ -53,6 +62,15 @@ public object MobaClient {
             MobaEntry.Attachment(
                 frame = { delta ->
                     host.frame(delta)
+                    if (newMatch.poll()) {
+                        // `playerIdOrNull` and not `playerId`: the swap and the repopulate land
+                        // in one barrier action, but a client must not die over a tick in which
+                        // it happened to look.
+                        MobaEntry.playerIdOrNull(host)?.let { current ->
+                            MobaEntry.follow(rendering, current)
+                            audio.listenTo(current)
+                        }
+                    }
                     audio.frame()
                 },
                 close = audio::close,

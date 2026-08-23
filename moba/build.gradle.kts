@@ -252,6 +252,23 @@ tasks.register<JavaExec>("runShot") {
     systemProperty("udea.shot.tick", providers.gradleProperty("udea.shot.tick").orNull ?: "18")
 }
 
+// The evidence task. `MatchShot` lives in the test source set - it needs a GL driver, so wiring it
+// into `check` would turn a missing driver into a skip, which is the failure mode this repository
+// has already shipped once (see `MobaShot`). It is run by name, and it is a task rather than a
+// hand-assembled `java -cp` so that the classpath it runs on is the one Gradle resolved.
+tasks.register<JavaExec>("runMatchShot") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.matchshot: captures the melee, the HUD, the spin and the match result."
+    mainClass.set("dev.wildware.moba.MatchShot")
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty(
+        "udea.matchshot.dir",
+        providers.gradleProperty("udea.matchshot.dir").orNull
+            ?: layout.buildDirectory.dir("reports/udea/match").get().asFile.absolutePath,
+    )
+}
+
 tasks.register<JavaExec>("runClient") {
     group = ApplicationPlugin.APPLICATION_GROUP
     description = "moba.client: a visible LWJGL3 window."

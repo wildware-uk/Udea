@@ -1,6 +1,7 @@
 package dev.wildware.udea.audio
 
 import dev.wildware.udea.core.Cue
+import dev.wildware.udea.core.CueId
 import dev.wildware.udea.core.CueQueue
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -93,6 +94,20 @@ public class CueAudio(
     private val voiceCount = IntArray(bindings.highestCueId + 1)
     private var drainStamp: Int = 0
 
+    /**
+     * Device plays per cue id, so "the game is audible" can be a number per *kind* of sound.
+     *
+     * [played] alone cannot tell a run where every cue fired from one where the deaths carried it,
+     * and that difference is exactly what a routing change makes: this game bound four of its nine
+     * cues for a while and the aggregate count looked healthy throughout. One array as long as the
+     * binding table, written on the play path only, which is already the path that starts a voice.
+     */
+    private val playsByCue = LongArray(bindings.highestCueId + 1)
+
+    /** How many voices [cue] has been given. Zero for a cue nothing is bound to. */
+    public fun playsOf(cue: CueId): Long =
+        if (cue.raw in playsByCue.indices) playsByCue[cue.raw] else 0L
+
     /** Hoisted, so [drain] does not build a closure per frame. Captures `this` and nothing else. */
     private val consume: (Cue) -> Unit = { cue -> playCue(cue) }
 
@@ -145,6 +160,7 @@ public class CueAudio(
             listener.panAt(dx),
         )
         played++
+        playsByCue[cue.id.raw]++
     }
 
     /**

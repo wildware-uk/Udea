@@ -9,6 +9,7 @@ import dev.wildware.udea.audio.CueAudio
 import dev.wildware.udea.audio.CueSourceLocator
 import dev.wildware.udea.core.CueQueue
 import dev.wildware.udea.core.CueSink
+import dev.wildware.udea.core.innermost
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
@@ -155,12 +156,17 @@ public class MobaAudio private constructor(
         /**
          * Builds over an explicit [device].
          *
-         * @throws IllegalStateException when the context's `CueSink` is not a `CueQueue`. There is
-         *   nothing to drain from a sink that is not one, and silently doing nothing is precisely
-         *   the failure this whole class exists to delete.
+         * The context's sink may be **decorated**: a debug build wraps it so an observer can see
+         * cues on the way past, and such a wrapper is a `CueSink` and not a `CueQueue`. So the
+         * chain is walked with `innermost()` rather than cast once. That is not a softening of the
+         * refusal below - a chain whose innermost sink is still not a queue is refused exactly as
+         * before, because there is genuinely nothing to drain and silently doing nothing is the
+         * failure this whole class exists to delete.
+         *
+         * @throws IllegalStateException when the innermost `CueSink` is not a `CueQueue`.
          */
         public fun of(host: GameHost, device: AudioDevice): MobaAudio {
-            val sink: CueSink = host.ctx.cues
+            val sink: CueSink = host.ctx.cues.innermost()
             val queue = checkNotNull(sink as? CueQueue) {
                 "GameContext.cues is a ${sink::class.simpleName}, not a CueQueue, so MobaAudio " +
                     "has nothing to drain. CoreModule is what puts a CueQueue there."

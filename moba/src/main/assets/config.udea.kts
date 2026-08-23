@@ -1,7 +1,7 @@
-gameConfig(
-    physics = physics(
-        gravity = Zero
-    ),
+// Migrated from example/src/main/resources/assets/config.udea.kts (issue #93).
 
-    defaultCharacter = reference("blueprint/player")
+gameConfig(
+    defaultCharacter = reference("blueprint/player"),
+    defaultLevel = reference("level/test_level"),
+    physics = physics(gravity = vec(0.0F, 0.0F)),
 )

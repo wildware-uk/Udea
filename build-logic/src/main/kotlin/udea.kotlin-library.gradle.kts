@@ -84,11 +84,11 @@ val pinnedConfigurationNames: Set<String> = UdeaStdlibPin.pinnedConfigurationsFo
  */
 configurations.matching { it.name in pinnedConfigurationNames }.configureEach {
     resolutionStrategy.eachDependency {
-        if (requested.group == "org.jetbrains.kotlin" && requested.name.startsWith("kotlin-stdlib")) {
+        if (requested.group == "org.jetbrains.kotlin" && UdeaStdlibPin.pins(requested.name)) {
             useVersion(UdeaVersions.KOTLIN)
             because(
                 "the project compiles with Kotlin ${UdeaVersions.KOTLIN} (gradle/libs.versions.toml); " +
-                    "a transitive request must not drag the stdlib past the compiler (spec 7)",
+                    "a transitive request must not drag the stdlib or reflect past the compiler (spec 7)",
             )
         }
     }

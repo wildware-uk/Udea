@@ -242,7 +242,13 @@ public object MobaAgent {
             .module(AgentHostTools)
             .toolset(RenderToolset(mode, control, artifacts))
             .toolset(ArtifactToolset(artifacts))
-            .build()
+
+        // `assets.*`, over the real corpus and the real running graph. Registered here rather
+        // than in `EngineToolModules` for the reason `AssetToolModule` gives: the daemon carries
+        // a Kotlin script compiler, which `UDEA-MG-005` forbids on a shipped game's classpath.
+        // Absent - not present and failing - when this process has no asset source tree.
+        val assets = MobaAssetTools.wire(tools, host)
+        val index = assets.builder.build()
 
         val identity = GameIdentity(MobaGame.NAME, MobaGame.VERSION)
         val agentHost = AgentHost.startIfRequested(
@@ -252,7 +258,7 @@ public object MobaAgent {
                     port = port,
                     identity = identity,
                     renderMode = mode,
-                    manifest = ToolManifest.of(identity, tools.tools),
+                    manifest = ToolManifest.of(identity, index.tools),
                     artifacts = artifacts,
                     paused = { host.time.paused },
                     // The *same* table the overlay colours from. Left to default, the host would
@@ -277,10 +283,10 @@ public object MobaAgent {
         } else {
             println(
                 "[moba.agent] listening on http://127.0.0.1:${agentHost.port} in $mode with " +
-                    "${tools.tools.size} tools",
+                    "${index.tools.size} tools",
             )
         }
-        val loop = AgentGameLoop(host, AgentRuntime(bridge, tools, host.world, host.ctx, digest))
+        val loop = AgentGameLoop(host, AgentRuntime(bridge, index, host.world, host.ctx, digest))
         // Loop first: stopping the surface while a tool call is mid-drain would leave the caller
         // holding a closed connection to a command that did run.
         shutdown

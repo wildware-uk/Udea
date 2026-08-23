@@ -6,6 +6,8 @@ import dev.wildware.udea.core.ServiceKey
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.loop.SimBarrier
+import dev.wildware.udea.core.movement.CharacterMoverSystem
+import dev.wildware.udea.core.movement.SceneCollision
 import dev.wildware.udea.core.physics.NoOpPhysicsWorld
 import dev.wildware.udea.core.physics.PhysicsStepSystem
 import dev.wildware.udea.core.physics.TeleportSystem
@@ -63,6 +65,15 @@ public class CoreModule(
     /** Physics with no solver. A game module replaces it with a Box2D-backed world. */
     public val physics: NoOpPhysicsWorld = NoOpPhysicsWorld()
 
+    /**
+     * The static walls `CharacterMover` sweeps against (spec 3.4).
+     *
+     * Empty until a scene loads geometry into it, which a scene load does through the barrier.
+     * Held here for the same reason the barrier and the id index are: a host has to be able to
+     * reach it before the world exists, because that is when a scene's collision is built.
+     */
+    public val sceneCollision: SceneCollision = SceneCollision()
+
     override fun context(builder: GameContextBuilder) {
         builder.rng = DefaultRngService(builder.config.seed)
         builder.physics = physics
@@ -76,7 +87,15 @@ public class CoreModule(
         // Constructor references, not class objects: the compiler checks that the system takes
         // a PhysicsWorld and that this module has one to give it.
         registry.add(SimPhase.PreSimulation, { ctx -> TeleportSystem(ctx.physics) })
+        // The authoritative movement model, ahead of the solver by phase ordinal (spec 3.4).
+        // Not `ctx.something`: the geometry holder is this module's own state, so the system
+        // names what it depends on in its constructor and the compiler checks it.
+        registry.add(SimPhase.Movement, { _ -> CharacterMoverSystem(sceneCollision) })
         registry.add(SimPhase.Physics, { ctx -> PhysicsStepSystem(ctx.physics) }) {
+            // Cross-phase, checked rather than dropped: move the mover after the solver and world
+            // construction fails here naming both systems, instead of Box2D quietly getting to
+            // decide where a character ended up - which is the whole of what spec 3.4 demotes.
+            after<CharacterMoverSystem>()
             // Cross-phase and therefore already true by phase ordinal. Kept as a live
             // assertion: move either system's phase so that a teleport would land after the
             // step and world construction fails here, naming both systems, instead of the

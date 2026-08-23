@@ -114,6 +114,19 @@ class AgentBridgeTest {
         }
 
         start.countDown()
+        // Do not drain until the cap has actually refused something.
+        //
+        // This test failed a full `./gradlew build` and then passed three consecutive reruns of
+        // its own: on a machine where the drainer keeps up, `rejected` stays empty, the
+        // "no submission was refused" guard below fires and the build is red for a scheduling
+        // reason. Deleting the guard would have been worse - it is the only thing stopping the
+        // test from passing having exercised neither half of its name. So the cap is made to
+        // happen instead of hoped for: 8 x 200 submissions against a queue of 64 with nobody
+        // draining refuses ~1536 of them, and the loop below still drains concurrently with
+        // every one of those remaining submissions.
+        while (rejected.isEmpty() && done.count > 0L) {
+            if (bridge.pendingCommands > 64) overCap++
+        }
         // The simulation thread: drains while the submitters are still going, which is the
         // interleaving the real system runs in.
         while (done.count > 0L) {

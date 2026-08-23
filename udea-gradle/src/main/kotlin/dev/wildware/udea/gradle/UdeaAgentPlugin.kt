@@ -19,30 +19,6 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.process.CommandLineArgumentProvider
 
 /**
- * An [org.gradle.api.Action] from a plain lambda, written out rather than SAM-converted.
- *
- * This file is compiled **twice** - once as `:udea-gradle`, and once inside `build-logic` so that
- * this build can apply the plugin to `:moba` (see `build-logic/build.gradle.kts`). The second
- * compilation has the Gradle Kotlin DSL on its classpath, and the DSL declares its own
- * `fun <T> Action(configuration: T.() -> Unit)`, which shadows the SAM constructor and takes a
- * *receiver* lambda. `Action { task -> ... }` therefore means two different things in the two
- * compilations and fails to compile in one of them. An explicit anonymous object means the same
- * thing in both, which is the property this file needs above brevity.
- */
-private fun <T : Any> gradleAction(block: (T) -> Unit): org.gradle.api.Action<T> =
-    object : org.gradle.api.Action<T> {
-        override fun execute(target: T) {
-            block(target)
-        }
-    }
-
-/** A [org.gradle.api.specs.Spec] from a predicate, written out for the reason [gradleAction] is. */
-private fun <T : Any> gradleSpec(predicate: (T) -> Boolean): org.gradle.api.specs.Spec<T> =
-    object : org.gradle.api.specs.Spec<T> {
-        override fun isSatisfiedBy(element: T): Boolean = predicate(element)
-    }
-
-/**
  * How a project overrides the generated launch declaration and the agent wiring.
  *
  * Every field has a default derived from the project, so the common case is applying the plugin

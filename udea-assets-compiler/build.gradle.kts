@@ -31,27 +31,12 @@ dependencies {
     runtimeOnly(libs.kotlin.scripting.compiler.embeddable)
 }
 
-// --- kotlin-reflect pin (spec 7, and the same argument as UdeaStdlibPin) ----------------------
-//
-// `udea.kotlin-library` pins the resolved `kotlin-stdlib` to the catalog version. It does not
-// pin `kotlin-reflect`, which nothing needed until KotlinPoet arrived: KotlinPoet 2.3.0 asks for
-// `kotlin-reflect:2.3.20`, and Gradle takes the highest request, so this module ended up loading
-// a 2.3 reflect against a 2.2.10 stdlib. That is not a theoretical skew - it fails at class load
-// with `NoClassDefFoundError: kotlin/jvm/internal/KotlinGenericDeclaration`, on the first
-// `KClass.qualifiedName` in a test, because 2.3's reflect references a stdlib class 2.2.10 has
-// not got. Pinned here rather than in `build-logic` because that convention is shared and being
-// worked on concurrently; it belongs in `UdeaStdlibPin` next to the stdlib rule.
-configurations.configureEach {
-    resolutionStrategy.eachDependency {
-        if (requested.group == "org.jetbrains.kotlin" && requested.name == "kotlin-reflect") {
-            useVersion(libs.versions.kotlin.get())
-            because(
-                "kotlin-reflect must match the kotlin-stdlib the build pins (spec 7); a newer " +
-                    "reflect on an older stdlib fails at class load, not at compile time",
-            )
-        }
-    }
-}
+// The kotlin-reflect pin that used to live here is now in `UdeaStdlibPin.PINNED_MODULES`, where
+// this file's own comment said it belonged. KotlinPoet drags `kotlin-reflect:2.3.20` in and 2.3's
+// reflect references a stdlib class 2.2.10 has not got, so the mismatch is a `NoClassDefFoundError`
+// at class load rather than a compile error. Pinning it per module fixed the module that had
+// already been bitten and nothing else: `:moba:run` hit the identical error from `agentRuntimeClasspath`
+// the moment the asset pipeline put this jar on the agent source set. One rule, in the convention.
 
 /**
  * The example asset tree, the compiler classpath and the repo root, handed to tests as
@@ -74,6 +59,21 @@ tasks.withType<Test>().configureEach {
     // module to itself would prove nothing.
     systemProperty("udea.pinnedKotlinVersion", libs.versions.kotlin.get())
     systemProperty("udea.exampleAssets", exampleAssets)
+
+    // The two asset trees these tests read are **inputs**, and saying so is not a tidiness
+    // measure. Without it the test task's up-to-date check sees only Kotlin sources and the
+    // classpath, so editing a `.udea.kts` and re-running leaves the task UP-TO-DATE and Gradle
+    // re-publishes the previous, passing report. That was observed here, not theorised: a
+    // deliberately broken reference in `moba/src/main/assets/character/orc.udea.kts` produced a
+    // green `MigratedCorpusCompilesTest` twice, `cleanTest` included, until this was declared.
+    // A corpus check whose corpus is not an input is a check that silently stops running.
+    inputs.dir(rootProject.layout.projectDirectory.dir("moba/src/main/assets"))
+        .withPropertyName("migratedAssetCorpus")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(rootProject.layout.projectDirectory.dir("example/src/main/resources/assets"))
+        .withPropertyName("exampleAssetCorpus")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
     // The script classpath used by AssetCompilerTest, and the classpath the forked worker is
     // launched with. It is this module's own test runtime classpath, which is what makes the
     // fixture scripts able to see AssetScope.

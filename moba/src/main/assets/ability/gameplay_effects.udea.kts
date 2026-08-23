@@ -1,71 +1,68 @@
-import dev.wildware.udea.ability.*
-import dev.wildware.udea.ability.ModifierType.Additive
-import dev.wildware.udea.example.ability.*
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
+// Migrated from example/src/main/resources/assets/ability/gameplay_effects.udea.kts (issue #93).
+//
+// `gameplayEffect` has no runtime type: `udea-gas` declares no `GameplayEffect`, so these are
+// `AssetKind.Unpublishable` and read back as opaque assets. Attribute targets, modifier types,
+// cues and tags are names rather than `KProperty` and enum references, which is what stops an
+// asset edit from depending on the game module compiling.
 
 gameplayEffect(
     name = "damage",
-    target = CharacterAttributeSet::health,
-    modifierType = Additive,
-    magnitude = value(Data.Damage),
+    target = "CharacterAttributeSet.health",
+    modifierType = "Additive",
+    magnitude = setByCaller("Data.Damage"),
     effectDuration = instant(),
-    cues = {
-        add(DamageCue)
-    }
+    cues = listOf("DamageCue"),
 )
 
 gameplayEffect(
     name = "knockback",
     effectDuration = instant(),
-    cues = {
-        add(KnockbackCue)
-    }
+    cues = listOf("KnockbackCue"),
 )
 
 gameplayEffect(
     name = "stun",
-    effectDuration = duration(Data.Duration),
-    tags = {
-        add(Debuffs.Stunned)
-    }
+    effectDuration = duration("Data.Duration"),
+    tags = listOf("Debuffs.Stunned"),
 )
 
 gameplayEffect(
     name = "cost_mana",
-    target = CharacterAttributeSet::mana,
-    modifierType = Additive,
-    magnitude = value(Cost.Mana),
-    effectDuration = instant()
+    target = "CharacterAttributeSet.mana",
+    modifierType = "Additive",
+    magnitude = setByCaller("Cost.Mana"),
+    effectDuration = instant(),
 )
 
 gameplayEffect(
     name = "heal",
-    target = CharacterAttributeSet::health,
-    modifierType = Additive,
-    magnitude = value(Data.Heal),
+    target = "CharacterAttributeSet.health",
+    modifierType = "Additive",
+    magnitude = setByCaller("Data.Heal"),
     effectDuration = instant(),
 )
 
 gameplayEffect(
     name = "heal_over_time",
-    target = CharacterAttributeSet::health,
-    modifierType = Additive,
-    magnitude = value(Data.Heal),
-    effectDuration = duration(Data.Duration),
-    period = 250.milliseconds
+    target = "CharacterAttributeSet.health",
+    modifierType = "Additive",
+    magnitude = setByCaller("Data.Heal"),
+    effectDuration = duration("Data.Duration"),
+    // `250.milliseconds` in the source. Seconds, because the pack format holds primitives and a
+    // `kotlin.time.Duration` has no bundle encoding.
+    period = 0.25F,
 )
 
 gameplayEffect(
     name = "cooldown",
-    effectDuration = duration(Data.Cooldown),
+    effectDuration = duration("Data.Cooldown"),
 )
 
 gameplayEffect(
     name = "passive_health_regen",
+    target = "CharacterAttributeSet.health",
+    modifierType = "Additive",
+    magnitude = attribute("CharacterAttributeSet.healthRegen"),
     effectDuration = infinite(),
-    target = CharacterAttributeSet::health,
-    modifierType = Additive,
-    magnitude = value(CharacterAttributeSet::healthRegen),
-    period = 1.seconds
+    period = 1.0F,
 )

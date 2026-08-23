@@ -1,75 +1,79 @@
-import dev.wildware.udea.ecs.component.base.networkable
-import dev.wildware.udea.example.component.aIUnit
-import dev.wildware.udea.example.component.player
-import dev.wildware.udea.example.system.*
-import kotlin.random.Random
-private val migratedRandom = Random(86400930)
+// Migrated from example/src/main/resources/assets/level/test_level.udea.kts (issue #93).
+//
+// The source spawned every entity at `kotlin.random.Random.nextFloat()` positions, so two builds
+// of identical sources produced different packs. `DeterminismValidator` bans the name outright
+// (UDEA0034) and its advice is "declare the value as a literal", which is what this is: a fixed
+// lattice with the same spread and the same group offsets the random scatter had. Seeding the
+// generator would not have been enough — a seeded `Random` is still `Random` by name, and the
+// number it produces is still not visible in the file an agent is editing.
 
+val spawnDistance = 4F
 
-// TODO ability spec system I GET IT NOW
+fun spawnAt(index: Int, offsetX: Float, offsetY: Float): Map<String, Any?> = vec(
+    (index * 3 % 7) * (spawnDistance / 7F) - spawnDistance / 2F + offsetX,
+    (index * 5 % 7) * (spawnDistance / 7F) - spawnDistance / 2F + offsetY,
+)
 
 level(
-    systems = {
-        add(EffectSystem::class)
-        add(ProjectileSystem::class)
-        add(UnitAISystem::class)
-        add(PlayerControlSystem::class)
-        add(GameUnitSystem::class)
-        add(HealthbarSystem::class)
-    },
-
+    systems = listOf(
+        "dev.wildware.udea.example.system.EffectSystem",
+        "dev.wildware.udea.example.system.ProjectileSystem",
+        "dev.wildware.udea.example.system.UnitAISystem",
+        "dev.wildware.udea.example.system.PlayerControlSystem",
+        "dev.wildware.udea.example.system.GameUnitSystem",
+        "dev.wildware.udea.example.system.HealthbarSystem",
+    ),
     entities = {
-        val spawnDistance = 4F
-        fun randomPos() = Vector2(
-            migratedRandom.nextFloat() * spawnDistance - spawnDistance / 2,
-            migratedRandom.nextFloat() * spawnDistance - spawnDistance / 2
-        )
-
-        entityDefinition(
+        entity(
+            name = "player",
             blueprint = reference("character/soldier"),
+            position = spawnAt(0, -5F, 0F),
             components = {
-                networkable(owner = -1)
-                player()
+                component("dev.wildware.udea.ecs.component.base.Networkable", "owner" to -1)
+                component("dev.wildware.udea.example.component.Player")
             },
-            position = randomPos().sub(5F, 0F)
         )
 
-        entityDefinition(
+        entity(
+            name = "priest",
             blueprint = reference("character/priest"),
+            position = spawnAt(1, 0F, 0F),
             components = {
-                aIUnit()
+                component("dev.wildware.udea.example.component.AIUnit")
             },
-            position = randomPos()
         )
 
         repeat(5) {
-            entityDefinition(
+            entity(
+                name = "orc_$it",
                 blueprint = reference("character/orc"),
+                position = spawnAt(it, -5F, 0F),
                 components = {
-                    aIUnit()
+                    component("dev.wildware.udea.example.component.AIUnit")
                 },
-                position = randomPos().sub(5F, 0F)
             )
         }
 
         repeat(10) {
-            entityDefinition(
+            entity(
+                name = "skeleton_$it",
                 blueprint = reference("character/skeleton"),
+                position = spawnAt(it, 10F, 0F),
                 components = {
-                    aIUnit()
+                    component("dev.wildware.udea.example.component.AIUnit")
                 },
-                position = randomPos().sub(-10F, 0F)
             )
         }
 
         repeat(10) {
-            entityDefinition(
+            entity(
+                name = "soldier_$it",
                 blueprint = reference("character/soldier"),
+                position = spawnAt(it, 0F, -5F),
                 components = {
-                    aIUnit()
+                    component("dev.wildware.udea.example.component.AIUnit")
                 },
-                position = randomPos().sub(0F, 5F)
             )
         }
-    }
+    },
 )

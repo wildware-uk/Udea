@@ -1,10 +1,9 @@
-import dev.wildware.udea.ecs.component.base.networkable
-import dev.wildware.udea.example.component.player
+// Migrated from example/src/main/resources/assets/blueprint/player.udea.kts (issue #93).
 
 blueprint(
     parent = reference("character/orc_elite"),
     components = {
-        player()
-        networkable()
-    }
+        component("dev.wildware.udea.example.component.Player")
+        component("dev.wildware.udea.ecs.component.base.Networkable")
+    },
 )

@@ -33,6 +33,22 @@ dependencies {
     // a consumer's *compile* classpath by default - which is the rule working as intended: a
     // module that writes a renderer opts in, visibly, on this line.
     implementation(libs.gdx)
+
+    /*
+     * The wire `SessionEndToEndTest` drives, on the test classpath only.
+     *
+     * Issue #80 shipped with an in-process double standing in for the transport, because
+     * `:udea-net` had no wire when it was written. It has one now, and a seam left un-joined is
+     * a seam nobody has ever run: the double would have passed on the day the real transport
+     * dropped every datagram, which its own KDoc admitted.
+     *
+     * `testImplementation` and not `implementation`: nothing this module *ships* names a
+     * transport. The session identity is deliberately a `SessionPeers.record` call and a list of
+     * JVM arguments so that a launcher can wire the two together without either module
+     * depending on the other, and putting `:udea-net` on the runtime classpath here would
+     * quietly turn that choice into a lie.
+     */
+    testImplementation(project(":udea-net"))
 }
 
 // --- the Phase 1 exit demo -------------------------------------------------------------------

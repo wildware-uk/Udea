@@ -1,6 +1,5 @@
 package dev.wildware.moba
 
-import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.Pixmap
 import com.badlogic.gdx.graphics.Texture
@@ -8,6 +7,8 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion
 import com.github.quillraven.fleks.Family
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.udea.assets.AssetIndex
+import dev.wildware.udea.assets.SpriteSheet
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.Tick
@@ -23,6 +24,7 @@ import dev.wildware.udea.render.control.PresentationControl
 import dev.wildware.udea.render.draw.DebugDraw
 import dev.wildware.udea.render.interp.Interpolator
 import dev.wildware.udea.render.interp.PoseHistory
+import dev.wildware.udea.generated.GameAssets
 
 /**
  * What `moba` draws, and the control surface an agent steers it through.
@@ -136,15 +138,25 @@ private object NoPoseHistory : PoseHistory {
 /**
  * One animated champion per [Position], in world space, through the shared batch.
  *
- * ## What it draws, and why it is a sprite rather than the quad it replaced
+ * ## Every number it draws with came out of the bundle
  *
- * A white quad made the demo's image diff *possible* - two captures of different simulation
- * states produced different pixels - and that was the whole of what it bought. It did not
- * exercise a texture upload, a region slice, a frame index or a non-opaque draw, so
- * "`render.screenshot` returns real bytes" and "`render.screenshot` returns real bytes **of a
- * real renderer**" were still two different claims. This draws a frame of [SHEET] - a 100x100
- * strip out of the character pack `docs/art-assets.md` describes - which closes that gap with
- * the smallest thing that actually goes through the sprite path.
+ * The frames are `AtlasIndex` regions cut at pack time out of one atlas page, and the world size
+ * is that region's pixel size multiplied by the authored `SpriteSheet.scale`. Nothing here
+ * divides a texture, and there is no `WORLD_SCALE` constant left to override an artist.
+ *
+ * What that deletes, precisely: `Gdx.files.classpath(SHEET)`, `texture.width / FRAME_SIZE`,
+ * `TextureRegion(texture, index * FRAME_SIZE, ...)` and a `HEIGHT = 34f` the renderer chose for
+ * itself - the runtime slicing path issue #123 asks for the removal of, and the four lines that
+ * made `.udeapak` a proven, unused artifact.
+ *
+ * ## The scale is read every frame, and that is the hot-reload proof
+ *
+ * [scale] is not cached at bind time. It is `registry.at(sheetIndex)` per frame - one array
+ * index into the live [dev.wildware.udea.assets.AssetRegistry], the same object `AssetHotReload`
+ * swaps a new `SpriteSheet` into at the top of a `Simulation.step`. So an agent that patches
+ * `championScale` in `moba/assets/champion/champion.udea.kts` changes the size of every champion
+ * in the very next capture, through the simulation's own asset graph - and cannot fake it,
+ * because no `world.*` tool can write a sprite size.
  *
  * ## The playhead is the simulation tick, and that is deliberate
  *
@@ -155,23 +167,11 @@ private object NoPoseHistory : PoseHistory {
  * would make two screenshots of an identical, paused, unmutated world differ by however long the
  * agent spent thinking - which is precisely the signal the tool exists to report, drowned in
  * noise the agent cannot attribute. Tick-timed, the picture is a pure function of the simulation
- * state: mutate and the diff is the mutation; rewind and the capture is byte-identical to the
- * one before it.
+ * state and the asset graph: mutate and the diff is the mutation; rewind and the capture is
+ * byte-identical to the one before it.
  *
  * `ctx.clock` is read, never written, and nothing here reaches [dev.wildware.udea.core.SimClock]
- * outside [render]. A game whose animations should keep running while an agent stares at them
- * should use `SpriteAnimation` and `AnimationRenderSystem` instead; this is the trade a game
- * built to be *inspected* makes.
- *
- * ## When the art is not there
- *
- * `moba/src/main/resources/assets/sprites/` is gitignored - the pack is third-party licensed and
- * this repository is public - so a fresh clone has no pixels until somebody runs
- * `python scripts/extract-art.py`. [loadFrames] says so on stderr and falls back to a single
- * white texel drawn at the same world size, which is the quad this replaced. **The fallback is
- * not a stub for the sprite path**: it is one frame instead of six, through the identical draw
- * call, so a capture on a machine with no art is still a capture of a real renderer - it just
- * does not animate.
+ * outside [render].
  */
 internal class ChampionRenderSystem(
     private val resources: RenderResources,
@@ -186,16 +186,27 @@ internal class ChampionRenderSystem(
     private var clock: SimClock? = null
 
     /**
-     * The strip, sliced once. Its [Texture] is owned by the pipeline and disposed with it.
+     * The live graph, and the slot the sheet occupies in it.
+     *
+     * The slot is resolved once because it is pack-time stable - that is the whole property an
+     * `AssetIndex` exists for, and it survives a value-only reload by construction
+     * (`AssetRegistry.applyDelta` swaps at the same slot). The *value* behind it is read fresh
+     * every frame.
+     */
+    private val registry = MobaAssets.registry
+
+    private val sheetIndex: AssetIndex = registry.indexOf(GameAssets.champion.idleSheet.id)
+
+    /**
+     * The frames, cut at pack time, pointing into the atlas pages.
      *
      * Built in the constructor rather than in [onBind] because the factory that calls this runs
-     * on the render thread inside `RenderRegistry.build`, which is where a GL context exists;
-     * `onBind` runs there too, but a texture is not a world lookup and does not belong with them.
+     * on the render thread inside `RenderRegistry.build`, which is where a GL context exists.
+     *
+     * Bracketed as the asset phase of `StartupTrace`: this is `moba`'s entire asset load - one
+     * bundle decoded, one atlas page uploaded - and naming it is what lets `udeaBenchStartup`
+     * attribute a regression to assets rather than to "startup".
      */
-    // Bracketed as the asset phase of `StartupTrace`: this is `moba`'s entire asset load
-    // today - one PNG decoded and uploaded - and it is the phase the `.udeapak` reader
-    // (issue #89) replaces. Naming it now is what lets `udeaBenchStartup` attribute a
-    // regression to assets rather than to "startup".
     private val frames: Array<TextureRegion> =
         dev.wildware.moba.entry.StartupTrace.asset { loadFrames(resources) }
 
@@ -214,6 +225,11 @@ internal class ChampionRenderSystem(
         val units = this.units ?: return
         drawnCount = 0
         val frame = frames[frameIndex(clock?.tick ?: Tick.ZERO, frames.size)]
+        // World units per pixel, out of the live graph. One array read per frame, and the reason
+        // an `assets.patch` is visible in the next capture.
+        val scale = (registry.at(sheetIndex) as SpriteSheet).scale
+        val width = frame.regionWidth * scale
+        val height = frame.regionHeight * scale
         val batch = resources.batch
         batch.projectionMatrix = camera.camera.combined
         batch.color = Color.WHITE
@@ -224,10 +240,10 @@ internal class ChampionRenderSystem(
                     val position = entity[Position]
                     batch.draw(
                         frame,
-                        position.x - HALF_WIDTH,
-                        position.y - HALF_HEIGHT,
-                        WIDTH,
-                        HEIGHT,
+                        position.x - width / 2f,
+                        position.y - height / 2f,
+                        width,
+                        height,
                     )
                     drawnCount++
                 }
@@ -243,44 +259,14 @@ internal class ChampionRenderSystem(
     internal companion object {
 
         /**
-         * The idle strip. `archer` because it is the first name in `docs/art-assets.md`'s roster,
-         * which is the least arbitrary reason available; nothing depends on the choice.
-         */
-        const val SHEET: String = "assets/sprites/champions/archer/idle.png"
-
-        /** Every sheet in the pack is a horizontal strip of 100x100 frames (docs/art-assets.md). */
-        const val FRAME_SIZE: Int = 100
-
-        /**
          * Simulation ticks per animation frame.
          *
          * At the default 60Hz tick that is a 10fps playhead, which is about right for a
-         * hand-drawn six-frame idle and - more usefully here - means a `time.step` of one tick
-         * usually does *not* change the picture, so a diff between two captures reports the
-         * mutation rather than the animation.
+         * six-frame idle and - more usefully here - means a `time.step` of one tick usually does
+         * *not* change the picture, so a diff between two captures reports the mutation rather
+         * than the animation.
          */
         const val TICKS_PER_FRAME: Long = 6L
-
-        /**
-         * How tall a champion's **frame** is drawn, in world units.
-         *
-         * Not how tall the champion looks, and the difference is large enough to be worth the
-         * arithmetic. The pack's characters are small islands in a big frame - the `archer` idle
-         * frame is 100x100 with 22x17 of it opaque - so the drawn character is about a sixth of
-         * this. At 34 world units against `MobaScene.WORLD_HEIGHT` of 80, on a 1280x720
-         * framebuffer, that is roughly a 52x40 pixel character: readable in a screenshot, and
-         * three of them across the [DriftSystem] field rather than one filling it.
-         *
-         * Sized by measurement rather than by eye, because 14 - the first value here - drew a
-         * 22-pixel character that a reviewer could reasonably have called a blank frame.
-         */
-        const val HEIGHT: Float = 34f
-
-        /** Square, because the source frames are. */
-        const val WIDTH: Float = HEIGHT
-
-        const val HALF_WIDTH: Float = WIDTH / 2f
-        const val HALF_HEIGHT: Float = HEIGHT / 2f
 
         /**
          * Which frame [tick] is showing, for [count] frames.
@@ -296,43 +282,41 @@ internal class ChampionRenderSystem(
         }
 
         /**
-         * [SHEET] sliced into frames, or one white texel when it is not on the classpath.
+         * The atlas pages uploaded, and the sheet's frames cut out of them.
          *
-         * @throws IllegalStateException if the sheet is present but narrower than one frame. A
-         *   silent zero-frame array would fail later, on the render thread, with an index error
-         *   that names nothing.
+         * Every page is uploaded even though this game draws from one: a page the atlas declares
+         * and nobody uploads is a `RenderAssets`-style "region on a page that was not loaded"
+         * failure the moment a second sheet is declared, and the loop costs nothing today.
+         *
+         * @throws IllegalStateException when the bundle holds no frames for the sheet. Loud,
+         *   because the alternative - drawing nothing - is a bug that looks like art direction,
+         *   and it means the pack and the graph disagree, which is a packer defect rather than an
+         *   authoring one.
          */
         private fun loadFrames(resources: RenderResources): Array<TextureRegion> {
-            val handle = Gdx.files?.classpath(SHEET)
-            if (handle == null || !handle.exists()) {
-                System.err.println(
-                    "[moba] $SHEET is not on the classpath, so units are drawn as plain white " +
-                        "squares. The character pack is gitignored (docs/art-assets.md); run " +
-                        "`python scripts/extract-art.py` to put it back.",
-                )
-                return arrayOf(TextureRegion(resources.own(whitePixel())))
+            val bundle = MobaAssets.bundle
+            val pages = List(bundle.atlas.pages.size) { page ->
+                val encoded = bundle.atlasPage(page)
+                val pixmap = Pixmap(encoded, 0, encoded.size)
+                val texture = resources.own(Texture(pixmap))
+                // The `Texture` copies the pixels on upload, so the decode buffer is this
+                // function's to free; leaving it is a native leak GL never reports.
+                pixmap.dispose()
+                // Nearest, because the source is pixel art and a linear filter turns a 64px frame
+                // scaled to 34 world units into mush.
+                texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest)
+                texture
             }
-            val texture = resources.own(Texture(handle))
-            // Nearest, because the source is pixel art and a linear filter turns a 100px frame
-            // scaled to 14 world units into mush.
-            texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest)
-            val count = texture.width / FRAME_SIZE
-            check(count > 0) {
-                "$SHEET is ${texture.width}x${texture.height}, which holds no whole " +
-                    "${FRAME_SIZE}x$FRAME_SIZE frame. docs/art-assets.md says every sheet in the " +
-                    "pack is a horizontal strip of ${FRAME_SIZE}x$FRAME_SIZE frames."
+            val regions = bundle.atlas.framesOf(GameAssets.champion.idleSheet.id)
+            check(regions.isNotEmpty()) {
+                "the bundle declares ${GameAssets.champion.idleSheet.id} but packed no frames " +
+                    "for it; the atlas holds ${bundle.atlas.size} region(s) across " +
+                    "${bundle.atlas.sheets.size} sheet(s)"
             }
-            return Array(count) { index ->
-                TextureRegion(texture, index * FRAME_SIZE, 0, FRAME_SIZE, texture.height)
+            return Array(regions.size) { at ->
+                val region = regions[at]
+                TextureRegion(pages[region.page], region.x, region.y, region.width, region.height)
             }
         }
-
-        /** The no-art fallback. One texel, tinted white, stretched over the same world quad. */
-        private fun whitePixel(): Texture = Texture(
-            Pixmap(1, 1, Pixmap.Format.RGBA8888).apply {
-                setColor(Color.WHITE)
-                fill()
-            },
-        )
     }
 }

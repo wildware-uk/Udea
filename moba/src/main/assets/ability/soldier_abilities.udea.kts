@@ -1,23 +1,12 @@
-import dev.wildware.udea.example.ability.AIHint
-import dev.wildware.udea.example.ability.Data
-import dev.wildware.udea.example.ability.Debuffs
-import dev.wildware.udea.example.ability.SoldierFireArrow
+// Migrated from example/src/main/resources/assets/ability/soldier_abilities.udea.kts (#93).
 
 ability(
     name = "soldier_fire_arrow",
-    exec = SoldierFireArrow::class,
+    exec = "dev.wildware.udea.example.ability.SoldierFireArrow",
     range = 2.0F,
-    blockedBy = {
-        add(Debuffs.Stunned)
-    },
-    cooldownEffect = reference("ability/cooldown"),
-    setByCallerTags = mapOf(
-        Data.Cooldown to 5.0F
-    ),
+    blockedBy = listOf("Debuffs.Stunned"),
+    cooldown = reference("ability/cooldown"),
+    setByCaller = mapOf("Data.Cooldown" to 5.0F),
     blockAnimations = true,
-    tags = {
-        add(AIHint.Ranged)
-        add(AIHint.Damage)
-        add(AIHint.TargetEnemy)
-    }
+    tags = listOf("AIHint.Ranged", "AIHint.Damage", "AIHint.TargetEnemy"),
 )

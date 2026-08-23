@@ -24,6 +24,39 @@ package dev.wildware.udea.build
 public object UdeaStdlibPin {
 
     /**
+     * The `org.jetbrains.kotlin` modules the pin forces to [UdeaVersions.KOTLIN].
+     *
+     * `kotlin-reflect` is here for a failure that was diagnosed twice before it was fixed once.
+     * KotlinPoet 2.3.0 asks for `kotlin-reflect:2.3.20`, Gradle takes the highest request, and
+     * 2.3's reflect references `kotlin.jvm.internal.KotlinGenericDeclaration` - a class 2.2.10's
+     * stdlib has not got. The failure is a `NoClassDefFoundError` at **class load**, not a
+     * compile error, so it reaches whoever runs the thing rather than whoever built it:
+     * `:moba:run` died on it the moment the asset pipeline put `udea-assets-compiler` on the
+     * agent source set.
+     *
+     * It was fixed once in `udea-assets-compiler/build.gradle.kts`, in that module's own
+     * `configurations.configureEach`, with a comment saying "it belongs in `UdeaStdlibPin` next
+     * to the stdlib rule". It did, and a per-module pin fixed exactly the module that had
+     * already been bitten - which is why the next consumer of the same jar hit the identical
+     * error from a different classpath.
+     *
+     * Matched exactly rather than by prefix: `kotlin-stdlib-jdk8` and `kotlin-stdlib-common` are
+     * real artifacts that must move with the stdlib, so those keep the prefix behaviour through
+     * [pins].
+     */
+    public val PINNED_MODULES: Set<String> = setOf(
+        "kotlin-stdlib",
+        "kotlin-stdlib-jdk7",
+        "kotlin-stdlib-jdk8",
+        "kotlin-stdlib-common",
+        "kotlin-reflect",
+    )
+
+    /** Whether the pin applies to `org.jetbrains.kotlin:[module]`. */
+    public fun pins(module: String): Boolean =
+        module in PINNED_MODULES || module.startsWith("kotlin-stdlib")
+
+    /**
      * A configuration that is deliberately left off the pin.
      *
      * @param projectPath Gradle path of the module, e.g. `:udea-codegen`.
@@ -185,6 +218,16 @@ public object UdeaStdlibPin {
         ToolClasspath(
             "*AnnotationProcessor",
             "javac's annotation-processor path for a non-main source set; same reasoning.",
+        ),
+        ToolClasspath(
+            "udeaAsset*",
+            "the build-time asset pipeline's own classpaths (`udeaAssetsCompiler`, which the " +
+                "forked `AssetPipelineCli` runs on, and `udeaAssetScript`, which `.udea.kts` " +
+                "compile against). Neither is a classpath this project runs on: the pipeline is " +
+                "a separate JVM, and it deliberately carries a newer kotlin-reflect than the " +
+                "game does because KotlinPoet needs one. Pinning them would be forcing the " +
+                "project's stdlib onto the tool that builds the project - the same mistake the " +
+                "`kotlin*` entry below this one exists to avoid.",
         ),
         ToolClasspath(
             "*DependenciesMetadata",

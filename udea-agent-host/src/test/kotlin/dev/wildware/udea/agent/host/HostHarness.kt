@@ -23,6 +23,12 @@ internal class HostHarness(
     registry: AgentRegistry = noRegistry(),
     paused: () -> Boolean = { false },
     workingDirectory: Path = Path.of("").toAbsolutePath(),
+    /**
+     * A fixed identity, so tests that assert the exact `/health` document are not asserting this
+     * JVM's pid. A real instance generates its own from the pid when nothing supplied one.
+     */
+    val session: SessionIdentity = SessionIdentity(InstanceRole.Standalone, SessionId("s-test")),
+    val peers: SessionPeers = SessionPeers(),
 ) : AutoCloseable {
 
     val host: AgentHost = AgentHost.start(
@@ -36,6 +42,8 @@ internal class HostHarness(
             paused = paused,
             registry = registry,
             workingDirectory = workingDirectory,
+            session = session,
+            peers = peers,
         ),
     )
 

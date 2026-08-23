@@ -1,2 +1,3 @@
 PreSimulation dev.wildware.udea.core.physics.TeleportSystem
-Physics dev.wildware.udea.core.physics.PhysicsStepSystem after=dev.wildware.udea.core.physics.TeleportSystem
+Movement dev.wildware.udea.core.movement.CharacterMoverSystem
+Physics dev.wildware.udea.core.physics.PhysicsStepSystem after=dev.wildware.udea.core.movement.CharacterMoverSystem,dev.wildware.udea.core.physics.TeleportSystem

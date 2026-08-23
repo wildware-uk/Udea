@@ -46,9 +46,36 @@ tasks.withType<Test>().configureEach {
     systemProperty("update.goldens", updateGoldens.get())
 }
 
+/**
+ * The sibling module sources `ReplicatorApiShapeTest` reads, declared as inputs.
+ *
+ * Found the hard way: adding `private val cached: FieldMask` to `udea-gas`'s
+ * `AttributesReplicator` left `:udea-core:test` UP-TO-DATE and the build green. No sibling
+ * module is on this module's test classpath, so nothing else makes the task rerun - the rule
+ * only fired when some unrelated change happened to invalidate it. A source rule that reads a
+ * tree it has not declared is a rule that reports whatever it last saw.
+ *
+ * A glob rather than a `listFiles()` scan so a module added later is covered without anyone
+ * remembering this line. `.kts` is deliberately not matched: the asset corpus under
+ * `moba/src/main/assets` is not Kotlin the rule reads.
+ */
+val fieldMaskScanSources: ConfigurableFileTree = fileTree(rootProject.layout.projectDirectory) {
+    include("udea-*/src/main/**/*.kt")
+    include("udea-*/src/testFixtures/**/*.kt")
+    include("moba/src/main/**/*.kt")
+    include("moba/src/testFixtures/**/*.kt")
+}
+
+tasks.named<Test>("test") {
+    inputs.files(fieldMaskScanSources)
+        .withPropertyName("fieldMaskScanSources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 val budgetTestClasses = listOf(
     "dev.wildware.udea.core.snapshot.SnapshotBudgetTest",
     "dev.wildware.udea.core.snapshot.TickLoopBudgetTest",
+    "dev.wildware.udea.core.movement.CharacterMoverBudgetTest",
 )
 
 tasks.named<Test>("test") {
@@ -81,6 +108,24 @@ val udeaBenchTickLoop = tasks.register<Test>("udeaBenchTickLoop") {
     outputs.file(layout.buildDirectory.file("reports/udea/tick-loop.json"))
 }
 
+/**
+ * The Phase 3 movement gate: 200 movers replayed 60 times inside a quarter of a 60Hz frame.
+ *
+ * Its own task for the same reason the two above are: it is a timing measurement, it belongs in
+ * the build log of whichever machine is slow, and a normal `test` run should not pay for it
+ * twice. `CharacterMoverBudgetTest`'s KDoc has the remedy when it fails, and the remedy is never
+ * a larger constant.
+ */
+val udeaBenchCharacterMover = tasks.register<Test>("udeaBenchCharacterMover") {
+    group = "verification"
+    description =
+        "Gates CharacterMover at 200 movers x 60 replay steps: under a quarter of a 60Hz frame."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    filter.includeTestsMatching("dev.wildware.udea.core.movement.CharacterMoverBudgetTest")
+    testLogging.showStandardStreams = true
+}
+
 tasks.named("check") {
-    dependsOn(udeaSnapshotBudget, udeaBenchTickLoop)
+    dependsOn(udeaSnapshotBudget, udeaBenchTickLoop, udeaBenchCharacterMover)
 }

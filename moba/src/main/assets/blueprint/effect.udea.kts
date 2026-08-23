@@ -1,13 +1,13 @@
-import dev.wildware.udea.ecs.component.animation.animations
-import dev.wildware.udea.ecs.component.render.spriteRenderer
+// Migrated from example/src/main/resources/assets/blueprint/effect.udea.kts (issue #93).
 
 blueprint(
     name = "effect",
     components = {
-        spriteRenderer(
-            order = 10,
-            offset = Vector2(0.0F, -0.1F)
+        component(
+            "dev.wildware.udea.ecs.component.render.SpriteRenderer",
+            "order" to 10,
+            "offset" to vec(0.0F, -0.1F),
         )
-        animations()
-    }
+        component("dev.wildware.udea.ecs.component.animation.Animations")
+    },
 )

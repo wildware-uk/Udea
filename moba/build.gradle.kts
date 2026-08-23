@@ -21,9 +21,30 @@ plugins {
     // creates the `agent` source set, generates the per-variant agent flag, wires
     // `-Dudea.agent.port` into `run`, and writes the launch declaration at the repository root.
     id("dev.wildware.udea.agent")
+
+    // The build-time asset pipeline of spec 3.6, applied to a real game for the first time.
+    // Before this, `AssetPackCli` said in its own KDoc that "nothing in `:moba`'s build produces
+    // or consumes a bundle yet; `MobaScene` still slices a PNG at runtime" - which was true, and
+    // is the sentence this line deletes.
+    id("dev.wildware.udea.assets")
 }
 
 dependencies {
+    // The forked asset pipeline: `udeaScanAssets`, `udeaValidateAssets`, `udeaPackBundle` and
+    // `udeaGenerateAccessors` all run out of this configuration, in a JVM of their own. It is
+    // NOT `implementation`: it carries `kotlin-compiler-embeddable`, and `UDEA-MG-005` forbids a
+    // script compiler on a shipped game's runtime classpath. `StartupClasspathTest` checks that
+    // from the other end by naming the artifacts.
+    udeaAssetsCompiler(project(":udea-assets-compiler"))
+
+    // The same module again, on the **agent** source set, so `:moba:run` can hold a warm
+    // `AssetDaemon` and serve `assets.*` over the live game (see `MobaAssetTools`). Deliberately
+    // not `implementation`: this is the jar that carries `kotlin-compiler-embeddable`, and
+    // `UDEA-MG-005` plus `ReleaseRules.CLASSPATH_RULE` both forbid it on `runtimeClasspath`.
+    // The `agent` source set is the one classpath in this project allowed to resolve it, and
+    // `jar` packages `main`, so it cannot reach the artifact either.
+    "agentImplementation"(project(":udea-assets-compiler"))
+
     implementation(project(":udea-core"))
 
     // `@Replicated`, `@Net` and `@Sim` on `Position`. BINARY-retained, so they are on this
@@ -55,6 +76,33 @@ dependencies {
 udeaAgent {
     name.set("moba")
     flagsPackage.set("dev.wildware.moba.agent")
+}
+
+/**
+ * Where this game's assets live, and what they are compiled by.
+ *
+ * `assets/` and not `src/main/assets` or `src/main/resources`. Two roots exist in this module
+ * today, and the reason has changed since this comment was first written. The old reason - that
+ * `src/main/assets`, the mechanically migrated 19-script corpus of issue #93, could not compile
+ * until #84's generated DSL landed - is **no longer true**: `AssetScope` grew the eight missing
+ * kinds, the 19 scripts carry no imports at all, and `MigratedCorpusCompilesTest` compiles and
+ * validates every one of them with zero errors. Breaking a reference in that tree turns it red
+ * without a `--rerun-tasks`, so it is a live check and not a stale one.
+ *
+ * What still keeps the roots apart is narrower and is a *packing* limit, not a compiling one:
+ * `character`, `gameplayEffect` and `effect` are `AssetKind.Unpublishable`, so
+ * `level/test_level`'s 27 entities pack without their blueprints - 27 `UDEA0013`s, pinned by
+ * `MigratedCorpusBundleTest`. A game cannot load a bundle whose level has no entities to spawn,
+ * so switching this line today would trade a working game for a corpus. Closing that is #84's,
+ * and when it closes the two roots become one and this block goes away.
+ *
+ * The Kotlin version is declared even though the compiler classpath is already `@Classpath` on
+ * every task - see `UdeaAssetsExtension.kotlinVersion` for why a redundant input is worth its
+ * line here.
+ */
+udea {
+    assetRoots.from("assets")
+    kotlinVersion.set(libs.versions.kotlin.get())
 }
 
 /**
@@ -135,6 +183,31 @@ tasks.register<JavaExec>("run") {
     description = "moba.agent: Offscreen by default, with the agent HTTP surface on -PdebugPort=N."
     mainClass.set("dev.wildware.moba.agent.MobaAgent")
     classpath = agentSources.runtimeClasspath
+
+    // --- the dev asset daemon -----------------------------------------------------------------
+    //
+    // Three properties, and the game registers `assets.*` only when all three are usable. A
+    // packaged game has none of them and correctly serves no asset tools at all; `MobaAssetTools`
+    // says so on stderr rather than registering tools that would fail on first call.
+    //
+    // `udea.assets.root` is the same directory `udea { assetRoots }` names above and the same one
+    // `udeaPackBundle` packed, which is what makes the daemon's graph and the loaded `.udeapak`
+    // the same graph - see `MobaAssetTools` for why that matters.
+    systemProperty("udea.assets.root", layout.projectDirectory.dir("assets").asFile.absolutePath)
+    systemProperty("udea.repoRoot", rootProject.layout.projectDirectory.asFile.absolutePath)
+
+    // A `CommandLineArgumentProvider` and not a `systemProperty`, because resolving a
+    // configuration during configuration is a configuration-cache failure and because the
+    // resolved classpath must be this invocation's rather than whichever one stored the cache.
+    // `files(provider)` and not `configurations.named(...).get()`: a `Configuration` is a
+    // `FileCollection` and is also one of the types the configuration cache refuses to
+    // serialize, so capturing one in the provider below fails the build at store time.
+    val scriptClasspath: FileCollection = files(configurations.named("udeaAssetScript"))
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            listOf("-Dudea.assetsCompiler.classpath=" + scriptClasspath.asPath)
+        },
+    )
 }
 
 tasks.register<JavaExec>("runServer") {
@@ -321,6 +394,13 @@ val udeaBenchStartup = tasks.register<UdeaBenchStartupTask>("udeaBenchStartup") 
  * gate in the sense that both are wired into `check`, and two tasks in the sense that one of
  * them can run anywhere.
  */
+tasks.test {
+    // Where `MobaAssetsTest` finds this module's sources. A relative path would resolve against
+    // the project directory under Gradle and against the daemon's working directory under an
+    // IDE, and a source scan that silently read nothing would pass.
+    systemProperty("udea.moba.projectDir", layout.projectDirectory.asFile.absolutePath)
+}
+
 tasks.test {
     // A *local* val, captured by the `doFirst` below. A script-level property here would make
     // the lambda hold a reference to the build script object, which the configuration cache

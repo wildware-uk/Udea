@@ -1,131 +1,108 @@
-import dev.wildware.udea.ability.abilitySpec
-import dev.wildware.udea.ecs.component.base.debug
-import dev.wildware.udea.ecs.component.base.networkable
-import dev.wildware.udea.example.ability.AITag
-import dev.wildware.udea.example.ability.CharacterAttributeSet
-import dev.wildware.udea.example.ability.Slot
-import dev.wildware.udea.example.character.gameUnitAnimations
-import dev.wildware.udea.example.component.Team
-import dev.wildware.udea.example.component.gameUnit
-import dev.wildware.udea.example.component.team
+// Migrated from example/src/main/resources/assets/character/skeleton.udea.kts (issue #93).
+
+val skeletonScale = 0.02F
 
 character(
     name = "skeleton",
-    animations = gameUnitAnimations(
-        walk = "skeleton_walk",
-        run = "skeleton_walk",
-        idle = "skeleton_idle",
-        death = "skeleton_death",
-        attack = "skeleton_attack",
-        hit = "skeleton_hit",
+    size = 0.2F,
+    spriteAnimationSet = reference("character/skeleton_animation_set"),
+    animationMap = mapOf(
+        "idle" to reference("character/skeleton_idle"),
+        "walk" to reference("character/skeleton_walk"),
+        "run" to reference("character/skeleton_walk"),
+        "attack" to reference("character/skeleton_attack"),
+        "hit" to reference("character/skeleton_hit"),
+        "death" to reference("character/skeleton_death"),
     ),
-    size = characterSize(0.2F, 0.2F),
-    attributeSet = {
-        CharacterAttributeSet(
-            initHealth = 50F,
-            initMana = 0F,
-            initMagicResist = 20F,
-            initHealthRegen = 0F
-        )
-    },
+    attributes = mapOf(
+        "health" to 50F,
+        "mana" to 0F,
+        "magicResist" to 20F,
+        "healthRegen" to 0F,
+    ),
     abilitySpecs = {
-        abilitySpec(
-            ability = reference("ability/npc_melee"),
-            tags = {
-                add(Slot.A)
-            }
-        )
+        abilitySpec(ability = reference("ability/npc_melee"), tags = listOf("Slot.A"))
     },
     components = {
-        networkable()
-        team(Team.UndeadTeam)
-        gameUnit(
-            aiTags = {
-                add(AITag.Fearless)
-            }
-        )
-        debug()
+        component("dev.wildware.udea.ecs.component.base.Networkable")
+        component("dev.wildware.udea.example.component.Team", "team" to "UndeadTeam")
+        component("dev.wildware.udea.example.component.GameUnit", "aiTags" to listOf("AITag.Fearless"))
+        component("dev.wildware.udea.ecs.component.base.Debug")
     },
-    spriteAnimationSet = reference("character/skeleton_animation_set"),
 )
 
 spriteAnimationSet(
     name = "skeleton_animation_set",
-    animations = {
-        spriteAnimation(
-            name = "skeleton_idle",
-            sheet = reference("character/skeleton_idle"),
-        )
-
-        spriteAnimation(
-            name = "skeleton_walk",
-            sheet = reference("character/skeleton_walk")
-        )
-
-        spriteAnimation(
-            name = "skeleton_attack",
-            sheet = reference("character/skeleton_attack"),
-            loop = false,
-            notifies = {
-                animNotify(3, "swoosh")
-                animNotify(4, "attack_hit")
-            }
-        )
-
-        spriteAnimation(
-            name = "skeleton_hit",
-            sheet = reference("character/skeleton_hit"),
-            loop = false,
-            interruptable = false
-        )
-
-        spriteAnimation(
-            name = "skeleton_death",
-            sheet = reference("character/skeleton_death"),
-            loop = false,
-            interruptable = false
-        )
-    }
+    animations = listOf(
+        reference("character/skeleton_idle"),
+        reference("character/skeleton_walk"),
+        reference("character/skeleton_attack"),
+        reference("character/skeleton_hit"),
+        reference("character/skeleton_death"),
+    ),
 )
 
-val skeletonScale = 0.02F
+spriteAnimation(name = "skeleton_idle", sheet = reference("character/skeleton_idle_sheet"))
+
+spriteAnimation(name = "skeleton_walk", sheet = reference("character/skeleton_walk_sheet"))
+
+spriteAnimation(
+    name = "skeleton_attack",
+    sheet = reference("character/skeleton_attack_sheet"),
+    loop = false,
+    notifies = mapOf("swoosh" to 3, "attack_hit" to 4),
+)
+
+spriteAnimation(
+    name = "skeleton_hit",
+    sheet = reference("character/skeleton_hit_sheet"),
+    loop = false,
+    interruptable = false,
+)
+
+spriteAnimation(
+    name = "skeleton_death",
+    sheet = reference("character/skeleton_death_sheet"),
+    loop = false,
+    interruptable = false,
+)
 
 spriteSheet(
-    name = "skeleton_idle",
+    name = "skeleton_idle_sheet",
     spritePath = "sprites/skeleton/Skeleton-Idle.png",
     rows = 1,
     columns = 6,
-    scale = skeletonScale
+    scale = skeletonScale,
 )
 
 spriteSheet(
-    name = "skeleton_walk",
+    name = "skeleton_walk_sheet",
     spritePath = "sprites/skeleton/Skeleton-Walk.png",
     rows = 1,
     columns = 8,
-    scale = skeletonScale
+    scale = skeletonScale,
 )
 
 spriteSheet(
-    name = "skeleton_attack",
+    name = "skeleton_attack_sheet",
     spritePath = "sprites/skeleton/Skeleton-Attack01.png",
     rows = 1,
     columns = 6,
-    scale = skeletonScale
+    scale = skeletonScale,
 )
 
 spriteSheet(
-    name = "skeleton_hit",
+    name = "skeleton_hit_sheet",
     spritePath = "sprites/skeleton/Skeleton-Hurt.png",
     rows = 1,
     columns = 4,
-    scale = skeletonScale
+    scale = skeletonScale,
 )
 
 spriteSheet(
-    name = "skeleton_death",
+    name = "skeleton_death_sheet",
     spritePath = "sprites/skeleton/Skeleton-Death.png",
     rows = 1,
     columns = 4,
-    scale = skeletonScale
+    scale = skeletonScale,
 )

@@ -123,6 +123,13 @@ public class AgentHost private constructor(
      * `renderMode` is additive to the contract and is why an agent does not have to call a render
      * tool to find out that the toolset is not live in this process.
      *
+     * `role` and `sessionId` are additive in the same way and exist for one reason: three ports of
+     * one match are otherwise indistinguishable from three unrelated games, so an agent debugging
+     * a desync cannot tell which port to send input on and which to assert authoritative state
+     * against. They are **read-only grouping hints**. No endpoint here branches on either, and
+     * none ever may - a bridge that ignores them would then silently get different semantics from
+     * one that does not, and `SessionAdditiveTest` drives a parser that knows neither key.
+     *
      * Discovery sweeps this across a whole port range, so it reads five atomics and allocates one
      * short string. Nothing here can block.
      */
@@ -136,6 +143,8 @@ public class AgentHost private constructor(
                 put("tick", bridge.tick)
                 put("paused", config.paused())
                 put("renderMode", config.renderMode.name)
+                put("role", config.session.role.id)
+                put("sessionId", config.session.sessionId.value)
             },
         )
     }
@@ -471,7 +480,13 @@ public class AgentHost private constructor(
             val host = AgentHost(server, executor, bridge, config)
             host.install()
             startOnADaemonThread(server)
-            config.registry.advertise(host.port, config.identity, config.renderMode, config.workingDirectory)
+            config.registry.advertise(
+                host.port,
+                config.identity,
+                config.renderMode,
+                config.session,
+                config.workingDirectory,
+            )
             return host
         }
 
@@ -563,6 +578,25 @@ public class AgentHostConfig(
     public val identity: GameIdentity = GameIdentity.UNKNOWN,
     /** Reported by `/health`, so an agent knows which toolsets are live before calling one. */
     public val renderMode: RenderMode = RenderMode.Headless,
+    /**
+     * This instance's place in a multiplayer session, reported by `/health` and by the registry.
+     *
+     * Resolved here rather than inside [AgentHost] because it has to be settled **before the port
+     * binds**: the entry is written straight after the bind and must not name a role that had not
+     * been decided. Defaulting to a standalone instance with an id of its own means the two
+     * fields are never missing, which is what keeps every reader one shape.
+     */
+    public val session: SessionIdentity = SessionIdentity(
+        InstanceRole.Standalone,
+        SessionId.generate(ProcessHandle.current().pid()),
+    ),
+    /**
+     * The peers this instance launched, reported by `agent_session`.
+     *
+     * Empty for an instance that launched none, which is most of them. `:udea-net`'s
+     * `start_host`/`start_client` record into it - see [SessionPeers] for that seam.
+     */
+    public val peers: SessionPeers = SessionPeers(),
     /** The manifest served by `/tools`. `null` serves a 404, which the bridge survives. */
     public val manifest: ToolManifest? = null,
     /** Backs `/artifact`. `null` serves a typed 404 for every id. */
@@ -593,5 +627,6 @@ public class AgentHostConfig(
         }
     }
 
-    override fun toString(): String = "AgentHostConfig(port=$port, $identity, $renderMode)"
+    override fun toString(): String =
+        "AgentHostConfig(port=$port, $identity, $renderMode, $session)"
 }

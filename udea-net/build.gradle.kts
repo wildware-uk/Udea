@@ -4,6 +4,12 @@ plugins {
 
 dependencies {
     api(project(":udea-core"))
+
+    // The Replicator contract's executable specification and the working service doubles
+    // `SnapshotService` needs. The networking tests drive a *real* Fleks world through a real
+    // snapshot ring rather than a mock of one, because "the ring is the baseline store" (spec
+    // 3.1) is only proven by using the ring.
+    testImplementation(testFixtures(project(":udea-core")))
 }
 
 /**

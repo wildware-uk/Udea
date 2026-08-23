@@ -40,6 +40,11 @@ gradlePlugin {
             implementationClass = "dev.wildware.udea.gradle.UdeaAgentPlugin"
             description = "gamebridge.json, the debug-only agent source set, and the run wiring."
         }
+        register("udeaAssets") {
+            id = "dev.wildware.udea.assets"
+            implementationClass = "dev.wildware.udea.gradle.UdeaAssetsPlugin"
+            description = "scan, compile, validate, pack and generate accessors for a .udea.kts tree."
+        }
     }
 }
 

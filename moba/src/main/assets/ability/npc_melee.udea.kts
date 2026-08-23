@@ -1,23 +1,12 @@
-import dev.wildware.udea.example.ability.AIHint
-import dev.wildware.udea.example.ability.Data
-import dev.wildware.udea.example.ability.Debuffs
-import dev.wildware.udea.example.ability.UnitMeleeAttack
+// Migrated from example/src/main/resources/assets/ability/npc_melee.udea.kts (issue #93).
 
 ability(
     name = "npc_melee",
-    exec = UnitMeleeAttack::class,
+    exec = "dev.wildware.udea.example.ability.UnitMeleeAttack",
     range = 0.5F,
-    blockedBy = {
-        add(Debuffs.Stunned)
-    },
-    cooldownEffect = reference("ability/cooldown"),
-    setByCallerTags = mapOf(
-        Data.Cooldown to 0.8F
-    ),
+    blockedBy = listOf("Debuffs.Stunned"),
+    cooldown = reference("ability/cooldown"),
+    setByCaller = mapOf("Data.Cooldown" to 0.8F),
     blockAnimations = true,
-    tags = {
-        add(AIHint.Damage)
-        add(AIHint.TargetEnemy)
-        add(AIHint.Melee)
-    }
+    tags = listOf("AIHint.Damage", "AIHint.TargetEnemy", "AIHint.Melee"),
 )

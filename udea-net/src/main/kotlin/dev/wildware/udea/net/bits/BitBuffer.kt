@@ -118,6 +118,25 @@ public class BitBufferWriter(
      */
     public val byteLength: Int get() = ((written + 7L) ushr 3).toInt()
 
+    /**
+     * Discards everything written after [bitPosition].
+     *
+     * The rollback half of "the bytes written so far remain a valid, sendable prefix". A packer
+     * filling a datagram entity by entity records the position before each entity and truncates
+     * back to it when that entity does not fit, so a packet ends on an entity boundary rather
+     * than mid-field. Without it the only options are to serialise every entity twice — once to
+     * measure — or to send a truncated record and let the peer misparse it.
+     *
+     * Bytes above the new position keep whatever they held; they are outside [byteLength] and
+     * [put] overwrites any byte it starts, so nothing stale can leak into a later write.
+     */
+    public fun truncateTo(bitPosition: Long) {
+        require(bitPosition in 0..written) {
+            "cannot truncate to bit $bitPosition: $written bit(s) are written"
+        }
+        written = bitPosition
+    }
+
     /** Rewinds to bit zero over the same slice. Subsequent writes overwrite, never OR. */
     public fun reset() {
         written = 0L
@@ -154,6 +173,39 @@ public class BitBufferWriter(
      * reader and [BitBufferReader.reset]s it per received datagram.
      */
     public fun toReader(): BitBufferReader = BitBufferReader(buffer, offset, byteLength)
+
+    /**
+     * Overwrites [bitCount] bits already written at [bitPosition], leaving the write cursor
+     * where it was.
+     *
+     * This exists for exactly one job: a length prefix. A framing layer that must know a
+     * message's length before it writes the message has only two options — serialise the
+     * message twice, or reserve the field and patch it once the length is known. The second is
+     * what makes several messages fit one datagram without a scratch buffer per message, and
+     * therefore what makes the whole send path allocation-free.
+     *
+     * @throws BitBufferOverflow if the range is not already inside what has been written. A
+     *   patch is by definition a correction to existing bytes: patching past [bitsWritten]
+     *   would leave an unwritten gap that reads back as whatever the recycled buffer held.
+     */
+    public fun patchBits(bitPosition: Long, value: Int, bitCount: Int) {
+        require(bitCount in 1..32) { "bitCount must be in 1..32, was $bitCount" }
+        require(bitPosition >= 0) { "bitPosition must be >= 0, was $bitPosition" }
+        if (bitPosition + bitCount > written) {
+            throw BitBufferOverflow(currentField, bitCount, bitPosition, written)
+        }
+        val resume = written
+        written = bitPosition
+        // `put` clears each byte it starts, so the bits above the patched field inside a shared
+        // byte would be lost. Frame prefixes are byte-aligned and byte-sized, so that cannot
+        // arise; the check makes the assumption explicit rather than latent.
+        require(bitPosition and 7L == 0L && bitCount and 7 == 0) {
+            "patchBits only supports byte-aligned, byte-sized fields; " +
+                "asked for $bitCount bit(s) at bit $bitPosition"
+        }
+        put(value.toLong() and lowMask(bitCount), bitCount)
+        written = resume
+    }
 
     private fun put(value: Long, bitCount: Int) {
         if (written + bitCount > capacityBits) {

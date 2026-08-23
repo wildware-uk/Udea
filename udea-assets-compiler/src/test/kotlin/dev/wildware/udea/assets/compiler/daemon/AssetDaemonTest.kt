@@ -91,10 +91,19 @@ class AssetDaemonTest {
         assertEquals(1, errors.size, "five referrers of one bad id is one defect, not five: $errors")
         assertEquals(UdeaRules.UNRESOLVED_REFERENCE.id, errors.single().ruleId)
         assertTrue(
-            "did you mean \"character/orc_idle\"?" in errors.single().message.lowercase(),
+            "did you mean `character/orc_idle`?" in errors.single().message.lowercase(),
             "an agent must be able to self-correct in one turn: ${errors.single().message}",
         )
-        assertTrue("referenced by 5 assets" in errors.single().message)
+        // The surviving diagnostic names a referrer and the field it was written in, which is
+        // where the author edits. It does *not* say "referenced by 5 assets" any more: that
+        // phrasing belonged to `daemon/AssetGraphValidator`, which aggregated the referrers
+        // itself. `UnresolvedReferenceValidator` reports every site honestly and `DiagnosticSink`
+        // collapses them, so the count is lost and the location is kept - the deliberate cost of
+        // having one implementation of this check instead of two.
+        assertTrue(
+            "references `character/orc_idel` from its `sheet`" in errors.single().message,
+            "the diagnostic must name a referrer and its field: ${errors.single().message}",
+        )
     }
 
     @Test
@@ -151,12 +160,20 @@ class AssetDaemonTest {
     }
 
     @Test
-    fun `a kind with no runtime value is refused rather than dropped from the delta`() {
+    fun `a kind the DSL has no runtime type for still gets a value, through the bundle codecs`() {
         val fixture = DaemonFixture("unpackable").writeBaseline()
         fixture.write("config.udea.kts", """gameConfig(defaultCharacter = reference("blueprint/player"))""")
+        fixture.write("bestiary/orc.udea.kts", """asset("beast", "orc", "bite" to 7)""")
         assertTrue(fixture.daemon.start().ok)
-        // `gameConfig` validates - the reference resolves - and simply has no packed value.
-        assertNull(fixture.daemon.value("config"))
+
+        // Both of these used to be `null`. `daemon/AssetPacker` was a hand-written `when` over
+        // six DSL words: it had no case for `gameConfig` at all, and nothing at all for a kind
+        // declared through `asset(...)`. The daemon now packs through `GraphPacker` and reads
+        // back through `BundleReader`, so it holds exactly the values a shipped `.udeapak`
+        // holds - `GameConfig` for the first, an opaque record for the second - and the two
+        // cannot disagree about an id, because there is only one writer and one reader.
+        assertNotNull(fixture.daemon.value("config"))
+        assertNotNull(fixture.daemon.value("bestiary/orc"))
         assertTrue("config" in fixture.daemon.ids)
 
         val edited = fixture.write(

@@ -9,30 +9,35 @@ import org.junit.jupiter.api.Test
 import kotlin.io.path.exists
 
 /**
- * What the migrated corpus still needs that the new receiver does not yet offer.
+ * The two gaps the first cut of this migration left, pinned shut.
  *
- * ## This test exists to stop a claim being overstated
+ * ## What this used to say
  *
- * "The 19 example scripts migrate" is true and is asserted next door. "The migrated corpus
- * *validates* against the new model" is **not** true, and would be easy to imply by only ever
- * asserting the first. The migration is a rewrite of spellings; `AssetScope` — the receiver the
- * new pipeline compiles scripts against — is still the provisional one issue #84 owns. The corpus
- * declares fourteen kinds and the receiver has a function for six of them, and even those six are
- * passed parameters it does not declare (`character(size = ..., attributeSet = ...)`).
+ * It measured a gap and asserted its size: the corpus used fourteen declaration kinds and the
+ * receiver had six of them, and the scripts still carried thirty-four imports of `common` and
+ * `example` game code. That was the honest statement at the time — "the corpus migrates" was
+ * true, "the corpus validates" was not — and the test existed so that closing the gap would
+ * fail on its own expected values and force somebody to come back and re-decide.
  *
- * So this measures the gap and pins it. When #84's generated DSL lands and the gap closes, this
- * test fails on its own expected values and somebody has to come back and re-decide, which is
- * the behaviour a "known gap" note in a report does not have.
+ * ## What it says now
+ *
+ * Both halves are closed, so the assertions are inverted rather than deleted: every kind the
+ * corpus declares is a member of [AssetScope], and no script imports game code from the old
+ * tree. Deleting the test instead would leave nothing failing when either regresses, and a
+ * regression here is invisible — a script that reaches back into `common` still *compiles*, in
+ * a build where `common` happens to be on the script classpath, and only stops compiling for
+ * the game that does not have it.
+ *
+ * `MigratedCorpusCompilesTest` is the other half: this one is about the vocabulary, that one
+ * runs the real pipeline over the real files.
  */
 class MigratedCorpusGapTest {
 
-    /**
-     * Every top-level declaration kind the migrated corpus uses, split by whether the current
-     * receiver has a function of that name.
-     */
+    private val root = TestPaths.repoRoot.resolve("moba/src/main/assets")
+
+    /** Every declaration kind the corpus uses is a declaration function on the receiver. */
     @Test
-    fun `the migrated corpus uses declaration kinds the provisional receiver does not have`() {
-        val root = TestPaths.repoRoot.resolve("moba/src/main/assets")
+    fun `every declaration kind the migrated corpus uses is a member of the receiver`() {
         assertTrue(
             root.exists(),
             "the migrated tree is missing; run `./gradlew :udea-assets-compiler:udeaMigrateAssets`",
@@ -41,62 +46,59 @@ class MigratedCorpusGapTest {
         assertEquals(19, report.files.size, "the migrated corpus is nineteen scripts")
 
         val kinds = report.declarations.map { it.kind }.toSortedSet()
-        val supported = kinds.filter { it in AssetScope.MEMBER_NAMES }.toSortedSet()
-        val unsupported = kinds.filterNot { it in AssetScope.MEMBER_NAMES }.toSortedSet()
-
-        // Pinned, not described. A change in either direction is a change in what is honestly
-        // claimable about the migration, and it should not pass silently.
         assertEquals(
-            setOf("blueprint", "character", "gameConfig", "level", "soundCue", "spriteSheet"),
-            supported.toSet(),
-            "the receiver's coverage of the corpus changed; re-check the migration claim",
+            emptySet<String>(),
+            kinds.filterNot { it in AssetScope.MEMBER_NAMES }.toSortedSet(),
+            "the corpus declares a kind the receiver has no function for",
         )
+
+        // Pinned, not merely derived: the point of the migration was that the receiver grew the
+        // eight kinds it was missing, and a corpus that quietly stopped using one would make the
+        // assertion above pass for the wrong reason.
         assertEquals(
             setOf(
                 "ability",
                 "axis2D",
                 "axis2DBinding",
                 "binding",
+                "blueprint",
+                "character",
                 "control",
                 "effect",
+                "gameConfig",
                 "gameplayEffect",
+                "level",
+                "soundCue",
+                "spriteAnimation",
                 "spriteAnimationSet",
+                "spriteSheet",
             ),
-            unsupported.toSet(),
-            "the corpus's unsupported kinds changed; re-check the migration claim",
+            kinds.toSet(),
+            "the set of kinds the corpus declares changed; re-check the migration claim",
         )
     }
 
     /**
-     * The corpus still imports game code from the old tree.
+     * No script reaches back into the old tree.
      *
-     * Those imports are the honest boundary of what a *mechanical* migration can do: `character(
-     * components = { networkable(); team(Team.OrcTeam) } )` names ECS component functions that
-     * live in `common` and `example`, and porting them is a port of game source, which is other
-     * epics' work. No rewrite of the asset DSL makes them resolve.
+     * `character(components = { networkable(); team(Team.OrcTeam) })` named ECS component
+     * *functions* in `common` and `example`, which made every asset script a compile dependency
+     * on the game — the thing that made an asset edit cost a Gradle build, and the reason `:moba`
+     * (which depends on neither module) could not compile its own assets. A component is data
+     * now: `component("dev.wildware.udea.ecs.component.base.Networkable")`, a type name in a
+     * `ComponentSpec`, resolved by whoever instantiates it rather than by the script compiler.
      */
     @Test
-    fun `the migrated corpus still imports common and example game code`() {
-        val root = TestPaths.repoRoot.resolve("moba/src/main/assets")
+    fun `the migrated corpus imports nothing at all`() {
         val imports = root.toFile().walkTopDown()
             .filter { it.isFile && it.name.endsWith(AssetTreeMigration.SCRIPT_SUFFIX) }
             .flatMap { file -> file.readLines().filter { it.startsWith("import ") } }
             .map { it.removePrefix("import ").trim() }
             .toSortedSet()
-        val foreign = imports.filter {
-            it.startsWith("dev.wildware.udea.ecs.") ||
-                it.startsWith("dev.wildware.udea.example.") ||
-                it.startsWith("dev.wildware.udea.ability.")
-        }
-        assertTrue(
-            foreign.isNotEmpty(),
-            "the corpus no longer imports old-tree game code, so this test's premise is stale " +
-                "and the migration claim can be strengthened. Imports: $imports",
-        )
         assertEquals(
-            34,
-            foreign.size,
-            "the number of old-tree imports changed:\n${foreign.joinToString("\n")}",
+            emptySet<String>(),
+            imports,
+            "an asset script imports something; the corpus compiles against `AssetScope` alone",
         )
     }
 }

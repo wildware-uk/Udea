@@ -32,7 +32,13 @@ class AgentRegistryTest {
         val registry = registry(entries)
         val cwd = temp.resolve("checkout").also { it.createDirectories() }
 
-        val file = registry.advertise(7820, GameIdentity("Orbital Freight", "0.9.2"), RenderMode.Offscreen, cwd)
+        val file = registry.advertise(
+            7820,
+            GameIdentity("Orbital Freight", "0.9.2"),
+            RenderMode.Offscreen,
+            SessionIdentity(InstanceRole.Client, SessionId("s-7f3a")),
+            cwd,
+        )
 
         assertTrue(file != null && file.exists())
         val json = file.readText()
@@ -46,6 +52,8 @@ class AgentRegistryTest {
             """"started":""",
             """"cwd":""",
             """"renderMode":"Offscreen"""",
+            """"role":"client"""",
+            """"sessionId":"s-7f3a"""",
         ).forEach { assertContains(json, it) }
         assertContains(json, cwd.toAbsolutePath().normalize().toString().replace("\\", "\\\\"))
         assertEquals("4242.json", file.fileName.toString(), "the entry is named for the pid")

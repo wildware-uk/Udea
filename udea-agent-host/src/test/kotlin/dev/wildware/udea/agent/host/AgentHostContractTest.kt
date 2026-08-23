@@ -29,7 +29,8 @@ class AgentHostContractTest {
 
             assertEquals(200, response.statusCode())
             assertEquals(
-                """{"ok":true,"frame":1,"tick":412,"paused":false,"renderMode":"Offscreen"}""",
+                """{"ok":true,"frame":1,"tick":412,"paused":false,"renderMode":"Offscreen",""" +
+                    """"role":"standalone","sessionId":"s-test"}""",
                 response.body(),
             )
         }

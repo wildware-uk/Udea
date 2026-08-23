@@ -64,6 +64,7 @@ public class AgentRegistry(
         port: Int,
         identity: GameIdentity,
         renderMode: RenderMode,
+        session: SessionIdentity,
         workingDirectory: Path = Path.of("").toAbsolutePath(),
     ): Path? {
         val directory = resolveDirectory(properties, environment) ?: run {
@@ -71,7 +72,7 @@ public class AgentRegistry(
             return null
         }
         val file = directory.resolve("$pid.json")
-        val document = render(port, identity, renderMode, workingDirectory)
+        val document = render(port, identity, renderMode, session, workingDirectory)
         return try {
             Files.createDirectories(directory)
             Files.writeString(file, document)
@@ -109,6 +110,7 @@ public class AgentRegistry(
         port: Int,
         identity: GameIdentity,
         renderMode: RenderMode,
+        session: SessionIdentity,
         workingDirectory: Path,
     ): String = Json.render {
         put("name", identity.name)
@@ -123,6 +125,15 @@ public class AgentRegistry(
         // field ignores it, and one that does can tell a Headless CI instance from a Windowed
         // developer session without calling /health first. /health remains authoritative.
         put("renderMode", renderMode.name)
+        // Also additive, and for a reason `renderMode` does not have: three ports of one match
+        // are otherwise indistinguishable from three unrelated games, so a bridge grouping
+        // `list_instances` rows has nothing to group by. Written here as well as served by
+        // `/health` so the grouping survives an instance that is still starting up and has not
+        // answered a request yet - which is exactly when an agent that just launched a session
+        // looks. `/health` stays authoritative when the two disagree, as the contract's reader
+        // rules require, and they cannot disagree: both read one `SessionIdentity`.
+        put("role", session.role.id)
+        put("sessionId", session.sessionId.value)
     }
 
     private fun warn(message: String) {

@@ -1,14 +1,19 @@
 package dev.wildware.udea.assets.compiler.pack
 
+import dev.wildware.udea.assets.Ability
 import dev.wildware.udea.assets.AssetData
 import dev.wildware.udea.assets.Axis2D
+import dev.wildware.udea.assets.Axis2DBinding
 import dev.wildware.udea.assets.Blueprint
 import dev.wildware.udea.assets.Control
 import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.SoundCue
+import dev.wildware.udea.assets.Binding
 import dev.wildware.udea.assets.SpriteAnimation
+import dev.wildware.udea.assets.SpriteAnimationSet
 import dev.wildware.udea.assets.SpriteSheet
+import dev.wildware.udea.assets.pack.AssetCodecs
 import dev.wildware.udea.assets.compiler.AssetCompilerRules
 import dev.wildware.udea.assets.compiler.AssetGraph
 import dev.wildware.udea.assets.compiler.DeclaredAsset
@@ -108,9 +113,15 @@ public object GraphPacker {
         "spriteSheet" to Schema { it.spriteSheet() },
         "soundCue" to Schema { it.soundCue() },
         "spriteAnimation" to Schema { it.spriteAnimation() },
+        "spriteAnimationSet" to Schema { it.spriteAnimationSet() },
         "blueprint" to Schema { it.blueprint() },
         "level" to Schema { it.level() },
         "gameConfig" to Schema { it.gameConfig() },
+        "control" to Schema { emptyMap() },
+        "axis2D" to Schema { emptyMap() },
+        "binding" to Schema { it.binding() },
+        "axis2DBinding" to Schema { it.axis2DBinding() },
+        "ability" to Schema { it.ability() },
     )
 
     /** The DSL words this packer maps onto a runtime type, sorted. For `DslCoverageTest`. */
@@ -121,11 +132,15 @@ public object GraphPacker {
         "spriteSheet" to fqn(SpriteSheet::class.qualifiedName),
         "soundCue" to fqn(SoundCue::class.qualifiedName),
         "spriteAnimation" to fqn(SpriteAnimation::class.qualifiedName),
+        "spriteAnimationSet" to fqn(SpriteAnimationSet::class.qualifiedName),
         "blueprint" to fqn(Blueprint::class.qualifiedName),
         "level" to fqn(Level::class.qualifiedName),
         "gameConfig" to fqn(GameConfig::class.qualifiedName),
         "control" to fqn(Control::class.qualifiedName),
         "axis2D" to fqn(Axis2D::class.qualifiedName),
+        "binding" to fqn(Binding::class.qualifiedName),
+        "axis2DBinding" to fqn(Axis2DBinding::class.qualifiedName),
+        "ability" to fqn(Ability::class.qualifiedName),
     )
 
     private fun fqn(name: String?): String = requireNotNull(name)
@@ -167,17 +182,119 @@ public object GraphPacker {
             // Both spellings are in the tree today, so the rename happens here rather than in
             // a script edit that would break every game that already wrote the other one.
             put("interruptible", PackValue.Bool(boolOf("interruptable", true)))
+            // The DSL holds notifies as name -> frame, because a name may only appear once and
+            // a map is the shape that says so. `AnimNotify` is a record, so they are turned back
+            // into one here, sorted by name so two packs of one tree agree byte for byte.
+            val notifies = (asset.fields["notifies"] as? Map<*, *>).orEmpty()
+            if (notifies.isNotEmpty()) {
+                put(
+                    "notifies",
+                    PackValue.Items(
+                        notifies.entries
+                            .mapNotNull { (name, frame) ->
+                                val text = name as? String ?: return@mapNotNull null
+                                val index = frame as? Int ?: return@mapNotNull null
+                                text to index
+                            }
+                            .sortedBy { it.first }
+                            .map {
+                                PackValue.Fields.of(
+                                    mapOf(
+                                        "frame" to PackValue.I32(it.second),
+                                        "name" to PackValue.Text(it.first),
+                                    ),
+                                )
+                            },
+                    ),
+                )
+            }
         }
 
-        fun blueprint(): Map<String, PackValue> = buildMap {
+        fun spriteAnimationSet(): Map<String, PackValue> = buildMap {
+            val animations = (asset.fields["animations"] as? List<*>).orEmpty()
             put(
-                "components",
+                "animations",
                 PackValue.Items(
-                    strings("components").map {
-                        PackValue.Fields.of(mapOf("type" to PackValue.Text(it)))
+                    animations.mapNotNull { value ->
+                        val ref = value as? Ref ?: return@mapNotNull null
+                        val slot = resolve(ref, SpriteAnimation::class) ?: return@mapNotNull null
+                        PackValue.Ref(slot, ref.id)
                     },
                 ),
             )
+        }
+
+        /**
+         * `key(62)` becomes the flat `inputKind`/`inputCode` pair `AssetCodecs` reads.
+         *
+         * The discriminator strings come from `AssetCodecs` rather than being spelled here: the
+         * reader throws `unknown binding input kind` on a mismatch, and a writer holding its own
+         * copy of the two words is how a bundle this build wrote comes to produce it.
+         */
+        private fun MutableMap<String, PackValue>.bindingInput() {
+            val input = asset.fields["input"] as? Map<*, *> ?: return
+            val kind = input["kind"] as? String ?: return
+            val code = input["code"] as? Int ?: return
+            put(
+                "inputKind",
+                PackValue.Text(if (kind == "mouseButton") AssetCodecs.MOUSE else AssetCodecs.KEY),
+            )
+            put("inputCode", PackValue.I32(code))
+        }
+
+        fun binding(): Map<String, PackValue> = buildMap {
+            ref("control", Control::class)?.let { put("control", it) }
+            bindingInput()
+        }
+
+        fun axis2DBinding(): Map<String, PackValue> = buildMap {
+            ref("axis", Axis2D::class)?.let { put("axis", it) }
+            bindingInput()
+            vecOf(asset.fields["direction"])?.let { put("direction", it) }
+        }
+
+        fun ability(): Map<String, PackValue> = buildMap {
+            put("exec", PackValue.Text(asset.fields["exec"] as? String ?: ""))
+            put("blockedBy", PackValue.Items(strings("blockedBy").map { PackValue.Text(it) }))
+            put("tags", PackValue.Items(strings("tags").map { PackValue.Text(it) }))
+            put("blockAnimations", PackValue.Bool(boolOf("blockAnimations", false)))
+            // Written only when set: `AssetCodecs` reads range as `if ("range" in fields)`, so a
+            // null written as a field would decode as a present-but-unreadable range instead of
+            // as "this ability has no range check".
+            (asset.fields["range"] as? Float)?.let { put("range", PackValue.F32(it)) }
+            val display = asset.fields["display"] as? Map<*, *>
+            (display?.get("name") as? String)?.let { put("displayName", PackValue.Text(it)) }
+            (display?.get("description") as? String)?.let { put("description", PackValue.Text(it)) }
+            // No codec reads these yet - `udea-gas` declares no `GameplayEffect` - but dropping
+            // them would lose what the script said, and the bundle is the only record of it.
+            (asset.fields["cooldown"] as? Ref)?.let { cooldown ->
+                resolve(cooldown)?.let { put("cooldown", PackValue.Ref(it, cooldown.id)) }
+            }
+            put(
+                "costs",
+                PackValue.Items(
+                    (asset.fields["costs"] as? List<*>).orEmpty().mapNotNull { value ->
+                        val cost = value as? Ref ?: return@mapNotNull null
+                        resolve(cost)?.let { PackValue.Ref(it, cost.id) }
+                    },
+                ),
+            )
+            put(
+                "setByCaller",
+                PackValue.Fields.of(
+                    (asset.fields["setByCaller"] as? Map<*, *>).orEmpty().entries
+                        .mapNotNull { (tag, magnitude) ->
+                            val name = tag as? String ?: return@mapNotNull null
+                            val value = magnitude as? Float ?: return@mapNotNull null
+                            name to (PackValue.F32(value) as PackValue)
+                        }
+                        .toMap(),
+                ),
+            )
+        }
+
+        fun blueprint(): Map<String, PackValue> = buildMap {
+            put("components", componentsOf(asset.fields["components"]))
             // `parent = reference("...")` is a single inheritance edge; `Blueprint` models the
             // chain as a list, so one becomes a list of one. Stored as the id rather than as a
             // slot because `inheritedFrom` is a `List<AssetId>` - the model deliberately does
@@ -190,11 +307,15 @@ public object GraphPacker {
         }
 
         fun level(): Map<String, PackValue> = buildMap {
+            put("systems", PackValue.Items(strings("systems").map { PackValue.Text(it) }))
             val entities = (asset.fields["entities"] as? List<*>).orEmpty()
             put(
                 "entities",
                 PackValue.Items(
                     entities.mapIndexedNotNull { index, value ->
+                        // The named form, from `level(entities = { entity(...) })`. The bare-ref
+                        // form below is the older `level(entities = listOf(reference(...)))`.
+                        if (value is Map<*, *>) return@mapIndexedNotNull entityDefinition(value)
                         val ref = value as? Ref ?: return@mapIndexedNotNull null
                         val slot = resolve(ref, Blueprint::class) ?: return@mapIndexedNotNull null
                         PackValue.Fields.of(
@@ -215,7 +336,85 @@ public object GraphPacker {
         fun gameConfig(): Map<String, PackValue> = buildMap {
             ref("defaultCharacter", Blueprint::class)?.let { put("defaultCharacter", it) }
             ref("defaultLevel", Level::class)?.let { put("defaultLevel", it) }
+            // `gameConfig(physics = physics(gravity = vec(0F, 0F)))` in the DSL; a flat `gravity`
+            // on the record, because `PhysicsConfig` has exactly one member and a struct holding
+            // one vector would cost a string in the table to say nothing.
+            val physics = asset.fields["physics"] as? Map<*, *>
+            vecOf(physics?.get("gravity"))?.let { put("gravity", it) }
         }
+
+        /** One `EntityDefinition` record. */
+        fun entityDefinition(entity: Map<*, *>): PackValue {
+            val fields = mutableMapOf<String, PackValue>()
+            fields["name"] = PackValue.Text(entity["name"] as? String ?: "Entity")
+            // Kind-checked, not merely resolved. `EntityDefinition.blueprint` is a
+            // `Ref<Blueprint>` and `BundleReader` binds it at load, so writing a reference to
+            // something that is not a `Blueprint` produces a bundle that opens with
+            // `AssetTypeMismatchException` in the game rather than a diagnostic in the build.
+            // That was the behaviour here until the migrated corpus was packed: every entity in
+            // `level/test_level` names a `character(...)`, which has no runtime type, and the
+            // bundle threw on the first one. Reported and dropped, exactly as `resolve` says.
+            (entity["blueprint"] as? Ref)?.let { blueprint ->
+                resolve(blueprint, Blueprint::class)?.let {
+                    fields["blueprint"] = PackValue.Ref(it, blueprint.id)
+                }
+            }
+            // Omitted rather than nulled: `AssetCodecs` reads `if ("position" in entity)`, so a
+            // null here would decode as an entity pinned to the origin.
+            vecOf(entity["position"])?.let { fields["position"] = it }
+            fields["components"] = componentsOf(entity["components"])
+            fields["tags"] = PackValue.Items(
+                (entity["tags"] as? List<*>).orEmpty()
+                    .filterIsInstance<String>()
+                    .map { PackValue.Text(it) },
+            )
+            return PackValue.Fields.of(fields)
+        }
+
+        /** The map the DSL's `vec` produces, as the bundle's own vector tag. */
+        fun vecOf(value: Any?): PackValue.Vec? {
+            val map = value as? Map<*, *> ?: return null
+            val x = map["x"] as? Float ?: return null
+            val y = map["y"] as? Float ?: return null
+            return PackValue.Vec(x, y)
+        }
+
+        /**
+         * `ComponentSpec` records from a field holding either bare type names or records.
+         *
+         * Both spellings are live: `blueprint(components = listOf("ai", "team"))` names a type
+         * and nothing else, and `components = { component("...Team", "team" to "OrcTeam") }`
+         * carries fields. A bare name is a `ComponentSpec` with no fields, which is what it
+         * means, rather than a second encoding.
+         */
+        fun componentsOf(value: Any?): PackValue = PackValue.Items(
+            (value as? List<*>).orEmpty().mapNotNull { component ->
+                when (component) {
+                    is String -> PackValue.Fields.of(mapOf("type" to PackValue.Text(component)))
+                    is Map<*, *> -> {
+                        val type = component["type"] as? String
+                        if (type == null) {
+                            null
+                        } else {
+                            val members = (component["fields"] as? Map<*, *>).orEmpty()
+                            PackValue.Fields.of(
+                                mapOf(
+                                    "type" to PackValue.Text(type),
+                                    "fields" to PackValue.Fields.of(
+                                        members.entries.associate { (key, item) ->
+                                            val field = key as? String
+                                                ?: keyNotAString("components", key)
+                                            field to convert(field, item)
+                                        },
+                                    ),
+                                ),
+                            )
+                        }
+                    }
+                    else -> null
+                }
+            },
+        )
 
         /**
          * Fields as the DSL wrote them, for a kind with no runtime type.

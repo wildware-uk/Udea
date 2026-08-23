@@ -1,10 +1,16 @@
 package dev.wildware.udea.assets.compiler
 
+import dev.wildware.udea.assets.Ability
+import dev.wildware.udea.assets.Axis2D
+import dev.wildware.udea.assets.Axis2DBinding
+import dev.wildware.udea.assets.Binding
 import dev.wildware.udea.assets.Blueprint
+import dev.wildware.udea.assets.Control
 import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpriteAnimation
+import dev.wildware.udea.assets.SpriteAnimationSet
 import dev.wildware.udea.assets.SpriteSheet
 import dev.wildware.udea.diagnostics.SourceSpan
 
@@ -303,12 +309,56 @@ public class AssetScope(
         "notifies" to LinkedHashMap(notifies),
     )
 
+    /**
+     * A set of animations one character or effect plays, as the runtime `SpriteAnimationSet`.
+     *
+     * ### Why the members are declared beside it and not inside it
+     *
+     * The old corpus nested them - `spriteAnimationSet(animations = { spriteAnimation(...) })` -
+     * and a nested builder would have reproduced that spelling exactly. It is not used, because
+     * pass 1 only walks **top-level** statements: a declaration written inside a lambda argument
+     * has no entry in the scan, and therefore no span, no pass-1 id, and no place in the
+     * "located name for everything, before anything is compiled" property the rest of the
+     * pipeline is built on. Flattening the sets is the price of keeping it, and it is the only
+     * structural change the migration makes.
+     */
+    public fun spriteAnimationSet(name: String, animations: List<Ref>): Unit =
+        declare(
+            AssetKind.of<SpriteAnimationSet>(),
+            "spriteAnimationSet",
+            name,
+            "animations" to animations.map { it.expecting<SpriteAnimation>() },
+        )
+
+    /**
+     * A character: a blueprint with animation, audio, attribute and ability wiring.
+     *
+     * Still [AssetKind.Unpublishable]: `udea-assets` has no `Character`, and the old DSL's
+     * `character(...)` returned a `Blueprint` only because it inlined a fixed component list at
+     * *build* time. Claiming `Blueprint` here would put an id in the compile-time catalog whose
+     * fields are not a `Blueprint`'s, which `AssetKind`'s KDoc calls out as worse than absence.
+     * Closing it is issue #84's remaining half.
+     *
+     * @param animationMap role (`idle`, `walk`, `attack`, ...) to the animation played for it.
+     *   References, not the bare name strings the old `gameUnitAnimations` took, so a role
+     *   pointing at an animation nothing declares is `UDEA0004` and not a null at spawn time.
+     * @param attributes initial attribute values by name, replacing the old
+     *   `attributeSet = { CharacterAttributeSet(initHealth = 500F, ...) }` lambda. It is data
+     *   here because the pack format holds data; the class that *interprets* the names is the
+     *   game's.
+     */
     public fun character(
         name: String,
         size: Float = 1f,
         health: Float = 100f,
         animations: List<Ref> = emptyList(),
         sounds: Map<String, Ref> = emptyMap(),
+        spriteAnimationSet: Ref? = null,
+        animationMap: Map<String, Ref> = emptyMap(),
+        attributes: Map<String, Float> = emptyMap(),
+        tags: List<String> = emptyList(),
+        abilitySpecs: AbilitySpecScope.() -> Unit = {},
+        components: ComponentScope.() -> Unit = {},
     ): Unit = declare(
         // No runtime kind: `udea-assets` has no `Character`. Reported by `AssetGraph.toCatalog`
         // rather than guessed at - see `AssetKind.Unpublishable`.
@@ -319,9 +369,19 @@ public class AssetScope(
         "health" to health,
         "animations" to animations.map { it.expecting<SpriteAnimation>() },
         "sounds" to sounds.mapValues { it.value.expecting<SoundCue>() },
+        "spriteAnimationSet" to spriteAnimationSet?.expecting<SpriteAnimationSet>(),
+        "animationMap" to animationMap.mapValues { it.value.expecting<SpriteAnimation>() },
+        "attributes" to LinkedHashMap(attributes),
+        "tags" to tags,
+        "abilitySpecs" to AbilitySpecScope().apply(abilitySpecs).build(),
+        "components" to ComponentScope().apply(components).build(),
     )
 
-    public fun blueprint(name: String, parent: Ref? = null, components: List<String> = emptyList()): Unit =
+    public fun blueprint(
+        name: String = defaultName,
+        parent: Ref? = null,
+        components: List<String> = emptyList(),
+    ): Unit =
         declare(
             AssetKind.of<Blueprint>(),
             "blueprint",
@@ -330,16 +390,225 @@ public class AssetScope(
             "components" to components,
         )
 
-    public fun level(name: String = defaultName, entities: List<Ref> = emptyList()): Unit =
-        declare(AssetKind.of<Level>(), "level", name, "entities" to entities.map { it.expecting<Blueprint>() })
+    /**
+     * A blueprint whose components carry fields.
+     *
+     * An overload rather than a widening of the `List<String>` parameter, and [components] is
+     * deliberately **not** defaulted: two overloads that are both applicable to `blueprint(name
+     * = "x")` would be an ambiguity at every call site that omits components.
+     */
+    public fun blueprint(
+        name: String = defaultName,
+        parent: Ref? = null,
+        components: ComponentScope.() -> Unit,
+    ): Unit = declare(
+        AssetKind.of<Blueprint>(),
+        "blueprint",
+        name,
+        "parent" to parent?.expecting<Blueprint>(),
+        "components" to ComponentScope().apply(components).build(),
+    )
+
+    public fun level(
+        name: String = defaultName,
+        systems: List<String> = emptyList(),
+        entities: List<Ref> = emptyList(),
+    ): Unit = declare(
+        AssetKind.of<Level>(),
+        "level",
+        name,
+        "systems" to systems,
+        "entities" to entities.map { it.expecting<Blueprint>() },
+    )
+
+    /**
+     * A level whose entities carry their own components, tags and spawn positions.
+     *
+     * The list overload above cannot express those: it takes bare blueprint references, and
+     * `GraphPacker` has to invent an `EntityDefinition.name` from the index for them. Here the
+     * author names each entity. [entities] is required for the reason [blueprint]'s is.
+     */
+    public fun level(
+        name: String = defaultName,
+        systems: List<String> = emptyList(),
+        entities: EntityScope.() -> Unit,
+    ): Unit = declare(
+        AssetKind.of<Level>(),
+        "level",
+        name,
+        "systems" to systems,
+        "entities" to EntityScope().apply(entities).build(),
+    )
 
     /**
      * `defaultCharacter` is deliberately **not** stamped with an expected kind: it points at a
      * `character`, which is [AssetKind.Unpublishable], so there is no `AssetData` type to
      * compare a resolved declaration against. See [Ref.expected].
      */
-    public fun gameConfig(name: String = defaultName, defaultCharacter: Ref): Unit =
-        declare(AssetKind.of<GameConfig>(), "gameConfig", name, "defaultCharacter" to defaultCharacter)
+    public fun gameConfig(
+        name: String = defaultName,
+        defaultCharacter: Ref,
+        defaultLevel: Ref? = null,
+        physics: Map<String, Any?>? = null,
+    ): Unit = declare(
+        AssetKind.of<GameConfig>(),
+        "gameConfig",
+        name,
+        "defaultCharacter" to defaultCharacter,
+        "defaultLevel" to defaultLevel?.expecting<Level>(),
+        "physics" to physics,
+    )
+
+    // --- input ---------------------------------------------------------------------------
+
+    /** A named action the game asks about; bindings point at it. */
+    public fun control(name: String): Unit = declare(AssetKind.of<Control>(), "control", name)
+
+    /** A named two-dimensional axis; [axis2DBinding]s contribute directions to it. */
+    public fun axis2D(name: String): Unit = declare(AssetKind.of<Axis2D>(), "axis2D", name)
+
+    /** Binds one input to one [control]. */
+    public fun binding(name: String, control: Ref, input: Map<String, Any?>): Unit = declare(
+        AssetKind.of<Binding>(),
+        "binding",
+        name,
+        "control" to control.expecting<Control>(),
+        "input" to input,
+    )
+
+    /** Binds one input to one [axis2D], contributing [direction] while held. */
+    public fun axis2DBinding(
+        name: String,
+        axis: Ref,
+        input: Map<String, Any?>,
+        direction: Map<String, Any?>,
+    ): Unit = declare(
+        AssetKind.of<Axis2DBinding>(),
+        "axis2DBinding",
+        name,
+        "axis" to axis.expecting<Axis2D>(),
+        "input" to input,
+        "direction" to direction,
+    )
+
+    /** A keyboard key, by its libGDX key code. */
+    public fun key(code: Int): Map<String, Any?> = linkedMapOf("kind" to "key", "code" to code)
+
+    /** A mouse button, by its libGDX button code. */
+    public fun mouse(button: Int): Map<String, Any?> =
+        linkedMapOf("kind" to "mouseButton", "code" to button)
+
+    /** A two-component vector, as `Vec2` is modelled in `udea-assets`. */
+    public fun vec(x: Float, y: Float): Map<String, Any?> = linkedMapOf("x" to x, "y" to y)
+
+    /** The `physics` block of a [gameConfig]. */
+    public fun physics(gravity: Map<String, Any?>): Map<String, Any?> = linkedMapOf("gravity" to gravity)
+
+    // --- gameplay ability system ----------------------------------------------------------
+
+    /**
+     * One ability: the class that runs it, and every number that tunes it.
+     *
+     * [exec] is a class **name** rather than a `KClass`, matching `Ability.exec`'s `UClass`.
+     * The old scripts wrote `exec = UnitMeleeAttack::class`, which put a game class on the
+     * asset compile classpath and made an asset edit depend on the game compiling.
+     *
+     * [cooldown] and [costs] are not stamped with an expected kind: they point at
+     * `gameplayEffect`, which has no runtime type until `udea-gas` declares one.
+     */
+    public fun ability(
+        name: String,
+        exec: String,
+        display: Map<String, Any?>? = null,
+        params: Map<String, Any?> = emptyMap(),
+        cooldown: Ref? = null,
+        costs: List<Ref> = emptyList(),
+        blockedBy: List<String> = emptyList(),
+        tags: List<String> = emptyList(),
+        setByCaller: Map<String, Float> = emptyMap(),
+        range: Float? = null,
+        blockAnimations: Boolean = false,
+    ): Unit = declare(
+        AssetKind.of<Ability>(),
+        "ability",
+        name,
+        "exec" to exec,
+        "display" to display,
+        "params" to LinkedHashMap(params),
+        "cooldown" to cooldown,
+        "costs" to costs,
+        "blockedBy" to blockedBy,
+        "tags" to tags,
+        "setByCaller" to LinkedHashMap(setByCaller),
+        "range" to range,
+        "blockAnimations" to blockAnimations,
+    )
+
+    /**
+     * One gameplay effect.
+     *
+     * [AssetKind.Unpublishable]: `udea-gas` is an empty module and there is no `GameplayEffect`
+     * type to name. The declaration is packed under its DSL word and read back as an opaque
+     * asset, which loses nothing and pretends nothing.
+     */
+    public fun gameplayEffect(
+        name: String,
+        effectDuration: Map<String, Any?>,
+        target: String? = null,
+        modifierType: String? = null,
+        magnitude: Map<String, Any?>? = null,
+        period: Float? = null,
+        cues: List<String> = emptyList(),
+        tags: List<String> = emptyList(),
+    ): Unit = declare(
+        AssetKind.Unpublishable("gameplayEffect"),
+        "gameplayEffect",
+        name,
+        "effectDuration" to effectDuration,
+        "target" to target,
+        "modifierType" to modifierType,
+        "magnitude" to magnitude,
+        "period" to period,
+        "cues" to cues,
+        "tags" to tags,
+    )
+
+    /** An effect that applies once and is over. */
+    public fun instant(): Map<String, Any?> = linkedMapOf("kind" to "instant")
+
+    /** An effect that lasts as long as the caller-supplied magnitude of [tag] says. */
+    public fun duration(tag: String): Map<String, Any?> = linkedMapOf("kind" to "duration", "tag" to tag)
+
+    /** An effect that never expires on its own. */
+    public fun infinite(): Map<String, Any?> = linkedMapOf("kind" to "infinite")
+
+    /** A magnitude the activating entity supplies at cast time, keyed by [tag]. */
+    public fun setByCaller(tag: String): Map<String, Any?> =
+        linkedMapOf("kind" to "setByCaller", "tag" to tag)
+
+    /** A magnitude read from an attribute of the target, by name. */
+    public fun attribute(name: String): Map<String, Any?> =
+        linkedMapOf("kind" to "attribute", "attribute" to name)
+
+    /**
+     * A short-lived visual: an animation set, which of its animations to play, and for how long.
+     *
+     * A game kind, not an engine one - the old tree declared it in
+     * `example/.../assets/effect.kt` - so it is [AssetKind.Unpublishable] like `character`.
+     */
+    public fun effect(
+        name: String,
+        animationSet: Ref,
+        animation: String,
+        duration: Float,
+    ): Unit = declare(
+        AssetKind.Unpublishable("effect"),
+        "effect",
+        name,
+        "animationSet" to animationSet.expecting<SpriteAnimationSet>(),
+        "animation" to animation,
+        "duration" to duration,
+    )
 
     /**
      * The generic escape for a kind this provisional DSL does not model.
@@ -399,10 +668,27 @@ public class AssetScope(
             "spriteSheet",
             "soundCue",
             "spriteAnimation",
+            "spriteAnimationSet",
             "character",
             "blueprint",
             "level",
             "gameConfig",
+            "control",
+            "axis2D",
+            "binding",
+            "axis2DBinding",
+            "ability",
+            "gameplayEffect",
+            "effect",
+            "key",
+            "mouse",
+            "vec",
+            "physics",
+            "instant",
+            "duration",
+            "infinite",
+            "setByCaller",
+            "attribute",
             "asset",
             "resource",
             "idOf",
@@ -443,4 +729,76 @@ public interface AssetSource {
 
     /** Declares this file's assets into [scope]. The body of the original script. */
     public fun build(scope: AssetScope)
+}
+
+/**
+ * A component list, as `ComponentSpec(type, fields)` records it.
+ *
+ * This is where the old `components = lazy { networkable(); team(Team.OrcTeam) }` lands. The old
+ * form named ECS component *functions* in game source, so every asset script was a compile
+ * dependency on the game - the thing that made an asset edit cost a Gradle build. A component is
+ * data here: a type name and its fields, checked against the real component types by the K2
+ * checker rather than by making the script import them.
+ */
+public class ComponentScope internal constructor() {
+
+    private val components = mutableListOf<Map<String, Any?>>()
+
+    /** One component: its type name, and the fields that tune it. */
+    public fun component(type: String, vararg fields: Pair<String, Any?>) {
+        components += linkedMapOf<String, Any?>(
+            "type" to type,
+            "fields" to linkedMapOf<String, Any?>(*fields),
+        )
+    }
+
+    internal fun build(): List<Map<String, Any?>> = components.toList()
+}
+
+/** The abilities a character is granted, and the slots and tags they are granted with. */
+public class AbilitySpecScope internal constructor() {
+
+    private val specs = mutableListOf<Map<String, Any?>>()
+
+    /** Grants [ability]. The reference is unstamped: `ability` is checked by the graph packer. */
+    public fun abilitySpec(ability: Ref, tags: List<String> = emptyList(), level: Int = 1) {
+        specs += linkedMapOf<String, Any?>(
+            "ability" to ability.expecting<Ability>(),
+            "tags" to tags,
+            "level" to level,
+        )
+    }
+
+    internal fun build(): List<Map<String, Any?>> = specs.toList()
+}
+
+/** The entities a level spawns, as `EntityDefinition` records them. */
+public class EntityScope internal constructor() {
+
+    private val entities = mutableListOf<Map<String, Any?>>()
+
+    /**
+     * One entity: which blueprint it instantiates, what is added on top, and where it starts.
+     *
+     * [blueprint] is not stamped with an expected kind because the corpus points these at
+     * `character(...)` declarations, which have no runtime type. That is the same gap
+     * `ReferenceTypeValidator` documents, not a new one.
+     */
+    public fun entity(
+        name: String,
+        blueprint: Ref? = null,
+        position: Map<String, Any?>? = null,
+        tags: List<String> = emptyList(),
+        components: ComponentScope.() -> Unit = {},
+    ) {
+        entities += linkedMapOf<String, Any?>(
+            "name" to name,
+            "blueprint" to blueprint,
+            "position" to position,
+            "tags" to tags,
+            "components" to ComponentScope().apply(components).build(),
+        )
+    }
+
+    internal fun build(): List<Map<String, Any?>> = entities.toList()
 }

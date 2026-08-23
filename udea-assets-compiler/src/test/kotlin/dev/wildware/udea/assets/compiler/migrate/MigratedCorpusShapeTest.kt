@@ -1,0 +1,71 @@
+package dev.wildware.udea.assets.compiler.migrate
+
+import dev.wildware.udea.assets.compiler.AbilitySpecScope
+import dev.wildware.udea.assets.compiler.AssetScope
+import dev.wildware.udea.assets.compiler.ComponentScope
+import dev.wildware.udea.assets.compiler.EntityScope
+import dev.wildware.udea.assets.compiler.TestPaths
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import java.lang.reflect.Modifier
+import kotlin.io.path.name
+import kotlin.io.path.readText
+
+/**
+ * The syntactic properties of the migrated tree, and the one trap its DSL could fall into.
+ */
+class MigratedCorpusShapeTest {
+
+    private val scripts = dev.wildware.udea.assets.compiler.AssetCompiler
+        .scriptsUnder(TestPaths.repoRoot.resolve("moba/src/main/assets"))
+
+    /**
+     * Issue #93's grep criterion: none of the three shapes the migration deletes survives.
+     *
+     * - `bundle { }` — the file is the bundle now, so the wrapper has nowhere to live.
+     * - `lazy { }` — the top-level `fun lazy` in `common/.../assets/LazyList.kt` shadowed
+     *   `kotlin.lazy` inside every script in the tree.
+     * - a leading-slash resource path — `/sprites/orc/idle.png` and `sprites/orc/idle.png` were
+     *   two keys for one file in the old loader (issue #84).
+     */
+    @Test
+    fun `no migrated script contains a bundle wrapper, a lazy list or an absolute resource path`() {
+        val offenders = scripts.mapNotNull { path ->
+            val text = path.readText()
+            val found = buildList {
+                if (Regex("""\bbundle\s*\{""").containsMatchIn(text)) add("bundle {")
+                if (Regex("""\blazy\s*\{""").containsMatchIn(text)) add("lazy {")
+                if (Regex(""""/[^"]*"""").containsMatchIn(text)) add("a leading-slash path")
+            }
+            if (found.isEmpty()) null else "${path.name}: ${found.joinToString()}"
+        }
+        assertEquals(emptyList<String>(), offenders)
+    }
+
+    /**
+     * No nested builder shares a name with an [AssetScope] member.
+     *
+     * `UdeaTranspiler.qualifyScopeCalls` prefixes `scope.` onto every call whose callee name is
+     * in [AssetScope.MEMBER_NAMES] — anywhere in the file, at any nesting depth. It is a
+     * syntactic front end with no resolver, so it cannot tell an inner receiver from the outer
+     * one. A builder method sharing a name with a scope member would therefore transpile into a
+     * call on the wrong receiver, and it would still *compile*: `components = { spriteSheet(...) }`
+     * would silently declare a sprite sheet instead of adding a component.
+     *
+     * That is the failure mode this test exists for, and it is why the animation-set builder was
+     * dropped rather than named `spriteAnimation`.
+     */
+    @Test
+    fun `no builder scope method collides with the transpiler's vocabulary`() {
+        val builders = listOf(ComponentScope::class.java, AbilitySpecScope::class.java, EntityScope::class.java)
+        val collisions = builders.flatMap { type ->
+            type.declaredMethods
+                .filter { Modifier.isPublic(it.modifiers) }
+                .map { it.name }
+                .filterNot { "$" in it }
+                .filter { it in AssetScope.MEMBER_NAMES }
+                .map { "${type.simpleName}.$it" }
+        }
+        assertEquals(emptyList<String>(), collisions)
+    }
+}

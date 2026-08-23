@@ -8,7 +8,11 @@ import dev.wildware.udea.assets.GraphDelta
 import dev.wildware.udea.assets.compiler.AssetCompiler
 import dev.wildware.udea.assets.compiler.AssetGraph
 import dev.wildware.udea.assets.compiler.DeclaredAsset
+import dev.wildware.udea.assets.compiler.pack.PackedValues
 import dev.wildware.udea.assets.compiler.scan.UdeaDeclarationScanner
+import dev.wildware.udea.assets.compiler.validate.UnresolvedReferenceValidator
+import dev.wildware.udea.assets.compiler.validate.ValidationContext
+import dev.wildware.udea.diagnostics.DiagnosticSink
 import dev.wildware.udea.diagnostics.Severity
 import dev.wildware.udea.diagnostics.SourceSpan
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
@@ -34,8 +38,8 @@ public data class ValidationReport(
  * ## Why this is not a second implementation
  *
  * Every pass this drives is the one a Gradle task would drive: [AssetCompiler] for pass 2,
- * [UdeaDeclarationScanner] for pass 1, [AssetGraphValidator] for pass 3, [AssetPacker] for the
- * slice of pass 4 a reload needs. This class adds *state* - a per-file graph, a last-good graph,
+ * [UdeaDeclarationScanner] for pass 1, [UnresolvedReferenceValidator] for pass 3, and
+ * [PackedValues] - the real bundle writer and the real reader - for the values a reload swaps in. This class adds *state* - a per-file graph, a last-good graph,
  * and the diff between two of them - and no compilation logic at all. That is what `UDEA-MG-003`
  * (no Gradle types in this module) is protecting: if an agent validates green here and CI then
  * fails, trust in the fast loop is gone, and the only durable way to prevent that is that there
@@ -141,10 +145,15 @@ public class AssetDaemon(
         val diagnostics = files.flatMap { compileInto(byFile, it) }
 
         val graph = AssetGraph.of(byFile.values.flatten())
-        val ranked = rank(diagnostics + AssetGraphValidator.validate(graph))
-        if (ranked.none { it.severity == Severity.Error }) {
+        val source = diagnostics + references(graph)
+        // Packed only when the source is clean. The bundle writer refuses a graph whose
+        // references do not resolve, so packing a broken corpus reports the same defect a second
+        // time in a less useful shape.
+        val packed = if (source.any { it.severity == Severity.Error }) null else PackedValues.of(graph)
+        val ranked = rank(source + packed?.diagnostics.orEmpty())
+        if (packed != null && ranked.none { it.severity == Severity.Error }) {
             lastGood = LinkedHashMap(graph.assets)
-            packedValues = packAll(graph)
+            packedValues = LinkedHashMap(packed.values)
         }
         return ValidationReport(ranked, millisSince(began), files.size)
     }
@@ -171,27 +180,29 @@ public class AssetDaemon(
         val compileDiagnostics = live.flatMap { compileInto(candidateByFile, it) }
 
         val candidate = AssetGraph.of(candidateByFile.values.flatten())
-        val diagnostics = compileDiagnostics + AssetGraphValidator.validate(candidate)
+        val diagnostics = compileDiagnostics + references(candidate)
         if (diagnostics.any { it.severity == Severity.Error }) {
             return ReloadOutcome.Rejected(rank(diagnostics), millisSince(began))
         }
 
-        val structural = structuralChanges(candidate)
+        val packed = PackedValues.of(candidate)
+        if (packed.diagnostics.any { it.severity == Severity.Error }) {
+            return ReloadOutcome.Rejected(rank(packed.diagnostics), millisSince(began))
+        }
+
+        val structural = structuralChanges(candidate, packed.values)
         if (structural.isNotEmpty()) return ReloadOutcome.RequiresRestart(structural, millisSince(began))
 
         val changedAssets = mutableListOf<ChangedAsset>()
-        val unpackable = mutableListOf<UdeaDiagnostic>()
         for ((id, declared) in candidate.assets) {
             if (lastGood[id] == declared) continue
-            when (val outcome = AssetPacker.pack(declared)) {
-                is PackOutcome.Packed ->
-                    if (outcome.data != packedValues[AssetId(id)]) {
-                        changedAssets += ChangedAsset(AssetId(id), outcome.data)
-                    }
-                is PackOutcome.Unpackable -> unpackable += outcome.diagnostic
-            }
+            val assetId = AssetId(id)
+            // Every id in the candidate graph has a value here, because a graph that could not
+            // be packed was rejected above. The elvis is the honest response to a branch that
+            // cannot be reached rather than a swallowed failure.
+            val value = packed.values[assetId] ?: continue
+            if (value != packedValues[assetId]) changedAssets += ChangedAsset(assetId, value)
         }
-        if (unpackable.isNotEmpty()) return ReloadOutcome.Rejected(rank(unpackable), millisSince(began))
         if (changedAssets.isEmpty()) return ReloadOutcome.NoChange(millisSince(began))
 
         pending = candidateByFile
@@ -213,7 +224,7 @@ public class AssetDaemon(
         byFile.putAll(installed)
         val graph = AssetGraph.of(byFile.values.flatten())
         lastGood = LinkedHashMap(graph.assets)
-        packedValues = packAll(graph)
+        packedValues = LinkedHashMap(PackedValues.of(graph).values)
         pending = null
         generation++
     }
@@ -244,7 +255,7 @@ public class AssetDaemon(
         val compileDiagnostics = targets.flatMap { compileInto(overlay, it) }
 
         val graph = AssetGraph.of(overlay.values.flatten())
-        val diagnostics = compileDiagnostics + AssetGraphValidator.validate(graph)
+        val diagnostics = compileDiagnostics + references(graph)
         return ValidationReport(rank(diagnostics), millisSince(began), targets.size)
     }
 
@@ -277,7 +288,10 @@ public class AssetDaemon(
      * `AssetRegistry.classify`, which by design compares only the runtime *class* of a value and
      * would call it an ordinary value change.
      */
-    private fun structuralChanges(candidate: AssetGraph): List<StructuralChange> {
+    private fun structuralChanges(
+        candidate: AssetGraph,
+        candidateValues: Map<AssetId, AssetData>,
+    ): List<StructuralChange> {
         val changes = mutableListOf<StructuralChange>()
         for (id in candidate.ids - lastGood.keys) changes += StructuralChange.added(AssetId(id))
         for (id in lastGood.keys - candidate.ids) changes += StructuralChange.removed(AssetId(id))
@@ -290,29 +304,33 @@ public class AssetDaemon(
             }
             if (after.kind != "blueprint") continue
             val old = (packedValues[AssetId(id)] as? Blueprint)?.components?.map { it.type.value } ?: continue
-            val repacked = (AssetPacker.pack(after) as? PackOutcome.Packed)?.data as? Blueprint ?: continue
-            val new = repacked.components.map { it.type.value }
+            val new = (candidateValues[AssetId(id)] as? Blueprint)?.components?.map { it.type.value } ?: continue
             if (old != new) changes += StructuralChange.blueprintComponents(AssetId(id), old, new)
         }
         return changes.sortedBy { it.id.value }
     }
 
     /**
-     * Every packable asset's runtime value.
+     * Does every reference in [graph] name something the graph declares?
      *
-     * A kind with no runtime type is absent rather than reported here: [start] and [validate] are
-     * about whether the *source* is valid, and a corpus is not broken because `udea-assets` has no
-     * `Character` yet. It becomes an error at exactly one place - a reload that changes such an
-     * asset - because that is the only moment a missing value would change what the game shows.
+     * One line, into `validate/UnresolvedReferenceValidator`, and that is the whole point. There
+     * used to be a `daemon/AssetGraphValidator` here doing the same walk with its own grouping
+     * and its own did-you-mean threshold - a second answer to "is this reference valid", which
+     * is exactly how a daemon comes to say yes to something CI says no to.
+     *
+     * `sources = emptyList()` because the only validator that reads them is `DeterminismValidator`
+     * and this is not running it; the default would walk the whole asset tree on every
+     * keystroke-driven validate, inside a 300ms budget, to build a list nothing here looks at.
      */
-    private fun packAll(graph: AssetGraph): LinkedHashMap<AssetId, AssetData> {
-        val values = LinkedHashMap<AssetId, AssetData>()
-        for (asset in graph.assets.values) {
-            val outcome = AssetPacker.pack(asset)
-            if (outcome is PackOutcome.Packed) values[AssetId(asset.id)] = outcome.data
-        }
-        return values
-    }
+    private fun references(graph: AssetGraph): List<UdeaDiagnostic> =
+        UnresolvedReferenceValidator.validate(
+            ValidationContext(
+                declared = graph.assets.values.toList(),
+                repoRoot = repoRoot,
+                assetRoot = assetRoot,
+                sources = emptyList(),
+            ),
+        )
 
     /** The repo-relative path a span for this file carries. */
     private fun Path.spanPath(): String = SourceSpan.relativize(
@@ -336,21 +354,16 @@ public class AssetDaemon(
         public const val MAX_DIAGNOSTICS: Int = 25
 
         /**
-         * Errors first, then by file and line, capped at [MAX_DIAGNOSTICS].
+         * Deduped, root-cause-collapsed, ranked and capped - by [DiagnosticSink], not here.
          *
-         * Root-cause ranking proper is [AssetGraphValidator]'s - it emits one diagnostic per
-         * unresolved id rather than one per referrer - so this is ordering and truncation only,
-         * and deliberately not a second, weaker attempt at the same idea.
+         * This used to be a hand-rolled sort with a `take(25)` on the end, defensible only
+         * because `daemon/AssetGraphValidator` had already collapsed five referrers of one
+         * missing id into a single diagnostic itself. That collapse now happens where every
+         * other producer's does, so the daemon's answer and `udeaValidateAssets`'s
+         * `diagnostics.json` are ordered by one implementation rather than by two that agreed
+         * with each other by coincidence.
          */
-        public fun rank(diagnostics: List<UdeaDiagnostic>): List<UdeaDiagnostic> = diagnostics
-            .sortedWith(
-                compareBy(
-                    { if (it.severity == Severity.Error) 0 else 1 },
-                    { it.span?.path ?: "" },
-                    { it.span?.startLine ?: 0 },
-                    { it.ruleId },
-                ),
-            )
-            .take(MAX_DIAGNOSTICS)
+        public fun rank(diagnostics: List<UdeaDiagnostic>): List<UdeaDiagnostic> =
+            DiagnosticSink(MAX_DIAGNOSTICS).apply { reportAll(diagnostics) }.build().diagnostics
     }
 }

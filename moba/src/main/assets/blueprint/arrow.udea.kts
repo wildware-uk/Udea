@@ -1,58 +1,46 @@
-import com.badlogic.gdx.physics.box2d.BodyDef.BodyType.KinematicBody
-import dev.wildware.udea.ecs.component.physics.body
-import dev.wildware.udea.ecs.component.physics.box
-import dev.wildware.udea.ecs.component.render.loadSprite
-import dev.wildware.udea.ecs.component.render.spriteRenderer
-import dev.wildware.udea.example.ability.Damage
-import dev.wildware.udea.example.ability.Data
-import dev.wildware.udea.example.ability.onHitEffect
-import dev.wildware.udea.example.component.projectile
-import dev.wildware.udea.example.component.team
+// Migrated from example/src/main/resources/assets/blueprint/arrow.udea.kts (issue #93).
+//
+// The source carried `// TODO you have broke ListBuilder<AssetReference>`: the on-hit effects
+// were a builder over a type the builder could not hold. They are plain records here, and the
+// `reference(...)` inside each one is found by the validator through the nested map exactly as
+// a top-level field would be.
 
 blueprint(
     components = {
-        body(
-            type = KinematicBody
+        component("dev.wildware.udea.ecs.component.physics.Body", "type" to "KinematicBody")
+
+        component(
+            "dev.wildware.udea.ecs.component.physics.Box",
+            "width" to 0.2F,
+            "height" to 0.1F,
+            "isSensor" to true,
         )
 
-        box(
-            width = 0.2F,
-            height = 0.1F,
-            isSensor = true
+        component(
+            "dev.wildware.udea.example.component.Projectile",
+            "onHitEffects" to listOf(
+                mapOf(
+                    "effect" to reference("ability/damage"),
+                    "setByCaller" to mapOf("Data.Damage" to -10F),
+                    "tags" to listOf("Damage.Physical"),
+                ),
+                mapOf(
+                    "effect" to reference("ability/knockback"),
+                    "setByCaller" to mapOf("Data.Knockback" to 0.2F),
+                ),
+                mapOf(
+                    "effect" to reference("ability/stun"),
+                    "setByCaller" to mapOf("Data.Duration" to 0.2F),
+                ),
+            ),
         )
 
-        // TODO you have broke ListBuilder<AssetReference>
-        projectile(
-            onHitEffects = {
-                onHitEffect(
-                    reference("ability/damage"),
-                    setByCallerMagnitudes = mapOf(
-                        Data.Damage to -10F
-                    ),
-                    tags = {
-                        add(Damage.Physical)
-                    }
-                )
-                onHitEffect(
-                    reference("ability/knockback"),
-                    setByCallerMagnitudes = mapOf(
-                        Data.Knockback to .2F
-                    )
-                )
+        component("dev.wildware.udea.example.component.Team")
 
-                onHitEffect(
-                    reference("ability/knockback"),
-                    setByCallerMagnitudes = mapOf(
-                        Data.Duration to .2F
-                    )
-                )
-            }
+        component(
+            "dev.wildware.udea.ecs.component.render.SpriteRenderer",
+            "texture" to resource("sprites/arrow/arrow.png"),
+            "scale" to 0.1F,
         )
-
-        team()
-
-        spriteRenderer(
-            texture = loadSprite("sprites/arrow/arrow.png", .1F)
-        )
-    }
+    },
 )

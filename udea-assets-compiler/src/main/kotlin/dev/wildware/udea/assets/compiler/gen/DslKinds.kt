@@ -1,5 +1,6 @@
 package dev.wildware.udea.assets.compiler.gen
 
+import dev.wildware.udea.assets.Ability
 import dev.wildware.udea.assets.AssetData
 import dev.wildware.udea.assets.Axis2D
 import dev.wildware.udea.assets.Axis2DBinding
@@ -42,6 +43,7 @@ public object DslKinds {
 
     /** DSL word to the `AssetData` it produces. */
     public val TYPES: Map<String, KClass<out AssetData>> = mapOf(
+        "ability" to Ability::class,
         "spriteSheet" to SpriteSheet::class,
         "spriteAnimation" to SpriteAnimation::class,
         "spriteAnimationSet" to SpriteAnimationSet::class,

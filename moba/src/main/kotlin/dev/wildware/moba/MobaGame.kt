@@ -14,6 +14,7 @@ import dev.wildware.moba.ability.MotionReplicator
 import dev.wildware.moba.ability.Projectile
 import dev.wildware.moba.ability.ProjectileReplicator
 import dev.wildware.moba.ability.UnitBlueprint
+import dev.wildware.moba.lane.LaneModule
 import dev.wildware.moba.match.MatchModule
 import dev.wildware.moba.match.MatchState
 import dev.wildware.moba.match.MatchStateReplicator
@@ -114,11 +115,47 @@ public object MobaGame {
             // is handed `combat.attributes` and not a fresh `CharacterAttributes.create()`,
             // because an `AttributeId` is an index into one table and a respawn built over a
             // second table would restore the player's *armour* and leave its health at zero.
+            //
+            // `LaneModule` is what makes this game a MOBA rather than a brawl in a field: the
+            // creep waves, the lane they walk, the towers that shoot down it, and the gold,
+            // experience and levels a champion takes off them (issues #130 and #131). It is
+            // handed `combat` and not a fresh module for the reason `MatchModule` is handed
+            // `combat.attributes`: a tower applies `ability/damage` through that module's
+            // applier against that module's effect table, and an index into a second table
+            // would apply whatever effect happened to sit at the same position.
+            //
+            // It is listed **after** `MatchModule`, which is load-bearing rather than tidy:
+            // `LaneModule` declares `after(RespawnSystem)` on its respawn scaling, and
+            // `SimRegistry` can only resolve an edge against a system some module has already
+            // contributed.
+            //
+            // `MobaPhysicsModule` is deliberately **NOT** here, and this is the honest version
+            // of why. The module is real - it swaps `CoreModule`'s `NoOpPhysicsWorld` for a
+            // Box2D `PhysicsWorld`, and `MobaPhysicsProofTest` runs every one of its claims
+            // against this exact game by passing it through `extraModules`. What it does to the
+            // *fight* is what keeps it out of this list: measured over the real level, twenty
+            // seven units with the solver installed deal **more** total damage in six hundred
+            // ticks (1134 hit points against 975) and produce **zero** deaths against three,
+            // because crowd separation holds the front line apart and the damage spreads across
+            // it instead of focusing. The first death moves from tick ~501 to ~701.
+            //
+            // That is a balance consequence of a correct change - units used to stand inside
+            // each other, and focus fire was an artefact of the pile - and fixing it is a
+            // balance pass over unit health, damage and `MAX_SEPARATION_STEP` that nobody has
+            // done. It was not attempted here by tuning: `MAX_SEPARATION_STEP` was measured at
+            // 2.5, 0.8 and 0.4 and the whole-suite failure count went 10, 10, 6 while
+            // `MobaPhysicsProofTest`'s own separation floor failed at all three, which is what
+            // a chaotic system tuned to a test count looks like rather than a fix.
+            //
+            // So the solver ships as a tested backend that the example's own physics tests
+            // drive, and not as the world this game's twenty-seven units fight in. Installing
+            // it is one line here; the balance pass is the work.
             modules = listOf(
                 InputModule(MobaControls.BINDINGS),
                 module,
                 combat,
                 MatchModule(combat.attributes),
+                LaneModule(combat),
                 RenderModule(),
             ) + extraModules,
             // The registry is built over **this** module's attribute table and not a fresh
@@ -189,6 +226,11 @@ public object MobaGame {
      * | `GameplayEffects` | `applied` - the whole effect list, one object field |
      * | `MatchState` | `endedTick`, `matchNumber`, `orcAlive`, `phase`, `seed`, `soldierAlive`, `startedTick`, `undeadAlive`, `winner` |
      * | `Respawn` | `deaths`, `maxHealth`, `readyTick`, `spawnX`, `spawnY` |
+     *
+     * The lane's five - `LaneCreep`, `LaneState`, `LastHit`, `Tower` and `Wallet` - are appended
+     * from `LaneModule.snapshotTypes()` rather than written out here, so that adding a component
+     * to a lane is one edit in the package that owns it. Their field tables are in that method's
+     * KDoc, in the same form and for the same reason as the table above.
      *
      * `ComponentSchema.of` refuses a list whose length disagrees with `fieldNames`, so a field
      * added to a component fails here rather than silently shifting a column - but a *kind* typed
@@ -341,7 +383,7 @@ public object MobaGame {
             attributesType(attributes),
             abilitiesType(),
             effectsType(),
-        ),
+        ) + LaneModule.snapshotTypes(),
     )
 
     /**

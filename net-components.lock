@@ -45,6 +45,15 @@
 # space is invisible to capture rather than partly captured - the cost the CharacterView note
 # above measured. Both names sort between `level.GameUnit` and the codegen fixtures, so the
 # only ids that moved are the fixture ones, and nothing has ever shipped against those.
+#
+# The five `dev.wildware.moba.lane` names are the MOBA lane of issues #130 and #131: the creep
+# that walks it, the lane's own wave timer, the record of who struck whom, the tower, and the
+# champion's purse. Every one of them has to survive a `time.rewind` - a wave timer that a
+# rewind did not restore would send the next wave on a schedule from a future that no longer
+# exists, and a `paid` flag that a rewind did not restore would pay the same creep twice - so
+# every one of them is here and in `MobaGame.componentRegistry`. They sort between
+# `ability.Projectile` and `level.GameUnit`, so `GameUnit`, `MatchState`, `Respawn` and the
+# codegen fixtures all move up by five. Nothing has shipped against those ids.
 dev.wildware.moba.CharacterView
 dev.wildware.moba.Player
 dev.wildware.moba.Position
@@ -52,6 +61,11 @@ dev.wildware.moba.ability.Combatant
 dev.wildware.moba.ability.Corpse
 dev.wildware.moba.ability.Motion
 dev.wildware.moba.ability.Projectile
+dev.wildware.moba.lane.LaneCreep
+dev.wildware.moba.lane.LaneState
+dev.wildware.moba.lane.LastHit
+dev.wildware.moba.lane.Tower
+dev.wildware.moba.lane.Wallet
 dev.wildware.moba.level.GameUnit
 dev.wildware.moba.match.MatchState
 dev.wildware.moba.match.Respawn

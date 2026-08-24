@@ -183,7 +183,7 @@ public class MobaAbilityModule(
 /**
  * The six characters the old game shipped, as [UnitKind]s.
  *
- * Every number is the one in the matching `character(...)` script under `src/main/assets`; where
+ * Every number is the one in the matching `character(...)` script under `assets/character`; where
  * a script omits a stat, the attribute's own default applies. `strength` is absent from four of
  * the six scripts, so those units deal the default 10 - which is what the old
  * `CharacterAttributeSet(initStrength = 10F)` gave them.

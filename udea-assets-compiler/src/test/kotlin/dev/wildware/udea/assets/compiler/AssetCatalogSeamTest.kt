@@ -2,7 +2,10 @@ package dev.wildware.udea.assets.compiler
 
 import dev.wildware.udea.assets.AssetData
 import dev.wildware.udea.assets.Blueprint
+import dev.wildware.udea.assets.Character
+import dev.wildware.udea.assets.Effect
 import dev.wildware.udea.assets.GameConfig
+import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpriteAnimation
@@ -52,8 +55,10 @@ class AssetCatalogSeamTest {
         // Not a hand-written expectation of strings: each is read off the class, so a rename in
         // `udea-assets` moves both sides at once and this test cannot rot into a lie.
         val expected = mapOf(
-            "character/orc_idle" to SpriteSheet::class,
-            "character/orc_walk" to SpriteSheet::class,
+            "character/orc" to Character::class,
+            "character/orc_idle" to SpriteAnimation::class,
+            "character/orc_idle_sheet" to SpriteSheet::class,
+            "character/orc_walk_sheet" to SpriteSheet::class,
             "character/orc_attack_cue" to SoundCue::class,
             "character/goblin_spawn" to Blueprint::class,
             "level/spawner_0" to Blueprint::class,
@@ -92,11 +97,19 @@ class AssetCatalogSeamTest {
         val scope = AssetScope(idPrefix = "fixture", defaultName = "fixture")
         scope.spriteSheet(name = "sheet", spritePath = "sprites/a.png")
         scope.spriteAnimation(name = "anim", sheet = scope.reference("fixture/sheet"))
+        scope.spriteAnimationSet(name = "set", animations = listOf(scope.reference("fixture/anim")))
         scope.soundCue(name = "cue")
         scope.blueprint(name = "bp")
         scope.level(name = "lvl")
         scope.gameConfig(name = "cfg", defaultCharacter = scope.reference("fixture/bp"))
         scope.character(name = "ch")
+        scope.gameplayEffect(name = "ge", effectDuration = scope.instant())
+        scope.effect(
+            name = "fx",
+            animationSet = scope.reference("fixture/set"),
+            animation = "heal",
+            duration = 1f,
+        )
         scope.asset("somethingAGameInvented", "custom")
 
         val byId = scope.assets.associateBy { it.id }
@@ -106,9 +119,12 @@ class AssetCatalogSeamTest {
         assertEquals(Blueprint::class.qualifiedName, byId.getValue("fixture/bp").kindFqn)
         assertEquals(Level::class.qualifiedName, byId.getValue("fixture/lvl").kindFqn)
         assertEquals(GameConfig::class.qualifiedName, byId.getValue("fixture/cfg").kindFqn)
+        assertEquals(Character::class.qualifiedName, byId.getValue("fixture/ch").kindFqn)
+        assertEquals(GameplayEffect::class.qualifiedName, byId.getValue("fixture/ge").kindFqn)
+        assertEquals(Effect::class.qualifiedName, byId.getValue("fixture/fx").kindFqn)
 
-        // The two that have no runtime type, and must not acquire one by guesswork.
-        assertNull(byId.getValue("fixture/ch").kindFqn)
+        // The one that has no runtime type, and must not acquire one by guesswork: the generic
+        // escape a game declares its own kinds through.
         assertNull(byId.getValue("fixture/custom").kindFqn)
     }
 
@@ -116,19 +132,17 @@ class AssetCatalogSeamTest {
     fun `a DSL word with no runtime type is reported, never invented`() {
         val export = graph().toCatalog()
 
-        // `character` is the live example: the provisional DSL declares it and `udea-assets` has
-        // no `Character`. The wrong fix is to publish `dev.wildware.udea.assets.Character`
-        // because the function is called `character` - the checker would then fail to resolve
-        // the kind and go silent, so the id would be indexed *and* unvalidated.
-        assertEquals(
-            listOf("character/goblin", "character/orc"),
-            export.unpublishable.map { it.id },
-        )
-        assertTrue(export.unpublishable.all { it.dslName == "character" })
-        assertNull(export.catalog.resolve("character/orc"))
+        // `asset(kind, ...)` is the live example now that `character` is published: a game
+        // declares its own kinds and this module cannot have a type for them. The wrong fix is to
+        // publish `dev.wildware.udea.assets.Particle` because the word is `particle` - the checker
+        // would then fail to resolve the kind and go silent, so the id would be indexed *and*
+        // unvalidated.
+        assertEquals(listOf("character/goblin_dust"), export.unpublishable.map { it.id })
+        assertTrue(export.unpublishable.all { it.dslName == "particle" })
+        assertNull(export.catalog.resolve("character/goblin_dust"))
 
-        // It is still absent rather than wrong: nothing named `Character` was invented.
-        assertTrue(export.catalog.entries.none { it.kindFqn.endsWith(".Character") })
+        // It is still absent rather than wrong: nothing named `Particle` was invented.
+        assertTrue(export.catalog.entries.none { it.kindFqn.endsWith(".Particle") })
     }
 
     @Test

@@ -62,8 +62,8 @@ class MobaFieldTest {
     fun `the authored level puts the elite orc and the wizard on the field`() {
         val level = MobaAssets.registry[GameAssets.level.testLevel]
         val named = level.entities.mapNotNull { it.blueprint?.id?.value }.toSet()
-        assertTrue("blueprint/orc_elite" in named, "the level names: $named")
-        assertTrue("blueprint/wizard" in named, "the level names: $named")
+        assertTrue("character/orc_elite" in named, "the level names: $named")
+        assertTrue("character/wizard" in named, "the level names: $named")
     }
 
     /**

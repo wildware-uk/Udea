@@ -61,6 +61,8 @@ import dev.wildware.udea.render.OverlayResources
 import dev.wildware.udea.render.OverlaySystem
 import dev.wildware.udea.render.input.InjectedIntent
 import dev.wildware.udea.render.input.IntentState
+import dev.wildware.udea.replay.tools.ReplayToolModules
+import dev.wildware.udea.replay.tools.ReplayToolset
 import java.nio.file.Path
 
 /**
@@ -313,6 +315,17 @@ public object MobaAgent {
             // and a host that only wants screenshots must not be forced to wire input as well.
             .module(AgentInputTools)
             .toolset(InputToolset(injected))
+            // `replay.*`: load a `.udearep`, verify it against this build, seek, step, rewind.
+            // The bisect loop of issue #149. It is here rather than in `EngineToolModules`
+            // because a `ReplayToolset` needs a `ReplayHost`, which knows how to build a world
+            // of a specific game - nothing but this game can supply one, and no amount of
+            // service discovery can invent it.
+            //
+            // The world these tools step is **not** the world this host is running: it is a
+            // second headless `moba` built from the recording. So `world.query_entities` does
+            // not see it, and every answer that matters - the tick, both hashes - is in the
+            // tool result itself. See `ReplayToolset`'s KDoc for the cost of a long seek.
+            .let { ReplayToolModules.wire(it, ReplayToolset(MobaReplayHost(host))) }
 
         // `assets.*`, over the real corpus and the real running graph. Registered here rather
         // than in `EngineToolModules` for the reason `AssetToolModule` gives: the daemon carries

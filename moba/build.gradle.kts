@@ -58,6 +58,15 @@ dependencies {
     implementation(project(":udea-assets"))
     implementation(project(":udea-render"))
 
+    // Phase 7: `.udearep` recording and deterministic replay (issues #147-#149). A shipped game
+    // records matches, so this is on `main` and not on the `agent` source set - and it can be,
+    // because `udea-replay` takes `:udea-agent` as `compileOnly`. The `replay.*` toolset classes
+    // are on this classpath and are simply unloadable here, exactly as `AssetsToolset` is in a
+    // process with no `AssetDaemon`; `MobaAgent`'s source set is where the agent surface that
+    // can load them lives, and `ReleaseRules.CLASSPATH_RULE` still resolves neither agent module
+    // from `runtimeClasspath`.
+    implementation(project(":udea-replay"))
+
     // The cue drain and the mixer. Presentation, like `udea-render`, but with no GL in it: the
     // module that names `Gdx.audio` is this one (`dev.wildware.moba.audio.GdxAudioDevice`),
     // because `udea-audio` is a designated headless module and `UDEA-MG-002-BYTECODE` bans
@@ -70,6 +79,16 @@ dependencies {
     // this adds is the ability to *name* `Texture` and `Batch`, which writing a `RenderSystem`
     // requires.
     implementation(libs.gdx)
+
+    // Box2D: the real `PhysicsWorld` behind `dev.wildware.moba.physics.Box2DPhysicsWorld`.
+    // `gdx-box2d` is the binding; the natives are a separate artifact with a `natives-desktop`
+    // classifier, which a version catalog cannot express, so the variant is asked for here the
+    // same way `udea-render` asks for the gdx desktop natives. Runtime-only because nothing
+    // compiles against a `.dll`, and on the *runtime* classpath rather than only the test one
+    // because a shipped game that cannot load the solver is a game that crashes on its first
+    // tick rather than one that fails a test.
+    implementation(libs.gdx.box2d)
+    runtimeOnly(variantOf(libs.gdx.box2d.platform) { classifier("natives-desktop") })
 }
 
 /**
@@ -87,27 +106,26 @@ udeaAgent {
 /**
  * Where this game's assets live, and what they are compiled by.
  *
- * `assets/` and not `src/main/assets` or `src/main/resources`. Two roots exist in this module
- * today, and the reason has narrowed twice since this comment was first written. The old reason - that
- * `src/main/assets`, the mechanically migrated 19-script corpus of issue #93, could not compile
- * until #84's generated DSL landed - is **no longer true**: `AssetScope` grew the eight missing
- * kinds, the 19 scripts carry no imports at all, and `MigratedCorpusCompilesTest` compiles and
- * validates every one of them with zero errors. Breaking a reference in that tree turns it red
- * without a `--rerun-tasks`, so it is a live check and not a stale one.
+ * ## One root
  *
- * It is also **no longer a capability gap**, which is the correction this line needed most.
- * `control`, `axis2D`, `binding` and `axis2DBinding` are published `AssetKind`s and `AssetCodecs`
- * has always round-tripped all four; nothing had simply ever put one in a *packed* root, and
- * `assets/control/controls.udea.kts` now does - `MobaControls.BINDINGS` is loaded from the bundle
- * and `MobaFieldTest` fails if the packed key codes stop being the ones the game runs on. So this
- * split costs the corpus, not the controls.
+ * There were two, and this comment used to explain why. `moba/src/main/assets` held the
+ * mechanically migrated 19-script corpus of issue #93 and `moba/assets` held a smaller,
+ * hand-reduced tree, and the reason narrowed three times before it closed:
  *
- * What still keeps the roots apart is narrower and is a *packing* limit, not a compiling one:
- * `character`, `gameplayEffect` and `effect` are `AssetKind.Unpublishable`, so
- * `level/test_level`'s 27 entities pack without their blueprints - 27 `UDEA0013`s, pinned by
- * `MigratedCorpusBundleTest`. A game cannot load a bundle whose level has no entities to spawn,
- * so switching this line today would trade a working game for a corpus. Closing that is #84's,
- * and when it closes the two roots become one and this block goes away.
+ * - not compilation - `MigratedCorpusCompilesTest` drove all 19 scripts with zero errors;
+ * - not the control kinds - `control`, `axis2D`, `binding` and `axis2DBinding` were always
+ *   published, and `assets/control/controls.udea.kts` proved it by being loaded by
+ *   `MobaControlAssets`;
+ * - but **packing**: `character`, `gameplayEffect` and `effect` were `AssetKind.Unpublishable`,
+ *   and `EntityDefinition.blueprint` was a `Ref<Blueprint>`, so packing the corpus reported 27
+ *   `UDEA0013`s and dropped every entity reference `level/test_level` had. A game cannot spawn
+ *   from a level like that, so switching this line would have traded a working game for a corpus.
+ *
+ * All three kinds have runtime types now and `EntityDefinition.blueprint` is a `Ref<SpawnRecipe>`,
+ * which `Blueprint` and `Character` both satisfy. The corpus is merged into `assets/`,
+ * `moba/src/main/assets` is deleted, and this line names the only asset root this game has - the
+ * one `MigratedCorpusBundleTest` packs, `MobaAssets` loads and `MobaAssetTools` serves a live
+ * `assets.*` daemon over.
  *
  * The Kotlin version is declared even though the compiler classpath is already `@Classpath` on
  * every task - see `UdeaAssetsExtension.kotlinVersion` for why a redundant input is worth its
@@ -266,6 +284,22 @@ tasks.register<JavaExec>("runMatchShot") {
         "udea.matchshot.dir",
         providers.gradleProperty("udea.matchshot.dir").orNull
             ?: layout.buildDirectory.dir("reports/udea/match").get().asFile.absolutePath,
+    )
+}
+
+// The lane's evidence task. `LaneShot` lives in the test source set for the same reason
+// `MatchShot` does - it needs a GL driver, and wiring it into `check` would turn a missing driver
+// into a skip, which is a failure mode this repository has already shipped once. Run by name.
+tasks.register<JavaExec>("runLaneShot") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.laneshot: captures a creep wave, the clash under the towers, and the champion farming."
+    mainClass.set("dev.wildware.moba.lane.LaneShot")
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty(
+        "udea.laneshot.dir",
+        providers.gradleProperty("udea.laneshot.dir").orNull
+            ?: layout.buildDirectory.dir("reports/udea/lane").get().asFile.absolutePath,
     )
 }
 

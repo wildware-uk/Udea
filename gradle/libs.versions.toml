@@ -60,6 +60,12 @@ gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", vers
 # UDEA-MG-002 bans `com.badlogicgames.gdx:*-platform` from every headless module for exactly
 # that reason.
 gdx-platform = { module = "com.badlogicgames.gdx:gdx-platform", version.ref = "gdx" }
+# Box2D. `gdx-box2d` is the Java binding and is headless in the sense UDEA-MG-002 cares about -
+# it names no GL type - but it is useless without `gdx-box2d-platform`, which is a
+# `*-platform` native loader and therefore banned from every designated headless module. Both are
+# consumed by `:moba`, which is a game and not one of those modules.
+gdx-box2d = { module = "com.badlogicgames.gdx:gdx-box2d", version.ref = "gdx" }
+gdx-box2d-platform = { module = "com.badlogicgames.gdx:gdx-box2d-platform", version.ref = "gdx" }
 asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
 junit5-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }

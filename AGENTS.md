@@ -56,6 +56,7 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `udea-audio` | Drains `GameContext.cues` and plays sound. No GL and no `Gdx`: playback is an `AudioDevice` SPI, and `AudioDevice.Silent` is what Headless uses |
 | `udea-agent` | MCP tool surface and test harness — the same code path |
 | `udea-agent-host` | HTTP server. Debug-only, verified absent from release |
+| `udea-replay` | `.udearep` input recording, deterministic headless replay, and the bisect tools |
 | `udea-gradle` | Tasks, verifiers, `gamebridge.json` emission |
 | `moba` | The example game: a 5v5 three-lane MOBA |
 | `common` | **Old tree.** Replaced module by module, deleted in Phase 6 |

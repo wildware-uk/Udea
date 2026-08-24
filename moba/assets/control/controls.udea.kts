@@ -10,12 +10,15 @@
 //   > publishes yet
 //
 // which is no longer true and can be checked in two places. `AssetScope.control` declares
-// `AssetKind.of<Control>()` - a *published* kind, not `AssetKind.Unpublishable`, which is what
-// `character`, `gameplayEffect` and `effect` are - and `AssetCodecs` carries reader and writer
+// `AssetKind.of<Control>()` - a *published* kind - and `AssetCodecs` carries reader and writer
 // entries for `Control`, `Axis2D`, `Binding` and `Axis2DBinding`, including the `inputKind`
 // discriminator that tells a `key(...)` from a `mouse(...)`. So the packer could always publish
 // these four kinds; nothing had ever asked it to, because this tree's only copy of the script sat
-// in `src/main/assets`, the migrated corpus root that `udea { assetRoots }` does not name.
+// in `src/main/assets`, the migrated corpus root that `udea { assetRoots }` did not name.
+//
+// `character`, `gameplayEffect` and `effect` were the kinds that really were unpublishable, and
+// they were what kept that second root alive. They are published now, the corpus is merged into
+// this root, and `src/main/assets` is deleted.
 //
 // This file is that script, in the packed root. `MobaControlAssets` reads it back out of the
 // bundle and builds the `InputBindings` the game runs on, so rebinding attack to `E` is an asset

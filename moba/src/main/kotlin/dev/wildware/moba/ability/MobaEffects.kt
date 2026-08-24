@@ -9,12 +9,19 @@ import dev.wildware.udea.gas.value
 /**
  * Every gameplay effect in this game, and the table index of each.
  *
- * Ported from `src/main/assets/ability/gameplay_effects.udea.kts`, which is data with no runtime
- * type behind it yet: `gameplayEffect` is `AssetKind.Unpublishable`, so the packer cannot publish
- * one and nothing loads these at boot. This is the runtime that corpus is waiting for. When #84
- * publishes the kind, this file becomes what the loader builds and these numbers move into the
- * scripts; until then it is written out, and `MobaAbilityContentTest` pins the names so the two
- * cannot drift silently.
+ * Ported from `assets/ability/gameplay_effects.udea.kts`, which is now a **packed** asset:
+ * `gameplayEffect` yields a `dev.wildware.udea.assets.GameplayEffect`, so every effect below has
+ * an authored declaration in the bundle this game ships.
+ *
+ * The table is still built here, and that is not a stub. A `GameplayEffectDef` holds an interned
+ * `AttributeId`, a `TagSet` and an `IntArray` of cue ids - results of a *running* game's attribute
+ * and tag tables - so it cannot be decoded from a bundle without one. What the publication removes
+ * is the **unchecked** copy: `MobaAuthoredContentTest` compares the names, the durations and the
+ * periods here against the authored ones, so retuning a period in the file a designer edits and
+ * leaving this file alone is a red build rather than a silent divergence.
+ *
+ * (The KDoc that stood here promised `MobaAbilityContentTest` would pin the names. There was no
+ * such test.)
  *
  * ## Durations are ticks
  *

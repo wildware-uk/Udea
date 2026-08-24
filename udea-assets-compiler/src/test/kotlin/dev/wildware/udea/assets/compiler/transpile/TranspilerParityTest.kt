@@ -111,7 +111,9 @@ class TranspilerParityTest {
         val orc = assertNotNull(viaTranspiled.graph.assets["character/orc"])
         assertEquals("character", orc.kind)
         assertEquals(500f, orc.fields["health"])
-        assertEquals(listOf("character/orc_idle", "character/orc_walk"), (orc.fields["animations"] as List<*>).map { (it as Ref).id })
+        val roles = (orc.fields["animationMap"] as Map<*, *>).entries
+            .associate { (role, ref) -> role as String to (ref as Ref).id }
+        assertEquals(mapOf("idle" to "character/orc_idle", "walk" to "character/orc_walk"), roles)
     }
 
     /**

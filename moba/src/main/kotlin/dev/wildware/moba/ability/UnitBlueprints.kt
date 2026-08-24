@@ -13,11 +13,14 @@ import dev.wildware.udea.gas.GameplayEffects
 /**
  * What one kind of unit starts with: its stats, its side and the abilities in its slots.
  *
- * The runtime shape of the `character(...)` scripts under `src/main/assets/character`. Those
- * scripts are the authored source and this is a hand-written stand-in for what the loader will
- * produce: `character` is `AssetKind.Unpublishable`, so the packer cannot publish one and nothing
- * loads them at boot. `MobaUnitAssetParityTest` diffs the numbers here against the numbers there,
- * so the stand-in cannot drift away from the corpus it stands in for.
+ * The runtime shape of the `character(...)` scripts under `assets/character`. Those scripts are
+ * the authored source and are **packed** - `character` yields a
+ * `dev.wildware.udea.assets.Character` - so a loader could build this from the bundle. It is still
+ * built in Kotlin because an ability index and an `AttributeId` are interning results a bundle
+ * cannot carry; `MobaAuthoredContentTest` compares the halves that *are* data (the roster, the
+ * animation roles, the loadout ids) so the stand-in cannot drift from what it stands in for.
+ *
+ * (The KDoc that stood here named a `MobaUnitAssetParityTest`. There was no such test.)
  */
 public class UnitKind(
     /** The character asset's name: `soldier`, `priest`, `orc`, `orc_elite`, `skeleton`, `wizard`. */
@@ -128,8 +131,8 @@ public class UnitBlueprint(
 /**
  * The arrow the soldier fires.
  *
- * Ported from `src/main/assets/blueprint/arrow.udea.kts`, whose three `onHitEffects` records are
- * the three fields on [Projectile]. It carries no `Attributes` and no `Combatant`, so it is not a
+ * Ported from `assets/blueprint/projectiles.udea.kts`, whose ancestor's three `onHitEffects`
+ * records are the three fields on [Projectile]. It carries no `Attributes` and no `Combatant`, so it is not a
  * unit: [CombatIndex] never sees it, nothing can target it, and it cannot be healed - which the
  * old arrow could be, because it carried a `Team` component and the friendly-unit query asked
  * only for a matching team.

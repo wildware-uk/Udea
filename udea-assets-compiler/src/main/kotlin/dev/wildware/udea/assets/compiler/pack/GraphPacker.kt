@@ -5,10 +5,14 @@ import dev.wildware.udea.assets.AssetData
 import dev.wildware.udea.assets.Axis2D
 import dev.wildware.udea.assets.Axis2DBinding
 import dev.wildware.udea.assets.Blueprint
+import dev.wildware.udea.assets.Character
 import dev.wildware.udea.assets.Control
+import dev.wildware.udea.assets.Effect
 import dev.wildware.udea.assets.GameConfig
+import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.SoundCue
+import dev.wildware.udea.assets.SpawnRecipe
 import dev.wildware.udea.assets.Binding
 import dev.wildware.udea.assets.SpriteAnimation
 import dev.wildware.udea.assets.SpriteAnimationSet
@@ -16,6 +20,7 @@ import dev.wildware.udea.assets.SpriteSheet
 import dev.wildware.udea.assets.pack.AssetCodecs
 import dev.wildware.udea.assets.compiler.AssetCompilerRules
 import dev.wildware.udea.assets.compiler.AssetGraph
+import dev.wildware.udea.assets.compiler.AssetKindHierarchy
 import dev.wildware.udea.assets.compiler.DeclaredAsset
 import dev.wildware.udea.assets.compiler.Ref
 import dev.wildware.udea.assets.compiler.ResFile
@@ -45,9 +50,11 @@ import kotlin.reflect.KClass
  * hand at read time, in a codec, where it would be invisible.
  *
  * That the mapping is *needed* is a statement about the DSL, not about this class: `AssetScope`
- * is still the provisional shape issue #86 landed, and several of its words - `character`, and
- * anything through `asset(kind, ...)` - have no runtime type at all. Those are packed as their
- * DSL word and read back as `OpaqueAsset`, which loses nothing and pretends nothing.
+ * is still the provisional shape issue #86 landed. One of its words has no runtime type at all -
+ * `asset(kind, ...)`, the escape a game declares its own kinds through - and a declaration made
+ * with it is packed under its DSL word and read back as `OpaqueAsset`, which loses nothing and
+ * pretends nothing. `character` was in that list until [dev.wildware.udea.assets.Character]
+ * existed; it has a schema here now, and so do `gameplayEffect` and `effect`.
  */
 public object GraphPacker {
 
@@ -122,6 +129,9 @@ public object GraphPacker {
         "binding" to Schema { it.binding() },
         "axis2DBinding" to Schema { it.axis2DBinding() },
         "ability" to Schema { it.ability() },
+        "character" to Schema { it.character() },
+        "gameplayEffect" to Schema { it.gameplayEffect() },
+        "effect" to Schema { it.effect() },
     )
 
     /** The DSL words this packer maps onto a runtime type, sorted. For `DslCoverageTest`. */
@@ -141,6 +151,9 @@ public object GraphPacker {
         "binding" to fqn(Binding::class.qualifiedName),
         "axis2DBinding" to fqn(Axis2DBinding::class.qualifiedName),
         "ability" to fqn(Ability::class.qualifiedName),
+        "character" to fqn(Character::class.qualifiedName),
+        "gameplayEffect" to fqn(GameplayEffect::class.qualifiedName),
+        "effect" to fqn(Effect::class.qualifiedName),
     )
 
     private fun fqn(name: String?): String = requireNotNull(name)
@@ -293,6 +306,114 @@ public object GraphPacker {
             )
         }
 
+        fun character(): Map<String, PackValue> = buildMap {
+            float("size", 1F)
+            float("health", 100F)
+            // The DSL spells the set `spriteAnimationSet`; `Character` spells it `animationSet`,
+            // because the field holds a reference and not a set of them. Renamed here, where
+            // every other DSL-to-model rename in this file lives.
+            ref("spriteAnimationSet", SpriteAnimationSet::class)?.let { put("animationSet", it) }
+            put("animations", refRecord("animationMap", SpriteAnimation::class))
+            put("sounds", refRecord("sounds", SoundCue::class))
+            put(
+                "attributes",
+                PackValue.Fields.of(
+                    (asset.fields["attributes"] as? Map<*, *>).orEmpty().entries
+                        .mapNotNull { (key, value) ->
+                            val attribute = key as? String ?: return@mapNotNull null
+                            val magnitude = value as? Float ?: return@mapNotNull null
+                            attribute to (PackValue.F32(magnitude) as PackValue)
+                        }
+                        .sortedBy { it.first }
+                        .toMap(),
+                ),
+            )
+            put("components", componentsOf(asset.fields["components"]))
+            put("tags", PackValue.Items(strings("tags").map { PackValue.Text(it) }))
+            put(
+                "abilities",
+                PackValue.Items(
+                    (asset.fields["abilitySpecs"] as? List<*>).orEmpty().mapNotNull { value ->
+                        val spec = value as? Map<*, *> ?: return@mapNotNull null
+                        val ability = spec["ability"] as? Ref ?: return@mapNotNull null
+                        val slot = resolve(ability, Ability::class) ?: return@mapNotNull null
+                        PackValue.Fields.of(
+                            mapOf(
+                                "ability" to PackValue.Ref(slot, ability.id),
+                                "level" to PackValue.I32(spec["level"] as? Int ?: 1),
+                                "tags" to PackValue.Items(
+                                    (spec["tags"] as? List<*>).orEmpty()
+                                        .filterIsInstance<String>()
+                                        .map { PackValue.Text(it) },
+                                ),
+                            ),
+                        )
+                    },
+                ),
+            )
+        }
+
+        /**
+         * `instant()`, `infinite()` and `duration(tag)` as the flat pair `AssetCodecs` reads.
+         *
+         * The discriminator words come from `AssetCodecs` for [bindingInput]'s reason: the reader
+         * throws `unknown effect duration kind` on a mismatch, and a writer holding its own copy
+         * of the words is how a bundle this build wrote comes to produce that.
+         */
+        fun gameplayEffect(): Map<String, PackValue> = buildMap {
+            val duration = asset.fields["effectDuration"] as? Map<*, *>
+            when (duration?.get("kind") as? String) {
+                "duration" -> {
+                    put("durationKind", PackValue.Text(AssetCodecs.SET_BY_CALLER))
+                    put("durationTag", PackValue.Text(duration["tag"] as? String ?: ""))
+                }
+                "infinite" -> put("durationKind", PackValue.Text(AssetCodecs.INFINITE))
+                else -> put("durationKind", PackValue.Text(AssetCodecs.INSTANT))
+            }
+            (asset.fields["target"] as? String)?.let { put("target", PackValue.Text(it)) }
+            (asset.fields["modifierType"] as? String)?.let { put("modifierType", PackValue.Text(it)) }
+            val magnitude = asset.fields["magnitude"] as? Map<*, *>
+            when (magnitude?.get("kind") as? String) {
+                "setByCaller" -> {
+                    put("magnitudeKind", PackValue.Text(AssetCodecs.SET_BY_CALLER))
+                    put("magnitudeTag", PackValue.Text(magnitude["tag"] as? String ?: ""))
+                }
+                "attribute" -> {
+                    put("magnitudeKind", PackValue.Text(AssetCodecs.ATTRIBUTE))
+                    put("magnitudeAttribute", PackValue.Text(magnitude["attribute"] as? String ?: ""))
+                }
+            }
+            put("period", PackValue.F32(floatOf("period", 0F)))
+            put("cues", PackValue.Items(strings("cues").map { PackValue.Text(it) }))
+            put("tags", PackValue.Items(strings("tags").map { PackValue.Text(it) }))
+        }
+
+        fun effect(): Map<String, PackValue> = buildMap {
+            ref("animationSet", SpriteAnimationSet::class)?.let { put("animationSet", it) }
+            put("animation", PackValue.Text(asset.fields["animation"] as? String ?: ""))
+            put("duration", PackValue.F32(floatOf("duration", 1F)))
+        }
+
+        /**
+         * A `name -> Ref<T>` field as one record, sorted by key.
+         *
+         * Sorted because two packs of one tree must agree byte for byte and a `LinkedHashMap`
+         * preserves *authoring* order, which a reordered `mapOf(...)` would change without
+         * changing what the asset means.
+         */
+        private fun refRecord(name: String, expected: KClass<out AssetData>): PackValue =
+            PackValue.Fields.of(
+                (asset.fields[name] as? Map<*, *>).orEmpty().entries
+                    .mapNotNull { (key, value) ->
+                        val role = key as? String ?: return@mapNotNull null
+                        val ref = value as? Ref ?: return@mapNotNull null
+                        val slot = resolve(ref, expected) ?: return@mapNotNull null
+                        role to (PackValue.Ref(slot, ref.id) as PackValue)
+                    }
+                    .sortedBy { it.first }
+                    .toMap(),
+            )
+
         fun blueprint(): Map<String, PackValue> = buildMap {
             put("components", componentsOf(asset.fields["components"]))
             // `parent = reference("...")` is a single inheritance edge; `Blueprint` models the
@@ -317,7 +438,7 @@ public object GraphPacker {
                         // form below is the older `level(entities = listOf(reference(...)))`.
                         if (value is Map<*, *>) return@mapIndexedNotNull entityDefinition(value)
                         val ref = value as? Ref ?: return@mapIndexedNotNull null
-                        val slot = resolve(ref, Blueprint::class) ?: return@mapIndexedNotNull null
+                        val slot = resolve(ref, SpawnRecipe::class) ?: return@mapIndexedNotNull null
                         PackValue.Fields.of(
                             mapOf(
                                 // The DSL's `level(entities = listOf(reference(...)))` names no
@@ -334,7 +455,7 @@ public object GraphPacker {
         }
 
         fun gameConfig(): Map<String, PackValue> = buildMap {
-            ref("defaultCharacter", Blueprint::class)?.let { put("defaultCharacter", it) }
+            ref("defaultCharacter", SpawnRecipe::class)?.let { put("defaultCharacter", it) }
             ref("defaultLevel", Level::class)?.let { put("defaultLevel", it) }
             // `gameConfig(physics = physics(gravity = vec(0F, 0F)))` in the DSL; a flat `gravity`
             // on the record, because `PhysicsConfig` has exactly one member and a struct holding
@@ -348,14 +469,13 @@ public object GraphPacker {
             val fields = mutableMapOf<String, PackValue>()
             fields["name"] = PackValue.Text(entity["name"] as? String ?: "Entity")
             // Kind-checked, not merely resolved. `EntityDefinition.blueprint` is a
-            // `Ref<Blueprint>` and `BundleReader` binds it at load, so writing a reference to
-            // something that is not a `Blueprint` produces a bundle that opens with
+            // `Ref<SpawnRecipe>` and `BundleReader` binds it at load, so writing a reference to
+            // something that is not a spawn recipe produces a bundle that opens with
             // `AssetTypeMismatchException` in the game rather than a diagnostic in the build.
-            // That was the behaviour here until the migrated corpus was packed: every entity in
-            // `level/test_level` names a `character(...)`, which has no runtime type, and the
-            // bundle threw on the first one. Reported and dropped, exactly as `resolve` says.
+            // The slot took exactly `Blueprint` until `Character` existed, which is why packing
+            // the migrated `level/test_level` dropped all twenty-seven of its entity references.
             (entity["blueprint"] as? Ref)?.let { blueprint ->
-                resolve(blueprint, Blueprint::class)?.let {
+                resolve(blueprint, SpawnRecipe::class)?.let {
                     fields["blueprint"] = PackValue.Ref(it, blueprint.id)
                 }
             }
@@ -494,11 +614,10 @@ public object GraphPacker {
          * load time and refuses one whose target is not an instance of the declared type. A
          * writer that emitted it anyway would turn a build error into a launch crash.
          *
-         * This is where the provisional DSL shows: `character(...)` has no runtime type, so a
-         * `gameConfig(defaultCharacter = reference("character/orc"))` is reported here. That is
-         * not a false positive - `GameConfig.defaultCharacter` really is a `Ref<Blueprint>` -
-         * and it stops being reported when `udea-assets` owns the generated DSL (#84's
-         * remaining half) and `character` yields a `Blueprint`.
+         * The check is **subtype-aware**, through [AssetKindHierarchy]. `EntityDefinition.blueprint` is a
+         * `Ref<SpawnRecipe>` and a `character(...)` yields a `Character`, so a migrated level's
+         * twenty-seven entities resolve; a `soundCue` in the same slot still does not. Exact
+         * string equality was what made packing that level drop every entity reference it had.
          */
         fun resolve(
             ref: Ref,
@@ -507,7 +626,7 @@ public object GraphPacker {
             val slot = resolve(ref) ?: return null
             val actual = kinds[slot]
             val wanted = expected.qualifiedName
-            if (actual != wanted) {
+            if (!AssetKindHierarchy.satisfies(actual, wanted)) {
                 diagnostics += UdeaRules.REFERENCE_KIND_MISMATCH.diagnostic(
                     message = "'${asset.id}' references '${ref.id}', which is " +
                         (actual?.let { "a $it" } ?: "a kind with no runtime type") +

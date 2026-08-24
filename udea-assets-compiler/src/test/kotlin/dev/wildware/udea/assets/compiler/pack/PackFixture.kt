@@ -23,11 +23,9 @@ internal object PackFixture {
     /**
      * The kind-correct corpus this issue's tests pack.
      *
-     * Not `resources/assets`: that tree is the front ends' corpus and several of its
-     * references point at `character(...)`, which the provisional DSL gives no runtime type,
-     * so packing it reports `UDEA0013`. `KindMismatchTest` asserts exactly that, and this tree
-     * exists so a round-trip failure means the writer or the reader is wrong rather than the
-     * DSL being unfinished.
+     * Not `resources/assets`: that tree exercises the *front ends* and is shaped for their
+     * tests. This one is kind-correct end to end, so a round-trip failure here means the writer
+     * or the reader is wrong rather than the corpus being deliberately odd.
      */
     val assetRoot: Path = TestPaths.repoRoot.resolve(ASSETS)
 
@@ -42,6 +40,7 @@ internal object PackFixture {
         "character/orc_idle_anim",
         "character/orc_walk_anim",
         "character/orc_attack_cue",
+        "character/orc_dust",
         "level/arena",
     )
 

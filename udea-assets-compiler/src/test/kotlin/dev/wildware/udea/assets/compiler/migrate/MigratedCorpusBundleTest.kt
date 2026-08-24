@@ -6,8 +6,14 @@ import dev.wildware.udea.assets.Axis2DBinding
 import dev.wildware.udea.assets.Binding
 import dev.wildware.udea.assets.BindingInput
 import dev.wildware.udea.assets.Blueprint
+import dev.wildware.udea.assets.Character
+import dev.wildware.udea.assets.Effect
+import dev.wildware.udea.assets.EffectDuration
+import dev.wildware.udea.assets.EffectMagnitude
 import dev.wildware.udea.assets.GameConfig
+import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.Level
+import dev.wildware.udea.assets.ModifierKind
 import dev.wildware.udea.assets.SpriteAnimation
 import dev.wildware.udea.assets.SpriteAnimationSet
 import dev.wildware.udea.assets.Vec2
@@ -22,11 +28,11 @@ import dev.wildware.udea.assets.reference
 import org.junit.jupiter.api.Test
 import kotlin.io.path.exists
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * The migrated corpus packs into a bundle the **runtime reader** can open.
+ * The game's one asset root packs into a bundle the **runtime reader** can open, with nothing lost.
  *
  * ### Why this is a separate claim from "it validates"
  *
@@ -37,14 +43,23 @@ import kotlin.test.assertTrue
  * then binds it with a codec that is looking for different fields — so a corpus that validates
  * perfectly can still fail to open, at launch, with `AssetDecodeException`.
  *
- * That was the live state after the eight new declaration kinds landed on `AssetScope`: six of
- * them have a runtime type and none of them had a packer schema. `binding` is the sharpest
- * case — the DSL holds `input = key(62)` as a nested record and `AssetCodecs` reads a flat
- * `inputKind`/`inputCode` pair — so this test opens the bytes and asserts the typed value.
+ * ### What this test asserted before, and what changed
+ *
+ * It asserted **twenty-seven `UDEA0013`s**. Every entity in `level/test_level` named a
+ * `character(...)`; `character` was `AssetKind.Unpublishable` and `EntityDefinition.blueprint` was
+ * a `Ref<Blueprint>`, so the packer reported each one and dropped the field. A level whose
+ * entities name nothing cannot spawn anything, which is why this game shipped a *second*, reduced
+ * asset root and left this corpus unpacked. Its own KDoc said the bill "goes to zero the day
+ * `character` has a type".
+ *
+ * It is zero. `Character`, `GameplayEffect` and `Effect` are real `AssetData` types,
+ * `EntityDefinition.blueprint` is a `Ref<SpawnRecipe>` that both `Blueprint` and `Character`
+ * satisfy, the two roots are one, and every assertion below reads the tree the shipped game boots
+ * from.
  */
 class MigratedCorpusBundleTest {
 
-    private val root = TestPaths.repoRoot.resolve("moba/src/main/assets")
+    private val root = TestPaths.repoRoot.resolve("moba/assets")
 
     private var packerDiagnostics: List<String> = emptyList()
 
@@ -57,13 +72,10 @@ class MigratedCorpusBundleTest {
         )
         val result = compiler.compile(AssetCompiler.scriptsUnder(root))
         check(!result.hasErrors) {
-            "the migrated corpus must compile:\n" +
+            "the game's asset root must compile:\n" +
                 result.diagnostics.joinToString("\n") { "${it.ruleId} ${it.message}" }
         }
         val packed = GraphPacker.pack(result.graph)
-        // Every diagnostic packing reports, kept rather than asserted away. See
-        // `the one thing the corpus cannot pack is reported by id` for what they are and why
-        // closing them is not this migration's work.
         packerDiagnostics = packed.diagnostics.map { "${it.ruleId} ${it.message}" }
         return BundleReader.open(
             BundleWriter.write(BundleContent(assets = packed.assets, atlas = PackedAtlas.EMPTY)),
@@ -71,9 +83,9 @@ class MigratedCorpusBundleTest {
     }
 
     @Test
-    fun `every asset in the migrated corpus binds to a typed model value`() {
+    fun `every asset in the corpus binds to a typed model value`() {
         bundle().use { bundle ->
-            assertEquals(116, bundle.registry.ids.size)
+            assertEquals(127, bundle.registry.ids.size)
 
             // A binding: the nested `key(62)` record became the flat pair the codec reads.
             val binding = bundle.registry[reference<Binding>("control/attack_binding")]
@@ -86,8 +98,8 @@ class MigratedCorpusBundleTest {
 
             // An ability: `exec` is a class name and the tag lists survive as names.
             val melee = bundle.registry[reference<Ability>("ability/npc_melee")]
-            assertEquals("dev.wildware.udea.example.ability.UnitMeleeAttack", melee.exec.type.value)
-            assertEquals(0.5F, melee.range)
+            assertEquals("dev.wildware.moba.ability.MeleeAttackExec", melee.exec.type.value)
+            assertEquals(32F, melee.range)
             assertTrue(melee.blockAnimations)
             assertEquals(listOf("Debuffs.Stunned"), melee.blockedBy.map { it.value })
             assertEquals(
@@ -115,87 +127,117 @@ class MigratedCorpusBundleTest {
                 attack.notifies.map { it.name to it.frame },
             )
 
-            // A blueprint whose components carry fields, and its inheritance edge.
-            val player = bundle.registry[reference<Blueprint>("blueprint/player")]
-            assertEquals(listOf("character/orc_elite"), player.inheritedFrom.map { it.value })
-            assertEquals(
-                listOf(
-                    "dev.wildware.udea.example.component.Player",
-                    "dev.wildware.udea.ecs.component.base.Networkable",
-                ),
-                player.components.map { it.type.value },
-            )
+            // A blueprint's component list.
             val arrow = bundle.registry[reference<Blueprint>("blueprint/arrow")]
-            val box = arrow.components.single { it.type.simpleName == "Box" }
-            assertEquals(setOf("width", "height", "isSensor"), box.fields.keys)
-
-            // A level: named entities, their blueprint, position and added components.
-            val level = bundle.registry[reference<Level>("level/test_level")]
-            assertEquals(6, level.systems.size)
-            assertEquals(27, level.entities.size)
-            val first = level.entities.first()
-            assertEquals("player", first.name)
-            assertEquals(Vec2(-7F, -2F), first.position)
             assertEquals(
                 listOf(
-                    "dev.wildware.udea.ecs.component.base.Networkable",
-                    "dev.wildware.udea.example.component.Player",
+                    "dev.wildware.moba.Position",
+                    "dev.wildware.moba.ability.Motion",
+                    "dev.wildware.moba.ability.Projectile",
+                    "dev.wildware.moba.SpriteView",
                 ),
-                first.components.map { it.type.value },
+                arrow.components.map { it.type.value },
             )
 
             // The config, including the gravity the DSL nests inside `physics { }`.
             val config = bundle.registry[reference<GameConfig>("config")]
-            assertEquals(AssetId("blueprint/player"), config.defaultCharacter?.id)
+            assertEquals(AssetId("character/soldier"), config.defaultCharacter?.id)
             assertEquals(AssetId("level/test_level"), config.defaultLevel?.id)
-            assertEquals(Vec2(0F, 0F), config.physics.gravity)
-
-            // `character`, `gameplayEffect` and `effect` have no runtime type, so they come back
-            // opaque with their fields intact. That is the honest outcome, not a gap this test
-            // papers over: see `AssetKind.Unpublishable`.
-            val orc = assertIs<dev.wildware.udea.assets.pack.OpaqueAsset>(
-                bundle.registry.find(AssetId("character/orc")),
-            )
-            assertEquals("character", orc.kind)
         }
     }
 
     /**
-     * The one gap left, named rather than described.
+     * The three kinds that had no runtime type come back typed, not opaque.
      *
-     * `EntityDefinition.blueprint` is a `Ref<Blueprint>`, and every entity in `level/test_level`
-     * names a `character(...)`, which `AssetKind.Unpublishable` says has no runtime type. So the
-     * packer reports `UDEA0013` and drops the field: the level comes back with its entities,
-     * their names, positions and components, and without the blueprint each was spawned from.
-     *
-     * Before this migration packed the corpus, the packer wrote that reference *unchecked* —
-     * `resolve(ref)` and not `resolve(ref, Blueprint::class)` — so the defect was invisible at
-     * build time and surfaced as `AssetTypeMismatchException: asset 'character/soldier' is a
-     * OpaqueAsset, but the reference expects a Blueprint` when the game opened the bundle. That
-     * is fixed; what remains is the gap itself.
-     *
-     * Closing it is issue #84's remaining half: it means deciding which of a character's
-     * animation, attribute and ability data becomes a `ComponentSpec`, which is a model decision
-     * and not a rewrite of scripts. This test stops it being invisible — twenty-seven entities,
-     * with a bill that goes to zero the day `character` has a type.
+     * Each of the three is asserted through the field that made publishing it worth doing rather
+     * than through its mere presence: the character's **role map** (which the game carried as an
+     * id-suffix convention no validator could check), the gameplay effect's **duration and
+     * magnitude** (which decide whether an applied effect writes `base` or `current`), and the
+     * effect's **animation set** (which the game carried as a Kotlin constant).
      */
     @Test
-    fun `the one thing the corpus cannot pack is reported by id`() {
+    fun `character, gameplayEffect and effect come back as typed model values`() {
+        bundle().use { bundle ->
+            val orc = bundle.registry[reference<Character>("character/orc")]
+            assertEquals(150F, orc.health)
+            assertEquals(
+                mapOf(
+                    "attack" to "character/orc_attack",
+                    "death" to "character/orc_death",
+                    "hit" to "character/orc_hit",
+                    "idle" to "character/orc_idle",
+                    "walk" to "character/orc_walk",
+                ),
+                orc.animations.mapValues { it.value.id.value },
+            )
+            assertEquals(
+                mapOf(
+                    "attack" to "sounds/melee_swoosh",
+                    "death" to "sounds/death",
+                    "hit" to "sounds/hurt",
+                ),
+                orc.sounds.mapValues { it.value.id.value },
+            )
+            assertEquals(mapOf("health" to 150F, "magicResist" to 20F, "strength" to 10F), orc.attributes)
+            assertEquals(
+                listOf(AssetId("ability/npc_melee")),
+                orc.abilities.map { it.ability.id },
+            )
+            assertEquals(listOf("Slot.A"), orc.abilities.single().tags.map { it.value })
+            // A role resolves through the registry, with no string lookup - the property the
+            // id-suffix convention could not have.
+            assertEquals(
+                AssetId("character/orc_walk_sheet"),
+                bundle.registry[bundle.registry[orc.animations.getValue("walk")].sheet].id,
+            )
+
+            val regen = bundle.registry[reference<GameplayEffect>("ability/passive_health_regen")]
+            assertEquals(EffectDuration.Infinite, regen.duration)
+            assertEquals("health", regen.target)
+            assertEquals(ModifierKind.Additive, regen.modifierType)
+            assertEquals(EffectMagnitude.Attribute("healthRegen"), regen.magnitude)
+            assertEquals(1.0F, regen.period)
+
+            val hot = bundle.registry[reference<GameplayEffect>("ability/heal_over_time")]
+            assertEquals(EffectDuration.SetByCaller(dev.wildware.udea.assets.GameplayTagName("Data.Duration")), hot.duration)
+            assertEquals(EffectMagnitude.SetByCaller(dev.wildware.udea.assets.GameplayTagName("Data.Heal")), hot.magnitude)
+            assertEquals(0.25F, hot.period)
+
+            val heal = bundle.registry[reference<Effect>("effects/heal")]
+            assertEquals(AssetId("effects/heal_effect_set"), heal.animationSet.id)
+            assertEquals("heal_effect", heal.animation)
+            assertEquals(0.4F, heal.duration)
+        }
+    }
+
+    /**
+     * The twenty-seven dropped references, counted at zero.
+     *
+     * This is the same shape of assertion the old `the one thing the corpus cannot pack is
+     * reported by id` made, inverted: it asserted `entities.all { it.blueprint == null }` and
+     * `packerDiagnostics.size == 27`. Inverted rather than deleted, because a regression here is
+     * invisible from the outside - a bundle whose level has no entity recipes still *opens*, and
+     * the game fails at scene-swap time with a message about a blueprint id nobody named.
+     */
+    @Test
+    fun `every entity in the level carries the recipe it spawns from`() {
         bundle().use { bundle ->
             val level = bundle.registry[reference<Level>("level/test_level")]
             assertEquals(27, level.entities.size)
             assertTrue(
-                level.entities.all { it.blueprint == null },
-                "an entity kept a blueprint reference the reader would refuse at load",
+                level.entities.all { it.blueprint != null },
+                "an entity lost its recipe: " + level.entities.filter { it.blueprint == null }.map { it.name },
             )
-            assertEquals(27, packerDiagnostics.size, packerDiagnostics.joinToString("\n"))
             assertTrue(
-                packerDiagnostics.all {
-                    it.startsWith("UDEA0013") && "is a kind with no runtime type" in it
-                },
-                "packing reported something other than the known `character` gap:\n" +
-                    packerDiagnostics.joinToString("\n"),
+                level.entities.all { it.blueprint!!.id.value.startsWith("character/") },
+                "the roster is declared in `character/`, beside the art and stats each unit wears",
             )
+            // And each one resolves to a real `Character` through the registry.
+            val player = assertNotNull(level.entities.first { it.name == "player" }.blueprint)
+            assertEquals(AssetId("character/orc_elite"), player.id)
+            assertEquals(500F, bundle.registry[player].let { it as Character }.health)
+
+            assertEquals(emptyList(), packerDiagnostics, "packing the game's asset root is clean")
         }
     }
 }

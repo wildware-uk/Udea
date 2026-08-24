@@ -56,8 +56,8 @@ class AssetIndexWriterTest {
     /**
      * A declaration with no runtime type is absent, not guessed.
      *
-     * The contract is explicit that publishing `dev.wildware.udea.assets.Character` on the
-     * strength of the word `character` would be *worse* than absence: an unresolvable `kindFqn`
+     * The contract is explicit that publishing `dev.wildware.udea.assets.Particle` on the
+     * strength of the word `particle` would be *worse* than absence: an unresolvable `kindFqn`
      * is a silent case in the FIR checker, so the id would be indexed and unvalidated at once.
      */
     @Test
@@ -65,8 +65,8 @@ class AssetIndexWriterTest {
         val catalog = AssetIndexWriter.catalogOfScan(declarations())
 
         assertTrue(
-            catalog.entries.none { it.id == "character/orc" },
-            "`character/orc` has no runtime type and must not be indexed",
+            catalog.entries.none { it.id == "character/orc_dust" },
+            "`character/orc_dust` is an `asset(\"particle\", ...)`, so it has no runtime type",
         )
         assertTrue(catalog.entries.any { it.id == "character/orc_idle" }, "its siblings are indexed")
     }
@@ -108,7 +108,7 @@ class AssetIndexWriterTest {
     fun `the export lists what it could not publish`() {
         val export = AssetIndexWriter.exportOf(graph())
 
-        assertEquals(listOf("character/orc"), export.unpublishable.map { it.id })
-        assertEquals(listOf("character"), export.unpublishable.map { it.dslName })
+        assertEquals(listOf("character/orc_dust"), export.unpublishable.map { it.id })
+        assertEquals(listOf("particle"), export.unpublishable.map { it.dslName })
     }
 }

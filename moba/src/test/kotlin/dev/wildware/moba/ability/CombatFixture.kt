@@ -7,6 +7,7 @@ import dev.wildware.udea.core.blueprint.Blueprint
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
 import dev.wildware.udea.core.blueprint.SpawnPosition
 import dev.wildware.udea.core.blueprint.blueprints
+import dev.wildware.moba.physics.MobaPhysicsModule
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
@@ -41,7 +42,18 @@ internal class CombatFixture(autopilot: Boolean = true) {
     val cues: MutableList<RecordedCue> = mutableListOf()
 
     private val definition: UdeaGameDef =
-        UdeaGameDef(modules = listOf(module, CueRecorderModule(module.gas.cues, cues)))
+        UdeaGameDef(
+            modules = listOf(
+                module,
+                // The game's physics, because `ProjectileSystem` now asks `PhysicsWorld.overlap`
+                // where an arrow's target is instead of scanning every combatant. A fixture that
+                // left this out would be a fixture whose `ctx.physics` is the no-op, where the
+                // answer to every overlap is "nobody" and every arrow flies through its target -
+                // which is a fixture testing a different simulation from the one that ships.
+                MobaPhysicsModule(),
+                CueRecorderModule(module.gas.cues, cues),
+            ),
+        )
 
     init {
         // Before `build()`, which `GameHost` calls: a spawner needs the barrier and the id index,

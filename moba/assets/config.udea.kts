@@ -3,10 +3,13 @@
 // first frame waits on a disk read it did not need to.
 //
 // `defaultLevel` is what makes the whole roster eager: the walk reaches `level/test_level`, and
-// through it the four unit blueprints. Without this line the level would be packed and would
-// stream, and the first scene swap - which happens on tick one of every entry point - would be
-// the thing waiting on the disk.
+// through it the six characters, their animation sets, their sheets and their cues. Without this
+// line the level would be packed and would stream, and the first scene swap - which happens on
+// tick one of every entry point - would be the thing waiting on the disk.
+//
+// `defaultCharacter` names a `character/` rather than the `blueprint/soldier` stand-in that is
+// gone with `blueprint/units.udea.kts`. The slot is a `Ref<SpawnRecipe>`, which both kinds are.
 gameConfig(
-    defaultCharacter = reference("blueprint/soldier"),
+    defaultCharacter = reference("character/soldier"),
     defaultLevel = reference("level/test_level"),
 )

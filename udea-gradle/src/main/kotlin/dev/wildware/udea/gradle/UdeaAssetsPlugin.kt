@@ -30,6 +30,8 @@ import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.process.ExecOperations
+import org.gradle.work.Incremental
+import org.gradle.work.InputChanges
 import java.io.File
 import javax.inject.Inject
 
@@ -97,8 +99,16 @@ public abstract class UdeaAssetTask : DefaultTask() {
     @get:Internal
     public abstract val repoRoot: DirectoryProperty
 
-    /** Every file under the asset root: scripts, images and audio alike. */
+    /**
+     * Every file under the asset root: scripts, images and audio alike.
+     *
+     * `@Incremental` so a task may ask *what* changed rather than only *that* something did.
+     * [UdeaScanAssetsTask] is the one that asks - it parses `.udea.kts` and nothing else, so a
+     * change confined to art is a change it can skip - and declaring it here rather than on that
+     * subclass is what keeps one description of this input for every pass.
+     */
     @get:InputFiles
+    @get:Incremental
     @get:PathSensitive(PathSensitivity.RELATIVE)
     @get:IgnoreEmptyDirectories
     public abstract val sources: ConfigurableFileCollection
@@ -135,7 +145,32 @@ public abstract class UdeaAssetTask : DefaultTask() {
     protected fun option(key: String, value: File): String = "--$key=${value.absolutePath}"
 }
 
-/** Pass 1: the PSI declaration scan, into `declarations.json`. */
+/**
+ * Pass 1: the PSI declaration scan, into `declarations.json`.
+ *
+ * ## Incremental, and exactly how far
+ *
+ * [UdeaAssetTask.sources] is every file under the asset root - scripts, PNGs and audio - because
+ * the *pack* has to be out of date when an image changes. Pass 1 reads none of that: it parses
+ * `.udea.kts` and nothing else. So a change confined to art made this task fork a JVM, build a
+ * `KotlinCoreEnvironment` and re-parse nineteen unchanged scripts to produce a byte-identical
+ * document, and `udeaGenerateAccessors` then re-ran behind it.
+ *
+ * [scan] skips the fork entirely in that case. That is the whole of the incrementality here and
+ * the limit is deliberate rather than unfinished:
+ *
+ * - **Measured, the fork is the cost.** On this corpus - nineteen scripts, 127 declarations - a
+ *   whole-tree rescan is about 1.6s wall, and almost all of it is JVM start-up plus building the
+ *   PSI environment. Re-parsing eighteen small files that were going to be parsed anyway is not
+ *   where the time goes, so per-file scoping would buy a fraction of a second and cost a merge.
+ * - **The merge cannot be lossless today.** Scoping the scan to changed files means carrying the
+ *   unchanged files' results forward out of the previous `declarations.json`, and that document
+ *   deliberately holds declarations and references and **not** diagnostics. `UDEA0020` (a
+ *   declaration whose name is not a string literal) is a *warning*, so a green document can have
+ *   warnings behind it, and a merge would drop them - silently, which is the one outcome worse
+ *   than being slow. Making it lossless is a change to the document's contract, and that is a
+ *   deliberate decision rather than an incidental one.
+ */
 @CacheableTask
 public abstract class UdeaScanAssetsTask : UdeaAssetTask() {
 
@@ -143,9 +178,16 @@ public abstract class UdeaScanAssetsTask : UdeaAssetTask() {
     @get:OutputFile
     public abstract val declarations: RegularFileProperty
 
-    /** Scans. */
+    /** Scans, or reports that nothing pass 1 reads has changed. */
     @TaskAction
-    public fun scan() {
+    public fun scan(changes: InputChanges) {
+        if (canSkip(changes)) {
+            logger.lifecycle(
+                "[$name] no .udea.kts changed; the previous declarations.json still describes " +
+                    "this tree",
+            )
+            return
+        }
         run(
             "scan",
             compilerClasspath,
@@ -153,6 +195,30 @@ public abstract class UdeaScanAssetsTask : UdeaAssetTask() {
             option("assetRoot", assetRoot.get().asFile),
             option("out", declarations.get().asFile),
         )
+    }
+
+    /**
+     * True when Gradle can say what changed, every changed file is a non-script, and the previous
+     * output is still on disk.
+     *
+     * All three are required. A non-incremental run (a first build, a changed classpath, a cache
+     * restore) has no previous state to trust; a missing output would leave a downstream task
+     * reading a file that is not there; and one changed script means the whole document may move.
+     */
+    private fun canSkip(changes: InputChanges): Boolean {
+        if (!changes.isIncremental) return false
+        if (!declarations.get().asFile.isFile) return false
+        // An empty change set reaches the end of this loop and skips, which is right for the same
+        // reason: nothing pass 1 reads moved.
+        for (change in changes.getFileChanges(sources)) {
+            if (change.file.name.endsWith(SCRIPT_SUFFIX)) return false
+        }
+        return true
+    }
+
+    private companion object {
+        /** What pass 1 parses. Everything else under the asset root is an input to later passes. */
+        const val SCRIPT_SUFFIX: String = ".udea.kts"
     }
 }
 

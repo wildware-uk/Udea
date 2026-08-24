@@ -130,7 +130,7 @@ public class SpriteView(
  * ## Why this is Kotlin and not an authored `effect(...)`
  *
  * The old corpus spelled it `effect(name = "heal_effect", animationSet = ..., duration = 5.0F)`,
- * and that is the better spelling. `effect` is `AssetKind.Unpublishable`: a record declared with
+ * and that is the better spelling. `effect` used to be `AssetKind.Unpublishable`: a record declared with
  * it packs as an opaque blob with no runtime type, so a game that read its durations from one
  * would not boot. The **art** is authored - `moba/assets/effects/effects.udea.kts` declares the
  * sheets and the animations, and changing a frame count or a scale there changes what is drawn

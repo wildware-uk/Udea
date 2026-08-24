@@ -43,5 +43,10 @@ include("udea-render")
 include("udea-audio")
 include("udea-agent")
 include("udea-agent-host")
+
+// Phase 7's retrofit (issues #147-#149): the `.udearep` recording, the deterministic headless
+// replay, and the bisect tools. Headless like every other module here - it names `udea-core` and
+// `udea-agent` and nothing that has ever seen a device.
+include("udea-replay")
 include("udea-gradle")
 include("moba")

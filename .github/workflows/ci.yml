@@ -941,3 +941,82 @@ jobs:
           path: agent-instance.log
           if-no-files-found: warn
           retention-days: 7
+
+  determinism:
+    # `udeaVerifyDeterminism` (issue #150) and the float-portability probe behind
+    # `determinism-audit.md` (issue #151), on BOTH operating systems and on TWO JVMs.
+    #
+    # ## Why this is a job when the scan already runs inside `build`
+    #
+    # `udeaVerifyDeterminism` is wired into `check`, so the `build` job above already runs it on
+    # both platforms and a violation already fails that job. What `build` does *not* do is keep
+    # the scan's report, and it does not run anything on a second JVM. Both matter here and
+    # neither is decoration:
+    #
+    # - The report (`build/reports/udea/determinism.txt`) records how many class files were
+    #   scanned per declared simulation scope. A scan whose class count silently went to zero
+    #   passes forever - the task has a guard for that, and this artifact is how a human notices
+    #   the number drifting before the guard is the only thing left.
+    # - The second JVM is the point of the whole exercise. `FloatPortabilityTest` measures
+    #   `java.lang.Math` against `java.lang.StrictMath` on the JVM it is running on, and
+    #   `determinism-audit.md` section 3.1 rests on that measurement: `Math.sin` is permitted a
+    #   1-ulp error and is not specified to agree between implementations, which is what makes
+    #   LibGDX's `MathUtils$Sin` lookup table a per-JVM artifact. Measuring it on one vendor
+    #   proves nothing about the pair. Temurin and Corretto are two independent builds, so this
+    #   matrix is genuinely two dimensions - two OSes and two JVMs - rather than two OSes on one.
+    #
+    # ## What this job is NOT
+    #
+    # It is **not** the determinism gate, and spec section 7 says so directly. A bytecode
+    # reference scan cannot see nondeterminism laundered through Fleks internals, through an
+    # interface call whose receiver happens to be a `HashMap` built elsewhere, or through the
+    # float divergence this job measures but cannot prevent. The gate is the `WorldHasher`
+    # snapshot-equivalence test and the cross-OS `replay-equality` job that issue #152 adds on
+    # top of `:udea-replay`'s headless replay. Until that job exists, THIS FILE CONTAINS NO
+    # REPLAY-EQUALITY GATE, and nobody should read a green tick here as one.
+    name: determinism (${{ matrix.os }}, ${{ matrix.distribution }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        distribution: [temurin, corretto]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: ${{ matrix.distribution }}
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      # The scan itself. Runs the aggregate task by name rather than `check`, so a failure here
+      # is unambiguously a determinism finding and not some other module's test.
+      - name: Scan the declared simulation source sets
+        shell: bash
+        run: ./gradlew udeaVerifyDeterminism --stacktrace
+
+      # The parser, the audit's completeness and the float probe. These live in `build-logic`,
+      # which the root `check` does not reach, so without this step the strictness that keeps
+      # `determinism-allowlist.txt` from becoming a dumping ground is never executed in CI.
+      - name: Verify the allowlist parser, the audit and float portability
+        shell: bash
+        run: ./gradlew -p build-logic test --stacktrace
+
+      - name: Upload the determinism report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: determinism-${{ matrix.os }}-${{ matrix.distribution }}
+          path: |
+            build/reports/udea/determinism.txt
+            build-logic/build/reports/tests/test/**
+          if-no-files-found: error
+          retention-days: 7

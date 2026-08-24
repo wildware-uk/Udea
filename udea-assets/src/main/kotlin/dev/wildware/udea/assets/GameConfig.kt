@@ -66,7 +66,7 @@ public data class UiConfig(public val defaultSkin: ResPath? = null)
 public data class GameConfig(
     override val id: AssetId,
     public val defaultLevel: Ref<Level>? = null,
-    public val defaultCharacter: Ref<Blueprint>? = null,
+    public val defaultCharacter: Ref<SpawnRecipe>? = null,
     public val backgroundTexture: ResPath? = null,
     public val network: NetworkConfig = NetworkConfig(),
     public val physics: PhysicsConfig = PhysicsConfig(),

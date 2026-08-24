@@ -2,6 +2,7 @@ package dev.wildware.moba.net
 
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.moba.lane.LaneCreep
 import dev.wildware.moba.level.GameUnit
 import dev.wildware.udea.core.replication.MaskOps
 import dev.wildware.udea.core.snapshot.ColumnarFieldStore
@@ -122,8 +123,24 @@ public object NetStateProbe {
         return fold(hash, body)
     }
 
-    /** How many [GameUnit]s this world holds. The headline "27" of the example's battle. */
-    public fun unitCount(world: World): Int = world.family { all(GameUnit) }.entities.size
+    /**
+     * How many roster [GameUnit]s this world holds. The headline "27" of the example's battle.
+     *
+     * [LaneCreep] is excluded, and that is a correctness fix rather than tidiness. A creep also
+     * carries [GameUnit], and `LaneModule` fields a wave every six hundred ticks and lets it die
+     * on the way down the lane - so the number of creeps alive is a function of the tick. A
+     * client and a server sample this at *different* ticks by construction (that is what a
+     * network is), so a census that counted creeps would compare two different moments and report
+     * a disagreement that is really a wave landing between two reads. `MobaUdpTwoProcessTest`
+     * found exactly that: the client held 30 where the level seeds 28.
+     *
+     * The creeps are **not** excused from the proof. [unitHash] folds every row carrying
+     * [GameUnit], creeps included, and that hash is compared client against server - so a creep
+     * that replicated wrongly still fails. What is excluded here is only the count, which is the
+     * one number a moving population cannot make comparable.
+     */
+    public fun unitCount(world: World): Int =
+        world.family { all(GameUnit).none(LaneCreep) }.entities.size
 
     /** How many entities carry a replicated component at all, for a fuller census. */
     public fun entityCount(fields: WorldFieldStore): Int = fields.rowCount

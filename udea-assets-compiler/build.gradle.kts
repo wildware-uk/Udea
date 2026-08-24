@@ -64,10 +64,10 @@ tasks.withType<Test>().configureEach {
     // measure. Without it the test task's up-to-date check sees only Kotlin sources and the
     // classpath, so editing a `.udea.kts` and re-running leaves the task UP-TO-DATE and Gradle
     // re-publishes the previous, passing report. That was observed here, not theorised: a
-    // deliberately broken reference in `moba/src/main/assets/character/orc.udea.kts` produced a
+    // deliberately broken reference in `moba/assets/character/orc.udea.kts` produced a
     // green `MigratedCorpusCompilesTest` twice, `cleanTest` included, until this was declared.
     // A corpus check whose corpus is not an input is a check that silently stops running.
-    inputs.dir(rootProject.layout.projectDirectory.dir("moba/src/main/assets"))
+    inputs.dir(rootProject.layout.projectDirectory.dir("moba/assets"))
         .withPropertyName("migratedAssetCorpus")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(rootProject.layout.projectDirectory.dir("example/src/main/resources/assets"))
@@ -119,12 +119,12 @@ tasks.named("check") {
 //
 //   ./gradlew :udea-assets-compiler:udeaMigrateAssets \
 //       -Pudea.migrate.from=example/src/main/resources/assets \
-//       -Pudea.migrate.to=moba/src/main/assets
+//       -Pudea.migrate.to=moba/assets
 
 val migrateFrom: String = providers.gradleProperty("udea.migrate.from")
     .getOrElse("example/src/main/resources/assets")
 val migrateTo: String = providers.gradleProperty("udea.migrate.to")
-    .getOrElse("moba/src/main/assets")
+    .getOrElse("moba/assets")
 val migrateDryRun: Boolean = providers.gradleProperty("udea.migrate.dryRun").isPresent
 
 tasks.register<JavaExec>("udeaMigrateAssets") {

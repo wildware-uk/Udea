@@ -39,6 +39,13 @@ class MobaLevelTest {
         val units = host.world.family { all(GameUnit) }
         with(host.world) {
             units.forEach { entity ->
+                // Lane creeps are not the level's roster. `LaneModule` sends a wave of them
+                // every ten seconds and they carry a real `GameUnit` team, exactly as every other
+                // unit does, so a census that counted them would report the world growing and
+                // would say nothing about the twenty-seven units this test is about. Skipped here
+                // rather than spawned teamless, because `GameUnit.team` disagreeing with
+                // `Combatant.teamId` is the invariant this very file pins.
+                if (dev.wildware.moba.lane.LaneCreep in entity) return@forEach
                 val team = entity[GameUnit].team
                 if (team in counts.indices) counts[team]++
             }
@@ -118,7 +125,13 @@ class MobaLevelTest {
     fun `dead units release their net ids`() {
         val host = booted()
         host.run(TICKS)
-        val live = host.world.family { all(GameUnit) }.entities.size
+        // The level's own roster, without the creep waves `LaneModule` sends into the lane -
+        // see the census above for why they are skipped rather than spawned teamless.
+        val live = with(host.world) {
+            host.world.family { all(GameUnit) }.entities.count {
+                dev.wildware.moba.lane.LaneCreep !in it
+            }
+        }
         assertTrue(live < 27, "nothing died, so this test proves nothing about the id space")
         var reachable = 0
         host.ctx[CoreModule.NET_IDS].forEachLive { _, _ -> reachable++ }
@@ -134,6 +147,7 @@ class MobaLevelTest {
         val out = ArrayList<String>(units.entities.size)
         with(host.world) {
             units.forEach { entity ->
+                if (dev.wildware.moba.lane.LaneCreep in entity) return@forEach
                 val position = entity[Position]
                 out += "${entity[GameUnit].kind}@${position.x},${position.y}"
             }

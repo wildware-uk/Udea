@@ -1,14 +1,13 @@
 // What `:moba` actually draws, declared once and packed at build time.
 //
-// This root is deliberately small and deliberately separate from `moba/src/main/assets`, the
-// mechanically migrated 19-script corpus of issue #93. That corpus *does* compile and validate
-// now - `MigratedCorpusCompilesTest` drives all 19 with zero errors - so the reason for the
-// split is no longer compilation. It is packing: `character`, `gameplayEffect` and `effect` are
-// still `AssetKind.Unpublishable`, so `level/test_level` packs its 27 entities without their
-// blueprints, and a game cannot spawn from a level like that.
+// One root. There were two - this one and `moba/src/main/assets`, the mechanically migrated
+// 19-script corpus of issue #93 - and the reason narrowed twice before it closed. It was never
+// that the corpus failed to compile; it was that `character`, `gameplayEffect` and `effect` were
+// `AssetKind.Unpublishable`, so packing the corpus dropped all 27 of `level/test_level`'s entity
+// references and produced a bundle with a level that spawned nothing.
 //
-// This root packs completely, so it is what the pipeline runs over and what the game loads. See
-// `moba/build.gradle.kts`'s `udea { }` block for the same statement in full.
+// Those three kinds have runtime types now, the corpus is merged into this root and the other one
+// is deleted. `moba/build.gradle.kts`'s `udea { }` block names this directory and nothing else.
 
 /**
  * World units per pixel.

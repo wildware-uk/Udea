@@ -12,12 +12,16 @@ import kotlin.io.path.name
 import kotlin.io.path.readText
 
 /**
- * The syntactic properties of the migrated tree, and the one trap its DSL could fall into.
+ * The syntactic properties of the game's asset tree, and the one trap its DSL could fall into.
+ *
+ * The tree is `moba/assets`, which is the *only* asset root this game has since `character`,
+ * `gameplayEffect` and `effect` became published kinds and `moba/src/main/assets` was merged into
+ * it and deleted.
  */
 class MigratedCorpusShapeTest {
 
     private val scripts = dev.wildware.udea.assets.compiler.AssetCompiler
-        .scriptsUnder(TestPaths.repoRoot.resolve("moba/src/main/assets"))
+        .scriptsUnder(TestPaths.repoRoot.resolve("moba/assets"))
 
     /**
      * Issue #93's grep criterion: none of the three shapes the migration deletes survives.
@@ -31,7 +35,14 @@ class MigratedCorpusShapeTest {
     @Test
     fun `no migrated script contains a bundle wrapper, a lazy list or an absolute resource path`() {
         val offenders = scripts.mapNotNull { path ->
+            // Line comments stripped first, for the reason `udeaVerifyGasTime` strips them: this
+            // tree's scripts deliberately *quote* the old shapes they replaced - `arrow.udea.kts`
+            // cites `loadSprite("/sprites/arrow/arrow.png", .1F)` - and a check that cannot tell a
+            // citation from a declaration forces the documentation to go vague about what it fixed.
             val text = path.readText()
+                .lineSequence()
+                .filterNot { it.trimStart().startsWith("//") }
+                .joinToString(separator = "\n")
             val found = buildList {
                 if (Regex("""\bbundle\s*\{""").containsMatchIn(text)) add("bundle {")
                 if (Regex("""\blazy\s*\{""").containsMatchIn(text)) add("lazy {")

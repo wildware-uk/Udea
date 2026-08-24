@@ -13,12 +13,13 @@ import dev.wildware.udea.render.input.InputBindings
  *
  * This file used to hard-code the same six bindings, under a KDoc claiming `control`, `binding`
  * and `axis2DBinding` "are not among the kinds `udeaPackBundle` publishes yet". That was never
- * true: those four kinds are `AssetKind.of<...>()` in `AssetScope` - published, unlike the
- * `AssetKind.Unpublishable` `character`, `gameplayEffect` and `effect` that actually do keep
- * `src/main/assets` a separate root - and `AssetCodecs` has always carried readers and writers
- * for them. What was missing was a copy of the script in the packed root and a loader. Both
- * exist now; see [MobaControlAssets] for the one thing the asset model still cannot express,
- * which is the gamepad half of a binding.
+ * true: those four kinds are `AssetKind.of<...>()` in `AssetScope` and `AssetCodecs` has always
+ * carried readers and writers for them. What was missing was a copy of the script in the packed
+ * root and a loader. Both exist now; see [MobaControlAssets] for the one thing the asset model
+ * still cannot express, which is the gamepad half of a binding.
+ *
+ * `character`, `gameplayEffect` and `effect` were the kinds that really did keep a second asset
+ * root alive. They are published too, the roots are one, and `moba/src/main/assets` is gone.
  *
  * What stays in code is the three *names*, as constants, because they are what the rest of this
  * game addresses an action by - and a name typed at a call site is checked by the compiler where

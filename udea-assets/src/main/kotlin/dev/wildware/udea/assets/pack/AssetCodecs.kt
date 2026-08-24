@@ -2,6 +2,7 @@ package dev.wildware.udea.assets.pack
 
 import dev.wildware.udea.assets.Ability
 import dev.wildware.udea.assets.AbilityDisplay
+import dev.wildware.udea.assets.AbilitySpec
 import dev.wildware.udea.assets.AnimNotify
 import dev.wildware.udea.assets.AssetData
 import dev.wildware.udea.assets.AssetId
@@ -11,18 +12,26 @@ import dev.wildware.udea.assets.Axis2DBinding
 import dev.wildware.udea.assets.Binding
 import dev.wildware.udea.assets.BindingInput
 import dev.wildware.udea.assets.Blueprint
+import dev.wildware.udea.assets.Character
 import dev.wildware.udea.assets.ComponentSpec
 import dev.wildware.udea.assets.Control
+import dev.wildware.udea.assets.Effect
+import dev.wildware.udea.assets.EffectDuration
+import dev.wildware.udea.assets.EffectMagnitude
 import dev.wildware.udea.assets.EntityDefinition
 import dev.wildware.udea.assets.EntityTagName
 import dev.wildware.udea.assets.GameConfig
+import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.GameplayTagName
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.LightingConfig
+import dev.wildware.udea.assets.ModifierKind
 import dev.wildware.udea.assets.MovementType
 import dev.wildware.udea.assets.NetworkConfig
 import dev.wildware.udea.assets.PhysicsConfig
+import dev.wildware.udea.assets.Ref
 import dev.wildware.udea.assets.SoundCue
+import dev.wildware.udea.assets.SpawnRecipe
 import dev.wildware.udea.assets.SpriteAnimation
 import dev.wildware.udea.assets.SpriteAnimationSet
 import dev.wildware.udea.assets.SpriteSheet
@@ -134,7 +143,7 @@ public class AssetCodecs private constructor(
                         entities = fields.list("entities").map { entity ->
                             EntityDefinition(
                                 name = entity.text("name", "Entity"),
-                                blueprint = entity.refOrNull("blueprint", Blueprint::class),
+                                blueprint = entity.refOrNull("blueprint", SpawnRecipe::class),
                                 components = entity.list("components").map { it.componentSpec() },
                                 tags = entity.textList("tags").map(::EntityTagName),
                                 position = if ("position" in entity) {
@@ -150,7 +159,7 @@ public class AssetCodecs private constructor(
                     GameConfig(
                         id = fields.id,
                         defaultLevel = fields.refOrNull("defaultLevel", Level::class),
-                        defaultCharacter = fields.refOrNull("defaultCharacter", Blueprint::class),
+                        defaultCharacter = fields.refOrNull("defaultCharacter", SpawnRecipe::class),
                         backgroundTexture = fields.pathOrNull("backgroundTexture"),
                         network = NetworkConfig(
                             tcpPort = fields.int("tcpPort", NetworkConfig.DEFAULT_TCP_PORT),
@@ -210,6 +219,60 @@ public class AssetCodecs private constructor(
                         tags = fields.textList("tags").map(::GameplayTagName),
                         range = if ("range" in fields) fields.float("range") else null,
                         blockAnimations = fields.bool("blockAnimations", false),
+                        // The four the writer has always written and this codec used to drop on
+                        // the floor. `GraphPacker.ability` emits `params`, `cooldown`, `costs` and
+                        // `setByCaller`; nothing read them back, so an ability's whole tuning
+                        // survived the round trip as bytes nobody could reach. The two reference
+                        // fields are typed `GameplayEffect` now that the kind exists - `Ability`
+                        // still declares them `Ref<*>`, so this is where the type token is chosen.
+                        params = fields.record("params").toAssetValues(),
+                        cooldown = fields.refOrNull("cooldown", GameplayEffect::class),
+                        costs = fields.refList("costs", GameplayEffect::class),
+                        setByCaller = fields.record("setByCaller").let { record ->
+                            record.names.associate { GameplayTagName(it) to record.float(it) }
+                        },
+                    )
+                }
+                put(Character::class) { fields ->
+                    Character(
+                        id = fields.id,
+                        size = fields.float("size", 1F),
+                        health = fields.float("health", 100F),
+                        animationSet = fields.refOrNull("animationSet", SpriteAnimationSet::class),
+                        animations = fields.refMap("animations", SpriteAnimation::class),
+                        sounds = fields.refMap("sounds", SoundCue::class),
+                        attributes = fields.record("attributes").let { record ->
+                            record.names.associateWith { record.float(it) }
+                        },
+                        components = fields.list("components").map { it.componentSpec() },
+                        tags = fields.textList("tags").map(::EntityTagName),
+                        abilities = fields.list("abilities").map { spec ->
+                            AbilitySpec(
+                                ability = spec.ref("ability", Ability::class),
+                                tags = spec.textList("tags").map(::GameplayTagName),
+                                level = spec.int("level", 1),
+                            )
+                        },
+                    )
+                }
+                put(GameplayEffect::class) { fields ->
+                    GameplayEffect(
+                        id = fields.id,
+                        duration = fields.effectDuration(),
+                        target = fields.textOrNull("target"),
+                        modifierType = fields.modifierKind(),
+                        magnitude = fields.effectMagnitude(),
+                        period = fields.float("period", 0F),
+                        cues = fields.textList("cues"),
+                        tags = fields.textList("tags").map(::GameplayTagName),
+                    )
+                }
+                put(Effect::class) { fields ->
+                    Effect(
+                        id = fields.id,
+                        animationSet = fields.ref("animationSet", SpriteAnimationSet::class),
+                        animation = fields.text("animation"),
+                        duration = fields.float("duration"),
                     )
                 }
             },
@@ -230,6 +293,65 @@ public class AssetCodecs private constructor(
          * the asset, and this is exactly the field a bundle from a newer compiler grows a case
          * in - so it is worth the four lines to say which `gameConfig` could not be read.
          */
+        /**
+         * A `name -> Ref<T>` field, as [Character.animations] and [Character.sounds] hold it.
+         *
+         * A record and not a list of `{key, value}` pairs, because a role may only appear once and
+         * a record is the encoding that says so - the same argument `GraphPacker.spriteAnimation`
+         * makes for animation notifies going the other way.
+         */
+        private fun <T : AssetData> AssetFields.refMap(
+            name: String,
+            expected: kotlin.reflect.KClass<T>,
+        ): Map<String, Ref<T>> {
+            val record = record(name)
+            return record.names.associateWith { record.ref(it, expected) }
+        }
+
+        /**
+         * `instant()` / `infinite()` / `duration(tag)` as a flat discriminator pair.
+         *
+         * Flat for [bindingInput]'s reason, and refusing an unknown word for [movementType]'s: an
+         * effect whose duration this build cannot read must not quietly become instant, because an
+         * instant effect writes `base` and a duration effect does not - so the difference is a
+         * permanently wrong stat rather than a wrong number for a while.
+         */
+        private fun AssetFields.effectDuration(): EffectDuration =
+            when (val kind = text("durationKind", INSTANT)) {
+                INSTANT -> EffectDuration.Instant
+                INFINITE -> EffectDuration.Infinite
+                SET_BY_CALLER -> EffectDuration.SetByCaller(GameplayTagName(text("durationTag")))
+                else -> throw AssetDecodeException(
+                    id.value,
+                    "unknown effect duration kind '$kind'; this build knows " +
+                        "'$INSTANT', '$INFINITE' and '$SET_BY_CALLER'",
+                )
+            }
+
+        /** `setByCaller(tag)` / `attribute(name)`, or absent. */
+        private fun AssetFields.effectMagnitude(): EffectMagnitude? =
+            when (val kind = textOrNull("magnitudeKind")) {
+                null -> null
+                SET_BY_CALLER -> EffectMagnitude.SetByCaller(GameplayTagName(text("magnitudeTag")))
+                ATTRIBUTE -> EffectMagnitude.Attribute(text("magnitudeAttribute"))
+                else -> throw AssetDecodeException(
+                    id.value,
+                    "unknown magnitude kind '$kind'; this build knows '$SET_BY_CALLER' and " +
+                        "'$ATTRIBUTE'",
+                )
+            }
+
+        /** The modifier, by name, refusing an unknown one exactly as [movementType] does. */
+        private fun AssetFields.modifierKind(): ModifierKind {
+            val name = text("modifierType", ModifierKind.Additive.name)
+            return ModifierKind.entries.firstOrNull { it.name == name }
+                ?: throw AssetDecodeException(
+                    id.value,
+                    "unknown modifierType '$name'; this build knows " +
+                        ModifierKind.entries.joinToString { it.name },
+                )
+        }
+
         private fun AssetFields.movementType(): MovementType {
             val name = text("movementType", MovementType.TopDown.name)
             return MovementType.entries.firstOrNull { it.name == name }
@@ -281,5 +403,17 @@ public class AssetCodecs private constructor(
 
         /** The `inputKind` discriminator for [BindingInput.MouseButton]. Shared with the writer. */
         public const val MOUSE: String = "mouse"
+
+        /** `durationKind` for [EffectDuration.Instant]. Shared with the writer. */
+        public const val INSTANT: String = "instant"
+
+        /** `durationKind` for [EffectDuration.Infinite]. */
+        public const val INFINITE: String = "infinite"
+
+        /** `durationKind` and `magnitudeKind` for the caller-supplied case. */
+        public const val SET_BY_CALLER: String = "setByCaller"
+
+        /** `magnitudeKind` for [EffectMagnitude.Attribute]. */
+        public const val ATTRIBUTE: String = "attribute"
     }
 }

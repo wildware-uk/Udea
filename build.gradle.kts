@@ -18,6 +18,13 @@ plugins {
     // The exception: the migration gates ask about the whole tree at once, so they are the one
     // pair that belongs on the root. See `docs/migration/ledger.md`.
     id("udea.migration-check")
+
+    // The same exception, for the same reason (issue #150): `udeaVerifyDeterminism` asks about
+    // a *set* of source sets spanning four modules, declared in
+    // `DeterminismRules.SIMULATION_SCOPES`, so a per-module answer to "does simulation read the
+    // wall clock" would be four answers to a question that has one. Root also keeps the switch
+    // that disables the gate out of the build script of the module it polices.
+    id("udea.determinism-check")
 }
 
 group = "dev.wildware.udea"

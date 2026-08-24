@@ -90,3 +90,47 @@ spriteSheet(
     columns = 4,
     scale = wizardScale,
 )
+
+// --- the gameplay half, which this root could not carry until `character` was a published kind
+//
+// `character(...)` was `AssetKind.Unpublishable`, so a declaration made with it packed as an
+// opaque record with no runtime type, and `EntityDefinition.blueprint` - a `Ref<Blueprint>` -
+// refused it. That is why this game had two asset roots: `moba/src/main/assets` held the migrated
+// corpus with its `character(...)` calls and could not be packed, and this root held the half that
+// could. `Character` is a `SpawnRecipe` now, so the two are one root and this is the half that
+// came back.
+//
+// `size` is left at its default: this game's world scale is per *sheet* (`wizardScale` below),
+// because the frames differ in how much transparent margin they carry, and a second scale on the
+// character that no renderer reads would be decoration.
+
+character(
+    name = "wizard",
+    health = 50F,
+    spriteAnimationSet = reference("character/wizard_animation_set"),
+    animationMap = mapOf(
+        "idle" to reference("character/wizard_idle"),
+        "walk" to reference("character/wizard_walk"),
+        "attack" to reference("character/wizard_attack"),
+        "hit" to reference("character/wizard_hit"),
+        "death" to reference("character/wizard_death"),
+    ),
+    sounds = mapOf(
+        "attack" to reference("sounds/melee_swoosh"),
+        "hit" to reference("sounds/hurt"),
+        "death" to reference("sounds/death"),
+    ),
+    attributes = mapOf(
+        "health" to 50F,
+        "mana" to 100F,
+        "strength" to 10F,
+    ),
+    abilitySpecs = {
+        abilitySpec(ability = reference("ability/npc_melee"), tags = listOf("Slot.A"))
+    },
+    components = {
+        component("dev.wildware.moba.Position")
+        component("dev.wildware.moba.level.GameUnit")
+        component("dev.wildware.moba.CharacterView")
+    },
+)

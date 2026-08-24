@@ -1,6 +1,21 @@
 package dev.wildware.udea.assets.compiler
 
+import dev.wildware.udea.assets.Ability
 import dev.wildware.udea.assets.AssetData
+import dev.wildware.udea.assets.Axis2D
+import dev.wildware.udea.assets.Axis2DBinding
+import dev.wildware.udea.assets.Binding
+import dev.wildware.udea.assets.Blueprint
+import dev.wildware.udea.assets.Character
+import dev.wildware.udea.assets.Control
+import dev.wildware.udea.assets.Effect
+import dev.wildware.udea.assets.GameConfig
+import dev.wildware.udea.assets.GameplayEffect
+import dev.wildware.udea.assets.Level
+import dev.wildware.udea.assets.SoundCue
+import dev.wildware.udea.assets.SpriteAnimation
+import dev.wildware.udea.assets.SpriteAnimationSet
+import dev.wildware.udea.assets.SpriteSheet
 import dev.wildware.udea.diagnostics.assets.AssetCatalog
 import dev.wildware.udea.diagnostics.assets.AssetCatalogEntry
 import kotlin.reflect.KClass
@@ -32,14 +47,18 @@ import kotlin.reflect.KClass
  *
  * ## `null` is a real answer
  *
- * [Unpublishable] exists because the provisional DSL in [AssetScope] declares kinds the runtime
- * model has no type for - `character` is the live example - and the honest treatment of one is
- * a named diagnostic rather than an invented FQN. An entry in a compile classpath's catalog is
- * a promise that a class of that name exists for the checker to resolve; writing
- * `dev.wildware.udea.assets.Character` because the DSL function is called `character` would
- * make the checker go quiet on every reference to it (an unresolvable kind is a silent case by
- * contract), which is worse than the declaration being absent, because it is absent *and*
- * reported as present.
+ * [Unpublishable] exists because a **game declares its own kinds** - `asset("particle", ...)`,
+ * the generic escape - and the honest treatment of one is a named diagnostic rather than an
+ * invented FQN. An entry in a compile classpath's catalog is a promise that a class of that name
+ * exists for the checker to resolve; writing `dev.wildware.udea.assets.Particle` because the DSL
+ * word is `particle` would make the checker go quiet on every reference to it (an unresolvable
+ * kind is a silent case by contract), which is worse than the declaration being absent, because
+ * it is absent *and* reported as present.
+ *
+ * `character`, `gameplayEffect` and `effect` used to be the live examples. They are
+ * [Declared] now - [dev.wildware.udea.assets.Character],
+ * [dev.wildware.udea.assets.GameplayEffect] and [dev.wildware.udea.assets.Effect] - and the
+ * argument above is exactly why the fix was to *add the types* rather than to name them anyway.
  */
 public sealed interface AssetKind {
 
@@ -65,6 +84,76 @@ public sealed interface AssetKind {
     public companion object {
         /** The kind of the [AssetData] subtype [T]. */
         public inline fun <reified T : AssetData> of(): AssetKind = Declared(T::class)
+    }
+}
+
+/**
+ * Which declared kinds may be stored in a slot that declares another.
+ *
+ * ## Why this is one object and not a comparison at each site
+ *
+ * Two passes decide "is this reference the right kind": [dev.wildware.udea.assets.compiler.validate.ReferenceTypeValidator]
+ * (pass 3, which reports `UDEA0013`) and `GraphPacker` (pass 4, which reports the same rule and
+ * then *drops the field*). They must agree exactly - a pass-4 drop that pass 3 did not report is
+ * a bundle silently missing a reference the build called clean - and until this object existed
+ * they agreed only because both spelled `actual == expected`.
+ *
+ * That spelling was also the bug. `EntityDefinition.blueprint` is a
+ * `Ref<dev.wildware.udea.assets.SpawnRecipe>`, satisfied by both `Blueprint` and [Character], so
+ * exact equality reported every entity in a migrated level as a kind mismatch and packed a level
+ * with no entities in it.
+ *
+ * ## Names, not classes
+ *
+ * A kind crosses the worker boundary as a fully qualified **name**, and a game's own kind is a
+ * name this module cannot load. So assignability is a lookup, derived from the engine's own
+ * classes - nothing is transcribed, so a type that grows an interface cannot forget to appear
+ * here - and a name that is not the engine's satisfies only itself. That is the conservative
+ * answer: accepting an unknown reference would move the failure to bundle-open time, where
+ * `AssetRegistry` refuses it with the game already running.
+ */
+public object AssetKindHierarchy {
+
+    /** Every [AssetData] type this module can name, by fully qualified name. */
+    public val KNOWN: Map<String, KClass<out AssetData>> = listOf(
+        SpriteSheet::class,
+        SoundCue::class,
+        SpriteAnimation::class,
+        SpriteAnimationSet::class,
+        Blueprint::class,
+        Level::class,
+        GameConfig::class,
+        Control::class,
+        Axis2D::class,
+        Binding::class,
+        Axis2DBinding::class,
+        Ability::class,
+        Character::class,
+        GameplayEffect::class,
+        Effect::class,
+    ).associateBy { requireNotNull(it.qualifiedName) }
+
+    /** For each known kind, every name it is also an instance of. */
+    private val assignable: Map<String, Set<String>> =
+        KNOWN.mapValues { (_, type) -> supertypesOf(type.java) }
+
+    /**
+     * Whether a declaration of kind [actual] may be stored in a slot declared as [wanted].
+     *
+     * `null` on either side is `false` from this function's point of view and **silence** at
+     * both call sites: a slot that constrains nothing and a target with no runtime kind are
+     * cases neither pass may invent an answer for, so each returns before asking.
+     */
+    public fun satisfies(actual: String?, wanted: String?): Boolean = when {
+        actual == null || wanted == null -> false
+        actual == wanted -> true
+        else -> wanted in assignable[actual].orEmpty()
+    }
+
+    private fun supertypesOf(type: Class<*>): Set<String> = buildSet {
+        add(type.name)
+        type.interfaces.forEach { addAll(supertypesOf(it)) }
+        type.superclass?.let { addAll(supertypesOf(it)) }
     }
 }
 

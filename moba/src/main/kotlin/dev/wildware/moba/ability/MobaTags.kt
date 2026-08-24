@@ -15,7 +15,7 @@ import dev.wildware.udea.gas.GameplayTagTable
  * - is an `and` of two longs. The vocabulary is unchanged; only its representation is.
  *
  * The names carry the old enum's own dots (`Debuffs.Stunned`, not `Stunned`), because the
- * migrated `.udea.kts` corpus under `src/main/assets` writes them that way and an asset that says
+ * `.udea.kts` corpus under `assets/` writes them that way and an asset that says
  * `blockedBy = listOf("Debuffs.Stunned")` has to resolve against this table when #84 wires the
  * corpus to the runtime. Getting that string wrong today is a `NoSuchTagException` at boot rather
  * than a tag that silently never matches.

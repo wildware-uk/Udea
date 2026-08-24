@@ -8,12 +8,15 @@ spriteAnimation(name = "orc_walk_anim", sheet = reference("character/orc_walk"),
 
 soundCue(name = "orc_attack_cue", pitchVariance = 0.8f, volume = 0.5f, sounds = listOf("/sounds/orc/attack.ogg"))
 
-// A kind the runtime has no type for. It stays in the graph and reads back as an OpaqueAsset;
-// nothing typed references it, which is what keeps this corpus kind-correct.
 character(
     name = "orc",
     size = 0.3f,
     health = 500f,
-    animations = listOf(reference("character/orc_idle_anim")),
+    animationMap = mapOf("idle" to reference("character/orc_idle_anim")),
     sounds = mapOf("attack" to reference("character/orc_attack_cue")),
 )
+
+// A kind the runtime has no type for: the `asset(kind, ...)` escape a game declares its own
+// kinds through. It stays in the graph and reads back as an `OpaqueAsset` with its fields intact;
+// nothing typed references it, which is what keeps this corpus kind-correct.
+asset("particle", "orc_dust", "lifetime" to 1.5f)

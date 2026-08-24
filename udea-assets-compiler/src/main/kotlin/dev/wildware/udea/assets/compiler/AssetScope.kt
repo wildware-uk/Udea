@@ -5,10 +5,14 @@ import dev.wildware.udea.assets.Axis2D
 import dev.wildware.udea.assets.Axis2DBinding
 import dev.wildware.udea.assets.Binding
 import dev.wildware.udea.assets.Blueprint
+import dev.wildware.udea.assets.Character
 import dev.wildware.udea.assets.Control
+import dev.wildware.udea.assets.Effect
 import dev.wildware.udea.assets.GameConfig
+import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.SoundCue
+import dev.wildware.udea.assets.SpawnRecipe
 import dev.wildware.udea.assets.SpriteAnimation
 import dev.wildware.udea.assets.SpriteAnimationSet
 import dev.wildware.udea.assets.SpriteSheet
@@ -43,10 +47,12 @@ public data class Ref(
      * that states what belongs there. There is no table of DSL word to type to keep in step,
      * which is the only reason it will stay in step - the same argument [AssetKind] makes.
      *
-     * `null` is a real answer and not a gap to be filled in later: `gameConfig`'s
-     * `defaultCharacter` points at a `character`, and [AssetKind.Unpublishable] means there is
-     * no runtime type to compare against. [dev.wildware.udea.assets.compiler.validate.ReferenceTypeValidator]
-     * stays silent there rather than inventing one.
+     * `null` is a real answer and not a gap to be filled in later: a reference passed to
+     * `asset(kind, ...)`, the escape a game declares its own kinds through, lands in a slot no
+     * signature constrains. [dev.wildware.udea.assets.compiler.validate.ReferenceTypeValidator]
+     * stays silent there rather than inventing an expectation. `gameConfig`'s `defaultCharacter`
+     * used to be the example and is not one any more: it is stamped
+     * [dev.wildware.udea.assets.SpawnRecipe], which `character` and `blueprint` both satisfy.
      */
     public val expected: String? = null,
 ) {
@@ -229,6 +235,10 @@ public object UdeaBuildContext {
  * and are deliberately narrow: this module needed *a* receiver to compile scripts against
  * before #84 landed one, and inventing a wide DSL here would be inventing the thing #84 is
  * for. See the report for the seam.
+ *
+ * What is **no longer** provisional is the set of kinds with a runtime type behind them. Every
+ * word below except [asset] now yields a real [dev.wildware.udea.assets.AssetData], so a
+ * declaration made through this receiver packs, decodes and gets a generated accessor.
  */
 public class AssetScope(
     /**
@@ -331,13 +341,29 @@ public class AssetScope(
         )
 
     /**
-     * A character: a blueprint with animation, audio, attribute and ability wiring.
+     * A character: a spawn recipe with animation, audio, attribute and ability wiring.
      *
-     * Still [AssetKind.Unpublishable]: `udea-assets` has no `Character`, and the old DSL's
-     * `character(...)` returned a `Blueprint` only because it inlined a fixed component list at
-     * *build* time. Claiming `Blueprint` here would put an id in the compile-time catalog whose
-     * fields are not a `Blueprint`'s, which `AssetKind`'s KDoc calls out as worse than absence.
-     * Closing it is issue #84's remaining half.
+     * ## It is a published kind now, and what that closes
+     *
+     * This declaration was [AssetKind.Unpublishable] until [Character] existed, and the cost was
+     * not the missing accessor. `EntityDefinition.blueprint` was a `Ref<Blueprint>`, so a level
+     * whose entities named `character/...` - which is every entity in the migrated
+     * `level/test_level`, because the old DSL's `character(...)` *returned* a `Blueprint` - packed
+     * with all twenty-seven references reported as `UDEA0013` and **dropped**. The bundle held a
+     * level that spawned nothing, which is why this game shipped a second, hand-reduced asset root.
+     *
+     * [Character] is a [SpawnRecipe] and so is `Blueprint`, and the entity slot takes the
+     * supertype, so `reference("character/orc")` in a level is accepted and
+     * `reference("character/orc_idle_sheet")` is still `UDEA0013`. Claiming `Blueprint` here
+     * instead - the other way to make those references type-check - is what `AssetKind`'s KDoc
+     * calls worse than absence: it would put an id in the compile-time catalog whose fields are
+     * not a `Blueprint`'s.
+     *
+     * ## The ordered `animations` list is gone
+     *
+     * It said the same thing as [spriteAnimationSet] - "these animations, in this order" - and
+     * nothing read it. [animationMap] is the half that carries information a set cannot:
+     * *which* of them is the walk.
      *
      * @param animationMap role (`idle`, `walk`, `attack`, ...) to the animation played for it.
      *   References, not the bare name strings the old `gameUnitAnimations` took, so a role
@@ -351,32 +377,35 @@ public class AssetScope(
         name: String,
         size: Float = 1f,
         health: Float = 100f,
-        animations: List<Ref> = emptyList(),
-        sounds: Map<String, Ref> = emptyMap(),
         spriteAnimationSet: Ref? = null,
         animationMap: Map<String, Ref> = emptyMap(),
+        sounds: Map<String, Ref> = emptyMap(),
         attributes: Map<String, Float> = emptyMap(),
         tags: List<String> = emptyList(),
         abilitySpecs: AbilitySpecScope.() -> Unit = {},
         components: ComponentScope.() -> Unit = {},
     ): Unit = declare(
-        // No runtime kind: `udea-assets` has no `Character`. Reported by `AssetGraph.toCatalog`
-        // rather than guessed at - see `AssetKind.Unpublishable`.
-        AssetKind.Unpublishable("character"),
+        AssetKind.of<Character>(),
         "character",
         name,
         "size" to size,
         "health" to health,
-        "animations" to animations.map { it.expecting<SpriteAnimation>() },
-        "sounds" to sounds.mapValues { it.value.expecting<SoundCue>() },
         "spriteAnimationSet" to spriteAnimationSet?.expecting<SpriteAnimationSet>(),
         "animationMap" to animationMap.mapValues { it.value.expecting<SpriteAnimation>() },
+        "sounds" to sounds.mapValues { it.value.expecting<SoundCue>() },
         "attributes" to LinkedHashMap(attributes),
         "tags" to tags,
         "abilitySpecs" to AbilitySpecScope().apply(abilitySpecs).build(),
         "components" to ComponentScope().apply(components).build(),
     )
 
+    /**
+     * A recipe named by its components alone.
+     *
+     * [parent] takes a `SpawnRecipe` rather than a `Blueprint` because the migrated corpus's
+     * `blueprint/player` inherits `character/orc_elite` - that is what "the player *is* the elite"
+     * was spelled as - and a character is a spawn recipe.
+     */
     public fun blueprint(
         name: String = defaultName,
         parent: Ref? = null,
@@ -386,7 +415,7 @@ public class AssetScope(
             AssetKind.of<Blueprint>(),
             "blueprint",
             name,
-            "parent" to parent?.expecting<Blueprint>(),
+            "parent" to parent?.expecting<SpawnRecipe>(),
             "components" to components,
         )
 
@@ -405,7 +434,7 @@ public class AssetScope(
         AssetKind.of<Blueprint>(),
         "blueprint",
         name,
-        "parent" to parent?.expecting<Blueprint>(),
+        "parent" to parent?.expecting<SpawnRecipe>(),
         "components" to ComponentScope().apply(components).build(),
     )
 
@@ -418,7 +447,7 @@ public class AssetScope(
         "level",
         name,
         "systems" to systems,
-        "entities" to entities.map { it.expecting<Blueprint>() },
+        "entities" to entities.map { it.expecting<SpawnRecipe>() },
     )
 
     /**
@@ -441,9 +470,10 @@ public class AssetScope(
     )
 
     /**
-     * `defaultCharacter` is deliberately **not** stamped with an expected kind: it points at a
-     * `character`, which is [AssetKind.Unpublishable], so there is no `AssetData` type to
-     * compare a resolved declaration against. See [Ref.expected].
+     * `defaultCharacter` is stamped [SpawnRecipe] and not `Blueprint`, because both corpora point
+     * it at one of the two: `moba/assets/config.udea.kts` names a `blueprint/` and the migrated
+     * one names a `blueprint/player` that inherits a `character/`. Widening it is not a loosening
+     * - a `soundCue` there is still `UDEA0013` - it is naming what the field always meant.
      */
     public fun gameConfig(
         name: String = defaultName,
@@ -454,7 +484,7 @@ public class AssetScope(
         AssetKind.of<GameConfig>(),
         "gameConfig",
         name,
-        "defaultCharacter" to defaultCharacter,
+        "defaultCharacter" to defaultCharacter.expecting<SpawnRecipe>(),
         "defaultLevel" to defaultLevel?.expecting<Level>(),
         "physics" to physics,
     )
@@ -513,8 +543,9 @@ public class AssetScope(
      * The old scripts wrote `exec = UnitMeleeAttack::class`, which put a game class on the
      * asset compile classpath and made an asset edit depend on the game compiling.
      *
-     * [cooldown] and [costs] are not stamped with an expected kind: they point at
-     * `gameplayEffect`, which has no runtime type until `udea-gas` declares one.
+     * [cooldown] and [costs] point at `gameplayEffect`, which is [GameplayEffect] now, so they
+     * are stamped with it - a cooldown pointing at a sprite sheet is `UDEA0013` at build time
+     * rather than a cast failure at load time.
      */
     public fun ability(
         name: String,
@@ -535,8 +566,8 @@ public class AssetScope(
         "exec" to exec,
         "display" to display,
         "params" to LinkedHashMap(params),
-        "cooldown" to cooldown,
-        "costs" to costs,
+        "cooldown" to cooldown?.expecting<GameplayEffect>(),
+        "costs" to costs.map { it.expecting<GameplayEffect>() },
         "blockedBy" to blockedBy,
         "tags" to tags,
         "setByCaller" to LinkedHashMap(setByCaller),
@@ -547,9 +578,11 @@ public class AssetScope(
     /**
      * One gameplay effect.
      *
-     * [AssetKind.Unpublishable]: `udea-gas` is an empty module and there is no `GameplayEffect`
-     * type to name. The declaration is packed under its DSL word and read back as an opaque
-     * asset, which loses nothing and pretends nothing.
+     * [GameplayEffect] is the authored record - names where `udea-gas`'s `GameplayEffectDef` has
+     * interned ids, and seconds where it has ticks. It is in `udea-assets` beside [ability]
+     * rather than in `udea-gas` because an interned `AttributeId` and a `TagSet` are results of
+     * a game's tag and attribute tables, so they cannot be what a `.udea.kts` declares and cannot
+     * be decoded from a bundle without one.
      */
     public fun gameplayEffect(
         name: String,
@@ -561,7 +594,7 @@ public class AssetScope(
         cues: List<String> = emptyList(),
         tags: List<String> = emptyList(),
     ): Unit = declare(
-        AssetKind.Unpublishable("gameplayEffect"),
+        AssetKind.of<GameplayEffect>(),
         "gameplayEffect",
         name,
         "effectDuration" to effectDuration,
@@ -593,8 +626,9 @@ public class AssetScope(
     /**
      * A short-lived visual: an animation set, which of its animations to play, and for how long.
      *
-     * A game kind, not an engine one - the old tree declared it in
-     * `example/.../assets/effect.kt` - so it is [AssetKind.Unpublishable] like `character`.
+     * A game kind in the old tree - it was declared in `example/.../assets/effect.kt` - and an
+     * engine one here, for [character]'s reason: unpublished, `effects/heal_effect` packed as an
+     * opaque record and no loader could find the priest's heal art by type.
      */
     public fun effect(
         name: String,
@@ -602,7 +636,7 @@ public class AssetScope(
         animation: String,
         duration: Float,
     ): Unit = declare(
-        AssetKind.Unpublishable("effect"),
+        AssetKind.of<Effect>(),
         "effect",
         name,
         "animationSet" to animationSet.expecting<SpriteAnimationSet>(),
@@ -778,11 +812,12 @@ public class EntityScope internal constructor() {
     private val entities = mutableListOf<Map<String, Any?>>()
 
     /**
-     * One entity: which blueprint it instantiates, what is added on top, and where it starts.
+     * One entity: which recipe it instantiates, what is added on top, and where it starts.
      *
-     * [blueprint] is not stamped with an expected kind because the corpus points these at
-     * `character(...)` declarations, which have no runtime type. That is the same gap
-     * `ReferenceTypeValidator` documents, not a new one.
+     * [blueprint] is stamped `SpawnRecipe` and not `Blueprint`: the corpus points these at
+     * `character(...)` declarations, which the old DSL turned into blueprints at build time, and
+     * both kinds are `SpawnRecipe`s. This is the one stamp that decides whether a migrated level
+     * packs with its entities or with twenty-seven dropped references.
      */
     public fun entity(
         name: String,
@@ -793,7 +828,7 @@ public class EntityScope internal constructor() {
     ) {
         entities += linkedMapOf<String, Any?>(
             "name" to name,
-            "blueprint" to blueprint,
+            "blueprint" to blueprint?.expecting<SpawnRecipe>(),
             "position" to position,
             "tags" to tags,
             "components" to ComponentScope().apply(components).build(),

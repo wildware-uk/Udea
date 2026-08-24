@@ -159,6 +159,19 @@ public class MatchSystem(
         with(world) {
             while (index < entities.size) {
                 val entity: Entity = entities[index]
+                // Creeps do not hold a side up. A MOBA match is decided by champions and
+                // structures, and a lane that sends three creeps a side every ten seconds
+                // would otherwise mean neither of the two lane teams can ever reach zero -
+                // so every match would run to `MatchRules.MATCH_LIMIT_TICKS` and be settled
+                // on a head count that says nothing about who was winning. Skipping them
+                // here rather than spawning them without a team keeps `GameUnit.team` and
+                // `Combatant.teamId` in agreement, which is the invariant `MobaIntegrationTest`
+                // pins and the one that decides whether a unit walks toward one enemy and
+                // swings at another.
+                if (dev.wildware.moba.lane.LaneCreep in entity) {
+                    index++
+                    continue
+                }
                 when (entity[GameUnit].team) {
                     Team.ORC -> orc++
                     Team.SOLDIER -> soldier++

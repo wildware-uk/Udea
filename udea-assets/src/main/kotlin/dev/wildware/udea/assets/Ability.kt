@@ -19,12 +19,14 @@ public data class AbilityDisplay(
  *
  * ## The effect references
  *
- * [cooldown] and [costs] are `Ref<*>` rather than `Ref<GameplayEffect>` because the effect kind
- * belongs to `udea-gas`, which depends on this module and not the other way round. The star is
- * only the *static* half: `reference<GameplayEffect>("...")` still records `GameplayEffect::class`
- * in [Ref.expected], so resolution still type-checks exactly, and the build-time validator checks
- * the target kind besides. When `udea-gas` declares the kind, these narrow to `Ref<GameplayEffect>`
- * with no change at any call site.
+ * [cooldown] and [costs] are `Ref<*>` rather than `Ref<GameplayEffect>`, and the reason has
+ * changed. It used to be that the effect kind "belongs to `udea-gas`"; it does not - what belongs
+ * there is `GameplayEffectDef`, which holds interned ids only a running game has - and
+ * [GameplayEffect] is declared in this module beside this class. What keeps the star is narrower:
+ * these two are the fields a *game's own* effect kind would land in, and `AssetCodecs` binds them
+ * with `GameplayEffect::class` today. The star is only the *static* half:
+ * `reference<GameplayEffect>("...")` records `GameplayEffect::class` in [Ref.expected], so
+ * resolution type-checks exactly, and the build-time validator checks the target kind besides.
  */
 public data class Ability(
     override val id: AssetId,

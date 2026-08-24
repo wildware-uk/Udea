@@ -21,6 +21,7 @@ import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.render.OffscreenTarget
+import dev.wildware.moba.lane.LaneRenderSystem
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderPipeline
 import dev.wildware.udea.render.RenderRegistry
@@ -182,10 +183,19 @@ public class MobaScene private constructor(
                 RenderPhase.World,
                 { resources -> BackgroundRenderSystem(resources, camera) },
             )
+            // The lane and its towers, over the ground and under everything alive. There is no
+            // structure art in this repository, so `LaneRenderSystem` draws shapes; see its
+            // KDoc. It is constrained `after(ground)` and the characters are constrained after
+            // *it*, so a creep walking past a tower is drawn in front of it rather than behind
+            // whichever of the two happened to be registered second.
+            val lane = registry.register(
+                RenderPhase.World,
+                { resources -> LaneRenderSystem(resources, camera) },
+            ) { after(ground) }
             val characters = registry.register(
                 RenderPhase.World,
                 { resources -> CharacterRenderSystem(resources, camera) },
-            ) { after(ground) }
+            ) { after(lane) }
             // Arrows and flashes over bodies. A second pass and not a wider family on the first:
             // `CharacterView` indexes the `CharacterRoster`, which refuses anything short of the
             // five `UnitState`s, and an arrow has one frame and no states. See `MobaVfx.kt`.

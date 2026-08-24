@@ -115,6 +115,8 @@ class BundleRoundTripTest {
             is Level -> asset.entities.mapNotNull { it.blueprint }
             is dev.wildware.udea.assets.SpriteAnimation -> listOf(asset.sheet)
             is dev.wildware.udea.assets.SpriteAnimationSet -> asset.animations
+            is dev.wildware.udea.assets.Character ->
+                asset.animations.values + asset.sounds.values + listOfNotNull(asset.animationSet)
             else -> emptyList()
         }
 
@@ -152,22 +154,52 @@ class BundleRoundTripTest {
     /**
      * A kind the runtime has no type for is readable, not lost and not fatal.
      *
-     * `character` is the live example: `AssetScope` declares it, `udea-assets` has no
-     * `Character`, and `AssetKind.Unpublishable` refuses to guess one. The fields still arrive.
+     * The `asset(kind, ...)` escape is the live example: a game declares its own kinds, so
+     * `udea-assets` cannot have a type for them and `AssetKind.Unpublishable` refuses to guess
+     * one. The fields still arrive.
      */
     @Test
     fun `an unpublishable kind reads back as an OpaqueAsset with its fields intact`() {
         bundle().use { bundle ->
-            val orc = assertIs<OpaqueAsset>(bundle.registry.find(AssetId("character/orc")))
+            val dust = assertIs<OpaqueAsset>(bundle.registry.find(AssetId("character/orc_dust")))
 
-            assertEquals("character", orc.kind)
-            assertTrue("health" in orc.fields, "the fields of an opaque asset are kept")
+            assertEquals("particle", dust.kind)
+            assertTrue("lifetime" in dust.fields, "the fields of an opaque asset are kept")
             assertEquals(
-                dev.wildware.udea.assets.AssetValue.FloatValue(500F),
-                orc.fields["health"],
+                dev.wildware.udea.assets.AssetValue.FloatValue(1.5F),
+                dust.fields["lifetime"],
             )
-            val animations = assertIs<dev.wildware.udea.assets.AssetValue.ListValue>(orc.fields["animations"])
-            assertEquals(1, animations.values.size, "orc names one animation")
+        }
+    }
+
+    /**
+     * And the kind that *stopped* being opaque comes back typed, with its role map intact.
+     *
+     * This is the assertion the twenty-seven dropped entity references were the absence of: a
+     * `character(...)` is a `Character`, a `Character` is a `SpawnRecipe`, and the role -> animation
+     * map the old id-suffix convention stood in for is a real `Ref<SpriteAnimation>` per role.
+     */
+    @Test
+    fun `a character comes back typed, with its animation roles and sounds bound`() {
+        bundle().use { bundle ->
+            val orc = bundle.registry[reference<dev.wildware.udea.assets.Character>("character/orc")]
+
+            assertEquals(0.3F, orc.size)
+            assertEquals(500F, orc.health)
+            assertEquals(
+                mapOf("idle" to AssetId("character/orc_idle_anim")),
+                orc.animations.mapValues { it.value.id },
+            )
+            assertEquals(
+                mapOf("attack" to AssetId("character/orc_attack_cue")),
+                orc.sounds.mapValues { it.value.id },
+            )
+            // Resolving the role goes through the registry with no string lookup, which is the
+            // whole point of the reference being typed rather than a name in an id suffix.
+            assertEquals(
+                AssetId("character/orc_idle_anim"),
+                bundle.registry[orc.animations.getValue("idle")].id,
+            )
         }
     }
 

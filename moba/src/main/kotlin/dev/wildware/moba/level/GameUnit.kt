@@ -140,7 +140,7 @@ public object Team {
  * game's world units (a unit sprite is about fifty of them across; the old one was about one).
  *
  * They are Kotlin constants rather than authored asset fields for one honest reason: the
- * authored `character` kind is `AssetKind.Unpublishable`, so a character's attribute map cannot
+ * authored `character` kind was `AssetKind.Unpublishable`, so a character's attribute map could not
  * be packed into a `.udeapak` yet and a game that read its stats from one would not boot. The
  * level *roster* is authored and load-bearing (see [TestLevelScene]); the stats are not, yet.
  *

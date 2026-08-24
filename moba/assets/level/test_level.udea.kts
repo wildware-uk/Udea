@@ -12,6 +12,16 @@
 //     `MobaModule` owns that now, once, for every scene - which is what makes "the server, the
 //     client and the agent run the identical Simulation" a checkable sentence.
 //
+// A third difference, and the one this file changes with the two asset roots becoming one: every
+// entity names a **`character/`** and not a `blueprint/`. That is what the migrated corpus wrote,
+// because the old DSL's `character(...)` returned a blueprint - and it is what packing that corpus
+// could not do, because `EntityDefinition.blueprint` was a `Ref<Blueprint>` and `character` had no
+// runtime type at all. All twenty-seven references were reported `UDEA0013` and dropped, so the
+// bundle held a level that spawned nothing and this game shipped a second, reduced asset root with
+// six `blueprint(...)` stand-ins in it. `Character` is a `SpawnRecipe` now, the stand-ins are gone
+// with `blueprint/units.udea.kts`, and the roster is declared once - beside the art and the stats
+// it wears, in `character/`.
+//
 //   * **No `Random.nextFloat()`.** The source scattered every unit at pack time, so two builds of
 //     identical sources produced different packs; `DeterminismValidator` bans the name outright
 //     (UDEA0034). The positions below are the *cluster centres*, and the scatter around them is
@@ -49,27 +59,27 @@ level(
         // `Team.ORC` because `MobaBlueprints` reads the side off the kind rather than off the
         // entity - so a game now begins with one elite and four orcs against eleven soldiers, a
         // priest, a wizard and ten skeletons.
-        entity(name = "player", blueprint = reference("blueprint/orc_elite"), position = orcClearing)
+        entity(name = "player", blueprint = reference("character/orc_elite"), position = orcClearing)
 
-        entity(name = "priest", blueprint = reference("blueprint/priest"), position = priestPost)
+        entity(name = "priest", blueprint = reference("character/priest"), position = priestPost)
 
         // The wizard. Its art was packed and unreachable for the same reason the elite's was; the
         // sheets are the corrected ones (`orc.udea.kts`' sibling `wizard.udea.kts` explains why
         // the source corpus' wizard pointed at priest PNGs and was invisible).
-        entity(name = "wizard", blueprint = reference("blueprint/wizard"), position = soldierCamp)
+        entity(name = "wizard", blueprint = reference("character/wizard"), position = soldierCamp)
 
         // Four, not five. The player took the fifth orc's place in the clearing as an elite, so
         // `Team.ORC` still fields five bodies - which is what `MobaLevelTest` counts, and it
         // counts the *team* rather than the blueprint precisely so a roster can be recomposed
         // without the test becoming a list of blueprint names.
         repeat(4) {
-            entity(name = "orc_$it", blueprint = reference("blueprint/orc"), position = orcClearing)
+            entity(name = "orc_$it", blueprint = reference("character/orc"), position = orcClearing)
         }
 
         repeat(10) {
             entity(
                 name = "skeleton_$it",
-                blueprint = reference("blueprint/skeleton"),
+                blueprint = reference("character/skeleton"),
                 position = skeletonCamp,
             )
         }
@@ -77,7 +87,7 @@ level(
         repeat(10) {
             entity(
                 name = "soldier_$it",
-                blueprint = reference("blueprint/soldier"),
+                blueprint = reference("character/soldier"),
                 position = soldierCamp,
             )
         }

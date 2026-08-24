@@ -15,7 +15,12 @@ package dev.wildware.udea.assets
 public data class EntityDefinition(
     /** A human-readable label for diagnostics and for the agent's `list_entities`. */
     public val name: String = "Entity",
-    public val blueprint: Ref<Blueprint>? = null,
+    /**
+     * What to build it from: a [Blueprint], or a [Character], or any other [SpawnRecipe] a game
+     * declares. Widened from `Ref<Blueprint>` deliberately - see [SpawnRecipe] for the twenty-seven
+     * dropped references that were the cost of the narrower type.
+     */
+    public val blueprint: Ref<SpawnRecipe>? = null,
     public val components: List<ComponentSpec> = emptyList(),
     public val tags: List<EntityTagName> = emptyList(),
     /** Where to put it, or `null` to leave the blueprint's own placement alone. */

@@ -70,12 +70,16 @@ class AccessorGeneratorTest {
 
         val text = fileNamed(files, "CharacterAssets").text
 
-        // `character(name = "orc")` -> id `character/orc` -> member `orc`, which must not exist.
+        // `asset("particle", "orc_dust")` -> id `character/orc_dust` -> member `orcDust`, which
+        // must not exist: a game declares its own kinds and this module has no type for one.
         assertTrue(
-            Regex("""val orc\s*:""").find(text) == null,
-            "`character/orc` has no AssetData type, so it must not be given an accessor:\n$text",
+            Regex("""val orcDust\s*:""").find(text) == null,
+            "`character/orc_dust` has no AssetData type, so it must not be given an accessor:\n$text",
         )
         assertTrue("orcIdle" in text, "its siblings are still generated")
+        // And the kind that *did* acquire a type does get one, which is the other half of the
+        // claim: absent because there is no type, not absent because the generator skipped it.
+        assertTrue(Regex("""val orc\s*:""").containsMatchIn(text), "`character/orc` is a Character")
     }
 
     @Test

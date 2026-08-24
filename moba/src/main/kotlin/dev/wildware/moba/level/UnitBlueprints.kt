@@ -25,8 +25,8 @@ import dev.wildware.udea.core.serviceKey
  * level.
  *
  * So the roster is authored (`assets/level/test_level.udea.kts` says which unit stands where and
- * `assets/blueprint/units.udea.kts` declares the ids it names) and the *construction* is code. [MobaBlueprints.byAssetId] is the seam between the
- * two, and it is deliberately strict: an authored entity pointing at a blueprint id no code
+ * `assets/character/<name>.udea.kts` declares the ids it names, with the art and stats each wears) and
+ * the *construction* is code. [MobaBlueprints.byAssetId] is the seam between the two, and it is deliberately strict: an authored entity pointing at a blueprint id no code
  * blueprint answers to fails the scene swap loudly rather than spawning nothing and leaving the
  * level short of a unit nobody counted.
  */
@@ -35,7 +35,7 @@ public class UnitBlueprint(
     public val kind: UnitKind,
     /** Which side it spawns on. */
     public val team: Int,
-    /** The authored asset this answers to, e.g. `blueprint/orc`. */
+    /** The authored asset this answers to, e.g. `character/orc`. */
     public val assetId: AssetId,
     /** Where this unit's combat comes from. */
     private val combat: MobaAbilityModule,
@@ -96,29 +96,28 @@ public class UnitBlueprint(
 /**
  * Every unit the level can spawn, and the lookup from an authored id to the code that builds it.
  *
- * The ids are the ones `assets/blueprint/units.udea.kts` declares - one per character the art
- * tree packs, which is the invariant that broke once already: `orc_elite` and `wizard` were
- * declared, packed and cut into the atlas with no blueprint naming them, so no level could
- * have spawned either. Renaming one there without
- * renaming it here turns the scene swap red on the next boot with a message naming both sides,
- * which is the whole reason [byAssetId] refuses rather than skips.
+ * The ids are the ones `assets/character/` declares - one per character the art tree packs,
+ * which is the invariant that broke once already: `orc_elite` and `wizard` were declared, packed
+ * and cut into the atlas with nothing naming them, so no level could have spawned either.
+ * Renaming one there without renaming it here turns the scene swap red on the next boot with a
+ * message naming both sides, which is the whole reason [byAssetId] refuses rather than skips.
  */
 public class MobaBlueprints(
     /** The combat module these units draw their attributes, effects and abilities from. */
     private val combat: MobaAbilityModule,
 ) {
 
-    /** The player's soldier and the ten with it. `blueprint/soldier`. */
+    /** The player's soldier and the ten with it. `character/soldier`. */
     public val soldier: UnitBlueprint = build(UnitKind.Soldier, Team.SOLDIER)
 
-    /** `blueprint/priest`. On the soldiers' side, as it was in the old level. */
+    /** `character/priest`. On the soldiers' side, as it was in the old level. */
     public val priest: UnitBlueprint = build(UnitKind.Priest, Team.SOLDIER)
 
-    /** `blueprint/orc`. */
+    /** `character/orc`. */
     public val orc: UnitBlueprint = build(UnitKind.Orc, Team.ORC)
 
     /**
-     * `blueprint/orc_elite`, and the unit a human drives.
+     * `character/orc_elite`, and the unit a human drives.
      *
      * The old game's `blueprint/player` declared `inherits = reference("blueprint/orc_elite")`,
      * so the player *was* the elite. It is here for a reason beyond fidelity: `MobaUnits` grants
@@ -130,11 +129,11 @@ public class MobaBlueprints(
      */
     public val orcElite: UnitBlueprint = build(UnitKind.OrcElite, Team.ORC)
 
-    /** `blueprint/skeleton`. */
+    /** `character/skeleton`. */
     public val skeleton: UnitBlueprint = build(UnitKind.Skeleton, Team.UNDEAD)
 
     /**
-     * `blueprint/wizard`. On the soldiers' side, as `MobaUnits` declares it.
+     * `character/wizard`. On the soldiers' side, as `MobaUnits` declares it.
      *
      * The sixth character, and the second whose packed art nothing could name. It carries the
      * basic attack alone - `wizard.udea.kts` records that the source corpus' `ability/wizard_heal`
@@ -151,7 +150,13 @@ public class MobaBlueprints(
     private fun build(kind: UnitKind, team: Int): UnitBlueprint = UnitBlueprint(
         kind = kind,
         team = team,
-        assetId = AssetId("blueprint/${kind.character}"),
+        // `character/<name>`, not `blueprint/<name>`. The six `blueprint(...)` stand-ins in
+        // `assets/blueprint/units.udea.kts` existed only because `character` was an unpublishable
+        // kind, so a level could not name one: `EntityDefinition.blueprint` was a `Ref<Blueprint>`
+        // and packing the authored roster dropped all twenty-seven entity references. `Character`
+        // is a `SpawnRecipe` now, the stand-ins are deleted, and the id a level writes is the id
+        // of the thing that carries the art, the stats and the loadout.
+        assetId = AssetId("character/${kind.character}"),
         combat = combat,
         characterIndex = characterIndexOf(kind),
     )
@@ -178,7 +183,7 @@ public class MobaBlueprints(
      * Which [CharacterRoster] entry [kind] wears, as the index `CharacterView` stores.
      *
      * By name, because that is the one key all three halves share: a roster entry is named by its
-     * `character/<name>_animation_set` id, an authored blueprint is `blueprint/<name>`, and a
+     * `character/<name>_animation_set` id, an authored recipe is `character/<name>`, and a
      * combat kind is `MobaUnits.kinds`' `<name>`. The level, the art tree and the ability table
      * spell it the same way or this refuses.
      *

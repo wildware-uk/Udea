@@ -18,17 +18,17 @@ import kotlin.math.roundToLong
  * ## Why a suffix and not a map
  *
  * The old tree carried this as `character(animationMap = mapOf("idle" to reference(...)))`, and
- * that is the better spelling. It is not available: `character` is `AssetKind.Unpublishable`, so
- * a `character(...)` declaration packs as an opaque record with no runtime type and a game
- * cannot load a bundle whose units are opaque records (see `moba/assets/character/orc.udea.kts`).
- * `SpriteAnimationSet` - which *is* publishable - is an ordered list of references with no keys
- * on it at all.
+ * that is the better spelling. `character` is a published kind now, so the corpus carries it
+ * again - but this enum stays, because it is what the *renderer* resolves by: a
+ * `SpriteAnimationSet` is an ordered list of references with no keys on it at all, and
+ * [CharacterRoster] is built from the set.
  *
  * So the key is carried in the asset id: `character/orc_walk` is the `walk` of `orc`. That is a
  * convention rather than a type, and the honest cost is stated here rather than buried: nothing
  * in the compiler enforces it, so a misnamed animation is caught by [CharacterRoster]'s own
- * `require` at bundle-open time instead of by the asset validator at build time. It is checked
- * loudly and early, and it goes away when issue #84 gives `character` a runtime type.
+ * `require` at bundle-open time instead of by the asset validator at build time. What is no
+ * longer true is that the convention is the *only* statement of the fact: `MobaAuthoredContentTest`
+ * compares it against the authored `animationMap`, role for role, for all six characters.
  */
 public enum class UnitState(
     /** The last underscore-separated word of the animation's id. */
@@ -108,13 +108,16 @@ public class CharacterEntry(
  * animation's id suffix names the state it is for.
  *
  * That is a convention rather than a type, and the reason is worth stating rather than hiding:
- * `character(...)` - the declaration that carried the name, the animation map, the sounds, the
- * attributes and the ability list in one place - is `AssetKind.Unpublishable`, so it packs as an
- * opaque record with no runtime type and a game cannot load a bundle whose units are opaque
- * records. `spriteAnimationSet` is publishable and is an ordered list of references with no keys
- * on it at all. So the keys live in the ids, and this class checks them loudly at bundle-open
- * time instead of the asset validator checking them at build time. It goes away when issue #84
- * gives `character` a runtime type, and this class becomes a `registry[blueprint.character]`.
+ * `spriteAnimationSet` is an ordered list of references with no keys on it at all, so the keys
+ * live in the ids and this class checks them loudly at bundle-open time instead of the asset
+ * validator checking them at build time.
+ *
+ * `character(...)` - the declaration that carries the name, the animation map, the sounds, the
+ * attributes and the ability list in one place - *is* packed now, and says the same thing
+ * directly. Two statements of one fact is a thing to check rather than trust, so
+ * `MobaAuthoredContentTest` compares them; moving this class onto the authored map and deleting
+ * the convention is the next step and is deliberately not taken in the wave that published the
+ * kind.
  *
  * Adding a seventh character is therefore one file under `moba/assets/character/` and no Kotlin.
  * That is the property this class exists for; a `listOf("orc", "priest", ...)` here would have

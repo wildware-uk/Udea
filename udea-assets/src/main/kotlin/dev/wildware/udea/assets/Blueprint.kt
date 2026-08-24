@@ -43,15 +43,15 @@ public data class ComponentSpec(
 public data class Blueprint(
     override val id: AssetId,
     /** Every component, parents already flattened in, in application order. */
-    public val components: List<ComponentSpec> = emptyList(),
+    override val components: List<ComponentSpec> = emptyList(),
     /** Every Fleks tag, parents already flattened in. */
-    public val tags: List<EntityTagName> = emptyList(),
+    override val tags: List<EntityTagName> = emptyList(),
     /**
      * The parent chain this blueprint was flattened from, root first. Empty when it had no parent.
      * Provenance for diagnostics and for `describe_blueprint`; never walked at runtime.
      */
     public val inheritedFrom: List<AssetId> = emptyList(),
-) : AssetData {
+) : SpawnRecipe {
 
     init {
         require(id !in inheritedFrom) { "blueprint '$id' lists itself in its own parent chain" }

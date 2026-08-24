@@ -98,6 +98,7 @@ public object ModuleGraphRules {
         ":udea-gas",
         ":udea-gradle",
         ":udea-net",
+        ":udea-replay",
     )
 
     /**

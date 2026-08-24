@@ -51,6 +51,14 @@ gradlePlugin {
 dependencies {
     implementation(libs.kotlin.gradle.plugin)
 
+    // The bytecode reader behind `udeaVerifyDeterminism` (issue #150). `implementation`, not
+    // `testImplementation`: the scan runs inside a Gradle task, not inside a test JVM, which
+    // is the difference from `udea-render`'s `udeaVerifyHeadless` - that one is a Test task,
+    // so its ASM dependency is test-scoped there. Nothing this puts on a build-logic classpath
+    // reaches a shipped runtime classpath; `udeaVerifyRelease` (UDEA-REL-002) checks that
+    // independently.
+    implementation(libs.asm)
+
     // A third Kotlin version in this build, and a deliberate one.
     //
     // `kotlin-dsl` compiles build logic with the Kotlin the *Gradle distribution* embeds -

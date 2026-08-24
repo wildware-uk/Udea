@@ -57,7 +57,7 @@ tasks.withType<Test>().configureEach {
  *
  * A glob rather than a `listFiles()` scan so a module added later is covered without anyone
  * remembering this line. `.kts` is deliberately not matched: the asset corpus under
- * `moba/src/main/assets` is not Kotlin the rule reads.
+ * `moba/assets` is not Kotlin the rule reads.
  */
 val fieldMaskScanSources: ConfigurableFileTree = fileTree(rootProject.layout.projectDirectory) {
     include("udea-*/src/main/**/*.kt")

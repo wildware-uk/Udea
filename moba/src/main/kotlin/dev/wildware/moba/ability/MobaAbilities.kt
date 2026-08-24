@@ -9,8 +9,10 @@ import dev.wildware.udea.gas.value
 /**
  * Every ability in this game: its exec, its cooldown, its cost and what blocks it.
  *
- * Ported from `src/main/assets/ability/{npc_melee,orc_elite_abilities,priest_abilities,
- * soldier_abilities}.udea.kts`, one `ability(...)` call per [AbilityDef] here. Two differences
+ * Ported from `assets/ability/{npc_melee,orc_elite_abilities,priest_abilities,
+ * soldier_abilities}.udea.kts`, one `ability(...)` call per [AbilityDef] here - and those scripts
+ * are in the packed root now, so `MobaAuthoredContentTest` compares each cooldown below against
+ * the seconds the asset declares rather than leaving the two copies to drift. Two differences
  * from the corpus, both of which the corpus's own migration comments predicted:
  *
  * - **Cooldowns are ticks.** `setByCaller = mapOf("Data.Cooldown" to 0.8F)` was seconds; it is

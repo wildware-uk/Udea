@@ -21,7 +21,7 @@ import dev.wildware.udea.assets.Axis2DBinding as AuthoredAxis2DBinding
  * yet". That was not true when it was written. `AssetScope.control` declares
  * `AssetKind.of<Control>()` and `AssetScope.axis2DBinding` declares
  * `AssetKind.of<Axis2DBinding>()` - *published* kinds, unlike `character`, `gameplayEffect` and
- * `effect`, which are `AssetKind.Unpublishable` and are the real reason `src/main/assets` is a
+ * `effect`, which were `AssetKind.Unpublishable` and were the real reason `src/main/assets` was a
  * separate root. `AssetCodecs` has carried a reader and a writer for all four types, including the
  * `inputKind` discriminator that separates a `key(...)` from a `mouse(...)`, for as long as those
  * types have existed. Nothing had ever asked the packer to publish one, because this tree's only

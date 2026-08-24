@@ -280,6 +280,13 @@ class MobaIntegrationTest {
         val counts = IntArray(TEAMS)
         with(host.world) {
             host.world.family { all(GameUnit) }.forEach { entity ->
+                // Lane creeps are not the level's roster. `LaneModule` sends a wave of them
+                // every ten seconds and they carry a real `GameUnit` team, exactly as every other
+                // unit does, so a census that counted them would report the world growing and
+                // would say nothing about the twenty-seven units this test is about. Skipped here
+                // rather than spawned teamless, because `GameUnit.team` disagreeing with
+                // `Combatant.teamId` is the invariant this very file pins.
+                if (dev.wildware.moba.lane.LaneCreep in entity) return@forEach
                 val team = entity[GameUnit].team
                 if (team in counts.indices) counts[team]++
             }

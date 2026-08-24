@@ -6,8 +6,11 @@ import dev.wildware.udea.assets.Axis2D
 import dev.wildware.udea.assets.Axis2DBinding
 import dev.wildware.udea.assets.Binding
 import dev.wildware.udea.assets.Blueprint
+import dev.wildware.udea.assets.Character
 import dev.wildware.udea.assets.Control
+import dev.wildware.udea.assets.Effect
 import dev.wildware.udea.assets.GameConfig
+import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpriteAnimation
@@ -33,8 +36,8 @@ import kotlin.reflect.KClass
  *
  * ## A word missing from this table is not an error
  *
- * `character` and anything declared through `asset(kind, ...)` have no runtime type - see
- * `AssetKind.Unpublishable`. They get no generated accessor, which is the honest outcome:
+ * Anything declared through `asset(kind, ...)`, the generic escape, has no runtime type - see
+ * `AssetKind.Unpublishable`. It gets no generated accessor, which is the honest outcome:
  * there is no type to give the `Ref` a parameter of. They are still packed, still validated,
  * and still reachable through `reference("...")` from a script, which is where the tree
  * actually names them (spec 3.6: scripts never consume generated accessors).
@@ -55,6 +58,9 @@ public object DslKinds {
         "axis2D" to Axis2D::class,
         "binding" to Binding::class,
         "axis2DBinding" to Axis2DBinding::class,
+        "character" to Character::class,
+        "gameplayEffect" to GameplayEffect::class,
+        "effect" to Effect::class,
     )
 
     /** The type for [word], or null when the word has no runtime type. */

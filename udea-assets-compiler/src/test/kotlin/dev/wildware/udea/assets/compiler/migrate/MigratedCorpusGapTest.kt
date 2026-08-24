@@ -33,17 +33,17 @@ import kotlin.io.path.exists
  */
 class MigratedCorpusGapTest {
 
-    private val root = TestPaths.repoRoot.resolve("moba/src/main/assets")
+    private val root = TestPaths.repoRoot.resolve("moba/assets")
 
     /** Every declaration kind the corpus uses is a declaration function on the receiver. */
     @Test
     fun `every declaration kind the migrated corpus uses is a member of the receiver`() {
         assertTrue(
             root.exists(),
-            "the migrated tree is missing; run `./gradlew :udea-assets-compiler:udeaMigrateAssets`",
+            "the game's asset root is missing; `moba/build.gradle.kts` names it in `udea { }`",
         )
         val report = UdeaDeclarationScanner(TestPaths.repoRoot, root).use { it.scanTree() }
-        assertEquals(19, report.files.size, "the migrated corpus is nineteen scripts")
+        assertEquals(19, report.files.size, "the game's asset root is nineteen scripts")
 
         val kinds = report.declarations.map { it.kind }.toSortedSet()
         assertEquals(

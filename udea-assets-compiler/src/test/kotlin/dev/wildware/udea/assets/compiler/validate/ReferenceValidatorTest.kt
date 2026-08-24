@@ -84,7 +84,7 @@ class ReferenceValidatorTest {
     /**
      * A reference to a real asset of the wrong kind is an error, not a cast failure at runtime.
      *
-     * `blueprint(parent = ...)` requires a `Blueprint`; `character/orc_idle` is a `SpriteSheet`.
+     * `blueprint(parent = ...)` requires a `SpawnRecipe`; `character/orc_idle` is a `SpriteSheet`.
      * The expectation comes from the DSL *parameter*, not from the call, because an author
      * writes `reference("id")` with no type argument.
      */
@@ -92,12 +92,12 @@ class ReferenceValidatorTest {
     fun `a reference of the wrong kind names both kinds`() {
         val diagnostic = assertNotNull(
             ReferenceTypeValidator.validate(corpus()).singleOrNull(),
-            "only `wrong_kind` points a Blueprint slot at a SpriteSheet",
+            "only `wrong_kind` points a SpawnRecipe slot at a SpriteSheet",
         )
 
         assertEquals(UdeaRules.REFERENCE_KIND_MISMATCH.id, diagnostic.ruleId)
         assertEquals("character/wrong_kind", diagnostic.assetId)
-        assertTrue("must be a Blueprint" in diagnostic.message, diagnostic.message)
+        assertTrue("must be a SpawnRecipe" in diagnostic.message, diagnostic.message)
         assertTrue("is a SpriteSheet" in diagnostic.message, diagnostic.message)
         assertNotNull(diagnostic.span)
     }

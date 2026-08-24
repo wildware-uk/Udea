@@ -8,13 +8,17 @@
 // parented to the healed unit. None of that was migrated, so damage in this build is a number on
 // a bar and nothing else - every blow, arrow and heal lands with no picture at all.
 //
-// Three sheets and three animations here, and no `effect(...)`: `effect` is
-// `AssetKind.Unpublishable`, so a record declared with it packs as an opaque blob no loader reads
-// and a game whose effects were authored that way would boot with three unloadable assets. The one
-// field that record carried - the duration - is therefore a Kotlin constant on
-// `dev.wildware.moba.EffectKind`, beside the cue that spawns it. That is a real loss of
-// authorability and it is stated rather than hidden: it goes away with issue #84, exactly as the
-// `character(...)` stats do.
+// Three sheets, three animations and - since `effect` became a published kind - three
+// `effect(...)` records. The comment that used to stand here said the opposite:
+//
+//   > `effect` is `AssetKind.Unpublishable`, so a record declared with it packs as an opaque blob
+//   > no loader reads [...] The one field that record carried - the duration - is therefore a
+//   > Kotlin constant on `dev.wildware.moba.EffectKind`.
+//
+// `Effect` exists now, so the duration is authored again. `EffectKind` still holds the *tick*
+// count, because a lifetime the simulation counts down must be ticks and this file is in seconds;
+// `MobaAuthoredContentTest` converts one to the other and fails if they disagree, so the number a
+// designer edits and the number the entity lives for are one number.
 //
 // The scale was 1.43 - a character scale's neighbour, on the reasoning that a 100px effect frame
 // beside a 100px character frame should share it. Measured on a real capture, that reasoning is
@@ -75,4 +79,45 @@ spriteAnimation(
     name = "spell_effect",
     sheet = reference("effects/spell_effect_sheet"),
     loop = false,
+)
+
+// --- the records the spawner's lifetimes come from -------------------------------------------
+//
+// `animationSet` is required by `Effect` and each of these has exactly one animation in it, which
+// is what an effect is: a set is the unit of art, so naming an animation outside one would let a
+// bundle hold an effect whose frames are in another atlas page.
+
+spriteAnimationSet(name = "heal_effect_set", animations = listOf(reference("effects/heal_effect")))
+
+spriteAnimationSet(name = "hit_effect_set", animations = listOf(reference("effects/hit_effect")))
+
+spriteAnimationSet(name = "spell_effect_set", animations = listOf(reference("effects/spell_effect")))
+
+// 24 ticks at 60Hz - `EffectKind.Heal.lifeTicks`. Not the old corpus's `duration = 5.0F`: that
+// asked for one five-second flash, and `ability/heal_over_time` re-emits `MobaCues.HEAL` every
+// period for its whole duration, so this is respawned instead and lives one pass of its own
+// four-frame animation.
+effect(
+    name = "heal",
+    animationSet = reference("effects/heal_effect_set"),
+    animation = "heal_effect",
+    duration = 0.4F,
+)
+
+// 30 ticks: five frames at the default 0.1s frameTime, which is the whole animation exactly once.
+// A flash that outlived its own frames would sit on the last one.
+effect(
+    name = "hit",
+    animationSet = reference("effects/hit_effect_set"),
+    animation = "hit_effect",
+    duration = 0.5F,
+)
+
+// 60 ticks. Spawned by nothing today - see the sheet above - and declared so the next wave has a
+// name for it rather than a grep.
+effect(
+    name = "spell",
+    animationSet = reference("effects/spell_effect_set"),
+    animation = "spell_effect",
+    duration = 1.0F,
 )

@@ -44,14 +44,17 @@ class AssetCompilerTest {
         )
 
         // The file constant `val scale = 0.02f` was evaluated, not guessed at.
-        assertEquals(0.02f, assertNotNull(result.graph.assets["character/orc_idle"]).fields["scale"])
+        assertEquals(0.02f, assertNotNull(result.graph.assets["character/orc_idle_sheet"]).fields["scale"])
 
         // ResPath normalisation: the author writes "/sprites/...", the model holds no leading
         // slash. This is the two-keys-for-one-file bug issue #84 names.
         // A `ResFile` and not a `String`: pass 3's MissingFileValidator finds every path a
         // declaration holds by *type*, so that a kind added later cannot forget to register
         // its path fields in a table somewhere else. See `ResFile`.
-        assertEquals(ResFile("sprites/orc/idle.png"), result.graph.assets["character/orc_idle"]?.fields?.get("spritePath"))
+        assertEquals(
+            ResFile("sprites/orc/idle.png"),
+            result.graph.assets["character/orc_idle_sheet"]?.fields?.get("spritePath"),
+        )
 
         // The sanctioned forEach and the repeat(n) loop both produced their assets.
         assertEquals(
@@ -206,9 +209,9 @@ class AssetCompilerTest {
             .referenceSpanIndex()
 
         val withoutCapture = compiler(cache).compile(scripts, spanIndex = index, captureOrigins = false)
-        val orcRefs = assertNotNull(withoutCapture.graph.assets["character/orc"]).fields["animations"]
+        val orcRefs = assertNotNull(withoutCapture.graph.assets["character/orc"]).fields["animationMap"]
         @Suppress("UNCHECKED_CAST")
-        val refs = orcRefs as List<Ref>
+        val refs = (orcRefs as Map<String, Ref>).values.toList()
         assertTrue(refs.all { it.origin != null }, "pass 1's index must have located every reference")
         assertEquals(
             "udea-assets-compiler/src/test/resources/assets/character/orc.udea.kts",
@@ -217,7 +220,8 @@ class AssetCompilerTest {
 
         val withCapture = compiler(cache).compile(scripts, spanIndex = null, captureOrigins = true)
         @Suppress("UNCHECKED_CAST")
-        val captured = assertNotNull(withCapture.graph.assets["character/orc"]).fields["animations"] as List<Ref>
+        val captured = (assertNotNull(withCapture.graph.assets["character/orc"])
+            .fields["animationMap"] as Map<String, Ref>).values.toList()
         assertTrue(
             captured.all { it.origin != null },
             "origin capture must locate a reference written directly in a script",
@@ -232,7 +236,8 @@ class AssetCompilerTest {
         val cache = TestPaths.scratch("no-origin-cache")
         val result = compiler(cache).compile(Fixtures.scripts())
         @Suppress("UNCHECKED_CAST")
-        val refs = assertNotNull(result.graph.assets["character/orc"]).fields["animations"] as List<Ref>
+        val refs = (assertNotNull(result.graph.assets["character/orc"])
+            .fields["animationMap"] as Map<String, Ref>).values.toList()
         assertTrue(refs.all { it.origin == null })
         assertEquals(emptyList(), result.diagnostics.filter { it.severity == Severity.Error })
     }

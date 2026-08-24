@@ -33,9 +33,9 @@ soundCue(
     pitchVariance = 0.25F,
     volume = 0.5F,
     sounds = listOf(
-        "/sounds/effects/melee_hit_1.ogg",
-        "/sounds/effects/melee_hit_2.ogg",
-        "/sounds/effects/melee_hit_3.ogg",
+        "sounds/effects/melee_hit_1.ogg",
+        "sounds/effects/melee_hit_2.ogg",
+        "sounds/effects/melee_hit_3.ogg",
     ),
 )
 
@@ -44,11 +44,11 @@ soundCue(
     pitchVariance = 0.25F,
     volume = 0.2F,
     sounds = listOf(
-        "/sounds/effects/melee_swoosh_1.ogg",
-        "/sounds/effects/melee_swoosh_2.ogg",
-        "/sounds/effects/melee_swoosh_3.ogg",
-        "/sounds/effects/melee_swoosh_4.ogg",
-        "/sounds/effects/melee_swoosh_5.ogg",
+        "sounds/effects/melee_swoosh_1.ogg",
+        "sounds/effects/melee_swoosh_2.ogg",
+        "sounds/effects/melee_swoosh_3.ogg",
+        "sounds/effects/melee_swoosh_4.ogg",
+        "sounds/effects/melee_swoosh_5.ogg",
     ),
 )
 
@@ -61,9 +61,9 @@ soundCue(
     pitchVariance = 0.15F,
     volume = 0.15F,
     sounds = listOf(
-        "/sounds/effects/melee_swoosh_1.ogg",
-        "/sounds/effects/melee_swoosh_3.ogg",
-        "/sounds/effects/melee_swoosh_5.ogg",
+        "sounds/effects/melee_swoosh_1.ogg",
+        "sounds/effects/melee_swoosh_3.ogg",
+        "sounds/effects/melee_swoosh_5.ogg",
     ),
 )
 
@@ -74,8 +74,8 @@ soundCue(
     pitchVariance = 0.2F,
     volume = 0.3F,
     sounds = listOf(
-        "/sounds/effects/melee_hit_1.ogg",
-        "/sounds/effects/melee_hit_2.ogg",
+        "sounds/effects/melee_hit_1.ogg",
+        "sounds/effects/melee_hit_2.ogg",
     ),
 )
 
@@ -85,11 +85,11 @@ soundCue(
     pitchVariance = 0.2F,
     volume = 0.35F,
     sounds = listOf(
-        "/sounds/orc/orc_hurt_1.ogg",
-        "/sounds/orc/orc_hurt_2.ogg",
-        "/sounds/orc/orc_hurt_3.ogg",
-        "/sounds/orc/orc_hurt_4.ogg",
-        "/sounds/orc/orc_hurt_5.ogg",
+        "sounds/orc/orc_hurt_1.ogg",
+        "sounds/orc/orc_hurt_2.ogg",
+        "sounds/orc/orc_hurt_3.ogg",
+        "sounds/orc/orc_hurt_4.ogg",
+        "sounds/orc/orc_hurt_5.ogg",
     ),
 )
 
@@ -100,10 +100,10 @@ soundCue(
     pitchVariance = 0.1F,
     volume = 0.5F,
     sounds = listOf(
-        "/sounds/orc/orc_death_1.ogg",
-        "/sounds/orc/orc_death_2.ogg",
-        "/sounds/orc/orc_death_3.ogg",
-        "/sounds/orc/orc_death_4.ogg",
+        "sounds/orc/orc_death_1.ogg",
+        "sounds/orc/orc_death_2.ogg",
+        "sounds/orc/orc_death_3.ogg",
+        "sounds/orc/orc_death_4.ogg",
     ),
 )
 
@@ -116,8 +116,8 @@ soundCue(
     pitchVariance = 0.1F,
     volume = 0.6F,
     sounds = listOf(
-        "/sounds/orc/orc_big_grunt.ogg",
-        "/sounds/orc/orc_elite_swoosh.ogg",
+        "sounds/orc/orc_big_grunt.ogg",
+        "sounds/orc/orc_elite_swoosh.ogg",
     ),
 )
 
@@ -127,11 +127,11 @@ soundCue(
     pitchVariance = 0.25F,
     volume = 0.3F,
     sounds = listOf(
-        "/sounds/orc/orc_grunt_1.ogg",
-        "/sounds/orc/orc_grunt_2.ogg",
-        "/sounds/orc/orc_grunt_3.ogg",
-        "/sounds/orc/orc_grunt_4.ogg",
-        "/sounds/orc/orc_grunt_5.ogg",
+        "sounds/orc/orc_grunt_1.ogg",
+        "sounds/orc/orc_grunt_2.ogg",
+        "sounds/orc/orc_grunt_3.ogg",
+        "sounds/orc/orc_grunt_4.ogg",
+        "sounds/orc/orc_grunt_5.ogg",
     ),
 )
 
@@ -155,7 +155,7 @@ soundCue(
     pitchVariance = 0.3F,
     volume = 0.12F,
     sounds = listOf(
-        "/sounds/effects/melee_swoosh_2.ogg",
-        "/sounds/effects/melee_swoosh_4.ogg",
+        "sounds/effects/melee_swoosh_2.ogg",
+        "sounds/effects/melee_swoosh_4.ogg",
     ),
 )

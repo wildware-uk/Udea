@@ -1,0 +1,48 @@
+# determinism-allowlist.txt - the exceptions to udeaVerifyDeterminism (issues #150, #151)
+#
+# FORMAT
+#
+#   RULE_ID  owner.Class#member  # reasoning
+#
+# `#*` allows every member of one owner under one rule. Nothing wider is expressible: an
+# allowlist that could say `com.badlogic.gdx.*` would be a switch, not an exception list.
+#
+# The parser is strict on purpose (spec 6's exit criterion: "a reviewed artefact, not a dumping
+# ground"). Each of these FAILS THE BUILD, under its own id, so the failure says which kind of
+# rot set in:
+#
+#   ALLOW001  the rule id in column one is not one of DET001..DET006
+#   ALLOW002  the entry carries no `  # reasoning`
+#   ALLOW003  the target is not `owner.Class#member`
+#   ALLOW004  the entry matched nothing on this run - it is stale, delete it
+#   ALLOW005  a `@version` pin no longer matches what the build resolves
+#   ALLOW006  an `@directive` this file does not understand
+#
+# ALLOW004 is the one that keeps the file honest. An exception that stops being needed stops
+# being allowed, so nobody inherits a list of excuses for code that is long gone.
+#
+#
+# THE VERSION PINS
+#
+# `determinism-audit.md` is a set of claims about a PARTICULAR Fleks and LibGDX source -
+# "`Family` iteration is insertion-ordered", "`MathUtils.sin` reads a fixed 16k table", "`Pool`
+# is a LIFO array". A point release is entitled to change every one of those, and would do it
+# silently. So the audited versions are stamped here and the resolved ones are compared to them
+# on every run: bumping `gradle/libs.versions.toml` fails this task until somebody re-reads the
+# affected rows and moves the pin. That is the whole mechanism issue #151 asks for.
+
+@version fleks 2.14
+@version gdx 1.13.5
+
+#
+# THE ENTRIES
+#
+# Empty, deliberately, and that is a result rather than a placeholder: the audit in
+# `determinism-audit.md` walked the Fleks and LibGDX surface the declared simulation scopes
+# actually reference and found nothing that needed excusing. The one candidate - `Pool`, whose
+# reuse order the audit rates `deterministic-if-used-thus` - is not referenced from a simulation
+# scope at all, so an entry for it would fail ALLOW004.
+#
+# Before adding a line here, check that the answer is not "move the code to presentation".
+# `udea-render`, `udea-audio` and `udea-agent-host` are not declared simulation, so wall-clock
+# reads and `PresentationRandom` are CORRECT there and need no entry.

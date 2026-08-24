@@ -4,7 +4,7 @@ package dev.wildware.udea.render.input
  * One action and the physical inputs that trigger it.
  *
  * The asset half of this is `control(...)` plus `binding(...)` in a `.udea.kts`
- * (`moba/src/main/assets/control/controls.udea.kts`). That corpus is not packed yet - `control`
+ * (`moba/assets/control/controls.udea.kts`). That corpus is packed now - `control`
  * is not among the kinds `udeaPackBundle` publishes - so bindings are declared in code today and
  * this class is deliberately shaped like the asset: a name, a list of keys, a list of buttons,
  * and **no method that reads a device**. `Binding.BindingInput.pressed()` in the old tree called

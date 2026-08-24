@@ -155,6 +155,20 @@ public class AssetFields internal constructor(
 
     public fun pathList(name: String): List<ResPath> = textList(name).map { ResPath(it) }
 
+    /**
+     * The nested record at [name], or an empty one when the field is absent.
+     *
+     * Empty rather than null, and never a throw on an absent field, for [list]'s reason: a codec
+     * reading a map-shaped field (`Character.animations`, a component's `fields`) wants to iterate
+     * [names], and "the author declared none" and "the writer omitted an empty map" are the same
+     * fact. A field that is present and is *not* a record is still an error naming both.
+     */
+    public fun record(name: String): AssetFields = when (val value = raw[name]) {
+        null, RawValue.Null -> AssetFields(id, emptyMap(), ids, binder)
+        is RawValue.Fields -> AssetFields(id, value.values, ids, binder)
+        else -> wrongType(name, value, "a record")
+    }
+
     /** A typed reference. Registered with the binder, so the registry can patch its index. */
     public fun <T : AssetData> ref(name: String, expected: KClass<T>): Ref<T> =
         when (val value = required(name)) {

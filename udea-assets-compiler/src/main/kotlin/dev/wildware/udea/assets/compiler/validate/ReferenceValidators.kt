@@ -1,5 +1,6 @@
 package dev.wildware.udea.assets.compiler.validate
 
+import dev.wildware.udea.assets.compiler.AssetKindHierarchy
 import dev.wildware.udea.diagnostics.Fix
 import dev.wildware.udea.diagnostics.Replacement
 import dev.wildware.udea.diagnostics.SourceSpan
@@ -87,15 +88,21 @@ public object UnresolvedReferenceValidator : AssetValidator {
  *   `UDEA0004`, and reporting a kind mismatch against nothing would be a second diagnostic for
  *   one defect.
  * - The slot does not constrain a kind ([dev.wildware.udea.assets.compiler.Ref.expected] is
- *   null) — `gameConfig`'s `defaultCharacter` points at a `character`, which
- *   `AssetKind.Unpublishable` says has no runtime type.
- * - The **target** has no runtime kind (`DeclaredAsset.kindFqn` is null) for the same reason.
- *   There is no name to compare, and inventing one is exactly what `AssetKind` forbids.
+ *   null) — the `asset(kind, ...)` escape hatch declares fields nothing stamps.
+ * - The **target** has no runtime kind (`DeclaredAsset.kindFqn` is null): a game's own kind,
+ *   declared through `asset(kind, ...)`. There is no name to compare, and inventing one is
+ *   exactly what `AssetKind` forbids.
  *
- * The last two are a real gap and not a rounding error: until `udea-assets` has a type behind
- * every DSL word, a reference into or out of `character` is unchecked. It is a gap that shows
- * up as *nothing reported*, which is why it is written down here rather than left to be
- * discovered.
+ * Those two are a real gap and not a rounding error - they show up as *nothing reported* - and
+ * they are narrower than they were: `character`, `gameplayEffect` and `effect` all have runtime
+ * types now, so the corpus that was entirely unchecked is entirely checked.
+ *
+ * ### Subtyping
+ *
+ * The comparison is [AssetKindHierarchy.satisfies] and not string equality, so a `character(...)`
+ * in a slot that takes a `SpawnRecipe` is accepted and one in a slot that takes a `SoundCue` is
+ * not. It is the same function `GraphPacker` uses, because a pass-4 drop that pass 3 did not
+ * report is a bundle quietly missing a reference the build called clean.
  */
 public object ReferenceTypeValidator : AssetValidator {
 
@@ -106,7 +113,7 @@ public object ReferenceTypeValidator : AssetValidator {
             val expected = site.ref.expected ?: return@mapNotNull null
             val target = context.resolve(site.ref.id) ?: return@mapNotNull null
             val actual = target.kindFqn ?: return@mapNotNull null
-            if (actual == expected) return@mapNotNull null
+            if (AssetKindHierarchy.satisfies(actual, expected)) return@mapNotNull null
 
             val suggestion = context.didYouMeanOfKind(site.ref.id, expected)
             UdeaRules.REFERENCE_KIND_MISMATCH.diagnostic(

@@ -97,6 +97,50 @@ public sealed interface Q {
     }
 
     /**
+     * 8 bits over `-1..1` **with an exact zero**: a signed stick axis.
+     *
+     * ## Why this is not `Fixed(-1f, 1f, ...)`
+     *
+     * Every other bounded kind spreads `2^bits - 1` steps over its range, so an 8-bit signed
+     * axis gets 255 steps and its midpoint falls at level 127.5 — between two representable
+     * levels. A centred stick therefore quantises to 128 and reads back as `+0.00392`, not
+     * zero. That is not a rounding nuisance, it is a behaviour change: a server stepping a
+     * character by a "zero" axis walks it at 0.0029 units per tick for ever, and every
+     * `moveX == 0f` early-out downstream is dead code for a networked client. The defect is
+     * invisible in a round-trip-error test, because 0.00392 is inside `maxError`.
+     *
+     * So this kind gives up one of the 256 codes to buy a centre: 254 steps, level 127 is
+     * exactly `0f`, and the two ends are exactly `-1f` and `+1f`. Level 255 is unreachable by
+     * [quantise] and clamps to `+1f` on the way back, so a corrupted or hostile stream decodes
+     * to a legal axis rather than out of range.
+     *
+     * The cost is a step of 1/127 rather than 1/127.5 — 0.0004 coarser, which no stick and no
+     * player can express.
+     */
+    public data object Axis8 : Q {
+
+        /** Level that means exactly zero. Half of [STEPS]. */
+        public const val CENTRE: Int = 127
+
+        /** Steps between `-1` and `+1`. Even, which is the whole point. */
+        public const val STEPS: Int = 2 * CENTRE
+
+        override val bits: Int get() = NORM8_BITS
+        override val maxError: Float = (1.0 / STEPS).toFloat()
+
+        override fun quantise(value: Float): Int {
+            require(!value.isNaN()) { "cannot quantise NaN as an axis; declare Q.Exact instead" }
+            val t = value.toDouble().coerceIn(-1.0, 1.0)
+            return (Math.round(t * CENTRE) + CENTRE).toInt()
+        }
+
+        override fun dequantise(raw: Int): Float {
+            val level = (raw and 0xFF).coerceAtMost(STEPS)
+            return ((level - CENTRE).toDouble() / CENTRE).toFloat()
+        }
+    }
+
+    /**
      * 8 bits over `0..1`: health fractions, alphas, cooldown progress, blend weights.
      *
      * A step of 1/255, so the error is under 0.2% — below what a health bar can render.

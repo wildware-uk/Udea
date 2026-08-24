@@ -78,11 +78,12 @@ public class NetToolset {
         latencyMs: Int,
         jitterMs: Int,
         loss: Float,
+        visionRadius: Float = 0f,
     ): AgentResult {
         session?.close()
         session = null
         val spawned = try {
-            NetSession(clients, seed).also {
+            NetSession(clients, seed, visionRadius = visionRadius).also {
                 it.conditions(client = null, latencyMs = latencyMs, jitterMs = jitterMs, loss = loss)
             }
         } catch (e: IllegalArgumentException) {
@@ -229,6 +230,8 @@ public class NetToolset {
         put("seed", live.seed)
         put("tick", live.tick.value)
         put("protoHash", live.protocol.protoHash)
+        put("visionRadius", live.visionRadius)
+        put("fog", live.fog != null)
         arr("peers") {
             element { put("peer", "server") }
             for (end in live.ends) element { put("peer", end.peer.toString()) }
@@ -342,6 +345,17 @@ public object NetSpawnSessionTool : AgentToolDef<NetToolset> {
             required = false,
             default = "0",
         ),
+        AgentToolArg(
+            name = "vision_radius",
+            type = "number",
+            description = "Sight radius in world units, turning on per-team fog of war. Zero, the " +
+                "default, means every client is told about every entity. Above zero the clients " +
+                "are split alternately across two teams, spawn out of each other's sight, and the " +
+                "server stops serialising what a client cannot see - which is what net.relevancy " +
+                "and net.assert_not_visible report on.",
+            required = false,
+            default = "0",
+        ),
     )
 
     override val inputSchema: String = ToolSchema.of(args)
@@ -354,6 +368,7 @@ public object NetSpawnSessionTool : AgentToolDef<NetToolset> {
         latencyMs = command.int("latency_ms", 0),
         jitterMs = command.int("jitter_ms", 0),
         loss = command.float("loss", 0f),
+        visionRadius = command.float("vision_radius", 0f),
     )
 
     /** Two ends and an authority: the smallest session a desync can exist in. */
@@ -610,10 +625,12 @@ public object NetToolModule : ToolModule {
     override val moduleName: String = "UdeaAgentNet"
 
     override val tools: List<AgentToolDef<*>> = listOf(
+        NetAssertNotVisibleTool,
         NetClientStateTool,
         NetCloseSessionTool,
         NetDesyncReportTool,
         NetInputTool,
+        NetRelevancyTool,
         NetServerStateTool,
         NetSetConditionsTool,
         NetSpawnSessionTool,

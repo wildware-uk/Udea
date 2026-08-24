@@ -68,6 +68,14 @@ public class MobaLoopbackSession(
      * sequence number cannot be spent by a caller that then throws the command away.
      */
     private val input: (MobaClientSession, Tick) -> MoveInput? = { _, _ -> null },
+
+    /**
+     * Champion sight radius in world units, or null for no fog at all.
+     *
+     * Null by default, because every existing proof over this harness asserts that a client holds
+     * the whole roster, which is the exact opposite of what fog does. See [MobaHostSession.fog].
+     */
+    private val fogSight: Float? = null,
 ) : AutoCloseable {
 
     init {
@@ -79,8 +87,13 @@ public class MobaLoopbackSession(
         NetHarness(clientCount, seed, mtu = mtu, initialConditions = conditions)
 
     /** The authoritative server. */
-    public val server: MobaHostSession =
-        MobaHostSession(harness.transport(PeerId.SERVER), BandwidthBudget(mtu), mtu)
+    public val server: MobaHostSession = MobaHostSession(
+        harness.transport(PeerId.SERVER),
+        BandwidthBudget(mtu),
+        mtu,
+        fog = if (fogSight == null) null else MobaHostSession.fogOfWar(),
+        championSight = fogSight ?: MobaHostSession.DEFAULT_CHAMPION_SIGHT,
+    )
 
     /** The clients, in peer order. */
     public val clients: List<MobaClientSession> = (1..clientCount).map { index ->

@@ -68,7 +68,30 @@ public data class PacketHeader(
      * and not.
      */
     public val hasAck: Boolean = true,
+
+    /**
+     * The last `MoveInput.seq` the sender had simulated when it built this packet, or
+     * [NO_INPUT_ACK].
+     *
+     * ## Why this is a second ack and not the first one
+     *
+     * [ack] is a *packet* sequence: it says which datagram arrived, and it is what the delta
+     * coder keys baselines off. Client-side prediction needs a different number - which
+     * *command* the server has consumed - and the two are not convertible. A datagram carries
+     * whatever commands happened to be in flight, a command sits in the jitter buffer for a
+     * variable number of ticks before it is consumed, and a repeated command (a starved buffer)
+     * is simulated without any datagram arriving at all. Reconciling against [ack] replays a
+     * history that is one to several commands too long, and the client is corrected every single
+     * tick for ever.
+     *
+     * Written only when [hasInputAck], so a client-to-server packet and a server that has
+     * consumed nothing both cost zero extra bits.
+     */
+    public val inputAck: Int = NO_INPUT_ACK,
 ) {
+
+    /** Whether [inputAck] names a real command. */
+    public val hasInputAck: Boolean get() = inputAck != NO_INPUT_ACK
 
     /** Writes the header. Always the same fields in the same order. */
     public fun write(out: BitWriter) {
@@ -77,11 +100,14 @@ public data class PacketHeader(
         out.writeBits(ack and SEQ_MASK, SEQ_BITS)
         out.writeInt(ackBits)
         out.writeBits(
-            (if (hasBaseline) FLAG_HAS_BASELINE else 0) or (if (hasAck) FLAG_HAS_ACK else 0),
+            (if (hasBaseline) FLAG_HAS_BASELINE else 0) or
+                (if (hasAck) FLAG_HAS_ACK else 0) or
+                (if (hasInputAck) FLAG_HAS_INPUT_ACK else 0),
             FLAG_BITS,
         )
         out.writeVarInt(serverTick.value.toInt())
         out.writeVarInt(if (hasBaseline) baselineTick.value.toInt() else 0)
+        if (hasInputAck) out.writeBits(inputAck and SEQ_MASK, SEQ_BITS)
     }
 
     public companion object {
@@ -99,6 +125,12 @@ public data class PacketHeader(
         /** Bit 1: [ack]/[ackBits] are a real acknowledgement rather than padding. */
         public const val FLAG_HAS_ACK: Int = 2
 
+        /** Bit 2: a 16-bit [inputAck] follows the tick varints. */
+        public const val FLAG_HAS_INPUT_ACK: Int = 4
+
+        /** [inputAck] when the sender has simulated no command from this peer. */
+        public const val NO_INPUT_ACK: Int = -1
+
         /** Reads a header written by [write]. */
         public fun read(src: BitReader): PacketHeader {
             val protoHash = src.readBits(ProtocolDescriptor.PROTO_HASH_BITS)
@@ -110,13 +142,17 @@ public data class PacketHeader(
             val baselineTick = Tick(src.readVarInt().toLong() and 0xFFFF_FFFFL)
             val hasBaseline = flags and FLAG_HAS_BASELINE != 0
             val hasAck = flags and FLAG_HAS_ACK != 0
+            val inputAck =
+                if (flags and FLAG_HAS_INPUT_ACK != 0) src.readBits(SEQ_BITS) else NO_INPUT_ACK
             if (hasBaseline && baselineTick >= serverTick) {
                 throw MalformedBitStream(
                     "packet claims a baseline at $baselineTick for server tick $serverTick; " +
                         "a baseline must be strictly older than the tick it is a baseline for",
                 )
             }
-            return PacketHeader(protoHash, seq, ack, ackBits, serverTick, baselineTick, hasBaseline, hasAck)
+            return PacketHeader(
+                protoHash, seq, ack, ackBits, serverTick, baselineTick, hasBaseline, hasAck, inputAck,
+            )
         }
 
         /**

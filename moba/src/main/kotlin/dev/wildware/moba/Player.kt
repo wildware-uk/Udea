@@ -6,6 +6,7 @@ import com.github.quillraven.fleks.Family
 import dev.wildware.moba.ability.AbilityRpcChannel
 import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.MobaBlueprints
+import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
 import dev.wildware.udea.annotations.Sim
 import dev.wildware.udea.core.SimSystem
@@ -20,6 +21,8 @@ import dev.wildware.udea.gas.AbilityActivation
 import dev.wildware.udea.gas.ActivationResult
 import dev.wildware.udea.gas.Attributes
 import dev.wildware.udea.gas.GameplayEffects
+import dev.wildware.udea.net.transport.PeerId
+import dev.wildware.udea.render.input.Intent
 import dev.wildware.udea.render.input.IntentState
 
 /**
@@ -68,13 +71,39 @@ public class Player(
      * rendering bug rather than as an input one.
      */
     @Sim public var facing: Float = 1f,
+    /**
+     * Which connection drives this champion: a [PeerId.raw], or [UNOWNED] for nobody's.
+     *
+     * `@Net` and not `@Sim`, and it is the only field of this component that is on the wire. A
+     * two-player game has two `Player` entities in it and a client has to know **which one is
+     * mine** - to point a camera at it, to draw its health bar differently, and for a human to
+     * be able to tell at all. Nothing else replicated says so: `NetId`s are allocation order,
+     * which is not a thing a client can predict, and there is no server-to-client RPC in this
+     * build to be told over.
+     *
+     * It is the server's answer and it is not a permission: the check that decides whether a
+     * datagram may fire this champion's abilities is `ChampionOwnership`, read by generated
+     * code, and a client editing this field in its own replicated copy changes what its own
+     * window draws and nothing else.
+     */
+    @Net public var owner: Int = UNOWNED,
 ) : Component<Player> {
 
     override fun type(): ComponentType<Player> = Player
 
-    override fun toString(): String = "Player(move=($moveX, $moveY) facing=$facing)"
+    override fun toString(): String = "Player(move=($moveX, $moveY) facing=$facing owner=$owner)"
 
     public companion object : ComponentType<Player>() {
+
+        /**
+         * [owner] for a champion no connection drives.
+         *
+         * [PeerId.SERVER]'s raw value, deliberately: the server owns everything nobody else
+         * does, which is the same rule `ChampionOwnership.ownerOf` answers for an entity it has
+         * never been told about. Single-player leaves every champion here, and that is correct -
+         * there are no connections.
+         */
+        public const val UNOWNED: Int = 0
 
         /**
          * Where the player's soldier lands, in the middle of the level's soldier cluster.
@@ -104,13 +133,40 @@ public class Player(
             blueprints: MobaBlueprints,
             x: Float = SPAWN_X,
             y: Float = SPAWN_Y,
+            owner: Int = UNOWNED,
         ): NetId = spawner.spawn(
             blueprint = blueprints.soldier,
             position = SpawnPosition(x, y),
         ) { context, entity ->
-            with(context) { entity += Player() }
+            with(context) { entity += Player(owner = owner) }
         }
     }
+}
+
+/**
+ * Which [Intent] drives which champion, for a process with more than one human in it.
+ *
+ * ## Why this exists rather than a second `IntentState`
+ *
+ * [IntentState] is one `Intent` per world, because a single-player process has one pair of
+ * hands. A server with two connections has two, and they are not interchangeable: the axis that
+ * arrived from `client2` must reach `client2`'s champion and no other, or the second player
+ * drives the first one's soldier - which is what "client 2 is a spectator" was hiding.
+ *
+ * It is a **lookup by [NetId]** and not a per-entity component, because the mapping is a
+ * property of the *connection* rather than of the world: it must not be snapshotted, must not be
+ * replicated, and must survive a rewind that recreates the champion's components. A `Player`
+ * entity nobody is driving answers `null`, and [PlayerControlSystem] leaves it standing still -
+ * a champion whose owner disconnected does not inherit the last axis they were holding.
+ *
+ * `null` on the system itself means "there is one pair of hands", which is single-player and
+ * every test that has never heard of a peer. That is the default and it is the path
+ * `MobaModule` wires.
+ */
+public fun interface PlayerIntents {
+
+    /** This tick's input for the champion [self], or `null` when nobody is driving it. */
+    public fun intentFor(self: NetId): Intent?
 }
 
 /**
@@ -173,6 +229,21 @@ public class PlayerControlSystem(
     private val channel: AbilityRpcChannel? = null,
 ) : SimSystem() {
 
+    /**
+     * Per-champion input, or `null` for the one-pair-of-hands case.
+     *
+     * A `var` set after the world is built rather than a constructor parameter, and that is
+     * forced rather than chosen: `MobaModule` is what constructs this system, out of a factory
+     * that is handed only the `GameContext`, and the router belongs to a
+     * [dev.wildware.moba.net.MobaHostSession] that does not exist until after
+     * `definition.build()`. It is scoped to **this world's** system instance - not a process
+     * global - so two sessions in one JVM route their own peers' hands to their own champions.
+     *
+     * While it is null every [Player] reads [input], which is exactly what single-player, the
+     * agent's instance and every existing test do.
+     */
+    public var intents: PlayerIntents? = null
+
     /** Resolved once at construction; `world.family { }` per tick is a lookup on a hot path. */
     private val players: Family = world.family { all(Player) }
 
@@ -195,14 +266,27 @@ public class PlayerControlSystem(
         private set
 
     override fun onTick() {
-        val intent = input.intent
-        val x = intent.axisX(MobaControls.MOVE_AXIS)
-        val y = intent.axisY(MobaControls.MOVE_AXIS)
-        val primary = intent.isJustPressed(MobaControls.ATTACK_ACTION)
-        val secondary = intent.isJustPressed(MobaControls.ATTACK_2_ACTION)
+        val router = intents
+        // Read once when there is one pair of hands, so the single-player path allocates and
+        // looks up nothing per entity - which is the path every test and the agent still run.
+        val shared = if (router == null) input.intent else null
         val now = tick
         players.forEach { entity ->
             val player = entity[Player]
+            val self = netIds.netIdOf(entity)
+            val intent = shared ?: router?.intentFor(self)
+            if (intent == null) {
+                // Nobody is driving this champion this tick. Zeroed rather than left alone: a
+                // disconnected player's soldier that kept walking would look like the server
+                // still taking their input, and `PlayerMovementSystem` reads exactly these two.
+                player.moveX = 0f
+                player.moveY = 0f
+                return@forEach
+            }
+            val x = intent.axisX(MobaControls.MOVE_AXIS)
+            val y = intent.axisY(MobaControls.MOVE_AXIS)
+            val primary = intent.isJustPressed(MobaControls.ATTACK_ACTION)
+            val secondary = intent.isJustPressed(MobaControls.ATTACK_2_ACTION)
             player.moveX = x
             player.moveY = y
             // Only on a real deflection: see `Player.facing`.
@@ -215,7 +299,6 @@ public class PlayerControlSystem(
             val abilities = entity.getOrNull(Abilities) ?: return@forEach
             val attributes = entity.getOrNull(Attributes) ?: return@forEach
             val effects = entity.getOrNull(GameplayEffects) ?: return@forEach
-            val self = netIds.netIdOf(entity)
             // Both keys are read on the same tick when both went down on it. A player who mashes
             // Space and Q together means both, and a rule that dropped one would be a rule they
             // have to learn by losing a fight.

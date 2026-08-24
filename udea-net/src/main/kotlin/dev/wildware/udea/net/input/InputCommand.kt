@@ -68,8 +68,14 @@ public data class MoveInput(
 
     public companion object {
 
-        /** Move axes: eight bits over `-1..1`. */
-        public val AXIS: Q.Fixed = Q.declared(bits = 8, min = -1f, max = 1f)
+        /**
+         * Move axes: eight bits over `-1..1`, **centred**.
+         *
+         * [Q.Axis8] and not `Q.declared(bits = 8, min = -1f, max = 1f)`: the latter has no code
+         * for zero, so a released stick arrived at the server as `+0.00392` and walked a
+         * standing character for ever. See [Q.Axis8] for the arithmetic.
+         */
+        public val AXIS: Q = Q.Axis8
 
         /** Aim: twelve bits over a full turn, about a twentieth of a degree. */
         public val AIM: Q.Fixed = Q.declared(bits = 12, min = -3.1416f, max = 3.1416f)

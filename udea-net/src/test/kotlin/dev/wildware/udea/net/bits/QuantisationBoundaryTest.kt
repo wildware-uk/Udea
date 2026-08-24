@@ -44,6 +44,7 @@ class QuantisationBoundaryTest {
         // land on a bound rather than exceed the bound's own error.
         is Q.Norm8 -> abs(decoded - expected.coerceIn(0f, 1f))
         is Q.Pos -> abs(decoded - expected.coerceIn(Q.Pos.MIN, Q.Pos.MAX))
+        is Q.Axis8 -> abs(decoded - expected.coerceIn(-1f, 1f))
         is Q.Fixed -> abs(decoded - expected.coerceIn(q.min, q.max))
         // No reduction and no error.
         is Q.Exact -> abs(decoded - expected)

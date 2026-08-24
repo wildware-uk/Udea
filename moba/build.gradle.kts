@@ -283,9 +283,24 @@ tasks.register<JavaExec>("runNetProof") {
 
 tasks.register<JavaExec>("runClient") {
     group = ApplicationPlugin.APPLICATION_GROUP
-    description = "moba.client: a visible LWJGL3 window."
+    description = "moba.client: a visible LWJGL3 window. Modes: local | listen | host [port] | join <host[:port]>."
     mainClass.set("dev.wildware.moba.entry.MobaClient")
     classpath = sourceSets.main.get().runtimeClasspath
+    // `JavaExec` forks, so a `-D` on the Gradle command line reaches the daemon and stops there.
+    // `MobaClient`'s three knobs are how a two-window run is *checked* rather than watched - a
+    // bounded frame count and a scripted axis are what turn two windows into two transcripts - so
+    // a task that silently dropped them made the documented command a no-op. Read through
+    // `providers` and not `System.getProperties()`: a configuration-time property read is exactly
+    // what the configuration cache refuses to serialise. Same shape as `runAudio` above.
+    listOf(
+        "udea.net.frames",
+        "udea.net.walk",
+        "udea.moba.fog",
+        "udea.render.mode",
+    ).forEach { name ->
+        val value = providers.systemProperty(name)
+        if (value.isPresent) systemProperty(name, value.get())
+    }
 }
 
 // The audible client. Identical to `runClient` except that its frame drains `GameContext.cues`

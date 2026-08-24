@@ -78,6 +78,17 @@ public class ReplicationClient(
     public var nextSeq: Int = 0
         private set
 
+    /**
+     * The last command of ours the server had simulated when it built the newest packet we
+     * applied, or [PacketHeader.NO_INPUT_ACK].
+     *
+     * This is the anchor [dev.wildware.udea.net.prediction.LocalPrediction] reconciles from,
+     * and it is deliberately *not* [nextSeq] or the packet ack: see `PacketHeader.inputAck`
+     * for why the two numbers are not convertible.
+     */
+    public var inputAck: Int = PacketHeader.NO_INPUT_ACK
+        private set
+
     /** Newest server tick whose state this client holds. */
     public var serverTick: Tick = Tick.ZERO
         private set
@@ -121,6 +132,7 @@ public class ReplicationClient(
             sectionReader.read(walker.readerFor(frame), world, applySink)
         }
         serverTick = header.serverTick
+        if (header.hasInputAck) inputAck = header.inputAck
         recordApplied(header.seq)
         applied++
         return true

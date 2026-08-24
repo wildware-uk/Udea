@@ -74,6 +74,10 @@ public class ReplicaApplier(
     public var componentsApplied: Long = 0L
         private set
 
+    /** Components taken off an entity because the store stopped holding them. */
+    public var componentsRemoved: Long = 0L
+        private set
+
     /** How many ids this applier currently believes in. Equals the store's live count. */
     public val liveCount: Int get() = boundCount
 
@@ -139,10 +143,21 @@ public class ReplicaApplier(
                     entitiesCreated++
                 }
                 for (component in 0 until registry.size) {
+                    val type = registry.typeAt(component)
                     val slot = store.slotOf(row, component)
-                    if (slot == ReplicaStore.ABSENT) continue
-                    registry.typeAt(component)
-                        .applyOnto(world, entity, store.storeAt(component), slot)
+                    if (slot == ReplicaStore.ABSENT) {
+                        // The store says this entity does not carry the component. A world that
+                        // still carries it is *wrong*, and stays wrong for ever if we merely skip:
+                        // nothing else on the client ever removes a replicated component, so a
+                        // server-side drop would never reach the client. `removeFrom` is a no-op
+                        // when the entity does not have it, so the common case costs one lookup.
+                        if (type.isPresent(world, entity)) {
+                            type.removeFrom(world, entity)
+                            componentsRemoved++
+                        }
+                        continue
+                    }
+                    type.applyOnto(world, entity, store.storeAt(component), slot)
                     componentsApplied++
                 }
             }

@@ -32,11 +32,13 @@ import dev.wildware.udea.core.snapshot.ComponentRegistry
  * the client's state at a given tick is not the server's world at that tick, and rebuilding from
  * it would apply every entity's delta to a baseline the server never diffed against.
  *
- * The one residual: a packet the client applies but whose acknowledgement never reaches the
- * server leaves that entity's server-side baseline behind the client's value, so a field that
- * changed and changed back across the gap would be left stale until it next moves. The ack for a
- * packet is repeated in up to 33 subsequent client packets (`ackBits`), so losing all of them is
- * a `0.3^33` event at 30% loss; it is a real hole and it is this small.
+ * The server's baseline is behind this store by a round trip, because it moves on an *ack* and
+ * this store moves on an *apply*. A field that changed and changed back inside that gap would be
+ * omitted from the delta as "unchanged since the baseline" and left stale here for ever - which
+ * is not a small hole, it is the one that stopped the stack converging under loss. It is closed
+ * on the server side: `SnapshotWriter.writeUpdate` diffs against the acked baseline **and every
+ * unacknowledged send since**, so whichever of those states this store is holding, every field
+ * that could be wrong is written with an absolute value. Nothing here has to guess.
  */
 public class ReplicaStore(
 
@@ -138,6 +140,28 @@ public class ReplicaStore(
         }
         slots[cell] = slot
         return slot
+    }
+
+    /**
+     * Drops [componentIndex] from [row], returning its slot to the free list.
+     *
+     * The receiving half of the component removal record. Without it the wire can say "this
+     * component is gone" and the client cannot act on it: a component the server dropped - a
+     * `Combatant` on a dead unit - stays attached to the client's copy for the rest of the
+     * session, and every later comparison reports it.
+     *
+     * @return true when the component was present.
+     */
+    public fun releaseSlot(row: Int, componentIndex: Int): Boolean {
+        val cell = row * registry.size + componentIndex
+        val slot = slots[cell]
+        if (slot == ABSENT) return false
+        if (freeSlotCount[componentIndex] == freeSlots[componentIndex].size) {
+            freeSlots[componentIndex] = freeSlots[componentIndex].copyOf(freeSlots[componentIndex].size * 2)
+        }
+        freeSlots[componentIndex][freeSlotCount[componentIndex]++] = slot
+        slots[cell] = ABSENT
+        return true
     }
 
     /** The columnar store for the component at dense [componentIndex]. */

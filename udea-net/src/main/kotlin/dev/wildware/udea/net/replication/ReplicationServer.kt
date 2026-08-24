@@ -14,6 +14,7 @@ import dev.wildware.udea.net.input.JitterBuffer
 import dev.wildware.udea.net.transport.LoopbackNetwork
 import dev.wildware.udea.net.transport.PeerId
 import dev.wildware.udea.net.transport.Transport
+import dev.wildware.udea.net.wire.BaselineSet
 import dev.wildware.udea.net.wire.EntityOp
 import dev.wildware.udea.net.wire.FrameReader
 import dev.wildware.udea.net.wire.FrameWriter
@@ -82,6 +83,7 @@ public class ReplicationServer(
     private val frames = FrameWriter(writer)
     private val section = SnapshotWriter(registry)
     private val selector = PrioritySelector()
+    private val baselines = BaselineSet()
     private val states = LinkedHashMap<Int, ClientReplicationState>()
     private val jitterBuffers = LinkedHashMap<Int, JitterBuffer>()
 
@@ -91,6 +93,32 @@ public class ReplicationServer(
 
     /** Entities dropped from a datagram because the budget was spent. They win the next tick. */
     public var budgetDeferrals: Long = 0L
+        private set
+
+    /**
+     * `Destroy` records that did not fit this datagram and will be written again next tick.
+     *
+     * Removals are written before anything else, so this is only ever non-zero when the destroys
+     * *alone* exceed the budget - a wave dying at once. It is counted rather than assumed away
+     * because the failure it replaces was silent: a truncated section loses destroys, and a
+     * client keeps corpses that the server deleted with nothing anywhere saying so.
+     */
+    public var removalDeferrals: Long = 0L
+        private set
+
+    /**
+     * `Leave` records written: an entity the client held and [relevancy] has stopped allowing.
+     *
+     * Counted separately from a `Destroy` because they mean opposite things about the world - a
+     * destroy says the entity is gone, a leave says only that this client may no longer see it -
+     * and because a fog implementation that thrashes shows up here as a number that climbs with
+     * nothing dying.
+     */
+    public var leaveWrites: Long = 0L
+        private set
+
+    /** Entities written in full because the client had confirmed a `Leave` and is being given the entity back. */
+    public var reentries: Long = 0L
         private set
 
     /** Registers [peer] and returns its state. Idempotent. */
@@ -184,13 +212,21 @@ public class ReplicationServer(
             baselineTick = state.lastAckedTick,
             hasBaseline = hasBaseline,
             hasAck = state.remoteSeq >= 0,
+            // Which *command* this tick was simulated with, so the client can reconcile against
+            // the right point in its own history. See `PacketHeader.inputAck`.
+            inputAck = jitterBuffers[client.raw]?.lastProcessedInputSeq ?: PacketHeader.NO_INPUT_ACK,
         ).write(writer)
 
         val payload = frames.beginMessage(MessageType.Snapshot)
         section.begin()
-        val budgetBytes = budget.bytesPerPacket
+        // The section still has to be closed and the frame still has to be byte-aligned after the
+        // last record fits, and neither is free. Packing to the literal end of the datagram and
+        // then discovering that the terminator does not fit throws out of `send` with a full
+        // buffer and no way to rewind to anything sendable - so the ceiling the packer works to
+        // is the buffer minus that tail, never the buffer.
+        val budgetBytes = minOf(budget.bytesPerPacket, buffer.size - SECTION_TAIL_BYTES)
 
-        writeRemovals(payload, state, fields, seq, current.tick)
+        writeRemovals(payload, state, fields, seq, current.tick, budgetBytes)
         accumulateAndSelect(state, fields, current.tick)
         packSelected(payload, state, current, fields, seq, budgetBytes)
 
@@ -202,11 +238,26 @@ public class ReplicationServer(
     }
 
     /**
-     * Emits a `Destroy` for every entity this client believes in that the world no longer has.
+     * Emits a removal for every entity this client believes in that it must stop believing in.
      *
      * Walks the client's own baseline generations rather than a separate roster: the roster
      * already exists, as the set of indices the client has acked, and a second one is a second
      * thing that can disagree.
+     *
+     * ## Two reasons, two ops
+     *
+     * `Destroy` - the world no longer has the entity. `Leave` - the world still has it, but
+     * [relevancy] says this client may not be told about it. The client's *store* treats the two
+     * identically (the row goes), and that is correct; the distinction is for the game above it,
+     * where a corpse plays a death animation and a unit walking into fog simply stops being
+     * drawn. Under [RelevancySet.ALL_VISIBLE] the `Leave` arm is unreachable, which is why
+     * turning fog on is the only thing that can change any existing behaviour here.
+     *
+     * Both are re-written every tick until an ack confirms them, for the same reason: a lost
+     * removal that were written once would leave the client holding the entity for ever, and -
+     * worse for a `Leave` - the entity could never be given back, because the server would think
+     * the client had it. That is what makes this loop walk *state* rather than a per-tick event
+     * list: the state is still true next tick, so the record is simply written again.
      */
     private fun writeRemovals(
         out: BitWriter,
@@ -214,16 +265,43 @@ public class ReplicationServer(
         fields: WorldFieldStore,
         seq: Int,
         tick: Tick,
+        budgetBytes: Int,
     ) {
         for (index in 0 until state.trackedIndices) {
             val generation = state.trackedGeneration(index)
             if (generation < 0) continue
             val netId = NetId.of(index, generation)
-            if (fields.rowOf(netId) != WorldFieldStore.NO_ROW) continue
-            section.writeRemoval(out, netId, EntityOp.Destroy)
-            state.markDestroyPending(netId)
+            val gone = fields.rowOf(netId) == WorldFieldStore.NO_ROW
+            val op = when {
+                gone -> EntityOp.Destroy
+                !relevancy.isRelevant(state.peer, netId) -> EntityOp.Leave
+                else -> continue
+            }
+
+            // Enough units dying in one tick will fill a datagram with destroys alone. The
+            // section must not be truncated mid-record: the same rollback pair the entity packer
+            // uses puts the bytes and the delta chain back, and the destroys that did not fit
+            // are simply not marked pending, so they are written again next tick.
+            val mark = writer.bitPosition
+            val cursor = section.cursor()
+            try {
+                section.writeRemoval(out, netId, op)
+            } catch (overflow: BitBufferOverflow) {
+                writer.truncateTo(mark)
+                section.rewindTo(cursor)
+                removalDeferrals++
+                return
+            }
+            if (writer.byteLength > budgetBytes) {
+                writer.truncateTo(mark)
+                section.rewindTo(cursor)
+                removalDeferrals++
+                return
+            }
+            state.markDestroyPending(netId, tick)
+            if (op == EntityOp.Leave) leaveWrites++
             // Recorded like any other entity in the packet, so the ack that confirms the datagram
-            // is what retires the id — and an unacked Destroy is simply written again next tick.
+            // is what retires the id — and an unacked removal is simply written again next tick.
             state.recordSent(netId, seq, tick)
         }
     }
@@ -256,16 +334,25 @@ public class ReplicationServer(
             val row = fields.rowOf(netId)
             if (row == WorldFieldStore.NO_ROW) continue
 
+            // The client confirmed a removal for this slot and the entity is back in view. The
+            // slot must start over, because `RETIRED` is deliberately terminal in the ack path:
+            // without this the entity is written in full every tick for ever, since no ack can
+            // ever promote it back to a baseline.
+            if (state.isRetired(netId.index)) {
+                state.forget(netId)
+                reentries++
+            }
+
             val mark = writer.bitPosition
             val cursor = section.cursor()
             val baselineTick = state.baselineTickOf(netId)
-            val baseline = baselineFor(baselineTick)
+            val delta = collectBaselines(state, netId, baselineTick)
             val written = try {
-                if (baseline == null) {
+                if (!delta) {
                     if (baselineTick != ClientReplicationState.NO_BASELINE) baselineRecoveries++
                     section.writeCreate(out, fields, row)
                 } else {
-                    section.writeUpdate(out, fields, row, baseline.fields, baseline.fields.rowOf(netId))
+                    section.writeUpdate(out, fields, row, baselines)
                 }
             } catch (overflow: BitBufferOverflow) {
                 // The datagram filled mid-entity. Both rollbacks together: the bytes, and the
@@ -294,15 +381,56 @@ public class ReplicationServer(
     }
 
     /**
-     * The ring slot for [baselineTick], or null when there is no usable baseline.
+     * Fills [baselines] with every state [client] could be holding for [netId].
      *
-     * Null means "write it in full": either the client has never acked this entity, or the tick
-     * it acked has aged out of the ring. Both are the same recovery, and neither needs a message.
+     * That set is the acked baseline **plus every send since that has not been acknowledged**,
+     * and getting it wrong is the whole of the convergence defect this replaces. The server's
+     * baseline moves on an ack; the client's store moves on an apply; they are a round trip
+     * apart. Diffing against the acked tick alone omits any field that changed and changed back
+     * inside that window, and the client keeps the intermediate value permanently - which is
+     * what "disagree at tick 204 on Attributes" was.
+     *
+     * @return true when a delta can be written; false means write the entity in full, because
+     *   the client has never acked it, the tracking overflowed, or one of the states it might be
+     *   holding has aged out of the ring and cannot be diffed against. All three are the same
+     *   recovery and none of them needs a message.
      */
-    private fun baselineFor(baselineTick: Long): WorldSnapshot? {
-        if (baselineTick == ClientReplicationState.NO_BASELINE) return null
-        val tick = Tick(baselineTick)
+    private fun collectBaselines(
+        state: ClientReplicationState,
+        netId: NetId,
+        baselineTick: Long,
+    ): Boolean {
+        baselines.clear()
+        if (baselineTick == ClientReplicationState.NO_BASELINE) return false
+        val pending = state.pendingSendCount(netId)
+        if (pending == ClientReplicationState.PENDING_OVERFLOW) return false
+        val acked = snapshotAt(baselineTick) ?: return false
+        baselines.add(acked.fields, acked.fields.rowOf(netId))
+        for (position in 0 until pending) {
+            val tick = state.pendingSendTick(netId, position)
+            if (tick <= baselineTick) continue
+            val snapshot = snapshotAt(tick) ?: return false
+            baselines.add(snapshot.fields, snapshot.fields.rowOf(netId))
+        }
+        return true
+    }
+
+    /** The ring slot for exactly [tickValue], or null when the ring no longer holds it. */
+    private fun snapshotAt(tickValue: Long): WorldSnapshot? {
+        val tick = Tick(tickValue)
         if (!ring.holds(tick)) return null
         return ring.nearestAtOrBefore(tick)?.takeIf { it.tick == tick }
+    }
+
+    public companion object {
+
+        /**
+         * Bytes held back from the packer for the section terminator and the frame's alignment.
+         *
+         * Two bytes for the terminating zig-zag, one for aligning the frame to a byte boundary,
+         * and one of slack. Reserving four bytes of a datagram is not a measurable cost; running
+         * out of room for the terminator is a thrown `BitBufferOverflow` at the top of `send`.
+         */
+        public const val SECTION_TAIL_BYTES: Int = 4
     }
 }

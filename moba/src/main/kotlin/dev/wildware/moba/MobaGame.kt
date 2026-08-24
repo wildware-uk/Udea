@@ -245,7 +245,10 @@ public object MobaGame {
                 ComponentSchema.of(
                     PlayerReplicator,
                     "Player",
-                    listOf(FieldKind.Float, FieldKind.Float, FieldKind.Float),
+                    // facing, moveX, moveY, owner - the generated replicator orders fields by
+                    // name, and `ComponentSchema.of` refuses a list that is not the same length
+                    // and the same order as `PlayerReplicator.fieldNames`.
+                    listOf(FieldKind.Float, FieldKind.Float, FieldKind.Float, FieldKind.Int),
                 ),
                 Player,
             ) { Player() },

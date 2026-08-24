@@ -13,6 +13,7 @@ import dev.wildware.udea.core.Tick
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -51,10 +52,14 @@ class NetAntiCheatTest {
             val server = live.server
             val champion = server.playerId
 
-            // Client 1 joined first, so it drives the level's one `Player`. Client 2 is a
-            // spectator: it owns nothing at all.
+            // Client 1 joined first, so it claimed the level's authored `Player`. Client 2 is
+            // not a spectator any more - it drives a champion of its own, which is exactly why
+            // "fire somebody else's" is still a question worth asking.
             assertEquals(PeerId.client(1), server.controllingPeer())
             assertEquals(PeerId.client(1), server.ownership.ownerOf(champion))
+            assertEquals(champion, server.championOf(PeerId.client(1)))
+            val theirs = assertNotNull(server.championOf(PeerId.client(2)))
+            assertTrue(theirs != champion, "both clients were seated on the same champion")
             assertEquals(PeerId.SERVER, server.ownership.ownerOf(anAiUnit(live, champion)))
 
             // --- the attack: client 2 fires client 1's champion ---
@@ -106,19 +111,36 @@ class NetAntiCheatTest {
     }
 
     @Test
-    fun `a spectator promoted to controller may then fire, and the departed peer may not`() {
-        // Ownership follows the controller, or a reconnect leaves a game nobody can play.
+    fun `a departed peer's champion is released, and the next joiner inherits it`() {
+        // A reconnect must be able to play, and a peer that left must not - which are two facts
+        // about the *same* champion now that every connection has one of its own.
         MobaLoopbackSession(clientCount = 2).use { live ->
             live.step(WARMUP)
-            val champion = live.server.playerId
-            live.server.removeClient(PeerId.client(1))
+            val server = live.server
+            val champion = server.playerId
+            val theirs = assertNotNull(server.championOf(PeerId.client(2)))
 
-            assertEquals(PeerId.client(2), live.server.controllingPeer())
-            assertNull(attack(live, PeerId.client(2), champion, MELEE), "the new controller was refused")
+            server.removeClient(PeerId.client(1))
+            assertEquals(PeerId.client(2), server.controllingPeer())
             assertIs<RpcRefusal.NotOwner>(
                 attack(live, PeerId.client(1), champion, MELEE),
                 "a peer that left still owned its champion",
             )
+            // The second player is untouched by the first one's departure. Under the old
+            // one-champion rule this peer was *promoted* onto the leaver's unit; there is nothing
+            // to promote it to now, and it keeps playing the game it was already playing.
+            assertEquals(theirs, server.championOf(PeerId.client(2)))
+            assertNull(attack(live, PeerId.client(2), theirs, MELEE), "an untouched peer was refused")
+            assertIs<RpcRefusal.NotOwner>(
+                attack(live, PeerId.client(2), champion, MELEE),
+                "a released champion was fired by somebody who does not own it",
+            )
+
+            // The reconnect. It reclaims the released entity rather than spawning a third, which
+            // is what stops a server that has been joined and left all evening holding a field of
+            // idle soldiers.
+            assertEquals(champion, server.addClient(PeerId.client(3)))
+            assertNull(attack(live, PeerId.client(3), champion, MELEE), "the reconnect was refused")
         }
     }
 

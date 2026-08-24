@@ -3,8 +3,11 @@ package dev.wildware.udea.agent.host.net
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.net.input.MoveInput
+import dev.wildware.udea.net.relevancy.FogOfWar
+import dev.wildware.udea.net.relevancy.VisionGrid
 import dev.wildware.udea.net.replication.Desync
 import dev.wildware.udea.net.replication.DesyncReport
+import dev.wildware.udea.net.replication.RelevancySet
 import dev.wildware.udea.net.replication.ReplicationClient
 import dev.wildware.udea.net.replication.ReplicationServer
 import dev.wildware.udea.net.transport.NetConditions
@@ -92,6 +95,17 @@ public class NetSession(
     public val seed: Long,
     /** The conditions every link starts on. */
     initialConditions: NetConditions = NetConditions.PERFECT,
+
+    /**
+     * Sight radius of every avatar, in world units, or zero for no fog at all.
+     *
+     * Zero by default, and that default is load-bearing rather than timid: every existing
+     * `net.*` session, every desync hunt and the two-process UDP proof all assume each client is
+     * told about every entity, and silently turning that off would make the transport tools lie.
+     * A session asks for fog explicitly, gets [FogOfWar] as its `RelevancySet`, and the clients
+     * are split alternately across two teams so there is something to be hidden from.
+     */
+    public val visionRadius: Float = 0f,
 ) {
 
     init {
@@ -110,28 +124,84 @@ public class NetSession(
     /** This build's protocol, shared by both ends. */
     public val protocol: ProtocolDescriptor = ProtocolDescriptor.of(arena.registry)
 
+    /**
+     * Per-team fog, or null when [visionRadius] is zero.
+     *
+     * The grid is centred on the arena's origin and sized for the whole area an avatar can reach
+     * in a ten-second step, so nothing this session can do walks off it - and a body that somehow
+     * did would clamp into an edge cell rather than vanish.
+     */
+    public val fog: FogOfWar? = if (visionRadius <= 0f) {
+        null
+    } else {
+        FogOfWar(
+            grid = VisionGrid(
+                originX = -FOG_EXTENT,
+                originY = -FOG_EXTENT,
+                cellSize = FOG_CELL,
+                columns = FOG_CELLS,
+                rows = FOG_CELLS,
+            ),
+            teams = FOG_TEAMS,
+        )
+    }
+
     /** The authority. */
     public val server: ReplicationServer = ReplicationServer(
         registry = arena.registry,
         protocol = protocol,
         transport = harness.transport(PeerId.SERVER),
         ring = arena.ring,
+        relevancy = fog ?: RelevancySet.ALL_VISIBLE,
     )
 
     private val held = Array(clients + 1) { HeldInput() }
 
     private val avatars = arrayOfNulls<NetId>(clients + 1)
 
+    /**
+     * How far apart the avatars spawn.
+     *
+     * Three sight radii, so a fogged session starts with every client out of every other client's
+     * vision and `net.assert_not_visible` has something true to assert from tick one. Zero without
+     * fog, which is the arrangement every pre-existing test was written against.
+     */
+    private val spawnSpacing: Float = if (fog == null) 0f else visionRadius * SPAWN_SPACING_RADII
+
     /** The client ends, `client(1)` first. */
     public val ends: List<ReplicationClient> = (1..clients).map { index ->
         val peer = PeerId.client(index)
         server.addClient(peer)
-        avatars[index] = arena.spawn(owner = index, x = 0f, y = 0f)
+        fog?.assign(peer, teamOf(index))
+        // Spread the avatars apart, so fog has something to hide. With no fog this is the old
+        // shared origin plus a per-client offset, which no existing assertion depends on.
+        avatars[index] = arena.spawn(owner = index, x = index * spawnSpacing, y = 0f)
         ReplicationClient(peer, arena.registry, protocol, harness.transport(peer))
     }
 
     /** The index of `NetAvatar` in the shared registry. Resolved once; it never moves. */
     private val avatarComponent: Int = arena.registry.indexOf(NetAvatarReplicator.typeId)
+
+    /** Which team client [client] is on: clients alternate, so two clients are already opponents. */
+    public fun teamOf(client: Int): Int = (client - 1) % FOG_TEAMS
+
+    /**
+     * Feeds this tick's positions to the fog solve. A no-op when the session has no fog.
+     *
+     * Called immediately before the broadcast and immediately after the capture, so the vision
+     * the packer filters against is vision of the state it is about to send - a solve run against
+     * last tick's positions would hide a body that had just stepped into the light.
+     */
+    private fun solveFog() {
+        val live = fog ?: return
+        live.beginSolve(arena.tick)
+        for (index in 1..clients) {
+            val netId = avatars[index] ?: continue
+            val avatar = arena.avatar(netId)
+            live.observe(netId, avatar.x, avatar.y, teamOf(index), visionRadius)
+        }
+        live.endSolve()
+    }
 
     init {
         harness.register(ServerEndpoint())
@@ -289,6 +359,7 @@ public class NetSession(
             }
             arena.captureTick()
             val captured = arena.newest() ?: error("the arena captured nothing this tick")
+            solveFog()
             server.broadcast(captured)
         }
     }
@@ -335,6 +406,18 @@ public class NetSession(
         public const val MAX_STEP: Int = 600
 
         private const val MILLIS_PER_SECOND: Int = 1_000
+
+        /** Two sides, so `clients = 2` already puts one client in the other's fog. */
+        public const val FOG_TEAMS: Int = 2
+
+        /** Half the fog grid's width in world units. Far past anything a stepped avatar reaches. */
+        private const val FOG_EXTENT: Float = 512f
+
+        /** Three sight radii between spawns: outside sight even with the hysteresis band. */
+        private const val SPAWN_SPACING_RADII: Float = 3f
+
+        private const val FOG_CELL: Float = 16f
+        private const val FOG_CELLS: Int = 64
     }
 }
 

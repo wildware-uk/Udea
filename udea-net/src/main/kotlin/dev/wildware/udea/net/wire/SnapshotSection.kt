@@ -69,6 +69,54 @@ public fun interface SnapshotApplySink {
 }
 
 /**
+ * The states a client may be holding for one entity, which is what a delta has to be safe against.
+ *
+ * Not "the baseline", singular. A client's store moves when it *applies* a packet and the
+ * server's baseline moves when it sees one *acknowledged*, so between them sits a round trip's
+ * worth of sends that may or may not have landed. Every one of those is a state the client could
+ * be sitting on right now, and a delta that is only correct against the acked one is only usually
+ * correct. Holding them all is what turns "usually" into "provably".
+ *
+ * Rows, not copies: each member is a row of a snapshot the ring already holds (spec 3.1), so a
+ * set of eighteen in-flight states costs eighteen ints and no world state at all.
+ */
+public class BaselineSet {
+
+    private var stores = arrayOfNulls<WorldFieldStore>(INITIAL)
+    private var rows = IntArray(INITIAL)
+
+    /** How many baselines are in the set. */
+    public var size: Int = 0
+        private set
+
+    /** Empties the set for the next entity. Keeps the buffers. */
+    public fun clear() {
+        size = 0
+    }
+
+    /** Adds [row] of [store]. [WorldFieldStore.NO_ROW] is a legal member: "absent back then". */
+    public fun add(store: WorldFieldStore, row: Int) {
+        if (size == stores.size) {
+            stores = stores.copyOf(size * 2)
+            rows = rows.copyOf(size * 2)
+        }
+        stores[size] = store
+        rows[size] = row
+        size++
+    }
+
+    /** The store of baseline [position]. */
+    public fun storeAt(position: Int): WorldFieldStore = stores[position]!!
+
+    /** The row of baseline [position], or [WorldFieldStore.NO_ROW]. */
+    public fun rowAt(position: Int): Int = rows[position]
+
+    private companion object {
+        private const val INITIAL: Int = 8
+    }
+}
+
+/**
  * Writes the delta snapshot section: self-describing, length-prefixed, delta-encoded.
  *
  * ## Layout
@@ -82,7 +130,16 @@ public fun interface SnapshotApplySink {
  *     repeat:
  *       varint typeIdDelta   -- ComponentTypeId minus the previous one; 0 terminates
  *       <Replicator.write>   -- the field mask, then the selected fields
+ *                            -- an all-zero field mask is "this component was removed"
  * ```
+ *
+ * ## The removal record spends a code point that was already unreachable
+ *
+ * A component the server drops has to be sayable, or a client keeps it for ever - which is what
+ * `moba` did with `Combatant` on a dead unit. It is spelled as a field mask with no bits set
+ * rather than a fifth [EntityOp], because the writer skips a component it has nothing to say
+ * about instead of emitting an empty mask for it: the encoding was unreachable, so spending it
+ * costs no bits, moves no existing field, and needs no `op` widening (two bits, four ops, full).
  *
  * Every one of those pieces is a direct answer to `PacketUtil.kt:122-129` and `:168-181`, which
  * streamed a Fleks `ComponentBag` in bag order with **no type tag and no length prefix**. A
@@ -114,6 +171,8 @@ public class SnapshotWriter(
     public val registry: ComponentRegistry,
 ) {
 
+    private val single = BaselineSet()
+
     private var previousIndex = NO_PREVIOUS
 
     /** Starts a section. Resets the delta chain. */
@@ -144,8 +203,10 @@ public class SnapshotWriter(
      *
      * @return the number of components written.
      */
-    public fun writeCreate(out: BitWriter, current: WorldFieldStore, row: Int): Int =
-        writeEntity(out, current, row, EntityOp.Create, null, WorldFieldStore.NO_ROW)
+    public fun writeCreate(out: BitWriter, current: WorldFieldStore, row: Int): Int {
+        single.clear()
+        return writeEntity(out, current, row, EntityOp.Create, single)
+    }
 
     /**
      * Writes a delta `Update` for [row] against [baselineRow] of [baseline].
@@ -162,7 +223,40 @@ public class SnapshotWriter(
         row: Int,
         baseline: WorldFieldStore,
         baselineRow: Int,
-    ): Int = writeEntity(out, current, row, EntityOp.Update, baseline, baselineRow)
+    ): Int {
+        single.clear()
+        single.add(baseline, baselineRow)
+        return writeEntity(out, current, row, EntityOp.Update, single)
+    }
+
+    /**
+     * Writes a delta `Update` for [row] that is correct against **every** state in [baselines].
+     *
+     * One baseline is not enough and that is the whole convergence fix. A delta names only the
+     * fields that differ from the state it was diffed against, so it is only safe to apply to
+     * that exact state — and the state a client is holding is the newest packet it *applied*,
+     * while the server's baseline is the newest packet it saw *acknowledged*. Those are a round
+     * trip apart. A field that changes and changes back inside that window equals the baseline
+     * again when the packer looks at it, so it is omitted, and the client keeps the intermediate
+     * value for ever.
+     *
+     * The set of states the client can be holding is small, known and named by [baselines]: the
+     * acked baseline, plus every send since that has not been acknowledged. Writing the union of
+     * the differences against all of them means that whichever one the client actually has, every
+     * field that could be wrong is overwritten with an absolute value, and every field not
+     * written is provably already right. There is no probability in it and no repair message.
+     *
+     * A component absent now but present in any of [baselines] is written as a **removal**
+     * record, which is how a component the server dropped stops existing on a client.
+     *
+     * @return the number of component records written; zero means nothing was emitted.
+     */
+    public fun writeUpdate(
+        out: BitWriter,
+        current: WorldFieldStore,
+        row: Int,
+        baselines: BaselineSet,
+    ): Int = writeEntity(out, current, row, EntityOp.Update, baselines)
 
     /** Writes a [EntityOp.Destroy] or [EntityOp.Leave] record for [netId]. */
     public fun writeRemoval(out: BitWriter, netId: NetId, op: EntityOp) {
@@ -186,32 +280,56 @@ public class SnapshotWriter(
         current: WorldFieldStore,
         row: Int,
         op: EntityOp,
-        baseline: WorldFieldStore?,
-        baselineRow: Int,
+        baselines: BaselineSet,
     ): Int {
         val netId = current.netIdAt(row)
         var written = 0
         var previousTypeId = -1
         var headerWritten = false
         for (componentIndex in 0 until registry.size) {
-            if (!current.isPresent(row, componentIndex)) continue
             val replicator = registry.typeAt(componentIndex).replicator
+            val present = current.isPresent(row, componentIndex)
+
+            if (!present) {
+                // Present in a state the client may be holding and gone now: say so, or the
+                // client keeps a component the server has dropped for the rest of the session.
+                if (op == EntityOp.Create || !anyBaselineHas(baselines, componentIndex)) continue
+                if (!headerWritten) {
+                    writeEntityHeader(out, netId, op)
+                    headerWritten = true
+                }
+                out.writeVarInt(replicator.typeId.raw - previousTypeId)
+                previousTypeId = replicator.typeId.raw
+                MaskOps.writeTo(MaskOps.EMPTY, out, replicator.fieldNames.size)
+                written++
+                continue
+            }
+
             val slot = current.componentSlotAt(row, componentIndex)
             val store = current.storeAt(componentIndex)
-
-            val hasBaseline = baseline != null &&
-                baselineRow != WorldFieldStore.NO_ROW &&
-                baseline.isPresent(baselineRow, componentIndex)
-
-            val mask = if (op == EntityOp.Create || !hasBaseline) {
-                // No baseline bits exist for this component, so a delta would be a delta against
-                // nothing. Full mask, whatever the op on the entity as a whole is.
+            val mask = if (op == EntityOp.Create || !allBaselinesHave(baselines, componentIndex)) {
+                // At least one state the client might hold has no bits for this component, so a
+                // delta would be a delta against nothing. Full mask, whatever the entity's op is.
                 LifetimePolicy.fullMask(replicator)
             } else {
-                val baselineStore = baseline.storeAt(componentIndex)
-                val baselineSlot = baseline.componentSlotAt(baselineRow, componentIndex)
-                val changed = diffAcross(replicator, store, slot, baselineStore, baselineSlot)
-                MaskOps.and(changed, LifetimePolicy.deltaMask(replicator))
+                val delta = LifetimePolicy.deltaMask(replicator)
+                var changed = MaskOps.EMPTY
+                for (position in 0 until baselines.size) {
+                    val baseline = baselines.storeAt(position)
+                    val baselineRow = baselines.rowAt(position)
+                    changed = MaskOps.or(
+                        changed,
+                        diffAcross(
+                            replicator,
+                            store,
+                            slot,
+                            baseline.storeAt(componentIndex),
+                            baseline.componentSlotAt(baselineRow, componentIndex),
+                        ),
+                    )
+                    if (MaskOps.containsAll(changed, delta)) break
+                }
+                MaskOps.and(changed, delta)
             }
             if (MaskOps.isEmpty(mask)) continue
 
@@ -226,6 +344,27 @@ public class SnapshotWriter(
         }
         if (headerWritten) out.writeVarInt(0)
         return written
+    }
+
+    /** Whether every baseline in [baselines] carries [componentIndex]. False for an empty set. */
+    private fun allBaselinesHave(baselines: BaselineSet, componentIndex: Int): Boolean {
+        if (baselines.size == 0) return false
+        for (position in 0 until baselines.size) {
+            val row = baselines.rowAt(position)
+            if (row == WorldFieldStore.NO_ROW) return false
+            if (!baselines.storeAt(position).isPresent(row, componentIndex)) return false
+        }
+        return true
+    }
+
+    /** Whether any baseline in [baselines] carries [componentIndex]. */
+    private fun anyBaselineHas(baselines: BaselineSet, componentIndex: Int): Boolean {
+        for (position in 0 until baselines.size) {
+            val row = baselines.rowAt(position)
+            if (row == WorldFieldStore.NO_ROW) continue
+            if (baselines.storeAt(position).isPresent(row, componentIndex)) return true
+        }
+        return false
     }
 
     private fun writeEntityHeader(out: BitWriter, netId: NetId, op: EntityOp) {
@@ -309,7 +448,15 @@ public class SnapshotReader(
                     sink.applied(netId, op, NO_COMPONENT, MaskOps.EMPTY)
                 }
 
-                EntityOp.Create -> readComponents(src, into, netId, into.createRow(netId), op, sink)
+                // A Create is a full state, and it is also the recovery a client gets when its
+                // baseline aged out of the ring. Dropping the row first is what makes it mean
+                // *this and nothing else*: keeping the old row would leave components the entity
+                // no longer carries attached to it, which is the same hole a removal record
+                // closes for the delta path.
+                EntityOp.Create -> {
+                    into.destroy(netId)
+                    readComponents(src, into, netId, into.createRow(netId), op, sink)
+                }
 
                 EntityOp.Update -> {
                     val row = into.rowOf(netId)
@@ -351,6 +498,11 @@ public class SnapshotReader(
             val replicator = registry.typeAt(componentIndex).replicator
             val slot = into.claimSlot(row, componentIndex)
             val mask = replicator.read(src, into.storeAt(componentIndex), slot)
+            // An all-zero field mask is the component removal record. It is free rather than a
+            // fifth `EntityOp` because the writer never emits an empty mask for a component that
+            // is still there - it skips it - so the code point was already unreachable, and
+            // spending it costs no bits and does not move a single existing field on the wire.
+            if (MaskOps.isEmpty(mask)) into.releaseSlot(row, componentIndex)
             sink.applied(netId, op, componentIndex, mask)
         }
     }

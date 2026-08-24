@@ -109,36 +109,37 @@ public object MobaUdpProof {
     }
 
     /**
-     * The two components a client is **not** required to match the server on, and why.
+     * The components a client is **not** required to match the server on. **Empty.**
      *
-     * Both are named engine defects with a measurement behind them, not conveniences. Every other
-     * replicated component is required to agree field for field, and `MobaUdpTwoProcessTest`
-     * fails if one of them ever stops.
+     * It was not. Two entries lived here, each with a measurement behind it, and both were engine
+     * defects rather than conveniences. Both are now fixed, and the set is kept - as an empty set
+     * rather than deleted - because it is the one place in the tree that says what replication is
+     * *not* promising, and a future exclusion must be argued for here in the same terms.
      *
-     * `Combatant` - **the wire has no per-component removal op.** `moba` drops `Combatant` when a
-     * unit dies and adds it back on respawn. `SnapshotSection.writeEntity` only ever walks the
-     * components an entity *currently* has, so a component present in the baseline and absent
-     * now produces no bytes at all. The client keeps it for ever. This one accumulates
-     * monotonically: over 480 ticks of the real battle it grows from nothing to most of the
-     * roster, and it is identical on a perfect link and a lossy one, which is what rules loss out.
+     * `Combatant` was excused because **the wire had no per-component removal op**. `moba` drops
+     * `Combatant` when a unit dies and adds it back on respawn; `SnapshotSection.writeEntity` only
+     * ever walked the components an entity currently had, so a component present in the baseline
+     * and absent now produced no bytes and the client kept it for ever. It accumulated
+     * monotonically and was identical on a perfect link and a lossy one, which is what ruled loss
+     * out as the cause. Fixed in two halves: an all-zero field mask is now a removal record on the
+     * wire (a code point the writer could never previously emit, so no layout changed), and
+     * `ReplicaApplier` now calls `ReplicatedComponentType.removeFrom` for a component the store
+     * has stopped holding instead of skipping it - which it did, so the wire fix alone changed
+     * nothing on a Fleks client.
      *
-     * `CharacterView` - **a field that changed and changed back inside one acknowledgement window
-     * is lost.** `ReplicationServer` delta-encodes each entity against the newest packet the
-     * client has *acknowledged*; `ReplicationClient` merges the delta into its *current* state,
-     * which is newer than the acked one for as long as an ack is in flight - which is always. A
-     * field equal at the baseline tick and at the send tick, but different in between, is absent
-     * from the mask, so the client keeps a value the server never held. Only oscillating fields
-     * are affected, which in `moba` is `CharacterView.state` and `.flipX`; positions, health,
-     * attributes and match state move monotonically inside a window and are always in the mask.
-     * Re-pointing the server's baseline at the last *sent* tick makes every one of these
-     * disappear on a clean link, which is the diagnosis - not the fix, since a lost packet then
-     * makes the baseline a state the client never received. The fix is a per-tick client history
-     * and a per-entity baseline tick on the wire.
+     * `CharacterView` was excused because **a field that changed and changed back inside one
+     * acknowledgement window was lost**. The server delta-encoded each entity against the newest
+     * packet the client had *acknowledged*, while the client merged deltas into its *current*
+     * state, which is newer than the acked one for as long as an ack is in flight - which is
+     * always. A field equal at the baseline tick and at the send tick but different in between was
+     * absent from the mask, so the client kept a value the server never held. Only oscillating
+     * fields were affected, which in `moba` is `CharacterView.state` and `.flipX`. Fixed by
+     * diffing against the union of the acked baseline **and every unacknowledged send**: whichever
+     * of those states the client is holding, every field that could be wrong is in the mask.
      *
-     * Neither exclusion may become permanent. This is the honest boundary of what today's
-     * replication design can promise, written where it will be deleted when that changes.
+     * `MobaUdpTwoProcessTest` fails if any replicated component stops agreeing field for field.
      */
-    public val EXCUSED_COMPONENTS: Set<String> = setOf("Combatant", "CharacterView")
+    public val EXCUSED_COMPONENTS: Set<String> = emptySet()
 
     /**
      * One hash per replicated component, folded over the `GameUnit` roster only.

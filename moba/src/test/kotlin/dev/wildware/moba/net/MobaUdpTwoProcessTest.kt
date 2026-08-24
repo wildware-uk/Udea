@@ -38,22 +38,19 @@ import kotlin.test.fail
  *
  * ## The residue, stated rather than hidden
  *
- * Three things genuinely differ between a client and the server, and none of them is a transport
- * defect. They are why the asserted hash is over the `GameUnit` roster
- * ([NetStateProbe.unitHash]) minus `CharacterView`, rather than over the whole world:
+ * The per-component assertion now covers **every** replicated component: [MobaUdpProof.EXCUSED_COMPONENTS]
+ * is empty, and that KDoc says which two defects used to be in it and how each was fixed. One
+ * thing still legitimately differs, and it is why the asserted hash is over the `GameUnit` roster
+ * ([NetStateProbe.unitHash]) rather than over the whole world:
  *
- *  1. **In-flight projectiles** are created and destroyed between the two captures, and a
- *     recycled `NetId` index waits one acknowledgement before its new occupant is sent - so a
- *     whole-world fold is very often one entity short at any given tick.
- *  2. **A component removed on the server is never removed on a client**: the wire has no
- *     per-component removal op, so `moba`'s `Combatant`, dropped when a unit dies, sticks to a
- *     client's copy for ever. That one accumulates monotonically and is a missing engine feature.
- *  3. **A field that changed and changed back inside one acknowledgement window is lost**, which
- *     is [MobaUdpProof.AGREED_COMPONENTS]' whole subject. In `moba` that is exactly
- *     `CharacterView.state` and `.flipX`.
+ *  - **In-flight projectiles** are created and destroyed between the two captures, and a recycled
+ *    `NetId` index waits one acknowledgement before its new occupant is sent - so a whole-world
+ *    fold is very often one entity short at any given tick. That is the replication protocol
+ *    working, not failing: an index cannot carry a new entity while the client's `Destroy` for the
+ *    old one is unacknowledged, or the client would delete the entity it had just been given.
  *
- * The whole-roster hash is printed on every run beside the asserted one, so the day any of the
- * three is fixed the transcript says so.
+ * The whole-roster hash is printed on every run beside the asserted one. It is printed and not
+ * asserted for the reason above: it folds the projectiles too.
  */
 class MobaUdpTwoProcessTest {
 
@@ -147,9 +144,10 @@ class MobaUdpTwoProcessTest {
                     assertEquals(
                         emptyList(),
                         disagreed - MobaUdpProof.EXCUSED_COMPONENTS,
-                        "${client.name} and the server disagree at tick $at on a component that " +
-                            "has no excuse. The only two that do are named in " +
-                            "MobaUdpProof.EXCUSED_COMPONENTS, each with the measurement behind it",
+                        "${client.name} and the server disagree at tick $at on a replicated " +
+                            "component. Nothing is excused any more - " +
+                            "MobaUdpProof.EXCUSED_COMPONENTS is empty, and its KDoc says which " +
+                            "two defects used to be in it and how each was fixed",
                     )
                     assertTrue(state.getValue("applied") > MIN_APPLIED, "${client.name} received almost nothing")
                 }
@@ -247,8 +245,15 @@ class MobaUdpTwoProcessTest {
 
         const val PACKAGE = "dev.wildware.moba.net"
 
-        /** The roster `level/test_level` spawns: three factions, twenty-seven units. */
-        const val UNITS = 27L
+        /**
+         * The roster on the field: `level/test_level`'s twenty-seven, plus one spawned champion.
+         *
+         * The level authors twenty-seven units and one of them carries `Player`, which the first
+         * connection claims. The **second** connection is no longer a spectator - `addClient`
+         * spawns it a soldier of its own so two humans can play - so a two-client run has
+         * twenty-eight `GameUnit`s in it, and both clients replicate all twenty-eight.
+         */
+        const val UNITS = 28L
 
         /** A minute of server at 60Hz, which outlives both clients with room to spare. */
         const val SERVER_TICKS = 3600

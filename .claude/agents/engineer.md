@@ -47,22 +47,20 @@ change if the owner disagrees. That last part is what makes it reviewable rather
 issue, and stop that part of the ticket. `AGENTS.md` states this without qualification, because a
 late contract change breaks several modules at once and the breakage is silent.
 
-## Stage the art first, or the build cannot pass
+## There is no art step, and you type nothing
 
-**Your worktree does not have the sprites.** `moba/assets/sprites/` is gitignored — it is
-third-party licensed art from the Tiny RPG Character Asset Pack (`docs/art-assets.md`) that this
-repository has no right to sublicense — so a fresh worktree carries none of it, and
-`:moba:udeaValidateAssets` fails with **25 x `UDEA0032`**, `names 1 file(s) that are not under the
-asset root`.
+**Your worktree does not have the sprites, and it does not need them.**
+`moba/assets/sprites/` is gitignored — it is third-party licensed art from the Tiny RPG Character
+Asset Pack (`docs/art-assets.md`) that this repository has no right to sublicense — so a fresh
+worktree carries none of it. The build stages it for you: `:moba:udeaStageCharacterArt` copies the
+sheets out of `example/src/main/resources/assets/sprites/`, where they already are, ahead of the
+asset pipeline, on every build. A clone builds, and `git status` stays clean because everything it
+writes is gitignored.
 
-    python3 scripts/stage-moba-art.py
-
-It copies 33 sheets out of `example/src/main/resources/assets/sprites/`, where they already are.
-Idempotent, overwrites what it copies, deletes nothing. Run it once, before your first build.
-
-**Nothing else tells you this.** `AGENTS.md`, `CLAUDE.md` and `HANDOFF.md` all say "run
-`./gradlew build`" and none of them mention it; the only record is that script's own docstring.
-A `UDEA0032` about a sprite is this, not your change.
+So there is nothing to run before your first build, and **a `UDEA0032` about a `spritePath` is a
+real defect in your change** rather than a step you forgot. If you find an instruction anywhere
+telling you to stage the art by hand, that instruction is stale — the script it names was deleted
+by #170.
 
 Note the coupling while you are here: the staging source lives in `example/`, which is old tree
 scheduled for deletion (#142). Deleting that module from `settings.gradle.kts` is safe — the files

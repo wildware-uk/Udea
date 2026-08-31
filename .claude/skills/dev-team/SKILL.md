@@ -331,18 +331,17 @@ Copy this block into every developer prompt.
 ```
 Udea. Kotlin 2.2.10, KSP 2.2.10-2.0.2, Gradle 8.13, JDK 17 toolchain.
 
-STAGE THE ART FIRST, OR THE BUILD CANNOT PASS. Your worktree does not have the
-sprites: `moba/assets/sprites/` is gitignored third-party licensed art, so a
-fresh worktree carries none of it and `:moba:udeaValidateAssets` fails with 25 x
-UDEA0032, `names 1 file(s) that are not under the asset root`.
+THERE IS NO ART STEP, AND YOU TYPE NOTHING. `moba/assets/sprites/` is gitignored
+third-party licensed art, so a fresh worktree carries none of it - and it does
+not need to. The build stages it: `:moba:udeaStageCharacterArt` copies the sheets
+out of `example/src/main/resources/assets/sprites/`, where they already are,
+ahead of the asset pipeline, on every build. A clone builds, and `git status`
+stays clean because everything it writes is gitignored.
 
-    python3 scripts/stage-moba-art.py
-
-It copies 33 sheets out of `example/src/main/resources/assets/sprites/`, where
-they already are. Idempotent. Run it once, before your first build. NOTHING ELSE
-TELLS YOU THIS - AGENTS.md, CLAUDE.md and HANDOFF.md all say "run ./gradlew
-build" and none of them mention it. A UDEA0032 about a sprite is this, not your
-change.
+So run nothing before your first build. A UDEA0032 about a `spritePath` is a REAL
+DEFECT in your change, not a step you forgot. `docs/art-assets.md` has the licence
+position. If you meet an instruction anywhere telling you to stage the art by
+hand, it is stale: the script it names was deleted by #170.
 
 THE BUILD. One command, no exclusions:
 

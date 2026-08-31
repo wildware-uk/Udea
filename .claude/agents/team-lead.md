@@ -239,9 +239,11 @@ The developer prompt MUST contain, in this order:
 2. The branch name — `issue-<N>-<slug>` — **branched from `origin/example`**.
 3. Any decision you have already made on the ticket, stated as decided, not as a question.
 4. "Use superpowers:test-driven-development. Failing test first."
-5. **`python3 scripts/stage-moba-art.py` before the first build** — the sprites are gitignored, so a
-   fresh worktree has none of them and `:moba:udeaValidateAssets` fails with 25 x `UDEA0032`. Nothing
-   in `AGENTS.md` or `HANDOFF.md` says so, and every worktree hits it.
+5. **No art-staging step, and do not add one.** The sprites are gitignored, but `:moba`'s build
+   stages them itself via `:moba:udeaStageCharacterArt` (#170), so a fresh worktree builds with
+   nothing typed. Older prompts carried a `python3 scripts/stage-moba-art.py` line; that script no
+   longer exists, and copying the line forward sends a developer to run a file that is not there.
+   Tell the developer instead that a `UDEA0032` about a `spritePath` is a real defect in its change.
 6. The verification contract: `sh gradlew build` with no exclusions, the xvfb GL run if the ticket
    touches GL, one evidence command proved to go red when the feature is reverted, the images, and
    `BRIEF.md`.

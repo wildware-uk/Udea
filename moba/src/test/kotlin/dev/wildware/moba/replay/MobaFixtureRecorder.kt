@@ -25,8 +25,9 @@ import java.util.Random
  *
  * It never enters a world. It authors a recording, offline, once, by writing into the
  * [InputSample] a `MobaReplayWorld` then hands to `ReplayIntentSource` - the same seam a keyboard
- * sits behind. Simulation randomness stays `RngService` and its named streams, which is what the
- * twenty-seven AI units draw from, and is why the recording only has to carry the champion.
+ * sits behind. Simulation randomness stays `RngService` and its named streams, which is what
+ * every AI-driven unit on the level draws from, and is why the recording only has to carry the
+ * champion.
  *
  * ## Recorded through the replay world, not beside it
  *

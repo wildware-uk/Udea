@@ -11,8 +11,8 @@ import dev.wildware.udea.replay.equality.ReplayFixtureRef
  *
  * Issue #172, and its argument is one sentence long: `DriftWorld` routes its trigonometry through
  * `StrictMath` because its author knew exactly which call was the trap, so a gate pointed at it
- * reports the health of its own fixture. `moba` was not written that way. It has twenty-seven AI
- * units, Box2D-free overlap resolution, a lane of creeps, towers, projectiles, a shop, an ability
+ * reports the health of its own fixture. `moba` was not written that way. It has a level full of
+ * AI-driven units, overlap resolution, a lane of creeps, towers, projectiles, a shop, an ability
  * system and a match loop, and **nothing in this repository had ever replayed it on two operating
  * systems and compared it field by field**. The drift world stays checked in as the *self-test* -
  * `udeaReplayEqualityProof` plants into it across five processes and `CrossPlatformDivergenceTest`

@@ -22,12 +22,12 @@ import kotlin.test.assertTrue
  *
  * ## What was wrong, in one sentence
  *
- * The three `replay-equality` legs and the three `replay-equality-nightly` legs replayed
- * `DriftWorld`, a purpose-built fixture whose author routed its trigonometry through `StrictMath`
- * because he knew exactly which call was the trap. That world is *written to be deterministic*, so
- * six green legs reported the health of their own fixture. `moba` is the thing Phase 7 exists to
- * make deterministic, and nothing in this repository had ever replayed it on two operating systems
- * and compared it field by field.
+ * Every `replay-equality` and `replay-equality-nightly` leg replayed `DriftWorld`, a purpose-built
+ * fixture whose author routed its trigonometry through `StrictMath` because he knew exactly which
+ * call was the trap. That world is *written to be deterministic*, so a green matrix reported the
+ * health of its own fixture. `moba` is the thing Phase 7 exists to make deterministic, and nothing
+ * in this repository had ever replayed it on two operating systems and compared it field by
+ * field.
  *
  * ## What this class asserts, and what it deliberately leaves to the sibling
  *
@@ -66,8 +66,8 @@ class MobaReplayEqualityTest {
      * `ci.yml` with its comment lines dropped.
      *
      * A fence that fires because somebody *wrote about* a fixture in a comment is as wrong as one
-     * that misses a real use of it, and this workflow is heavily commented on purpose - the
-     * `replay-equality` job is thirty lines of steps under seventy of prose, and that prose names
+     * that misses a real use of it, and this workflow is commented far more heavily than it is
+     * coded - the `replay-equality` job's prose outweighs its steps, and that prose names
      * `moba-36000.udearep` while explaining the job. `a comment naming a fixture is not a job
      * running one` is the control.
      */

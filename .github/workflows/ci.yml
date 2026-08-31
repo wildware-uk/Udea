@@ -1180,8 +1180,8 @@ jobs:
     # ## What it replays, since issue #172: `moba`, and not a fixture world
     #
     # `moba-3600.udearep` is a minute of a real match - the champion piloted by a specified LCG,
-    # twenty-seven AI units, the lane, the towers, the projectiles, the abilities and the match
-    # loop, all reproduced from the seed. Until #172 these legs replayed `DriftWorld`, a
+    # and the AI units, the lane, the towers, the projectiles, the abilities and the match loop
+    # all reproduced from the seed. Until #172 these legs replayed `DriftWorld`, a
     # purpose-built fixture that routes its trigonometry through `StrictMath` because its author
     # knew exactly which call was the trap: a world *written to be deterministic*, so three green
     # legs reported the health of their own fixture. `moba` was not written that way and is the

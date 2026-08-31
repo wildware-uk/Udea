@@ -654,9 +654,9 @@ tasks.test {
 // few hundred lines of purpose-built drifters that route their trigonometry through `StrictMath`
 // because their author knew exactly which call was the trap. That world is *written to be
 // deterministic*. `moba` is not, and `moba` is the thing Phase 7 exists to make deterministic:
-// twenty-seven AI units, a lane of creeps, towers, projectiles, abilities, a shop and a match
-// loop, none of which had ever been replayed on two operating systems and compared field by
-// field. A gate whose fixture cannot fail reports the health of its own fixture.
+// a level of AI-driven units, a lane of creeps, towers, projectiles, abilities, a shop and a
+// match loop, none of which had ever been replayed on two operating systems and compared field
+// by field. A gate whose fixture cannot fail reports the health of its own fixture.
 //
 // So the CI legs run the tasks below, and `:udea-replay`'s equivalents stay as the gate's
 // self-test - `udeaReplayEqualityProof` there plants into `DriftWorld` across five processes and

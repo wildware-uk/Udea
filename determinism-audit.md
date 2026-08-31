@@ -32,7 +32,7 @@ grows a rule.
 Since issue #172 the `replay-equality` legs and the `replay-equality-nightly` legs replay
 **`moba`**, not a fixture world. That matters because the fixture world they used to replay,
 `DriftWorld`, routes its trigonometry through `StrictMath` on purpose — it is written to be
-deterministic, so six green legs reported the health of their own fixture rather than of the game.
+deterministic, so a green matrix reported the health of its own fixture rather than of the game.
 `DriftWorld` stays as the gate's **self-test**: it is what `:udea-replay:udeaReplayEqualityProof`
 plants a one-ulp divergence into across five processes, and what `CrossPlatformDivergenceTest`
 pins the rendered cross-platform failure against.

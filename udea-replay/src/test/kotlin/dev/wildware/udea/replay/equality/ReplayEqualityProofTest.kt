@@ -3,6 +3,8 @@ package dev.wildware.udea.replay.equality
 import dev.wildware.udea.replay.InputSample
 import dev.wildware.udea.replay.equality.fixture.DriftDigestMain
 import dev.wildware.udea.replay.equality.fixture.DriftFixture
+import dev.wildware.udea.replay.equality.fixture.DriftFixtureKind
+import dev.wildware.udea.replay.fixture.ReplayFixtures
 import dev.wildware.udea.replay.equality.fixture.DriftFixtureRecorder
 import java.nio.file.Files
 import java.nio.file.Path
@@ -200,7 +202,7 @@ class ReplayEqualityProofTest {
 
     @Test
     fun `a leg's digest lands in the directory its upload step globs`() {
-        val requested = gradlePropertyInWorkflow("out")
+        val requested = gradlePropertyInJob(PR_JOB, "out")
         val written = DriftDigestMain.parse(
             arrayOf("--workspace", workspace.toString(), "--label", "leg", "--out", requested),
         ).out
@@ -235,7 +237,7 @@ class ReplayEqualityProofTest {
             .resolve(stepValue("Download every leg's digest", "path"))
             .toAbsolutePath().normalize()
         val compared = ReplayEqualsMain.parse(
-            arrayOf("--workspace", workspace.toString(), gradlePropertyInWorkflow("streams")),
+            arrayOf("--workspace", workspace.toString(), gradlePropertyInJob(PR_JOIN_JOB, "streams")),
         ).streams
 
         assertEquals(
@@ -291,15 +293,193 @@ class ReplayEqualityProofTest {
         )
     }
 
-    /** The value `ci.yml` hands `-Pudea.replay.<name>`, with its Actions expressions stood in for. */
-    private fun gradlePropertyInWorkflow(name: String): String {
-        val found = Regex("-Pudea\\.replay\\.$name=(.+)").findAll(workflowCode)
+    @Test
+    fun `the test task forwards the regeneration flag to the JVM that reads it`() {
+        // A `Test` task forks its own JVM and does not inherit the launcher's system properties.
+        // Without this line `-Dupdate.replay.fixtures=true` reaches Gradle, is never forwarded,
+        // and `ReplayFixturesCurrentTest` reports every fixture current and rebuilds nothing.
+        // Nothing fails: the flag simply does not work, and a reviewer reads a green run beside a
+        // fixture that never moved. That is the worst shape a regeneration path can take, and
+        // this is the only place it can be caught - the build script is on no classpath.
+        val flag = ReplayFixtures.UPDATE_PROPERTY
+        val normalised = buildScript.replace(Regex("\\s+"), " ")
+
+        assertContains(
+            normalised,
+            "systemProperty( \"$flag\", providers.systemProperty(\"$flag\")",
+            message = "udea-replay/build.gradle.kts no longer forwards -D$flag to the test JVM",
+        )
+    }
+
+    // --- issue #165: the nightly job, which is the same gate over a ten-times-longer recording --
+
+    @Test
+    fun `the job slicer cuts one job and not its neighbour`() {
+        // The control for `jobBlock`, and the reason it exists: `replay-equality` is a prefix of
+        // `replay-equality-nightly`, so a slicer anchored on a prefix would hand every assertion
+        // below the wrong job's steps while returning a perfectly plausible block. That is a
+        // check that runs and answers truthfully about the wrong subject.
+        val pr = jobBlock(PR_JOB)
+        val nightly = jobBlock(NIGHTLY_JOB)
+
+        assertTrue(pr.isNotEmpty() && nightly.isNotEmpty(), "a job block came back empty")
+        // Discriminators each block has and the other cannot: the nightly is the only job that
+        // names a fixture, and the plant leg lives only on the gate. Not a path prefix - the
+        // first draft of this control used one, and `nightly-digests/` contains `digests/`.
+        assertTrue(
+            "udea.replay.fixture" !in pr,
+            "the `$PR_JOB` block reaches into `$NIGHTLY_JOB`:\n$pr",
+        )
+        assertTrue(
+            "plant" !in nightly,
+            "the `$NIGHTLY_JOB` block reaches back into `$PR_JOB`:\n$nightly",
+        )
+        assertTrue(
+            "runs-on" in pr && "runs-on" in nightly,
+            "a job block was cut short of its own body",
+        )
+    }
+
+    @Test
+    fun `the nightly replays the long fixture and the PR job replays the short one`() {
+        // Derived from the enum rather than restated: the workflow names a fixture by string and
+        // `DriftFixtureKind.byName` is what resolves it, so a typo here is a job that fails
+        // inside a classpath lookup at three in the morning.
+        val named = gradlePropertyInJob(NIGHTLY_JOB, "fixture")
+
+        assertEquals(DriftFixtureKind.NIGHTLY, DriftFixtureKind.byName(named))
+        assertTrue(
+            "-Pudea.replay.fixture" !in jobBlock(PR_JOB),
+            "the PR job now names a fixture explicitly. Issue #152's scope says the long fixture " +
+                "must not block a pull request, and `DriftDigestMain` defaults to the short one, " +
+                "so the PR job naming one at all is how it would come to replay the long one.",
+        )
+    }
+
+    @Test
+    fun `the nightly never runs on a pull request and the gate always does`() {
+        // The whole reason this is a second job. A leg cannot be skipped by event without the
+        // runner starting anyway, so the condition has to be on the job.
+        val condition = Regex("(?m)^ {4}if: (?:>-)?\\s*\\n((?: {6}.*\\n)+)")
+            .find(jobBlock(NIGHTLY_JOB))?.groupValues?.get(1)
+            ?: fail("the `$NIGHTLY_JOB` job has no `if:` condition, so it runs on pull requests")
+
+        assertContains(condition, "github.event_name")
+        assertContains(condition, "'schedule'")
+        assertContains(condition, "refs/heads/example")
+        assertTrue(
+            "pull_request" !in condition,
+            "the nightly's condition mentions pull_request:\n$condition",
+        )
+        assertTrue(
+            Regex("(?m)^ {4}if:").find(jobBlock(PR_JOB)) == null,
+            "the `$PR_JOB` job has grown a condition. It is the gate: it runs on everything, and " +
+                "issue #165 is explicitly not allowed to change that.",
+        )
+    }
+
+    @Test
+    fun `a nightly leg's digest lands in the directory its upload step globs`() {
+        // Issue #169's defect, for the second pair of jobs. It is not enough that the first pair
+        // resolves correctly: these are different literals in a different block, and the bug was
+        // never that the code was wrong - it was that two identical-looking spellings resolved
+        // against two different directories.
+        val requested = gradlePropertyInJob(NIGHTLY_JOB, "out")
+        val written = DriftDigestMain.parse(
+            arrayOf("--workspace", workspace.toString(), "--label", "leg", "--out", requested),
+        ).out
+
+        val glob = stepValue("Upload this nightly leg's digest stream", "path")
+        val globbedDirectory = workspace.resolve(glob.substringBeforeLast('/')).normalize()
+
+        assertEquals(
+            globbedDirectory, written.parent,
+            "the nightly leg writes its digest where its upload step does not look, so the " +
+                "upload trips `if-no-files-found: error` and nothing is ever compared",
+        )
+        assertTrue(
+            globMatches(glob.substringAfterLast('/'), written.fileName.toString()),
+            "the nightly upload globs '${glob.substringAfterLast('/')}', which does not match " +
+                "'${written.fileName}'",
+        )
+    }
+
+    @Test
+    fun `the nightly join compares the directory the workflow downloads into`() {
+        val downloadedInto = workspace
+            .resolve(stepValue("Download every nightly leg's digest", "path"))
+            .toAbsolutePath().normalize()
+        val compared = ReplayEqualsMain.parse(
+            arrayOf(
+                "--workspace", workspace.toString(),
+                gradlePropertyInJob(NIGHTLY_JOIN_JOB, "streams"),
+            ),
+        ).streams
+
+        assertEquals(listOf(downloadedInto), compared)
+    }
+
+    @Test
+    fun `the two pairs of jobs do not upload into each other's artifact names`() {
+        // Two jobs downloading by pattern into one workspace. `replay-digest-*` and
+        // `replay-nightly-digest-*` are different globs, but `replay-*` would match both - and a
+        // join handed six streams of two different fixtures reports `EXIT_UNUSABLE` rather than a
+        // verdict, which reads as a broken runner rather than as a mistake in this file.
+        val prPattern = stepValue("Download every leg's digest", "pattern")
+        val nightlyPattern = stepValue("Download every nightly leg's digest", "pattern")
+        val prName = stepValue("Upload this leg's digest stream", "name")
+        val nightlyName = stepValue("Upload this nightly leg's digest stream", "name")
+
+        assertTrue(
+            globMatches(prPattern, prName) && globMatches(nightlyPattern, nightlyName),
+            "a join's download pattern does not match its own legs' artifact name: " +
+                "'$prPattern' against '$prName', '$nightlyPattern' against '$nightlyName'",
+        )
+        assertTrue(
+            !globMatches(prPattern, nightlyName),
+            "the PR join would download the nightly legs' digests as well ('$prPattern' matches " +
+                "'$nightlyName'), and a join handed two fixtures cannot produce a verdict",
+        )
+        assertTrue(
+            !globMatches(nightlyPattern, prName),
+            "the nightly join would download the PR legs' digests as well",
+        )
+    }
+
+    /**
+     * The value the `ci.yml` job called [job] hands `-Pudea.replay.<name>`.
+     *
+     * Scoped to one job rather than to the whole file. Issue #165 added a second pair of jobs
+     * replaying a second fixture, so `-Pudea.replay.out=` and `-Pudea.replay.streams=` each now
+     * appear twice - and a fence that counted them across the file would have compared the PR
+     * job's path against whichever of the two the regex found first. That is the shape of
+     * check that runs and returns a true answer about the wrong subject.
+     */
+    private fun gradlePropertyInJob(job: String, name: String): String {
+        val found = Regex("-Pudea\\.replay\\.$name=(.+)").findAll(jobBlock(job))
             .map { it.groupValues[1].trim() }.toList()
         assertEquals(
             1, found.size,
-            "ci.yml should hand -Pudea.replay.$name to exactly one step; found $found",
+            "the ci.yml job '$job' should hand -Pudea.replay.$name to exactly one step; found $found",
         )
         return substituteExpressions(found.single())
+    }
+
+    /**
+     * The `ci.yml` block of the job called [job], from its header to the next job's.
+     *
+     * A job header is the only thing in this file at exactly two spaces of indent followed by a
+     * name and a colon, which is what the pattern anchors on. It has to anchor on the *whole*
+     * name too: `replay-equality` is a prefix of `replay-equality-nightly`, and a slicer that
+     * matched a prefix would hand every assertion the wrong job's steps while looking right.
+     * `the job slicer cuts one job and not its neighbour` is the control for it.
+     */
+    private fun jobBlock(job: String): String {
+        val header = Regex("(?m)^ {2}${Regex.escape(job)}:\\s*$").find(workflowCode)
+            ?: fail("ci.yml has no job called '$job'")
+        val rest = workflowCode.substring(header.range.last + 1)
+        val next = Regex("(?m)^ {2}[A-Za-z][\\w-]*:\\s*$").find(rest)
+        return rest.substring(0, next?.range?.first ?: rest.length)
     }
 
     /** The value of [key] inside the `ci.yml` step called [stepName]. */
@@ -329,6 +509,14 @@ class ReplayEqualityProofTest {
                 "Actions expression, so comparing it would compare a string no runner ever sees",
         )
         return expanded
+    }
+
+    /** The `ci.yml` jobs this class reads, named once so a rename is one edit. */
+    private companion object {
+        const val PR_JOB: String = "replay-equality"
+        const val PR_JOIN_JOB: String = "replay-equality-join"
+        const val NIGHTLY_JOB: String = "replay-equality-nightly"
+        const val NIGHTLY_JOIN_JOB: String = "replay-equality-nightly-join"
     }
 
     /** Whether [name] matches [glob], where `*` runs up to a path separator. */

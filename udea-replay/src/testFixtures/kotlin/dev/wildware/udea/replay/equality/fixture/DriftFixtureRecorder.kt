@@ -4,7 +4,8 @@ import dev.wildware.udea.replay.BuildIdentity
 import dev.wildware.udea.replay.InputSample
 import dev.wildware.udea.replay.ReplayRecorder
 import dev.wildware.udea.replay.ReplayRecording
-import java.nio.file.Files
+import dev.wildware.udea.replay.fixture.ReplayFixture
+import dev.wildware.udea.replay.fixture.ReplayFixtures
 import java.nio.file.Path
 import java.util.Random
 
@@ -42,6 +43,24 @@ public object DriftFixtureRecorder {
     public const val PULSE_ODDS: Int = 24
 
     /**
+     * The pilot's press counter is a `u8`, and it rolls over rather than climbing.
+     *
+     * `InputSample.setPressCount` takes `0..255` and refuses anything else - a press count is one
+     * byte on the wire, and every game that sends one sends a rolling counter that wraps. The
+     * fixture pilot ignored that and kept a lifetime total, which fitted only because the
+     * 3600-tick fixture presses roughly `3600 / PULSE_ODDS` = 150 times. The 36000-tick fixture
+     * of issue #165 presses about ten times as often, and recording it threw
+     * `a press count must be in 0..255, was 256 for action 'drift/pulse'` partway through - so
+     * the length of every fixture this world can have was capped by a limit nothing named.
+     *
+     * `ChargeSystem` reads the counter as `pulseCount > lastPulseCount`, so on the tick a wrap
+     * lands it sees 0 after 255 and declines to fire. That is one missed press in every 256 and
+     * it is arithmetic on integers, so both legs of a cross-OS comparison miss the same one. The
+     * fixture's job is to churn deterministically, and it still does.
+     */
+    public const val PULSE_COUNT_MASK: Int = 0xFF
+
+    /**
      * Records [ticks] of piloted play into a fresh fixture world.
      *
      * @return the sealed recording, ready to be written or replayed.
@@ -68,7 +87,7 @@ public object DriftFixtureRecorder {
                     pilot.nextFloat() * 2f - 1f,
                     pilot.nextFloat() * 2f - 1f,
                 )
-                if (pilot.nextInt(PULSE_ODDS) == 0) pulses++
+                if (pilot.nextInt(PULSE_ODDS) == 0) pulses = (pulses + 1) and PULSE_COUNT_MASK
                 sample.setPressed(DriftFixture.ACTION_PULSE, pulses % 2 == 1)
                 sample.setPressCount(DriftFixture.ACTION_PULSE, pulses)
 
@@ -96,63 +115,82 @@ public object DriftFixtureRecorder {
         inputSchemaHash = DriftFixture.SCHEMA.hash,
     )
 
-    /** Reads the checked-in fixture from the classpath. */
-    public fun readCheckedIn(): ReplayRecording {
-        val bytes = checkNotNull(javaClass.getResourceAsStream(DriftFixture.PR_RESOURCE)) {
-            "${DriftFixture.PR_RESOURCE} is not on the classpath. It is checked in under " +
-                "udea-replay/src/testFixtures/resources; regenerate it with DriftFixtureRecorder."
+    /** Reads one checked-in fixture from the classpath. */
+    public fun readCheckedIn(kind: DriftFixtureKind = DriftFixtureKind.PR): ReplayRecording {
+        val bytes = checkNotNull(javaClass.getResourceAsStream(kind.resource)) {
+            "${kind.resource} is not on the classpath. It is checked in under " +
+                "udea-replay/src/testFixtures/resources; rebuild it with " +
+                ReplayFixtures.updateCommand(GRADLE_TASK)
         }.use { it.readBytes() }
         return ReplayRecording.decode(bytes)
     }
 
-    /** Regenerates the checked-in fixture at [path]. Used by the generator entry point only. */
-    public fun writeTo(path: Path, ticks: Int = DriftFixture.PR_TICKS) {
-        Files.createDirectories(path.toAbsolutePath().parent)
-        record(ticks).writeTo(path)
-    }
+    /**
+     * Every fixture of this world, as `--update-replay-fixtures` reconciles them.
+     *
+     * @param fixturesDir the source directory the bytes are checked in under, normally
+     *   `udea-replay/src/testFixtures/resources/fixtures`. A parameter rather than a constant
+     *   because the caller knows where the source tree is and this class does not - it is loaded
+     *   from a jar in CI.
+     */
+    public fun fixtures(fixturesDir: Path): List<ReplayFixture> =
+        DriftFixtureKind.entries.map { kind ->
+            ReplayFixture(
+                name = kind.fixtureName,
+                checkedInAt = fixturesDir.resolve(kind.fixtureName),
+                ticks = kind.ticks,
+                identity = ::identity,
+                record = ::record,
+            )
+        }
+
+    /** The task a reader is sent to when a fixture of this world has gone stale. */
+    public const val GRADLE_TASK: String = ":udea-replay:test"
 
     private const val PROTO_MIX: Int = 31
 }
 
 /**
- * Regenerates the checked-in fixture: `--out <path>` and optionally `--ticks <n>`.
+ * `--update-replay-fixtures` for this world: `--fixtures-dir <dir>`, optionally `--dry-run`.
  *
- * Deliberately a separate entry point from the CI one, and deliberately not wired into any task
- * this build runs. Regenerating a fixture is how a gate is silenced, so it is a thing somebody
- * types on purpose. The general form of it - `--update-replay-fixtures` across every fixture a
- * game has - is issue #165.
+ * Deliberately a separate entry point from the CI one, and deliberately not wired into anything
+ * `check` runs. Regenerating a fixture is how a gate is silenced, so it is a thing somebody types
+ * on purpose - the same bargain `udeaWriteProtocolLock` strikes with `net-protocol.lock`.
+ *
+ * It shares [ReplayFixtures.reconcile] with the `--update-goldens`-shaped route through
+ * `:udea-replay:test -Dupdate.replay.fixtures=true`, so the two front doors cannot disagree about
+ * what "stale" means or about what they write. `--dry-run` is the same call with `update = false`,
+ * which is what makes the reporting half of this runnable without writing anything.
  */
-public object DriftFixtureMain {
+public object DriftFixturesMain {
 
     @JvmStatic
     public fun main(args: Array<String>) {
-        var out: Path? = null
-        var ticks = DriftFixture.PR_TICKS
+        var dir: Path? = null
+        var update = true
         var at = 0
         while (at < args.size) {
             when (args[at]) {
-                "--out" -> {
-                    require(at + 1 < args.size) { "--out needs a path after it" }
-                    out = Path.of(args[at + 1])
+                "--fixtures-dir" -> {
+                    require(at + 1 < args.size) { "--fixtures-dir needs a directory after it" }
+                    dir = Path.of(args[at + 1]).toAbsolutePath().normalize()
                     at++
                 }
 
-                "--ticks" -> {
-                    require(at + 1 < args.size) { "--ticks needs a number after it" }
-                    ticks = args[at + 1].toInt()
-                    at++
-                }
+                "--dry-run" -> update = false
 
                 else -> throw IllegalArgumentException("unknown option '${args[at]}'")
             }
             at++
         }
-        val target = requireNotNull(out) { "--out is required" }
-        DriftFixtureRecorder.writeTo(target, ticks)
-        val recording = ReplayRecording.readFrom(target)
-        println(
-            "wrote $target: ${recording.tickCount} tick(s) from ${recording.firstTick} to " +
-                "${recording.endTick}, ${Files.size(target)} bytes",
+        val fixturesDir = requireNotNull(dir) { "--fixtures-dir is required" }
+        val statuses = ReplayFixtures.reconcile(
+            DriftFixtureRecorder.fixtures(fixturesDir),
+            update = update,
         )
+        for (status in statuses) println(status.describe())
+        // A dry run still has to fail on a stale fixture, or "report what is stale" and "say
+        // nothing" would print the same exit code.
+        if (!update) ReplayFixtures.requireCurrent(statuses, DriftFixtureRecorder.GRADLE_TASK)
     }
 }

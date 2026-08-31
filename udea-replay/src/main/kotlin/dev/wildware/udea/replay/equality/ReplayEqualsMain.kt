@@ -1,5 +1,6 @@
 package dev.wildware.udea.replay.equality
 
+import dev.wildware.udea.core.Tick
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.stream.Collectors
@@ -156,6 +157,7 @@ public object ReplayEqualsMain {
         }
 
         var worst = EXIT_EQUAL
+        var firstDivergence: Tick? = null
         for (index in 1 until digests.size) {
             val result = try {
                 ReplayEquality.replayEquals(reference, digests[index])
@@ -165,8 +167,19 @@ public object ReplayEqualsMain {
                 continue
             }
             report.append("\n\n").append(result.describe())
+            val tick = result.tick
+            // The earliest across every pair, not the first pair's. Two legs can diverge from the
+            // reference at different ticks, and the one worth landing on is the earlier - every
+            // later one may be a consequence of it.
+            if (tick != null && (firstDivergence == null || tick < firstDivergence)) {
+                firstDivergence = tick
+            }
             if (!result.isEqual && worst == EXIT_EQUAL) worst = EXIT_DIVERGED
         }
+        // Issue #165: the summary tells a reader how to reproduce this on their own machine, on a
+        // green run as well as a red one. Rendered by a class with tests rather than assembled in
+        // a workflow step - see `ReplayBisectGuide`.
+        report.append(ReplayBisectGuide.render(reference.header.fixture, firstDivergence))
         return worst
     }
 

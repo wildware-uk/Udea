@@ -75,6 +75,14 @@ tasks.withType<Test>().configureEach {
         "update.goldens",
         providers.systemProperty("update.goldens").orElse("false").get(),
     )
+    // `--update-replay-fixtures` (issue #165), spelled the way `--update-goldens` is actually
+    // typed. A `Test` task forks its own JVM and does not inherit the launcher's system
+    // properties, so a flag that is not passed here is a flag `ReplayFixturesCurrentTest` never
+    // sees - it would report every fixture current and rebuild nothing, silently.
+    systemProperty(
+        "update.replay.fixtures",
+        providers.systemProperty("update.replay.fixtures").orElse("false").get(),
+    )
     // The build script and the workflow are read by `ReplayEqualityProofTest`, so an edit to
     // either has to make the task rerun. Found the same way `udea-core`'s FieldMask scan was: a
     // source rule that reads a tree it has not declared reports whatever it last saw.
@@ -175,10 +183,14 @@ val digestLauncher: Provider<JavaLauncher> = providers.provider {
  * One of these runs per matrix leg in CI, each with its own `--label`. `-Pudea.replay.label` and
  * `-Pudea.replay.out` are how the workflow names them; the defaults describe a local run, so the
  * task is runnable by hand with no properties at all.
+ *
+ * `-Pudea.replay.fixture` chooses which checked-in recording to replay. Absent, it is the
+ * 3600-tick one every push replays; the nightly job of issue #165 names the 36000-tick one. A
+ * name this world does not have fails naming the ones it does, in `DriftFixtureKind.byName`.
  */
 tasks.register<JavaExec>("udeaReplayDigest") {
     group = "verification"
-    description = "Replays the checked-in .udearep fixture and writes this machine's .udeaeq digest."
+    description = "Replays a checked-in .udearep fixture and writes this machine's .udeaeq digest."
     classpath = equalityClasspath
     mainClass.set("dev.wildware.udea.replay.equality.fixture.DriftDigestMain")
     javaLauncher.set(digestLauncher)
@@ -186,6 +198,7 @@ tasks.register<JavaExec>("udeaReplayDigest") {
     val out = providers.gradleProperty("udea.replay.out")
         .orElse(replayEqualityDir.map { "${it.asFile}/local.udeaeq" })
     val plantAt = providers.gradleProperty("udea.replay.plantUlpAt")
+    val fixture = providers.gradleProperty("udea.replay.fixture")
     val reports = replayEqualityDir
     val workspace = workspaceRoot
     argumentProviders.add {
@@ -198,6 +211,10 @@ tasks.register<JavaExec>("udeaReplayDigest") {
             add(out.get())
             add("--timing")
             add("${reports.get().asFile}/${label.get().replace('/', '-')}.timing.txt")
+            if (fixture.isPresent) {
+                add("--fixture")
+                add(fixture.get())
+            }
             if (plantAt.isPresent) {
                 add("--plant-ulp-at")
                 add(plantAt.get())
@@ -207,7 +224,7 @@ tasks.register<JavaExec>("udeaReplayDigest") {
 }
 
 /**
- * Rewrites the checked-in `.udearep` fixture from `DriftFixtureRecorder`.
+ * `--update-replay-fixtures` (issue #165): rewrites every checked-in `.udearep` of this module.
  *
  * Nothing depends on this and nothing in CI runs it: regenerating a fixture is how a gate gets
  * silenced, so it is a command somebody types on purpose. It exists because the alternative is a
@@ -215,16 +232,28 @@ tasks.register<JavaExec>("udeaReplayDigest") {
  * check them - `java.util.Random`'s LCG is specified, so the same seed rebuilds the same input
  * stream on any machine.
  *
- * This is **not** issue #165's `--update-replay-fixtures`. That flag regenerates every fixture a
- * game has, across games; this rewrites one file for one fixture world.
+ * The convention is `--update-goldens`, spelled the way that one is actually typed:
+ * `./gradlew :udea-replay:test -Dupdate.replay.fixtures=true` goes through
+ * `ReplayFixturesCurrentTest` and reconciles the same set through the same
+ * `ReplayFixtures.reconcile`. This task is the same call without the rest of the test suite, and
+ * `-Pudea.replay.dryRun` is the reporting half of it, which writes nothing and fails on a stale
+ * fixture - the shape a CI job would use if one ever needed to assert currency without a JVM
+ * running tests.
  */
 tasks.register<JavaExec>("udeaWriteReplayFixture") {
     group = "build"
-    description = "Regenerates udea-replay's checked-in .udearep replay-equality fixture."
+    description = "Rebuilds udea-replay's checked-in .udearep replay-equality fixtures."
     classpath = equalityClasspath
-    mainClass.set("dev.wildware.udea.replay.equality.fixture.DriftFixtureMain")
-    val target = layout.projectDirectory.file("src/testFixtures/resources/fixtures/drift-3600.udearep")
-    argumentProviders.add { listOf("--out", target.asFile.absolutePath) }
+    mainClass.set("dev.wildware.udea.replay.equality.fixture.DriftFixturesMain")
+    val fixturesDir = layout.projectDirectory.dir("src/testFixtures/resources/fixtures")
+    val dryRun = providers.gradleProperty("udea.replay.dryRun")
+    argumentProviders.add {
+        buildList {
+            add("--fixtures-dir")
+            add(fixturesDir.asFile.absolutePath)
+            if (dryRun.isPresent) add("--dry-run")
+        }
+    }
 }
 
 /**

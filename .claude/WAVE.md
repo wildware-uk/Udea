@@ -163,11 +163,22 @@ transitive over byte equality); a double space `run: >-` leaves when the plant e
 Do not read "#169 merged" as "Phase 7 done". The exit criterion in `ci.yml:1028` is "The cross-OS
 `replay-equality` CI job. Nothing else."
 
-- **Done:** the job exists and produces a verdict, proven both ways on real runs — green
-  cell-for-cell over 3600 ticks across Windows Server 2025 and Linux on Corretto and Temurin
-  ([33421649878](https://github.com/wildware-uk/Udea/actions/runs/33421649878)), and red at t1200
-  naming `Drifter.x` with the hex bit patterns when a divergence is planted
-  ([33419266780](https://github.com/wildware-uk/Udea/actions/runs/33419266780)).
+- **Done, and confirmed on `example` itself rather than only on a topic branch.** Run
+  [33425001370](https://github.com/wildware-uk/Udea/actions/runs/33425001370) at `d6146e3`:
+  all three legs green — ubuntu/temurin, ubuntu/corretto, windows/temurin — and
+  **`replay-equality (join)` green**, its log reading `3 digest stream(s)` then
+  `replay equality holds: 3600 tick(s) of 'drift-3600.udearep' are cell-for-cell identical`.
+  It is also proven to FAIL: run
+  [33419266780](https://github.com/wildware-uk/Udea/actions/runs/33419266780) with
+  `replay_plant_ulp_at=1200` goes red at t1200 naming `Drifter.x`,
+  `A=6.565088 (0x40d21533)` vs `B=6.5650873 (0x40d21532)`, with t1195-t1199 agreeing.
+  A gate that only ever passes is the defect #169 existed to fix, so both directions matter.
+
+  **Everything else in that run is red, and all of it is #170 or older.** The ten failing jobs
+  are `build` x2, `clean build under budget`, `determinism` x4, `plugin-disabled`,
+  `bridge-conformance` — every one of which builds `moba` — plus `the FIR checkers fail a real
+  build`, which was failing identically on run `33413123651` before this wave started.
+  `replay-equality` is the only job whose result CHANGED this wave, and it changed red to green.
 - **Not done:** the gate replays `udea-replay`'s own `DriftWorld`, **not `moba`**. That is the
   goal's remaining clause and it is blocked on **#170** — a gate cannot be pointed at a module CI
   cannot build.

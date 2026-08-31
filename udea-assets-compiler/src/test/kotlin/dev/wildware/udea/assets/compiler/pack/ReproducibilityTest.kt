@@ -1,16 +1,11 @@
 package dev.wildware.udea.assets.compiler.pack
 
 import dev.wildware.udea.assets.compiler.TestPaths
-import dev.wildware.udea.assets.compiler.atlas.AtlasPacker
 import dev.wildware.udea.assets.compiler.atlas.MobaArt
-import dev.wildware.udea.assets.compiler.atlas.SheetInput
+import dev.wildware.udea.assets.compiler.atlas.SpriteCorpus
+import dev.wildware.udea.assets.compiler.atlas.SyntheticArt
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
-import java.nio.file.Path
-import java.security.MessageDigest
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.copyToRecursively
-import kotlin.io.path.createDirectories
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -32,26 +27,16 @@ import kotlin.test.assertTrue
  * `AssetCompiler`'s own cache key. [`no absolute path appears anywhere in the bundle`] checks
  * the artifact directly for the directory names, which catches a leak this comparison would
  * miss if both packs leaked the *same* wrong thing.
+ *
+ * ## The two atlas tests it inherits
+ *
+ * They come from [CorpusReproducibilityContract] and run against [SyntheticArt], which is why
+ * this class no longer skips on a checkout with no paid art (issue #168).
+ * [RealArtReproducibilityTest] is the same pair pointed at the real corpus.
  */
-class ReproducibilityTest {
+internal class ReproducibilityTest : CorpusReproducibilityContract() {
 
-    @OptIn(ExperimentalPathApi::class)
-    private fun checkoutAt(name: String): Path {
-        val root = TestPaths.scratch(name)
-        val assets = root.resolve(ASSETS)
-        assets.parent.createDirectories()
-        PackFixture.assetRoot.copyToRecursively(assets, followLinks = false, overwrite = true)
-        return root
-    }
-
-    /**
-     * The two roots have different names *and* different lengths.
-     *
-     * Equal-length names would hide a leak that wrote a fixed-width path, and a leak of a
-     * fixed-width path is exactly what a naive `String.format` of a directory produces.
-     */
-    private fun twoCheckouts(): Pair<Path, Path> =
-        checkoutAt("repro-a") to checkoutAt("repro-b-with-a-much-longer-name")
+    override val corpus: SpriteCorpus = SyntheticArt
 
     @Test
     fun `two packs from two different checkout directories are byte-identical`() {
@@ -76,7 +61,7 @@ class ReproducibilityTest {
         val (first, _) = twoCheckouts()
         val bytes = PackFixture.bundle(first, first.resolve(ASSETS), "repro-cache-paths")
 
-        for (fragment in listOf(first.toString(), first.toString().replace('\\', '/'), "repro-a")) {
+        for (fragment in listOf(first.toString(), first.toString().replace('\\', '/'), "$checkoutPrefix-a")) {
             assertTrue(
                 indexOf(bytes, fragment.toByteArray(Charsets.UTF_8)) < 0,
                 "'$fragment' leaked into the bundle at byte ${indexOf(bytes, fragment.toByteArray())}",
@@ -88,51 +73,6 @@ class ReproducibilityTest {
             "the repository root leaked into the bundle",
         )
     }
-
-    /**
-     * The full 327-sheet atlas is byte-identical across two packs, pages included.
-     *
-     * The graph half above is cheap; this is the expensive half and the one issue #89 flags as
-     * "the fiddliest part". The `SheetInput` lists are built from two *separate* directory
-     * walks, so a dependence on `Files.walk` order would show up here.
-     */
-    @Test
-    fun `two packs of the whole art corpus produce identical atlas pages`() {
-        assumeTrue(MobaArt.available, "moba sprite art is absent; run python scripts/extract-art.py")
-        val packer = AtlasPacker()
-
-        val first = packer.pack(MobaArt.sheets())
-        val second = packer.pack(MobaArt.sheets().reversed())
-
-        assertEquals(first.pages.size, second.pages.size, "different page counts")
-        assertTrue(first.pages.isNotEmpty(), "the corpus packed into no pages at all")
-        first.pages.forEachIndexed { page, bytes ->
-            assertEquals(sha256(bytes), sha256(second.pages[page]), "atlas page $page differs")
-        }
-        assertEquals(first.regions, second.regions)
-        assertEquals(first.sheetRanges, second.sheetRanges)
-    }
-
-    /** A bundle carrying the real atlas is byte-identical across two packs. */
-    @Test
-    fun `a bundle carrying real atlas pages is byte-identical across two packs`() {
-        assumeTrue(MobaArt.available, "moba sprite art is absent; run python scripts/extract-art.py")
-        val (first, second) = twoCheckouts()
-        // One character's sheets: the whole corpus is exercised by the test above, and a
-        // six-page atlas in a bundle comparison would make this test a minute long for no
-        // additional coverage of the *writer*.
-        val sheets: List<SheetInput> =
-            MobaArt.sheets().filter { it.id.startsWith("sprites/champions/archer/") }
-        val packer = AtlasPacker()
-
-        val a = PackFixture.bundle(first, first.resolve(ASSETS), "repro-atlas-a", packer.pack(sheets))
-        val b = PackFixture.bundle(second, second.resolve(ASSETS), "repro-atlas-b", packer.pack(sheets.reversed()))
-
-        assertContentEquals(a, b)
-    }
-
-    private fun sha256(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     private fun diffAt(a: ByteArray, b: ByteArray): String {
         val at = a.indices.firstOrNull { it >= b.size || a[it] != b[it] } ?: return "the tail"
@@ -147,8 +87,21 @@ class ReproducibilityTest {
         }
         return -1
     }
+}
 
-    private companion object {
-        const val ASSETS = PackFixture.ASSETS
-    }
+/**
+ * The two corpus packs against the real art, which only a machine holding the paid archives has.
+ *
+ * Kept as the additional run rather than deleted: the synthetic corpus is drawn by this
+ * repository's own PNG encoder, so it cannot stand in for decoding somebody else's PNGs and
+ * blitting them. It skips when the art is absent; [ReproducibilityTest] has already proved the
+ * property in the same task by then.
+ */
+internal class RealArtReproducibilityTest : CorpusReproducibilityContract() {
+
+    override val corpus: SpriteCorpus = MobaArt
+
+    override val checkoutPrefix: String = "repro-real-art"
+
+    override fun requireCorpus(): Unit = assumeTrue(corpus.available, corpus.unavailable)
 }

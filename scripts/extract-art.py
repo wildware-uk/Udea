@@ -12,11 +12,18 @@ match what the packed bundle reads.
 
 **It is still the only thing that produces its output**, which is why it is kept rather than
 deleted. `moba/src/main/resources/assets/sprites/` is the full 327-sheet corpus, and
-`udea-assets-compiler`'s `MobaArt` resolves exactly that path: the atlas determinism and pack
-reproducibility tests read it and `assumeTrue` themselves away when it is absent. Those tests
-therefore run on a machine that has the two archives and skip everywhere else - a hole their own
-KDoc names rather than hides. Do not repoint them at `scripts/stage-moba-art.py`: that stages 33
-sheets for six characters, and the corpus is the point of those tests.
+`udea-assets-compiler`'s `MobaArt` resolves exactly that path.
+
+That used to leave the atlas determinism and pack reproducibility tests running on one machine
+and skipping everywhere else. Issue #168 closed it: `SyntheticArt` draws a corpus of the same
+shape - 327 one-row sheets, 2269 frames, every frame 100x100 - at test time, `AtlasPackerTest`
+and `ReproducibilityTest` run against that on every clone, and `RealArtAtlasPackerTest` /
+`RealArtReproducibilityTest` are the same bodies pointed at whatever this script produced. Those
+two still skip when the archives are absent, which is now a statement about the real pixels
+rather than a hole in the property.
+
+Do not repoint the real-art tests at `scripts/stage-moba-art.py`: that stages 33 sheets for six
+characters, and the corpus shape is the point of those tests.
 """
 import os, re, zipfile, collections
 

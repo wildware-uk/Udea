@@ -147,12 +147,22 @@ tasks.register<JavaExec>("udeaMigrateAssets") {
 // the same arrangement `udeaDaemonBudget` above has, and for the same reason: a criterion nobody
 // can run by name is a criterion nobody runs.
 //
-// It also packs the real 327-sheet art corpus, which is tens of seconds of image decoding, so
+// It also packs a 327-sheet, 2269-frame art corpus, which is tens of seconds of image work, so
 // `test` excludes it and pays for it once here instead of on every unrelated run.
+//
+// The `RealArt*` pair is the same two test bodies pointed at the paid Tiny RPG corpus instead of
+// at the synthesised one (issue #168). They are listed here rather than left to `test` for one
+// reason: they are the expensive ones on a machine that *has* the art, and splitting a gate's two
+// halves across two tasks is how one half stops being run.
 val packGateClasses = listOf(
     "dev.wildware.udea.assets.compiler.pack.ReproducibilityTest",
+    "dev.wildware.udea.assets.compiler.pack.RealArtReproducibilityTest",
     "dev.wildware.udea.assets.compiler.pack.GraphBudgetTest",
     "dev.wildware.udea.assets.compiler.atlas.AtlasPackerTest",
+    "dev.wildware.udea.assets.compiler.atlas.RealArtAtlasPackerTest",
+    // The control. It belongs in the same task as the tests it controls, so one run says both
+    // "the property holds" and "the corpus is still one that could show it failing".
+    "dev.wildware.udea.assets.compiler.atlas.SmallFixtureContrastTest",
 )
 
 tasks.named<Test>("test") {

@@ -32,9 +32,9 @@ dependency rules; `docs/migration/ledger.md` has the retirement order.
 - **`common`** - Old engine core. Replaced module by module; deleted in Phase 6.
 - **`gradle-plugin`** - Old codegen plugin. Replaced by `udea-gradle` + `udea-codegen` in Phase 6.
 - **`example`** - Old example game. Replaced by `moba` in Phase 3. Dropping it from
-  `settings.gradle.kts` is safe; **deleting its files is not**, because
-  `scripts/stage-moba-art.py` stages `moba`'s character art out of
-  `example/src/main/resources/assets/sprites/` and that is the only copy in the tree.
+  `settings.gradle.kts` is safe; **deleting its files is not**, because `:moba`'s build stages
+  its character art out of `example/src/main/resources/assets/sprites/` and that is the only copy
+  in the tree.
 
 The level editor, the IDEA plugin and `compose-ui` were deleted in Phase 0: the tool surface is
 the editor, so there is nothing to replace them with.
@@ -60,9 +60,9 @@ The **art and audio are not**. Third-party sprite art from a paid asset pack is 
 [`docs/art-assets.md`](docs/art-assets.md) records what is there, the options and the decision
 taken. If you fork this repository, bring your own art.
 
-`moba`'s copy of that art is **not** committed, so a fresh clone cannot build `:moba` until you
-run `python3 scripts/stage-moba-art.py`. That step, and why the pixels are gitignored rather
-than committed, are in [`docs/art-assets.md`](docs/art-assets.md).
+`moba`'s copy of that art is **not** committed. There is no step to run: `./gradlew :moba:build`
+stages it out of the copy this repository already holds, and leaves your checkout clean. Why the
+pixels are gitignored rather than committed is in [`docs/art-assets.md`](docs/art-assets.md).
 
 ## Contact
 For questions or support, raise an issue on the project.

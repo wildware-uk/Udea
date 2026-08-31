@@ -6,32 +6,46 @@ The pixels are **not committed** - they are third-party licensed art and this re
 `.gitignore` excludes `moba/src/main/resources/assets/sprites/`, `moba/assets/sprites/` and
 `moba/raw-assets/`.
 
-`moba/assets/sprites/` is the path `moba/assets/character/*.udea.kts` actually names and the one
-`:moba:udeaPackBundle` reads, so **a fresh clone cannot build `:moba` until it is populated**.
-`:moba:udeaValidateAssets` fails on an unpopulated clone with a page of `UDEA0032`, each naming
-one `spritePath` that is not under the asset root. That is this step not having been run; it is
-not a fault in whatever you were changing.
+`moba/assets/sprites/` is the path the character scripts under `moba/assets/character/` actually
+name and the one `:moba:udeaPackBundle` reads, so a clone carries none of it. **The build puts it
+there.** `:moba:udeaStageCharacterArt` copies the sheets out of
+`example/src/main/resources/assets/sprites/`, where this repository already holds them, and runs
+ahead of `udeaScanAssets`, `udeaValidateAssets` and `udeaPackBundle`.
 
 ## Getting the art
 
-One step, after a fresh clone and before the first build:
+Nothing. Build the game:
 
 <!-- verify-art-staging: the documented step begins -->
 ```
-python3 scripts/stage-moba-art.py
+./gradlew :moba:build
 ```
 <!-- verify-art-staging: the documented step ends -->
 
-It copies 33 sheets for six characters out of `example/src/main/resources/assets/sprites/`,
-where this repository already holds them, into the six directories `moba/assets/character/*.udea.kts`
-name. It is idempotent: it overwrites what it copies and deletes nothing. The copies stay
-gitignored, which is the point of it — the alternative was committing a second set of the same
-paid-pack frames under a second path, doubling an exposure this file already documents.
+Staging is idempotent: it overwrites what it copies and deletes nothing, so a sheet you are
+holding in place by hand survives everything except that one file. The copies stay gitignored,
+which is the point of it — the alternative was committing a second set of the same paid-pack
+frames under a second path, doubling an exposure this file already documents. `git status` after
+a build is the check: it must be clean.
 
-`scripts/verify-art-staging.py` proves that claim end to end against a fresh checkout, and it
-reads the command out of the marked block above rather than carrying its own copy, so this
-document naming the wrong script fails a check instead of costing somebody an afternoon. Those
-markers are load-bearing: if you move the command, move them with it.
+### Until issue #170 this was a step a human had to know about
+
+`scripts/stage-moba-art.py` did the copying, it was named here and in `README.md`, and **nothing
+in the build or in CI ran it**. So every CI job that built `:moba` failed with 25 x `UDEA0032` on
+every push from the day the characters landed — a run nobody read, which is how three unrelated
+genuine failures sat unnoticed in the same runs. The script is gone; its knowledge of which sheets
+belong where is `CharacterArtStaging` in `build-logic`, held against the sprites the real asset
+scripts name by `CharacterArtStagingTest`.
+
+If `:moba:udeaValidateAssets` ever fails with `UDEA0032` on a `spritePath` again, it now means one
+of two things and neither of them is "you forgot a step": a character was added whose sheets
+nothing stages (that test says which), or the committed tree the sheets come from has moved.
+
+`scripts/verify-art-staging.py` proves the whole claim end to end against a fresh checkout of
+`HEAD` — including the negative control, which asks for the failure back by running the validator
+with `-x udeaStageCharacterArt`. It reads the command out of the marked block above rather than
+carrying its own copy, so this document naming the wrong command fails a check instead of costing
+somebody an afternoon. Those markers are load-bearing: if you move the command, move them with it.
 
 ### `scripts/extract-art.py` is not that step
 
@@ -63,8 +77,8 @@ again. The paid corpus is now the *additional* run — `RealArtAtlasPackerTest` 
 archives are absent, and that skip now means "the real pixels were not checked here" rather than
 "the property was not checked at all".
 
-Do not repoint the real-art tests at `scripts/stage-moba-art.py`: that stages 33 sheets for six
-characters, and the corpus shape is the point of those tests.
+Do not repoint the real-art tests at the art `:moba:udeaStageCharacterArt` puts in place: that
+stages 33 sheets for six characters, and the corpus shape is the point of those tests.
 
 This manifest IS committed so blueprints, issues and champion designs can name real
 characters and animation frame counts without shipping the art.
@@ -73,8 +87,8 @@ characters and animation frame counts without shipping the art.
 > pack is already committed under `example/src/main/resources/assets/sprites/`, and this
 > repository is public. See [Committed art in `example`](#committed-art-in-example) at the
 > bottom of this file for what is there, the options, and **the decision** — which is to leave
-> it, because `scripts/stage-moba-art.py` now stages `moba`'s art out of it and removing it
-> would red-build the repository.
+> it, because `:moba`'s build now stages `moba`'s art out of it and removing it would red-build
+> the repository.
 
 ## Format
 
@@ -211,15 +225,20 @@ This file recommended **option 2** — delete the four paid directories from `HE
 demo art, swap the affected `.udea.kts` characters for placeholders. That recommendation was
 written in commit `3f962bb`, and `git show 3f962bb --name-only` does not list
 `scripts/stage-moba-art.py`, because that script did not exist yet. It arrived two commits later
-in `531bec1`, and it copies out of exactly the directories option 2 deletes:
+in `531bec1`, and it copied out of exactly the directories option 2 deletes:
 
 ```
-$ git log --oneline -- scripts/stage-moba-art.py
+$ git log --oneline --diff-filter=A -- scripts/stage-moba-art.py
 531bec1 The game is playable again: 27 units fight with abilities, animation and art
 ```
 
-Four of the six characters `scripts/stage-moba-art.py` stages — `wizard`, `priest`, `skeleton`,
-`orc_elite` — are the four paid directories, and they are the only copy in the repository.
+(`--diff-filter=A` because the file has since been deleted, and a plain `git log` on the path now
+lists the deletion too.)
+
+That script is gone — issue #170 moved the copying into the build — and the dependency it created
+is not. Four of the six characters `:moba:udeaStageCharacterArt` stages — `wizard`, `priest`,
+`skeleton`, `orc_elite` — are the four paid directories, and they are the only copy in the
+repository.
 Deleting them makes `:moba:udeaValidateAssets` fail on every fresh clone with nothing to replace
 it. Option 2 stopped being "a placeholder swap in a module being deleted anyway" the moment the
 new game started reading from the old module's art, and nobody noticed because the two changes
@@ -256,15 +275,16 @@ now stated rather than implied, which is what option 1 requires to be defensible
 **Still open, for the owner.** Whether to act on options 2, 3 or 4 later. Nothing here forecloses
 any of them. **If you disagree with this decision**, the change is: pick option 2, re-source
 `moba`'s six characters from art the project may redistribute, update
-`scripts/stage-moba-art.py`'s `SHEETS` to the new sources, and delete
+`CharacterArtStaging`'s plan in `build-logic` to the new sources, and delete
 `example/src/main/resources/assets/sprites/{wizard,priest,skeleton,orc_elite}/`. In that order —
 the last step alone breaks the build. `scripts/verify-art-staging.py` will tell you if it does.
 
 ### The ongoing mechanism for `moba`'s art
 
-**Unchanged, and deliberately so:** `.gitignore` excludes `moba/assets/sprites/`,
-`scripts/stage-moba-art.py` populates it from art the repository already holds, and this file is
-the committed manifest. Three alternatives were considered for the same decision and rejected:
+**Unchanged in substance, and deliberately so:** `.gitignore` excludes `moba/assets/sprites/`,
+the build populates it from art the repository already holds, and this file is the committed
+manifest. Issue #170 changed only who runs the copying — the build rather than a person who had
+read this file. Three alternatives were considered for the same decision and rejected:
 
 | Alternative | Why not |
 |---|---|
@@ -275,4 +295,4 @@ the committed manifest. Three alternatives were considered for the same decision
 All three trade a mechanism that demonstrably works, and that
 `scripts/verify-art-staging.py` proves on a fresh checkout, for infrastructure this repository
 has no way to exercise. If the art is ever re-sourced to something redistributable, the right
-answer is to commit it and delete the staging script, not to build a private channel.
+answer is to commit it and delete the staging task, not to build a private channel.

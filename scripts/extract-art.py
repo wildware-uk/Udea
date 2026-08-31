@@ -1,7 +1,8 @@
 """How the committed Tiny RPG frames were unpacked from the two purchased archives.
 
-**This is not a build step and it will not give a fresh clone a tree `:moba` can build.** Run
-`python3 scripts/stage-moba-art.py` for that; `docs/art-assets.md` is the record of why.
+**This is not a build step and it will not give a fresh clone a tree `:moba` can build.** The
+build does that by itself now, in `:moba:udeaStageCharacterArt`; `docs/art-assets.md` is the
+record of why.
 
 Three things stop it being a fresh-clone step. It reads the two **paid** archives by exact
 filename from a hardcoded Windows `~\\Downloads`; its destination is an absolute path on the
@@ -22,8 +23,8 @@ and `ReproducibilityTest` run against that on every clone, and `RealArtAtlasPack
 two still skip when the archives are absent, which is now a statement about the real pixels
 rather than a hole in the property.
 
-Do not repoint the real-art tests at `scripts/stage-moba-art.py`: that stages 33 sheets for six
-characters, and the corpus shape is the point of those tests.
+Do not repoint the real-art tests at the art `:moba:udeaStageCharacterArt` puts in place: that
+stages 33 sheets for six characters, and the corpus shape is the point of those tests.
 """
 import os, re, zipfile, collections
 

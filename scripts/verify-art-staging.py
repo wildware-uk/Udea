@@ -1,37 +1,43 @@
 #!/usr/bin/env python3
-"""Prove that a fresh clone plus the *documented* art step gives `:moba` a tree it can build.
+"""Prove that a fresh clone builds `:moba` with no manual step, and commits no paid-pack art.
 
     python3 scripts/verify-art-staging.py
 
-This is the executable half of issue #154. The claim it checks is the one a reader of
-`docs/art-assets.md` relies on and nothing else in the repository tests: the pixels are not
-committed, so a fresh clone **cannot** build `:moba` until the documented step has been run, and
-after it has been run the build accepts the tree.
+This is the executable half of issue #154, rewritten for issue #170. The claim it checks is the
+one a reader of `docs/art-assets.md` relies on and nothing else in the repository tests: the
+pixels are **not** committed, and the build puts them in place anyway.
 
-It checks a fresh checkout of `HEAD`, not the working tree, because that is what somebody
-cloning actually receives. Uncommitted edits to the docs or to the staging script are invisible
-to it until they are committed.
+It checks a fresh checkout of `HEAD`, not the working tree, because that is what somebody cloning
+actually receives. Uncommitted edits to the docs, to the build or to `LICENSE` are invisible to
+it until they are committed.
 
 ## What it asserts, and why each one can fail
 
-1. **The negative control.** `:moba:udeaValidateAssets` must FAIL on the clean tree. If it
-   passes, the art is no longer absent — somebody committed the pack, or `.gitignore` stopped
-   excluding it — and every later assertion here would be passing for the wrong reason.
-2. **The documented step is the step that works.** The command is read out of
+1. **The negative control.** `:moba:udeaValidateAssets` must FAIL on the clean tree when the
+   staging task is excluded with `-x`. Two things would make it pass: the art being committed
+   after all, or the pipeline no longer minding a `spritePath` it cannot resolve. Either would
+   make every later assertion here pass for the wrong reason. This is the assertion #154 shipped;
+   what #170 changed is that it now has to be *asked for*, because an unexcluded build stages the
+   art itself.
+2. **No paid-pack file is committed.** A fresh checkout's sprite tree must hold exactly the files
+   listed in [COMMITTED_SPRITES] and nothing else. Making CI green by committing the pack is the
+   fix #170 puts out of scope, and this is what would catch it.
+3. **The documented step is the step that works.** The command is read out of
    `docs/art-assets.md` between the markers below rather than hardcoded here, so a document that
-   names the wrong script fails this check instead of quietly misleading a reader. That is the
-   exact defect #154 exists to remove: before it, the manifest offered
-   `scripts/extract-art.py` as an equivalent, and that script unpacks two paid ZIPs from a
-   Windows `~/Downloads` into `moba/src/main/resources/assets/sprites` — a path `:moba` has not
-   read since the asset root moved.
-3. **The build accepts the result.** `:moba:udeaValidateAssets` must PASS afterwards.
-4. **`LICENSE` covers wherever the step put the art.** The destination directories are taken
-   from the files that appeared during step 2, not from a list written here, so moving the
+   names the wrong command fails this check instead of quietly misleading a reader.
+4. **The build stages the art, packs it, and leaves the checkout clean.** Files must have
+   appeared under the sprite tree during step 3, the `.udeapak` those pixels go into must exist
+   afterwards - a staging step that ran and a bundle that did not are two different outcomes -
+   and `git status` in the clean tree must be empty, which is what says the art landed somewhere
+   git ignores rather than somewhere a contributor could commit it by accident.
+5. **`LICENSE` covers wherever the build put the art.** The destination directories are taken
+   from the files that appeared during step 3, not from a list written here, so moving the
    staging destination without extending `LICENSE` fails this check.
-5. **`README.md`'s licence claim matches `LICENSE`.** One name for the licence, in both places.
-6. **`README.md` does not send a reader to a different staging script.** It repeats the command
+6. **`README.md`'s licence claim matches `LICENSE`.** One name for the licence, in both places.
+7. **`README.md` does not send a reader to a staging script.** It repeats the build instruction
    for the fresh cloner who never opens the manifest, and a repeated instruction can drift from
-   the one it repeats.
+   the one it repeats - which is exactly how `scripts/extract-art.py` came to be offered as an
+   equivalent of a step it has never been able to perform.
 
 Every step prints its own verdict, and exit status is 0 only if all of them hold.
 """
@@ -51,6 +57,27 @@ BEGIN = "<!-- verify-art-staging: the documented step begins -->"
 END = "<!-- verify-art-staging: the documented step ends -->"
 
 VALIDATE = ":moba:udeaValidateAssets"
+
+# The task the build runs to put the art in place, excluded in step 1 to make the control mean
+# something. A rename fails step 1 as "task not found" rather than passing quietly.
+STAGING_TASK = "udeaStageCharacterArt"
+
+SPRITE_TREE = os.path.join("moba", "assets", "sprites")
+
+# The bundle `:moba:build` packs those pixels into.
+BUNDLE = os.path.join("moba", "build", "udea", "pack", "assets.udeapak")
+
+# Every file a clone is supposed to carry under the sprite tree, repo-relative.
+#
+# `.gitignore` excludes the whole tree and then excepts these: `champion_idle.png` predates the
+# rule, and the arrow is the free demo pack's 260-byte file plus the `.udea.kts` that has to sit
+# beside it. Anything else appearing here means paid-pack art was committed, which is the one
+# thing #170 was not allowed to do to make CI green.
+COMMITTED_SPRITES = {
+    os.path.join(SPRITE_TREE, "champion_idle.png"),
+    os.path.join(SPRITE_TREE, "arrow", "arrow.png"),
+    os.path.join(SPRITE_TREE, "arrow", "arrow.udea.kts"),
+}
 
 # Directory paths in `LICENSE`, e.g. `moba/assets/sprites/`. Two constraints, and dropping
 # either one lets a false pass through:
@@ -141,13 +168,38 @@ def read(clean, name):
     return open(path, encoding="utf-8").read()
 
 
+def check_no_committed_pack_art(clean):
+    """A fresh checkout's sprite tree must hold the excepted files and nothing else."""
+    present = {
+        os.path.join(SPRITE_TREE, path)
+        for path in tree_files(os.path.join(clean, SPRITE_TREE))
+    }
+    unexpected = sorted(present - COMMITTED_SPRITES)
+    if unexpected:
+        raise Failure(
+            f"a fresh checkout carries {len(unexpected)} file(s) under {SPRITE_TREE} that are "
+            "not the documented exceptions: "
+            + ", ".join(unexpected[:5])
+            + ". Committing the paid pack is how this build would go green without the staging "
+            "step, and docs/art-assets.md rules it out."
+        )
+    absent = sorted(COMMITTED_SPRITES - present)
+    if absent:
+        raise Failure(
+            "a fresh checkout is missing " + ", ".join(absent) + ", which this check expects it "
+            "to carry. Either the file was removed or this list is out of date; both are worth "
+            "a decision rather than a silent pass."
+        )
+    print(f"  {len(present)} file(s) under {SPRITE_TREE}, all of them the documented exceptions")
+
+
 def check_licence_covers_destinations(clean, staged_files):
     tokens = set(PATH_TOKEN.findall(exclusion_section(read(clean, "LICENSE"))))
     uncovered = sorted(p for p in staged_files if not licence_covers(p, tokens))
     if uncovered:
         raise Failure(
             "LICENSE names no directory covering "
-            + f"{len(uncovered)} file(s) the documented step created, e.g. "
+            + f"{len(uncovered)} file(s) the build created, e.g. "
             + ", ".join(uncovered[:3])
             + ". Third-party art landed at a path the licence exclusion does not mention."
         )
@@ -163,11 +215,13 @@ def readme_licence_section(readme_text):
 
 
 def check_readme_names_the_same_step(clean, step):
-    """`README.md` repeats the staging command; it must not drift from the documented one.
+    """`README.md` repeats the build instruction; it must not drift from the documented one.
 
     Conditional by design: a README that names no script at all passes here, because the
     manifest is the authority and the README is allowed to link rather than repeat. What it
-    cannot do is repeat a *different* script, which is the drift this exists to catch.
+    cannot do is repeat a *different* instruction, which is the drift this exists to catch.
+    Since #170 the documented step names no script, so a README that names one is by definition
+    sending a reader somewhere the manifest does not.
     """
     section = readme_licence_section(read(clean, "README.md"))
     named = set(re.findall(r"scripts/[A-Za-z0-9_.-]+\.py", section))
@@ -212,19 +266,27 @@ def main():
     try:
         print(f"clean tree: {clean}")
 
+        # The wrapper is checked in WITHOUT the executable bit - CI's first step after checkout
+        # is `chmod +x ./gradlew` - so the documented step is given the same treatment here
+        # rather than being rewritten into something a reader would not type.
+        os.chmod(os.path.join(clean, "gradlew"), 0o755)
+
         # Read from the clean tree, not the working tree: every artefact under test - the
-        # manifest, the staging script, LICENSE and README - must be the committed one.
+        # manifest, the build, LICENSE and README - must be the committed one.
         step = documented_step(read(clean, MANIFEST))
         print(f"documented step, from {MANIFEST}:")
         for line in step:
             print(f"    {line}")
 
-        print(f"\n[1/6] negative control: {VALIDATE} must FAIL with no staged art")
-        code, out = run(["sh", "gradlew", VALIDATE, "--console=plain"], clean)
+        print(f"\n[1/7] negative control: {VALIDATE} must FAIL with -x {STAGING_TASK}")
+        code, out = run(
+            ["sh", "gradlew", VALIDATE, "-x", STAGING_TASK, "--console=plain"], clean
+        )
         if code == 0:
             raise Failure(
-                f"{VALIDATE} PASSED on a fresh checkout with nothing staged. The art is no "
-                "longer absent from a clone, so this whole check would pass for the wrong "
+                f"{VALIDATE} PASSED on a fresh checkout with the staging task excluded. The art "
+                "is no longer absent from a clone, or the pipeline stopped minding an "
+                "unresolvable spritePath. Either way this whole check would pass for the wrong "
                 "reason. Investigate before trusting anything below."
             )
         diagnostics = out.count("UDEA0032")
@@ -235,41 +297,56 @@ def main():
             )
         print(f"  FAILED as required, {diagnostics} x UDEA0032")
 
+        print(f"\n[2/7] a fresh checkout must carry no paid-pack art under {SPRITE_TREE}")
+        check_no_committed_pack_art(clean)
+
         before = tree_files(clean)
 
-        print("\n[2/6] running the documented step in the clean tree")
+        print("\n[3/7] running the documented step in the clean tree")
         for line in step:
             code, out = run(["sh", "-c", line], clean)
-            print(("  " + out.strip()).replace("\n", "\n  "))
+            print(("  " + out.strip()[-4000:]).replace("\n", "\n  "))
             if code != 0:
                 raise Failure(
                     f"the step {MANIFEST} documents exited {code}: {line!r}. "
                     "The documentation names a command a fresh clone cannot use."
                 )
 
-        staged = sorted(tree_files(clean) - before)
+        print("\n[4/7] the build must have staged the art, packed it, and left the tree clean")
+        appeared = sorted(tree_files(clean) - before)
+        staged = [path for path in appeared if path.startswith(SPRITE_TREE + os.sep)]
         if not staged:
             raise Failure(
-                f"the documented step succeeded but created no files. {MANIFEST} names a "
-                "command that does not stage the art."
+                f"the documented step succeeded but created no file under {SPRITE_TREE}. "
+                f"{MANIFEST} names a command that does not stage the art, and step 1 says the "
+                "tree needs staging."
             )
-        print(f"  {len(staged)} new file(s)")
-
-        print(f"\n[3/6] {VALIDATE} must now PASS")
-        code, out = run(["sh", "gradlew", VALIDATE, "--console=plain"], clean)
-        if code != 0:
+        if not os.path.isfile(os.path.join(clean, BUNDLE)):
             raise Failure(
-                f"{VALIDATE} still fails after the documented step:\n{out[-3000:]}"
+                f"{len(staged)} file(s) were staged but {BUNDLE} does not exist, so nothing "
+                "proves the pipeline got as far as packing those pixels."
             )
-        print("  PASSED")
+        # `git status` and not a walk of the tree, because the question is not "what did the
+        # build write" - it wrote a `build/` directory and a `gamebridge.json` and is meant to -
+        # but "did any of it land somewhere git would track". A build that stages licensed art
+        # into a tracked path is the failure this catches, and it is the same failure whether
+        # the path is new or an overwrite of something committed.
+        code, out = run(["git", "status", "--porcelain"], clean)
+        if code != 0 or out.strip():
+            raise Failure(
+                "the build left the clean checkout dirty:\n" + out.strip()[:2000] + "\nEvery "
+                "file it stages has to be one git ignores, or a clone becomes a checkout with "
+                "uncommitted paid-pack art in it."
+            )
+        print(f"  {len(staged)} sheet(s) staged, {BUNDLE} packed, `git status` clean")
 
-        print("\n[4/6] LICENSE must exclude wherever the step put the art")
+        print("\n[5/7] LICENSE must exclude wherever the build put the art")
         check_licence_covers_destinations(clean, staged)
 
-        print("\n[5/6] README.md's licence claim must match LICENSE")
+        print("\n[6/7] README.md's licence claim must match LICENSE")
         check_readme_matches_licence(clean)
 
-        print("\n[6/6] README.md must not name a different staging script")
+        print("\n[7/7] README.md must not name a staging script")
         check_readme_names_the_same_step(clean, step)
     finally:
         # Say so rather than leaving a stale worktree registration behind silently. The check's
@@ -279,7 +356,7 @@ def main():
             print(f"\nwarning: could not remove {clean}; `git worktree prune` will:\n{out}")
         shutil.rmtree(parent, ignore_errors=True)
 
-    print("\nOK: a fresh clone plus the documented step builds, and the licence covers it.")
+    print("\nOK: a fresh clone builds :moba with no manual step, and the licence covers the art.")
     return 0
 
 

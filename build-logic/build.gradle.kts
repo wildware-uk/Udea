@@ -108,6 +108,14 @@ val outerBuildInputs: FileCollection = files(
         include("build.gradle.kts")
         include("udea-gradle/src/**")
         include("moba/src/**/*.kt")
+
+        // `CharacterArtStagingTest` derives what the build has to stage from the sprites the real
+        // asset scripts name, and checks every one of them against the committed tree it copies
+        // out of. Both are outside anything Gradle would otherwise associate with this module, so
+        // without these two lines the test stays UP-TO-DATE across a new character and across the
+        // deletion of the art it stages - which are the two edits it exists to notice.
+        include("moba/assets/**/*.udea.kts")
+        include("example/src/main/resources/assets/sprites/**")
     },
 )
 

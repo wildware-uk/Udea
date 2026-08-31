@@ -1,6 +1,7 @@
 import dev.wildware.udea.build.ReleaseRules
 import dev.wildware.udea.build.UdeaNetComponents
 import dev.wildware.udea.build.UdeaVerifyReleaseTask
+import dev.wildware.udea.build.registerCharacterArtStaging
 import dev.wildware.udea.build.registerNetProtocolLock
 import dev.wildware.udea.gradle.UdeaAgentPlugin
 
@@ -145,6 +146,32 @@ udea {
     assetRoots.from("assets")
     kotlinVersion.set(libs.versions.kotlin.get())
 }
+
+/**
+ * The character art, put where the asset root expects it before anything reads the asset root.
+ *
+ * ## What this replaces
+ *
+ * A shell step. The sheets under `assets/sprites` are paid-pack art this public repository cannot
+ * sublicense, so they are gitignored and a clone has none of them - and the pipeline said so, once
+ * per sheet, as `UDEA0032`. The step that fixed it was `scripts/stage-moba-art.py`, named in
+ * `docs/art-assets.md` and nowhere the build could see. Nothing in CI ran it, so every job that
+ * built this module had been red since the characters landed, and three real failures went unread
+ * in those runs.
+ *
+ * ## Why staging rather than teaching the pipeline a second root
+ *
+ * Two other fixes were available and both are worse. Resolving a `spritePath` against a *second*
+ * tree means the asset pipeline supporting two roots, which `UdeaAssetsExtension` declines to do
+ * for a reason that has not changed: ids are relative to a root, so two roots need a rule for a
+ * colliding id. Staging into `build/` and packing from there means the daemon, the diagnostics'
+ * repo-relative spans and `:moba:run`'s `udea.assets.root` all naming a generated directory
+ * instead of the tree a developer edits.
+ *
+ * So the art lands where the manifest already says it lands, and the only thing that changed is
+ * who puts it there.
+ */
+registerCharacterArtStaging()
 
 /**
  * The release gate bans **this game's** agent package too, not only the engine's.

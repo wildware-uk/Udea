@@ -174,6 +174,10 @@ replaced**, not left "for reference".
 
 No `-x` exclusions. The whole repository is green; if it is not, that is your change.
 
+- **There is no art step.** `moba/assets/sprites/` is gitignored licensed art, and
+  `:moba:udeaStageCharacterArt` copies it out of the tree that already holds it, ahead of the
+  asset pipeline, on every build. So a clone builds, `git status` stays clean, and a `UDEA0032`
+  about a `spritePath` is a real defect rather than a step you forgot. `docs/art-assets.md`.
 - Tests assert **behaviour**. A test that cannot fail is a defect a reviewer will reject.
 - Break the production code, watch the test go red, revert. A test you have not seen fail is
   unverified.

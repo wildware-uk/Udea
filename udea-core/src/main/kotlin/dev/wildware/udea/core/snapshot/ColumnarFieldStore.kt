@@ -252,8 +252,20 @@ public class ColumnarFieldStore(
      * An `Object` field contributes its `hashCode`, which is why [FieldKind.Object] carries a
      * stable-hash obligation: `Any.hashCode` on an ordinary class is an address, and hashing
      * one would make the determinism gate fail on every second run for no reason at all.
+     *
+     * ## Why this is public
+     *
+     * Phase 7's cross-OS `replay-equality` gate writes these values out per tick, so that two
+     * machines which disagree can be told *which field* they disagree about rather than only
+     * that a `Long` came out different. Its writer refolds exactly these values through
+     * [WorldHasher.fold] and refuses to write a tick that does not reproduce
+     * [WorldHasher.hash] — which is only possible if it can read the same bits the hash read.
+     *
+     * The alternative was recovering the bits from [valueAt] and the [FieldKind], which would
+     * put a second copy of the float canonicalisation in another module, where it would agree
+     * with this one right up until somebody edited one of them.
      */
-    internal fun hashableBits(slot: Int, field: Int, comparison: FieldComparison): Long {
+    public fun hashableBits(slot: Int, field: Int, comparison: FieldComparison): Long {
         val at = cell(slot, field)
         return when (schema.kindOf(field).group) {
             ColumnGroup.Ints -> ints[at].toLong()

@@ -6,10 +6,10 @@
 #
 # That is not hypothetical. Issue #176: this repository has no root `.gitattributes` and Git for
 # Windows checks out with `core.autocrlf=true`, so `build (windows-latest)` had been failing both
-# cases on a golden that arrived with `CR=169 LF=169` against output with `CR=0 LF=169`. It was
-# invisible for two rounds because `assertEquals` renders a carriage return as nothing and both
-# halves of the diff printed identically; it was only settled by counting the bytes in the
-# uploaded test-report artefact.
+# cases on a golden that arrives with `CR=169 LF=169` against output the writer emits with no
+# carriage return at all. In the issue's own words the rendered assertion "looks identical on
+# both sides, which is the tell", and it was settled by counting the bytes in the uploaded
+# test-report artefact rather than by reading the diff.
 #
 # `-text` rather than `text eol=lf`, and rather than a repository-wide rule. `-text` says "never
 # translate this in either direction", which is what a byte comparison needs, and it is what

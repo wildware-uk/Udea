@@ -182,15 +182,15 @@ class CrossPlatformDivergenceTest {
         val expected = Files.readString(golden)
         // Issue #176. `udea-replay/.gitattributes` marks this golden `-text` so no checkout
         // translates it, and this is the fence for a copy that arrived some other way. Without
-        // it the comparison below fails on the carriage returns instead - and a carriage return
-        // renders as nothing, so the reader is shown two blocks of text that look identical.
+        // it the comparison below fails on the carriage returns instead, and its rendered diff
+        // looks identical on both sides when that is the only difference.
         assertEquals(
             0, expected.count { it == '\r' },
             "$GOLDEN reached this test with carriage returns in it. It is committed with LF and " +
                 "the renderer emits LF, so this copy was translated on the way here - a checkout " +
                 "with core.autocrlf=true (Git for Windows' default) is the usual cause, and " +
                 "udea-replay/.gitattributes marks it `-text` to prevent that. Reported here " +
-                "because the comparison below would fail with both halves printing identically.",
+                "because the comparison below would print two blocks that look identical.",
         )
         assertEquals(
             expected.trimEnd(), actual.trimEnd(),

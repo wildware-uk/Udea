@@ -137,14 +137,16 @@ class CompilerPluginSwitchTest {
      * the checks are about; a slicer that silently returned nothing would make both tests pass
      * on anything.
      *
-     * It takes the workflow as text, and normalises it, for two reasons that are really one.
-     * Issue #176: this repository has no root `.gitattributes`, Git for Windows checks out with
-     * `core.autocrlf=true`, and `ci.yml` therefore arrives CRLF there - which made the
-     * `indexOf` below return -1 and failed both tests below with "no longer has a
-     * `checkers-fire:` job" on a workflow that plainly still had one. What these tests assert
-     * is what the workflow *says*, never what bytes it is stored in, so the line ending is
-     * noise and is removed here rather than worked around in each regex. Taking the text as a
-     * parameter is what lets the CRLF case be asserted without a Windows checkout.
+     * It normalises the line endings first (issue #176). This repository has no root
+     * `.gitattributes`, Git for Windows checks out with `core.autocrlf=true`, and `ci.yml`
+     * therefore arrives CRLF there - which made the `indexOf` below return -1, so the fence
+     * reported "no longer has a `checkers-fire:` job" about a workflow that plainly still had
+     * one. What these tests assert is what the workflow *says*, never what bytes it is stored
+     * in, so a line ending is noise and is removed once here rather than worked around in each
+     * regex.
+     *
+     * It takes the workflow as a parameter so the CRLF case can be asserted without a Windows
+     * checkout; the default is the file, so every existing caller is unchanged.
      */
     private fun checkersFireJob(ciYaml: String = ci.readText()): String {
         val text = ciYaml.replace("\r\n", "\n")

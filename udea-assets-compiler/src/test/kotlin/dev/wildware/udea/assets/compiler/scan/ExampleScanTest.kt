@@ -33,10 +33,10 @@ class ExampleScanTest {
      * The committed golden, refusing a copy a checkout has translated.
      *
      * Read through [GoldenResource] rather than straight off the classpath because the two
-     * tests that compare against it compare *bytes*, and a carriage return renders as nothing:
-     * on a `core.autocrlf=true` checkout the equality failed with both halves of the diff
-     * printing identically. `udea-assets-compiler/.gitattributes` stops the translation and
-     * this stops a translated copy arriving by some other route. Issue #176.
+     * tests that compare against it compare *bytes*: on a `core.autocrlf=true` checkout the
+     * equality failed, and issue #176 records that "the rendered assertion looks identical on
+     * both sides, which is the tell". `udea-assets-compiler/.gitattributes` stops the
+     * translation and this stops a translated copy arriving by some other route.
      */
     private fun goldenText(): String = GoldenResource.read(GoldenResource.EXAMPLE_DECLARATIONS)
 

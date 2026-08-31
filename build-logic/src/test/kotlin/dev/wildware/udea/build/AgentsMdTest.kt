@@ -99,8 +99,13 @@ class AgentsMdTest {
     }
 
     /**
-     * The control for the test above: an *untranslated* settings script still reaches the same
-     * finding, so the CRLF case is not passing because the mutation stopped mattering.
+     * The other half of the test above, on the unedited pair.
+     *
+     * The test above proves a *stale* document is still caught on a translated checkout; this
+     * proves a *correct* one is still passed, and that the two readings the gate does — which
+     * modules the build declares, and which modules the brief documents — are the same lists
+     * either way. Without it the CRLF case could be green because the gate had started finding
+     * drift everywhere, which is the same uselessness in the other direction.
      */
     @Test
     fun `the module table reads the same whatever the checkout did to the line endings`() {
@@ -108,24 +113,6 @@ class AgentsMdTest {
         assertEquals(AgentsMd.documentedModules(agentsMd), AgentsMd.documentedModules(agentsMd.asCrlf()))
         assertEquals(emptyList(), AgentsMd.findings(agentsMd.asCrlf(), settings.asCrlf()))
     }
-
-    /**
-     * [settings] with one module's `include(...)` line removed, whatever line ending it carries.
-     *
-     * The `assertTrue` is part of the fence rather than defensive noise. A removal that removed
-     * nothing hands the caller an unedited script, `findings` returns nothing, and the caller
-     * fails on an empty list with no hint of why - which is precisely the failure issue #176
-     * spent a CI leg on. Failing here names the cause instead.
-     */
-    private fun settingsWithout(module: String, from: String = settings): String {
-        val line = Regex("""(?m)^[ \t]*include\("${Regex.escape(module)}"\)[ \t]*\r?\n""")
-        val edited = line.replace(from, "")
-        assertTrue(edited != from, "the settings script has no `include(\"$module\")` line to remove")
-        return edited
-    }
-
-    /** The bytes a `core.autocrlf=true` checkout would have written for LF-committed text. */
-    private fun String.asCrlf(): String = replace("\r\n", "\n").replace("\n", "\r\n")
 
     @Test
     fun `dropping a spec section 5 contract fails, naming it`() {
@@ -159,4 +146,22 @@ class AgentsMdTest {
             AgentsMd.documentedModules(agentsMd.replace(AgentsMd.MODULE_SECTION, "## Bits and pieces"))
         }
     }
+
+    /**
+     * [from] with one module's `include(...)` line removed, whatever line ending it carries.
+     *
+     * The `assertTrue` is part of the fence rather than defensive noise. A removal that removed
+     * nothing hands the caller an unedited script, `findings` returns nothing, and the caller
+     * fails on an empty list with no hint of why — which is exactly the failure issue #176 spent
+     * a CI leg on. Failing here names the cause instead.
+     */
+    private fun settingsWithout(module: String, from: String = settings): String {
+        val line = Regex("""(?m)^[ \t]*include\("${Regex.escape(module)}"\)[ \t]*\r?\n""")
+        val edited = line.replace(from, "")
+        assertTrue(edited != from, "the settings script has no `include(\"$module\")` line to remove")
+        return edited
+    }
+
+    /** The bytes a `core.autocrlf=true` checkout would have written for LF-committed text. */
+    private fun String.asCrlf(): String = replace("\r\n", "\n").replace("\n", "\r\n")
 }

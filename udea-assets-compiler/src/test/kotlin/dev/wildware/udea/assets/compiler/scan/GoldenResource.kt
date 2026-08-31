@@ -12,11 +12,10 @@ package dev.wildware.udea.assets.compiler.scan
  * This is the other half of that, and issue #176 is why it is not redundant. An attribute
  * governs a checkout; it does nothing about a copy that arrived some other way - restored from
  * an archive, unzipped on Windows, written by an editor set to CRLF, or checked out before the
- * attribute existed. Without a fence such a copy fails on the byte comparison alone, and the
- * failure is worse than useless: `assertEquals` renders `\r` as nothing, so both halves of the
- * diff print identically and the reader is left staring at two blocks of text that look the
- * same. That is exactly how #176 was missed until somebody counted the bytes in the CI
- * artefact.
+ * attribute existed. Without a fence such a copy fails on the byte comparison alone, and that
+ * failure is worse than useless: issue #176 records that "the rendered assertion looks
+ * identical on both sides, which is the tell", and it was only settled by counting `\r` and
+ * `\n` in the uploaded CI artefact.
  *
  * The shape is the one issue #171 shipped for the vendored bridge sources: the attribute stops
  * the translation, and the code that reads the file refuses a translated copy by name.
@@ -52,9 +51,9 @@ internal object GoldenResource {
                 "core.autocrlf=true (Git for Windows' default) is the usual cause, and " +
                 "udea-assets-compiler/.gitattributes marks the goldens `-text` to prevent it. " +
                 "Refresh the working tree (git rm --cached -r . && git reset --hard) or fix the " +
-                "editor that saved it. Reported here rather than by the byte comparison because " +
-                "a carriage return renders as nothing: the diff would have shown two blocks of " +
-                "text that look identical (issue #176)."
+                "editor that saved it. Reported here rather than by the byte comparison, whose " +
+                "rendered diff looks identical on both sides when the only difference is a " +
+                "carriage return (issue #176)."
         }
         return text
     }

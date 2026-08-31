@@ -145,15 +145,19 @@ class ReplayEqualityPathsTest {
         // `ReplayDigestRecorder` makes it return having written nothing - the paths that could
         // go wrong throw an `IOException` from inside the write instead - so the post-condition
         // guards against a future change, and its removal would be caught by nothing else. Its
-        // *behaviour* is the four tests above; this is only that `main` still calls it.
+        // *behaviour* is the four tests above; this is only that the entry point still calls it.
+        //
+        // It reads `ReplayDigestCli` and not a game's `main`, which is issue #172: since the gate
+        // was pointed at `moba` there are two `main`s over one shared run, so a scan of either
+        // one of them would answer about half the legs.
         val source = Files.readString(
             Path.of(System.getProperty("udea.projectDir")!!)
-                .resolve("src/testFixtures/kotlin/dev/wildware/udea/replay/equality/fixture/DriftDigestMain.kt"),
+                .resolve("src/main/kotlin/dev/wildware/udea/replay/equality/ReplayDigestCli.kt"),
         )
 
         assertContains(
             source, "ReplayEqualityPaths.requireStreamWritten(",
-            message = "DriftDigestMain no longer checks that it wrote a stream, so a leg that " +
+            message = "ReplayDigestCli no longer checks that it wrote a stream, so a leg that " +
                 "produced nothing would exit 0 and leave the upload step to report a glob two " +
                 "lines later",
         )

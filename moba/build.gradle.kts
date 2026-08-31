@@ -644,3 +644,345 @@ tasks.test {
         systemProperty("udea.moba.agentClasses", agentClasses.asPath)
     }
 }
+
+// --- the cross-OS replay-equality gate, pointed at this game (issue #172) ----------------------
+//
+// ## What moved, and why it had to
+//
+// Issues #152 and #169 built a working three-leg, two-OS, two-vendor gate with a field-level
+// divergence report and a `join` that produces a verdict - and pointed it at `DriftWorld`, a
+// few hundred lines of purpose-built drifters that route their trigonometry through `StrictMath`
+// because their author knew exactly which call was the trap. That world is *written to be
+// deterministic*. `moba` is not, and `moba` is the thing Phase 7 exists to make deterministic:
+// a level of AI-driven units, a lane of creeps, towers, projectiles, abilities, a shop and a
+// match loop, none of which had ever been replayed on two operating systems and compared field
+// by field. A gate whose fixture cannot fail reports the health of its own fixture.
+//
+// So the CI legs run the tasks below, and `:udea-replay`'s equivalents stay as the gate's
+// self-test - `udeaReplayEqualityProof` there plants into `DriftWorld` across five processes and
+// `CrossPlatformDivergenceTest` pins its rendered failure against a checked-in expected output.
+//
+// ## Why the logic is in tasks and classes rather than in the workflow YAML
+//
+// Nobody can run GitHub Actions locally, so anything expressed only in `ci.yml` is unverifiable
+// until it has already gone wrong once on a branch somebody merged. Everything a leg does -
+// replay, write the digest, compare two of them, render the divergence, choose the exit code -
+// is a class with a `main` and a task that drives it, and `ci.yml` is a few `./gradlew` lines
+// over the top. `udeaReplayEqualityProof` below runs the whole shape on one machine, including
+// the half that has to fail.
+//
+// None of these is wired into `check`. A digest is a multi-second replay whose output is only
+// meaningful beside another machine's, and the proof starts five JVMs - the same reason
+// `runUdpProof` and `runLaneShot` are named tasks rather than `check` dependencies.
+
+val replayEqualityDir: Provider<Directory> =
+    layout.buildDirectory.dir("reports/udea/replay-equality")
+
+/**
+ * The base every relative path handed to these tasks is resolved against: the repository root.
+ *
+ * Issue #169, and it is not this project's to rediscover. A `JavaExec` with no `workingDir`
+ * inherits the *project* directory, so `-Pudea.replay.out=digests/x.udeaeq` would write into
+ * `moba/digests/` while `actions/upload-artifact` globs `digests/` under `$GITHUB_WORKSPACE`.
+ * Both spellings are identical and both resolve somewhere else; the upload fails, and because
+ * the join declares `needs:` the leg job, no verdict is ever produced.
+ *
+ * Passed as an argument rather than set as `workingDir` because an argument is a value
+ * `ReplayEqualityPaths.resolve` can be tested against - see `MobaReplayEqualityTest`, which
+ * drives `MobaDigestMain.parse` with the workflow's own strings.
+ */
+val replayWorkspaceRoot: String = rootProject.layout.projectDirectory.asFile.absolutePath
+
+/**
+ * The classpath every entry point below runs on.
+ *
+ * The **test** runtime classpath, and that is a release gate rather than a preference.
+ * `ReleaseRules.CLASSPATH_RULE` (UDEA-REL-002) is about `runtimeClasspath`; a fixture pilot and a
+ * digest entry point are CI machinery and have no business inside the shipped jar, so they live
+ * in `src/test` beside `MatchShot` and `LaneShot` for the same reason those do.
+ */
+val replayEqualityClasspath: FileCollection = sourceSets.test.get().runtimeClasspath
+
+/**
+ * The launcher a digest runs on, honouring `-Pudea.replay.jvm=<feature version>`.
+ *
+ * The second axis of the matrix is a second JVM, and it is not decoration:
+ * `determinism-audit.md` section 3.1 measured `Math.sin` disagreeing with `StrictMath.sin` on
+ * 3.4% of sampled inputs on a single JVM, and two implementations are under no obligation to
+ * disagree in the same places.
+ *
+ * `-Pudea.replay.jvmVendor` is not optional on a CI matrix. `actions/setup-java` puts its JDK on
+ * `PATH` and in `JAVA_HOME`, but Gradle's toolchain auto-detection also finds whatever the runner
+ * image ships - so two legs asking only for "17" can both resolve to the *same* vendor and the
+ * second axis quietly stops existing while both legs go green. The digest header records the
+ * vendor it actually ran on and the join prints it, so the claim is checkable after the fact.
+ */
+val replayDigestLauncher: Provider<JavaLauncher> = providers.provider {
+    val version = providers.gradleProperty("udea.replay.jvm").orNull
+    val vendor = providers.gradleProperty("udea.replay.jvmVendor").orNull
+    if (version == null && vendor == null) {
+        javaToolchains.launcherFor(java.toolchain).get()
+    } else {
+        javaToolchains.launcherFor {
+            languageVersion.set(
+                version?.let { JavaLanguageVersion.of(it) } ?: java.toolchain.languageVersion.get(),
+            )
+            if (vendor != null) this.vendor.set(JvmVendorSpec.matching(vendor))
+        }.get()
+    }
+}
+
+/**
+ * Replays a checked-in `moba` recording and writes this machine's digest stream.
+ *
+ * One of these runs per matrix leg in CI, each with its own `--label`. `-Pudea.replay.label` and
+ * `-Pudea.replay.out` are how the workflow names them; the defaults describe a local run, so the
+ * task is runnable by hand with no properties at all.
+ *
+ * `-Pudea.replay.fixture` chooses which checked-in recording to replay. Absent, it is the
+ * 3600-tick one every push replays; the nightly names the 36000-tick one. A name this game does
+ * not have fails naming the ones it does, in `MobaFixtureKind.byName`.
+ */
+tasks.register<JavaExec>("udeaReplayDigest") {
+    group = "verification"
+    description = "Replays a checked-in moba .udearep and writes this machine's .udeaeq digest."
+    classpath = replayEqualityClasspath
+    mainClass.set("dev.wildware.moba.replay.MobaDigestMain")
+    javaLauncher.set(replayDigestLauncher)
+    val label = providers.gradleProperty("udea.replay.label").orElse("local")
+    val out = providers.gradleProperty("udea.replay.out")
+        .orElse(replayEqualityDir.map { "${it.asFile}/local.udeaeq" })
+    val plantAt = providers.gradleProperty("udea.replay.plantUlpAt")
+    val fixture = providers.gradleProperty("udea.replay.fixture")
+    val reports = replayEqualityDir
+    val workspace = replayWorkspaceRoot
+    argumentProviders.add {
+        buildList {
+            add("--workspace")
+            add(workspace)
+            add("--label")
+            add(label.get())
+            add("--out")
+            add(out.get())
+            add("--timing")
+            add("${reports.get().asFile}/${label.get().replace('/', '-')}.timing.txt")
+            if (fixture.isPresent) {
+                add("--fixture")
+                add(fixture.get())
+            }
+            if (plantAt.isPresent) {
+                add("--plant-ulp-at")
+                add(plantAt.get())
+            }
+        }
+    }
+}
+
+/**
+ * `--update-replay-fixtures` (issue #165): rewrites every checked-in `.udearep` of this game.
+ *
+ * ```
+ * ./gradlew :moba:udeaWriteReplayFixture
+ * ```
+ *
+ * Nothing depends on this and nothing in CI runs it: regenerating a fixture is how a gate gets
+ * silenced, so it is a command somebody types on purpose. It exists because the alternative is a
+ * checked-in binary nobody can reproduce, and a reviewer has to be able to rebuild the bytes to
+ * check them - `java.util.Random`'s LCG is specified, so the same seed rebuilds the same input
+ * stream on any machine.
+ *
+ * `./gradlew :moba:test -Dupdate.replay.fixtures=true` is the other front door, and it goes
+ * through `MobaReplayFixturesCurrentTest` and the same `ReplayFixtures.reconcile`, so the two
+ * cannot disagree about what "stale" means or about what they write.
+ */
+tasks.register<JavaExec>("udeaWriteReplayFixture") {
+    group = "build"
+    description = "Rebuilds moba's checked-in .udearep replay-equality fixtures."
+    classpath = replayEqualityClasspath
+    mainClass.set("dev.wildware.moba.replay.MobaFixturesMain")
+    val fixturesDir = layout.projectDirectory.dir("src/test/resources/fixtures")
+    argumentProviders.add { listOf("--fixtures-dir", fixturesDir.asFile.absolutePath) }
+}
+
+// --- the local proof --------------------------------------------------------------------------
+//
+// Five processes: three digests and two joins. The digests are separate JVMs on purpose - two
+// runs inside one process share a warmed JIT, a loaded class hierarchy and one set of static
+// initialisers, which is most of what a cross-process comparison is asking about.
+
+val replayProofDir: Provider<Directory> =
+    layout.buildDirectory.dir("reports/udea/replay-equality/proof")
+
+/**
+ * `MobaFixture.PLANT_TICK`, as a literal.
+ *
+ * A Gradle script cannot read a Kotlin constant out of a source set it is about to compile.
+ * `MobaReplayEqualityTest` asserts this file and that constant agree, so the duplication fails a
+ * test rather than drifting quietly.
+ */
+val replayPlantTick = "1200"
+
+fun registerReplayProofDigest(name: String, label: String, file: String, plantAt: String?) =
+    tasks.register<JavaExec>(name) {
+        group = "verification"
+        description = "replay-equality proof: writes $file"
+        classpath = replayEqualityClasspath
+        mainClass.set("dev.wildware.moba.replay.MobaDigestMain")
+        javaLauncher.set(replayDigestLauncher)
+        val root = replayProofDir
+        argumentProviders.add {
+            buildList {
+                add("--label")
+                add(label)
+                add("--out")
+                add("${root.get().asFile}/$file")
+                if (plantAt != null) {
+                    add("--plant-ulp-at")
+                    add(plantAt)
+                }
+            }
+        }
+    }
+
+fun registerReplayProofJoin(
+    name: String,
+    first: String,
+    second: String,
+    summary: String,
+    after: List<Any>,
+) = tasks.register<JavaExec>(name) {
+    group = "verification"
+    description = "replay-equality proof: joins $first and $second"
+    dependsOn(after)
+    classpath = replayEqualityClasspath
+    mainClass.set("dev.wildware.udea.replay.equality.ReplayEqualsMain")
+    // The planted half exists to exit non-zero, so the task has to survive that and let
+    // `udeaReplayEqualityProof` decide what it meant.
+    isIgnoreExitValue = true
+    val root = replayProofDir
+    argumentProviders.add {
+        val dir = root.get().asFile
+        listOf("--summary", "$dir/$summary", "$dir/$first", "$dir/$second")
+    }
+    // Written here rather than read through `executionResult` from the aggregate task: that
+    // provider is only resolvable from inside the task that produced it, and querying it from a
+    // sibling fails at execution time with "this provider has no value available".
+    val exitFile = root.map { it.file("$summary.exit") }
+    doLast {
+        exitFile.get().asFile.writeText(executionResult.get().exitValue.toString())
+    }
+}
+
+val replayProofDigestA =
+    registerReplayProofDigest("udeaReplayProofDigestA", "proof/leg-a", "leg-a.udeaeq", null)
+val replayProofDigestB =
+    registerReplayProofDigest("udeaReplayProofDigestB", "proof/leg-b", "leg-b.udeaeq", null)
+val replayProofDigestPlanted = registerReplayProofDigest(
+    "udeaReplayProofDigestPlanted", "proof/leg-planted", "planted.udeaeq", replayPlantTick,
+)
+
+val replayProofJoinEqual = registerReplayProofJoin(
+    "udeaReplayProofJoinEqual", "leg-a.udeaeq", "leg-b.udeaeq", "equal.txt",
+    listOf(replayProofDigestA, replayProofDigestB),
+)
+val replayProofJoinPlanted = registerReplayProofJoin(
+    "udeaReplayProofJoinPlanted", "leg-a.udeaeq", "planted.udeaeq", "planted.txt",
+    listOf(replayProofDigestA, replayProofDigestPlanted),
+)
+
+/**
+ * **The evidence command.** Two honest `moba` legs agree, and a one-ulp leg is caught and named.
+ *
+ * ```
+ * ./gradlew :moba:udeaReplayEqualityProof
+ * ```
+ *
+ * Both halves matter and the second is the one usually missing. A gate that has only ever been
+ * seen to pass is a gate nobody has watched fail, and `docs/engineering-standards.md` section 8
+ * lists "a test that cannot fail" as a rejection.
+ *
+ * The strings it insists on are what spec 7 asks a cross-OS failure to name: the tick, the
+ * entity, the component and field, and the preceding five ticks of that field's history - and
+ * here they name a **`moba`** component, which is issue #172's second acceptance criterion.
+ */
+tasks.register("udeaReplayEqualityProof") {
+    group = "verification"
+    description =
+        "Proves the moba replay-equality gate both ways: two honest legs agree, and a one-ulp " +
+            "leg fails with the tick, the entity, the component and the field named."
+    dependsOn(replayProofJoinEqual, replayProofJoinPlanted)
+
+    val equalSummary = replayProofDir.map { it.file("equal.txt") }
+    val plantedSummary = replayProofDir.map { it.file("planted.txt") }
+    val equalExitFile = replayProofDir.map { it.file("equal.txt.exit") }
+    val plantedExitFile = replayProofDir.map { it.file("planted.txt.exit") }
+    val expectedTick = replayPlantTick
+
+    doLast {
+        val equalReport = equalSummary.get().asFile.readText()
+        val plantedReport = plantedSummary.get().asFile.readText()
+        val equalExit = equalExitFile.get().asFile.readText().trim().toInt()
+        val plantedExit = plantedExitFile.get().asFile.readText().trim().toInt()
+
+        println("=== two honest moba legs, two separate JVM processes ===")
+        println(equalReport)
+        println("=== a third leg carrying a planted one-ulp divergence ===")
+        println(plantedReport)
+
+        check(equalExit == 0) {
+            "two honest legs of the same moba fixture disagreed. That is either a real " +
+                "determinism defect in this build or a broken gate.\n" + equalReport
+        }
+        check(plantedExit == 1) {
+            "a leg with a deliberately planted one-ulp divergence was NOT caught (exit " +
+                plantedExit + "). A gate that cannot fail proves nothing.\n" + plantedReport
+        }
+        // `Tick.toString()` renders `t1200`. Spec 7 asks a cross-OS failure to name the tick, the
+        // entity, the component and field, and five ticks of that field's history; issue #165
+        // adds the block saying how to reproduce it on one machine, with the tick to land on
+        // already worked out.
+        val required = listOf(
+            "at t$expectedTick",
+            "Position.x",
+            "NetId(",
+            "the preceding 5 tick(s)",
+            "--- reproducing this locally ---",
+            "replay.seek    {\"tick\": ${expectedTick.toInt() - 1}}",
+        )
+        for (needle in required) {
+            check(plantedReport.contains(needle)) {
+                "the planted divergence report does not contain '$needle', so it does not name " +
+                    "what issue #152 requires it to name.\n" + plantedReport
+            }
+        }
+        println(
+            "moba replay-equality proof PASSED: two honest legs agree (exit 0); the planted leg " +
+                "fails (exit 1) naming Position.x at t$expectedTick, with five ticks of history.",
+        )
+    }
+}
+
+tasks.test {
+    /*
+     * `--update-replay-fixtures`, forwarded to the JVM that reads it.
+     *
+     * A `Test` task forks its own JVM and does not inherit the launcher's system properties, so a
+     * flag that is not passed here is a flag `MobaReplayFixturesCurrentTest` never sees - it
+     * would report every fixture current and rebuild nothing, silently, and a reviewer would read
+     * a green run beside a fixture that never moved.
+     */
+    systemProperty(
+        "update.replay.fixtures",
+        providers.systemProperty("update.replay.fixtures").orElse("false").get(),
+    )
+    // `MobaReplayEqualityTest` reads this project's build script and the workflow, and neither is
+    // on any classpath. Declared so an edit to either makes the task rerun - found the same way
+    // `udea-core`'s FieldMask scan was: a source rule that reads a tree it has not declared
+    // reports whatever it last saw.
+    inputs.file(layout.projectDirectory.file("build.gradle.kts"))
+        .withPropertyName("mobaBuildScript")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(rootProject.layout.projectDirectory.file(".github/workflows/ci.yml"))
+        .withPropertyName("ciWorkflow")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}

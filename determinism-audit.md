@@ -27,6 +27,63 @@ grows a rule.
 
 ---
 
+## 0. What the gate replays, and how to rebuild it
+
+Since issue #172 the `replay-equality` legs and the `replay-equality-nightly` legs replay
+**`moba`**, not a fixture world. That matters because the fixture world they used to replay,
+`DriftWorld`, routes its trigonometry through `StrictMath` on purpose — it is written to be
+deterministic, so a green matrix reported the health of its own fixture rather than of the game.
+`DriftWorld` stays as the gate's **self-test**: it is what `:udea-replay:udeaReplayEqualityProof`
+plants a one-ulp divergence into across five processes, and what `CrossPlatformDivergenceTest`
+pins the rendered cross-platform failure against.
+
+| | replays | checked in at | length |
+| --- | --- | --- | --- |
+| `replay-equality`, every push | `moba-3600.udearep` | `moba/src/test/resources/fixtures/` | 3600 ticks |
+| `replay-equality-nightly` | `moba-36000.udearep` | the same directory | 36000 ticks |
+| `:udea-replay:udeaReplayEqualityProof`, the self-test | `drift-3600.udearep` | `udea-replay/src/testFixtures/resources/fixtures/` | 3600 ticks |
+
+### Rebuilding a fixture
+
+A `.udearep` carries the `BuildIdentity` of the build that recorded it — root seed, `protoHash`,
+asset graph hash, input schema hash — and a replay refuses it the moment any of the four moves.
+`moba`'s `protoHash` moves whenever a replicated component is added or removed, its asset graph
+hash whenever an asset changes, and its input schema hash whenever a key is rebound, so this is
+ordinary gameplay work rather than a rare event. `:moba:test` fails on the machine that made the
+change, with `MobaReplayFixturesCurrentTest` naming which identity field moved and what both
+sides hold.
+
+Two front doors, one reconciliation (`ReplayFixtures.reconcile`), so they cannot disagree about
+what "stale" means or about what they write:
+
+```
+./gradlew :moba:udeaWriteReplayFixture                 # rebuilds moba's two, and nothing else
+./gradlew :moba:test -Dupdate.replay.fixtures=true     # the --update-goldens-shaped route
+./gradlew :udea-replay:udeaWriteReplayFixture          # the self-test world's two
+```
+
+Review the diff. The pilot is a `java.util.Random` LCG with a fixed seed, and that algorithm is in
+the class's specification, so the same seed rebuilds the same input stream on any conforming JVM —
+which is what makes a checked-in binary something a reviewer can reproduce rather than trust.
+`MobaReplayEqualityTest` compares the checked-in input stream against a fresh recording sample for
+sample on every push.
+
+Nothing in CI runs these. Regenerating a fixture is how a gate gets silenced, so it is a command
+somebody types on purpose — the same bargain `udeaWriteProtocolLock` strikes with
+`net-protocol.lock`.
+
+### Running the gate on one machine
+
+```
+./gradlew :moba:udeaReplayEqualityProof         # five processes: two honest legs agree, a planted one fails
+./gradlew :udea-replay:udeaReplayEqualityProof  # the same shape over the self-test world
+```
+
+The planted half is the one that matters. A gate that has only ever been seen to pass is a gate
+nobody has watched fail.
+
+---
+
 ## 1. What the scanner structurally cannot see
 
 Written first because it is the part people skip.
@@ -36,7 +93,7 @@ Written first because it is the part people skip.
 | Hash order across a class boundary | Kotlin **never** emits the concrete owner at an iteration site: `for ((k, v) in someHashMap)` compiles to `checkcast java/util/Map` + `INVOKEINTERFACE java/util/Map.entrySet` whatever the static type is (verified by `javap` on a planted probe). The concrete type appears only at the `NEW`. `DET004` therefore joins the two halves **at class level** - a class that constructs a hash-ordered collection *and* walks a map or set. A `HashMap` built in one class and iterated in another, or a class handed a map it did not build, is invisible. | Replay equality; `WorldHasher` over two runs with different insertion histories |
 | Indirection | The scan sees direct references only. `helper()` calling `System.nanoTime()` in a module nobody declared simulation, called from a system, reports nothing. | Replay equality |
 | Fleks internals | Nothing in Fleks is in a declared simulation scope, so no rule ever inspects it. Section 2 below is the manual substitute for that. | This document; replay equality |
-| Float differences across JVMs | Bytecode is identical on both platforms. That is exactly the failure mode `Math.sin` has (section 3.1). | The cross-OS `replay-equality` CI job. Nothing else. |
+| Float differences across JVMs | Bytecode is identical on both platforms. That is exactly the failure mode `Math.sin` has (section 3.1). | The cross-OS `replay-equality` CI job, replaying `moba` since issue #172. Nothing else. |
 | Iteration order of a `LinkedHashMap` fed in nondeterministic order | Insertion-ordered is only reproducible if the *insertions* are. A `LinkedHashMap` filled from a `HashSet` is as unstable as the `HashSet`. | Replay equality |
 | Anything reflective, or loaded by name | No reference exists in the bytecode to match. | Replay equality |
 

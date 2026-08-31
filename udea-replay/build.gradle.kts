@@ -97,15 +97,33 @@ tasks.withType<Test>().configureEach {
     // hand today's recorder makes it return without writing, so the check that catches the day
     // one does is the check nothing else would notice the loss of. Declared for the same reason
     // the two above are.
+    //
+    // `ReplayDigestCli` and not a game's `main`: since issue #172 pointed the CI legs at `moba`
+    // there are two `main`s over this one shared run, and a scan of either would answer about
+    // half of them.
     inputs.file(
         layout.projectDirectory.file(
-            "src/testFixtures/kotlin/dev/wildware/udea/replay/equality/fixture/DriftDigestMain.kt",
+            "src/main/kotlin/dev/wildware/udea/replay/equality/ReplayDigestCli.kt",
         ),
-    ).withPropertyName("driftDigestMainSource")
+    ).withPropertyName("replayDigestCliSource")
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
-// --- the cross-OS replay-equality gate (issue #152) -------------------------------------------
+// --- the cross-OS replay-equality gate: its machinery, and its self-test (issues #152, #172) ---
+//
+// ## What this project still owns after issue #172
+//
+// The **machinery** - `ReplayDigestCli`, `ReplayDigestRecorder`, `ReplayEquality`,
+// `ReplayEqualsMain`, `ReplayBisectGuide` - and the **join**, which `ci.yml` runs as
+// `:udea-replay:udeaReplayEquals` on both pairs of jobs. It reads nothing but the `.udeaeq` files,
+// which is what lets one job rule on three legs of a game it could not build.
+//
+// What it no longer owns is what the legs replay. `:moba:udeaReplayDigest` is the leg since #172,
+// because a gate pointed at `DriftWorld` - which routes its trigonometry through `StrictMath`
+// because its author knew exactly which call was the trap - reports the health of its own fixture.
+// The tasks below stay as the **self-test**: `udeaReplayEqualityProof` here plants a one-ulp
+// divergence into that world across five processes and checks that it is caught and named, which
+// is the half of the gate no honest fixture can demonstrate.
 //
 // ## Why the logic is in tasks and classes rather than in the workflow YAML
 //
@@ -178,15 +196,15 @@ val digestLauncher: Provider<JavaLauncher> = providers.provider {
 }
 
 /**
- * Replays the checked-in fixture and writes this machine's digest stream.
+ * Replays a checked-in self-test recording and writes this machine's digest stream.
  *
- * One of these runs per matrix leg in CI, each with its own `--label`. `-Pudea.replay.label` and
- * `-Pudea.replay.out` are how the workflow names them; the defaults describe a local run, so the
- * task is runnable by hand with no properties at all.
+ * The same task shape `:moba:udeaReplayDigest` has, over the drift world instead of the game. CI
+ * runs the `moba` one; this is here so the machinery can be exercised end to end without building
+ * a game, and so the two-JVM axis can be driven on one developer machine.
  *
  * `-Pudea.replay.fixture` chooses which checked-in recording to replay. Absent, it is the
- * 3600-tick one every push replays; the nightly job of issue #165 names the 36000-tick one. A
- * name this world does not have fails naming the ones it does, in `DriftFixtureKind.byName`.
+ * 3600-tick one. A name this world does not have fails naming the ones it does, in
+ * `DriftFixtureKind.byName`.
  */
 tasks.register<JavaExec>("udeaReplayDigest") {
     group = "verification"
@@ -349,7 +367,11 @@ val proofJoinPlanted = registerProofJoin(
 )
 
 /**
- * The evidence command: two honest legs agree, and a one-ulp leg is caught and named.
+ * The gate's self-test: two honest legs agree, and a one-ulp leg is caught and named.
+ *
+ * `:moba:udeaReplayEqualityProof` is the same shape over what CI actually replays. This one is
+ * about the *machinery*: it is the only place a divergence of exactly one ulp on exactly one field
+ * at exactly one tick can be arranged, because this world exists to have that done to it.
  *
  * Both halves matter and the second is the one usually missing. A gate that has only ever been
  * seen to pass is a gate nobody has watched fail, and `docs/engineering-standards.md` §8 lists

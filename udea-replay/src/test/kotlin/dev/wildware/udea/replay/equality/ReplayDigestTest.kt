@@ -3,6 +3,7 @@ package dev.wildware.udea.replay.equality
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.snapshot.WorldHasher
 import dev.wildware.udea.replay.equality.fixture.DriftComponents
+import dev.wildware.udea.replay.equality.fixture.DriftDigestMain
 import dev.wildware.udea.replay.equality.fixture.DriftFixture
 import dev.wildware.udea.replay.equality.fixture.DriftFixtureRecorder
 import dev.wildware.udea.replay.equality.fixture.DriftWorld
@@ -45,6 +46,7 @@ class ReplayDigestTest {
             output = out,
             label = label,
             fixture = "short",
+            gradleProject = DriftDigestMain.GRADLE_PROJECT,
         )
         return ReplayDigestIo.read(out)
     }
@@ -164,6 +166,7 @@ class ReplayDigestTest {
             output = out,
             label = "leg-b",
             fixture = "a-different-fixture",
+            gradleProject = DriftDigestMain.GRADLE_PROJECT,
         )
 
         val failure = assertFailsWith<IncomparableDigestsException> {

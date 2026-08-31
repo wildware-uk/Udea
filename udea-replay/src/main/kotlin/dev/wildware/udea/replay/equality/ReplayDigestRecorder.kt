@@ -67,6 +67,9 @@ public object ReplayDigestRecorder {
     /**
      * Replays [recording] into a world from [factory], writing every tick's cells to [output].
      *
+     * @param gradleProject the project whose `udeaReplayDigest` this is, e.g. `:moba`. Recorded
+     *   in the header so the join step can print a reproduce command that names the right module -
+     *   see [ReplayDigestHeader.gradleProject].
      * @param registry the registry the replay world captures through. It supplies the component
      *   table the join step renders names from, and it must be the same registry *object* the
      *   world's `SnapshotService` was built over - see `MobaReplay.REGISTRY` for what goes wrong
@@ -82,6 +85,7 @@ public object ReplayDigestRecorder {
         output: Path,
         label: String,
         fixture: String,
+        gradleProject: String,
     ): ReplayDigestRun {
         val header = ReplayDigestHeader(
             label = label,
@@ -92,6 +96,7 @@ public object ReplayDigestRecorder {
             tickCount = recording.tickCount,
             jvm = describeJvm(),
             os = describeOs(),
+            gradleProject = gradleProject,
             components = ReplayDigestIo.componentsOf(registry),
         )
 

@@ -173,7 +173,11 @@ public object ReplayEqualsMain {
         // Issue #165: the summary tells a reader how to reproduce this on their own machine, on a
         // green run as well as a red one. Rendered by a class with tests rather than assembled in
         // a workflow step - see `ReplayBisectGuide`.
-        report.append(ReplayBisectGuide.render(reference.header.fixture, divergentTicks))
+        report.append(ReplayBisectGuide.render(
+                reference.header.fixture,
+                reference.header.gradleProject,
+                divergentTicks,
+            ))
         return worst
     }
 

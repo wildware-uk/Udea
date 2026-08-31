@@ -1,14 +1,9 @@
 package dev.wildware.udea.replay.equality.fixture
 
-import dev.wildware.udea.core.Tick
-import dev.wildware.udea.replay.ReplayVerifier
-import dev.wildware.udea.replay.equality.ReplayDigestRecorder
-import dev.wildware.udea.replay.equality.ReplayEqualityPaths
-import java.nio.file.Files
-import java.nio.file.Path
+import dev.wildware.udea.replay.equality.ReplayDigestCli
 
 /**
- * One matrix leg's half of the `replay-equality` job: replay the fixture, write the digest.
+ * The drift world's half of a `replay-equality` leg: replay the fixture, write the digest.
  *
  * ```
  * DriftDigestMain --workspace /home/runner/work/Udea/Udea \
@@ -17,154 +12,51 @@ import java.nio.file.Path
  *                 [--plant-ulp-at 1200]
  * ```
  *
- * Every leg runs this identical command with a different `--label`, and the join step compares
- * whatever they produced. `--fixture` is which checked-in recording to replay: the PR job leaves
- * it alone and takes the 3600-tick one, and the nightly names the 36000-tick one (issue #165).
+ * ## What this is now, and what it is not
  *
- * `--plant-ulp-at` is the deliberate divergence the gate is proven
- * against; nothing in a plain CI run passes it, and `ReplayEqualityProofTest`, the
- * `udeaReplayEqualityProof` task and the workflow's `replay_plant_ulp_at` dispatch input are what
- * do.
+ * It is the gate's **self-test**, and since issue #172 that is all it is. The CI legs replay
+ * `moba` - a world that was not written to be deterministic, which is the whole of #172's
+ * argument - and this world, which routes its trigonometry through `StrictMath` because its
+ * author knew exactly which call was the trap, is what proves the *machinery* can fail:
+ * `udeaReplayEqualityProof` plants into it across five processes, and
+ * `CrossPlatformDivergenceTest` renders its divergence against a checked-in expected output.
  *
- * `--workspace` is not decoration and it is why [parse] exists as a function of its own: issue
- * #169 is the whole of what happens when the base a relative `--out` resolves against is
- * inherited rather than stated. See [ReplayEqualityPaths].
+ * Every option, every path resolution and the identity refusal live in [ReplayDigestCli], which
+ * `moba`'s entry point runs too. Nothing about a command line is duplicated between the two
+ * games, so nothing about a command line can differ between them.
  *
- * @see ReplayDigestRecorder for why this does not compare against the recording's own hashes.
+ * `--workspace` is why the parsing is a function of its own rather than inline: issue #169 is the
+ * whole of what happens when the base a relative `--out` resolves against is inherited rather
+ * than stated.
+ *
+ * @see dev.wildware.udea.replay.equality.ReplayDigestRecorder for why this does not compare
+ *   against the recording's own hashes.
  */
 public object DriftDigestMain {
 
-    /** One leg's command line, with every path already resolved. */
-    public class Options(
-        /** The raw `--out`, kept so a failure can name what was asked for as well as what it meant. */
-        public val requestedOut: String,
-        /** The base a relative path in this command line was resolved against. */
-        public val workspace: Path,
-        /** Where this leg's digest stream goes. Always absolute. */
-        public val out: Path,
-        /** What a divergence calls this leg. */
-        public val label: String,
-        /** Which checked-in recording this leg replays. */
-        public val fixture: DriftFixtureKind,
-        /** Where the leg's wall time goes, or `null`. Always absolute when present. */
-        public val timing: Path?,
-        /** The tick to plant a one-ulp divergence at, or `null` for an honest leg. */
-        public val plantAt: Tick?,
-    )
-
     /**
-     * Reads one leg's command line and resolves its paths, without touching the world or the disk.
+     * The project this entry point belongs to, recorded in every digest header it writes.
      *
-     * Separate from [main] so that the resolution CI depends on can be asserted against the
-     * workflow's own argument strings rather than inferred from them - `ReplayEqualityProofTest`
-     * hands this function exactly the `-Pudea.replay.out` value `ci.yml` passes and checks the
-     * answer against the directory `actions/upload-artifact` globs.
+     * It is what the join step's reproduce block names, so a reader of a red summary is sent to a
+     * `udeaReplayDigest` that can actually resolve the fixture that diverged.
      */
-    public fun parse(args: Array<String>): Options {
-        var out: String? = null
-        var label: String? = null
-        var timing: String? = null
-        var fixture: DriftFixtureKind = DriftFixtureKind.PR
-        var workspace: Path = ReplayEqualityPaths.defaultWorkspace()
-        var plantAt: Tick? = null
-        var at = 0
-        while (at < args.size) {
-            when (val arg = args[at]) {
-                "--out" -> {
-                    require(at + 1 < args.size) { "--out needs a path after it" }
-                    out = args[at + 1]
-                    at++
-                }
+    public const val GRADLE_PROJECT: String = ":udea-replay"
 
-                "--label" -> {
-                    require(at + 1 < args.size) { "--label needs a name after it" }
-                    label = args[at + 1]
-                    at++
-                }
-
-                "--timing" -> {
-                    require(at + 1 < args.size) { "--timing needs a path after it" }
-                    timing = args[at + 1]
-                    at++
-                }
-
-                "--fixture" -> {
-                    require(at + 1 < args.size) { "--fixture needs a fixture name after it" }
-                    fixture = DriftFixtureKind.byName(args[at + 1])
-                    at++
-                }
-
-                ReplayEqualityPaths.WORKSPACE_OPTION -> {
-                    require(at + 1 < args.size) { "${ReplayEqualityPaths.WORKSPACE_OPTION} needs a directory after it" }
-                    workspace = Path.of(args[at + 1]).toAbsolutePath().normalize()
-                    at++
-                }
-
-                "--plant-ulp-at" -> {
-                    require(at + 1 < args.size) { "--plant-ulp-at needs a tick after it" }
-                    plantAt = Tick(args[at + 1].toLong())
-                    at++
-                }
-
-                else -> throw IllegalArgumentException("unknown option '$arg'")
-            }
-            at++
-        }
-
-        val requestedOut = requireNotNull(out) { "--out is required" }
-        return Options(
-            requestedOut = requestedOut,
-            workspace = workspace,
-            out = ReplayEqualityPaths.resolve(workspace, requestedOut),
-            label = requireNotNull(label) {
-                "--label is required: it is what a divergence calls this leg"
-            },
-            fixture = fixture,
-            timing = timing?.let { ReplayEqualityPaths.resolve(workspace, it) },
-            plantAt = plantAt,
-        )
-    }
+    /** Reads one leg's command line against this world's fixtures. See [ReplayDigestCli.parse]. */
+    public fun parse(args: Array<String>): ReplayDigestCli.Options =
+        ReplayDigestCli.parse(args, DriftFixtureKind.entries)
 
     @JvmStatic
     public fun main(args: Array<String>) {
         val options = parse(args)
-        val output = options.out
-
-        val recording = DriftFixtureRecorder.readCheckedIn(options.fixture)
-        // Refused here rather than at the first differing tick. A recording made against a
-        // different input schema presses a different action with every value in range and every
-        // array the right length, so nothing downstream would notice.
-        ReplayVerifier.refuseIfMismatched(recording, DriftFixtureRecorder.identity())
-
-        val run = ReplayDigestRecorder.record(
-            recording = recording,
-            factory = DriftWorld.worlds(plantUlpAt = options.plantAt),
+        ReplayDigestCli.run(
+            options = options,
+            recording = DriftFixtureRecorder.readCheckedIn(options.fixture),
+            identity = DriftFixtureRecorder.identity(),
+            worlds = { plantAt -> DriftWorld.worlds(plantUlpAt = plantAt) },
             registry = DriftComponents.registry(),
-            output = output,
-            label = options.label,
-            fixture = options.fixture.fixtureName,
+            gradleProject = GRADLE_PROJECT,
+            plantDescription = DriftFixture.PLANT_DESCRIPTION,
         )
-
-        // The post-condition, before anything downstream is allowed to assume it. A leg that
-        // wrote nothing has to say so here, where it knows the path, rather than leave the
-        // upload step two lines later to report a glob that matched nothing.
-        val size = ReplayEqualityPaths.requireStreamWritten(options.requestedOut, options.workspace, output)
-
-        val summary = buildString {
-            append(options.label).append(": ").append(run.describe())
-            if (options.plantAt != null) {
-                append("\n  PLANTED: ").append(DriftFixture.PLANT_DESCRIPTION).append(", at ")
-                    .append(options.plantAt)
-            }
-            // The absolute path, not the argument. The argument is what issue #169's legs printed
-            // and it is the one thing that did not tell anybody where the bytes went.
-            append("\n  ").append(size).append(" bytes at ").append(output)
-        }
-        println(summary)
-        val timing = options.timing
-        if (timing != null) {
-            Files.createDirectories(timing.parent)
-            Files.writeString(timing, "${run.elapsedMillis}\n")
-        }
     }
 }

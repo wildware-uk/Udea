@@ -29,8 +29,11 @@ to it until they are committed.
    from the files that appeared during step 2, not from a list written here, so moving the
    staging destination without extending `LICENSE` fails this check.
 5. **`README.md`'s licence claim matches `LICENSE`.** One name for the licence, in both places.
+6. **`README.md` does not send a reader to a different staging script.** It repeats the command
+   for the fresh cloner who never opens the manifest, and a repeated instruction can drift from
+   the one it repeats.
 
-Exit status is 0 only if all five hold. Every step prints its own verdict.
+Every step prints its own verdict, and exit status is 0 only if all of them hold.
 """
 import os
 import re
@@ -151,6 +154,34 @@ def check_licence_covers_destinations(clean, staged_files):
     print(f"  LICENSE covers all {len(staged_files)} staged file(s)")
 
 
+def readme_licence_section(readme_text):
+    """`README.md`'s own licence section, so a stray mention elsewhere cannot satisfy a check."""
+    section = re.search(r"^##+ +Licen[cs]e\s*$(.*?)(?=^##+ |\Z)", readme_text, re.S | re.M)
+    if not section:
+        raise Failure("README.md has no licence section for LICENSE's claim to match.")
+    return section.group(1)
+
+
+def check_readme_names_the_same_step(clean, step):
+    """`README.md` repeats the staging command; it must not drift from the documented one.
+
+    Conditional by design: a README that names no script at all passes here, because the
+    manifest is the authority and the README is allowed to link rather than repeat. What it
+    cannot do is repeat a *different* script, which is the drift this exists to catch.
+    """
+    section = readme_licence_section(read(clean, "README.md"))
+    named = set(re.findall(r"scripts/[A-Za-z0-9_.-]+\.py", section))
+    documented = set(re.findall(r"scripts/[A-Za-z0-9_.-]+\.py", "\n".join(step)))
+    drifted = sorted(named - documented)
+    if drifted:
+        raise Failure(
+            f"README.md's licence section tells a reader to run {', '.join(drifted)}, which is "
+            f"not what {MANIFEST} documents ({', '.join(sorted(documented)) or 'no script'}). "
+            "Two front doors, two different instructions."
+        )
+    print(f"  README.md names {', '.join(sorted(named)) or 'no script'}, consistent with {MANIFEST}")
+
+
 def check_readme_matches_licence(clean):
     licence = read(clean, "LICENSE")
     readme = read(clean, "README.md")
@@ -158,12 +189,9 @@ def check_readme_matches_licence(clean):
     if not heading:
         raise Failure("LICENSE is empty: it names no licence for README.md to match.")
     name = heading[0].strip()
-    # README's own licence section, so a stray mention elsewhere in the file cannot satisfy this.
-    section = re.search(r"^##+ +Licen[cs]e\s*$(.*?)(?=^##+ |\Z)", readme, re.S | re.M)
-    if not section:
-        raise Failure("README.md has no licence section for LICENSE's claim to match.")
+    section = readme_licence_section(readme)
     short = name.replace(" License", "").replace(" Licence", "")
-    if short not in section.group(1):
+    if short not in section:
         raise Failure(
             f"README.md's licence section does not name {short!r}, "
             f"which is what LICENSE's first line says this project is: {name!r}."
@@ -191,7 +219,7 @@ def main():
         for line in step:
             print(f"    {line}")
 
-        print(f"\n[1/5] negative control: {VALIDATE} must FAIL with no staged art")
+        print(f"\n[1/6] negative control: {VALIDATE} must FAIL with no staged art")
         code, out = run(["sh", "gradlew", VALIDATE, "--console=plain"], clean)
         if code == 0:
             raise Failure(
@@ -209,7 +237,7 @@ def main():
 
         before = tree_files(clean)
 
-        print(f"\n[2/5] running the documented step in the clean tree")
+        print(f"\n[2/6] running the documented step in the clean tree")
         for line in step:
             code, out = run(["sh", "-c", line], clean)
             print(("  " + out.strip()).replace("\n", "\n  "))
@@ -227,7 +255,7 @@ def main():
             )
         print(f"  {len(staged)} new file(s)")
 
-        print(f"\n[3/5] {VALIDATE} must now PASS")
+        print(f"\n[3/6] {VALIDATE} must now PASS")
         code, out = run(["sh", "gradlew", VALIDATE, "--console=plain"], clean)
         if code != 0:
             raise Failure(
@@ -235,11 +263,14 @@ def main():
             )
         print("  PASSED")
 
-        print("\n[4/5] LICENSE must exclude wherever the step put the art")
+        print("\n[4/6] LICENSE must exclude wherever the step put the art")
         check_licence_covers_destinations(clean, staged)
 
-        print("\n[5/5] README.md's licence claim must match LICENSE")
+        print("\n[5/6] README.md's licence claim must match LICENSE")
         check_readme_matches_licence(clean)
+
+        print("\n[6/6] README.md must not name a different staging script")
+        check_readme_names_the_same_step(clean, step)
     finally:
         run(["git", "worktree", "remove", "--force", clean], ROOT)
         shutil.rmtree(parent, ignore_errors=True)

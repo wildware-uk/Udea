@@ -1,0 +1,25 @@
+# `ExampleScanTest` compares `golden/example-declarations.json` byte for byte against what
+# `DeclarationsJson.write` emits, and one of the two cases doing so - `two checkouts produce
+# byte-identical json` - is a determinism assertion whose whole subject is the bytes. The writer
+# emits LF and only LF, so a checkout that translates the golden makes the comparison fail on a
+# difference nobody introduced.
+#
+# That is not hypothetical. Issue #176: this repository has no root `.gitattributes` and Git for
+# Windows checks out with `core.autocrlf=true`, so `build (windows-latest)` had been failing both
+# cases on a golden that arrives with `CR=169 LF=169` against output the writer emits with no
+# carriage return at all. In the issue's own words the rendered assertion "looks identical on
+# both sides, which is the tell", and it was settled by counting the bytes in the uploaded
+# test-report artefact rather than by reading the diff.
+#
+# `-text` rather than `text eol=lf`, and rather than a repository-wide rule. `-text` says "never
+# translate this in either direction", which is what a byte comparison needs, and it is what
+# `udea-diagnostics/.gitattributes` and `.github/conformance/.gitattributes` (issue #171) already
+# say for the same reason. A repository-wide `* text=auto eol=lf` would additionally rewrite
+# `example/`'s asset corpus, which is committed CRLF on purpose - see the KDoc on
+# `UdeaDeclarationScanner.normalizeLineEndings`, which found that the whole corpus is CRLF and
+# that pass 1 is wrong on it without normalising.
+#
+# The fence that goes with this lives in `GoldenResource`, so that a copy translated by something
+# other than a checkout - an archive, an editor, a working tree that predates this file - fails
+# by name instead of failing as an equality diff of two identical-looking blocks.
+src/test/resources/golden/*.json -text

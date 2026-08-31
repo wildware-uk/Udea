@@ -9,9 +9,13 @@ import kotlin.test.assertTrue
 /**
  * `AGENTS.md` describes the tree it is a brief for.
  *
- * Three of these run against the **real** `AGENTS.md` and `settings.gradle.kts`, so the file
- * committed alongside this test is the thing being asserted, not a fixture that resembles it.
- * The rest edit a copy, which is what issue #138 asks for: proof the gate can fail.
+ * Some of these read the **real** `AGENTS.md` and `settings.gradle.kts`, so the file committed
+ * alongside this test is the thing being asserted, not a fixture that resembles it. The rest
+ * edit a copy of it, which is what issue #138 asks for: proof the gate can fail.
+ *
+ * Either way the input is the committed file, so what a checkout did to its line endings is
+ * part of the input. `settingsWithout` and `asCrlf` are where that is dealt with; issue #176
+ * is why.
  */
 class AgentsMdTest {
 
@@ -57,13 +61,58 @@ class AgentsMdTest {
 
     @Test
     fun `a row for a module that has been deleted fails`() {
-        val edited = settings.replace("include(\"udea-gas\")\n", "")
+        val edited = settingsWithout("udea-gas")
 
         val finding = AgentsMd.findings(agentsMd, edited).single()
 
         assertEquals(AgentsMd.MODULE_TABLE_DRIFT, finding.rule)
         assertTrue(finding.message.contains("udea-gas"), finding.message)
         assertTrue(finding.message.contains("reads as current"), finding.message)
+    }
+
+    /**
+     * Issue #176: the same drift, on a checkout that translated the line endings.
+     *
+     * This repository has no root `.gitattributes` and Git for Windows checks out with
+     * `core.autocrlf=true`, so on that platform `settings.gradle.kts` and `AGENTS.md` arrive
+     * CRLF. `AgentsMd` itself copes - its regexes are anchored on `^`, and `\s` matches a
+     * carriage return - but the mutation above was built from a literal `\n`. It removed
+     * nothing, `findings` came back empty and `single()` threw `NoSuchElementException`.
+     *
+     * That is the thing worth fixing rather than the red itself. `udeaVerifyAgentsMd` is what
+     * makes `CLAUDE.md`'s "a stale `AGENTS.md` is a correctness bug" a checkable claim, and on
+     * Windows this class was red on a **perfect** `AGENTS.md` - so a red there said nothing
+     * about whether the document was stale. A gate that cannot tell its own subject apart is
+     * not a gate.
+     *
+     * No Windows checkout is needed to hold that: the translation is what a checkout does to
+     * the bytes, and doing it here reaches the same code with the same input.
+     */
+    @Test
+    fun `a deleted module is still caught when the checkout translated the line endings`() {
+        val edited = settingsWithout("udea-gas", settings.asCrlf())
+
+        val finding = AgentsMd.findings(agentsMd.asCrlf(), edited).single()
+
+        assertEquals(AgentsMd.MODULE_TABLE_DRIFT, finding.rule)
+        assertTrue(finding.message.contains("udea-gas"), finding.message)
+        assertTrue(finding.message.contains("reads as current"), finding.message)
+    }
+
+    /**
+     * The other half of the test above, on the unedited pair.
+     *
+     * The test above proves a *stale* document is still caught on a translated checkout; this
+     * proves a *correct* one is still passed, and that the two readings the gate does — which
+     * modules the build declares, and which modules the brief documents — are the same lists
+     * either way. Without it the CRLF case could be green because the gate had started finding
+     * drift everywhere, which is the same uselessness in the other direction.
+     */
+    @Test
+    fun `the module table reads the same whatever the checkout did to the line endings`() {
+        assertEquals(AgentsMd.declaredModules(settings), AgentsMd.declaredModules(settings.asCrlf()))
+        assertEquals(AgentsMd.documentedModules(agentsMd), AgentsMd.documentedModules(agentsMd.asCrlf()))
+        assertEquals(emptyList(), AgentsMd.findings(agentsMd.asCrlf(), settings.asCrlf()))
     }
 
     @Test
@@ -98,4 +147,22 @@ class AgentsMdTest {
             AgentsMd.documentedModules(agentsMd.replace(AgentsMd.MODULE_SECTION, "## Bits and pieces"))
         }
     }
+
+    /**
+     * [from] with one module's `include(...)` line removed, whatever line ending it carries.
+     *
+     * The `assertTrue` is part of the fence rather than defensive noise. A removal that removed
+     * nothing hands the caller an unedited script, `findings` returns nothing, and the caller
+     * fails on an empty list with no hint of why — which is exactly the failure issue #176 spent
+     * a CI leg on. Failing here names the cause instead.
+     */
+    private fun settingsWithout(module: String, from: String = settings): String {
+        val line = Regex("""(?m)^[ \t]*include\("${Regex.escape(module)}"\)[ \t]*\r?\n""")
+        val edited = line.replace(from, "")
+        assertTrue(edited != from, "the settings script has no `include(\"$module\")` line to remove")
+        return edited
+    }
+
+    /** The bytes a `core.autocrlf=true` checkout would have written for LF-committed text. */
+    private fun String.asCrlf(): String = replace("\r\n", "\n").replace("\n", "\r\n")
 }

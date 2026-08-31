@@ -29,10 +29,16 @@ class ExampleScanTest {
     private fun scanner(repoRoot: Path = TestPaths.repoRoot, assets: Path = TestPaths.exampleAssets) =
         UdeaDeclarationScanner(repoRoot, assets)
 
-    private fun goldenText(): String =
-        checkNotNull(javaClass.getResourceAsStream("/golden/example-declarations.json")) {
-            "golden/example-declarations.json is missing from test resources"
-        }.readBytes().toString(Charsets.UTF_8)
+    /**
+     * The committed golden, refusing a copy a checkout has translated.
+     *
+     * Read through [GoldenResource] rather than straight off the classpath because the two
+     * tests that compare against it compare *bytes*: on a `core.autocrlf=true` checkout the
+     * equality failed, and issue #176 records that "the rendered assertion looks identical on
+     * both sides, which is the tell". `udea-assets-compiler/.gitattributes` stops the
+     * translation and this stops a translated copy arriving by some other route.
+     */
+    private fun goldenText(): String = GoldenResource.read(GoldenResource.EXAMPLE_DECLARATIONS)
 
     @Test
     fun `the scan of the example tree matches the golden`() {

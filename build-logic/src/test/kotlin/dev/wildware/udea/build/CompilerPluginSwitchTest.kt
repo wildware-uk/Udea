@@ -2,6 +2,7 @@ package dev.wildware.udea.build
 
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -135,9 +136,20 @@ class CompilerPluginSwitchTest {
      * the regexes are, so it asserts it found the job and that the job still contains the step
      * the checks are about; a slicer that silently returned nothing would make both tests pass
      * on anything.
+     *
+     * It normalises the line endings first (issue #176). This repository has no root
+     * `.gitattributes`, Git for Windows checks out with `core.autocrlf=true`, and `ci.yml`
+     * therefore arrives CRLF there - which made the `indexOf` below return -1, so the fence
+     * reported "no longer has a `checkers-fire:` job" about a workflow that plainly still had
+     * one. What these tests assert is what the workflow *says*, never what bytes it is stored
+     * in, so a line ending is noise and is removed once here rather than worked around in each
+     * regex.
+     *
+     * It takes the workflow as a parameter so the CRLF case can be asserted without a Windows
+     * checkout; the default is the file, so every existing caller is unchanged.
      */
-    private fun checkersFireJob(): String {
-        val text = ci.readText()
+    private fun checkersFireJob(ciYaml: String = ci.readText()): String {
+        val text = ciYaml.replace("\r\n", "\n")
         val start = text.indexOf("\n  checkers-fire:\n")
         assertTrue(start >= 0, "ci.yml no longer has a `checkers-fire:` job")
         val rest = text.substring(start + 1)
@@ -161,8 +173,8 @@ class CompilerPluginSwitchTest {
      * cannot drift; these two tests read the same two variables rather than a path spelled
      * out a third time here.
      */
-    private fun probeDeclaration(): Pair<String, String> {
-        val text = checkersFireJob()
+    private fun probeDeclaration(ciYaml: String = ci.readText()): Pair<String, String> {
+        val text = checkersFireJob(ciYaml)
         val absent = "ci.yml no longer declares it in the checkers-fire step, so these tests " +
             "are reading nothing. If the step was rewritten, rewrite them with it."
         val module = assertNotNull(
@@ -251,6 +263,31 @@ class CompilerPluginSwitchTest {
                 "). The probe would compile clean and the job would fail claiming the plugin " +
                 "is unwired.",
         )
+    }
+
+    /**
+     * Issue #176: the same two questions, on a checkout that translated the line endings.
+     *
+     * `core.autocrlf=true` is what Git for Windows checks out with, and this repository has no
+     * root `.gitattributes`, so `ci.yml` arrives CRLF there. Both tests above then failed
+     * saying the workflow "no longer has a `checkers-fire:` job", about a workflow that has
+     * one - a fence reporting the absence of the thing it was looking at.
+     *
+     * The assertion is the same pair the two tests above make, not a weaker restatement of
+     * them: same module, same probe, from the same slicer, off bytes a Windows checkout would
+     * have written.
+     */
+    @Test
+    fun `the job slice survives a checkout that translated the line endings`() {
+        val translated = ci.readText().replace("\r\n", "\n").replace("\n", "\r\n")
+        // The control. A `replace` that matched nothing would leave this comparing LF with LF,
+        // and the test would pass without ever having posed the question.
+        assertTrue(
+            translated.contains("\r\n  checkers-fire:\r\n"),
+            "the CRLF copy has no `checkers-fire:` job in it, so this asserts nothing",
+        )
+
+        assertEquals(probeDeclaration(), probeDeclaration(translated))
     }
 
     @Test

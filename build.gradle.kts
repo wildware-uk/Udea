@@ -168,6 +168,40 @@ val udeaLatencyBudgets by tasks.registering {
     dependsOn(latencyBudgetTasks)
 }
 
+/**
+ * A latency budget is never up to date and is never served from the build cache.
+ *
+ * Found on the first two CI runs of this branch, which is the only reason it is written down as a
+ * rule rather than assumed: run 33450534282 measured all six on both runners, and run
+ * 33451573256 - a docs-only commit, so identical task inputs - reported every one of them
+ * `FROM-CACHE` on **both** `ubuntu-latest` and `windows-latest` and finished the whole job in 24
+ * seconds. Two green ticks, one measurement. A `Test` task is cacheable by default and Gradle was
+ * entirely right by its own rules: same inputs, same outputs.
+ *
+ * But the input to a stopwatch is the machine, and the machine is exactly what is not in the
+ * cache key. A cached green here says "this code was fast on some runner once", which is the
+ * skip-reads-as-a-pass defect this repository has already closed twice - once for the GL tests
+ * and once for the atlas tests - arriving through a third door. So both switches are off:
+ * `upToDateWhen` because the previous run's outputs are not an answer about this run's machine,
+ * and `cacheIf` because a task that is not up to date still consults the cache before executing.
+ *
+ * Configured here rather than six times over in three build scripts, and lazily through
+ * `configureEach`, so a task that is never realised is never configured. Matching on the simple
+ * name keeps [latencyBudgetTasks] the single list.
+ */
+val latencyBudgetTaskNames: Set<String> = latencyBudgetTasks.map { it.substringAfterLast(':') }.toSet()
+
+subprojects {
+    tasks.withType<Test>().configureEach {
+        if (name in latencyBudgetTaskNames) {
+            outputs.upToDateWhen { false }
+            outputs.cacheIf("a wall-clock measurement is about this machine, not about these inputs") {
+                false
+            }
+        }
+    }
+}
+
 tasks.named("check") {
     dependsOn(udeaVerifyNoLegacyDependencies, udeaVerifyModuleGraph)
 }

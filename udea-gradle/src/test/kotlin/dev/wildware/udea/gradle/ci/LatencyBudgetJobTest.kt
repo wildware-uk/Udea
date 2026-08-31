@@ -98,6 +98,29 @@ class LatencyBudgetJobTest {
         )
     }
 
+    @Test
+    fun `a latency budget is never up to date and never served from the build cache`() {
+        // Observed, not theorised. Actions run 33451573256 was a docs-only commit on this branch,
+        // so every budget task had identical inputs, and both runners reported all six
+        // `FROM-CACHE` and finished in seconds. Two green ticks and no measurement between them -
+        // the same shape as a skipped test reported as a pass, which is the defect this
+        // repository has already closed for the GL tests and for the atlas tests.
+        val script = File(repoRoot, "build.gradle.kts").readText()
+            .lines().joinToString("\n") { it.substringBefore("//") }
+        val at = script.indexOf(CACHE_GUARD)
+        assertTrue(
+            at >= 0,
+            "build.gradle.kts no longer configures the latency budgets with `$CACHE_GUARD`. " +
+                "A `Test` task is cacheable by default, so without it Gradle answers a stopwatch " +
+                "from another machine's recorded time.",
+        )
+        assertTrue(
+            script.indexOf("outputs.upToDateWhen { false }") >= 0,
+            "the latency budgets are cache-disabled but still up-to-date-able, so a second run " +
+                "on the same machine reports the first run's numbers without measuring",
+        )
+    }
+
     /**
      * The task paths the root build script hangs on `udeaLatencyBudgets`.
      *
@@ -149,6 +172,9 @@ class LatencyBudgetJobTest {
 
         /** The declaration in `build.gradle.kts` this test reads the membership out of. */
         const val MEMBER_LIST = "val latencyBudgetTasks = listOf("
+
+        /** What turns the build cache off for a measurement, in the root build script. */
+        const val CACHE_GUARD = "outputs.cacheIf("
 
         val MEMBER = Regex("\"(:[A-Za-z0-9:_-]+)\"")
 

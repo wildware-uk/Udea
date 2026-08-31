@@ -65,14 +65,10 @@ class Failure(Exception):
     """An assertion this script makes about the repository did not hold."""
 
 
-def run(argv, cwd, capture=True):
+def run(argv, cwd):
     """Run a command and return (exit code, combined output)."""
     proc = subprocess.run(
-        argv,
-        cwd=cwd,
-        stdout=subprocess.PIPE if capture else None,
-        stderr=subprocess.STDOUT if capture else None,
-        text=True,
+        argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
     )
     return proc.returncode, (proc.stdout or "")
 
@@ -109,9 +105,34 @@ def licence_covers(path, tokens):
     return any(path.startswith(token) for token in tokens)
 
 
+def exclusion_section(licence_text):
+    """The part of `LICENSE` that lists what the grant does not cover.
+
+    Scoped deliberately: a path named in the MIT grant above, or in the closing paragraph
+    below, must not count as an exclusion. What this cannot do is read English — a path named
+    inside the list for some other reason would still satisfy the check, so the assertion this
+    makes is "the exclusion list names a directory containing this file", not "the exclusion
+    list excludes it". `check_readme_matches_licence` has the same shape and the same limit.
+    """
+    marker = "Specifically excluded, and NOT redistributable under this licence:"
+    if marker not in licence_text:
+        raise Failure(
+            f"LICENSE has no exclusion list: it must carry the line {marker!r}, which is what "
+            "makes the third-party art excluded rather than merely mentioned."
+        )
+    # The list is the indented block after the marker. It ends at the first line that starts in
+    # column 0, which is the closing paragraph. No English is parsed to find that.
+    kept = []
+    for line in licence_text.split(marker, 1)[1].splitlines():
+        if line.strip() and not line.startswith("  "):
+            break
+        kept.append(line)
+    return "\n".join(kept)
+
+
 def check_licence_covers_destinations(clean, staged_files):
     text = open(os.path.join(clean, "LICENSE"), encoding="utf-8").read()
-    tokens = set(PATH_TOKEN.findall(text))
+    tokens = set(PATH_TOKEN.findall(exclusion_section(text)))
     uncovered = sorted(p for p in staged_files if not licence_covers(p, tokens))
     if uncovered:
         raise Failure(

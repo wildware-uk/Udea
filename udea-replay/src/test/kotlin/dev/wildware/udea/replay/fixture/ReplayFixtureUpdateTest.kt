@@ -117,6 +117,54 @@ class ReplayFixtureUpdateTest {
     }
 
     @Test
+    fun `each of the four identity fields is named when it is the one that moved`() {
+        // `protoHash` is the one issue #167 moved and the one the tests above use, but all four
+        // are refused by the same `mismatchesAgainst`, and a reader whose asset graph moved needs
+        // to be told *that* rather than be sent looking at generated ids.
+        for (stale in staleIdentities()) {
+            val target = dir.resolve(NAME)
+            record(TICKS, stale).writeTo(target)
+
+            val status = reconcileOne(target, update = false)
+
+            assertEquals(ReplayFixtureStatus.Outcome.REFUSED, status.outcome)
+            assertContains(
+                status.detail, stale.field,
+                message = "a fixture whose ${stale.field} had moved was refused without naming it",
+            )
+            Files.delete(target)
+        }
+    }
+
+    @Test
+    fun `two stale fixtures are both reported, not just the first`() {
+        // `reconcile` maps and `requireCurrent` filters, so stopping at the first would be a
+        // change nothing else notices - and a reader told about one of two rebuilds one of two.
+        val first = dir.resolve("first.udearep")
+        val second = dir.resolve("second.udearep")
+        write(first, protoHash = STALE_PROTO_HASH)
+        write(second, protoHash = STALE_PROTO_HASH)
+        val fixtures = listOf(fixture(first, "first.udearep"), fixture(second, "second.udearep"))
+
+        val statuses = ReplayFixtures.reconcile(fixtures, update = false)
+
+        assertEquals(listOf("first.udearep", "second.udearep"), statuses.map { it.fixture.name })
+        assertTrue(statuses.all { it.outcome == ReplayFixtureStatus.Outcome.REFUSED })
+
+        val failure = assertFailsWith<IllegalStateException> {
+            ReplayFixtures.requireCurrent(statuses, TASK)
+        }
+        assertContains(failure.message.orEmpty(), "first.udearep")
+        assertContains(failure.message.orEmpty(), "second.udearep")
+        assertContains(failure.message.orEmpty(), "2 replay fixture(s)")
+
+        // And the flag rebuilds both, not the first one it met.
+        val rebuilt = ReplayFixtures.reconcile(fixtures, update = true)
+        assertTrue(rebuilt.all { it.outcome == ReplayFixtureStatus.Outcome.REGENERATED })
+        ReplayFixtures.requireCurrent(ReplayFixtures.reconcile(fixtures, update = false), TASK)
+    }
+
+    @Test
     fun `a fixture that does not exist yet is reported missing, and the flag writes it`() {
         val target = dir.resolve(NAME)
         assertTrue(Files.notExists(target), "the test is meaningless if the file is already there")
@@ -172,8 +220,8 @@ class ReplayFixtureUpdateTest {
     private fun reconcileOne(target: Path, update: Boolean): ReplayFixtureStatus =
         ReplayFixtures.reconcile(listOf(fixture(target)), update = update).single()
 
-    private fun fixture(target: Path): ReplayFixture = ReplayFixture(
-        name = NAME,
+    private fun fixture(target: Path, name: String = NAME): ReplayFixture = ReplayFixture(
+        name = name,
         checkedInAt = target,
         ticks = TICKS,
         identity = ::liveIdentity,
@@ -186,15 +234,44 @@ class ReplayFixtureUpdateTest {
         record(ticks, protoHash).writeTo(target)
     }
 
-    private fun record(ticks: Int, protoHash: Int): ReplayRecording {
+    /** One recording per identity field, each differing from this build in that field alone. */
+    private fun staleIdentities(): List<StaleIdentity> {
+        val live = liveIdentity()
+        return listOf(
+            StaleIdentity("rootSeed", live.copy(rootSeed = live.rootSeed + 1L)),
+            StaleIdentity("protoHash", live.copy(protoHash = STALE_PROTO_HASH)),
+            StaleIdentity(
+                "assetGraphHash",
+                live.copy(assetGraphHash = "a different asset graph".toByteArray(Charsets.UTF_8)),
+            ),
+            // Not `copy(inputSchemaHash = ...)`: `ReplayRecorder` substitutes the schema's own
+            // hash over whatever it is handed, so the only way to move this field is to record
+            // against a different schema. That is the shape a real one has too.
+            StaleIdentity("inputSchemaHash", live, OTHER_SCHEMA),
+        )
+    }
+
+    private class StaleIdentity(
+        val field: String,
+        val identity: BuildIdentity,
+        val schema: InputSchema = SCHEMA,
+    )
+
+    private fun record(ticks: Int, stale: StaleIdentity): ReplayRecording =
+        record(ticks, stale.identity, stale.schema)
+
+    private fun record(ticks: Int, protoHash: Int): ReplayRecording =
+        record(ticks, identity(protoHash), SCHEMA)
+
+    private fun record(ticks: Int, identity: BuildIdentity, schema: InputSchema): ReplayRecording {
         val recorder = ReplayRecorder(
-            identityWithoutSchema = identity(protoHash),
-            schema = SCHEMA,
+            identityWithoutSchema = identity,
+            schema = schema,
             peerCount = 1,
             gameId = "udea-replay-fixture-update-test",
             gameVersion = "1",
         )
-        val slots = arrayOf(InputSample(SCHEMA))
+        val slots = arrayOf(InputSample(schema))
         repeat(ticks) { index ->
             slots[0].setAxis(0, index * 0.25f, -index * 0.25f)
             recorder.record(Tick(index.toLong()), slots, index.toLong())
@@ -219,5 +296,9 @@ class ReplayFixtureUpdateTest {
         const val LIVE_PROTO_HASH: Int = 0xc67b
 
         val SCHEMA: InputSchema = InputSchema(axes = listOf("test/move"), actions = listOf("test/act"))
+
+        /** A second vocabulary, so `inputSchemaHash` can be made to differ the only way it can. */
+        val OTHER_SCHEMA: InputSchema =
+            InputSchema(axes = listOf("test/move"), actions = listOf("test/act", "test/other"))
     }
 }

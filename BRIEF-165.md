@@ -244,8 +244,8 @@ sit there in range saying nothing.
 ### The final tree: green
 
 ```
-BUILD SUCCESSFUL in 5s
-204 actionable tasks: 3 executed, 201 up-to-date
+BUILD SUCCESSFUL in 11s
+204 actionable tasks: 8 executed, 2 from cache, 194 up-to-date
 ```
 
 **Say what that does not say.** Most of that run was `UP-TO-DATE`. `:udea-replay:test` was one of
@@ -258,24 +258,29 @@ last edit before it was a comment in `ci.yml`, so every test this branch adds ra
 ```
 
 The four wall-clock budget tasks were `UP-TO-DATE` in it, so the run says nothing about them. They
-were therefore run by name at this same tree, all four together with `--rerun-tasks`, starting at
-load `18.96` and ending at `15.38` (`scratchpad/budgets-final.log`):
+were therefore run by name at this same tree, all four together with `--rerun-tasks` — and by then
+the box had finally gone quiet, load `4.20` at the start and `4.81` at the end
+(`scratchpad/budgets-quiet.log`):
 
 ```
-    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) median 2.198ms, budget 4.0ms
-    graph deserialisation: best=5.809734ms median=5.904022ms over 2000 assets (budget 15ms)
-    warm reload decision: median 178ms over 4 samples [178, 186, 153, 131]
-    warm validate of one script: median 113ms over 4 samples [17, 116, 108, 113]
-    phase 2 exit: typo'd reference rejected in 13ms (median of [346, 13, 9])
-    phase 2 exit: agent request -> running world observed changed in 502ms
-BUILD SUCCESSFUL in 26s
+    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) median 2.081ms, budget 4.0ms
+    graph deserialisation: best=5.737ms median=5.926901ms over 2000 assets (budget 15ms)
+    warm reload decision: median 140ms over 4 samples [200, 140, 135, 117]
+    warm validate of one script: median 117ms over 4 samples [12, 129, 113, 117]
+    phase 2 exit: typo'd reference rejected in 14ms (median of [289, 10, 14])
+    phase 2 exit: agent request -> running world observed changed in 466ms
+BUILD SUCCESSFUL in 20s
 ```
 
-**All four pass, comfortably**: 2.198ms against 4.0ms, 5.904ms against 15ms, 178ms against
-`WARM_RELOAD_BUDGET_MS` = 500, 113ms against `WARM_VALIDATE_BUDGET_MS` = 300, and 502ms for the
-agent edit-to-observe. So the repository is green with no exclusions, in two commands rather than
-one, and I would rather say that plainly than present a mostly-cached `BUILD SUCCESSFUL` as though
-it had exercised the budgets.
+**All four pass, comfortably**: 2.081ms against 4.0ms, 5.927ms against 15ms, 140ms against
+`WARM_RELOAD_BUDGET_MS` = 500, 117ms against `WARM_VALIDATE_BUDGET_MS` = 300, and 466ms for the
+agent edit-to-observe. The 140ms is the figure the developer contract records for `udeaDaemonBudget`
+run alone on this box.
+
+So the repository is green with no exclusions, in two commands rather than one, and I would rather
+say that plainly than present a mostly-cached `BUILD SUCCESSFUL` as though it had exercised the
+budgets. An earlier by-name run of the same four at load `18.96` gave 2.198 / 5.904 / 178 / 113 /
+502 (`scratchpad/budgets-final.log`) — the same picture, which is the point.
 
 ### An earlier run mid-ticket was red on exactly those four, and it is worth reading why
 
@@ -403,7 +408,8 @@ That is the whole `replay*` job list for run `33429395807`, unedited
 lines apart in the same output. The join shows `cancelled` because a later push to the same ref
 tripped the workflow's `concurrency: cancel-in-progress`.
 
-**A third data point, mid-ticket.** The same four with `--rerun-tasks` starting at load `5.74`
+**A third data point, mid-ticket, showing the shape of the interference.** The same four with
+`--rerun-tasks` starting at load `5.74`
 (`scratchpad/budgets-solo.log`):
 
 ```
@@ -426,9 +432,10 @@ and both passed (`scratchpad/budgets-two-solo.log`):
 BUILD SUCCESSFUL in 23s
 ```
 
-Three separate by-name runs, at loads 5.7, 21.0 and 19.0, every task inside its budget in at least
-two of them, and the only runs in which any of them missed were runs competing with a full build or
-with another project's suite.
+Four separate by-name runs across this ticket, at starting loads 5.7, 21.0, 19.0 and 4.2. Every
+one of the four tasks is inside its budget in the quiet run at the top of this section, and the
+only runs in which any of them missed were runs competing with a full build or with another
+project's GL suite.
 
 ### `sh gradlew :udea-replay:tasks`
 
@@ -626,6 +633,8 @@ at `moba` is issue #172, which is blocked on this ticket. Commented on the issue
 | the refusal names the field and both sides | `a fixture whose protoHash has moved is refused, naming the field and both sides`, using #167's real `0xea9f` and `0xc67b` |
 | the refusal names the command | `a refused fixture names the one command that rebuilds it`. Mutation M9 |
 | the flag reaches the forked test JVM | `the test task forwards the regeneration flag to the JVM that reads it`. Mutations M7 and C2 |
+| each of the four identity fields is named when it moves | `each of the four identity fields is named when it is the one that moved`. Mutation M14 |
+| two stale fixtures are both reported and both rebuilt | `two stale fixtures are both reported, not just the first`. Mutation M15 |
 | it works on the real checked-in bytes | `ReplayFixturesCurrentTest`, and the regeneration transcript in §4 |
 
 ### "A job summary that links the `replay.bisect` MCP tool with the exact invocation for local reproduction."
@@ -874,6 +883,43 @@ ReplayBisectGuideTest > one pair agreeing does not hide another pair's divergenc
 ReplayBisectGuideTest > the guide lands on the earliest tick any pair diverged at, not the first pair's() FAILED
 ```
 
+### M14 — the refusal stops naming which identity field moved
+
+```diff
+--- a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/fixture/ReplayFixtures.kt
++++ b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/fixture/ReplayFixtures.kt
+@@ -215,5 +215,5 @@
+         val mismatches = recording.header.identity.mismatchesAgainst(fixture.identity())
+         if (mismatches.isNotEmpty()) {
+-            return "this build cannot replay it - " + mismatches.joinToString("; ")
++            return "this build cannot replay it"
+         }
+         if (recording.tickCount != fixture.ticks) {
+```
+```
+ReplayFixtureUpdateTest > the update flag rebuilds a fixture whose protoHash has moved, and the replay stops refusing it() FAILED
+ReplayFixtureUpdateTest > each of the four identity fields is named when it is the one that moved() FAILED
+ReplayFixtureUpdateTest > a fixture whose protoHash has moved is refused, naming the field and both sides() FAILED
+```
+
+### M15 — `reconcile` looks at the first fixture only
+
+```diff
+--- a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/fixture/ReplayFixtures.kt
++++ b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/fixture/ReplayFixtures.kt
+@@ -153,5 +153,5 @@
+      */
+     public fun reconcile(fixtures: List<ReplayFixture>, update: Boolean): List<ReplayFixtureStatus> =
+-        fixtures.map { reconcileOne(it, update) }
++        fixtures.take(1).map { reconcileOne(it, update) }
+ 
+     /**
+```
+```
+ReplayFixtureUpdateTest > two stale fixtures are both reported, not just the first() FAILED
+ReplayFixturesCurrentTest > every checked-in replay fixture can be replayed by this build() FAILED
+```
+
 ### C1 (control) — prose naming every forbidden string leaves every fence green
 
 ```diff
@@ -950,6 +996,30 @@ what those runs showed:
 Both are checkable: `git diff b06b2bc..HEAD -- .github/workflows/ci.yml` is comment-only, and
 `git diff b06b2bc..HEAD --stat` names the rest.
 
+## 8b. Merging onto the current `origin/example`
+
+`origin/example` moved while this branch was in flight — #171 and #173 merged into it
+(`efab1d0`). Checked rather than assumed, and then undone so the branch is exactly what is
+reported:
+
+- `git merge --no-commit --no-ff origin/example` → `Auto-merging .github/workflows/ci.yml` /
+  `Automatic merge went well`. Four of us edited that file in four disjoint blocks and it merged
+  with no conflict.
+- The merged `ci.yml` parses, with fifteen jobs: `build`, `gl-tests`, `legacy-ledger`,
+  `agents-md`, `plugin-disabled`, `checkers-fire`, `kotlin-upgrade-probe`, `clean-build-budget`,
+  `ksp-incremental-budget`, `bridge-conformance`, `determinism`, `replay-equality`,
+  `replay-equality-join`, `replay-equality-nightly`, `replay-equality-nightly-join`.
+- `sh gradlew :udea-replay:test --rerun-tasks` against the **merged** workflow: `BUILD SUCCESSFUL`.
+  That matters because every fence in `ReplayEqualityProofTest` reads `ci.yml`, and the job slicer
+  in particular has to keep cutting the right block when neighbouring jobs move.
+- `git merge --abort`, and `git status` is clean again apart from the wrapper's mode bit.
+
+`git diff 7942823..HEAD` — against the merge base, not against today's `origin/example` — is the
+honest statement of what this branch changes: `.github/workflows/ci.yml`, `udea-replay/**` and
+`BRIEF-165.md`, and nothing else.
+
+---
+
 ## 9. Regenerated files
 
 **`udea-codegen/net-protocol.lock`: not touched. `expected-generated-hashes.txt`: not touched.**
@@ -1011,10 +1081,15 @@ byte-identical (`sha256 57cc9c2f…` on both sides) and is therefore **not** in 
 - **The nightly on a genuinely red leg.** The join's `if: always()` and `EXIT_UNUSABLE` path are
   inherited from `replay-equality-join`, which #169 proved; I have not made a nightly leg fail on a
   runner. `ReplayEqualsMain`'s "a leg produced no stream" branch is covered by its own tests.
-- **A fixture whose `assetGraphHash` or `inputSchemaHash` has moved.** Only `protoHash` is
-  exercised. All four go through the same `mismatchesAgainst`, and the detail string is built from
-  whatever it returns, so the difference is which element of one list is non-empty.
-- **Two fixtures stale at once.** `reconcile` maps over the list and `requireCurrent` reports all
-  failures, but every test has one stale fixture at a time.
+- ~~A fixture whose `assetGraphHash` or `inputSchemaHash` has moved.~~ **Closed.** I wrote this
+  down as untested and then noticed it was a five-minute check.
+  `each of the four identity fields is named when it is the one that moved` builds a recording per
+  field, each differing from this build in that field alone, and asserts the refusal names it.
+  `inputSchemaHash` needed a second `InputSchema` rather than a `copy()`, because `ReplayRecorder`
+  substitutes the schema's own hash over whatever it is handed — which is the shape a real
+  mismatch has too. Mutation M14.
+- ~~Two fixtures stale at once.~~ **Closed**, same reason.
+  `two stale fixtures are both reported, not just the first` checks the order, both outcomes, both
+  names in the failure message, and that the flag rebuilds both. Mutation M15.
 - **The nightly's Windows leg locally.** No Windows here. It is the same `JavaExec` the gate's
   Windows leg already runs.

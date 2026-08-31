@@ -51,7 +51,15 @@ class CharacterArtStagingTest {
         "sprites/arrow/arrow.png",
     )
 
-    /** `spritePath = "sprites/orc/Orc-Idle.png"`, in any `.udea.kts` under the asset root. */
+    /**
+     * `spritePath = "sprites/orc/Orc-Idle.png"`, in any `.udea.kts` under the asset root.
+     *
+     * A regex and not a parse, with one limit that was checked rather than assumed: prose
+     * mentioning the word (`item/components.udea.kts` has a comment that does) is **not** matched,
+     * because the assignment is part of the pattern; a *commented-out* assignment would be. The
+     * direction of that mistake is the safe one - the test would demand a sheet nobody uses and go
+     * red, rather than excuse one the build needs - so it is written down instead of parsed away.
+     */
     private val spritePath = Regex("spritePath\\s*=\\s*\"([^\"]+)\"")
 
     /** Every sprite the game's own asset scripts name, asset-root-relative. */

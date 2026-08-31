@@ -153,11 +153,12 @@ udea {
  * ## What this replaces
  *
  * A shell step. The sheets under `assets/sprites` are paid-pack art this public repository cannot
- * sublicense, so they are gitignored and a clone has none of them - and the pipeline said so, once
- * per sheet, as `UDEA0032`. The step that fixed it was `scripts/stage-moba-art.py`, named in
- * `docs/art-assets.md` and nowhere the build could see. Nothing in CI ran it, so every job that
- * built this module had been red since the characters landed, and three real failures went unread
- * in those runs.
+ * sublicense, so they are gitignored and a clone has none of them - and the pipeline said so, with
+ * a `UDEA0032` for each `spritePath` it could not resolve. The step that fixed it was
+ * `scripts/stage-moba-art.py`, named in `docs/art-assets.md` and nowhere the build could see.
+ * Nothing in CI ran it, so every job that built this module had been red since the characters
+ * landed - and because every one of those runs stopped here, the failures behind this one went
+ * unread for as long. Issue #170 enumerates what they were.
  *
  * ## Why staging rather than teaching the pipeline a second root
  *

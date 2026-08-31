@@ -3,6 +3,7 @@ package dev.wildware.udea.build
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -34,6 +35,8 @@ class CompilerPluginSwitchTest {
     private val ci = repoRoot.resolve(".github/workflows/ci.yml")
 
     private val docs = repoRoot.resolve("docs/compiler-plugin.md")
+
+    private val buildLogicScript = repoRoot.resolve("build-logic/build.gradle.kts")
 
     /** Every Kotlin source and build script `build-logic` could hold the wiring in. */
     private fun buildLogicSources(): List<File> =
@@ -118,6 +121,107 @@ class CompilerPluginSwitchTest {
             "inert" in docs.readText(),
             "docs/compiler-plugin.md still describes the outer switch as inert, but the wiring " +
                 "is in place",
+        )
+    }
+
+    // --- where the checkers-fire probe may live (issue #173) ---------------------------
+
+    /**
+     * `module=` and `probe=` as the `checkers-fire` step sets them.
+     *
+     * The step declares the module once and derives its Gradle task from it, so the two
+     * cannot drift; these two tests read the same two variables rather than a path spelled
+     * out a third time here.
+     */
+    private fun probeDeclaration(): Pair<String, String> {
+        val text = ci.readText()
+        val absent = "ci.yml no longer declares it in the checkers-fire step, so these tests " +
+            "are reading nothing. If the step was rewritten, rewrite them with it."
+        val module = assertNotNull(
+            Regex("""^\s*module=(\S+)$""", RegexOption.MULTILINE).find(text)?.groupValues?.get(1),
+            "no `module=` line: $absent",
+        )
+        val probe = assertNotNull(
+            Regex("""^\s*probe=(\S+)$""", RegexOption.MULTILINE).find(text)?.groupValues?.get(1),
+            "no `probe=` line: $absent",
+        )
+        return module to probe
+    }
+
+    /**
+     * Source trees of the *outer* build that `build-logic` compiles a second time.
+     *
+     * `build-logic` is an included build, so anything it srcDirs is compiled by
+     * `:build-logic:compileKotlin` — with `build-logic`'s classpath and the Kotlin the Gradle
+     * distribution embeds, not with the module's own classpath and not with the K2 plugin.
+     * That compilation runs before any task of the main build, so a file placed in such a
+     * tree never reaches the compilation a reader assumes it reaches.
+     */
+    private fun doublyCompiledSourceTrees(): List<String> {
+        val text = buildLogicScript.readText()
+        val resolved = Regex("""val\s+(\w+)\s*:\s*File\s*=\s*rootDir\.resolve\("\.\./([^"]+)"\)""")
+            .findAll(text)
+            .associate { it.groupValues[1] to it.groupValues[2] }
+        val dirs = Regex("""kotlin\.srcDir\(([^)]+)\)""")
+            .findAll(text)
+            .map { it.groupValues[1].trim() }
+            .mapNotNull { resolved[it] }
+            .toList()
+        // The control. A parser that has quietly stopped matching returns an empty list and
+        // makes the test below pass on anything, which is the exact defect issue #173 is
+        // about, one level up. "No foreign source dirs at all" is a legitimate answer; "the
+        // script still srcDirs something and this could not say what" is not.
+        assertTrue(
+            dirs.isNotEmpty() || "kotlin.srcDir(" !in text,
+            "$buildLogicScript still calls kotlin.srcDir(...), but this test could not work " +
+                "out which tree, so it is about to pass without checking anything",
+        )
+        return dirs
+    }
+
+    @Test
+    fun `the checkers-fire probe is not written into a tree build-logic compiles a second time`() {
+        // Issue #173. The probe was written into `udea-gradle/src/main/kotlin`, which
+        // `build-logic/build.gradle.kts` adds to its own main source set - the only such tree
+        // in the repository. `:build-logic:compileKotlin` therefore compiled the probe first,
+        // with no `udea-annotations` anywhere near it, and answered with six unresolved
+        // references instead of with a rule id. The job had never once reached a checker.
+        //
+        // The claim that made it hard to see was in `ci.yml` itself: it named
+        // `udea-gradle`'s compile classpath as the reason for the choice, and that classpath
+        // is genuinely fine - `implementation(project(":udea-assets-compiler"))` does carry
+        // `udea-annotations` through two `api` edges. Nothing about the dependency graph was
+        // ever wrong, so reading the graph could not find the fault.
+        val (_, probe) = probeDeclaration()
+        doublyCompiledSourceTrees().forEach { tree ->
+            assertFalse(
+                probe == tree || probe.startsWith("$tree/"),
+                "the checkers-fire probe is written to $probe, inside $tree, which " +
+                    "$buildLogicScript adds to build-logic's own main source set. It will be " +
+                    "compiled by :build-logic:compileKotlin - an included build with neither " +
+                    "udea-annotations nor the K2 plugin on it - before the main build starts, " +
+                    "so the job reports unresolved references and never reaches a checker.",
+            )
+        }
+    }
+
+    @Test
+    fun `the checkers-fire probe is in a module the K2 plugin is actually applied to`() {
+        // The other way the job can fail without any checker being involved: a probe written
+        // into `:udea-annotations` or `:udea-diagnostics` compiles perfectly cleanly, because
+        // `UdeaCompilerPluginWiring.EXCLUSIONS` keeps the plugin off both of them.
+        val (module, probe) = probeDeclaration()
+        assertTrue(
+            probe.startsWith("$module/"),
+            "the checkers-fire step declares module=$module but writes its probe to $probe, " +
+                "so the file it compiles and the file it writes are in different modules",
+        )
+        assertTrue(
+            UdeaCompilerPluginWiring.appliesTo(":$module", enabled = true),
+            "the checkers-fire probe is in :$module, which the K2 plugin is not applied to (" +
+                (UdeaCompilerPluginWiring.skipReason(":$module", true) ?: "no reason recorded") +
+                "). The probe would compile clean and the job would fail claiming the plugin " +
+                "is unwired.",
         )
     }
 

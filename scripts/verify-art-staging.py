@@ -289,6 +289,15 @@ def main():
                 "unresolvable spritePath. Either way this whole check would pass for the wrong "
                 "reason. Investigate before trusting anything below."
             )
+        # Distinguished from a plain "no UDEA0032" because it is the failure a reader most
+        # needs named: with the staging task gone, `-x` refuses the invocation and the control
+        # is answering a question about a task that does not exist.
+        if "not found" in out and STAGING_TASK in out:
+            raise Failure(
+                f"there is no task called {STAGING_TASK} to exclude, so the control could not "
+                "be run. Nothing in this build stages the art, which is the state issue #170 "
+                f"was filed about:\n{out[-1500:]}"
+            )
         diagnostics = out.count("UDEA0032")
         if diagnostics == 0:
             raise Failure(

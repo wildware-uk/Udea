@@ -272,7 +272,11 @@ def main():
         print("\n[6/6] README.md must not name a different staging script")
         check_readme_names_the_same_step(clean, step)
     finally:
-        run(["git", "worktree", "remove", "--force", clean], ROOT)
+        # Say so rather than leaving a stale worktree registration behind silently. The check's
+        # verdict does not depend on cleanup, so this warns instead of raising.
+        code, out = run(["git", "worktree", "remove", "--force", clean], ROOT)
+        if code != 0:
+            print(f"\nwarning: could not remove {clean}; `git worktree prune` will:\n{out}")
         shutil.rmtree(parent, ignore_errors=True)
 
     print("\nOK: a fresh clone plus the documented step builds, and the licence covers it.")

@@ -28,8 +28,8 @@ import java.nio.file.StandardCopyOption
  * art from the Tiny RPG Character Asset Pack. This repository is public and has no right to
  * sublicense them, so `.gitignore` excludes the whole destination tree and a clone carries none of
  * it. Until this task existed, `:moba:udeaValidateAssets` therefore refused the manifest on every
- * clean clone and on every CI runner with one `UDEA0032` per sheet, and the only way out was a
- * shell step named in one document nobody had to read.
+ * clean clone and on every CI runner, with a `UDEA0032` for each `spritePath` it could not
+ * resolve, and the only way out was a shell step named in one document nobody had to read.
  *
  * Every file named here is **already committed**, under [SOURCE_TREE]. Copying out of it adds no
  * exposure; committing a second set of the same frames under a second path would have doubled one
@@ -224,13 +224,14 @@ public abstract class UdeaStageCharacterArtTask : DefaultTask() {
 }
 
 /**
- * Registers [CharacterArtStaging.TASK] and puts it ahead of everything that reads the asset tree.
+ * Registers [CharacterArtStaging.TASK] and puts it ahead of this project's asset pipeline.
  *
- * Three tasks, and all three are needed rather than only the one that reports the failure.
- * `udeaValidateAssets` is where a missing sheet is *diagnosed*, but `udeaScanAssets` and
- * `udeaPackBundle` both take the whole asset tree as an input, so a build that ordered only the
+ * The tasks listed below are the ones `UdeaAssetsPlugin` gives the whole asset tree to as an
+ * input, and each of them needs the ordering rather than only the one that reports the failure:
+ * `udeaValidateAssets` is where a missing sheet is *diagnosed*, but a build that ordered only the
  * validator would have Gradle rejecting the graph for an undeclared dependency on files another
- * task produces.
+ * task produces. Consumers outside this project order themselves the same way — see the `Test`
+ * tasks in `udea-assets-compiler/build.gradle.kts`, which read `moba/assets` by path.
  *
  * `tasks.named` rather than `pluginManager.withPlugin`: a game that calls this without the assets
  * plugin applied has nothing to stage art for, and an immediate `UnknownTaskException` naming the

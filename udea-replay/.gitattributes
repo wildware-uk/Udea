@@ -1,0 +1,17 @@
+# `CrossPlatformDivergenceTest` compares the rendered divergence report against
+# `expected/planted-divergence.txt`, and it compares `expected.trimEnd()` with `actual.trimEnd()`
+# - `trimEnd` touches the ends, so an interior carriage return survives into the comparison and
+# fails it.
+#
+# Issue #176: this repository has no root `.gitattributes` and Git for Windows checks out with
+# `core.autocrlf=true`, so that golden arrived CRLF on `build (windows-latest)` and the test
+# failed there for a reason that has nothing to do with divergence rendering. Reproduced by
+# cloning the tree with `core.autocrlf=true` and again with `core.autocrlf=false`; red in the
+# first, green in the second.
+#
+# `-text` rather than `text eol=lf`, matching `udea-diagnostics/.gitattributes` and
+# `.github/conformance/.gitattributes` (issue #171): never translate, in either direction. The
+# fence that goes with it is in `CrossPlatformDivergenceTest.assertGolden`, so a copy translated
+# by something other than a checkout fails by name rather than as a diff of two blocks that
+# render identically.
+src/test/resources/expected/*.txt -text

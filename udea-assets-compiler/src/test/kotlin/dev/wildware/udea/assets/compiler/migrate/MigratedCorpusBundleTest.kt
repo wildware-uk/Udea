@@ -63,6 +63,17 @@ class MigratedCorpusBundleTest {
 
     private var packerDiagnostics: List<String> = emptyList()
 
+    /**
+     * How many assets the corpus declared, recorded while it was compiled.
+     *
+     * The bundle's own size is asserted against this rather than against a literal. "Every asset
+     * in the corpus binds to a typed model value" is a statement about the corpus *and* the
+     * bundle agreeing, and a hard-coded number states neither side: it was 127 when this was
+     * written and 147 once the shop's twenty items landed, so it had to be edited by a change
+     * that broke nothing. Derived, it fails only when the bundle really has dropped something.
+     */
+    private var declaredAssets: Int = 0
+
     private fun bundle(): dev.wildware.udea.assets.pack.Bundle {
         val compiler = AssetCompiler(
             repoRoot = TestPaths.repoRoot,
@@ -76,6 +87,7 @@ class MigratedCorpusBundleTest {
                 result.diagnostics.joinToString("\n") { "${it.ruleId} ${it.message}" }
         }
         val packed = GraphPacker.pack(result.graph)
+        declaredAssets = result.graph.assets.size
         packerDiagnostics = packed.diagnostics.map { "${it.ruleId} ${it.message}" }
         return BundleReader.open(
             BundleWriter.write(BundleContent(assets = packed.assets, atlas = PackedAtlas.EMPTY)),
@@ -85,7 +97,12 @@ class MigratedCorpusBundleTest {
     @Test
     fun `every asset in the corpus binds to a typed model value`() {
         bundle().use { bundle ->
-            assertEquals(127, bundle.registry.ids.size)
+            assertEquals(
+                declaredAssets,
+                bundle.registry.ids.size,
+                "the bundle must hold every asset the corpus declared",
+            )
+            assertTrue(declaredAssets > 0, "an empty corpus would satisfy the line above")
 
             // A binding: the nested `key(62)` record became the flat pair the codec reads.
             val binding = bundle.registry[reference<Binding>("control/attack_binding")]

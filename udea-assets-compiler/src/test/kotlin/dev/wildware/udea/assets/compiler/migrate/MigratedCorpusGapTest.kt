@@ -43,7 +43,14 @@ class MigratedCorpusGapTest {
             "the game's asset root is missing; `moba/build.gradle.kts` names it in `udea { }`",
         )
         val report = UdeaDeclarationScanner(TestPaths.repoRoot, root).use { it.scanTree() }
-        assertEquals(19, report.files.size, "the game's asset root is nineteen scripts")
+        // A lower bound and not an exact count. What matters to *this* test is that the scan
+        // walked the real tree rather than an empty directory; which files it found is
+        // `MigratedCorpusCompilesTest`'s assertion, spelled there as a list, and repeating it as
+        // a number here would be a second thing to edit for every script added.
+        assertTrue(
+            report.files.isNotEmpty(),
+            "the scan found no scripts under $root, so the kind set below is vacuously empty",
+        )
 
         val kinds = report.declarations.map { it.kind }.toSortedSet()
         assertEquals(
@@ -67,6 +74,11 @@ class MigratedCorpusGapTest {
                 "effect",
                 "gameConfig",
                 "gameplayEffect",
+                // The shop of issue #132. It is in this set for the reason every other word is:
+                // the point of the migration was that the receiver grew the kinds it was missing,
+                // and a corpus that quietly stopped using one would make the assertion above pass
+                // for the wrong reason.
+                "item",
                 "level",
                 "soundCue",
                 "spriteAnimation",

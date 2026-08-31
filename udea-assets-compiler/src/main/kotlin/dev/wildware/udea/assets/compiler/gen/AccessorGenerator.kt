@@ -27,8 +27,11 @@ public data class GeneratedFile(
  * Spec 3.6: `.udea.kts` uses validated `reference("id")` strings; only `.kt` uses
  * `GameAssets.character.orcElite`. Without that split the build has a cycle - the accessors are
  * generated from the scripts, so putting them on the script compile classpath makes every asset
- * rename invalidate that classpath and recompile every script in the tree. On this corpus that
- * is nineteen script compilations for a rename, against a 3s asset-edit budget.
+ * rename invalidate that classpath and recompile every script in the tree - **every** script,
+ * whatever the corpus happens to hold, against a 3s asset-edit budget. (This sentence used to
+ * cost that out as "nineteen script compilations". It was true when it was written, `moba/assets`
+ * has grown since, and the cost was never the number: it is that the count is the size of the
+ * tree rather than the size of the edit.)
  *
  * Nothing in *this file* enforces the split: it emits source, and what compiles against it is
  * decided by whoever registers the source directory. `AccessorsNotOnScriptClasspathTest` is

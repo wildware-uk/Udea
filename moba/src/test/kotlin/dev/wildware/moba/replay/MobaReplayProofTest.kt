@@ -321,7 +321,38 @@ class MobaReplayProofTest {
             val current = recording.firstTick + index.toLong()
             recording.samplesInto(current, slots)
             if (current == tick) {
-                slots[0].setAxis(MobaControls.MOVE_AXIS.value, -1f, 0f)
+                // Away from whatever was recorded, never toward a constant.
+                //
+                // This wrote `setAxis(MOVE_AXIS, -1f, 0f)` flat, and `Pilot.sample` draws each
+                // axis from `rng.nextInt(3) - 1f` - so `(-1, 0)` is one of nine equiprobable
+                // pairs, and roughly one recording in nine already held it at this tick. The
+                // "corruption" then wrote the value that was already there, the replay was
+                // legitimately bit-exact, and the assertion below failed while every piece of
+                // machinery it is about was working perfectly. The pilot is seeded from
+                // `System.nanoTime()`, so it was a fresh draw every build: ~11% red, for a
+                // reason the failure message positively denies ("the replay is not reading the
+                // recorded input at all").
+                //
+                // Negating both components moves at least one of them for every direction the
+                // pilot can hold except the idle one, and idle is sent somewhere definite - so
+                // the rule is total and the write always differs from the read.
+                val sample = slots[0]
+                val axis = MobaControls.MOVE_AXIS.value
+                val x = sample.axisX(axis)
+                val y = sample.axisY(axis)
+                val idle = x == 0f && y == 0f
+                val mutatedX = if (idle) 1f else -x
+                val mutatedY = if (idle) 0f else -y
+                // Not a restatement of the two lines above: it is the property they exist to
+                // have, and it is what fails loudly if a later edit picks a rule that can land
+                // on the recorded value again. A silent no-op here presents as this test
+                // failing with a message that positively denies the cause.
+                check(mutatedX != x || mutatedY != y) {
+                    "the corruption at $tick wrote ($mutatedX, $mutatedY) over the recorded " +
+                        "($x, $y), which changes nothing; the test below would then be " +
+                        "asserting against an unmutated recording"
+                }
+                sample.setAxis(axis, mutatedX, mutatedY)
             }
             recorder.record(current, slots, recording.hashAt(current))
         }

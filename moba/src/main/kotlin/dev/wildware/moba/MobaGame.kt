@@ -15,6 +15,8 @@ import dev.wildware.moba.ability.Projectile
 import dev.wildware.moba.ability.ProjectileReplicator
 import dev.wildware.moba.ability.UnitBlueprint
 import dev.wildware.moba.lane.LaneModule
+import dev.wildware.moba.item.ItemCatalog
+import dev.wildware.moba.item.ItemModule
 import dev.wildware.moba.match.MatchModule
 import dev.wildware.moba.match.MatchState
 import dev.wildware.moba.match.MatchStateReplicator
@@ -156,6 +158,18 @@ public object MobaGame {
                 combat,
                 MatchModule(combat.attributes),
                 LaneModule(combat),
+                // The shop, and it is **after** `LaneModule` because `ShopSystem` declares
+                // `after(ChampionSystem)` - a shopper needs the wallet that system grants, and
+                // `SimRegistry` resolves an edge only against a system some module has already
+                // contributed. Same constraint, same shape and same reason as `LaneModule`
+                // sitting after `MatchModule` for its `after(RespawnSystem)`.
+                //
+                // The catalogue is read here rather than cached process-wide, so a host built
+                // after an `assets.patch` sees the items the patch wrote. It is still a snapshot
+                // for the life of one host - a reload during a match does not re-price the shop -
+                // which is the same bargain `CharacterAnimation.roster` makes, stated rather than
+                // discovered.
+                ItemModule(ItemCatalog.read(MobaAssets.registry)),
                 RenderModule(),
             ) + extraModules,
             // The registry is built over **this** module's attribute table and not a fresh
@@ -383,7 +397,7 @@ public object MobaGame {
             attributesType(attributes),
             abilitiesType(),
             effectsType(),
-        ) + LaneModule.snapshotTypes(),
+        ) + LaneModule.snapshotTypes() + ItemModule.snapshotTypes(),
     )
 
     /**

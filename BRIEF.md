@@ -1,719 +1,834 @@
-# BRIEF — issue #152, cross-OS replay equality with field-level divergence
+# Issue #132 — the shop, the items and the inventory
 
-    2d4d2c8
+1698eb0
 
-That is the code under review. This brief is the commit sitting on top of it, so
-`git rev-parse --short HEAD` on `issue-152-replay-equality-ci` is one ahead of it; every
-transcript below was produced against `2d4d2c8`.
+**The code is complete at that commit**, and every transcript below was run against it. The commits
+after it on this branch touch nothing but this file — a brief cannot name its own SHA without
+changing it, so the line above names the last commit that changes what the reviewer is ruling on.
+`git log --oneline origin/example..HEAD` shows which is which.
 
-Branch: `issue-152-replay-equality-ci`, from `origin/example` at `866ba0a`.
-Worktree: `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a6cc34edc8f68a0fb`
+Branch `issue-132-shop-and-items`, off `origin/example` at `866ba0a`.
+Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a5b3c68bd564f1fda`.
+
+Scope is the **first half** of #132 as the lead split it: the `item` asset kind, the `Inventory`
+component, `ShopSystem`, enough items to exercise it, and acceptance criteria **1 and 4**.
+`ItemPassiveSystem`, unique-passive deduplication and item actives are **#166** and are not here.
 
 ---
 
 ## 1. The evidence command
 
 ```
-JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew :udea-replay:udeaReplayEqualityProof
+JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew \
+  :moba:test --tests 'dev.wildware.moba.item.*' \
+  :udea-assets-compiler:test --tests '*ItemRecipeValidatorTest' \
+  --console=plain
 ```
 
-Five processes: three `DriftDigestMain` runs that each replay the checked-in 3600-tick
-`.udearep` and write a `.udeaeq` digest, and two `ReplayEqualsMain` runs that join them. Two of
-the three legs are honest and must agree; the third carries a deliberate one-ulp divergence and
-must be caught, at the right tick, naming the right entity, component and field.
+25 tests: `RecipeTest` (8), `ShopProofTest` (11), `ItemRecipeValidatorTest` (6). Every purchase in
+the first two runs through `ShopService` and is carried out by `ShopSystem` on a real tick of the
+shipped `MobaGame.definition()`; nothing calls `ShopRules` directly.
 
-Leaves behind `udea-replay/build/reports/udea/replay-equality/proof/` — three `.udeaeq` streams
-(1.6MB each) and the two rendered verdicts, `equal.txt` and `planted.txt`.
+Everything quoted in this brief is spliced from a file under
+`/tmp/udea-issue132-agent-a5b3c68bd564f1fda/`, which holds every log, JSON body, mutation diff and
+PNG named below. Nothing here is retyped from memory, and §2 records the one number that was.
 
-### Its real output
+### Proof it goes red
 
-Spliced from `build/evidence/proof.log`, the run of that exact command at `2d4d2c8`:
+Twelve mutations, each a shape the code plausibly *could* have had with one behaviour removed, each
+run through the command above. **The literal `git diff` of every one is in §8**, taken from the run,
+not retyped. Control before and after: all of them ran, 0 failed.
 
-```
-=== two honest legs, two separate JVM processes ===
-replay-equality over 2 leg(s) of 'drift-3600.udearep', 3600 tick(s) from t0
-  proof/leg-a  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-  proof/leg-b  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
+| # | What is removed | Red |
+|---|---|---|
+| M1 | `ShopSystem.buy` no longer clears the consumed slots | 6 |
+| M2 | `ShopRules.priceFor` returns the shelf price, no recipe difference | 5 |
+| M3 | `ShopSystem.buy` has no affordability check | 1 |
+| M4 | `item(components = ...)` declared as a list of **id strings** instead of references | 11 |
+| M5 | the `expecting<Item>()` stamp dropped, reference kept | 1 |
+| M6 | `ItemRecipeValidator`'s pricing arm removed | 1 |
+| M7 | no fountain check | 2 |
+| M8 | `componentSlots` lets one slot satisfy two components | 1 |
+| M9 | `hasRoomFor` ignores the slots the purchase frees | 1 |
+| M10 | no aliveness check | 1 |
+| M11 | `sellValue` returns the full shelf price | 1 |
+| M12 | `Inventory` removed from `ItemModule.snapshotTypes()` | 1 |
 
-replay equality holds: 3600 tick(s) of 'drift-3600.udearep' are cell-for-cell identical
-  fixture drift-3600.udearep
-  A = 'proof/leg-a'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-  B = 'proof/leg-b'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-=== a third leg carrying a planted one-ulp divergence ===
-replay-equality over 2 leg(s) of 'drift-3600.udearep', 3600 tick(s) from t0
-  proof/leg-a  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-  proof/leg-planted  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
+**Two things worth reading rather than skimming.**
 
-replay equality FAILED at t1200 (1200 tick(s) matched first)
-  fixture drift-3600.udearep
-  A = 'proof/leg-a'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-  B = 'proof/leg-planted'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-  world hash: -7000854319554458987 against 8365181117672703832
-  1 differing cell(s):
-    NetId(#0@0) dev.wildware.udea.replay.equality.fixture.Drifter.x
-      A = 6.5650873 (0x40d21532)
-      B = 6.565088 (0x40d21533)
-      the preceding 5 tick(s) of this cell:
-        t1195  agreed  A = 7.066144 (0x40e21dda), B = 7.066144 (0x40e21dda)
-        t1196  agreed  A = 6.9657426 (0x40dee75d), B = 6.9657426 (0x40dee75d)
-        t1197  agreed  A = 6.8644977 (0x40dba9f7), B = 6.8644977 (0x40dba9f7)
-        t1198  agreed  A = 6.763905 (0x40d871e9), B = 6.763905 (0x40d871e9)
-        t1199  agreed  A = 6.6647997 (0x40d5460a), B = 6.6647997 (0x40d5460a)
-replay-equality proof PASSED: two honest legs agree (exit 0); the planted leg fails (exit 1) naming Drifter.x at t1200, with five ticks of history.
-```
+**M4 changed answer between two runs of the same mutation, and the first answer was the flattering
+one.** The first pass reddened 4 tests; the re-run reddened 11. The first pass ran against a stale
+packed bundle, so only the compiler-side tests saw the change; the re-run repacked and the runtime
+shop lost its recipes too. Both runs were "green means green" — but one of them under-reported the
+blast radius of the mutation, which is exactly what a mutation table is for. The 11 in the table is
+the re-run.
 
-`0x40d21532` and `0x40d21533` are adjacent representable floats — the difference is one bit of
-the significand, which is the magnitude `determinism-audit.md` §3.1 measured `Math.sin` differing
-from `StrictMath.sin` by.
-
-### Proof it goes red when the feature is reverted
-
-Two reverts, both run, both from `build/evidence/`.
-
-**(a) Neutralise the comparison itself** — `ReplayEquality.ticksAgree` always says "agree", which
-is the whole feature gone:
-
-```diff
-diff --git a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-index 8174698..621fca8 100644
---- a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-+++ b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-@@ -234,7 +234,7 @@ public object ReplayEquality {
-         // `ReplayDigestWriter` can produce, so meeting it means a file has been truncated, edited
-         // or written by something else, and the caller is told that rather than handed a "they
-         // agree" that is built on a stream nobody should trust.
--        if (expected.hashAt(index) != actual.hashAt(index)) return false
-+        if (true) return true
-         val mine = expected.cellsOf(index)
-         val theirs = actual.cellsOf(index)
-         if (mine.last - mine.first != theirs.last - theirs.first) return false
-```
-
-`build/evidence/proof-feature-reverted.log`, exit 1:
-
-```
-* What went wrong:
-Execution failed for task ':udea-replay:udeaReplayEqualityProof'.
-> a leg with a deliberately planted one-ulp divergence was NOT caught (exit 0). A gate that cannot fail proves nothing.
-```
-
-**(b) Neutralise the plant** — `DriftWorld.plant` writes the value back unchanged, so the third
-leg is no longer a third answer. Same task, `build/evidence/proof-reverted.log`, exit 1, same
-message. That second one matters separately: it shows the proof is not merely asserting that
-three files differ, it is asserting that *the planted difference* is the one that was found.
+**The whole table was re-run into a private directory after `dev-154` found that
+`/tmp/claude-1000/-srv-ssd1-workspace-Udea/<uuid>/scratchpad/` is not session-private on this box** —
+our `mut/M*.log` files had been overwriting each other. My failing-test names never came from those
+logs (they are collected from this worktree's own `build/test-results/**/*.xml`, and the diffs were
+printed by `git diff` in the same tool call), but "sound by construction" is not a check. Everything
+in §8 was regenerated under `/tmp/udea-issue132-agent-a5b3c68bd564f1fda/mut/`, and the collector now
+refuses to run outside this worktree and stamps the worktree path into every result file.
 
 ---
 
-## 2. What I did, what I decided, what I rejected
+## 2. What I did, what I decided, and what I rejected
 
-### The mechanism
+Every decision below is also on the issue as
+[a comment](https://github.com/wildware-uk/Udea/issues/132#issuecomment-5480132031), so a later
+reader can disagree with the reasoning rather than guess at it.
 
-Each matrix leg replays a checked-in `.udearep` headless and writes a `.udeaeq` **digest stream**:
-per tick, every value `WorldHasher.hash(WorldSnapshot)` folds, each one keyed by
-`(scope, NetId, ComponentTypeId, fieldIndex)`. A join step reads two or more of those files and
-reports the first tick they disagree at, cell by cell.
+### The `item` asset kind is the engine's, not the game's
 
-The load-bearing property is in `ReplayDigestWriter.writeTick`: it **refolds its own cells through
-`WorldHasher.fold` and refuses to write a tick that does not reproduce `WorldHasher.hash`**. The
-cells are therefore provably the hash's own inputs, on every tick of every run. That is what lets
-the join step promise something a hash stream cannot — if two legs' hashes differ, some *named*
-cell differs, so there is always something to print. A run that diverged only in its random
-streams reports `<rng>.word[0]`; only in the id allocator, `<handles>.nextFresh`; only in which
-entity carries a component, `<roster>.presence[0]`. Those four pseudo-components exist precisely
-because `WorldHasher` folds the clock, the RNG, the allocator and the roster shape, and not one of
-them is a field of anything.
+`udea-assets/Item.kt`, registered in `AssetKindHierarchy`, `DslKinds`, `GraphPacker` and
+`AssetCodecs`, with an `item(...)` function on `AssetScope`. Every field on it is a number, a name
+or a `Ref`, so it decodes out of a `.udeapak` with no running game — which is the test
+`GameplayEffect`'s KDoc sets for a kind belonging here rather than in a game.
 
-It also fails loudly the day `WorldHasher.hash` grows a folded input nobody added a cell for:
-without that check the gate would keep passing while silently ceasing to cover the new state.
+The alternative was `asset("item", ...)`, the generic escape. It was rejected because it loses the
+typed references, and **that loss is acceptance criterion 4**: `components` declared as a
+`List<String>` gets no `UDEA0004`, no `UDEA0013`, no did-you-mean and no line number — it gets a
+null in the shop, in a match, with the build green. Mutation **M4** is that alternative, applied,
+and it reddens 11 tests.
 
-### Why the logic is in classes and tasks rather than in `ci.yml`
+### `cost` is the price on the shelf; the counter price is derived
 
-I cannot run GitHub Actions here and neither can the reviewer, so anything expressed only in YAML
-is unverifiable until it has already gone wrong on a branch somebody merged. Every decision the
-job makes — what to replay, what to write down, what counts as a divergence, how to render one,
-which exit code to use — is a class with a `main` and a Gradle task that drives it. The workflow
-is `./gradlew` lines and artifact plumbing over the top.
+One authored number per item. A champion who already carries a component pays
+`cost - sum(owned components' costs)` — the recipe difference — and the components are consumed.
 
-**Proven locally:** the replay, the digest format and its round trip, the comparison, the
-rendering, the exit codes, the artifact sizes, the per-leg runtime, and both halves of the verdict.
-**Resting on the YAML being correct:** that `ubuntu-latest` and `windows-latest` runners exist and
-green, that `actions/upload-artifact` / `download-artifact` move the `.udeaeq` files between the
-legs and the join job, and that `$GITHUB_STEP_SUMMARY` renders. `ReplayEqualityProofTest` asserts
-the workflow delegates to the two tasks rather than reimplementing the comparison in shell, which
-is the most a local test can say about a file it cannot execute.
+Rejected: authoring a *combine cost* beside a total, which is how a lot of MOBAs store it. Two
+numbers that must agree with no compiler checking they do is the unchecked duplication
+`MobaAuthoredContentTest` exists to close, one level down; a designer who retunes one and not the
+other ships an item whose displayed price is not its price.
 
-### Decisions
+The cost of the choice is that `cost` below the sum of the parts becomes expressible, and that
+subtraction going negative is a shop that pays gold **out** on a purchase. So a new build-time rule
+**`UDEA0037 ITEM_RECIPE`** refuses it, and refuses an item that lists itself as its own component.
+If the owner prefers the other shape: add `combineCost` to `Item`, delete `ItemRecipeValidator`, and
+have `ShopRules.priceFor` return it.
 
-**1. The fixture is `udea-replay`'s own world, not `moba`.** Commented on the issue
-([#152 comment](https://github.com/wildware-uk/Udea/issues/152#issuecomment-5479780077)).
-`BuildIdentity` refuses a recording whose `protoHash`, `assetGraphHash` or `inputSchemaHash` has
-moved; #132 is in flight on `moba/` and `udea-gas/` this wave and will regenerate
-`net-protocol.lock`, so a `moba` fixture checked in today is refused the day that merges — and the
-tool for regenerating fixtures is #165, which I am not building. Landing a fixture whose
-maintenance tool does not exist yet is landing a red gate. *Rejected:* checking in a `moba` 5v5
-recording and registering the task in `moba/build.gradle.kts`. *Cost, stated plainly:* the job
-gates the engine's snapshot and float paths, not `moba`'s gameplay float paths. *To change it:*
-the machinery is generic over `ReplayWorld` and `MobaReplayWorld` already implements everything it
-needs, so wiring `moba` in after #165 is one task registration plus a checked-in `.udearep`; add
-it as a **second** fixture rather than replacing this one, because only a small world can be
-perturbed by exactly one ulp at exactly one tick.
+### The fountain is the champion's own spawn point
 
-**2. Two `udea-core` declarations widen: `WorldHasher.fold` and `WorldHasher.OFFSET_BASIS`
-(private → public), and `ColumnarFieldStore.hashableBits` (internal → public).** A digest is only
-worth anything if its cells are provably the same values the hash folded, and the only way to
-prove that is to fold them and get the hash back. *Rejected:* a second FNV-1a and a second float
-canonicalisation written out in `udea-replay` — two implementations of a determinism gate's own
-arithmetic that agree until somebody edits one. Both widenings carry a KDoc section saying why.
-No frozen contract is touched: `docs/contracts/` is unchanged, and `WorldHasher`'s canonical
-order is unchanged.
+`Respawn.spawnX`/`spawnY`, radius `ShopRules.FOUNTAIN_RADIUS = 260`. That is what a fountain *is* in
+this genre, it is per-team without a second table, and `Respawn` is already in the snapshot registry
+so a `time.rewind` restores it. Rejected: a rectangle in a new `ShopGeometry`, which would be a
+third place the map's layout is written down. 260 is above `LaneGeometry.XP_RADIUS` (220), so a
+champion cannot both shop and soak a wave's experience from one spot.
 
-**3. The digest does not gate on the recording's own hash stream.** A `.udearep` carries one hash
-per tick, produced by whichever machine recorded it. Gating on those would make the recording
-machine the authority and report a genuine cross-platform float difference as the *other*
-platform's fault, in the wrong job. `ReplayDigestRecorder` counts the mismatches and prints them
-as a note; the verdict comes from comparing two legs against each other, which is symmetric.
-`ReplayEqualityProofTest` documents the same reasoning for why it compares the regenerated fixture
-input-for-input and not hash-for-hash.
+### Orders queue; there is no RPC and no shop tool
 
-**4. `-Pudea.replay.jvmVendor` is passed explicitly in CI.** `setup-java` sets `JAVA_HOME`, but
-Gradle toolchain auto-detection also finds whatever JDKs the runner image ships, so two legs
-asking only for "17" can both resolve to the same vendor and the second axis silently stops
-existing while both stay green. Naming the vendor makes a missing one a loud failure. The digest
-header records the vendor that actually ran and the join step prints it, so the claim is
-checkable in the log rather than assumed from the YAML.
+`ShopService.buy/sell` enqueues a `ShopOrder`; `ShopSystem` drains it at a known point in a known
+tick. That is the Command shape `SimBarrier` and `AbilityActivationSink` already use here, and it
+means a bot, a test and (later) a client reach the simulation through one door.
 
-**5. The golden normalises the OS, the JVM and a float's *decimal*, but not its bits.**
-`Float.toString` changed algorithm in JDK 19, so the same `Float` renders as different text on
-either side of that release; the hexadecimal raw bits beside it are the value itself and are
-pinned. The two world hashes and the tick are pinned too, because the fixture world uses only
-exactly-specified arithmetic and is meant to produce the same numbers everywhere.
+Rejected: an `@Rpc` like `activateAbility`, and an `@AgentTool` shop toolset. Neither is asked for,
+both add protocol or tool surface a reviewer would have to rule on, and the declared consumer of
+this work is #133 (lane bots), which is in-tree Kotlin and needs neither.
 
-### What the issue left open, and what I ruled
+### Twenty items, ten of them finished
 
-- **"and is required for merge"** (criterion 1) is a GitHub branch-protection setting on the
-  repository. Nobody in this session can set it. The job exists and is named
-  `replay-equality (<os>, <distribution>)` plus `replay-equality (join)`; marking those required
-  is an owner action.
-- **"green for seven consecutive nights"** (criterion 5) is #165's nightly and is unachievable
-  inside a ticket by construction. Not built, not faked.
-- **The 36000-tick nightly fixture, `--update-replay-fixtures`, and the `replay.bisect` job-summary
-  link** are #165 and are out of scope by the lead's split.
-- **`udeaWriteReplayFixture`** *is* in scope and is not that flag: it is the one command that
-  produced the checked-in bytes. Without it the fixture is a binary nobody can reproduce, which is
-  worse than the regeneration risk. Nothing depends on it and nothing in CI runs it.
+Eight basic components, ten finished items with real build paths, two trinkets. The ten include one
+built from a finished item (`warhammer` ← `greatsword` + `blade`) and one that names the same
+component twice (`twin_blades` ← two `blade`s), because those are the two recipe shapes a naive
+implementation gets wrong.
+
+**These three numbers are measured, not remembered.** An earlier draft of this brief and my first
+comment on the issue both said "nineteen items, nine finished"; I had counted from memory. The
+figures above are the census `ShopProofTest` prints out of the **packed bundle** the game opens:
+
+```
+[shop] 20 items, 10 with build paths, 2 trinkets
+```
+
+A grep over the source made the same mistake in a second way: `grep -c "trinket = true"` over
+`trinkets.udea.kts` answers **3**, because one of the hits is the word inside a comment. The bundle
+says 2, and the bundle is what the shop reads.
+
+### `@Net(visibility = OwnerOnly)` on `Inventory` is DECLARED and NOT ENFORCED
+
+**Read this paragraph before assuming the guarantee holds.** `Visibility.OwnerOnly` has been in
+`udea-annotations/Net.kt` since Phase 0 and **nothing reads it**. I grepped the tree: the only hits
+are the enum declaration and `AnnotationVocabularyTest` lines 97 and 153. `udea-codegen`'s
+`ComponentModelBuilder` never looks at the argument and `udea-net`'s `SnapshotWriter` has no
+per-recipient mask stripping. So today **every client that holds a champion is sent every field of
+its inventory** — a real information leak in a competitive game.
+
+That is the same state `lifetime` was in before #114 turned it into bytes not sent. It is filed as
+**#167** and deliberately not built here: it is a codegen mask, a wire marker, a writer policy and
+an ownership seam landing on the wire contract, which is a second concern in one branch. The
+annotation is on the component as the statement of intent #167 will make true. **There is no test
+pretending otherwise** — a test asserting the annotation is present would prove nothing about the
+wire and is the "test that cannot fail" the reject list names.
+
+The evidence that nothing is enforced is in the regenerated lock (§9): all seven fields read
+`i32:32`, with no visibility marker, beside `heading`'s `i32:32:oncreate` which shows what a
+declaration that *is* enforced looks like in the same file.
+
+### `Inventory` is seven `Int` fields, and an agent can read it
+
+Six carried slots plus a trinket, each holding an `AssetIndex` value or `-1`. Not an array, because
+`FieldLowering` accepts only `Boolean`/`Int`/`Long`/`Float`/`NetId`/`Tick`/enum and a component with
+array state needs a hand-written `Replicator`, which `ReplicatorApiShapeTest` forbids in game code.
+
+`Inventory` also joins `Position`, `GameUnit` and `MatchState` on `WorldToolset`'s component index
+(second commit). Without it the feature is invisible to everything except a Kotlin test — see §5.
+Read-only: a caller that could write a slot could hand itself `item/aegis` without paying for it.
+
+### Four stale asset counts, and one I did not touch
+
+Adding three asset scripts broke `MigratedCorpusCompilesTest`, `MigratedCorpusGapTest`,
+`MigratedCorpusBundleTest` and `MobaWarmEditBudgetTest` — every one on a hard-coded `19` scripts or
+`127` assets. Rather than renumber:
+
+- the script count is now the **list** of script paths (a list invites an addition; a number invites
+  a contradiction);
+- the bundle count is **derived** from the compiled graph, which is what the test's own name claims;
+- two counts that guarded nothing their neighbours did not are **deleted** rather than rewritten.
+
+I grepped the class rather than fixing only what broke. `ExampleScanTest`, `AssetMigratorTest` and
+`MigratorIdempotenceTest` also carry `19`, and they are about `TestPaths.exampleAssets` — the old
+`example/` tree, unchanged — so they are correct and untouched. **One more is left standing:**
+`udea-gradle/src/main/kotlin/dev/wildware/udea/gradle/UdeaAssetsPlugin.kt:162` says "On this corpus -
+nineteen scripts, 127 declarations" in a KDoc. `moba/assets` is 22 scripts and 147 assets now.
+`udea-gradle` is **dev-152's this wave**, so it is reported rather than edited.
+
+### Two commits that are not shop work, and why they are here anyway
+
+Both are flagged in their own commit subjects so a reviewer is not surprised by them mid-diff.
+
+**`72aae75` — `MobaReplayProofTest`'s mutation could be a silent no-op, ~1 run in 9.**
+`dev-154` diagnosed it on their branch; I said I would leave it off mine, and then **it fired on my
+own `sh gradlew build` at `f3fe456`**:
+
+```
+MobaReplayProofTest > a corrupted recording is caught at the tick it was corrupted() FAILED
+    org.opentest4j.AssertionFailedError at MobaReplayProofTest.kt:279
+
+203 tests completed, 1 failed
+```
+
+with, out of `moba/build/test-results/test/TEST-…MobaReplayProofTest.xml`:
+
+```
+a recording whose input was altered at t301 replayed to the ORIGINAL hash stream,
+which means the replay is not reading the recorded input at all
+```
+
+The arithmetic: `corruptAxisAt` wrote the constant `(-1f, 0f)`, and `Pilot.sample` draws each axis
+from `rng.nextInt(3) - 1f`, so `(-1, 0)` is 1 of 9 equiprobable pairs. When the pilot already held
+it at t301 the write changed nothing, the replay was legitimately bit-exact, and the assertion
+failed with a message that positively denies the cause. The pilot is seeded from
+`System.nanoTime()`, so it is a fresh draw every build. `(8/9)^5 = 0.55` is why `HANDOFF.md`'s
+recorded 5/5 was never evidence against it.
+
+I changed my mind on one argument and not on scope: **I cannot report a green build while a test in
+my own module fails one run in nine**, and one run in nine that assertion was checking a recording
+that had not been mutated — item 3 on the closed reject list, in this module, found during this
+ticket. It now negates the recorded axis, sends the one idle case `(0, 0)` somewhere definite so the
+rule is total, and `check`s that what it wrote differs from what it read, so a later edit picking a
+rule that can land on the recorded value fails loudly at the mutation site rather than forty lines
+later. Soak: **20 runs, `--rerun-tasks` each so the pilot is a fresh draw, 20 green.** Twenty clean
+runs miss a 1-in-9 flake 9.5% of the time, so the soak is corroboration and the diff is the
+argument.
+
+**The boundary, because "fixed" is easy to misread.** The fix is on this branch and **unmerged**,
+so the flake is still live on `origin/example` and on every branch diffed against it. A developer
+who hits it on `example` has not found a regression; they have found the defect `72aae75` is
+waiting to fix. dev-154's brief states the same boundary from the other side.
+
+**`5fbc158` — a KDoc count in `udea-gradle` that *this branch* falsifies.**
+`UdeaScanAssetsTask`'s KDoc costed a rescan out as "nineteen scripts, 127 declarations".
+`udea-gradle` is dev-152's this wave, so my first instinct was to report it and not touch it —
+and that instinct was wrong for a reason `dev-154` supplied by checking rather than assuming: the
+sentence is **correct at `origin/example`** (they measured `[udeaPackBundle] assets.udeapak: 127
+asset(s)` there), and it is my three item scripts that take it to 22 and 147. A diff that changes
+the thing counted has to change the sentence too, and leaving it would be landing a false statement
+I created.
+
+It is one KDoc paragraph and no code. Following the standards rather than my own instinct, the
+number is **replaced by the property it was evidence for** — "a couple of dozen scripts declaring a
+couple of hundred assets", and the fork dominates either way — rather than renumbered to 22/147,
+which would go stale on the next asset anybody authors. The old numbers and the fact that they moved
+are recorded in the paragraph, so the next reader knows why there is no number rather than assuming
+nobody measured.
 
 ---
 
 ## 3. `sh gradlew build`
 
-```
-JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build
-```
-
-`build/evidence/full-build-final.log`, exit 0:
+Green at the reported SHA, `1698eb0`:
 
 ```
-BUILD SUCCESSFUL in 20s
-204 actionable tasks: 5 executed, 2 from cache, 197 up-to-date
-Configuration cache entry reused.
+$ JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew clean build --console=plain
+...
+BUILD SUCCESSFUL in 1m 16s
+229 actionable tasks: 146 executed, 69 from cache, 14 up-to-date
 ```
 
-Mostly up-to-date because the same tasks had already executed green in earlier runs on this
-branch; Gradle marks a task up-to-date only when its inputs and outputs are unchanged, so that is
-a correct statement about the whole build at this SHA. The two that matter most were forced to
-execute rather than taken up-to-date, below.
+Test totals swept out of every `build/test-results/**/*.xml` immediately afterwards:
+**365 suites, 2445 tests, 0 failures, 0 errors, 34 skipped.** `:moba:test` executed rather than
+coming from the cache.
 
-Across every `build/test-results/**/*.xml` in the tree after that run: **2446 test cases, 0
-failures, 34 skipped.** (Counted by parsing every `testsuite` XML present, which includes the
-budget tasks' own results; that is a different aggregation from the 2447 recorded at `8035374`,
-so the two numbers are not directly comparable and I am not claiming they are. `:udea-replay` went from 27 to 53: `CrossPlatformDivergenceTest` 4, `DivergenceReportFormatTest` 9,
-`ReplayDigestTest` 8, `ReplayEqualityProofTest` 5, on top of the existing `ReplayEngineTest` 7,
-`ReplayFormatTest` 12 and `ReplayToolTest` 8.)
+The 34 skipped are the GL tests skipping with no `$DISPLAY` — 25 across `udea-render/gl` and
+`udea-agent-host/gl` — plus 9 in `udea-assets-compiler`'s `ReproducibilityTest` and
+`AtlasPackerTest`. The GL 25 are run for real below.
 
-The 34 skips break down as **25 GL** — `udeaGlTest` and `udeaAgentGlTest` running under `check`
-with no `DISPLAY`, which is the documented behaviour and is why §4 runs them again under xvfb —
-and **9 in `:udea-assets-compiler:udeaPackGate`** (`AtlasPackerTest` 7, `ReproducibilityTest` 2),
-which are pre-existing on `origin/example` and untouched by this branch. I checked rather than
-assumed: the first draft of this sentence attributed all 34 to GL and was wrong.
+**It took four attempts to get that run, and the three failures were the box.** Recorded because
+"it went green on the fourth try" is the sort of sentence that should come with its three:
 
-### `:udea-assets-compiler:udeaDaemonBudget` — what I saw, and the solo run
+| Attempt | Foreign Gradle builds on the box | Failed |
+|---|---|---|
+| 1 (`build`) | 2-3, load ~9 | `GraphBudgetTest`, `DaemonLatencyBudgetTest` ×2, `Phase2ExitTest`, `udeaPackGate` — **plus** four `MigratedCorpus*`/`MobaWarmEdit` failures that were **mine**: the stale asset counts of §2, fixed rather than re-run |
+| 2 (`clean build --no-build-cache`) | 3, load ~20 | `GraphBudgetTest`, `CharacterMoverBudgetTest`, `DaemonLatencyBudgetTest` ×2 |
+| 3 (`build`) | 10, load ~53 | `DaemonLatencyBudgetTest` ×2 |
+| 4 (`clean build`) | 8, load ~33 | **none** |
 
-The **first** full-build attempt failed, on that task only, at load ≈20 with melon-merge running
-a scenario suite. `build/evidence/full-build.log` and its test XML:
+Every one of the budget failures is a wall-clock deadline, and every one passes alone on the same commit — §4 has
+the solo numbers, measured rather than asserted. The tell the contract names holds: a *different*
+subset failed each time.
 
-```
- - a warm reload of one script decides inside the edit-to-observe budget()
-    org.opentest4j.AssertionFailedError: the reload decision is the compile half of the under-3s edit-to-observe loop; median was 1118ms [1118, 895, 902, 1286]
- - a warm validate of one edited script is under 300ms()
-    org.opentest4j.AssertionFailedError: spec 6 gates warm validate at 300ms; median was 632ms [70, 552, 632, 735]
-```
+One failure in that list was **not** the box and is fixed on this branch: attempt 3 also went red on
+`MobaReplayProofTest`, which is the ~1-in-9 flake §2 covers.
 
-Re-run alone, `build/evidence/daemon-budget-solo2.log`, exit 0:
+### GL, run for real
 
-```
-    warm reload decision: median 358ms over 4 samples [443, 358, 354, 316]
-    warm validate of one script: median 217ms over 4 samples [24, 215, 217, 236]
-```
-
-That is the box, not this branch: the branch touches nothing `:udea-assets-compiler` compiles or
-runs. Load at the solo run was 24.05 and it still passed with three times the headroom.
-
-### Gates outside `check`, run by name
+This ticket touches **no GL** — nothing in the diff is in `udea-render` or the render half of
+`udea-agent-host`. Run anyway, because a green `build` is not evidence about GL and the omission is
+a finding:
 
 ```
-JAVA_HOME=... sh gradlew udeaVerifyModuleGraph udeaVerifyNoLegacyDependencies udeaVerifyAgentsMd udeaVerifyMigration udeaLegacyReport
-BUILD SUCCESSFUL in 10s
-```
-
-`udeaVerifyDeterminism`, forced to execute rather than taken up-to-date
-(`build/evidence/determinism.log`, exit 0), and its report:
-
-```
-udeaVerifyDeterminism
-  scanned :udea-core: 223 class files
-  scanned :udea-gas: 115 class files
-  scanned :udea-net: 179 class files
-  scanned :moba: 318 class files
-  allowlist entries used: 0
-  findings: 0
-```
-
-`:moba:runUdpProof` is **red on `origin/example` and was not touched by this branch** — see
-`HANDOFF.md`. I did not run it and I am not claiming anything about it.
-
----
-
-## 4. GL
-
-**This ticket touches no GL.** `udea-replay` is a designated headless module, and the only
-`udea-core` edits are two visibility widenings in the snapshot spine. I ran the GL tests for real
-anyway, so the omission cannot be a finding:
-
-```
-xvfb-run -a -s "-screen 0 1280x720x24" \
-  env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
-  env JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem \
-  sh gradlew udeaGlTest udeaAgentGlTest -Pudea.render.requireGl=true
-```
-
-`build/evidence/gl.log`, exit 0:
-
-```
+$ xvfb-run -a -s "-screen 0 1280x720x24" \
+    env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+    JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem \
+    sh gradlew udeaGlTest udeaAgentGlTest -Pudea.render.requireGl=true --console=plain
+...
 > Task :udea-agent-host:udeaAgentGlTest
 > Task :udea-render:udeaGlTest
 
-BUILD SUCCESSFUL in 9s
+BUILD SUCCESSFUL in 6s
+41 actionable tasks: 2 executed, 39 up-to-date
 ```
 
-From the XML, preserved in `build/evidence/gl-counts.txt` because a later `build` run overwrites
-those result files with the skipping `check` variant:
+`udeaGlTest` 18 tests / 0 failures / **0 skipped**; `udeaAgentGlTest` 8 / 0 / **0 skipped**. Both
+ran for real; neither skipped. `:moba:runLaneShot` under the same xvfb wrapper is green and wrote
+the three lane PNGs in §6.
+
+### The gates outside `check`
 
 ```
-udeaGlTest: 18 tests, 0 failures, 0 skipped
-udeaAgentGlTest: 8 tests, 0 failures, 0 skipped
+$ sh gradlew udeaVerifyModuleGraph udeaVerifyNoLegacyDependencies udeaVerifyAgentsMd \
+             udeaVerifyMigration udeaLegacyReport udeaVerifyDeterminism
+BUILD SUCCESSFUL in 1s
+83 actionable tasks: 83 up-to-date
 ```
 
-The zero skips are the point — under `check` with no `DISPLAY`, 25 of those 26 skip and report
-green having checked nothing.
+`:moba:runLaneShot` under xvfb: green, three PNGs (§6). `:moba:runUdpProof` not run — it is red on
+`example` before this branch and nothing here claims to have moved it.
 
 ---
 
-## 5. The two-JVM axis, run for real on this box
+## 4. Failures that were the box, and one that was not a regression
 
-Criterion 4 asks for a second JVM. CI runs Temurin 17 and Corretto 17, which I cannot observe from
-here — but this box has three JDKs from two vendors, so I ran the axis locally instead of asserting
-it. Three digests, three separate JVMs, then one join:
+**Load-flake set.** A first `sh gradlew build` and a later `clean build --no-build-cache` both failed
+on wall-clock budget tests while two or three *other agents'* Gradle builds were on the box (load
+17-21). Every one passed alone, on the same commit:
+
+| Test | Under load | Alone |
+|---|---|---|
+| `GraphBudgetTest` graph deserialisation | 28.07ms (budget 15ms) | best 6.77ms, **median 7.35ms** |
+| `DaemonLatencyBudgetTest` warm reload | 925ms, 759ms, 1628ms, 622ms across four loaded runs | **137ms** `[146, 137, 134, 124]`, and **305ms** `[386, 305, 265, 269]` at the final SHA |
+| `DaemonLatencyBudgetTest` warm validate | 390ms, 486ms, 528ms, 437ms (budget 300ms) | **112ms** `[9, 147, 112, 109]`, and **205ms** `[23, 293, 166, 205]` at the final SHA |
+| `CharacterMoverBudgetTest` | median 6.975ms (budget 4ms) | not re-run alone; `dev-154` measured 2.163ms |
+| `Phase2ExitTest` agent→world | 1169ms | **391ms** |
+| `MobaWarmEditBudgetTest` | (failed on a stale count, §2) | **max 148ms, median 135ms**, budget 3000ms |
+
+The tell is the one the contract names: a *different* thing failed each time.
+
+**`:moba:runNetProof` — checked against the baseline before believing it.** This branch changes the
+wire contract, so I ran the agreement proof. One of its three scenarios came back
+`perfect units DISAGREED`, which reads exactly like a regression I had caused.
+
+It is not. I checked out `origin/example` detached in this worktree and ran the same task three
+times, then came back and ran it three times on the branch:
 
 ```
-sh gradlew :udea-replay:udeaReplayDigest -Pudea.replay.label=local/adoptium-17 -Pudea.replay.jvm=17 -Pudea.replay.jvmVendor=Adoptium -Pudea.replay.out=.../jvmaxis/adoptium-17.udeaeq
-sh gradlew :udea-replay:udeaReplayDigest -Pudea.replay.label=local/adoptium-21 -Pudea.replay.jvm=21 -Pudea.replay.jvmVendor=Adoptium -Pudea.replay.out=.../jvmaxis/adoptium-21.udeaeq
-sh gradlew :udea-replay:udeaReplayDigest -Pudea.replay.label=local/graalvm-21  -Pudea.replay.jvm=21 -Pudea.replay.jvmVendor=GraalVM  -Pudea.replay.out=.../jvmaxis/graalvm-21.udeaeq
-sh gradlew :udea-replay:udeaReplayEquals -Pudea.replay.streams=.../jvmaxis
+origin/example (866ba0a), 3 runs      issue-132 (92ae5e0), 3 runs
+  perfect        units DISAGREED        perfect        units DISAGREED
+  150ms+5% loss  units AGREED           150ms+5% loss  units AGREED
+  TRELLO_8       units AGREED           TRELLO_8       units AGREED
 ```
 
-`build/evidence/jvm-axis-summary.txt`:
+Identical, 3/3 on each side. The perfect-link disagreement predates this branch. (Note it is
+`runNetProof`, the in-process proof — **not** the `runUdpProof` that `HANDOFF.md` records as red; a
+reader should not merge the two.)
+
+What the same output *does* say about this branch, and the reason it is worth quoting:
 
 ```
-replay-equality over 3 leg(s) of 'drift-3600.udearep', 3600 tick(s) from t0
-  local/adoptium-17  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-  local/adoptium-21  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 21.0.11]
-  local/graalvm-21  [Linux amd64; GraalVM Community OpenJDK 64-Bit Server VM 21.0.2]
-
-replay equality holds: 3600 tick(s) of 'drift-3600.udearep' are cell-for-cell identical
-  fixture drift-3600.udearep
-  A = 'local/adoptium-17'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-  B = 'local/adoptium-21'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 21.0.11]
-
-replay equality holds: 3600 tick(s) of 'drift-3600.udearep' are cell-for-cell identical
-  fixture drift-3600.udearep
-  A = 'local/adoptium-17'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-  B = 'local/graalvm-21'  [Linux amd64; GraalVM Community OpenJDK 64-Bit Server VM 21.0.2]
+mine: 14 replicated component types on the wire: CharacterView, Player, Position, Combatant,
+      Projectile, Inventory, LaneCreep, LaneState, Tower, Wallet, GameUnit, MatchState, Respawn,
+      Attributes
+base: 13 replicated component types on the wire: CharacterView, Player, Position, Combatant,
+      Projectile, LaneCreep, LaneState, Tower, Wallet, GameUnit, MatchState, Respawn, Attributes
 ```
 
-Two vendors, three JVMs, 3600 ticks, cell-for-cell identical. The headers are not decoration — the
-join step printed the vendor each leg actually ran on, which is how I know the axis was real and
-not three runs of the same JDK.
-
-**What this does not say:** nothing about Windows. The OS axis genuinely cannot be observed from
-this box, and I have not implied otherwise anywhere in this brief.
-
-Per-leg replay time, from the `--timing` files the task writes:
-`adoptium-17` 483ms, `adoptium-21` 527ms, `graalvm-21` 441ms, for 3600 ticks each.
+`Inventory` is genuinely on the wire, and both lossy scenarios still agree on the 28-unit roster
+with it there.
 
 ---
 
-## 6. Timing, against criterion 6
+## 5. Driving the real game, and why there is no picture of the feature
 
-The criterion asks for the added PR CI wall time to be under 4 minutes, measured and printed in
-the job summary.
+**There is no picture of a champion carrying an item, and there cannot be one from this branch.**
+Issue #132 puts item icon art out of scope; nothing in `moba` renders an inventory; and a HUD panel
+is neither asked for nor in a file this ticket owns. Building one to have something to photograph
+would be building a harness for the evidence rather than for the game. So the feature's evidence is
+the test transcript in §1 and the live reading below, and the pictures in §6 are **regression
+controls** — labelled as such rather than passed off as the feature.
 
-- **Measured here:** the replay itself is 441–527ms per leg and the join is under a second. The
-  digest artifact is 1.6MB gzipped per leg, so upload and download are seconds.
-- **Printed in the job summary:** each leg starts a clock in its first step and, in an
-  `if: always()` step, appends `| <os> / <distribution>-17 | <n>s |` to `$GITHUB_STEP_SUMMARY`
-  and emits a `::warning::` over 240s. That is whole-job seconds — checkout, JDK setup and the
-  Gradle build included — because those are wall time a pull request pays for too.
-- **What I cannot do:** measure a GitHub-hosted runner from this box. The dominant term is
-  `setup-java` plus Gradle configuration, not the replay, and I will not guess at it. The number
-  will be in the first run's summary.
-
----
-
-## 7. Images
-
-Both in `/srv/ssd1/workspace/Udea/build/debug-screenshots/`. A determinism gate has nothing to
-photograph — the artefact *is* text — so these are the tool's own output rendered, byte for byte,
-by `build/evidence/render-verdict.py` from the summary files the tasks wrote. Neither composes a
-line of its own beyond the title.
-
-- **`issue152-jvm-axis-equal.png`** — the three-JVM join above. Shows two vendors and three JVM
-  versions producing cell-for-cell identical 3600-tick streams. Proves the second axis of
-  criterion 4 is a real second JVM and that the fixture world is genuinely portable across JVM
-  implementations, which is the property the whole gate rests on.
-- **`issue152-planted-divergence.png`** — the planted verdict from the evidence command. Shows the
-  failure naming the tick, the `NetId`, the component FQN, the field, both values with their raw
-  bits, and five preceding ticks that agreed. Proves criterion 2's rendering, and shows what a red
-  CI job will actually print.
-
----
-
-## 8. The issue, criterion by criterion
-
-| # | Criterion | Proved by | Verdict |
-|---|---|---|---|
-| 1 | The `replay-equality` job is green on `ubuntu-latest` and `windows-latest` **and is required for merge** | The job exists (`ci.yml`, `replay-equality` + `replay-equality-join`); its Gradle tasks are proven locally in §1 and §5; `ReplayEqualityProofTest` asserts the workflow invokes them | **Partly.** Green-on-two-OSes can only be observed in CI, by design of the thing being built. "Required for merge" is a repository branch-protection setting nobody in this session can apply — owner action, not faked |
-| 2 | `CrossPlatformDivergenceTest`: a planted float-sensitive divergence behind a test flag fails the job, the log names tick / `NetId` / component / field, verified against a checked-in expected-output fixture | `udea-replay/src/test/.../CrossPlatformDivergenceTest.kt` (4 tests) against `src/test/resources/expected/planted-divergence.txt`; plus §1's five-process run, which asserts the same four strings on the real exit codes | **Met** |
-| 3 | `DivergenceReportFormatTest` asserts no failure path can emit a bare "hash mismatch at tick N" without a field | `DivergenceReportFormatTest.kt`. What its cases have in common: each drives the comparison to a state where the *only* difference is one that is not a component field, and asserts the rendering names it — one per pseudo-component (`<rng>.word[0]`, `<handles>.nextFresh`, `<clock>.tick`, `<roster>.presence[0]`), plus a component field for contrast, a forged stream whose hash disagrees with its own cells (refused as corrupt, never rendered as a divergence), a forged stream that *shares* a hash while its cells differ (caught by the cell walk), a direct assertion that the renderer throws rather than printing a hash when handed a non-equal verdict with no cell, and a control asserting an equal verdict reads as equal and contains no failure text | **Met**, and structurally: `ReplayDigestWriter` refolds its cells into the hash on every tick, so a differing hash implies a differing named cell by construction (`ReplayDigestTest`, with a per-cell negative control) |
-| 4 | The two-JVM axis runs and is green, defined in the same workflow file as the Phase 0 matrix | The third matrix leg (`ubuntu-latest` / `corretto`) in `ci.yml`, the same file as the Phase 0 `build` matrix; and §5, where three JVMs from two vendors agree cell-for-cell on this box | **Met locally**, on three JVMs rather than two. The CI legs themselves are observable only in CI |
-| 5 | The nightly ten-minute 5v5 replay-equality run is green for seven consecutive nights | — | **Not this ticket.** #165 owns the 36000-tick nightly; seven nights is unachievable inside a ticket by construction. Stated, not faked |
-| 6 | Added PR CI wall time <4 minutes, measured and printed in the job summary | The per-leg clock steps in `ci.yml` and the `::warning::` over 240s; measured replay time in §6 | **Printed.** The number itself can only be measured on a hosted runner |
-
-Three scope bullets — the 36000-tick nightly fixture, `--update-replay-fixtures`, and the
-`replay.bisect` job-summary link — are #165 by the lead's split and are deliberately absent.
-
----
-
-## 9. Regenerated files
-
-**None.** `udea-codegen/net-protocol.lock` and
-`udea-codegen/src/test/resources/expected-generated-hashes.txt` are **untouched**, and that is
-deliberate rather than lucky: the fixture world's two components carry no `@Replicated` annotation
-and their `Replicator`s are hand-written, exactly as `TransformReplicator` and
-`SnapshotComponents` are. No component id moved, so no id moved for anything after it.
+What I did drive, on a live `:moba:run -PdebugPort=7842` under xvfb (`Offscreen`, 51 tools —
+read off `/tools`, not assumed):
 
 ```
-$ git diff --stat 866ba0a..HEAD -- udea-codegen/
-(no output)
+$ curl -s http://127.0.0.1:7842/health
+{"ok":true,"frame":246,"tick":246,"paused":false,"renderMode":"Offscreen","role":"standalone","sessionId":"s-e1ad"}
+
+[moba.agent] asset daemon: ok=true 6469ms 147 assets over .../moba/assets
+[moba.agent] listening on http://127.0.0.1:7842 in Offscreen with 51 tools
 ```
 
-One new binary is checked in: `udea-replay/src/testFixtures/resources/fixtures/drift-3600.udearep`,
-66,413 bytes, regenerable with `sh gradlew :udea-replay:udeaWriteReplayFixture`.
-`ReplayEqualityProofTest` asserts the checked-in file matches what the generator produces, sample
-for sample across all 3600 ticks, so it cannot rot into an unreproducible blob.
+Then, paused at tick 247:
+
+```
+$ curl -s "http://127.0.0.1:7842/command?cmd=world.query_entities&with=Inventory\
+&fields=slot0,slot1,slot2,slot3,slot4,slot5,trinket"
+{"accepted":true,"commandId":3,"frame":1326}
+
+$ curl -s http://127.0.0.1:7842/state -o live-state-d.json     # then, out of that file,
+$ python3 -c "import json; ...; print(result with id 3)"       # the entry for command 3:
+{
+ "id": 3,
+ "ok": true,
+ "result": {
+  "total": 1, "offset": 0, "returned": 1, "hasMore": false,
+  "entities": [ { "id": 0, "slot0": -1, "slot1": -1, "slot2": -1, "slot3": -1,
+                  "slot4": -1, "slot5": -1, "trinket": -1 } ]
+ }
+}
+```
+
+One champion, seven empty slots — which is correct for a match where nobody has shopped, and is the
+reading that proves the component reached the generated surface end to end. **What it does not
+show** is a purchase: there is no shop tool, deliberately (§2), so the only way to buy over the
+bridge would be a write to `Inventory`, which is refused by design. Buying is proved by §1.
+
+The instance was closed with `cmd=close` and confirmed gone (`pgrep -af "[d]ebugPort=784"` empty).
+
+The same query against the **previous** commit answered, verbatim,
+`no component named Inventory; registered: GameUnit, MatchState, Position` — that is the
+before-state, and it is why the second commit exists.
+
+---
+
+## 6. Images
+
+All three in `/srv/ssd1/workspace/Udea/build/debug-screenshots/`.
+
+| File | What it shows | What it proves |
+|---|---|---|
+| `issue132-game-runs-with-shop.png` | `render.screenshot` from the live instance at tick 247: the brawl, the HUD, 5 orcs / 11 soldiers / 9 undead | The game boots, ticks and draws with `ItemModule` in the definition and every component id after `ability.Projectile` shifted by one. A **regression control**, not the feature. |
+| `issue132-lane-still-draws-wave.png` | `:moba:runLaneShot` wave frame, tick 272, wave 1 walking | The lane renders on a real GL context after the wire contract changed |
+| `issue132-lane-still-draws-clash.png` | `:moba:runLaneShot` clash frame, tick 642, both towers and the meeting point | Same, at the frame with the most on it. I looked at both: towers, aggro cones, health bars and the ability bar are all where they were |
+
+---
+
+## 7. The acceptance criteria, one by one
+
+Criteria 2 and 3 belong to **#166** and are not claimed here.
+
+### ☑ 1. `RecipeTest`: buying a finished item consumes owned components, refunds the recipe difference correctly, and fails cleanly with insufficient gold
+
+`moba/src/test/kotlin/dev/wildware/moba/item/RecipeTest.kt`, 8 tests, all through `ShopSystem` on a
+real tick of the shipped definition.
+
+| Clause | Test | Goes red under |
+|---|---|---|
+| consumes owned components | `buying a finished item consumes its components and charges the difference` — asserts the two parts are **gone** from the inventory, not merely paid for | M1, M2, M4 |
+| refunds the difference **correctly** | same test (both parts owned), plus `a component the champion does not own is not discounted` (one owned — the case a shop that credits every component whether owned or not passes), plus `a recipe naming one component twice needs two of it`, plus `a recipe trades in a finished component, not the parts inside it` | M1, M2, M4, M8 |
+| fails cleanly with insufficient gold | `a purchase with too little gold is refused and moves nothing` — a typed `ShopRefusal.InsufficientGold`, **and** the purse untouched, **and** the inventory untouched. "Cleanly" is three assertions: a shop that took what it could and delivered nothing would satisfy "the purchase did not happen" | M3 |
+| the boundary underneath it | `a purchase with exactly enough gold succeeds and leaves nothing` — without it, "refused when short" is satisfied by a shop that refuses everything | M2 |
+
+Prices are read off the catalogue rather than written as literals, so what is asserted is the
+*relationship* (`paid == shelf - parts`) and a balance pass moves both sides at once.
+
+### ☑ 4. `udeaValidateAssets` passes on the whole item tree, including a negative test that a recipe referencing a nonexistent component is a build error with file, line and did-you-mean
+
+Positive half, on the real tree:
+
+```
+> Task :moba:udeaValidateAssets
+[udeaValidateAssets] 147 asset(s), 0 diagnostic(s)
+
+> Task :moba:udeaPackBundle
+[udeaPackBundle] assets.udeapak: 147 asset(s), 38 sheet(s), 1 atlas page(s), 101450 bytes
+```
+
+Negative half, `ItemRecipeValidatorTest` — every fixture a real `.udea.kts` on disk through the real
+passes 1, 2 and 3:
+
+| Test | Asserts | Red under |
+|---|---|---|
+| `a well priced item tree produces no diagnostics at all` | **the control.** A fence that fires on a healthy tree is as wrong as one that stays quiet on a broken one | — (it is the control) |
+| `a recipe naming a component that does not exist is a located build error` | `UDEA0004`, `Severity.Error`, `assetId=item/greatsword`, `causedBy=item/whetstoen`, **"did you mean `item/whetstone`?"** in the message, a span whose path ends `item/shop.udea.kts`, starts `udea-assets-compiler/` (repo-relative) and has a positive line number. Run through the **pipeline**, because that is what `udeaValidateAssets` runs | M4 |
+| `a recipe pointing at something that is not an item is a kind mismatch` | `UDEA0013` naming both kinds | M4, M5 |
+| `an item that costs less than its components fails the build` | `UDEA0037`, with the arithmetic in the message | M4, M6 |
+| `an item that is its own component fails the build` | `UDEA0037`, other arm | M4 |
+| `an unresolved component is not also reported as a pricing failure` | one defect, one diagnostic | — |
+
+`ShopProofTest > every finished item in the bundle costs at least its parts` re-checks the same
+property at **runtime**, against the bytes that shipped rather than the source tree.
+
+### Scope bullets outside the numbered criteria
+
+| Scope bullet | Where |
+|---|---|
+| `item/*.udea.kts` kind: cost, stats, components, unique, granted ability, passive | `udea-assets/Item.kt`, `AssetScope.item(...)`, `moba/assets/item/*.udea.kts` |
+| ~20 items, ≥8 finished, real build paths, component cost refund | **20 items, 10 with build paths, 2 trinkets** — the census `ShopProofTest` prints out of the packed bundle. §2 |
+| ≥3 with actives, ≥3 with uniques | **4** declare `grantedAbility` (3 finished + 1 trinket); **6** declare `unique`, across **3** groups — `fortified` ×3, `vitality` ×2, `sharpened` ×1. Schema only; #166 acts on them |
+| `Inventory`, 6 slots + trinket, `@Net` `OwnerOnly` | `ItemComponents.kt`. **Declared, not enforced — §2** |
+| buy | `RecipeTest` throughout |
+| sell at reduced value | `ShopProofTest > selling returns a reduced price and empties the slot` (exact value **and** the two inequalities that say the number means something) |
+| recipe combine on purchase | `RecipeTest`, plus `a full inventory can still combine two of its own slots` |
+| only in the fountain radius | `the shop refuses a champion who has walked out of the fountain` — **both** directions, one unit outside and one unit inside, measured off `FOUNTAIN_RADIUS` |
+| only while alive | `the shop refuses a corpse` — killed the way the game kills, by zeroing health and letting `DeathSystem` take the `Combatant` |
+
+### A rewind across a purchase — the gap I found by looking for one, and what it taught
+
+Writing this section is what produced `ShopProofTest > a rewind restores what the champion was
+carrying and what it had spent`. `ItemModule.snapshotTypes()`'s KDoc claimed an inventory a rewind
+did not restore would be "a champion whose gold came back and whose items did not", and **nothing
+checked it** — a claim in my own diff that nothing showed, which is the question §7 is here to ask.
+
+The first version of that test failed, and the two ways it was wrong are worth more than the test:
+
+1. **It wrote gold onto the `Wallet` and snapshotted in the same breath.** The ring captures at a
+   tick boundary, so the write was not in the keyframe, and the rewind correctly restored the gold
+   the champion had at the top of that tick: **zero**. That reads exactly like a `Wallet` that does
+   not survive a rewind, and I nearly filed it as a #131 defect. It is not one — `Wallet` restores
+   fine, and the fix was a `host.run(1)` before the snapshot.
+2. **Its keyframe was an empty inventory, so its inventory assertion could not fail.** A champion
+   whose inventory is never restored is re-granted a fresh `Inventory()` by `InventoryGrantSystem`,
+   and a fresh one is empty — so "restored to empty" and "never restored" are the same seven `-1`s.
+   The inventory half **passed** in that run while the purse half failed, and it passed by agreeing
+   with a freshly granted component. That is the contract's "an empty fixture is not a neutral one",
+   met in the wild, in a test I had just written a KDoc paragraph about avoiding it in.
+
+It now buys a blade **before** the keyframe, so the state it rewinds to predates the later purchases
+without being the default. **M12** is the mutation that proves it, and its failure is the KDoc's
+sentence word for word — gold back, items not:
+
+```
+[rewind] keyframe t8  carrying [item/blade, -, -, -, -, -, -] gold=9650
+[rewind] drifted  t10 carrying [item/greatsword, -, -, -, -, -, -] gold=9250
+[rewind] after    t8  carrying [item/greatsword, -, -, -, -, -, -] gold=9650   <- M12
+[rewind] after    t8  carrying [item/blade, -, -, -, -, -, -] gold=9650        <- as committed
+```
+
+### What I still did not exercise
+
+- **A second match.** The inventory dies with the entity on a scene swap, which is asserted nowhere.
+- **Two champions shopping in one tick.** The queue is FIFO and per-order, so it should be fine;
+  nothing proves it.
+- **`ShopRefusal.NoRoom` for a trinket when the trinket slot is full** *is* covered
+  (`a trinket fits when the six carried slots do not` buys a second one and asserts the refusal).
+
+---
+
+## 8. The mutation diffs
+
+Each block is the literal `git diff` from that mutation's run, under
+`/tmp/udea-issue132-agent-a5b3c68bd564f1fda/mut/M*.diff`. Hunk headers kept; nothing retyped.
+
+**M1 — components not consumed** (6 red: 5 × `RecipeTest`, `ShopProofTest > a full inventory can still combine two of its own slots`)
+```diff
+@@ -303,7 +303,6 @@ public class ShopSystem(
+         var tradedIn = 0
+         for (slot in 0 until Inventory.CARRIED) {
+             if (consumed and (1 shl slot) == 0) continue
+-            inventory.place(slot, null)
+             tradedIn++
+         }
+         val destination = if (entry.item.trinket) Inventory.TRINKET else inventory.firstFreeCarried()
+```
+
+**M2 — no recipe difference** (5 red, all `RecipeTest`)
+```diff
+@@ -133,7 +133,7 @@ public object ShopRules {
+             if (consumed and (1 shl slot) == 0) continue
+             traded += catalog.at(inventory, slot)?.item?.cost ?: 0
+         }
+-        return entry.item.cost - traded
++        return entry.item.cost
+     }
+```
+
+**M3 — no affordability check** (1 red: `RecipeTest > a purchase with too little gold is refused and moves nothing`)
+```diff
+@@ -296,9 +296,7 @@ public class ShopSystem(
+             return ShopOutcome.Refused(order.champion, ShopRefusal.NoRoom)
+         }
+         val price = ShopRules.priceFor(inventory, catalog, entry, consumed)
+-        if (wallet.gold < price) {
+-            return ShopOutcome.Refused(order.champion, ShopRefusal.InsufficientGold)
+-        }
++        // mutation: no affordability check
+ 
+         var tradedIn = 0
+         for (slot in 0 until Inventory.CARRIED) {
+```
+
+**M4 — a recipe as a list of id strings** (11 red: all 4 compiler-side, 5 × `RecipeTest`, 2 × `ShopProofTest`)
+```diff
+@@ -688,7 +688,7 @@ public class AssetScope(
+         name,
+         "cost" to cost,
+         "stats" to LinkedHashMap(stats),
+-        "components" to components.map { it.expecting<Item>() },
++        "components" to components.map { it.id },
+         "unique" to unique,
+         "grantedAbility" to grantedAbility?.expecting<Ability>(),
+         "passive" to passive?.expecting<GameplayEffect>(),
+```
+
+**M5 — the typed stamp dropped, reference kept** (1 red: `ItemRecipeValidatorTest > a recipe pointing at something that is not an item is a kind mismatch`)
+```diff
+@@ -688,7 +688,7 @@ public class AssetScope(
+         name,
+         "cost" to cost,
+         "stats" to LinkedHashMap(stats),
+-        "components" to components.map { it.expecting<Item>() },
++        "components" to components.map { it },
+         "unique" to unique,
+         "grantedAbility" to grantedAbility?.expecting<Ability>(),
+         "passive" to passive?.expecting<GameplayEffect>(),
+```
+
+**M6 — UDEA0037's pricing arm removed** (1 red: `ItemRecipeValidatorTest > an item that costs less than its components fails the build`)
+```diff
+@@ -242,7 +242,7 @@ public object ItemRecipeValidator : AssetValidator {
+ 
+             val cost = costs.getValue(item.id)
+             val parts = components.sumOf { costs.getValue(it.id) }
+-            if (cost >= parts) continue
++            continue
+             val listed = components.joinToString { "`${it.id}` at ${costs.getValue(it.id)}" }
+             diagnostics += AssetValidationRules.ITEM_RECIPE.diagnostic(
+                 message = "`${item.id}` costs $cost gold but is built from components worth " +
+```
+
+**M7 — no fountain check** (2 red: both `ShopProofTest` fountain tests)
+```diff
+@@ -278,9 +278,7 @@ public class ShopSystem(
+             val spawn = entity.getOrNull(Respawn) ?: return refused
+ 
+             if (Corpse in entity) return ShopOutcome.Refused(order.champion, ShopRefusal.Dead)
+-            if (!ShopRules.inFountain(position.x, position.y, spawn.spawnX, spawn.spawnY)) {
+-                return ShopOutcome.Refused(order.champion, ShopRefusal.OutsideFountain)
+-            }
++            // mutation: no fountain check
+             return when (order) {
+                 is ShopOrder.Buy -> buy(order, wallet, inventory)
+                 is ShopOrder.Sell -> sell(order, wallet, inventory)
+```
+
+**M8 — one slot satisfies two components** (1 red: `RecipeTest > a recipe naming one component twice needs two of it`)
+```diff
+@@ -105,7 +105,6 @@ public object ShopRules {
+         for (component in entry.componentIndices) {
+             for (slot in 0 until Inventory.CARRIED) {
+                 val bit = 1 shl slot
+-                if (claimed and bit != 0) continue
+                 if (inventory.rawAt(slot) != component) continue
+                 claimed = claimed or bit
+                 break
+```
+
+**M9 — room ignores the slots the purchase frees** (1 red: `ShopProofTest > a full inventory can still combine two of its own slots`)
+```diff
+@@ -149,7 +149,7 @@ public object ShopRules {
+         if (entry.item.trinket) return inventory.isEmpty(Inventory.TRINKET)
+         var free = 0
+         for (slot in 0 until Inventory.CARRIED) {
+-            if (inventory.isEmpty(slot) || consumed and (1 shl slot) != 0) free++
++            if (inventory.isEmpty(slot)) free++
+         }
+         return free > 0
+     }
+```
+
+**M10 — no aliveness check** (1 red: `ShopProofTest > the shop refuses a corpse`)
+```diff
+@@ -277,7 +277,7 @@ public class ShopSystem(
+             val inventory = entity.getOrNull(Inventory) ?: return refused
+             val spawn = entity.getOrNull(Respawn) ?: return refused
+ 
+-            if (Corpse in entity) return ShopOutcome.Refused(order.champion, ShopRefusal.Dead)
++            // mutation: no aliveness check
+             if (!ShopRules.inFountain(position.x, position.y, spawn.spawnX, spawn.spawnY)) {
+                 return ShopOutcome.Refused(order.champion, ShopRefusal.OutsideFountain)
+             }
+```
+
+**M11 — a sale returns the full price** (1 red: `ShopProofTest > selling returns a reduced price and empties the slot`)
+```diff
+@@ -78,7 +78,7 @@ public object ShopRules {
+     public const val NO_SLOTS: Int = 0
+ 
+     /** Gold returned for selling an item that cost [cost]. */
+-    public fun sellValue(cost: Int): Int = cost * SELL_PERCENT / 100
++    public fun sellValue(cost: Int): Int = cost
+ 
+     /** Whether a champion at ([x], [y]) is inside the fountain at ([spawnX], [spawnY]). */
+     public fun inFountain(x: Float, y: Float, spawnX: Float, spawnY: Float): Boolean {
+```
+
+**M12 — `Inventory` absent from the snapshot registry** (1 red: `ShopProofTest > a rewind restores what the champion was carrying and what it had spent`)
+```diff
+@@ -87,7 +87,7 @@ public class ItemModule(
+     public companion object {
+ 
+         /** @see ItemModule.Companion */
+-        public fun snapshotTypes(): List<ReplicatedComponentType<*>> = listOf(
++        public fun snapshotTypes(): List<ReplicatedComponentType<*>> = emptyList<ReplicatedComponentType<*>>().ifEmpty { listOf(
+             fleksComponentType(
+                 InventoryReplicator,
+                 ComponentSchema.of(
+@@ -97,6 +97,6 @@ public class ItemModule(
+                 ),
+                 Inventory,
+             ) { Inventory() },
+-        )
++        ) }.let { emptyList<ReplicatedComponentType<*>>() }
+     }
+ }
+```
+
+(`NO_SLOTS` is `private` on the branch as committed — the M11 diff was taken before the
+public-surface trim in `92ae5e0`, and the mutated line is the one below it either way.)
+
+---
+
+## 9. Regenerated files, and by how much the ids moved
+
+Three files, each rewritten by its own task, never by hand.
+
+**`net-components.lock`** — hand-edited, as it is meant to be: one name added.
+`dev.wildware.moba.item.Inventory` sorts between `ability.Projectile` and `lane.LaneCreep`.
+
+**`moba/net-protocol.lock`** — `sh gradlew :moba:udeaWriteProtocolLock`.
+`Inventory` takes **id 7**, and every moba component after it moves up by **one**:
+`lane.LaneCreep` 7→8, `lane.LaneState` 8→9, `lane.LastHit` 9→10, `lane.Tower` 10→11,
+`lane.Wallet` 11→12, `level.GameUnit` 12→13, `match.MatchState` 13→14, `match.Respawn` 14→15.
+`protoHash` **0xdf75 → 0xea9f**.
+
+```diff
+-component 7 dev.wildware.moba.lane.LaneCreep
++component 7 dev.wildware.moba.item.Inventory
++  field 0 slot0 i32:32
++  field 1 slot1 i32:32
++  field 2 slot2 i32:32
++  field 3 slot3 i32:32
++  field 4 slot4 i32:32
++  field 5 slot5 i32:32
++  field 6 trinket i32:32
++component 8 dev.wildware.moba.lane.LaneCreep
+   field 0 goldBounty i32:32
+   field 1 heading i32:32:oncreate
+```
+
+Read that diff for the `OwnerOnly` point in §2: seven plain `i32:32` tokens with no visibility
+marker, two lines above `heading`'s `i32:32:oncreate`, which is what a declaration the wire *does*
+honour looks like in the same file.
+
+**`udea-codegen/net-protocol.lock`** — `sh gradlew :udea-codegen:udeaWriteProtocolLock`.
+The six fixture components move **15-20 → 16-21**; `protoHash` **0x0140 → 0xf167**.
+
+**`udea-codegen/src/test/resources/expected-generated-hashes.txt`** —
+`sh gradlew :udea-codegen:test -Pudea.updateGeneratedHashes=true`. **Seven** hashes moved: the six
+fixture replicators (whose emitted `typeId` shifted) plus `CodegenFixturesNetProtocol.kt`. The
+agent-state and tool files are unchanged, which is the right shape — nothing about them moved.
+
+Nothing has shipped against any of these ids: no recorded replay and no connected client decodes
+with them.
 
 ---
 
 ## 10. Self-review against the reject list
 
-Read my own diff against §8 of `docs/engineering-standards.md` and the `AGENTS.md` do-not list
-before reporting. Two things it caught, both fixed in `2d4d2c8`:
+Read against `docs/engineering-standards.md` §8 and `AGENTS.md`'s "Do not", both closed lists.
 
-- **Copy-pasted logic differing only in a constant.** The digest's writer and reader each had a
-  private parallel-array accumulator differing in three methods over identical storage and an
-  identical `grow()`. Folded into one `CellBuffer` with the initial capacity as a parameter.
-- **`public` declarations nobody uses.** `ReplayDigestWriter.tickCount` deleted; `describeJvm` and
-  `describeOs` made private; `DigestCellKey` now carries an assertion rather than only being
-  rendered.
-
-The rest of the list, checked and clear:
-
-- **No wall clock or unseeded randomness in simulation.** `System.nanoTime` appears once, in
-  `ReplayDigestRecorder`, timing a build task and never entering a world. `java.util.Random`
-  appears once, in `DriftFixtureRecorder`, authoring a recording offline — seeded, and specified
-  by the JDK as an LCG so it reproduces on any machine. Simulation randomness is `RngService` and
-  its named streams. `udeaVerifyDeterminism` is green with 0 findings over 835 class files.
-- **No frozen contract changed.** `docs/contracts/` is untouched. The
-  `fieldNames[i]` == `FieldMask` bit *i* == `FieldStore` index *i* alignment is what the digest's
-  keys and the component table are built on, and `ComponentSchema.of` checks it at construction
-  for both fixture components.
-- **No `Tick` expressed as seconds or milliseconds.** The one millisecond figure is
-  `ReplayDigestRun.elapsedMillis`, a build measurement of a Gradle task, KDoc'd as such.
-- **No new `common` dependency, no GL outside `udea-render`, no presentation system as a Fleks
-  system, no module arrow pointing upward.** `udeaVerifyModuleGraph` and
-  `udeaVerifyNoLegacyDependencies` green.
-- **No `AGENTS.md` staleness.** No module moved; `udeaVerifyAgentsMd` green.
-- **No `TODO()`, stubbed return or swallowed exception.** `ReplayEqualsMain` catches exactly two
-  exception types and turns each into a distinct exit code and a printed reason.
-- **Self-describing format.** Every cell carries its own key rather than relying on both sides
-  walking in the same order, and the file is magic-, version- and length-prefixed — the
-  `PacketUtil.kt:122` smell §1 names.
-
-### What I did not exercise
-
-- **Windows.** Cannot be run here. Everything about the OS axis rests on the YAML.
-- **A `moba` world.** By decision, above. The gate covers the engine's snapshot and float paths.
-- **A digest with more than 25 differing cells.** The `MAX_REPORTED` cap and the
-  "... and N more" line are inherited from `DivergenceReport` and rendered by the same branch, but
-  no test drives a world that far apart.
-- **A stream from a *different* build of the same game.** `incomparabilitiesAgainst` covers the
-  fixture, game, version, tick range and component table, and the fixture and component-table
-  cases have tests; the game-version case does not.
-- **`ReplayEqualsMain` with more than three legs.** Three is what CI runs.
-
----
-
-## 11. Mutation table
-
-Nine mutations, each applied on its own, with the literal `git diff` and the failing test names
-taken from the JUnit XML (`build/evidence/run-mutations.py`, output in
-`build/evidence/mutations.txt`). Names come from the XML rather than a console `grep -c FAILED`,
-which would also match `BUILD FAILED` and inflate every count by one.
-
-**Baseline before any mutation: 53 tests, 0 failed.**
-
-One of these had to be earned. M1 originally produced **zero** failures, because the hash check
-precedes the cell walk and every honest divergence moves both — so the cell walk could have been
-deleted with nothing going red. Rather than describe that away, I added
-`two runs that share a hash but not their cells are still caught, and named`, which forges a
-stream whose recorded hash is the honest one's while its `x` is not. M1 now fails.
-
-### M1 comparison ignores the cells
-```diff
-diff --git a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-index f4c704e..d45f3c0 100644
---- a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-+++ b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-@@ -241,7 +241,6 @@ public object ReplayEquality {
-         var a = mine.first
-         var b = theirs.first
-         while (a <= mine.last) {
--            if (expected.valueAt(a) != actual.valueAt(b)) return false
-             if (expected.scopeAt(a) != actual.scopeAt(b)) return false
-             if (expected.netIdAt(a) != actual.netIdAt(b)) return false
-             if (expected.typeIdAt(a) != actual.typeIdAt(b)) return false
-```
-53 tests, 1 failed
-  DivergenceReportFormatTest > two runs that share a hash but not their cells are still caught, and named()
-
-### M2 the digest omits the RNG cells
-```diff
-diff --git a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayDigestFormat.kt b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayDigestFormat.kt
-index ce56138..09de4d8 100644
---- a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayDigestFormat.kt
-+++ b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayDigestFormat.kt
-@@ -173,9 +173,6 @@ public class ReplayDigestWriter internal constructor(
-         collectComponents(fields, buffer)
- 
-         buffer.add(DigestScope.Clock, NetId.NONE.raw, NO_TYPE, NO_FIELD, snapshot.tick.value)
--        for (word in snapshot.rng.indices) {
--            buffer.add(DigestScope.Rng, NetId.NONE.raw, NO_TYPE, word, snapshot.rng[word])
--        }
- 
-         val handles = snapshot.handles
-         buffer.add(
-```
-53 tests, 10 failed
-  CrossPlatformDivergenceTest > a planted one-ulp divergence fails the comparison and names tick, entity, component and field()
-  CrossPlatformDivergenceTest > the plant is the smallest change a float can carry, not a visible one()
-  CrossPlatformDivergenceTest > with the plant off, two runs of the fixture are cell-for-cell identical()
-  ReplayDigestTest > a digest survives a round trip through the file()
-  ReplayDigestTest > a tick's cells fold back to the world hash()
-  ReplayDigestTest > dropping a single cell breaks the fold()
-  ReplayDigestTest > the component table carries the fully qualified name and the field kinds()
-  ReplayDigestTest > the first tick is the tick that was simulated, not the clock after it()
-  ReplayDigestTest > the fixture world really does churn its roster, its presence bits and its free list()
-  ReplayDigestTest > two streams of different fixtures refuse to be compared()
-
-### M3 the renderer prints a hash with no cell
-```diff
-diff --git a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-index f4c704e..4538f75 100644
---- a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-+++ b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-@@ -115,12 +115,6 @@ public class ReplayEqualityResult(
-             .append(" (").append(matchingTicks).append(" tick(s) matched first)")
-         appendLegs(builder)
-         builder.append("\n  world hash: ").append(expectedHash).append(" against ").append(actualHash)
--        check(divergences.isNotEmpty()) {
--            "a divergence at $tick named no cell. That is unreachable by construction - " +
--                "ReplayDigestWriter refolds its cells into the world hash before writing them - " +
--                "and reporting it as a hash mismatch would be exactly the bare hash this gate " +
--                "exists to replace."
--        }
-         builder.append("\n  ").append(divergingCells).append(" differing cell(s):")
-         for (divergence in divergences) appendDivergence(builder, divergence)
-         if (divergingCells > divergences.size) {
-```
-53 tests, 1 failed
-  DivergenceReportFormatTest > a result that carries a tick but no cell refuses to render rather than printing a hash()
-
-### M4 no history is gathered
-```diff
-diff --git a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-index f4c704e..d723c72 100644
---- a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-+++ b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-@@ -304,7 +304,7 @@ public object ReplayEquality {
-     ): CrossRunCellDivergence {
-         val component = expected.componentOf(key.typeIdRaw) ?: actual.componentOf(key.typeIdRaw)
-         val history = ArrayList<CellHistoryEntry>(ReplayEquality.HISTORY_TICKS)
--        val from = maxOf(0, index - HISTORY_TICKS)
-+        val from = index
-         for (earlier in from until index) {
-             history += CellHistoryEntry(
-                 tick = expected.tickAt(earlier),
-```
-53 tests, 1 failed
-  CrossPlatformDivergenceTest > a planted one-ulp divergence fails the comparison and names tick, entity, component and field()
-
-### M5 the report names the component but not the field
-```diff
-diff --git a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-index f4c704e..7edb78a 100644
---- a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-+++ b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-@@ -382,7 +382,7 @@ public object ReplayEquality {
- 
-     private fun fieldNameOf(key: DigestCellKey, component: DigestComponentInfo?): String =
-         when (key.scope) {
--            DigestScope.Component -> component?.nameOf(key.field) ?: "<field ${key.field}>"
-+            DigestScope.Component -> "<field>"
-             DigestScope.ComponentType -> "<typeId>"
-             DigestScope.ComponentSlots -> "<slotsUsed>"
-             DigestScope.RowCount -> "rowCount"
-```
-53 tests, 3 failed
-  CrossPlatformDivergenceTest > a planted one-ulp divergence fails the comparison and names tick, entity, component and field()
-  DivergenceReportFormatTest > a component field divergence names the entity, the component FQN and the field()
-  DivergenceReportFormatTest > two runs that share a hash but not their cells are still caught, and named()
-
-### M6 the corrupt-stream refusal is silenced
-```diff
-diff --git a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-index f4c704e..4fb0008 100644
---- a/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-+++ b/udea-replay/src/main/kotlin/dev/wildware/udea/replay/equality/ReplayEquality.kt
-@@ -234,7 +234,6 @@ public object ReplayEquality {
-         // `ReplayDigestWriter` can produce, so meeting it means a file has been truncated, edited
-         // or written by something else, and the caller is told that rather than handed a "they
-         // agree" that is built on a stream nobody should trust.
--        if (expected.hashAt(index) != actual.hashAt(index)) return false
-         val mine = expected.cellsOf(index)
-         val theirs = actual.cellsOf(index)
-         if (mine.last - mine.first != theirs.last - theirs.first) return false
-```
-53 tests, 1 failed
-  DivergenceReportFormatTest > a stream whose hash disagrees with its own cells is refused, not reported as a divergence()
-
-### M7 the plant is a no-op
-```diff
-diff --git a/udea-replay/src/testFixtures/kotlin/dev/wildware/udea/replay/equality/fixture/DriftWorld.kt b/udea-replay/src/testFixtures/kotlin/dev/wildware/udea/replay/equality/fixture/DriftWorld.kt
-index c9c6c59..34aca90 100644
---- a/udea-replay/src/testFixtures/kotlin/dev/wildware/udea/replay/equality/fixture/DriftWorld.kt
-+++ b/udea-replay/src/testFixtures/kotlin/dev/wildware/udea/replay/equality/fixture/DriftWorld.kt
-@@ -318,7 +318,7 @@ public class DriftWorld(
-         val entity = checkNotNull(netIds.resolveOrNull(leadNetId)) { "$leadNetId is not live" }
-         with(fleks) {
-             val drifter = entity[Drifter]
--            drifter.x = Math.nextUp(drifter.x)
-+            drifter.x = drifter.x
-         }
-     }
- 
-```
-53 tests, 2 failed
-  CrossPlatformDivergenceTest > a planted one-ulp divergence fails the comparison and names tick, entity, component and field()
-  CrossPlatformDivergenceTest > the plant is the smallest change a float can carry, not a visible one()
-
-### M8 the fixture world never churns its roster
-```diff
-diff --git a/udea-replay/src/testFixtures/kotlin/dev/wildware/udea/replay/equality/fixture/DriftWorld.kt b/udea-replay/src/testFixtures/kotlin/dev/wildware/udea/replay/equality/fixture/DriftWorld.kt
-index c9c6c59..bd439a3 100644
---- a/udea-replay/src/testFixtures/kotlin/dev/wildware/udea/replay/equality/fixture/DriftWorld.kt
-+++ b/udea-replay/src/testFixtures/kotlin/dev/wildware/udea/replay/equality/fixture/DriftWorld.kt
-@@ -193,7 +193,7 @@ internal class PopulationSystem(private val netIds: NetIdIndex) : SimSystem() {
-             }
-             netIds.allocate(entity)
-         }
--        if (at % RETIRE_INTERVAL == 0L && drifters.entities.size > MIN_POPULATION) {
-+        if (false && at % RETIRE_INTERVAL == 0L && drifters.entities.size > MIN_POPULATION) {
-             // The newest, not the oldest: the lead drifter the pilot steers must survive the
-             // whole fixture, or the recording stops mattering half way through it.
-             val entity = drifters.entities[drifters.entities.size - 1]
-```
-53 tests, 2 failed
-  CrossPlatformDivergenceTest > a planted one-ulp divergence fails the comparison and names tick, entity, component and field()
-  ReplayDigestTest > the fixture world really does churn its roster, its presence bits and its free list()
-
-
-### M9 the stale placeholder is put back in ci.yml
-```diff
-diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
-index 4df3400..a6cd7da 100644
---- a/.github/workflows/ci.yml
-+++ b/.github/workflows/ci.yml
-@@ -974,7 +974,7 @@ jobs:
-     # snapshot-equivalence test and the cross-OS `replay-equality` job at the foot of this file,
-     # which issue #152 added on top of `:udea-replay`'s headless replay. A green tick *here* is
-     # still not one there: if the two ever disagree, the replay result wins and this scanner
--    # grows a rule.
-+    # grows a rule. Until that job exists, THIS FILE CONTAINS NO REPLAY-EQUALITY GATE.
-     name: determinism (${{ matrix.os }}, ${{ matrix.distribution }})
-     runs-on: ${{ matrix.os }}
-     strategy:
-```
-53 tests, 1 failed
-  ReplayEqualityProofTest > the determinism job no longer claims this file has no replay-equality gate()
-
+- **§1 smells** — no top-level `var`, no mutable singleton (`ShopService` is constructed by
+  `ItemModule` and injected), no god object, every wire/disk field self-describing, no stringly-typed
+  domain (`UniqueName` is a value class; a slot holds an `AssetIndex` value with the `Int` storage
+  justified against `Tower.targetRaw`'s precedent), no string-concatenated codegen, no silent
+  failure (every refusal is a typed `ShopRefusal`), no reflection, no linear scan on a per-tick path
+  (`netIds.resolveOrNull` is O(1); `ItemCatalog` is an array read), no magic buffer.
+- **A `public` declaration nobody outside the module uses** — swept in `92ae5e0`.
+  `ItemCatalog.EMPTY`, `ShopService.pending` and `Inventory.itemAt` had no callers and are deleted;
+  `ItemCatalog.atRaw` and `ShopRules.NO_SLOTS` had none outside their own files and are private.
+- **A test that cannot fail** — §1 and §8. Twelve mutations, every test file represented, control
+  runs on both sides. The `ItemRecipeValidatorTest` control (`a well priced item tree produces no
+  diagnostics at all`) is the known-negative for the four validator tests.
+- **Generated code by string concatenation** — none; the packer emits `PackValue`s.
+- **A new field on `GameContext`** — none. `ShopService` reaches the world through
+  `builder.service(KEY, …)`, the same door `LaneService` uses.
+- **Wall clock or unseeded randomness in simulation** — none in the diff.
+  `ShopSystem` reads no clock at all; `ShopService`'s queue is an `ArrayDeque` (insertion order);
+  `ItemCatalog.byId` is a `HashMap` that is **only ever looked up, never iterated**, with the ordered
+  answer being `entries`, built from `registry.ids` — that is written into its KDoc so a reviewer
+  does not have to work it out.
+- **`TODO()`, stubbed return, swallowed exception** — none. The one `check` in `ShopSystem.buy`
+  fires only on a disagreement between `hasRoomFor` and `firstFreeCarried`, which is a defect in that
+  file rather than a state a player can reach, and it fails loudly rather than writing to slot −1.
+- **Copy-pasted logic differing only in a constant** — the seven-way `when` in `Inventory.rawAt`/
+  `place` is the closest thing, and it is the honest cost of a component with no arrays; the "which
+  slot" arithmetic lives in exactly those two functions and nowhere else.
+- **`by net(...)`, a second snapshot codec, setter instrumentation** — none.
+- **A new module depending on `common`** — none; `udeaVerifyNoLegacyDependencies` green.
+- **GL outside `udea-render`** — none.
+- **A presentation system as a Fleks system** — none; nothing here draws.
+- **A module arrow pointing upward** — none; `udeaVerifyModuleGraph` green.
+- **A `docs/contracts/` file changed** — **none.** `git diff origin/example...HEAD --name-only`
+  has no `docs/contracts/` entry.
+- **`fieldNames[i]` == FieldMask bit *i* == FieldStore index *i*** — held.
+  `InventoryReplicator.fieldNames` is `["slot0","slot1","slot2","slot3","slot4","slot5","trinket"]`,
+  and `ItemModule.snapshotTypes()` passes `List(Inventory.CAPACITY) { FieldKind.Int }` — **derived**
+  from the capacity rather than transcribed, and every one of the seven fields really is an `Int`, so
+  a kind cannot be typed wrong at the right length here.
+- **A duration expressed in seconds or milliseconds rather than a `Tick`** — the diff contains no
+  duration at all. Gold is `Int`; the sell rate is integer percent, so the arithmetic truncates
+  identically on a server, a client and a replay.
+- **`AGENTS.md`'s module table stale** — no module moved; `udeaVerifyAgentsMd` green.
 
 ---
 
-## 12. Where the artefacts are
+## 11. Files
 
-`build/` is gitignored, so these live only in the worktree. Everything quoted above was spliced
-from one of them.
+**New** — `udea-assets/…/Item.kt`; `moba/assets/item/{components,finished,trinkets}.udea.kts`;
+`moba/src/main/…/item/{ItemComponents,ItemCatalog,ShopRules,ShopSystem,ItemModule}.kt`;
+`moba/src/test/…/item/{ShopHarness,RecipeTest,ShopProofTest}.kt`;
+`udea-assets-compiler/src/test/…/validate/ItemRecipeValidatorTest.kt`.
 
-| File | What it is |
-|---|---|
-| `build/evidence/proof.log` | The evidence command's full run |
-| `build/evidence/proof-feature-reverted.log` | The same command with `ReplayEquality` neutralised |
-| `build/evidence/proof-reverted.log` | The same command with the plant neutralised |
-| `build/evidence/jvm-axis-summary.txt` | The three-JVM join |
-| `build/evidence/full-build-final.log` | `sh gradlew build` |
-| `build/evidence/full-build.log` | The first attempt, red on `udeaDaemonBudget` at load 20 |
-| `build/evidence/daemon-budget-solo2.log` | That task alone, green |
-| `build/evidence/gl.log` | `udeaGlTest` + `udeaAgentGlTest` under xvfb |
-| `build/evidence/gl-counts.txt` | Their counts, saved because a later `build` overwrites the XML |
-| `build/evidence/determinism.log` | `udeaVerifyDeterminism`, forced to execute |
-| `build/evidence/verifiers.log` | The module-graph and migration verifiers |
-| `build/evidence/test-totals.txt` | The 2446/0/34 count, as counted |
-| `build/evidence/mutations.txt` | The table in §11, as generated |
-| `build/evidence/run-mutations.py` | What generated it |
-| `build/evidence/render-verdict.py` | What rendered the two PNGs |
+**Changed, outside the shop** — `moba/src/test/…/replay/MobaReplayProofTest.kt` (`72aae75`) and
+`udea-gradle/…/UdeaAssetsPlugin.kt` (`5fbc158`, KDoc only). Both are argued in §2 and both say so
+in their commit subjects.
 
-None of these was written to the shared `/tmp` scratchpad. dev-154 found that the directory the
-harness advertises as session-specific is shared per project on this box, so a generic filename
-there is a silent cross-branch overwrite; the two files I had put there
-(`replay-equality-job.yml`, `commit-msg.txt`) were both consumed at write time and I re-read both
-out of their destinations — `yaml.safe_load` over the whole workflow and `git log -1 --format=%B`
-— and both came back as mine. Worth one line in the wave handoff.
+**Changed** — `udea-assets/…/{Names.kt, pack/AssetCodecs.kt}`;
+`udea-assets-compiler/…/{AssetKind, AssetScope, gen/DslKinds, gen/AccessorGenerator,
+pack/GraphPacker, validate/AssetValidationRules, validate/AssetValidator,
+validate/GraphValidators}.kt`; the four `udea-assets-compiler` tests carrying stale counts;
+`moba/src/main/…/MobaGame.kt`; `moba/src/agent/…/MobaAgent.kt`; the three lock files.
+
+**`gradlew` shows as `M` in `git status` and is deliberately not staged** — it is the `chmod +x` the
+contract prescribes for this box, and a mode flip on the wrapper is not part of this change.

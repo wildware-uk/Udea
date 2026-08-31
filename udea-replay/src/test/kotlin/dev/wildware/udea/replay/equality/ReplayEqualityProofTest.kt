@@ -33,15 +33,16 @@ class ReplayEqualityProofTest {
      *
      * Read this way because the raw text was demonstrably not enough. Writing the phrase
      * `digests` followed by a slash and a star into the KDoc above `workspaceRoot` opened a
-     * *nested* block comment - Kotlin's nest - which ran to the end of the file and took all
-     * eight `udeaReplay*` task registrations with it. `sh gradlew build` stayed green, because
-     * none of those tasks is wired into `check`, and every assertion in this class stayed green,
-     * because the text it was matching was all still there and merely switched off. The only
-     * thing that noticed was `gradlew :udea-replay:tasks`.
+     * *nested* block comment - Kotlin's nest - which ran to the end of the file and took every
+     * task registered below it with it, `udeaReplayDigest` and `udeaReplayEquals` included.
+     * `sh gradlew build` stayed green, because none of those tasks is wired into `check`, and
+     * every assertion in this class stayed green, because the text it was matching was all still
+     * there and merely switched off. The only thing that noticed was
+     * `gradlew :udea-replay:tasks`.
      *
      * So the fence reads what the compiler reads. `commentsStripped` handles nesting and string
-     * literals; commenting out the `replay-equality` section is in the mutation table and turns
-     * four of these tests red.
+     * literals; commenting out the `replay-equality` section is in the mutation table, and
+     * `the build script fence reads what the compiler reads` covers the stripper itself.
      */
     private val buildScript: String by lazy {
         commentsStripped(Files.readString(projectDir.resolve("build.gradle.kts")))
@@ -151,7 +152,7 @@ class ReplayEqualityProofTest {
         assertTrue("blockCommented" !in ordinary, "a block comment survived the strip:\n$ordinary")
         assertTrue("A KDoc" !in ordinary, "a KDoc survived the strip:\n$ordinary")
 
-        // And the shape that cost this module its eight `udeaReplay*` tasks: Kotlin block
+        // And the shape that cost this module every task registered below one KDoc: Kotlin block
         // comments nest, so a slash-star written inside a KDoc leaves the comment open when that
         // KDoc ends, and everything after it to the end of the file is switched off. The
         // stripper must agree with the compiler about that, or the fence would read a task

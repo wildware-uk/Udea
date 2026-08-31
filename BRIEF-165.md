@@ -1,9 +1,9 @@
-3334113
+0a09576
 
-*(The commit that adds this line is `3334113`'s child and touches only this file — a file cannot
-state the hash of the commit containing it. `3334113` is the SHA to review: `git diff
-origin/example..3334113` is the whole change. `git log --oneline 3334113..HEAD` shows the brief-only
-commits after it.)*
+*(The commit that adds this line is `0a09576`'s child and touches only this file — a file cannot
+state the hash of the commit containing it. `0a09576` is the SHA to review, and
+`git diff 7942823..0a09576` is the whole change: this branch's merge base is `7942823`, not
+today's `origin/example`, which has moved under it — see §8b.)*
 
 # Issue #165 — replay-equality nightly fixture, regeneration flag and bisect job summary
 
@@ -984,7 +984,7 @@ Two of those runs were cancelled part-way by the workflow's own
 The jobs quoted above had all reached a terminal state before the cancellation; where one had not,
 I have not quoted it.
 
-**The Actions evidence was produced at `b06b2bc`.** Two commits land after it and neither can move
+**The Actions evidence was produced at `b06b2bc`.** Three commits land after it and none can move
 what those runs showed:
 
 - `ded18b4` moves the earliest-divergence selection into `ReplayBisectGuide.render` so it can be
@@ -992,9 +992,19 @@ what those runs showed:
 - `3334113` adds this brief and rewrites a comment block inside the nightly job, replacing the
   locally-estimated cost with the numbers that run actually produced. No step, no condition and no
   property changed.
+- `0a09576` adds two tests and touches no production code at all.
 
-Both are checkable: `git diff b06b2bc..HEAD -- .github/workflows/ci.yml` is comment-only, and
-`git diff b06b2bc..HEAD --stat` names the rest.
+Checkable rather than asserted: every one of the fifteen changed lines in `ci.yml` since `b06b2bc`
+is a comment line, which is why the count below is zero.
+
+`git diff b06b2bc..HEAD -- .github/workflows/ci.yml` was saved to a file; counting its changed
+lines, and then its changed lines that are **not** comments, gives (`scratchpad/`
+`ci-since-evidence.counts.txt`):
+
+```
+15
+0
+```
 
 ## 8b. Merging onto the current `origin/example`
 

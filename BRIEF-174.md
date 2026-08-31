@@ -1,4 +1,4 @@
-**SHA: SHA_PLACEHOLDER**
+**SHA: 4058275**
 
 *(the whole change, and this brief. A brief cannot name the commit that contains it, so
 there is exactly one commit on top of that SHA — the branch head — and it edits nothing but this

@@ -49,7 +49,8 @@ public object DriftFixtureRecorder {
      * byte on the wire, and every game that sends one sends a rolling counter that wraps. The
      * fixture pilot ignored that and kept a lifetime total, which fitted only because the
      * 3600-tick fixture presses roughly `3600 / PULSE_ODDS` = 150 times. The 36000-tick fixture
-     * of issue #165 presses about ten times as often, and recording it threw
+     * of issue #165 is ten times as long, so its pilot presses ten times as many times; recording
+     * it threw
      * `a press count must be in 0..255, was 256 for action 'drift/pulse'` partway through - so
      * the length of every fixture this world can have was capped by a limit nothing named.
      *
@@ -151,7 +152,7 @@ public object DriftFixtureRecorder {
 }
 
 /**
- * `--update-replay-fixtures` for this world: `--fixtures-dir <dir>`, optionally `--dry-run`.
+ * `--update-replay-fixtures` for this world: `--fixtures-dir <dir>`.
  *
  * Deliberately a separate entry point from the CI one, and deliberately not wired into anything
  * `check` runs. Regenerating a fixture is how a gate is silenced, so it is a thing somebody types
@@ -159,15 +160,15 @@ public object DriftFixtureRecorder {
  *
  * It shares [ReplayFixtures.reconcile] with the `--update-goldens`-shaped route through
  * `:udea-replay:test -Dupdate.replay.fixtures=true`, so the two front doors cannot disagree about
- * what "stale" means or about what they write. `--dry-run` is the same call with `update = false`,
- * which is what makes the reporting half of this runnable without writing anything.
+ * what "stale" means or about what they write. There is no reporting-only mode here: reconciling
+ * without writing is what `ReplayFixturesCurrentTest` does on every push, and a second way to ask
+ * the same question would be a code path nothing exercised.
  */
 public object DriftFixturesMain {
 
     @JvmStatic
     public fun main(args: Array<String>) {
         var dir: Path? = null
-        var update = true
         var at = 0
         while (at < args.size) {
             when (args[at]) {
@@ -177,8 +178,6 @@ public object DriftFixturesMain {
                     at++
                 }
 
-                "--dry-run" -> update = false
-
                 else -> throw IllegalArgumentException("unknown option '${args[at]}'")
             }
             at++
@@ -186,11 +185,8 @@ public object DriftFixturesMain {
         val fixturesDir = requireNotNull(dir) { "--fixtures-dir is required" }
         val statuses = ReplayFixtures.reconcile(
             DriftFixtureRecorder.fixtures(fixturesDir),
-            update = update,
+            update = true,
         )
         for (status in statuses) println(status.describe())
-        // A dry run still has to fail on a stale fixture, or "report what is stale" and "say
-        // nothing" would print the same exit code.
-        if (!update) ReplayFixtures.requireCurrent(statuses, DriftFixtureRecorder.GRADLE_TASK)
     }
 }

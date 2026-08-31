@@ -235,10 +235,7 @@ tasks.register<JavaExec>("udeaReplayDigest") {
  * The convention is `--update-goldens`, spelled the way that one is actually typed:
  * `./gradlew :udea-replay:test -Dupdate.replay.fixtures=true` goes through
  * `ReplayFixturesCurrentTest` and reconciles the same set through the same
- * `ReplayFixtures.reconcile`. This task is the same call without the rest of the test suite, and
- * `-Pudea.replay.dryRun` is the reporting half of it, which writes nothing and fails on a stale
- * fixture - the shape a CI job would use if one ever needed to assert currency without a JVM
- * running tests.
+ * `ReplayFixtures.reconcile`. This task is the same call without the rest of the test suite.
  */
 tasks.register<JavaExec>("udeaWriteReplayFixture") {
     group = "build"
@@ -246,14 +243,7 @@ tasks.register<JavaExec>("udeaWriteReplayFixture") {
     classpath = equalityClasspath
     mainClass.set("dev.wildware.udea.replay.equality.fixture.DriftFixturesMain")
     val fixturesDir = layout.projectDirectory.dir("src/testFixtures/resources/fixtures")
-    val dryRun = providers.gradleProperty("udea.replay.dryRun")
-    argumentProviders.add {
-        buildList {
-            add("--fixtures-dir")
-            add(fixturesDir.asFile.absolutePath)
-            if (dryRun.isPresent) add("--dry-run")
-        }
-    }
+    argumentProviders.add { listOf("--fixtures-dir", fixturesDir.asFile.absolutePath) }
 }
 
 /**

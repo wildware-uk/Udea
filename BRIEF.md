@@ -1,9 +1,11 @@
 # Issue #132 — the shop, the items and the inventory
 
-f3fe456
+1698eb0
 
-(The code is complete at `92ae5e0`; this commit adds only this file. Every build transcript below
-was run at `92ae5e0`, and §3 records a re-run of `sh gradlew build` at `f3fe456` itself.)
+**The code is complete at that commit**, and every transcript below was run against it. The commits
+after it on this branch touch nothing but this file — a brief cannot name its own SHA without
+changing it, so the line above names the last commit that changes what the reviewer is ruling on.
+`git log --oneline origin/example..HEAD` shows which is which.
 
 Branch `issue-132-shop-and-items`, off `origin/example` at `866ba0a`.
 Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a5b3c68bd564f1fda`.
@@ -255,33 +257,39 @@ nobody measured.
 
 ## 3. `sh gradlew build`
 
+Green at the reported SHA, `1698eb0`:
+
 ```
 $ JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew clean build --console=plain
 ...
-> Task :moba:check
-> Task :moba:build
-> Task :udeaVerifyMigration
-> Task :check
-> Task :build
-> Task :udea-compiler-plugin:test
-> Task :udea-compiler-plugin:check
-> Task :udea-compiler-plugin:build
-
-BUILD SUCCESSFUL in 18s
-229 actionable tasks: 137 executed, 78 from cache, 14 up-to-date
+BUILD SUCCESSFUL in 1m 16s
+229 actionable tasks: 146 executed, 69 from cache, 14 up-to-date
 ```
 
-Test totals swept out of every `build/test-results/**/*.xml` afterwards: **365 suites, 2444 tests,
-0 failures, 0 errors, 34 skipped.** `:moba:test` executed rather than coming from the cache.
+Test totals swept out of every `build/test-results/**/*.xml` immediately afterwards:
+**365 suites, 2445 tests, 0 failures, 0 errors, 34 skipped.** `:moba:test` executed rather than
+coming from the cache.
 
-**The caveat, stated:** 78 of those tasks were build-cache hits. A cache hit is keyed on the task's
-inputs, so its stored results are valid for this tree — but it is not a cold run, and it took 18s
-for that reason. I attempted a `clean build --no-build-cache` for a colder transcript; it failed,
-and the failures were **the box, not the branch** (§4).
+The 34 skipped are the GL tests skipping with no `$DISPLAY` — 25 across `udea-render/gl` and
+`udea-agent-host/gl` — plus 9 in `udea-assets-compiler`'s `ReproducibilityTest` and
+`AtlasPackerTest`. The GL 25 are run for real below.
 
-The 34 skipped are the GL tests skipping with no `$DISPLAY` (25 of them, across
-`udea-render/gl` and `udea-agent-host/gl`) plus 9 in `udea-assets-compiler`'s
-`ReproducibilityTest`/`AtlasPackerTest`.
+**It took four attempts to get that run, and the three failures were the box.** Recorded because
+"it went green on the fourth try" is the sort of sentence that should come with its three:
+
+| Attempt | Foreign Gradle builds on the box | Failed |
+|---|---|---|
+| 1 (`build`) | 2-3, load ~9 | `GraphBudgetTest`, `DaemonLatencyBudgetTest` ×2, `Phase2ExitTest`, `udeaPackGate` — **plus** four `MigratedCorpus*`/`MobaWarmEdit` failures that were **mine**: the stale asset counts of §2, fixed rather than re-run |
+| 2 (`clean build --no-build-cache`) | 3, load ~20 | `GraphBudgetTest`, `CharacterMoverBudgetTest`, `DaemonLatencyBudgetTest` ×2 |
+| 3 (`build`) | 10, load ~53 | `DaemonLatencyBudgetTest` ×2 |
+| 4 (`clean build`) | 8, load ~33 | **none** |
+
+Every one of the budget failures is a wall-clock deadline, and every one passes alone on the same commit — §4 has
+the solo numbers, measured rather than asserted. The tell the contract names holds: a *different*
+subset failed each time.
+
+One failure in that list was **not** the box and is fixed on this branch: attempt 3 also went red on
+`MobaReplayProofTest`, which is the ~1-in-9 flake §2 covers.
 
 ### GL, run for real
 
@@ -303,7 +311,8 @@ BUILD SUCCESSFUL in 6s
 ```
 
 `udeaGlTest` 18 tests / 0 failures / **0 skipped**; `udeaAgentGlTest` 8 / 0 / **0 skipped**. Both
-ran for real; neither skipped.
+ran for real; neither skipped. `:moba:runLaneShot` under the same xvfb wrapper is green and wrote
+the three lane PNGs in §6.
 
 ### The gates outside `check`
 
@@ -328,8 +337,8 @@ on wall-clock budget tests while two or three *other agents'* Gradle builds were
 | Test | Under load | Alone |
 |---|---|---|
 | `GraphBudgetTest` graph deserialisation | 28.07ms (budget 15ms) | best 6.77ms, **median 7.35ms** |
-| `DaemonLatencyBudgetTest` warm reload | median 925ms, then 759ms | **median 137ms** `[146, 137, 134, 124]` |
-| `DaemonLatencyBudgetTest` warm validate | median 390ms, then 486ms (budget 300ms) | **median 112ms** `[9, 147, 112, 109]` |
+| `DaemonLatencyBudgetTest` warm reload | 925ms, 759ms, 1628ms, 622ms across four loaded runs | **137ms** `[146, 137, 134, 124]`, and **305ms** `[386, 305, 265, 269]` at the final SHA |
+| `DaemonLatencyBudgetTest` warm validate | 390ms, 486ms, 528ms, 437ms (budget 300ms) | **112ms** `[9, 147, 112, 109]`, and **205ms** `[23, 293, 166, 205]` at the final SHA |
 | `CharacterMoverBudgetTest` | median 6.975ms (budget 4ms) | not re-run alone; `dev-154` measured 2.163ms |
 | `Phase2ExitTest` agent→world | 1169ms | **391ms** |
 | `MobaWarmEditBudgetTest` | (failed on a stale count, §2) | **max 148ms, median 135ms**, budget 3000ms |

@@ -15,7 +15,6 @@ import org.gradle.api.tasks.OutputFiles
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
-import org.gradle.api.tasks.TaskProvider
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -55,14 +54,19 @@ import java.nio.file.StandardCopyOption
  */
 public object CharacterArtStaging {
 
-    /** The task a game registers to put its character art in place before the asset pipeline runs. */
+    /**
+     * The task a game registers to put its character art in place before the asset pipeline runs.
+     *
+     * The one name in here another build script needs: `:udea-assets-compiler` orders its tests
+     * after this task, and a literal in two files is how the two ends drift.
+     */
     public const val TASK: String = "udeaStageCharacterArt"
 
     /** Repo-relative tree the sheets are copied out of. Committed; see the class KDoc. */
-    public const val SOURCE_TREE: String = "example/src/main/resources/assets/sprites"
+    internal const val SOURCE_TREE: String = "example/src/main/resources/assets/sprites"
 
     /** Repo-relative tree the sheets are copied into: the part of `:moba`'s asset root git ignores. */
-    public const val DESTINATION_TREE: String = "moba/assets/sprites"
+    internal const val DESTINATION_TREE: String = "moba/assets/sprites"
 
     /**
      * The sheets each character's `.udea.kts` names, by the file name it names them at.
@@ -133,7 +137,7 @@ public object CharacterArtStaging {
      * `orc/Orc-Idle.png` to `orc/Orc-Idle.png`; `wizard/Wizard-Idle.png` to
      * `wizard/Wizard/Wizard-Idle.png`.
      */
-    public val PLAN: Map<String, String> = SHEETS.entries
+    internal val PLAN: Map<String, String> = SHEETS.entries
         .flatMap { (character, sheets) ->
             val nested = NESTED[character]
             sheets.map { sheet ->
@@ -145,7 +149,10 @@ public object CharacterArtStaging {
 }
 
 /**
- * Copies the sheets of [CharacterArtStaging.PLAN] into the game's asset root.
+ * Copies the sheets of `CharacterArtStaging.PLAN` into the game's asset root.
+ *
+ * `public` because Gradle instantiates and decorates it; nothing else outside this module names
+ * it, which is why [registerCharacterArtStaging] returns nothing rather than a typed provider.
  *
  * Idempotent: it overwrites what it copies and deletes nothing, so a developer who has staged the
  * art by hand, or who is holding a newer sheet in place, loses nothing but that one file.
@@ -229,7 +236,7 @@ public abstract class UdeaStageCharacterArtTask : DefaultTask() {
  * plugin applied has nothing to stage art for, and an immediate `UnknownTaskException` naming the
  * task says so, where a silent no-op would restore the exact defect this closes.
  */
-public fun Project.registerCharacterArtStaging(): TaskProvider<UdeaStageCharacterArtTask> {
+public fun Project.registerCharacterArtStaging() {
     val repositoryRoot: Directory = rootProject.layout.projectDirectory
     val destination: Directory = repositoryRoot.dir(CharacterArtStaging.DESTINATION_TREE)
 
@@ -250,5 +257,4 @@ public fun Project.registerCharacterArtStaging(): TaskProvider<UdeaStageCharacte
     )) {
         tasks.named(consumer) { dependsOn(stage) }
     }
-    return stage
 }

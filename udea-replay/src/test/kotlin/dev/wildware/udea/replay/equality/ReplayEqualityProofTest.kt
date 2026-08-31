@@ -80,6 +80,16 @@ class ReplayEqualityProofTest {
     }
 
     @Test
+    fun `the proof task also checks that the report says how to reproduce it`() {
+        // The other half of the same fence, kept as its own test so the one above keeps saying
+        // what spec 7 asks for and this one says what issue #165 adds. Without it, deleting the
+        // two needles from `udeaReplayEqualityProof` would leave the proof green while nothing
+        // checked that the rendered guide ever reaches the file a job summary prints.
+        assertContains(buildScript, "\"--- reproducing this locally ---\"")
+        assertContains(buildScript, "replay.seek")
+    }
+
+    @Test
     fun `the checked-in fixture is regenerable, input for input`() {
         // Regenerated from the specified `java.util.Random` LCG, so this holds on any JVM.
         //

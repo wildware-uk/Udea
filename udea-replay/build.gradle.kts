@@ -390,13 +390,13 @@ tasks.register("udeaReplayEqualityProof") {
             "a leg with a deliberately planted one-ulp divergence was NOT caught (exit " +
                 plantedExit + "). A gate that cannot fail proves nothing.\n" + plantedReport
         }
-        // `Tick.toString()` renders `t1200`, and the report has to name the tick, the entity, the
-        // component and field, and five ticks of that field's history - spec 7's four.
+        // `Tick.toString()` renders `t1200`. Spec 7 asks a cross-OS failure to name the tick, the
+        // entity, the component and field, and five ticks of that field's history.
         //
-        // The last two are issue #165's: what CI publishes has to tell a reader how to reproduce
-        // this on one machine, with the tick to land on already worked out. `ReplayBisectGuide`
-        // renders it and `ReplayBisectGuideTest` covers the renderer; this is the only thing that
-        // checks the rendered block actually reaches the file the job summary prints.
+        // Issue #165 adds what a reader does next: the block saying how to reproduce this on one
+        // machine, with the tick to land on already worked out. `ReplayBisectGuide` renders it and
+        // `ReplayBisectGuideTest` covers the renderer; this is the only thing that checks the
+        // rendered block actually reaches the file a job summary prints.
         val required = listOf(
             "at t$expectedTick",
             "Drifter.x",

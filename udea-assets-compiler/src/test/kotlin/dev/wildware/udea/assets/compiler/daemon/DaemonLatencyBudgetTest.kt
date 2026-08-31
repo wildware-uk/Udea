@@ -1,5 +1,6 @@
 package dev.wildware.udea.assets.compiler.daemon
 
+import dev.wildware.udea.diagnostics.bench.LatencyBudget
 import org.junit.jupiter.api.Test
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -11,6 +12,10 @@ import kotlin.test.assertTrue
  * surface is the editor" only works if `assets_validate` is faster than the agent's patience - so
  * the number is asserted, on its own Gradle task, excluded from `test` so a normal run does not
  * pay for it twice. That is the same shape as `udeaDigestBudget` in `udea-agent`.
+ *
+ * That task hangs off the root's `udeaLatencyBudgets` and is measured by the `latency-budgets` CI
+ * job with the runner to itself (issue #175). Reaching it any other way measures the build as
+ * well as the daemon, and the failure messages below say so with this machine's load in them.
  *
  * ## What is measured, and what would be cheating
  *
@@ -59,7 +64,8 @@ class DaemonLatencyBudgetTest {
         println("warm validate of one script: median ${median}ms over ${samples.size} samples $samples")
         assertTrue(
             median <= WARM_VALIDATE_BUDGET_MS,
-            "spec 6 gates warm validate at ${WARM_VALIDATE_BUDGET_MS}ms; median was ${median}ms $samples",
+            "spec 6 gates warm validate at ${WARM_VALIDATE_BUDGET_MS}ms; median was ${median}ms " +
+                "$samples. " + LatencyBudget.contentionNote(TASK),
         )
     }
 
@@ -85,23 +91,29 @@ class DaemonLatencyBudgetTest {
         }
 
         // Median, the same statistic the validate half above uses, and changed from `slowest`
-        // deliberately. This task runs inside `check`, on a machine whose every core is compiling
-        // the rest of the build, and the *maximum* of five samples there is the worst scheduling
-        // hiccup in a two-minute window rather than anything about the daemon: measured on this
-        // machine it was 172ms run alone and 528ms run alongside a full `clean build`, from code
-        // that had not changed. The budget itself is untouched at 300ms - widening it is what
-        // would have measured nothing - and every sample is printed, so a run whose spread is
-        // suspicious is visible in the log rather than hidden behind one number.
+        // deliberately: the *maximum* of five samples is the worst scheduling hiccup in a
+        // two-minute window rather than anything about the daemon. Measured on this machine it
+        // was 172ms run alone and 528ms run alongside a full `clean build`, from code that had
+        // not changed. Every sample is printed, so a run whose spread is suspicious is visible in
+        // the log rather than hidden behind one number.
+        //
+        // Issue #175 removed the other half of that problem: this task no longer runs inside
+        // `check`, so the machine compiling the rest of the build is no longer the machine taking
+        // the measurement. The median stays, because a runner is a shared VM even when the job
+        // has it to itself.
         val median = samples.sorted()[samples.size / 2]
         println("warm reload decision: median ${median}ms over ${samples.size} samples $samples")
         assertTrue(
             median <= WARM_RELOAD_BUDGET_MS,
             "the reload decision is the compile half of the under-3s edit-to-observe loop; " +
-                "median was ${median}ms $samples",
+                "median was ${median}ms $samples. " + LatencyBudget.contentionNote(TASK),
         )
     }
 
     private companion object {
+        /** The task that measures these, and the one to re-run alone before believing a red. */
+        const val TASK = ":udea-assets-compiler:udeaDaemonBudget"
+
         /** Spec 6, Phase 2: the number the spec names, for the call the spec names it about. */
         const val WARM_VALIDATE_BUDGET_MS = 300L
 

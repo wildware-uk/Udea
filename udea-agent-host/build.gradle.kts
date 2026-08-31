@@ -57,6 +57,12 @@ dependencies {
      * classpath, which is the gate that lets it hold a dependency `moba` also holds.
      */
     implementation(project(":udea-net"))
+
+    // `LatencyBudget`, the contention note `Phase2ExitTest` ends its budget failures with
+    // (issue #175). Test scope only, and `udea-diagnostics` is a zero-dependency leaf, so this
+    // adds the fixture and nothing else to a module `udeaVerifyRelease` already keeps out of
+    // every shipped artifact.
+    testImplementation(testFixtures(project(":udea-diagnostics")))
 }
 
 // --- the Phase 1 exit demo -------------------------------------------------------------------
@@ -203,12 +209,28 @@ val udeaPhase2Demo = tasks.register<JavaExec>("udeaPhase2Demo") {
 }
 
 /**
- * The Phase 2 exit criterion, as a gate on `check`.
+ * The Phase 2 exit criterion, as a gate on the root's `udeaLatencyBudgets`.
  *
  * Its own `Test` task and not part of `test`, for the same reason `udea-agent`'s `udeaAssetTools`
  * is: the daemon it needs carries the Kotlin scripting host, and that host reaches this JVM
  * through `assetDaemonRuntime` alone. Excluded from `test` so it runs once, on the classpath that
  * can actually load `AssetDaemon`.
+ *
+ * ## Why it is no longer on `check` (issue #175)
+ *
+ * Its budget is one second from an agent's HTTP request to the running world reporting the new
+ * value, and the whole path - JSON, socket, bridge queue, barrier, tick boundary - is inside the
+ * measurement. Every part of that is a wall-clock duration on a shared machine. Measured inside
+ * `./gradlew build` on a GitHub runner it took 1485ms against the 1000ms budget, on a branch that
+ * had not touched the agent host; it was the `build` job's first red on both `ubuntu-latest` and
+ * `windows-latest`. It is now measured by the `latency-budgets` job, serially, with nothing else
+ * on the runner.
+ *
+ * The second half of this test - a typo'd reference is refused with a file, a line, a column and
+ * a did-you-mean - is a correctness claim rather than a latency one, and moving the task moves it
+ * too. It is not weakened by that: the `latency-budgets` job runs on every push, on both runner
+ * images, which is more often than the criterion has ever actually been checked before, because
+ * before #170 unblocked `:moba` the `build` job never reached this task at all.
  */
 val phase2ExitTests = "dev.wildware.udea.agent.host.Phase2ExitTest"
 
@@ -226,10 +248,6 @@ val udeaPhase2Exit = tasks.register<Test>("udeaPhase2Exit") {
 
 tasks.test {
     filter { excludeTestsMatching(phase2ExitTests) }
-}
-
-tasks.check {
-    dependsOn(udeaPhase2Exit)
 }
 
 // `AssetDaemon` takes its repo root and its script compile classpath as arguments rather than

@@ -5,8 +5,13 @@
 # Gates that have landed and run inside the `build` job, because they are wired into `check`
 # and therefore need no step of their own: the golden-file diffs and the `net-protocol.lock`
 # drift check (`udeaCheckProtocolLock`, registered by `registerNetProtocolLock` in
-# `build-logic` for every module that emits a protocol), and the allocation budgets (spec 4 of
-# the engineering standards) via `udeaSnapshotBudget` and `udeaBenchTickLoop`.
+# `build-logic` for every module that emits a protocol).
+#
+# The **wall-clock latency budgets are not among them** - `udeaSnapshotBudget`,
+# `udeaBenchTickLoop`, `udeaBenchCharacterMover`, `udeaDaemonBudget`, `udeaGraphBudget` and
+# `udeaPhase2Exit` are measured by the `latency-budgets` job below, which runs them serially
+# with nothing else on the runner. Issue #175 has the reasoning; the short version is that a
+# millisecond measured while nineteen modules compile is a measurement of the compilation.
 #
 # The `game-bridge-mcp` conformance run is the `bridge-conformance` job below: its own job and
 # not a step, because it needs a JVM and Node at once and it needs a game process left running
@@ -176,17 +181,124 @@ jobs:
             **/build/reports/tests/**
           retention-days: 7
 
-      # The measured numbers, on a GREEN run as well as a red one. `udeaBenchTickLoop` writes
-      # `build/reports/udea/tick-loop.json` and its own KDoc calls it "published by the Phase 0
-      # CI job as the gate's artifact" - which was only true of a failing build while this
-      # shared the failure-only step above. A budget you can only read once you have blown it
-      # tells you nothing about the headroom you had on the way there, and the Phase 0 exit is
-      # stated as a number, so the number has to survive a passing run.
+      # The measured numbers, on a GREEN run as well as a red one. A budget you can only read
+      # once you have blown it tells you nothing about the headroom you had on the way there,
+      # and the Phase 0 exit is stated as a number, so the number has to survive a passing run.
+      #
+      # `tick-loop.json` is no longer among them: since issue #175 the wall-clock budgets are
+      # measured by the `latency-budgets` job, and that job uploads them under its own artifact
+      # name. What this step still collects is every other `reports/udea` file a full build
+      # writes - the stdlib pin, the compiler-plugin scan, the legacy ledger, the determinism
+      # report, the release scan, `moba`'s startup json - which is why `if-no-files-found:
+      # error` is still the right setting here rather than a lie waiting to happen.
       - name: Upload measured budgets
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: udea-budgets-${{ matrix.os }}
+          path: |
+            **/build/reports/udea/**
+          if-no-files-found: error
+          retention-days: 7
+
+  latency-budgets:
+    # Issue #175: **a wall-clock latency measurement taken beside a parallel build measures the
+    # build**, so the six gates that assert a number of milliseconds get a runner to themselves.
+    #
+    # ## The defect
+    #
+    # `udeaPhase2Exit`, `udeaDaemonBudget`, the graph-deserialisation budget and the two
+    # `udea-core` benches hung off `check`. `check` runs inside `build`, so every one of them was
+    # timed while nineteen other modules compiled on the same cores. On run 33428671524 -- the
+    # first run that reached them at all, because before #170 the build died at
+    # `:moba:udeaPackBundle` -- `udeaPhase2Exit` measured 1485ms against its 1000ms budget on
+    # `ubuntu-latest` and failed again on `windows-latest`, and `udeaDaemonBudget` and
+    # `udeaPackGate` failed on the plugin-disabled leg. Nothing in any of those tests had changed;
+    # none of them reads `moba/assets`; all three use synthetic fixtures.
+    #
+    # The same tasks on this project's own development box, inside a parallel build and then
+    # alone: warm reload 646ms then 195ms, warm validate 377ms then 151ms, graph deserialisation
+    # a 31.4ms median then 7.6ms. Two to four times, from the same bytes.
+    #
+    # ## Why this job and not one of the other two answers
+    #
+    # The issue names three. Widening the numbers is refused by the tests' own KDoc and would
+    # have measured nothing. Taking the budgets off `check` and running them only where the
+    # machine is known is cheapest and quietly means nobody measures latency in CI at all. This
+    # is the third: they still run on every push, on both runner images, and they are still hard
+    # gates -- they simply run where the measurement is a measurement.
+    #
+    # ## What makes the job exclusive, and why both flags
+    #
+    # `--no-parallel` stops Gradle executing tasks from two projects at once. `--max-workers=1`
+    # stops it running anything at all beside the forked test JVM -- without it Gradle is free to
+    # start the next task's worker while a budget is being timed. Either alone leaves a second
+    # process on the other cores, which is the whole defect. `:udea-gradle`'s
+    # `LatencyBudgetJobTest` asserts both flags are still here, that this job still covers every
+    # runner image the `build` job covers, and that no other step in this workflow runs a budget
+    # task beside anything else.
+    #
+    # ## Why the compile is a separate step
+    #
+    # Compiling three modules serially would cost several minutes of runner time for no benefit:
+    # nothing is being measured yet. So the warm-up step compiles in parallel like any other job,
+    # and only the step that takes the readings is serialised. The Gradle daemon survives between
+    # steps, so the measuring invocation finds its inputs up to date and does nothing but run the
+    # six test tasks.
+    name: latency budgets (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      # In parallel, deliberately: this step measures nothing.
+      - name: Compile what the budgets measure
+        shell: bash
+        run: >-
+          ./gradlew
+          :udea-core:testClasses
+          :udea-assets-compiler:testClasses
+          :udea-agent-host:testClasses
+          --stacktrace
+
+      - name: Measure, with the runner to itself
+        shell: bash
+        run: ./gradlew udeaLatencyBudgets --no-parallel --max-workers=1 --stacktrace
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: latency-budget-reports-${{ matrix.os }}
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**
+          retention-days: 7
+
+      # On a green run as well as a red one, and for the same reason the `build` job says it:
+      # `udeaBenchTickLoop` writes `build/reports/udea/tick-loop.json` and its own KDoc calls it
+      # "published by the Phase 0 CI job as the gate's artifact". This is now that job.
+      - name: Upload measured budgets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: udea-latency-budgets-${{ matrix.os }}
           path: |
             **/build/reports/udea/**
           if-no-files-found: error

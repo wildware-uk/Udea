@@ -31,6 +31,11 @@ dependencies {
     // that teaches kotlin-compiler-embeddable how to compile a script at all. Without it on the
     // runtime classpath, every .udea.kts compile fails with "cannot find script definition".
     runtimeOnly(libs.kotlin.scripting.compiler.embeddable)
+
+    // `LatencyBudget`, the contention note `DaemonLatencyBudgetTest` and `GraphBudgetTest` end
+    // their failure messages with (issue #175). `udea-diagnostics` is already an `api` dependency
+    // of this module; this line adds its test fixtures, and nothing else, to the test classpath.
+    testImplementation(testFixtures(project(":udea-diagnostics")))
 }
 
 // The kotlin-reflect pin that used to live here is now in `UdeaStdlibPin.PINNED_MODULES`, where
@@ -101,9 +106,16 @@ tasks.withType<Test>().configureEach {
 // --- Phase 2 budget gate (spec 6, Phase 2 exit) ----------------------------------------------
 //
 // "warm validate < 300ms" is an exit criterion, so it is a CI gate and not an advisory print,
-// wired exactly like `udeaDigestBudget` in `udea-agent`: its own task on `check`, excluded from
-// `test` so a normal run does not pay for it twice, and `showStandardStreams` on so the measured
-// numbers reach the build log of whatever machine is actually slow.
+// wired exactly like `udeaDigestBudget` in `udea-agent`: its own task, excluded from `test` so a
+// normal run does not pay for it twice, and `showStandardStreams` on so the measured numbers
+// reach the build log of whatever machine is actually slow.
+//
+// It hangs off the root's `udeaLatencyBudgets` and no longer off `check` (issue #175). Both of
+// its numbers are wall-clock milliseconds, and the difference between measuring them alone and
+// measuring them inside a parallel build is most of the number: on this box the warm reload
+// medians 195ms alone and 646ms inside a full `build`, against a 500ms budget. That is not a
+// slower daemon, it is a busier machine, and it is why this job now measures on a runner of its
+// own rather than beside nineteen Kotlin compilations.
 //
 // If it fails, the remedy is the daemon's incremental scope - validate fewer files - never a
 // wider budget. The number lives in `DaemonLatencyBudgetTest`, where moving it is a diff.
@@ -113,17 +125,13 @@ tasks.named<Test>("test") {
     filter.excludeTestsMatching(daemonBudgetTestClass)
 }
 
-val udeaDaemonBudget = tasks.register<Test>("udeaDaemonBudget") {
+tasks.register<Test>("udeaDaemonBudget") {
     group = "verification"
     description = "Gates the warm daemon: validate and reload of one edited script under 300ms."
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     filter.includeTestsMatching(daemonBudgetTestClass)
     testLogging.showStandardStreams = true
-}
-
-tasks.named("check") {
-    dependsOn(udeaDaemonBudget)
 }
 
 // --- udeaMigrateAssets (issue #93) --------------------------------------------------------
@@ -173,7 +181,6 @@ tasks.register<JavaExec>("udeaMigrateAssets") {
 val packGateClasses = listOf(
     "dev.wildware.udea.assets.compiler.pack.ReproducibilityTest",
     "dev.wildware.udea.assets.compiler.pack.RealArtReproducibilityTest",
-    "dev.wildware.udea.assets.compiler.pack.GraphBudgetTest",
     "dev.wildware.udea.assets.compiler.atlas.AtlasPackerTest",
     "dev.wildware.udea.assets.compiler.atlas.RealArtAtlasPackerTest",
     // The control. It belongs in the same task as the tests it controls, so one run says both
@@ -181,15 +188,32 @@ val packGateClasses = listOf(
     "dev.wildware.udea.assets.compiler.atlas.SmallFixtureContrastTest",
 )
 
+/**
+ * The 15ms graph-deserialisation budget, split out of `udeaPackGate` by issue #175.
+ *
+ * The two halves of that task answered different questions and only one of them is a stopwatch.
+ * "Two clean builds produce a byte-identical `.udeapak`" is a determinism claim: it gives the
+ * same answer on a busy machine as on an idle one, so it belongs on `check` where every build
+ * runs it. `GraphBudgetTest` asserts a *median of nine timings* against 15ms, which on this box
+ * is 7.6ms alone and 31.4ms inside a parallel build - the same decoder, twice the budget apart,
+ * because the measurement is of the machine. It belongs with the other latency gates, on the
+ * root's `udeaLatencyBudgets`, measured by a CI job that has the runner to itself.
+ *
+ * Splitting it is what lets `udeaPackGate` stay on `check`, which matters: the `build` job's
+ * "Assert the atlas determinism tests ran and none skipped" step reads that task's own JUnit
+ * reports, and a task that no longer runs there writes no reports for it to read.
+ */
+val graphBudgetTestClass = "dev.wildware.udea.assets.compiler.pack.GraphBudgetTest"
+
 tasks.named<Test>("test") {
     packGateClasses.forEach { filter.excludeTestsMatching(it) }
+    filter.excludeTestsMatching(graphBudgetTestClass)
 }
 
 val udeaPackGate = tasks.register<Test>("udeaPackGate") {
     group = "verification"
     description =
-        "Phase 2 exit: byte-identical .udeapak from two checkouts, the real atlas, and the " +
-            "15ms graph deserialisation budget."
+        "Phase 2 exit: byte-identical .udeapak from two checkouts, and the real atlas."
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     packGateClasses.forEach { filter.includeTestsMatching(it) }
@@ -198,6 +222,17 @@ val udeaPackGate = tasks.register<Test>("udeaPackGate") {
     testLogging.showStandardStreams = true
 }
 
+tasks.register<Test>("udeaGraphBudget") {
+    group = "verification"
+    description = "Gates .udeapak graph deserialisation at 2000 assets: 15ms median."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    filter.includeTestsMatching(graphBudgetTestClass)
+    testLogging.showStandardStreams = true
+}
+
+// `udeaPackGate` only. `udeaGraphBudget` is reached through the root's `udeaLatencyBudgets`,
+// which the `latency-budgets` CI job runs serially on both runner images (issue #175).
 tasks.named("check") {
     dependsOn(udeaPackGate)
 }

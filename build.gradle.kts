@@ -120,6 +120,54 @@ val udeaAssemble by tasks.registering {
     dependsOn(rewriteProjects.map { "${it.path}:assemble" })
 }
 
+// --- the wall-clock latency budgets (issue #175) ----------------------------------------------
+//
+// Every gate in this repository that asserts a number of *milliseconds*, gathered under one task
+// so that one CI job can measure them all with the runner to itself.
+//
+// ## Why they are not on `check`
+//
+// They were, and they could not pass on a GitHub runner. `check` runs inside `build`, so each of
+// these was measured while nineteen other modules compiled on the same cores, and a wall-clock
+// measurement taken during a parallel build measures the build. The same code, on this box:
+// warm daemon reload medians 195ms alone and 646ms inside a full build; graph deserialisation
+// medians 7.6ms alone and 31.4ms inside one, against a 15ms budget. Three waves of developers
+// each rediscovered that by re-running the task solo.
+//
+// ## Why this is not "take them off `check` and forget them"
+//
+// Issue #175 lists that as option 3 and ranks it last, because it quietly means nobody measures
+// latency in CI at all. This is option 1: they are measured on **every push, on both runner
+// images**, by the `latency-budgets` job, which runs this task and nothing else with
+// `--no-parallel --max-workers=1`. `:udea-gradle`'s `LatencyBudgetJobTest` is what stops the two
+// halves drifting apart - it reads the list below out of this file and asserts the workflow still
+// measures every member of it, serially, on every runner the `build` job covers.
+//
+// It is also the arrangement this repository already uses for exactly this reason. `runUdpProof`
+// and `runLaneShot` sit outside `check` because wall-clock timing across forked JVMs and a GL
+// driver are not things a parallel build can hold still. These are the same class of thing, and
+// they were the ones that had not been moved yet.
+//
+// Adding a budget here is what puts it under the CI job and under that test. Do not add anything
+// else: a task in this list is one whose number is a duration, and a correctness gate parked here
+// would be a correctness gate nobody runs on `check`.
+val latencyBudgetTasks = listOf(
+    ":udea-core:udeaSnapshotBudget",
+    ":udea-core:udeaBenchTickLoop",
+    ":udea-core:udeaBenchCharacterMover",
+    ":udea-assets-compiler:udeaDaemonBudget",
+    ":udea-assets-compiler:udeaGraphBudget",
+    ":udea-agent-host:udeaPhase2Exit",
+)
+
+val udeaLatencyBudgets by tasks.registering {
+    group = "verification"
+    description =
+        "Measures every wall-clock latency budget. Run it with --no-parallel --max-workers=1 " +
+            "and nothing else on the machine, or it measures the machine."
+    dependsOn(latencyBudgetTasks)
+}
+
 tasks.named("check") {
     dependsOn(udeaVerifyNoLegacyDependencies, udeaVerifyModuleGraph)
 }

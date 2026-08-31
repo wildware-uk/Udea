@@ -2,6 +2,7 @@ package dev.wildware.udea.assets.compiler.pack
 
 import dev.wildware.udea.assets.compiler.TestPaths
 import dev.wildware.udea.assets.pack.BundleReader
+import dev.wildware.udea.diagnostics.bench.LatencyBudget
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -28,6 +29,15 @@ import kotlin.time.TimeSource
  *
  * The number is printed on every run, so a machine that is merely slow shows up as a number
  * near the line rather than as a mysterious red.
+ *
+ * ## Where it is measured
+ *
+ * On `udeaGraphBudget`, split out of `udeaPackGate` by issue #175 and reached through the root's
+ * `udeaLatencyBudgets`. `udeaPackGate`'s other tests ask whether two builds produce identical
+ * bytes, which is true or false regardless of what else the machine is doing; this one asks how
+ * long nine deserialisations take, which is not. On this box the same decoder medians 7.6ms alone
+ * and 31.4ms inside a parallel build, against a 15ms budget - so measured beside the build it
+ * fails on a machine four times inside its budget.
  */
 class GraphBudgetTest {
 
@@ -51,7 +61,8 @@ class GraphBudgetTest {
 
         assertTrue(
             median <= BUDGET,
-            "deserialising $ASSETS assets took a median of $median, over the $BUDGET budget",
+            "deserialising $ASSETS assets took a median of $median, over the $BUDGET budget. " +
+                LatencyBudget.contentionNote(TASK),
         )
     }
 
@@ -79,6 +90,9 @@ class GraphBudgetTest {
     }.sortedBy { it.id }
 
     private companion object {
+        /** The task that measures this, and the one to re-run alone before believing a red. */
+        const val TASK = ":udea-assets-compiler:udeaGraphBudget"
+
         /** Issue #89's number. */
         val BUDGET = 15.milliseconds
 

@@ -1,5 +1,6 @@
 package dev.wildware.udea.core.movement
 
+import dev.wildware.udea.diagnostics.bench.LatencyBudget
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -12,7 +13,14 @@ import kotlin.test.assertTrue
  * frame is 16.67ms. A client reconciling a 200-entity match re-runs the last second of movement
  * for every entity it predicts, every frame, and that work has to leave room for the rest of the
  * tick. The gate is therefore [BUDGET_MS] for 12000 `move` calls - a quarter of the frame - and
- * it is a *hard* gate wired into `check`, not an aspiration.
+ * it is a *hard* gate, not an aspiration.
+ *
+ * It is measured by `udeaBenchCharacterMover`, on the root's `udeaLatencyBudgets`, in a CI job
+ * that has the runner to itself. It used to hang off `check` and therefore be measured inside a
+ * twenty-module parallel build, which is what issue #175 was about: 12000 move calls take a
+ * median of 2.0-2.2ms alone on this repository's development box, against the 4.0ms budget, and
+ * miss it outright when nineteen Kotlin compilations are competing for the same cores. Neither
+ * number is about `CharacterMover`.
  *
  * ## The remedy when it fails is never to loosen the number
  *
@@ -66,7 +74,8 @@ class CharacterMoverBudgetTest {
         )
         assertTrue(
             medianMs < budgetMs,
-            "movement took ${medianMs}ms for ${movers * replays} calls; the budget is ${budgetMs}ms",
+            "movement took ${medianMs}ms for ${movers * replays} calls; the budget is " +
+                "${budgetMs}ms. " + LatencyBudget.contentionNote(TASK),
         )
     }
 
@@ -116,5 +125,8 @@ class CharacterMoverBudgetTest {
 
     private companion object {
         const val BUDGET_MS: Double = 4.0
+
+        /** The task that measures this, and the one to re-run alone before believing a red. */
+        const val TASK = ":udea-core:udeaBenchCharacterMover"
     }
 }

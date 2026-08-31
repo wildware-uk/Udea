@@ -2,6 +2,7 @@ package dev.wildware.udea.agent.host
 
 import dev.wildware.udea.agent.host.demo.Phase2Demo
 import dev.wildware.udea.agent.host.demo.Phase2Instance
+import dev.wildware.udea.diagnostics.bench.LatencyBudget
 import org.junit.jupiter.api.Test
 import java.net.URI
 import java.net.http.HttpClient
@@ -71,7 +72,8 @@ class Phase2ExitTest {
             assertTrue(observed, "the running world never reported the new value; hp is ${hp(game)}")
             assertTrue(
                 elapsedMs <= BUDGET_APPLY_MS,
-                "spec 6 gates this at ${BUDGET_APPLY_MS}ms; it took ${elapsedMs}ms",
+                "spec 6 gates this at ${BUDGET_APPLY_MS}ms; it took ${elapsedMs}ms. " +
+                    LatencyBudget.contentionNote(TASK),
             )
             // Without a restart: the same instance, the same loop thread, still ticking.
             assertTrue(!game.loopFinished(), "the loop thread ended, so this was a restart")
@@ -87,9 +89,11 @@ class Phase2ExitTest {
             val before = file.readText()
 
             // Three rejections, and the median is the gate. Same statistic and same reason as
-            // `DaemonLatencyBudgetTest`: this task runs inside `check`, beside every other
-            // compilation in the build, and the maximum of a small sample there is the worst
-            // scheduling hiccup rather than anything about the compiler. Every sample is printed.
+            // `DaemonLatencyBudgetTest`: the maximum of a small sample is the worst scheduling
+            // hiccup in the window rather than anything about the compiler. Every sample is
+            // printed. Since issue #175 the task is measured by a CI job with the runner to
+            // itself rather than beside every other compilation in the build, which removes the
+            // largest source of that hiccup without removing the reason for the statistic.
             val samples = mutableListOf<Long>()
             var json = ""
             repeat(REJECT_SAMPLES) {
@@ -121,7 +125,8 @@ class Phase2ExitTest {
             println("phase 2 exit: typo'd reference rejected in ${median}ms (median of $samples)")
             assertTrue(
                 median <= BUDGET_REJECT_MS,
-                "spec 6 gates the rejection at ${BUDGET_REJECT_MS}ms; median was ${median}ms $samples",
+                "spec 6 gates the rejection at ${BUDGET_REJECT_MS}ms; median was ${median}ms " +
+                    "$samples. " + LatencyBudget.contentionNote(TASK),
             )
             // The last-good graph: the world still carries the value the daemon had before.
             assertEquals(2.0, hp(game), "a rejected edit must leave the running game as it was")
@@ -265,6 +270,9 @@ class Phase2ExitTest {
         java.net.URLEncoder.encode(value, Charsets.UTF_8)
 
     private companion object {
+        /** The task that measures these, and the one to re-run alone before believing a red. */
+        const val TASK = ":udea-agent-host:udeaPhase2Exit"
+
         /** Spec 6, Phase 2: "reflects it in under a second". */
         const val BUDGET_APPLY_MS = 1_000L
 

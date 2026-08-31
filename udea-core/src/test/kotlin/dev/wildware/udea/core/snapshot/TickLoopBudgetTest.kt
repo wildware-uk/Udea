@@ -4,6 +4,7 @@ import dev.wildware.udea.core.EngineConfig
 import dev.wildware.udea.core.ModuleFiles
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.alloc.AllocationProbe
+import dev.wildware.udea.diagnostics.bench.LatencyBudget
 import java.io.File
 import java.lang.reflect.Modifier
 import kotlin.test.Test
@@ -47,7 +48,8 @@ class TickLoopBudgetTest {
             median <= SnapshotBudgets.LOOP_NANOS,
             "the assembled loop took a median of ${median / 1_000_000.0}ms against a " +
                 "${SnapshotBudgets.LOOP_NANOS / 1_000_000.0}ms budget (p95 ${p95 / 1_000_000.0}ms). " +
-                "This is the Phase 0 exit number; do not widen it.",
+                "This is the Phase 0 exit number; do not widen it. " +
+                LatencyBudget.contentionNote(":udea-core:udeaBenchTickLoop"),
         )
     }
 

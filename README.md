@@ -1,4 +1,4 @@
-![Udea Logo](images/logo_square.png)
+<img src="images/logo.svg" alt="Udea Logo" width="464">
 
 # UDEA
 

@@ -130,9 +130,16 @@ def exclusion_section(licence_text):
     return "\n".join(kept)
 
 
+def read(clean, name):
+    """One repo-relative file out of the tree under test, or a Failure naming what is missing."""
+    path = os.path.join(clean, name)
+    if not os.path.isfile(path):
+        raise Failure(f"a fresh checkout of HEAD has no {name}.")
+    return open(path, encoding="utf-8").read()
+
+
 def check_licence_covers_destinations(clean, staged_files):
-    text = open(os.path.join(clean, "LICENSE"), encoding="utf-8").read()
-    tokens = set(PATH_TOKEN.findall(exclusion_section(text)))
+    tokens = set(PATH_TOKEN.findall(exclusion_section(read(clean, "LICENSE"))))
     uncovered = sorted(p for p in staged_files if not licence_covers(p, tokens))
     if uncovered:
         raise Failure(
@@ -145,11 +152,12 @@ def check_licence_covers_destinations(clean, staged_files):
 
 
 def check_readme_matches_licence(clean):
-    licence = open(os.path.join(clean, "LICENSE"), encoding="utf-8").read()
-    readme = open(os.path.join(clean, "README.md"), encoding="utf-8").read()
-    name = licence.strip().splitlines()[0].strip()
-    if not name:
-        raise Failure("LICENSE is empty: it has no licence name on its first line.")
+    licence = read(clean, "LICENSE")
+    readme = read(clean, "README.md")
+    heading = licence.strip().splitlines()
+    if not heading:
+        raise Failure("LICENSE is empty: it names no licence for README.md to match.")
+    name = heading[0].strip()
     # README's own licence section, so a stray mention elsewhere in the file cannot satisfy this.
     section = re.search(r"^##+ +Licen[cs]e\s*$(.*?)(?=^##+ |\Z)", readme, re.S | re.M)
     if not section:
@@ -178,7 +186,7 @@ def main():
 
         # Read from the clean tree, not the working tree: every artefact under test - the
         # manifest, the staging script, LICENSE and README - must be the committed one.
-        step = documented_step(open(os.path.join(clean, MANIFEST), encoding="utf-8").read())
+        step = documented_step(read(clean, MANIFEST))
         print(f"documented step, from {MANIFEST}:")
         for line in step:
             print(f"    {line}")

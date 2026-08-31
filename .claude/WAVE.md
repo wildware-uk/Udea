@@ -1,200 +1,232 @@
-# Wave handoff — 2026-08-31, wave 2
+# Wave handoff — 2026-08-31, wave 3
 
-**Three tickets dispatched, three merged at review round 1, zero findings on any of them.**
-`example` went `5dc9024 → 1f6cddd → 65d6ac9 → 71c3a36 → 3881dcc`, all pushed. `master` untouched at
+**Four tickets dispatched, four merged.** Three at review round 1 with zero findings; #170 took two
+rounds on a single finding that was the lead's, not the developer's.
+
+`example` went `7942823 → c74c730 → efab1d0 → 7691b3d → ea9b267`, all pushed. `master` untouched at
 `ce7db67`, as `HANDOFF.md` reserves.
 
 | Issue | What merged | Commit |
 |---|---|---|
-| #167 | `@Net(visibility = OwnerOnly)` enforced end to end; `moba`'s `Inventory` no longer leaks | `65d6ac9` |
-| #168 | 327-sheet synthetic corpus; the nine atlas determinism tests run on every clone | `71c3a36` |
-| #169 | The `replay-equality` gate produces a verdict — its first ever | `3881dcc` |
+| #173 | The FIR-checker gate reaches a checker — first pass in the repo's history | `c74c730` |
+| #171 | `game-bridge-mcp conformance` runs all 19 steps — first time since the job existed | `efab1d0` |
+| #165 | The 36000-tick nightly, `--update-replay-fixtures`, and a bisect reproduction block | `7691b3d` |
+| #170 | A clone builds `moba` and nobody types anything | `ea9b267` |
 
-Worktrees left on disk under `.claude/worktrees/` — `agent-a3079d2d31be163cf` (#167),
-`agent-a8e84931037574687` (#168), `agent-a30fa1e7426fea7a5` (#169). Nobody asked for them to go.
+Worktrees left on disk under `.claude/worktrees/` — `agent-a46c9497c28044fbe` (#173),
+`agent-abeb18c3aaaf4e15d` (#171), `agent-a5d07682a843e49fe` (#165), `agent-aae42d941ef837a54` (#170).
+Nobody asked for them to go.
+
+---
+
+## The wave in one sentence
+
+**Three CI gates had never once run, and the red that hid them was a fourth.**
+
+#170's art failure made every `moba`-building job red on every push, and three separate gates sat
+behind it in a state nobody could see: the FIR-checker probe could not resolve `@Net`, the vendored
+client's hashes had never matched their own bytes, and — found only after those merged — a
+newly-added Windows test cannot read a CRLF checkout. Each was found by reading `gh run list`, not
+by any ticket.
+
+**A closed ticket is not a working feature, and a red CI is a CI nobody reads.** Wave 2 wrote the
+first half of that. This wave earned the second.
+
+---
+
+## What CI on `example` looks like now
+
+Before (run `33425479983` at `7942823`) — 10 red, most carrying the same 25 `UDEA0032`.
+After (run `33437939749` at `ea9b267`):
+
+**Green, and every one was red before this wave:** `the FIR checkers fail a real build`,
+`game-bridge-mcp conformance`, `clean build under budget`, `determinism (ubuntu-latest, temurin)`,
+`determinism (ubuntu-latest, corretto)`.
+
+**Green and new:** `replay-equality-nightly` — three legs and the join, on the integration branch
+exactly as #165 designed, `36000 tick(s) of 'drift-36000.udearep' are cell-for-cell identical`.
+
+**Still green:** all five `replay-equality` legs and the join, `migration ledger`,
+`agent brief matches the tree`, `KSP stays incremental`.
+
+**Still red, each mapping to a filed issue — nothing unexplained:**
+
+| Job | Cause | Issue |
+|---|---|---|
+| `build (ubuntu-latest)`, `build with the K2 plugin disabled` | `:udea-agent-host:udeaPhase2Exit` over budget | **#175** |
+| `build (windows-latest)`, `determinism (windows-latest, x2)` | `AgentsMdTest`, `ExampleScanTest`, `CompilerPluginSwitchTest` on CRLF | **#176** |
+| `gl tests (xvfb)` | `OffscreenBackendTest` shutdown flake | **#178** |
+
+`grep -c UDEA0032` is **0** everywhere. That number was 50 on the baseline.
 
 ---
 
 ## Read this before you dispatch anything
 
-### CI has been red on every push, and it is TWO faults, not one
+### The staging script is gone. Do not tell anyone to run it
 
-Nobody had read a CI run in a long time. Both faults were found by reading `gh run list`, not by
-any ticket.
+`python3 scripts/stage-moba-art.py` **no longer exists.** `:moba:udeaStageCharacterArt` stages the
+33 sheets as part of the build, ahead of `udeaScanAssets`, `udeaValidateAssets` and `udeaPackBundle`.
+A fresh clone, a fresh worktree and a detached review checkout all build `:moba` with **nothing
+typed**, and `git status` stays clean because the staged art is gitignored.
 
-1. **#170 (open, unassigned, first pick).** Every job that builds `moba` fails with 25 x
-   `UDEA0032` on `moba/assets/sprites/` — gitignored licensed art a clean clone does not have.
-   `build` on both OSes, `clean build under budget`, both `determinism` legs, `plugin-disabled`
-   and `bridge-conformance`. The art is **already committed** under `example/`, and nothing in CI
-   copied it across. **#170 fixed that in the build**: `:moba:udeaStageCharacterArt` stages it
-   ahead of the asset pipeline on every build, and `scripts/stage-moba-art.py` is deleted.
-2. **#169 (merged).** The `replay-equality` legs died at the upload step on every run since #152,
-   so `replay-equality-join` — which `needs:` them — had never executed. **#152 closed against a
-   gate that had never compared anything.**
+`.claude/skills/dev-team/SKILL.md`, `.claude/agents/engineer.md` and `.claude/agents/team-lead.md`
+were corrected on #170's branch. **A `UDEA0032` about a `spritePath` is now a real defect in whatever
+you just changed**, not an environment step you forgot.
 
-**The lesson worth carrying: a closed ticket is not a working feature.** #152 shipped a job, a
-fixture, a matrix and a divergence renderer, all reviewed and all correct, and the thing still did
-not run. Read the Actions run, not the merge commit.
+That correction was the wave's one review finding, and it was mine: dev-170 spotted all four
+documents in round 1, listed them with line numbers, and asked; I said leave them, because at that
+moment they were still correct. That reasoning expired when the other three tickets merged, and
+`review-170-r1` was right to fail the branch for it. **#177** is filed to make
+`verify-art-staging.py` fence `.claude/`, so the next such drift is caught by the build rather than
+by a reviewer.
 
-### A detached review checkout cannot build `moba`, and it costs an hour every time
+### Two ways to get a confident wrong answer on this box
 
-Same root cause as #170. `git worktree add --detach` gives a tree with no `moba/assets/sprites/`,
-so `:moba:udeaValidateAssets` and `:moba:udeaPackBundle` fail and **`:moba:test` never runs** —
-which silently breaks any evidence command that names a `:moba:` test. `review-167-r1` lost an hour
-to it and warned the next reviewer would too.
+Both cost real time this wave. Put them in the dispatch.
 
-**That was true for most of this wave, and #170 ended it.** Every review checkout and trial merge
-up to then ran `python3 scripts/stage-moba-art.py` by hand — I did it on all three trial merges,
-and the reviewer prompt carried it. That script is deleted. `:moba:udeaStageCharacterArt` stages
-the art on every build instead, so a detached checkout builds `moba` on its own: run nothing, and
-put no staging line in the reviewer prompt. Everything it writes is gitignored, so `git status`
-stays clean and the tracked tree remains exactly the branch.
+**1. A backgrounded Bash command starts in the *session* directory, not wherever you last `cd`-ed.**
+dev-170b launched a `clean build` with `run_in_background: true` and no `cd`; it ran in
+`/srv/ssd1/workspace/Udea` on branch `example` and returned `BUILD SUCCESSFUL` **about the wrong
+repository**. Nothing errored. It caught it only because an expected task was missing from the log,
+and confirmed it by comparing jar mtimes. Echo `pwd` and `git rev-parse` from the same command line.
 
-### Name briefs `BRIEF-<issue>.md`. This is settled
+That `clean` also deleted `/srv/ssd1/workspace/Udea/build/`, which is **where the screenshot gallery
+lives** — `tools/screenshot-gallery.py` serves `build/debug-screenshots/`. Round 1's image was
+destroyed and had to be regenerated. Worth moving the gallery out of a directory `gradle clean`
+deletes by design.
 
-Wave 1 hit an add/add conflict at the repo root on the second and third merge, and each resolution
-threw away the previous ticket's brief. Ruled at the start of this wave and commented on all three
-issues; all three developers complied and there was **no conflict at any merge**. `example` still
-carries wave 1's `BRIEF.md` (#154's) plus `BRIEF-169.md`. Leave them or bin them, but do not go
-back to the unnumbered name.
+**2. `grep` on this box is a shell function wrapping ugrep, which skips gitignored directories.**
+A working-tree `grep -rn` silently reads nothing under `build/`. Use `git grep`. dev-170b was bitten
+by exactly this; `review-170-r2` then found a hit that the developer's own `git grep -- '*.md'` had
+filtered out. **Grep the class, not the instances you thought of.**
 
-### Three developers is fine; the four budget tasks are not evidence of anything
+And one of mine: **do not pipe a build through `| tail`.** The pipeline's exit status becomes
+`tail`'s, so a `BUILD FAILED` comes back as exit 0. Redirect to a file and grep it.
 
-24 cores, ~14G free at dispatch. Three developers plus three reviewers peaked at **load 33**. It
-cost nothing but patience: **every trial merge failed on wall-clock budget tasks and every one
-passed solo.**
+### The wall-clock budgets, now with a ticket
 
-| Task | Under load | Alone |
-|---|---|---|
-| `:udea-assets-compiler:udeaPackGate` (`GraphBudgetTest`) | 34.9ms / 15.478ms | 11.18ms / 11.80ms |
-| `:udea-assets-compiler:udeaDaemonBudget` | 1022ms + 661ms | 147ms / 99ms |
-| `:udea-core:udeaBenchCharacterMover` | 12.476ms vs 4ms | 2.590ms |
-| `:udea-agent-host:udeaPhase2Exit` | fail | 12ms |
+`:udea-assets-compiler:udeaDaemonBudget`, `:udea-assets-compiler:udeaPackGate`,
+`:udea-core:udeaBenchCharacterMover`, `:udea-core:udeaBenchTickLoop` and
+`:udea-agent-host:udeaPhase2Exit` fail under load and pass alone. **Every trial merge this wave hit
+between two and four of them, and every one passed solo with 2-4x headroom.** They also fail on
+GitHub runners, which is **#175** — a decision, not a number, and `DaemonLatencyBudgetTest`'s KDoc
+forbids widening the budget.
 
-The procedure that works: `until awk '{exit !($1 < 9.0)}' /proc/loadavg; do sleep 20; done` in a
-background shell, then re-run the failing task with `--rerun-tasks` alone. **Do not merge on a
-loaded red build and do not merge without re-running it.**
+The procedure, never once wrong this wave:
 
-dev-168 did the better version of this: a matched control on `origin/example`, same box, minutes
-apart, which failed **more** budgets than its own branch. That is the arithmetic answer to "did my
-change push a budget over", and it beats waving at load.
+```
+until awk '{exit !($1 < 9.0)}' /proc/loadavg; do sleep 20; done
+sh gradlew <task> --rerun-tasks --no-build-cache
+```
 
-### The trap that should scare you most this wave
+**And the trap that makes a green meaningless:** after a budget task passes once, the next plain
+`sh gradlew build` reports it `FROM-CACHE` and the whole build goes green. dev-171 nearly wrote that
+up as its green build. Use `--rerun-tasks --no-build-cache` for anything you intend to rule on.
 
-dev-169 wrote `digests` + `/` + `*` into a KDoc in `udea-replay/build.gradle.kts`. That opens a
-**nested Kotlin block comment which runs to EOF**, and it switched off *every* `udeaReplay*` task
-registration.
+### What reviewers did that turned reviews into checks
 
-- `sh gradlew build` stayed **green** — none of those tasks is in `check`.
-- `ReplayEqualityProofTest` stayed **green** — it was matching text that was present in the file
-  and merely commented out.
-- Only `gradlew :udea-replay:tasks` noticed.
+All four verdicts were reached by breaking something rather than by reading a brief. Keep asking:
 
-That class has read the raw build script since #152, so the weakness was pre-existing. It now
-strips comments with nesting and string literals handled; the reviewer planted a `/*` itself and
-confirmed the fence goes red. **`sh gradlew :udea-replay:tasks` is a cheap check worth typing after
-anything touches a build script.**
+- `review-173-r1` **reverted the fix in its own checkout** and reproduced the issue's six error
+  lines, confirming the developer's cause and the ticket's error first-hand.
+- `review-171-r1` applied **five mutations and got five reds**, including proving the new recorder
+  *refuses* to write a CRLF-converted file, and pinned upstream identity out of band against a real
+  clone at `ecc9ac5`.
+- `review-165-r1` proved `drift-3600.udearep` regenerates byte-identical by **deleting the file and
+  rebuilding it**, not by reading `git status`.
+- `review-170-r2` **followed the new instructions literally** on a bare checkout with no manual step,
+  and grepped without a path filter where the developer's grep had one.
 
-### What the reviewers did right, and what to keep asking for
-
-All three verdicts were PASS at round 1 with zero findings, and none of them was a rubber stamp:
-
-- `review-167-r1` checked the `NetStateProbe` narrowing **arithmetically** — exactly one of moba's
-  16 replicators implements `OwnerOnlyFields`, so `andNot(netMask, EMPTY) == netMask` for the other
-  15 — rather than accepting a plausible story about why a desync probe went quiet.
-- `review-168-r1` measured the corpus off the **PNG `IHDR` headers on disk**, not from
-  `CorpusShape`. A quietly-30-sheet corpus would have passed every test on the branch.
-- `review-169-r1` read the **Actions logs and jobs API**, not the brief's list of run URLs.
-
-Each applied the developer's own mutations itself. Keep putting "apply the mutations yourself, do
-not trust the table" in the reviewer prompt — it is the line that turns a review into a check.
+Three developers also corrected their own work before reporting — a KDoc claiming a gate had been
+broken "for a year" when it was eight days, a spliced transcript carrying a stale pid, three
+transcripts quoting files a later run had overwritten. **That self-review is the cheapest round in
+the ticket. Keep demanding it.**
 
 ---
 
 ## Issues opened this wave
 
-- **#169** — merged. Filed and closed in the same wave.
-- **#170** — CI cannot build `moba` on a clean clone. **Open, unassigned, and the first thing to
-  pick up.** It blocks reading CI at all, and it blocks pointing the replay gate at `moba`.
+Filed: **#171**, **#172**, **#173**, **#174**, **#175**, **#176**, **#177**, **#178**.
+Closed: **#165**, **#170**, **#171**, **#173**.
 
-**Dropped rather than filed**, per the standing instruction: `VisibilityPolicy.ownerOnlyMask`'s
-`as?` + `require` per component per entity per recipient per tick (a type check, not reflection —
-hoist only if the packer shows in a profile); the narrowed `NetStateProbe` no longer covering
-whether an owner receives its *own* private fields (moved to two live-client tests, said plainly in
-the KDoc); the join printing two pairwise comparisons for three legs (a chain against a reference,
-transitive over byte equality); a double space `run: >-` leaves when the plant expression is empty.
+**Dropped rather than filed**, per the standing instruction: the `vendor-hash.mjs` circularity
+between recorder and verifier (pinned out of band; a card at most); `verify-vendor` alone still
+passing a hand-reordered manifest (only `test:vendor` catches it, and CI runs `test:vendor`);
+regenerating a deleted fixture reporting red on the run that rebuilds it; `clean build under budget`
+measuring the runner rather than the tree.
+
+**#178 was dropped on its first occurrence and filed on its second.** That is the right shape: one
+flake is noise, two in the only job that makes a surface pass-or-fail is a pattern.
+
+---
+
+## Phase 7, precisely
+
+- **Done: the real Actions run.** Verified on `example` itself, not on a branch — run `33425479983`,
+  `replay-equality (join)`: `3 digest stream(s)`, then `replay equality holds: 3600 tick(s) of
+  'drift-3600.udearep' are cell-for-cell identical`. And proven able to fail: run `33419266780` with
+  `replay_plant_ulp_at=1200` goes red at t1200 naming `Drifter.x`, `0x40d21533` vs `0x40d21532`.
+- **Done: the nightly.** #165, green on the integration branch on its first run there.
+- **Not done: the gate still replays `DriftWorld`, not `moba`.** That is **#172**, now unblocked —
+  #170 merged so CI can build `moba`, and #165's regeneration flag exists.
+
+**#172's scope was corrected this wave and the correction matters.** It originally excluded the
+nightly on the grounds that #165 owned it; what #165 delivered is a nightly pointed at `DriftWorld`.
+So *pointing the long nightly at the game* was owned by neither issue. #172 now covers both legs.
+Found by `review-165-r1`, not by me.
+
+---
+
+## The frozen-contract audit
+
+Run this wave against `AGENTS.md`'s table. **All eight are backed by real code**, not merely declared:
+
+| Contract | Its enforcement |
+|---|---|
+| Serialization | `udeaCheckProtocolLock`, `expected-generated-hashes.txt` |
+| Dirty determination | Capture-and-diff by construction; no setter instrumentation exists |
+| Id assignment | `net-protocol.lock`, `ProtocolDescriptor.PROTO_HASH_BITS`, `ServiceLoader` |
+| Between-tick mutation | `SimBarrierTest`, `TornWorldRestoreTest` |
+| Entity identity | `NetIdIndex`, `EntityDetail.render(NetId)` — Fleks `Entity` appears in `udea-agent` only *below* the tool boundary |
+| Time | `DET001`, `DET003` |
+| Authority vocabulary | `@Net` parameters plus the K2 checkers |
+| Diagnostics | `DiagnosticSink.MAX_DIAGNOSTICS = 25`, `UdeaRuleParityTest` |
+| Randomness | `DET002` |
+
+**One gap, one level up: nothing gates `docs/contracts/` itself.** A grep for `docs/contracts` across
+every `.kt`, `.kts`, `.yml` and `.py` returns only KDoc prose. Wire ids, module arrows, generated
+output, `AGENTS.md`'s own table and migration copies each have a verifier task; the frozen contracts
+have a reviewer's attention. That is **#174**.
+
+A structural-skip sweep came back clean: the only tests skipping in the tree are the GL suites (no
+`$DISPLAY`, covered by the `gl-tests` job) and the `RealArt*` twins (deliberate, #168). Zero
+allocation tests skipped.
 
 ---
 
 ## Left for the owner
 
-- **Run `sh gradlew :udea-assets-compiler:udeaPackGate --rerun` once locally.** #168's shared
-  contract now derives frame size from the images and asserts every frame is 100x100. The real-art
-  twins have never been *executed* anywhere — there is no paid art on this box, which is why the
-  ticket existed — so a real corpus that is not uniform will newly fail **on your machine only**.
-  If it does, relax the contract's uniformity assertion, not the corpus.
-- **Mark `replay-equality` required for merge.** Branch protection; no agent can set it. It now
-  actually produces a verdict, so this is finally worth doing.
+- **Mark `replay-equality` and `the FIR checkers fail a real build` as required status checks.**
+  Branch protection; no agent can set it. Both now produce a verdict and both have been seen to fail
+  for the right reason. `checkers-fire`'s own comment has demanded this since Phase 0 and it was
+  never possible until today.
+- **Run `sh gradlew :udea-assets-compiler:udeaPackGate --rerun` once locally.** Carried from wave 2,
+  still outstanding: #168's contract derives frame size from the images and asserts every frame is
+  100x100. The real-art twins have never been executed anywhere, so a real corpus that is not
+  uniform will newly fail **on your machine only**. If it does, relax the uniformity assertion, not
+  the corpus.
 - **Whether `example` merges into `master`.** Still yours, still untouched.
-- **The eight phase-checkpoint issues.** `docs/decisions/phase-log.md` says they were never opened
-  because the automation's token got `403 Resource not accessible by personal access token`.
-  **That note is stale — this session's `gh` creates issues fine** (#169 and #170 are proof). I did
-  not open all eight unasked; it is a one-command job whenever you want the mechanism installed.
-
----
-
-## What is still red or unfinished
-
-- **#170.** Every `moba`-building CI job, every push. Nothing else on this list moves until it does.
-- **`:moba:runUdpProof` fails under 5% loss, 5/5.** Unchanged, pre-existing, `HANDOFF.md`
-  documents it. Still the honest top of the queue after #170.
-- **`:moba:runNetProof` reports `perfect units DISAGREED`.** Pre-existing; confirmed again this
-  wave by `review-167-r1` running it on the branch and on a control checkout of `origin/example`
-  and getting identical verdicts. Nobody owns it.
-- **`MigratedCorpusCompilesTest`** fails identically on `origin/example` — another #170 symptom,
-  confirmed by `review-168-r1`.
-- **`docs/decisions/phase-log.md` still has no entries.** I deliberately added none: #169 closed
-  *half* of one exit criterion, not a phase boundary, and that file's own rules forbid an entry
-  that flatters progress.
-
-### Phase 7, precisely
-
-Do not read "#169 merged" as "Phase 7 done". The exit criterion in `ci.yml:1028` is "The cross-OS
-`replay-equality` CI job. Nothing else."
-
-- **Done, and confirmed on `example` itself rather than only on a topic branch.** Run
-  [33425001370](https://github.com/wildware-uk/Udea/actions/runs/33425001370) at `d6146e3`:
-  all three legs green — ubuntu/temurin, ubuntu/corretto, windows/temurin — and
-  **`replay-equality (join)` green**, its log reading `3 digest stream(s)` then
-  `replay equality holds: 3600 tick(s) of 'drift-3600.udearep' are cell-for-cell identical`.
-  It is also proven to FAIL: run
-  [33419266780](https://github.com/wildware-uk/Udea/actions/runs/33419266780) with
-  `replay_plant_ulp_at=1200` goes red at t1200 naming `Drifter.x`,
-  `A=6.565088 (0x40d21533)` vs `B=6.5650873 (0x40d21532)`, with t1195-t1199 agreeing.
-  A gate that only ever passes is the defect #169 existed to fix, so both directions matter.
-
-  **Everything else in that run is red, and all of it is #170 or older.** The ten failing jobs
-  are `build` x2, `clean build under budget`, `determinism` x4, `plugin-disabled`,
-  `bridge-conformance` — every one of which builds `moba` — plus `the FIR checkers fail a real
-  build`, which was failing identically on run `33413123651` before this wave started.
-  `replay-equality` is the only job whose result CHANGED this wave, and it changed red to green.
-- **Not done:** the gate replays `udea-replay`'s own `DriftWorld`, **not `moba`**. That is the
-  goal's remaining clause and it is blocked on **#170** — a gate cannot be pointed at a module CI
-  cannot build.
-- **Not done:** #165's nightly 36000-tick fixture and `--update-replay-fixtures`. Held this wave
-  with the reason commented on the issue: it extends a gate that had never executed, and building a
-  nightly on that would have produced a second thing that also did not run. **That objection is now
-  spent — #169 is merged, so #165 is unblocked.**
+- **Three orphan `Xvfb` servers** (`:104` at 14h, `:99` at 2.8h, both parentless). Left deliberately:
+  this box is shared with `melon-merge` and neither is provably ours.
 
 ---
 
 ## Pick up next
 
-1. **#170** — CI cannot build `moba`. Unblocks reading CI, and unblocks pointing the gate at `moba`.
-2. **#165** — the nightly and `--update-replay-fixtures`. Now genuinely unblocked.
-3. **Point the replay-equality gate at `moba`.** Needs #170 first, and #165's regeneration flag,
-   because a checked-in `moba` `.udearep` is refused by `BuildIdentity` the moment `protoHash`
-   moves — which #167 just did (`0xea9f -> 0xc67b`). No ticket exists yet; file one when #170 lands.
-4. **#166** — item actives and unique passives. Its lock collision with #167 is now resolved,
-   because #167 has merged.
-5. **The lossy-UDP divergence.** Still red, still understood only as a symptom.
+1. **#172 — point the replay-equality gate at `moba`.** The last Phase 7 clause. Unblocked, scope
+   corrected, and it needs both the PR leg and the nightly.
+2. **#175 and #176** — between them they are every remaining red job on `example` bar the flake.
+   #176 also blocks trusting any cross-platform byte-identity claim, which Phase 7 rests on.
+3. **#174** — the frozen contracts have no gate.
+4. **#166** — item actives and unique passives. Untouched this wave.

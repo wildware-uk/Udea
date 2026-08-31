@@ -70,7 +70,8 @@ moba/raw-assets/
 # back copied the pack's sheets here - four of the six characters (wizard, priest, skeleton,
 # orc_elite) are from the *paid* pack, which docs/art-assets.md calls "the part that matters".
 # Committing them would have doubled an exposure that file already recommends removing.
-# `scripts/stage-moba-art.py` puts them here from art the repository already holds.
+# `:moba:udeaStageCharacterArt` puts them here from art the repository already holds, on every
+# build, which is why a clone builds without any manual step and still commits none of them.
 moba/assets/sprites/*
 !moba/assets/sprites/champion_idle.png
 #

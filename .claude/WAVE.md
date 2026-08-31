@@ -25,8 +25,9 @@ any ticket.
 1. **#170 (open, unassigned, first pick).** Every job that builds `moba` fails with 25 x
    `UDEA0032` on `moba/assets/sprites/` — gitignored licensed art a clean clone does not have.
    `build` on both OSes, `clean build under budget`, both `determinism` legs, `plugin-disabled`
-   and `bridge-conformance`. `scripts/stage-moba-art.py` fixes it from art **already committed**
-   under `example/`, and nothing in CI runs it.
+   and `bridge-conformance`. The art is **already committed** under `example/`, and nothing in CI
+   copied it across. **#170 fixed that in the build**: `:moba:udeaStageCharacterArt` stages it
+   ahead of the asset pipeline on every build, and `scripts/stage-moba-art.py` is deleted.
 2. **#169 (merged).** The `replay-equality` legs died at the upload step on every run since #152,
    so `replay-equality-join` — which `needs:` them — had never executed. **#152 closed against a
    gate that had never compared anything.**
@@ -42,14 +43,12 @@ so `:moba:udeaValidateAssets` and `:moba:udeaPackBundle` fail and **`:moba:test`
 which silently breaks any evidence command that names a `:moba:` test. `review-167-r1` lost an hour
 to it and warned the next reviewer would too.
 
-**Do this in every review checkout and every trial merge, before the build:**
-
-```
-cd /tmp/<checkout> && python3 scripts/stage-moba-art.py
-```
-
-Everything it copies is gitignored, so `git status` stays clean and the tracked tree remains
-exactly the branch. I did it on all three trial merges this wave. Put it in the reviewer prompt.
+**That was true for most of this wave, and #170 ended it.** Every review checkout and trial merge
+up to then ran `python3 scripts/stage-moba-art.py` by hand — I did it on all three trial merges,
+and the reviewer prompt carried it. That script is deleted. `:moba:udeaStageCharacterArt` stages
+the art on every build instead, so a detached checkout builds `moba` on its own: run nothing, and
+put no staging line in the reviewer prompt. Everything it writes is gitignored, so `git status`
+stays clean and the tracked tree remains exactly the branch.
 
 ### Name briefs `BRIEF-<issue>.md`. This is settled
 

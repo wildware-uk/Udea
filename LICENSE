@@ -44,8 +44,9 @@ Specifically excluded, and NOT redistributable under this licence:
     exception named below. .gitignore excludes these paths and the pack's pixels
     are not committed, so a clone of this repository does not carry them;
     docs/art-assets.md carries the manifest instead. moba/assets/sprites/ is
-    where scripts/stage-moba-art.py puts the pack's frames, so a developer's
-    working tree holds excluded art at that path even though a clone does not.
+    where the build's udeaStageCharacterArt task puts the pack's frames, so any
+    tree that has been built holds excluded art at that path even though a clone
+    does not.
 
     The one exception is moba/assets/sprites/champion_idle.png. It is committed,
     it IS covered by the MIT licence above, and it is not third-party art: it is

@@ -127,6 +127,34 @@ class CompilerPluginSwitchTest {
     // --- where the checkers-fire probe may live (issue #173) ---------------------------
 
     /**
+     * Just the `checkers-fire:` job block of `ci.yml`.
+     *
+     * Scoped rather than searched whole, because the two tests below ask "what does *this job*
+     * probe" and a `module=` line anywhere else in a 1200-line workflow would answer a
+     * different question with the same confidence. The slice is as much part of the fence as
+     * the regexes are, so it asserts it found the job and that the job still contains the step
+     * the checks are about; a slicer that silently returned nothing would make both tests pass
+     * on anything.
+     */
+    private fun checkersFireJob(): String {
+        val text = ci.readText()
+        val start = text.indexOf("\n  checkers-fire:\n")
+        assertTrue(start >= 0, "ci.yml no longer has a `checkers-fire:` job")
+        val rest = text.substring(start + 1)
+        val next = Regex("""^ {2}[A-Za-z0-9_-]+:$""", RegexOption.MULTILINE)
+            .findAll(rest)
+            .drop(1)
+            .firstOrNull()
+        val block = next?.let { rest.substring(0, it.range.first) } ?: rest
+        assertTrue(
+            "A broken component fails a real build" in block,
+            "the checkers-fire job no longer contains the step these tests are about; the " +
+                "slice found:\n$block",
+        )
+        return block
+    }
+
+    /**
      * `module=` and `probe=` as the `checkers-fire` step sets them.
      *
      * The step declares the module once and derives its Gradle task from it, so the two
@@ -134,7 +162,7 @@ class CompilerPluginSwitchTest {
      * out a third time here.
      */
     private fun probeDeclaration(): Pair<String, String> {
-        val text = ci.readText()
+        val text = checkersFireJob()
         val absent = "ci.yml no longer declares it in the checkers-fire step, so these tests " +
             "are reading nothing. If the step was rewritten, rewrite them with it."
         val module = assertNotNull(
@@ -182,10 +210,10 @@ class CompilerPluginSwitchTest {
     @Test
     fun `the checkers-fire probe is not written into a tree build-logic compiles a second time`() {
         // Issue #173. The probe was written into `udea-gradle/src/main/kotlin`, which
-        // `build-logic/build.gradle.kts` adds to its own main source set - the only such tree
-        // in the repository. `:build-logic:compileKotlin` therefore compiled the probe first,
-        // with no `udea-annotations` anywhere near it, and answered with six unresolved
-        // references instead of with a rule id. The job had never once reached a checker.
+        // `build-logic/build.gradle.kts` adds to its own main source set.
+        // `:build-logic:compileKotlin` therefore compiled the probe first, with no
+        // `udea-annotations` anywhere near it, and answered with six unresolved references
+        // instead of with a rule id. The job had never once reached a checker.
         //
         // The claim that made it hard to see was in `ci.yml` itself: it named
         // `udea-gradle`'s compile classpath as the reason for the choice, and that classpath

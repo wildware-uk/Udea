@@ -118,6 +118,19 @@ class ReplayEqualityProofTest {
     /** `$GITHUB_WORKSPACE`: what `actions/checkout` roots a workflow's relative paths at. */
     private val workspace: Path get() = projectDir.parent
 
+    /**
+     * `ci.yml` with its comment lines dropped.
+     *
+     * A fence that fires because somebody *wrote about* a path in a comment is as wrong as one
+     * that misses a real second use of it, and this workflow is heavily commented on purpose -
+     * the `replay-equality` job is thirty lines of steps under fifty of prose. The path tests
+     * below read this; the control, a comment naming a second `-Pudea.replay.out=`, is run with
+     * the mutations and leaves them green.
+     */
+    private val workflowCode: String by lazy {
+        workflow.lineSequence().filterNot { it.trimStart().startsWith("#") }.joinToString("\n")
+    }
+
     @Test
     fun `a leg's digest lands in the directory its upload step globs`() {
         val requested = gradlePropertyInWorkflow("out")
@@ -204,7 +217,7 @@ class ReplayEqualityProofTest {
         // proves the opposite of what it claims.
         assertContains(workflow, "replay_plant_ulp_at")
         assertContains(workflow, "udea.replay.plantUlpAt")
-        val planted = Regex("(?m)^\\s*plant: true\\s*$").findAll(workflow).count()
+        val planted = Regex("(?m)^\\s*plant: true\\s*$").findAll(workflowCode).count()
         assertEquals(
             1, planted,
             "the replay-equality matrix marks $planted leg(s) `plant: true`; it must mark one",
@@ -213,7 +226,7 @@ class ReplayEqualityProofTest {
 
     /** The value `ci.yml` hands `-Pudea.replay.<name>`, with its Actions expressions stood in for. */
     private fun gradlePropertyInWorkflow(name: String): String {
-        val found = Regex("-Pudea\\.replay\\.$name=(.+)").findAll(workflow)
+        val found = Regex("-Pudea\\.replay\\.$name=(.+)").findAll(workflowCode)
             .map { it.groupValues[1].trim() }.toList()
         assertEquals(
             1, found.size,
@@ -224,9 +237,9 @@ class ReplayEqualityProofTest {
 
     /** The value of [key] inside the `ci.yml` step called [stepName]. */
     private fun stepValue(stepName: String, key: String): String {
-        val start = workflow.indexOf("- name: $stepName")
+        val start = workflowCode.indexOf("- name: $stepName")
         assertTrue(start >= 0, "ci.yml has no step named '$stepName'")
-        val rest = workflow.substring(start + "- name: $stepName".length)
+        val rest = workflowCode.substring(start + "- name: $stepName".length)
         val end = rest.indexOf("\n      - ").let { if (it < 0) rest.length else it }
         val block = rest.substring(0, end)
         val value = Regex("(?m)^\\s*$key:\\s*(\\S.*)$").find(block)?.groupValues?.get(1)?.trim()

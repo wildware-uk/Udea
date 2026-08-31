@@ -485,10 +485,42 @@ jobs:
     # every gate was green.
     #
     # The fixture is written here rather than checked in for the obvious reason: it must not
-    # compile. `udea-gradle` is the module used because it is a `udea-*` module on the
-    # `udea.kotlin-library` convention whose compile classpath already carries
-    # `udea-annotations` (through `udea-assets-compiler` -> `udea-assets`), so the probe needs
-    # no dependency added for its own sake.
+    # compile.
+    #
+    # `udea-assets` is the module used, and the reason is narrower than "it can see the
+    # annotations". Three things have to be true of the module at once, and the third is the
+    # one issue #173 was about:
+    #
+    #   1. the K2 plugin is applied to it - `UdeaCompilerPluginWiring.appliesTo` accepts it, so
+    #      not `:udea-annotations`, `:udea-diagnostics` or `:udea-compiler-plugin`;
+    #   2. `udea-annotations` is on its **compile** classpath. `udea-assets` declares
+    #      `api(project(":udea-annotations"))` itself, which is the shortest and least
+    #      accident-prone route there is - no transitive edge to reason about;
+    #   3. its sources are compiled **once**. `udea-gradle`, which this job used to probe, is
+    #      not: `build-logic/build.gradle.kts` adds `../udea-gradle/src/main/kotlin` to
+    #      `build-logic`'s own main source set, so the probe was compiled by
+    #      `:build-logic:compileKotlin` - an included build, with neither `udea-annotations`
+    #      nor the K2 plugin anywhere on it - before any task of the main build ran. The job
+    #      answered with six `Unresolved reference` errors and had never once reached a
+    #      checker. Which trees those are is not repeated here: `CompilerPluginSwitchTest`
+    #      reads the `kotlin.srcDir(...)` calls out of `build-logic/build.gradle.kts` and
+    #      checks this `probe=` path against whatever it finds.
+    #
+    # The claim that used to stand here named `udea-gradle`'s compile classpath as the reason
+    # for the choice, and issue #173 recorded it as false because `implementation` does not
+    # propagate. It is not false: `implementation(project(":udea-assets-compiler"))` does put
+    # `udea-annotations` on `udea-gradle`'s compile classpath, through two `api` edges, and
+    # `./gradlew :udea-gradle:dependencies --configuration compileClasspath` prints it. The
+    # sentence was true and the module was still the wrong one, which is why the fix is a move
+    # rather than a dependency.
+    #
+    # Two alternatives were rejected. Adding `udea-annotations` to `udea-gradle` for the
+    # probe's sake would have been a production dependency nobody needs *and* would not have
+    # worked, because `build-logic`'s classpath is the one that was short. Having this step add
+    # and remove that dependency around the probe fails for the same reason, and would have
+    # looked like a fix while the job stayed red. `CompilerPluginSwitchTest` asserts (1) and
+    # (3) against this file, so a future move back into a doubly-compiled tree is a red test
+    # rather than a red job nobody reads.
     #
     # The line and column are computed from the fixture rather than hard-coded. Presence alone
     # is not enough, and `docs/compiler-plugin.md` says why: a rule that fires on the right
@@ -518,7 +550,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          probe=udea-gradle/src/main/kotlin/dev/wildware/udea/gradle/CheckerProbe.kt
+          # The module, once. `probe` and the Gradle task below are both derived from it, so
+          # the file this step writes and the compilation it inspects cannot come apart.
+          module=udea-assets
+          probe=udea-assets/src/main/kotlin/dev/wildware/udea/assets/CheckerProbe.kt
           logs=$(mktemp -d)
           # Deleted whatever happens, so a failing run cannot leave a source that will not
           # compile behind for a later step or for an artifact upload. The compiler output goes
@@ -527,7 +562,7 @@ jobs:
           trap 'rm -f "$probe"; rm -rf "$logs"' EXIT
 
           cat > "$probe" <<'KOTLIN'
-          package dev.wildware.udea.gradle
+          package dev.wildware.udea.assets
 
           import dev.wildware.udea.annotations.Net
           import dev.wildware.udea.annotations.Q
@@ -547,9 +582,34 @@ jobs:
           slots_col=$(awk '/var slots/ { print index($0, "slots"); exit }' "$probe")
           echo "expecting UDEA0001 at ${health_line}:${health_col}, UDEA0003 at ${slots_line}:${slots_col}"
 
-          if ./gradlew :udea-gradle:compileKotlin --console=plain > "$logs/enabled.log" 2>&1; then
-            echo "::error::a @Net val and a @Q Int compiled cleanly in udea-gradle, so the K2 plugin is not applied to a real compilation and the FIR checkers cannot fail a build"
+          if ./gradlew ":${module}:compileKotlin" --console=plain > "$logs/enabled.log" 2>&1; then
+            echo "::error::a @Net val and a @Q Int compiled cleanly in ${module}, so the K2 plugin is not applied to a real compilation and the FIR checkers cannot fail a build"
             tail -n 40 "$logs/enabled.log"
+            exit 1
+          fi
+
+          # Three outcomes from a failed compile, not two.
+          #
+          # A compile can fail without a checker having run at all, and for the whole of
+          # Phase 0 that is what this step did (#173): the probe never resolved its imports, so
+          # the only thing that noticed was the position greps below, and what they said was
+          # "expected UDEA0001, got nothing" - which points a reader at the checkers, the one
+          # place the fault was not. So "failed for a reason that is not a checker" is
+          # separated out and named before any position is asserted.
+          grep -E '^e: ' "$logs/enabled.log" > "$logs/errors.log" || true
+          if ! grep -qE 'UDEA[0-9]{4}:' "$logs/errors.log"; then
+            echo "::error::the probe failed to compile, but not one diagnostic carries a UDEA rule id, so no FIR checker ran. This says nothing about the checkers either way - it is the probe failing for the wrong reason. Check that :${module} resolves dev.wildware.udea.annotations from this compilation, and that nothing else in the build compiles ${probe} first."
+            # The tail as well as the error lines: a build that fails before the compiler
+            # starts - a bad JDK, a configuration failure - produces no `e:` lines at all, and
+            # an empty list here would look identical to a compiler that reported nothing.
+            cat "$logs/errors.log"
+            echo "--- tail of the build log ---"
+            tail -n 40 "$logs/enabled.log"
+            exit 1
+          fi
+          if grep -vE 'UDEA[0-9]{4}:' "$logs/errors.log" | grep -q .; then
+            echo "::error::the checkers fired, but :${module} also failed to compile for reasons that are not checkers, so the positions below would be read off a compilation that was broken anyway:"
+            grep -vE 'UDEA[0-9]{4}:' "$logs/errors.log"
             exit 1
           fi
 
@@ -557,23 +617,36 @@ jobs:
           for expectation in "UDEA0001 ${health_line}:${health_col}" "UDEA0003 ${slots_line}:${slots_col}"; do
             rule=${expectation%% *}
             position=${expectation#* }
-            if ! grep -q "CheckerProbe.kt:${position} ${rule}:" "$logs/enabled.log"; then
-              echo "::error::expected ${rule} at CheckerProbe.kt:${position}; the compiler reported:"
-              grep -E '^e: ' "$logs/enabled.log" || echo "(no error diagnostics at all)"
+            if ! grep -q "CheckerProbe.kt:${position} ${rule}:" "$logs/errors.log"; then
+              echo "::error::${rule} did not land at CheckerProbe.kt:${position}. Every diagnostic here is a UDEA rule, so the checkers did run; they reported:"
+              cat "$logs/errors.log"
               status=1
             fi
           done
           [ "$status" -eq 0 ] || exit 1
 
+          # Echoed on the *success* path as well, not only on the failure paths. Both gradle
+          # invocations write to a temporary directory that the EXIT trap removes, so without
+          # this a green run leaves a log saying only that it expected something - and a gate
+          # whose passing evidence is not in its own log is a gate nobody can quote later.
+          echo "the compilation reported, and every line of it is a UDEA rule:"
+          cat "$logs/errors.log"
+
           # The same source, the same module, the flag flipped. This is the half that makes the
           # degrade procedure in docs/compiler-plugin.md a procedure rather than a hope.
-          if ! ./gradlew :udea-gradle:compileKotlin -Pudea.compilerPlugin.enabled=false --console=plain > "$logs/disabled.log" 2>&1; then
+          if ! ./gradlew ":${module}:compileKotlin" -Pudea.compilerPlugin.enabled=false --console=plain > "$logs/disabled.log" 2>&1; then
             echo "::error::-Pudea.compilerPlugin.enabled=false did not remove the checkers: the same source still fails to compile"
             grep -E '^e: ' "$logs/disabled.log" || tail -n 40 "$logs/disabled.log"
             exit 1
           fi
+          echo "-Pudea.compilerPlugin.enabled=false, the same file, :${module}:compileKotlin:"
+          grep -E '^BUILD ' "$logs/disabled.log" || tail -n 3 "$logs/disabled.log"
 
-          {
+          # Built once and written twice: to the job summary, which is where a person reads
+          # it, and to stdout, which is where the run log keeps it. A summary is not in the
+          # log and cannot be fetched with `gh api`, so a gate whose only evidence is the
+          # summary is a gate nobody can quote afterwards.
+          summary=$(
             echo "### The FIR checkers fail a real build"
             echo
             echo "| Rule | Symbol | Reported at |"
@@ -581,8 +654,13 @@ jobs:
             echo "| UDEA0001 | CheckerProbe.health | ${health_line}:${health_col} |"
             echo "| UDEA0003 | CheckerProbe.slots | ${slots_line}:${slots_col} |"
             echo
-            echo "The same file compiles clean under -Pudea.compilerPlugin.enabled=false."
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo "Module: \`:${module}\`, main source set. Every diagnostic the compilation"
+            echo "produced carried a UDEA rule id, so nothing here is a compile that failed for"
+            echo "some other reason. The same file compiles clean under"
+            echo "\`-Pudea.compilerPlugin.enabled=false\`."
+          )
+          echo "$summary"
+          echo "$summary" >> "$GITHUB_STEP_SUMMARY"
 
   kotlin-upgrade-probe:
     # Spec 3.2's version policy: the K2 plugin is the most Kotlin-version-fragile thing in the
@@ -867,7 +945,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
-          npm run verify-vendor
+          npm run test:vendor
           npm run build
 
       # The launch declaration, generated on a clean checkout and then parsed by the bridge's

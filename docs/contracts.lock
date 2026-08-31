@@ -1,0 +1,12 @@
+# SHA-256 of every file in docs/contracts/, with line endings normalised to LF.
+#
+# docs/contracts/ holds the frozen contracts. Frozen means frozen: if your work needs
+# one to change, stop and say so. Do not change it and carry on.
+#
+# When a change is agreed, that is what this file is for. Run:
+#     gradlew udeaWriteContractLock
+# and commit the result in the same change as the contract edit. Review the diff:
+# it is the contract.
+docs/contracts/agent-tools.md  2b04fa03afd60558bdc508269178bd6207a5d80c9675554bd9c3b22b57c8b532
+docs/contracts/asset-index.md  714837e74df1b1e741595ee46a1909c9a485e10800d1aab23dacbf76b95825a0
+docs/contracts/replicator.md  31a0567934f4dcf1979540af4d7f9a7a8b8212a1ae6298616e4d1e568b31d08a

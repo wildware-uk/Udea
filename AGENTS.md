@@ -12,7 +12,8 @@ Three documents, in order of authority:
 3. **This file** — orientation and rules. Not a tutorial, not API docs.
 
 `docs/contracts/` holds the frozen contracts. **Frozen means frozen**: if your work needs one
-to change, stop and say so. Do not change it and carry on.
+to change, stop and say so. Do not change it and carry on. `./gradlew udeaVerifyContracts` fails
+the build when one of them moves — see "Frozen contracts" below for the deliberate route.
 
 ---
 
@@ -114,6 +115,24 @@ breaks several modules at once.
 silent: **`fieldNames[i]` == `FieldMask` bit *i* == `FieldStore` field index *i*.**
 `desync_report` names the differing *field* by indexing `fieldNames` with each set bit of a mask
 diff, so a misalignment does not fail — it lies.
+
+### The gate on the freeze
+
+`docs/contracts.lock` holds a SHA-256 of every file in `docs/contracts/`, and
+`udeaVerifyContracts` runs on `check` — so `./gradlew build` fails if one of them has been
+edited, or if a contract has appeared, vanished or been renamed. It is on `check` rather than
+only in CI because these are documents a developer edits, and a rule only CI knows about is a
+rule found after the work is done.
+
+When a contract change is genuinely agreed, that is what the lock is for:
+
+```
+./gradlew udeaWriteContractLock
+```
+
+and commit `docs/contracts.lock` in the same change. Review the diff: it is the contract. There
+is no `-P` flag for this, deliberately — a flag can be passed to a whole `build` and re-baseline
+the freeze as a side effect of an ordinary one.
 
 ---
 

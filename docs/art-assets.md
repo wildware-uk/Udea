@@ -50,12 +50,21 @@ separate things make it useless as a fresh-clone step:
 
 It is kept, and not only for provenance: **it is the only thing that produces its output.**
 `moba/src/main/resources/assets/sprites/` is the full 327-sheet corpus, and
-`udea-assets-compiler`'s `MobaArt` resolves exactly that path — the atlas determinism and pack
-reproducibility tests read it and `assumeTrue` themselves away when it is absent. So those tests
-run on a machine holding the two archives and skip everywhere else, which their own KDoc names as
-*"a real hole … named here rather than hidden"*. Do not repoint them at
-`scripts/stage-moba-art.py`: that stages 33 sheets for six characters, and the corpus is the
-point of those tests.
+`udea-assets-compiler`'s `MobaArt` resolves exactly that path.
+
+That used to mean the atlas determinism and pack reproducibility tests ran on the owner's machine
+and skipped everywhere else — nine tests reporting green having packed nothing — which their own
+KDoc named as *"a real hole … named here rather than hidden"*. **Issue #168 closed it.**
+`SyntheticArt` draws a corpus of the same shape (327 one-row sheets, 2269 frames, every frame
+100x100) at test time out of no third-party pixels, `AtlasPackerTest` and `ReproducibilityTest`
+run against that everywhere, and a CI step in the `build` job fails the run if either ever skips
+again. The paid corpus is now the *additional* run — `RealArtAtlasPackerTest` and
+`RealArtReproducibilityTest`, the same test bodies pointed at it — which still skips when the
+archives are absent, and that skip now means "the real pixels were not checked here" rather than
+"the property was not checked at all".
+
+Do not repoint the real-art tests at `scripts/stage-moba-art.py`: that stages 33 sheets for six
+characters, and the corpus shape is the point of those tests.
 
 This manifest IS committed so blueprints, issues and champion designs can name real
 characters and animation frame counts without shipping the art.

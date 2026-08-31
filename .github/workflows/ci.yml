@@ -102,6 +102,63 @@ jobs:
           -Pudea.render.requireGl=false
           --stacktrace
 
+      # Issue #168, and the same defect class as the `gl-tests` job below: a test that skips is
+      # reported as a pass. `AtlasPackerTest` and `ReproducibilityTest` used to abort their
+      # assumptions on every machine without the two paid Tiny RPG archives - which is every
+      # machine but the owner's, this runner included - so nine tests reported green having packed
+      # nothing at all. They now run against `SyntheticArt`, a corpus of the same shape drawn at
+      # test time from no third-party pixels, and this step is what stops them going quietly back:
+      # it names the two result files and fails on a `<skipped>` in either.
+      #
+      # The difference from the GL case is worth keeping straight. That skip is environmental and
+      # the fix was to supply a display; this one was structural and the fix was to supply a
+      # corpus. `RealArtAtlasPackerTest` and `RealArtReproducibilityTest` are the same two bodies
+      # pointed at the paid art, they are *expected* to skip here, and they are deliberately not
+      # named below.
+      #
+      # It reads the counts rather than grepping for `<skipped`, and that is the whole difference
+      # between this gate and a vacuous one. A grep for a skip marker passes a report with **no
+      # test cases in it at all** - a renamed class, a filter that stopped matching, a task that
+      # wrote an empty suite - which is the same "green having checked nothing" the step exists to
+      # forbid, arriving one level up. So: the file must exist, `tests` must be above zero, and
+      # `skipped` must be exactly zero.
+      #
+      # No `if: always()`, unlike the GL job's version: `udeaPackGate` runs inside `check`, so a
+      # build that failed earlier never reached it and never wrote these files. Reporting "the
+      # atlas tests did not run" about such a run would be a true sentence that reads as a second,
+      # invented defect.
+      - name: Assert the atlas determinism tests ran and none skipped
+        shell: bash
+        run: |
+          set -euo pipefail
+          results=udea-assets-compiler/build/test-results/udeaPackGate
+          suites=(
+            "$results/TEST-dev.wildware.udea.assets.compiler.atlas.AtlasPackerTest.xml"
+            "$results/TEST-dev.wildware.udea.assets.compiler.pack.ReproducibilityTest.xml"
+          )
+          for report in "${suites[@]}"; do
+            if [ ! -s "$report" ]; then
+              echo "::error::$report was not written - udeaPackGate did not run the atlas tests"
+              exit 1
+            fi
+            counts=$(sed -n 's/.*<testsuite [^>]*tests="\([0-9][0-9]*\)"[^>]*skipped="\([0-9][0-9]*\)".*/\1 \2/p' "$report" | head -1)
+            if [ -z "$counts" ]; then
+              echo "::error::$report has no <testsuite> counts - it is not a JUnit report"
+              exit 1
+            fi
+            ran=${counts% *}
+            skipped=${counts#* }
+            if [ "$ran" -eq 0 ]; then
+              echo "::error::$report reports 0 tests - the suite was filtered away or renamed"
+              exit 1
+            fi
+            if [ "$skipped" -ne 0 ]; then
+              echo "::error::$report skipped $skipped of $ran - the synthetic corpus was not packed"
+              exit 1
+            fi
+            echo "$(basename "$report"): $ran ran, $skipped skipped"
+          done
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4

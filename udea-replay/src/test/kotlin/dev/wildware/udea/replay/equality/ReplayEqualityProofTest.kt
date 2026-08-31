@@ -28,8 +28,26 @@ class ReplayEqualityProofTest {
             ?: error("udea.projectDir is not set; the test task must pass it"),
     )
 
-    private val buildScript: String by lazy { Files.readString(projectDir.resolve("build.gradle.kts")) }
+    /**
+     * `udea-replay/build.gradle.kts` with everything the Kotlin compiler ignores taken out.
+     *
+     * Read this way because the raw text was demonstrably not enough. Writing the phrase
+     * `digests` followed by a slash and a star into the KDoc above `workspaceRoot` opened a
+     * *nested* block comment - Kotlin's nest - which ran to the end of the file and took all
+     * eight `udeaReplay*` task registrations with it. `sh gradlew build` stayed green, because
+     * none of those tasks is wired into `check`, and every assertion in this class stayed green,
+     * because the text it was matching was all still there and merely switched off. The only
+     * thing that noticed was `gradlew :udea-replay:tasks`.
+     *
+     * So the fence reads what the compiler reads. `commentsStripped` handles nesting and string
+     * literals; commenting out the `replay-equality` section is in the mutation table and turns
+     * four of these tests red.
+     */
+    private val buildScript: String by lazy {
+        commentsStripped(Files.readString(projectDir.resolve("build.gradle.kts")))
+    }
 
+    /** `ci.yml` verbatim. Only the test about a comment's *content* should read this. */
     private val workflow: String by lazy {
         Files.readString(projectDir.resolve("../.github/workflows/ci.yml").normalize())
     }
@@ -97,12 +115,60 @@ class ReplayEqualityProofTest {
     fun `the workflow runs the entry points these tests cover, and no logic of its own`() {
         // `ci.yml` cannot be executed here, so what is checkable is that it delegates: the job
         // must invoke the two Gradle tasks and must not reimplement the comparison in shell.
-        assertContains(workflow, "replay-equality")
-        assertContains(workflow, "udeaReplayDigest")
-        assertContains(workflow, "udeaReplayEquals")
+        //
+        // Against `workflowCode` rather than the raw file: a job that had been commented out
+        // would satisfy every one of these against the raw text, and a step nobody runs is
+        // exactly what this class exists to notice.
+        assertContains(workflowCode, "replay-equality")
+        assertContains(workflowCode, "udeaReplayDigest")
+        assertContains(workflowCode, "udeaReplayEquals")
         assertTrue(
-            workflow.contains("udea.replay.label"),
+            workflowCode.contains("udea.replay.label"),
             "each matrix leg must label its own digest, or a divergence names neither side",
+        )
+    }
+
+    @Test
+    fun `the build script fence reads what the compiler reads, not what is switched off`() {
+        // The helper that decides what every build-script assertion in this class sees, checked
+        // in both directions. Live code and string literals survive - a slash-star inside a
+        // string opens nothing - while a line comment and a block comment do not.
+        val ordinary = commentsStripped(
+            """
+            val live = "kept"
+            // val lineCommented = "gone"
+            /* val blockCommented = "gone" */
+            /** A KDoc. */
+            val alsoLive = "kept"
+            val stringWithOpener = "literal /* not a comment"
+            """.trimIndent(),
+        )
+
+        assertContains(ordinary, "val live")
+        assertContains(ordinary, "val alsoLive")
+        assertContains(ordinary, "literal /* not a comment")
+        assertTrue("lineCommented" !in ordinary, "a line comment survived the strip:\n$ordinary")
+        assertTrue("blockCommented" !in ordinary, "a block comment survived the strip:\n$ordinary")
+        assertTrue("A KDoc" !in ordinary, "a KDoc survived the strip:\n$ordinary")
+
+        // And the shape that cost this module its eight `udeaReplay*` tasks: Kotlin block
+        // comments nest, so a slash-star written inside a KDoc leaves the comment open when that
+        // KDoc ends, and everything after it to the end of the file is switched off. The
+        // stripper must agree with the compiler about that, or the fence would read a task
+        // registration the compiler never saw.
+        val nested = commentsStripped(
+            """
+            val beforeIt = "kept"
+            /** A KDoc naming a path with a slash-star in it: reports/x/*.txt */
+            tasks.register("udeaSwallowed") { }
+            """.trimIndent(),
+        )
+
+        assertContains(nested, "val beforeIt")
+        assertTrue(
+            "udeaSwallowed" !in nested,
+            "the stripper thinks a registration after an unclosed nested comment is live; the " +
+                "Kotlin compiler does not, and that disagreement is the whole defect:\n$nested",
         )
     }
 
@@ -267,6 +333,43 @@ class ReplayEqualityProofTest {
     /** Whether [name] matches [glob], where `*` runs up to a path separator. */
     private fun globMatches(glob: String, name: String): Boolean =
         Regex(glob.split("*").joinToString("[^/\\\\]*") { Regex.escape(it) }).matches(name)
+
+    /**
+     * [source] with its Kotlin comments removed, leaving only what the compiler acts on.
+     *
+     * Nesting is the point: Kotlin block comments nest, so one stray opener inside a KDoc runs
+     * to the file's end and switches off everything after it. String literals are tracked so a
+     * path in a string cannot open a comment that is not there.
+     */
+    private fun commentsStripped(source: String): String {
+        val out = StringBuilder(source.length)
+        var depth = 0
+        var inString = false
+        var index = 0
+        while (index < source.length) {
+            val two = if (index + 1 < source.length) source.substring(index, index + 2) else ""
+            when {
+                depth > 0 && two == "/*" -> { depth++; index += 2 }
+                depth > 0 && two == "*/" -> { depth--; index += 2 }
+                depth > 0 -> {
+                    // Newlines survive, so a line-oriented assertion still sees the right shape.
+                    if (source[index] == '\n') out.append('\n')
+                    index++
+                }
+                inString && source[index] == '\\' -> { out.append(source, index, index + 2); index += 2 }
+                inString && source[index] == '"' -> { inString = false; out.append('"'); index++ }
+                inString -> { out.append(source[index]); index++ }
+                source[index] == '"' -> { inString = true; out.append('"'); index++ }
+                two == "/*" -> { depth = 1; index += 2 }
+                two == "//" -> {
+                    while (index < source.length && source[index] != '\n') index++
+                }
+
+                else -> { out.append(source[index]); index++ }
+            }
+        }
+        return out.toString()
+    }
 
     @Test
     fun `the determinism job no longer claims this file has no replay-equality gate`() {

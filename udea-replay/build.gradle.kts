@@ -122,7 +122,7 @@ val replayEqualityDir: Provider<Directory> =
  *
  * Issue #169. A `JavaExec` with no `workingDir` inherits the *project* directory, so
  * `-Pudea.replay.out=digests/x.udeaeq` wrote into `udea-replay/digests/` while
- * `actions/upload-artifact` globbed `digests/*.udeaeq` under `$GITHUB_WORKSPACE`. Both spellings
+ * `actions/upload-artifact` globbed `*.udeaeq` under `$GITHUB_WORKSPACE/digests`. Both spellings
  * were the same and both were resolved somewhere else; the upload failed, and because
  * `replay-equality-join` declares `needs: replay-equality` the join has never executed on any
  * run of this repository.

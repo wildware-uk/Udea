@@ -1,19 +1,23 @@
 # BRIEF-170 — a clone builds `:moba`, and nobody types anything
 
-`a966e29` — the last commit that touches anything but this file. `HEAD` is that commit plus this
-brief (two commits of it), and a self-naming SHA is impossible: writing one into a file changes
-it. `git log --oneline a966e29..HEAD` shows only `BRIEF-170.md`.
+`d6a04a4` — the merge of `origin/example` into this branch, and the SHA the linked Actions run
+below was built from. `HEAD` is that plus further commits of this file alone; a self-naming SHA is
+impossible, since writing one into a file changes it. `git diff --stat d6a04a4..HEAD` is
+`BRIEF-170.md` and nothing else.
 
-Branch `issue-170-moba-art-clean-clone`, off `origin/example` (`7942823`).
+Branch `issue-170-moba-art-clean-clone`, branched from `origin/example` at `7942823` and merged up
+to `efab1d0` (which is `origin/example` with #171 and #173 in it). The merge was clean; `git diff
+--name-only origin/example..HEAD` is this branch's fourteen files and nothing of theirs.
 
 Every `logs/...` filename below is a real file in
 `/tmp/claude-1000/-srv-ssd1-workspace-Udea/a3ee2737-1b26-4f77-96b3-6805f45c796f/scratchpad/logs/`
 on this box; every block quoted from one is spliced, not retyped.
 
-Every transcript below was produced at `e0f4de6`, and the linked Actions run is `c035e1c`.
-`e0f4de6` to `a966e29` is three comment corrections — a stale count in a KDoc, an over-reaching
-"everything", and a recorded limit on the test's regex — and nothing else: `git diff
-e0f4de6..a966e29` is four hunks, every one of them inside a comment.
+The local transcripts below were produced at `e0f4de6` and re-run at `d6a04a4` after the merge;
+where the numbers differ the `d6a04a4` ones are quoted. `e0f4de6` to `a966e29` is three comment
+corrections and nothing else — `git diff e0f4de6..a966e29` is four hunks, every one inside a
+comment — and `a966e29` to `d6a04a4` is the merge, which brings in #171 and #173 and touches none
+of this branch's files.
 
 ---
 
@@ -25,12 +29,13 @@ JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem python3 scripts/verify-art-s
 
 It creates a **fresh checkout of `HEAD`** in a temporary worktree, asks the validator for the old
 failure back, checks that the checkout carries no paid-pack art, runs the command
-`docs/art-assets.md` documents, and then checks what that produced. Its whole run at `e0f4de6`, spliced from `logs/issue170-evidence-GREEN.log`:
+`docs/art-assets.md` documents, and then checks what that produced. Its whole run at `d6a04a4`,
+spliced from `logs/issue170-evidence-GREEN.log`:
 
 ```
 repository: /srv/ssd1/workspace/Udea/.claude/worktrees/agent-aae42d941ef837a54
-verifying commit: e0f4de6 (a fresh checkout of HEAD, not the working tree)
-clean tree: /tmp/udea-art-verify-39m9jw9k/clean
+verifying commit: d6a04a4 (a fresh checkout of HEAD, not the working tree)
+clean tree: /tmp/udea-art-verify-03rdurk3/clean
 documented step, from docs/art-assets.md:
     ./gradlew :moba:build
 
@@ -42,8 +47,8 @@ documented step, from docs/art-assets.md:
 
 [3/7] running the documented step in the clean tree
   ...
-  BUILD SUCCESSFUL in 15s
-  66 actionable tasks: 35 executed, 11 from cache, 20 up-to-date
+  BUILD SUCCESSFUL in 8s
+  66 actionable tasks: 23 executed, 23 from cache, 20 up-to-date
 
 [4/7] the build must have staged the art, packed it, and left the tree clean
   33 sheet(s) staged, moba/build/udea/pack/assets.udeapak packed, `git status` clean
@@ -282,23 +287,28 @@ ubuntu `determinism` legs are green; the two Windows `determinism` legs are red 
 which is the line-endings class above and not this test — the Windows artefact reports
 `CharacterArtStagingTest: 6 tests, 0 failures`.
 
-Red first (`logs/red-1.log`, and the message out of the JUnit XML):
+Red first. The original run's report has since been overwritten by later green runs, so rather
+than quote a file that no longer exists, the stub was **re-enacted** at `d6a04a4` in a throwaway
+worktree — `PLAN` emptied, the copy and the missing-sheet report removed from `stage()` — and the
+result saved: `logs/issue170-red-reenacted.log` and `logs/issue170-red-reenacted.xml`. Same three
+tests, same three reasons:
 
 ```
 CharacterArtStagingTest > the plan stages every sprite the game names that a clone does not carry() FAILED
-    org.opentest4j.AssertionFailedError at CharacterArtStagingTest.kt:72
-
 CharacterArtStagingTest > staging fails and names the sheet when the committed art is not there() FAILED
-    org.opentest4j.AssertionFailedError at CharacterArtStagingTest.kt:142
-
 CharacterArtStagingTest > staging copies every planned sheet into the destination tree() FAILED
-    java.io.FileNotFoundException at CharacterArtStagingTest.kt:131
-
 6 tests completed, 3 failed
+> Task :test FAILED
+BUILD FAILED in 8s
 ```
+
+and, out of the XML beside it:
+
 ```
-org.opentest4j.AssertionFailedError: the build stages a different set of sheets from the one moba/assets/**/*.udea.kts names. Every sprite the game names has to be either committed or staged; one that is neither is a UDEA0032 on every clean clone. ==> expected: <[sprites/orc/Orc-Attack01.png, ... sprites/wizard/Wizard-Walk.png]>
+    org.opentest4j.AssertionFailedError: the build stages a different set of sheets from the one moba/assets/**/*.udea.kts names. Every sprite the game names has to be either committed or staged; one that is neither is a UDEA0032 on every clean clone. ==> expected: <[sprites/orc/Orc-Attack01.png, sprites/orc/Orc-Death.png, sprites/orc/Orc-Hurt.png, sprites/orc/Orc-Idle.png, sprites/orc/Orc-Walk.png, sprites/orc_elite/orc_elite_attack01.png, sprites/orc_elite/orc_elite_attack02.png, sprites/orc_elite/orc_elite_deat
 ```
+
+(elided by the report writer, not by me — the list runs to all 33.)
 
 That expected list is **derived from the real asset scripts**, not written next to the plan: the
 test walks `moba/assets` for `spritePath = "sprites/..."`, subtracts the two committed exceptions,
@@ -306,7 +316,9 @@ and demands the plan equal what is left. A seventh character therefore fails a t
 sheets nobody wired up. The exception list is itself checked against the tree, so a wrong entry
 cannot quietly excuse a sheet the build should have staged.
 
-Green after (`logs/green-1.log`): `BUILD SUCCESSFUL`, 6 tests.
+Green after, at `d6a04a4` in this worktree: `sh gradlew -p build-logic test --tests
+'*CharacterArtStagingTest*'` is `BUILD SUCCESSFUL`, and the Windows artefact from the linked run's
+predecessor says `6 tests, 0 failures, 100% successful`.
 
 The two behaviour tests drive the real task over a synthetic tree — copying, including the nested
 `wizard/Wizard/` case, and the failure path when a sheet is not there. The rest of the wiring is
@@ -318,79 +330,51 @@ build a clean checkout.
 
 ## 4. `sh gradlew build`
 
-`sh gradlew build`, no exclusions, at `e0f4de6` (`logs/issue170-build-final.log`):
+`sh gradlew build`, no exclusions, at `d6a04a4` (`logs/issue170-build-merged-final.log`):
 
 ```
-BUILD SUCCESSFUL in 1m 53s
-214 actionable tasks: 54 executed, 4 from cache, 156 up-to-date
+BUILD SUCCESSFUL in 12s
+205 actionable tasks: 28 executed, 25 from cache, 152 up-to-date
 ```
 
-**That green is partly a replay, and here is which part.** Three of the four wall-clock gates
-were `UP-TO-DATE` in it, because they had passed in the solo run below and their inputs had not
-moved since:
-
-```
-> Task :moba:udeaStageCharacterArt UP-TO-DATE
-> Task :udea-assets-compiler:udeaDaemonBudget UP-TO-DATE
-> Task :udea-core:udeaBenchCharacterMover UP-TO-DATE
-> Task :udea-assets-compiler:udeaPackGate UP-TO-DATE
-> Task :udea-agent-host:udeaPhase2Exit
-```
-
-So the honest transcript is the cold one. `sh gradlew clean build --no-build-cache` at the same
-commit, started at load 14.86 on a box shared with another project
-(`logs/issue170-build-cold-final.log`):
+**That green is partly a replay, and here is which part.** The wall-clock gates in it were
+`UP-TO-DATE` or `FROM-CACHE`, because they had passed in the solo run below. So the honest
+transcript is the cold one. `sh gradlew clean build --no-build-cache` at the same commit, started
+at load 6.96 on a box shared with another project (`logs/issue170-build-cold-merged.log`):
 
 ```
 > Task :udea-core:udeaBenchCharacterMover FAILED
 > Task :udea-assets-compiler:udeaDaemonBudget FAILED
-BUILD FAILED in 1m 54s
-179 actionable tasks: 169 executed, 10 up-to-date
+BUILD FAILED in 1m 21s
+179 actionable tasks: 168 executed, 11 up-to-date
 ```
 ```
-    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) median 15.245ms, budget 4.0ms
-    warm reload decision: median 844ms over 4 samples [844, 621, 886, 642]
-    warm validate of one script: median 471ms over 4 samples [38, 471, 456, 577]
+    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) median 4.954ms, budget 4.0ms
+    warm reload decision: median 786ms over 4 samples [1473, 391, 451, 786]
+    warm validate of one script: median 433ms over 4 samples [35, 632, 433, 221]
 ```
 
-Two of the four tasks the developer contract names as load-sensitive. Re-run alone with
-`--rerun-tasks` minutes later, still at load 14 (`logs/issue170-budgets-solo-final.log`):
+Two of the four tasks the developer contract names as load-sensitive, and the same two the earlier
+cold build at `e0f4de6` failed. Re-run alone with `--rerun-tasks` a minute later
+(`logs/issue170-budgets-solo-merged.log`):
 
 ```
-    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) median 2.467ms, budget 4.0ms
-    warm reload decision: median 193ms over 4 samples [274, 193, 193, 165]
-    warm validate of one script: median 140ms over 4 samples [14, 182, 140, 124]
-BUILD SUCCESSFUL in 36s
+    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) median 2.551ms, budget 4.0ms
+    warm reload decision: median 145ms over 4 samples [199, 145, 141, 132]
+    warm validate of one script: median 136ms over 4 samples [10, 165, 136, 110]
+BUILD SUCCESSFUL in 17s
 ```
 
-15.245 ms to 2.467 ms and 471 ms to 140 ms is a factor of six on the same commit, minutes apart,
-at the same load average — it is contention inside the build's own 24-way parallelism, not
-anything this branch does.
+4.954 ms to 2.551 ms and 433 ms to 136 ms, same commit, minutes apart. It is contention inside the
+build's own parallelism, not anything this branch does — these gates are *on* `check`
+(`udea-assets-compiler/build.gradle.kts` line 126 wires `udeaDaemonBudget` into it), which is why
+every full build meets them, and the dev-team contract names this exact set as the one to re-run
+alone before concluding anything. Nothing in the diff is reachable from `CharacterMoverBudgetTest`
+or `DaemonLatencyBudgetTest`: both drive their own fixtures.
 
-The sharpest version of that control came at the end, on `a966e29` and by accident. `sh gradlew
-build` failed `udeaDaemonBudget` at load 20.8 with `warm validate ... median 533ms` and `warm
-reload ... median 764ms`; `sh gradlew :udea-assets-compiler:udeaDaemonBudget --rerun-tasks`,
-immediately afterwards and at **load 20.7**, gave:
-
-```
-    warm reload decision: median 236ms over 4 samples [256, 236, 228, 233]
-    warm validate of one script: median 128ms over 4 samples [12, 128, 125, 133]
-BUILD SUCCESSFUL in 21s
-```
-
-Same commit, same minute, same load average, four times faster. So it is not "the box is loaded"
-in general — it is this build's own parallelism competing with a task that measures latency. These
-gates are *on* `check` (`udea-assets-compiler/build.gradle.kts` wires `udeaDaemonBudget` into it
-explicitly), which is why every full build meets them and why the dev-team contract names this
-exact set as the one to re-run alone before concluding anything. A final `sh gradlew build` after
-that solo run is green in 1m 5s, with `udeaPhase2Exit` executing rather than cached, and passing.
-
-Nothing in the diff is reachable from `CharacterMoverBudgetTest` or `DaemonLatencyBudgetTest`:
-both drive their own fixtures.
-
-The same two tasks failed under the same conditions earlier in the session and passed the same way
-(`logs/issue170-budgets-alone.log`), and `dev-171` reported the identical pattern independently on
-a different branch.
+The same pattern held three times in this session on two commits (`logs/issue170-budgets-alone.log`,
+`logs/issue170-budgets-solo-final.log`, `logs/issue170-budgets-solo-merged.log`), and `dev-171`
+reported it independently on a different branch.
 
 What the cold build proves about this ticket, from the same log:
 
@@ -418,14 +402,12 @@ BUILD SUCCESSFUL in 716ms
 ### `build-logic` is an included build
 
 `sh gradlew build` does **not** run `CharacterArtStagingTest` — `ci.yml` says so in as many words
-at line 345. It is run by `sh gradlew -p build-logic check`, which on this box gives:
-
-```
-248 tests completed, 2 failed
-```
+at line 345. It is run by `sh gradlew -p build-logic check`, which on this box gives `248 tests completed,
+2 failed` (`logs/issue170-buildlogic-final.log`).
 
 The two are `KotlinPinCheckTest`, and they are the box: there is **no JDK 17 installed here**, and
-those two spin up a TestKit build that asks for one.
+those two spin up a TestKit build that asks for one. Out of
+`logs/issue170-kotlinpin-here.xml`, re-captured at `d6a04a4`:
 
 ```
 * What went wrong:
@@ -477,32 +459,33 @@ Both in `/srv/ssd1/workspace/Udea/build/debug-screenshots/`.
 
 ### AC1 — "A real Actions run on the branch shows every `moba`-building job green. Link the run."
 
-**Run: <https://github.com/wildware-uk/Udea/actions/runs/33431241769>** (`c035e1c`).
+**Run: <https://github.com/wildware-uk/Udea/actions/runs/33432681337>** (`d6a04a4`, this branch
+merged up to `origin/example`).
 
 | Job | Verdict | Why, if red |
 |---|---|---|
-| `build (ubuntu-latest)` | red | `udeaPhase2Exit` 1217 ms against a 1000 ms budget |
+| `build (ubuntu-latest)` | red | `udeaBenchCharacterMover` 4.873 ms against a 4.0 ms budget |
 | `build (windows-latest)` | red | `udeaDaemonBudget` over budget; `ExampleScanTest` x2 on CRLF |
-| `clean build under budget` | red | 93867 ms against 90000; 60405 ms two runs earlier |
-| `build with the K2 plugin disabled` | red | `udeaDaemonBudget` and `udeaPackGate` over budget |
-| `determinism (ubuntu-latest, temurin)` | **green** | |
-| `determinism (ubuntu-latest, corretto)` | **green** | |
+| `build with the K2 plugin disabled` | red | `udeaDaemonBudget` warm reload 960 ms, warm validate 561 ms |
 | `determinism (windows-latest, temurin)` | red | `AgentsMdTest` on CRLF |
 | `determinism (windows-latest, corretto)` | red | `AgentsMdTest` on CRLF |
-| `game-bridge-mcp conformance` | red | compiling the vendored client — **#171** |
-| `the FIR checkers fail a real build` | red | `CheckerProbe.kt` classpath — **#173** |
+| `the FIR checkers fail a real build` | red | its own new guard, on a Kotlin daemon that died at startup |
+| `clean build under budget` | **green** | |
+| `game-bridge-mcp conformance` | **green** | was red before #171 merged |
+| `determinism (ubuntu-latest, temurin)` | **green** | |
+| `determinism (ubuntu-latest, corretto)` | **green** | |
 | `gl tests (xvfb)` | **green** | |
 | `migration ledger` | **green** | includes `-p build-logic check` |
 | `agent brief matches the tree` | **green** | `udeaVerifyAgentsMd` over the edited `AGENTS.md` |
 | `KSP stays incremental` | **green** | |
 | `replay-equality` (all four legs + join) | **green** | |
 
-**The art cause is gone from every one of them.** `build (ubuntu-latest)` and `build
-(windows-latest)` are the two the issue names first, and both now contain, on a runner that
-cloned this repository and staged nothing by hand:
+**The art cause is gone from every one of them.** `grep -c UDEA0032` over the `build
+(ubuntu-latest)`, `build (windows-latest)` and `build with the K2 plugin disabled` job logs
+returns **0** on this run, against 25 on `origin/example`. Both `build` legs staged the art
+themselves, on a runner that cloned this repository and did nothing by hand:
 
 ```
-> Task :moba:udeaStageCharacterArt
 [udeaStageCharacterArt] staged 33 sheet(s) into /home/runner/work/Udea/Udea/moba/assets/sprites
 [udeaValidateAssets] 147 asset(s), 0 diagnostic(s)
 [udeaPackBundle] assets.udeapak: 147 asset(s), 38 sheet(s), 1 atlas page(s), 101450 bytes
@@ -512,21 +495,35 @@ cloned this repository and staged nothing by hand:
 [udeaPackBundle] assets.udeapak: 147 asset(s), 38 sheet(s), 1 atlas page(s), 101450 bytes
 ```
 
-`grep -c UDEA0032` over each of those two job logs returns **0**, against 25 on `origin/example`.
-The two bundles are the same 101450 bytes on Linux and Windows, which is a free datum about the
-staging being byte-faithful across platforms.
+(Those two are from run 33431241769's `build` legs, which is where a Windows `udeaPackBundle` line
+survives; on this run the Windows leg staged the same 33 sheets and failed later, on the two
+reasons in the table. The bundles are the same 101450 bytes on Linux and Windows, which is a free
+datum about the staging being byte-faithful across platforms.)
 
-**Read that honestly: the art cause is gone from every one of those jobs, and the criterion as
-written is not met, because unblocking them revealed failures that were behind the art.** The
-evidence that this is what happened, rather than a regression, is in §2 and on the issue: on
-`origin/example` (`7942823`, run 33425479983) `build (ubuntu-latest)` and `build
-(windows-latest)` both die at `:moba:udeaPackBundle` with `UDEA0032` and their logs contain **no
-line at all** for `udeaPhase2Exit`, `udeaDaemonBudget`, `udeaPackGate`, `:udea-assets-compiler:test`
-or `-p build-logic test`. Those checks have not run in CI since the characters landed, so there is
-no run in which they were green and this branch made them red.
+**Read the table honestly: the criterion as written is not met, because unblocking these jobs
+revealed failures that were behind the art.** The evidence that this is what happened, rather than
+a regression, is checkable: on `origin/example` at `7942823` (run 33425479983) `build
+(ubuntu-latest)` and `build (windows-latest)` both die at `:moba:udeaPackBundle` with `UDEA0032`,
+and their logs contain **no line at all** for `udeaPhase2Exit`, `udeaBenchCharacterMover`,
+`udeaDaemonBudget`, `udeaPackGate`, `:udea-assets-compiler:test` or `-p build-logic test`. Those
+checks have not run in CI since the characters landed, so there is no run in which they were green
+and this branch made them red.
+
+Two of the six reds have moved since I started, which is the shape of the wave working:
+`game-bridge-mcp conformance` was red on my first three runs and is green here, because **#171
+merged**. `the FIR checkers fail a real build` is still red, but for a different reason than
+before: **#173 merged** and its rewritten job now says
+
+```
+##[error]the checkers fired, but :udea-assets also failed to compile for reasons that are not checkers, so the positions below would be read off a compilation that was
+e: The daemon has terminated unexpectedly on startup attempt #1 with error code: 0.
+```
+
+— which is that job's own new guard, doing its job, over a Kotlin daemon that died on the runner.
+Not the art, and not mine to chase.
 
 `clean build under budget` deserves its own paragraph, because it is the one that looked like
-mine. Four measurements of the same command on the same code, in run order:
+mine. Four measurements of the same command on the same code, before this run:
 
 | Run | Measured | Budget | Verdict |
 |---|---|---|---|
@@ -535,12 +532,12 @@ mine. Four measurements of the same command on the same code, in run order:
 | 33429732331 | 60405 ms | 90000 ms | green |
 | 33431241769 | 93867 ms | 90000 ms | red |
 
-60.4 s to 94.3 s — a 34-second spread on a build whose inputs did not move. The gate is measuring
-the runner it was given, not the tree, and it cannot be compared against `origin/example` because
-there the job dies at `UDEA0032` before it measures anything. That is a finding for somebody, and
-it is not a thing this branch did: the staging task copies 33 files, which is milliseconds, and
-what it genuinely adds to a clean build is the atlas pack the build used to abort before reaching
-(101450 bytes, one page, from the cold-build log in §4).
+60.4 s to 94.3 s — a 34-second spread on a build whose inputs did not move; it is green again on
+the linked run. The gate is measuring the runner it was given, not the tree, and it cannot be
+compared against `origin/example` because there the job dies at `UDEA0032` before it measures
+anything. That is a finding for somebody, and it is not a thing this branch did: the staging task
+copies 33 files, which is milliseconds, and what it genuinely adds to a clean build is the atlas
+pack the build used to abort before reaching (101450 bytes, one page).
 
 ### AC2 — "The fresh-clone proof #154 shipped still passes, and is extended to cover `:moba:build`"
 
@@ -561,6 +558,7 @@ from the files that actually appeared, the `README`/`LICENSE` licence-name agree
 $ git diff --name-only origin/example..HEAD
 .gitignore
 AGENTS.md
+BRIEF-170.md
 LICENSE
 README.md
 build-logic/build.gradle.kts
@@ -577,7 +575,7 @@ $ git diff --name-only origin/example..HEAD | grep -icE "\.png$|\.ogg$|sprites/"
 0
 ```
 
-Thirteen files, no binary, nothing under `sprites/`. And the proof checks it from the other end on
+Text only: no binary, and nothing under `sprites/`. And the proof checks it from the other end on
 every run, against a fresh checkout rather than against the diff:
 
 ```

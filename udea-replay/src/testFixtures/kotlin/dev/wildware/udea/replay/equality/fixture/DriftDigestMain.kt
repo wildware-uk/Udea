@@ -13,11 +13,15 @@ import java.nio.file.Path
  * ```
  * DriftDigestMain --workspace /home/runner/work/Udea/Udea \
  *                 --out digests/ubuntu-latest-temurin.udeaeq \
- *                 --label ubuntu-latest/temurin-17 [--plant-ulp-at 1200]
+ *                 --label ubuntu-latest/temurin-17 [--fixture drift-36000.udearep]
+ *                 [--plant-ulp-at 1200]
  * ```
  *
  * Every leg runs this identical command with a different `--label`, and the join step compares
- * whatever they produced. `--plant-ulp-at` is the deliberate divergence the gate is proven
+ * whatever they produced. `--fixture` is which checked-in recording to replay: the PR job leaves
+ * it alone and takes the 3600-tick one, and the nightly names the 36000-tick one (issue #165).
+ *
+ * `--plant-ulp-at` is the deliberate divergence the gate is proven
  * against; nothing in a plain CI run passes it, and `ReplayEqualityProofTest`, the
  * `udeaReplayEqualityProof` task and the workflow's `replay_plant_ulp_at` dispatch input are what
  * do.
@@ -40,6 +44,8 @@ public object DriftDigestMain {
         public val out: Path,
         /** What a divergence calls this leg. */
         public val label: String,
+        /** Which checked-in recording this leg replays. */
+        public val fixture: DriftFixtureKind,
         /** Where the leg's wall time goes, or `null`. Always absolute when present. */
         public val timing: Path?,
         /** The tick to plant a one-ulp divergence at, or `null` for an honest leg. */
@@ -58,6 +64,7 @@ public object DriftDigestMain {
         var out: String? = null
         var label: String? = null
         var timing: String? = null
+        var fixture: DriftFixtureKind = DriftFixtureKind.PR
         var workspace: Path = ReplayEqualityPaths.defaultWorkspace()
         var plantAt: Tick? = null
         var at = 0
@@ -78,6 +85,12 @@ public object DriftDigestMain {
                 "--timing" -> {
                     require(at + 1 < args.size) { "--timing needs a path after it" }
                     timing = args[at + 1]
+                    at++
+                }
+
+                "--fixture" -> {
+                    require(at + 1 < args.size) { "--fixture needs a fixture name after it" }
+                    fixture = DriftFixtureKind.byName(args[at + 1])
                     at++
                 }
 
@@ -106,6 +119,7 @@ public object DriftDigestMain {
             label = requireNotNull(label) {
                 "--label is required: it is what a divergence calls this leg"
             },
+            fixture = fixture,
             timing = timing?.let { ReplayEqualityPaths.resolve(workspace, it) },
             plantAt = plantAt,
         )
@@ -116,7 +130,7 @@ public object DriftDigestMain {
         val options = parse(args)
         val output = options.out
 
-        val recording = DriftFixtureRecorder.readCheckedIn()
+        val recording = DriftFixtureRecorder.readCheckedIn(options.fixture)
         // Refused here rather than at the first differing tick. A recording made against a
         // different input schema presses a different action with every value in range and every
         // array the right length, so nothing downstream would notice.
@@ -128,7 +142,7 @@ public object DriftDigestMain {
             registry = DriftComponents.registry(),
             output = output,
             label = options.label,
-            fixture = DriftFixture.PR_FIXTURE,
+            fixture = options.fixture.fixtureName,
         )
 
         // The post-condition, before anything downstream is allowed to assume it. A leg that

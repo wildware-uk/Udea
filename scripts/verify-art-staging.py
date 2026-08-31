@@ -49,9 +49,16 @@ END = "<!-- verify-art-staging: the documented step ends -->"
 
 VALIDATE = ":moba:udeaValidateAssets"
 
-# Path-like tokens in `LICENSE`, e.g. `moba/assets/sprites/`. Trailing slash required: a token
-# without one names a file, and a file cannot be the prefix of another path.
-PATH_TOKEN = re.compile(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*/")
+# Directory paths in `LICENSE`, e.g. `moba/assets/sprites/`. Two constraints, and dropping
+# either one lets a false pass through:
+#
+#   * a trailing slash, because a token without one names a file and a file is nobody's prefix;
+#   * a lookahead for the end of the path, so `moba/assets/sprites/champion_idle.png` - which
+#     the licence names in order to *exempt* it - does not read as a directory exclusion
+#     covering everything beside it. That is precisely the false pass this check exists to
+#     catch, and without the lookahead the exemption would satisfy the rule it is an exemption
+#     from.
+PATH_TOKEN = re.compile(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*/(?![A-Za-z0-9_.-])")
 
 
 class Failure(Exception):

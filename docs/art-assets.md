@@ -8,17 +8,54 @@ The pixels are **not committed** - they are third-party licensed art and this re
 
 `moba/assets/sprites/` is the path `moba/assets/character/*.udea.kts` actually names and the one
 `:moba:udeaPackBundle` reads, so **a fresh clone cannot build `:moba` until it is populated**.
-Populate it from art this repository already holds:
+`:moba:udeaValidateAssets` fails on an unpopulated clone with a page of `UDEA0032`, each naming
+one `spritePath` that is not under the asset root. That is this step not having been run; it is
+not a fault in whatever you were changing.
 
-```
-python scripts/stage-moba-art.py
-```
+## Getting the art
 
-Or re-extract everything locally from the two zips:
+One step, after a fresh clone and before the first build:
 
+<!-- verify-art-staging: the documented step begins -->
 ```
-python scripts/extract-art.py
+python3 scripts/stage-moba-art.py
 ```
+<!-- verify-art-staging: the documented step ends -->
+
+It copies 33 sheets for six characters out of `example/src/main/resources/assets/sprites/`,
+where this repository already holds them, into the six directories `moba/assets/character/*.udea.kts`
+name. It is idempotent: it overwrites what it copies and deletes nothing. The copies stay
+gitignored, which is the point of it — the alternative was committing a second set of the same
+paid-pack frames under a second path, doubling an exposure this file already documents.
+
+`scripts/verify-art-staging.py` proves that claim end to end against a fresh checkout, and it
+reads the command out of the marked block above rather than carrying its own copy, so this
+document naming the wrong script fails a check instead of costing somebody an afternoon. Those
+markers are load-bearing: if you move the command, move them with it.
+
+### `scripts/extract-art.py` is not that step
+
+The manifest used to offer `scripts/extract-art.py` as an equivalent alternative. It is not one,
+and it will not produce a tree `:moba` can build. It is the one-off the owner ran on a Windows
+machine to unpack the two purchased `.zip` files into the tree in the first place, and three
+separate things make it useless as a fresh-clone step:
+
+- It reads the two paid archives by exact filename from a hardcoded Windows `~\Downloads`, so it
+  needs files nobody who clones this repository has.
+- Its `MOBA` destination is an absolute path on the author's own machine.
+- It writes `sprites/<char>/idle.png`, lowercased and un-hyphenated, under
+  `moba/src/main/resources/assets/sprites/` — the old asset root. `moba/assets/character/*.udea.kts`
+  name `sprites/wizard/Wizard-Idle.png` under `moba/assets/`. Neither the root nor the filenames
+  match.
+
+It is kept, and not only for provenance: **it is the only thing that produces its output.**
+`moba/src/main/resources/assets/sprites/` is the full 327-sheet corpus, and
+`udea-assets-compiler`'s `MobaArt` resolves exactly that path — the atlas determinism and pack
+reproducibility tests read it and `assumeTrue` themselves away when it is absent. So those tests
+run on a machine holding the two archives and skip everywhere else, which their own KDoc names as
+*"a real hole … named here rather than hidden"*. Do not repoint them at
+`scripts/stage-moba-art.py`: that stages 33 sheets for six characters, and the corpus is the
+point of those tests.
 
 This manifest IS committed so blueprints, issues and champion designs can name real
 characters and animation frame counts without shipping the art.
@@ -26,7 +63,9 @@ characters and animation frame counts without shipping the art.
 > **The `moba` half of that is true. The `example` half is not.** Third-party art from the same
 > pack is already committed under `example/src/main/resources/assets/sprites/`, and this
 > repository is public. See [Committed art in `example`](#committed-art-in-example) at the
-> bottom of this file for what is there, the options, and the recommendation.
+> bottom of this file for what is there, the options, and **the decision** — which is to leave
+> it, because `scripts/stage-moba-art.py` now stages `moba`'s art out of it and removing it
+> would red-build the repository.
 
 ## Format
 
@@ -157,21 +196,74 @@ licence actually permits and what the risk appetite is. All four options are rea
 | 3 | **Option 2, plus rewrite history** (`git filter-repo`) and force-push | Breaks every clone and every open PR; rewrites 500+ commits | Nothing, but it is the most expensive option and the tree is public, so copies may already exist |
 | 4 | **Make the repository private** until the art is out | Loses the public project | Reversible, but it is a bigger decision than the art |
 
-### Recommendation
+### The earlier recommendation, and why it no longer holds
 
-**Option 2, now; not option 3.**
+This file recommended **option 2** — delete the four paid directories from `HEAD`, keep the free
+demo art, swap the affected `.udea.kts` characters for placeholders. That recommendation was
+written in commit `3f962bb`, and `git show 3f962bb --name-only` does not list
+`scripts/stage-moba-art.py`, because that script did not exist yet. It arrived two commits later
+in `531bec1`, and it copies out of exactly the directories option 2 deletes:
 
-- The exposure that matters is what a visitor sees at `HEAD`, and option 2 removes it for the
-  cost of a placeholder swap in a module that is being deleted in Phase 6 regardless.
-- Option 3 buys very little on top. The repository is already public: history rewriting removes
-  the files from *this* copy, not from any clone, fork or cache that already has them, so it
-  pays the full cost of breaking every clone for a partial guarantee. **This is explicitly the
-  owner's call and nothing here should rewrite published history to force it.**
-- Option 1 is defensible only as a deliberate, recorded choice. It is not defensible as the
-  thing that happens because nobody decided.
-- Option 4 is a bigger lever than the problem needs.
+```
+$ git log --oneline -- scripts/stage-moba-art.py
+531bec1 The game is playable again: 27 units fight with abilities, animation and art
+```
 
-Whichever is chosen, the `LICENSE` exclusion stays: it is what makes the position explicit
-rather than implied, and it is needed for the free-demo art in any case.
+Four of the six characters `scripts/stage-moba-art.py` stages — `wizard`, `priest`, `skeleton`,
+`orc_elite` — are the four paid directories, and they are the only copy in the repository.
+Deleting them makes `:moba:udeaValidateAssets` fail on every fresh clone with nothing to replace
+it. Option 2 stopped being "a placeholder swap in a module being deleted anyway" the moment the
+new game started reading from the old module's art, and nobody noticed because the two changes
+landed in the same wave.
 
-**Status:** undecided. This is a Phase 0 checkpoint item — `docs/decisions/phase-log.md`.
+### The decision
+
+**Option 1: leave the committed art where it is. Do not delete it and do not rewrite history.**
+Taken 2026-08-31 under issue #154. Recorded here so it is not re-litigated.
+
+Three reasons, in the order they carry weight:
+
+1. **Deleting it red-builds the repository today.** The dependency above is not hypothetical and
+   there is no replacement mechanism to switch to. Option 2 is now a two-part change — remove the
+   art *and* re-source `moba`'s six characters — and the second part is a different ticket about
+   choosing art, which #154 puts out of scope.
+2. **Where a reversible option exists, take the reversible one.** Leaving the files is
+   reversible: options 2, 3 and 4 all remain open, and the exposure is unchanged from what it has
+   been since `2ffb932`. Option 3 is not reversible in any sense — `git filter-repo` rewrites
+   500+ published commits, breaks every clone and every open PR, and the repository is already
+   public, so it removes the files from *this* copy and from no fork or cache that already has
+   them. It pays the whole cost for a partial guarantee.
+3. **It is the owner's call, and the issue says so.** Issue #154's own Notes: *"Flagged rather
+   than actioned because the call on already-published history is the owner's, not an agent's."*
+   An agent choosing option 2 or 3 unprompted would be making that call in the direction that
+   cannot be undone.
+
+What this decision does *not* claim: it does not claim the exposure is acceptable, only that
+removing it is a decision above an agent's pay grade and that the reversible half of the work —
+saying plainly what is not covered — is the half that could be done now. `LICENSE` names the
+four paid directories explicitly and excludes them, `README.md` points at it, and the position is
+now stated rather than implied, which is what option 1 requires to be defensible at all.
+
+**Still open, for the owner.** Whether to act on options 2, 3 or 4 later. Nothing here forecloses
+any of them. **If you disagree with this decision**, the change is: pick option 2, re-source
+`moba`'s six characters from art the project may redistribute, update
+`scripts/stage-moba-art.py`'s `SHEETS` to the new sources, and delete
+`example/src/main/resources/assets/sprites/{wizard,priest,skeleton,orc_elite}/`. In that order —
+the last step alone breaks the build. `scripts/verify-art-staging.py` will tell you if it does.
+
+### The ongoing mechanism for `moba`'s art
+
+**Unchanged, and deliberately so:** `.gitignore` excludes `moba/assets/sprites/`,
+`scripts/stage-moba-art.py` populates it from art the repository already holds, and this file is
+the committed manifest. Three alternatives were considered for the same decision and rejected:
+
+| Alternative | Why not |
+|---|---|
+| A private submodule | Needs a second repository and per-developer credentials. A public clone gets a broken submodule pointer rather than a clear instruction, and CI would need a deploy key this project has no way to test |
+| A release asset, fetched at build time | Adds a network dependency to a build that has none, and a release asset on a public repository is a public download — the art would be no less redistributed, only less obviously so |
+| Git LFS with restricted access | Same access-control problem as the submodule, plus LFS on a public repo serves the objects to anyone who clones. It solves size, which is not the problem here |
+
+All three trade a mechanism that demonstrably works, and that
+`scripts/verify-art-staging.py` proves on a fresh checkout, for infrastructure this repository
+has no way to exercise. If the art is ever re-sourced to something redistributable, the right
+answer is to commit it and delete the staging script, not to build a private channel.

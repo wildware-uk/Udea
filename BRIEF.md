@@ -1,834 +1,881 @@
-# Issue #132 — the shop, the items and the inventory
+# Issue #154 — a LICENSE, and settling third-party art redistribution
 
-1698eb0
+**ad6eac3**
 
-**The code is complete at that commit**, and every transcript below was run against it. The commits
-after it on this branch touch nothing but this file — a brief cannot name its own SHA without
-changing it, so the line above names the last commit that changes what the reviewer is ruling on.
-`git log --oneline origin/example..HEAD` shows which is which.
+That is the commit under review: every change is in it. `BRIEF.md` itself lands in the one commit
+on top, so `git rev-parse --short HEAD` will show that instead — `git diff ad6eac3 HEAD --stat`
+names `BRIEF.md` and nothing else. A brief cannot contain its own hash.
 
-Branch `issue-132-shop-and-items`, off `origin/example` at `866ba0a`.
-Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a5b3c68bd564f1fda`.
+Branch `issue-154-license-and-art`, worktree
+`/srv/ssd1/workspace/Udea/.claude/worktrees/agent-ae07475ff2761864b`.
 
-Scope is the **first half** of #132 as the lead split it: the `item` asset kind, the `Inventory`
-component, `ShopSystem`, enough items to exercise it, and acceptance criteria **1 and 4**.
-`ItemPassiveSystem`, unique-passive deduplication and item actives are **#166** and are not here.
+**Branch point `866ba0a`, and `origin/example` has moved since.** #152 merged while this was in
+flight, so the integration branch is now `a1d5217` and this branch is 4 commits behind it.
+`git merge-base HEAD origin/example` is `866ba0a`, so **`866ba0a` is the ref every diff in this
+brief is taken against** — `git diff origin/example` would show #152's work as deletions and say
+nothing about this change. Named rather than assumed: `git merge-base --is-ancestor 866ba0a
+origin/example` succeeds, `git rev-list --count 866ba0a..origin/example` is 4, and the four are
+
+```
+a1d5217 Gate cross-OS replay equality in CI with field-level divergence
+671a75a Add BRIEF.md for issue #152
+2d4d2c8 Fold the two cell buffers into one, and tighten the public surface
+2e168b9 Gate cross-OS replay equality in CI, naming the field that diverged
+```
+
+**It merges clean, checked rather than claimed.** `git merge-tree --write-tree HEAD
+origin/example` exits 0 and writes tree `ad26fae` with no conflict; and the two changesets touch
+disjoint files — #152's 24 files against this branch's 6, intersection empty
+(`comm -12` over the two sorted `git diff --name-only` lists). Not rebased, deliberately: rebasing
+would move the SHA and invalidate every transcript below for no benefit the lead cannot get by
+merging. Two consequences worth stating: mutation **M2** is `git checkout origin/example --
+LICENSE`, and `origin/example:LICENSE` is byte-identical to `866ba0a:LICENSE` (`cmp`), so M2 still
+reverts exactly what it reverted when it was run; and `git diff --stat` in §6 is against `866ba0a`
+for the same reason.
 
 ---
 
 ## 1. The evidence command
 
 ```
-JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew \
-  :moba:test --tests 'dev.wildware.moba.item.*' \
-  :udea-assets-compiler:test --tests '*ItemRecipeValidatorTest' \
-  --console=plain
+JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem python3 scripts/verify-art-staging.py
 ```
 
-25 tests: `RecipeTest` (8), `ShopProofTest` (11), `ItemRecipeValidatorTest` (6). Every purchase in
-the first two runs through `ShopService` and is carried out by `ShopSystem` on a real tick of the
-shipped `MobaGame.definition()`; nothing calls `ShopRules` directly.
+Self-contained: it makes a throwaway `git worktree` at `HEAD` — a genuinely clean tree, carrying
+none of the gitignored art — and asserts six things in order, running
+`:moba:udeaValidateAssets` in that tree twice. Nothing has to be staged or built first. **20
+seconds** on this box (`3.46s user 0.67s system 20% cpu 20.448 total`), because the Gradle build
+cache serves the fresh worktree.
 
-Everything quoted in this brief is spliced from a file under
-`/tmp/udea-issue132-agent-a5b3c68bd564f1fda/`, which holds every log, JSON body, mutation diff and
-PNG named below. Nothing here is retyped from memory, and §2 records the one number that was.
+```
+repository: /srv/ssd1/workspace/Udea/.claude/worktrees/agent-ae07475ff2761864b
+verifying commit: ad6eac3 (a fresh checkout of HEAD, not the working tree)
+clean tree: /tmp/udea-art-verify-j6bwhzow/clean
+documented step, from docs/art-assets.md:
+    python3 scripts/stage-moba-art.py
 
-### Proof it goes red
+[1/6] negative control: :moba:udeaValidateAssets must FAIL with no staged art
+  FAILED as required, 25 x UDEA0032
 
-Twelve mutations, each a shape the code plausibly *could* have had with one behaviour removed, each
-run through the command above. **The literal `git diff` of every one is in §8**, taken from the run,
-not retyped. Control before and after: all of them ran, 0 failed.
+[2/6] running the documented step in the clean tree
+  staged 33 sheets into /tmp/udea-art-verify-j6bwhzow/clean/moba/assets/sprites
+  33 new file(s)
 
-| # | What is removed | Red |
-|---|---|---|
-| M1 | `ShopSystem.buy` no longer clears the consumed slots | 6 |
-| M2 | `ShopRules.priceFor` returns the shelf price, no recipe difference | 5 |
-| M3 | `ShopSystem.buy` has no affordability check | 1 |
-| M4 | `item(components = ...)` declared as a list of **id strings** instead of references | 11 |
-| M5 | the `expecting<Item>()` stamp dropped, reference kept | 1 |
-| M6 | `ItemRecipeValidator`'s pricing arm removed | 1 |
-| M7 | no fountain check | 2 |
-| M8 | `componentSlots` lets one slot satisfy two components | 1 |
-| M9 | `hasRoomFor` ignores the slots the purchase frees | 1 |
-| M10 | no aliveness check | 1 |
-| M11 | `sellValue` returns the full shelf price | 1 |
-| M12 | `Inventory` removed from `ItemModule.snapshotTypes()` | 1 |
+[3/6] :moba:udeaValidateAssets must now PASS
+  PASSED
 
-**Two things worth reading rather than skimming.**
+[4/6] LICENSE must exclude wherever the step put the art
+  LICENSE covers all 33 staged file(s)
 
-**M4 changed answer between two runs of the same mutation, and the first answer was the flattering
-one.** The first pass reddened 4 tests; the re-run reddened 11. The first pass ran against a stale
-packed bundle, so only the compiler-side tests saw the change; the re-run repacked and the runtime
-shop lost its recipes too. Both runs were "green means green" — but one of them under-reported the
-blast radius of the mutation, which is exactly what a mutation table is for. The 11 in the table is
-the re-run.
+[5/6] README.md's licence claim must match LICENSE
+  README.md's licence section and LICENSE agree on 'MIT'
 
-**The whole table was re-run into a private directory after `dev-154` found that
-`/tmp/claude-1000/-srv-ssd1-workspace-Udea/<uuid>/scratchpad/` is not session-private on this box** —
-our `mut/M*.log` files had been overwriting each other. My failing-test names never came from those
-logs (they are collected from this worktree's own `build/test-results/**/*.xml`, and the diffs were
-printed by `git diff` in the same tool call), but "sound by construction" is not a check. Everything
-in §8 was regenerated under `/tmp/udea-issue132-agent-a5b3c68bd564f1fda/mut/`, and the collector now
-refuses to run outside this worktree and stamps the worktree path into every result file.
+[6/6] README.md must not name a different staging script
+  README.md names scripts/stage-moba-art.py, consistent with docs/art-assets.md
+
+OK: a fresh clone plus the documented step builds, and the licence covers it.
+```
+
+**What `25 x UDEA0032` does not say.** It is not "25 files are missing". `moba/assets/character/*.udea.kts`
+declare **33** `spritePath`s, which is exactly the 33 sheets step 2 stages; the diagnostic sink
+ranks and caps at 25 (`AGENTS.md`'s Diagnostics contract row; `DiagnosticSink`'s
+"Rank and cap"). The check counts occurrences rather
+than asserting a number, so the cap moving would not turn it red for the wrong reason.
+
+### It goes red when the feature is reverted
+
+Six mutations, one per assertion, **all applied against the same `ad6eac3`** in a single pass. Every
+diff below is `git show` output from the very commit the failure beside it was produced against —
+not a description of one, and not re-typed. Each was applied, committed, run, and reverted with
+`git reset --hard`.
+
+**Each row is self-contained**: apply the diff shown, run the evidence command, revert. Nothing
+depends on a scratch file. The mutation commits are reflog-only in this worktree, so they are not
+offered as the source either — the diffs above are.
+
+> **Provenance, and it needed re-establishing.** The first version of this table was spliced from
+> `…/scratchpad/mut/M*.log`, and those files had been silently overwritten by another agent —
+> the harness's "session-specific" scratchpad is shared per *project* on this box, so `mut/M1.log`
+> was the same file for two of us. It is spelled out in §7 because it nearly put another branch's
+> `RecipeTest` failures into this brief. Every transcript here was re-run afterwards into
+> `/tmp/udea-issue154-agent-ae07475ff2761864b/`, and audited: six of six mutation logs name this
+> worktree and none names another's.
+
+#### M1 — fails at `[2/6]`
+
+`docs/art-assets.md` documents `scripts/extract-art.py`. README moved with it so this reaches step 2 rather than stopping at step 6.
+
+````diff
+1892c15 MUTATION M1
+
+diff --git a/README.md b/README.md
+index 6c23c99..110a8d0 100644
+--- a/README.md
++++ b/README.md
+@@ -61,7 +61,7 @@ The **art and audio are not**. Third-party sprite art from a paid asset pack is
+ taken. If you fork this repository, bring your own art.
+ 
+ `moba`'s copy of that art is **not** committed, so a fresh clone cannot build `:moba` until you
+-run `python3 scripts/stage-moba-art.py`. That step, and why the pixels are gitignored rather
++run `python3 scripts/extract-art.py`. That step, and why the pixels are gitignored rather
+ than committed, are in [`docs/art-assets.md`](docs/art-assets.md).
+ 
+ ## Contact
+diff --git a/docs/art-assets.md b/docs/art-assets.md
+index afa45e9..56fcbe0 100644
+--- a/docs/art-assets.md
++++ b/docs/art-assets.md
+@@ -18,7 +18,7 @@ One step, after a fresh clone and before the first build:
+ 
+ <!-- verify-art-staging: the documented step begins -->
+ ```
+-python3 scripts/stage-moba-art.py
++python3 scripts/extract-art.py
+ ```
+ <!-- verify-art-staging: the documented step ends -->
+ 
+````
+
+```
+FAILED: the documented step succeeded but created no files. docs/art-assets.md names a command that does not stage the art.
+```
+
+#### M2 — fails at `[4/6]`
+
+`git checkout origin/example -- LICENSE` — a literal revert of the licence half of this branch.
+
+````diff
+5ed94b7 MUTATION M2
+
+diff --git a/LICENSE b/LICENSE
+index e654e01..f91aa16 100644
+--- a/LICENSE
++++ b/LICENSE
+@@ -39,24 +39,9 @@ Specifically excluded, and NOT redistributable under this licence:
+     but is not limited to, the wizard/, priest/, skeleton/ and orc_elite/
+     directories, which come from the PAID pack rather than the free demo.
+ 
+-  * Any content under moba/assets/sprites/,
+-    moba/src/main/resources/assets/sprites/ or moba/raw-assets/, with one
+-    exception named below. .gitignore excludes these paths and the pack's pixels
+-    are not committed, so a clone of this repository does not carry them;
+-    docs/art-assets.md carries the manifest instead. moba/assets/sprites/ is
+-    where scripts/stage-moba-art.py puts the pack's frames, so a developer's
+-    working tree holds excluded art at that path even though a clone does not.
+-
+-    The one exception is moba/assets/sprites/champion_idle.png. It is committed,
+-    it IS covered by the MIT licence above, and it is not third-party art: it is
+-    six frames of a placeholder figure computed from arithmetic by
+-    scripts/make-placeholder-strip.py, whose bytes are a function of that script
+-    and nothing else.
+-
+-    moba/assets/sprites/arrow/arrow.png is committed but is NOT an exception. It
+-    is byte-identical to example/src/main/resources/assets/sprites/arrow/arrow.png
+-    and comes from the same free Soldier & Orc demo — usable under that demo's own
+-    terms, and still not this project's to sublicense.
++  * Any content under moba/src/main/resources/assets/sprites/ or
++    moba/raw-assets/. These paths are excluded by .gitignore and the pixels are
++    not committed; docs/art-assets.md carries the manifest instead.
+ 
+   * Audio under example/src/main/resources/assets/sounds/. The provenance of
+     these files is not recorded anywhere in the repository, so no claim is made
+````
+
+```
+FAILED: LICENSE names no directory covering 33 file(s) the documented step created, e.g. moba/assets/sprites/orc/Orc-Attack01.png, moba/assets/sprites/orc/Orc-Death.png, moba/assets/sprites/orc/Orc-Hurt.png. Third-party art landed at a path the licence exclusion does not mention.
+```
+
+#### M3 — fails at `[5/6]`
+
+`README.md`'s licence section says Apache-2.0.
+
+````diff
+13e8a9d MUTATION M3
+
+diff --git a/README.md b/README.md
+index 6c23c99..873771d 100644
+--- a/README.md
++++ b/README.md
+@@ -53,7 +53,7 @@ Contributions are welcome! Please follow these steps:
+ 
+ ## License
+ 
+-The **code** is MIT. See [`LICENSE`](LICENSE).
++The **code** is Apache-2.0. See [`LICENSE`](LICENSE).
+ 
+ The **art and audio are not**. Third-party sprite art from a paid asset pack is committed under
+ `example/src/main/resources/assets/sprites/`; `LICENSE` names it and excludes it explicitly, and
+````
+
+```
+FAILED: README.md's licence section does not name 'MIT', which is what LICENSE's first line says this project is: 'MIT License'.
+```
+
+#### M4 — fails at `[1/6]`
+
+The 33 staged sheets force-committed, so the art is no longer absent from a clone. This is the negative control, and it is the one nobody watches fail.
+
+````diff
+bbdc79d MUTATION M4
+
+ moba/assets/sprites/orc/Orc-Attack01.png             | Bin 0 -> 2333 bytes
+ moba/assets/sprites/orc/Orc-Death.png                | Bin 0 -> 1757 bytes
+ moba/assets/sprites/orc/Orc-Hurt.png                 | Bin 0 -> 2086 bytes
+ moba/assets/sprites/orc/Orc-Idle.png                 | Bin 0 -> 1410 bytes
+ moba/assets/sprites/orc/Orc-Walk.png                 | Bin 0 -> 1870 bytes
+ moba/assets/sprites/orc_elite/orc_elite_attack01.png | Bin 0 -> 3209 bytes
+ moba/assets/sprites/orc_elite/orc_elite_attack02.png | Bin 0 -> 4380 bytes
+ moba/assets/sprites/orc_elite/orc_elite_death.png    | Bin 0 -> 2486 bytes
+ moba/assets/sprites/orc_elite/orc_elite_hurt.png     | Bin 0 -> 3130 bytes
+ moba/assets/sprites/orc_elite/orc_elite_idle.png     | Bin 0 -> 2073 bytes
+ moba/assets/sprites/orc_elite/orc_elite_walk.png     | Bin 0 -> 2494 bytes
+ moba/assets/sprites/priest/Priest-Attack.png         | Bin 0 -> 2094 bytes
+ moba/assets/sprites/priest/Priest-Death.png          | Bin 0 -> 1541 bytes
+ moba/assets/sprites/priest/Priest-Heal.png           | Bin 0 -> 1663 bytes
+ moba/assets/sprites/priest/Priest-Hurt.png           | Bin 0 -> 2073 bytes
+ moba/assets/sprites/priest/Priest-Idle.png           | Bin 0 -> 1606 bytes
+ moba/assets/sprites/priest/Priest-Walk.png           | Bin 0 -> 1976 bytes
+ moba/assets/sprites/skeleton/Skeleton-Attack01.png   | Bin 0 -> 2023 bytes
+ moba/assets/sprites/skeleton/Skeleton-Death.png      | Bin 0 -> 1396 bytes
+ moba/assets/sprites/skeleton/Skeleton-Hurt.png       | Bin 0 -> 1943 bytes
+ moba/assets/sprites/skeleton/Skeleton-Idle.png       | Bin 0 -> 1292 bytes
+ moba/assets/sprites/skeleton/Skeleton-Walk.png       | Bin 0 -> 1749 bytes
+ moba/assets/sprites/soldier/Soldier-Attack01.png     | Bin 0 -> 1934 bytes
+ moba/assets/sprites/soldier/Soldier-Attack03.png     | Bin 0 -> 2488 bytes
+ moba/assets/sprites/soldier/Soldier-Death.png        | Bin 0 -> 1526 bytes
+ moba/assets/sprites/soldier/Soldier-Hurt.png         | Bin 0 -> 1924 bytes
+ moba/assets/sprites/soldier/Soldier-Idle.png         | Bin 0 -> 1367 bytes
+ moba/assets/sprites/soldier/Soldier-Walk.png         | Bin 0 -> 1806 bytes
+ moba/assets/sprites/wizard/Wizard-Attack01.png       | Bin 0 -> 2169 bytes
+ moba/assets/sprites/wizard/Wizard-Death.png          | Bin 0 -> 1641 bytes
+ moba/assets/sprites/wizard/Wizard-Hurt.png           | Bin 0 -> 2169 bytes
+ moba/assets/sprites/wizard/Wizard-Idle.png           | Bin 0 -> 1658 bytes
+ moba/assets/sprites/wizard/Wizard-Walk.png           | Bin 0 -> 2054 bytes
+ 33 files changed, 0 insertions(+), 0 deletions(-)
+````
+
+```
+FAILED: :moba:udeaValidateAssets PASSED on a fresh checkout with nothing staged. The art is no longer absent from a clone, so this whole check would pass for the wrong reason. Investigate before trusting anything below.
+```
+
+#### M5 — fails at `[6/6]`
+
+`README.md` alone names the wrong staging script, while the manifest still names the right one — the two front doors drift apart.
+
+````diff
+20a5a45 MUTATION M5
+
+diff --git a/README.md b/README.md
+index 6c23c99..110a8d0 100644
+--- a/README.md
++++ b/README.md
+@@ -61,7 +61,7 @@ The **art and audio are not**. Third-party sprite art from a paid asset pack is
+ taken. If you fork this repository, bring your own art.
+ 
+ `moba`'s copy of that art is **not** committed, so a fresh clone cannot build `:moba` until you
+-run `python3 scripts/stage-moba-art.py`. That step, and why the pixels are gitignored rather
++run `python3 scripts/extract-art.py`. That step, and why the pixels are gitignored rather
+ than committed, are in [`docs/art-assets.md`](docs/art-assets.md).
+ 
+ ## Contact
+````
+
+```
+FAILED: README.md's licence section tells a reader to run scripts/extract-art.py, which is not what docs/art-assets.md documents (scripts/stage-moba-art.py). Two front doors, two different instructions.
+```
+
+#### M6 — fails at `[3/6]`
+
+`scripts/stage-moba-art.py` stops staging one sheet the build needs. The step succeeds and creates files; the build still rejects the tree.
+
+````diff
+0ee770b MUTATION M6
+
+diff --git a/scripts/stage-moba-art.py b/scripts/stage-moba-art.py
+index c6ea6d6..b2b1ee8 100644
+--- a/scripts/stage-moba-art.py
++++ b/scripts/stage-moba-art.py
+@@ -28,7 +28,7 @@ DEST = os.path.join(ROOT, "moba", "assets", "sprites")
+ # Every sheet `moba/assets/character/*.udea.kts` declares, by the path it declares it at.
+ # `wizard` is flattened: the committed tree nests it one level deeper than the other five.
+ SHEETS = {
+-    "orc": ["Orc-Attack01.png", "Orc-Death.png", "Orc-Hurt.png", "Orc-Idle.png", "Orc-Walk.png"],
++    "orc": ["Orc-Attack01.png", "Orc-Death.png", "Orc-Hurt.png", "Orc-Walk.png"],
+     "orc_elite": [
+         "orc_elite_attack01.png",
+         "orc_elite_attack02.png",
+````
+
+```
+FAILED: :moba:udeaValidateAssets still fails after the documented step:
+```
+
+**Why M1 is the whole ticket in one row.** `scripts/extract-art.py` **exits 0** in a clean tree —
+it prints `MISSING` for both archives and returns success. A check that asked only "did the
+documented command succeed?" would have gone green on a document naming a script that stages
+nothing. The assertion that bites is *"…and created files"*.
+
+**Why M4 matters most.** Step 1 is a negative control, and a control nobody has watched fail is
+worth nothing — it would silently turn the whole check into a tautology the day the art got
+committed. M4 makes it fail. That commit was local only, was never pushed, and is accounted for
+in §6.
+
+### One mutation that did *not* bite, and what it changed
+
+An earlier M2 — deleting `moba/assets/sprites/` from the exclusion bullet but leaving the
+explanatory sentence two lines below — left the check **green**. A path named *anywhere* in
+`LICENSE` was reading as excluded. Fixed in `bcbc010`: the token scan now runs only over the
+indented block after `Specifically excluded, and NOT redistributable under this licence:`, and
+stops at the first line in column 0. M2 above is now the stronger form — a literal
+`git checkout origin/example -- LICENSE`.
+
+Control for that fix, run before trusting it. Moving the path out of the list and into the closing
+paragraph must stop it counting, and does:
+
+```
+real LICENSE, exclusion-list tokens: ['example/src/main/resources/assets/sprites/', 'moba/assets/sprites/', 'moba/raw-assets/', 'moba/src/main/resources/assets/sprites/', 'orc_elite/', 'priest/', 'skeleton/', 'wizard/']
+covers moba/assets/sprites/orc/Orc-Idle.png: True
+
+CONTROL LICENSE, exclusion-list tokens: ['example/src/main/resources/assets/sprites/', 'moba/raw-assets/', 'moba/src/main/resources/assets/sprites/', 'orc_elite/', 'priest/', 'skeleton/', 'wizard/']
+covers moba/assets/sprites/orc/Orc-Idle.png: False
+```
+
+A second false pass was caught the same way, before it ever ran (`f7d4388`):
+`moba/assets/sprites/` appears in `LICENSE` in order to *exempt* `champion_idle.png`, and without
+an end-of-path lookahead that exemption would have satisfied the exclusion rule it is an exemption
+from. Its known negative — the exemption line alone — yields no directory token and covers
+nothing.
+
+**What the check still cannot do**, said here rather than left for a reader to assume: it does not
+parse English. Its assertion is *"the exclusion list names a directory containing this file"*, not
+*"the exclusion list excludes it"*. The docstring says the same.
 
 ---
 
-## 2. What I did, what I decided, and what I rejected
+## 2. Summary
 
-Every decision below is also on the issue as
-[a comment](https://github.com/wildware-uk/Udea/issues/132#issuecomment-5480132031), so a later
-reader can disagree with the reasoning rather than guess at it.
+The issue asked for three judgement calls and one proof. The calls were made and commented on the
+issue ([#issuecomment-5479874268](https://github.com/wildware-uk/Udea/issues/154#issuecomment-5479874268),
+[#issuecomment-5479877730](https://github.com/wildware-uk/Udea/issues/154#issuecomment-5479877730));
+the proof is §1.
 
-### The `item` asset kind is the engine's, not the game's
+### What was already true on `origin/example`
 
-`udea-assets/Item.kt`, registered in `AssetKindHierarchy`, `DslKinds`, `GraphPacker` and
-`AssetCodecs`, with an `item(...)` function on `AssetScope`. Every field on it is a number, a name
-or a `Ref`, so it decodes out of a `.udeapak` with no running game — which is the test
-`GameplayEffect`'s KDoc sets for a kind belonging here rather than in a game.
+The issue body quotes a README saying *"This project is licensed under the MIT License. See the
+LICENSE file for details."* and reports that the file does not exist. Both have moved on since it
+was filed: `LICENSE` landed in `3f962bb`, and `README.md`'s licence section was rewritten in the
+same commit. **Acceptance criteria 1 and 2 were therefore already partly satisfied before this
+branch**, and saying so is more useful than claiming credit for them. What was *not* satisfied is
+in §5.
 
-The alternative was `asset("item", ...)`, the generic escape. It was rejected because it loses the
-typed references, and **that loss is acceptance criterion 4**: `components` declared as a
-`List<String>` gets no `UDEA0004`, no `UDEA0013`, no did-you-mean and no line number — it gets a
-null in the shop, in a match, with the build green. Mutation **M4** is that alternative, applied,
-and it reddens 11 tests.
+### The three decisions
 
-### `cost` is the price on the shelf; the counter price is derived
+**1. MIT, matching the README.** Nothing to change: `LICENSE` already reads `MIT License`,
+`Copyright (c) 2025-2026 Shaun Wild`. Step 5 of the evidence command now *asserts* the two agree
+rather than leaving it to a reader to notice when they stop.
 
-One authored number per item. A champion who already carries a component pays
-`cost - sum(owned components' costs)` — the recipe difference — and the components are consumed.
-
-Rejected: authoring a *combine cost* beside a total, which is how a lot of MOBAs store it. Two
-numbers that must agree with no compiler checking they do is the unchecked duplication
-`MobaAuthoredContentTest` exists to close, one level down; a designer who retunes one and not the
-other ships an item whose displayed price is not its price.
-
-The cost of the choice is that `cost` below the sum of the parts becomes expressible, and that
-subtraction going negative is a shop that pays gold **out** on a purchase. So a new build-time rule
-**`UDEA0037 ITEM_RECIPE`** refuses it, and refuses an item that lists itself as its own component.
-If the owner prefers the other shape: add `combineCost` to `Item`, delete `ItemRecipeValidator`, and
-have `ShopRules.priceFor` return it.
-
-### The fountain is the champion's own spawn point
-
-`Respawn.spawnX`/`spawnY`, radius `ShopRules.FOUNTAIN_RADIUS = 260`. That is what a fountain *is* in
-this genre, it is per-team without a second table, and `Respawn` is already in the snapshot registry
-so a `time.rewind` restores it. Rejected: a rectangle in a new `ShopGeometry`, which would be a
-third place the map's layout is written down. 260 is above `LaneGeometry.XP_RADIUS` (220), so a
-champion cannot both shop and soak a wave's experience from one spot.
-
-### Orders queue; there is no RPC and no shop tool
-
-`ShopService.buy/sell` enqueues a `ShopOrder`; `ShopSystem` drains it at a known point in a known
-tick. That is the Command shape `SimBarrier` and `AbilityActivationSink` already use here, and it
-means a bot, a test and (later) a client reach the simulation through one door.
-
-Rejected: an `@Rpc` like `activateAbility`, and an `@AgentTool` shop toolset. Neither is asked for,
-both add protocol or tool surface a reviewer would have to rule on, and the declared consumer of
-this work is #133 (lane bots), which is in-tree Kotlin and needs neither.
-
-### Twenty items, ten of them finished
-
-Eight basic components, ten finished items with real build paths, two trinkets. The ten include one
-built from a finished item (`warhammer` ← `greatsword` + `blade`) and one that names the same
-component twice (`twin_blades` ← two `blade`s), because those are the two recipe shapes a naive
-implementation gets wrong.
-
-**These three numbers are measured, not remembered.** An earlier draft of this brief and my first
-comment on the issue both said "nineteen items, nine finished"; I had counted from memory. The
-figures above are the census `ShopProofTest` prints out of the **packed bundle** the game opens:
+**2. The committed `example/` art stays. No deletion from `HEAD`, no history rewrite.** This
+reverses the recommendation `docs/art-assets.md` carried, and the reason is a fact that arrived
+after the recommendation was written:
 
 ```
-[shop] 20 items, 10 with build paths, 2 trinkets
+$ git log --oneline -- scripts/stage-moba-art.py
+531bec1 The game is playable again: 27 units fight with abilities, animation and art
 ```
 
-A grep over the source made the same mistake in a second way: `grep -c "trinket = true"` over
-`trinkets.udea.kts` answers **3**, because one of the hits is the word inside a comment. The bundle
-says 2, and the bundle is what the shop reads.
+The Option 2 recommendation was written in `3f962bb`, which does not contain that script.
+`scripts/stage-moba-art.py` copies `moba`'s art *out of* the four paid directories Option 2
+deletes — `wizard`, `priest`, `skeleton` and `orc_elite` are four of its six characters and the
+only copy in the tree. So Option 2 today red-builds the repository, and its second half
+(re-sourcing the art) is out of scope by the issue's own words. Beyond that: leaving the files is
+reversible and `git filter-repo` is not, and the issue says the call on published history is the
+owner's. Recorded in `docs/art-assets.md` under **The decision**, with what to change to disagree
+and the order that does not break the build.
 
-### `@Net(visibility = OwnerOnly)` on `Inventory` is DECLARED and NOT ENFORCED
+**3. The ongoing mechanism is unchanged** — `.gitignore`, plus `scripts/stage-moba-art.py`, plus
+the committed manifest. A private submodule, a release asset and Git LFS were considered and
+rejected; the table of reasons is in `docs/art-assets.md` under **The ongoing mechanism for
+`moba`'s art**. All three need access control or a network dependency this repository has no way
+to exercise, and a release asset on a public repository is a public download — the art would be no
+less redistributed, only less obviously so.
 
-**Read this paragraph before assuming the guarantee holds.** `Visibility.OwnerOnly` has been in
-`udea-annotations/Net.kt` since Phase 0 and **nothing reads it**. I grepped the tree: the only hits
-are the enum declaration and `AnnotationVocabularyTest` lines 97 and 153. `udea-codegen`'s
-`ComponentModelBuilder` never looks at the argument and `udea-net`'s `SnapshotWriter` has no
-per-recipient mask stripping. So today **every client that holds a champion is sent every field of
-its inventory** — a real information leak in a competitive game.
+### Two defects found while doing it, neither of which the issue names
 
-That is the same state `lifetime` was in before #114 turned it into bytes not sent. It is filed as
-**#167** and deliberately not built here: it is a codegen mask, a wire marker, a writer policy and
-an ownership seam landing on the wire contract, which is a second concern in one branch. The
-annotation is on the component as the statement of intent #167 will make true. **There is no test
-pretending otherwise** — a test asserting the annotation is present would prove nothing about the
-wire and is the "test that cannot fail" the reject list names.
+**`LICENSE` excluded the wrong `moba` path.** It named
+`moba/src/main/resources/assets/sprites/` and `moba/raw-assets/`, but the art actually lands at
+`moba/assets/sprites/`, where `scripts/stage-moba-art.py` writes it. Every developer's working
+tree held paid-pack art at a path the exclusion did not mention. Now named — and step 4 of the
+evidence command derives the destination from a real staging run rather than from a list written
+inside the check, so moving it again without extending `LICENSE` fails.
 
-The evidence that nothing is enforced is in the regenerated lock (§9): all seven fields read
-`i32:32`, with no visibility marker, beside `heading`'s `i32:32:oncreate` which shows what a
-declaration that *is* enforced looks like in the same file.
+Two sub-cases went with it. `moba/assets/sprites/champion_idle.png` is carved out because it
+genuinely is this project's own — six frames computed from arithmetic by
+`scripts/make-placeholder-strip.py`, whose docstring says the bytes are a function of that file
+and nothing else. `moba/assets/sprites/arrow/arrow.png` is explicitly **not** carved out: `cmp`
+reports it byte-identical to `example/src/main/resources/assets/sprites/arrow/arrow.png`, which
+`docs/art-assets.md` classes under the free Soldier & Orc demo, *"still not this repo's to
+relicense"*. My first draft claimed both were the project's own; checking the second one against
+the manifest is what stopped a false statement going into a licence.
 
-### `Inventory` is seven `Int` fields, and an agent can read it
+**The issue's own Notes name the wrong script, and so did the manifest.** `scripts/extract-art.py`
+cannot give a fresh clone a buildable tree, for three independent reasons, each readable in its
+source: it reads the two **paid** archives by exact filename from
+`os.path.expanduser(r"~\Downloads")`; its `MOBA` destination is
+`r"C:\Users\shaun\Workspace\udea\moba"`; and it writes `snake(char)` names —
+`sprites/wizard/idle.png` — under `moba/src/main/resources/assets/sprites/`, while
+`moba/assets/character/wizard.udea.kts:56` names `sprites/wizard/Wizard-Idle.png` under
+`moba/assets/`. Neither the asset root nor the filename convention matches. Its docstring claimed
+it extracted the packs "into the moba module".
 
-Six carried slots plus a trinket, each holding an `AssetIndex` value or `-1`. Not an array, because
-`FieldLowering` accepts only `Boolean`/`Int`/`Long`/`Float`/`NetId`/`Tick`/enum and a component with
-array state needs a hand-written `Replicator`, which `ReplicatorApiShapeTest` forbids in game code.
+### Sweeping the class, and where my first answer was wrong
 
-`Inventory` also joins `Position`, `GameUnit` and `MatchState` on `WorldToolset`'s component index
-(second commit). Without it the feature is invisible to everything except a Kotlin test — see §5.
-Read-only: a caller that could write a slot could hand itself `item/aegis` without paying for it.
-
-### Four stale asset counts, and one I did not touch
-
-Adding three asset scripts broke `MigratedCorpusCompilesTest`, `MigratedCorpusGapTest`,
-`MigratedCorpusBundleTest` and `MobaWarmEditBudgetTest` — every one on a hard-coded `19` scripts or
-`127` assets. Rather than renumber:
-
-- the script count is now the **list** of script paths (a list invites an addition; a number invites
-  a contradiction);
-- the bundle count is **derived** from the compiled graph, which is what the test's own name claims;
-- two counts that guarded nothing their neighbours did not are **deleted** rather than rewritten.
-
-I grepped the class rather than fixing only what broke. `ExampleScanTest`, `AssetMigratorTest` and
-`MigratorIdempotenceTest` also carry `19`, and they are about `TestPaths.exampleAssets` — the old
-`example/` tree, unchanged — so they are correct and untouched. **One more is left standing:**
-`udea-gradle/src/main/kotlin/dev/wildware/udea/gradle/UdeaAssetsPlugin.kt:162` says "On this corpus -
-nineteen scripts, 127 declarations" in a KDoc. `moba/assets` is 22 scripts and 147 assets now.
-`udea-gradle` is **dev-152's this wave**, so it is reported rather than edited.
-
-### Two commits that are not shop work, and why they are here anyway
-
-Both are flagged in their own commit subjects so a reviewer is not surprised by them mid-diff.
-
-**`72aae75` — `MobaReplayProofTest`'s mutation could be a silent no-op, ~1 run in 9.**
-`dev-154` diagnosed it on their branch; I said I would leave it off mine, and then **it fired on my
-own `sh gradlew build` at `f3fe456`**:
+The class is *a document telling a reader to run a script that will not do what the document
+says*. I wrote "nothing else of the class" into a draft of this brief, then ran the grep instead
+of trusting it, and there were more:
 
 ```
-MobaReplayProofTest > a corrupted recording is caught at the tick it was corrupted() FAILED
-    org.opentest4j.AssertionFailedError at MobaReplayProofTest.kt:279
-
-203 tests completed, 1 failed
+$ grep -rn "extract-art" . --exclude-dir=.git --exclude-dir=build --exclude-dir=.gradle --exclude=BRIEF.md
+docs/art-assets.md:36:### `scripts/extract-art.py` is not that step
+docs/art-assets.md:38:The manifest used to offer `scripts/extract-art.py` as an equivalent alternative. It is not one,
+.gitignore:65:# Extract locally with scripts/extract-art.py; the manifest is committed, the pixels are not.
+scripts/verify-art-staging.py:24:   `scripts/extract-art.py` as an equivalent, and that script unpacks two paid ZIPs from a
+udea-assets-compiler/src/test/kotlin/dev/wildware/udea/assets/compiler/atlas/AtlasPackerTest.kt:20:        assumeTrue(MobaArt.available, "moba sprite art is absent; run python scripts/extract-art.py")
+udea-assets-compiler/src/test/kotlin/dev/wildware/udea/assets/compiler/pack/ReproducibilityTest.kt:101:        assumeTrue(MobaArt.available, "moba sprite art is absent; run python scripts/extract-art.py")
+udea-assets-compiler/src/test/kotlin/dev/wildware/udea/assets/compiler/pack/ReproducibilityTest.kt:119:        assumeTrue(MobaArt.available, "moba sprite art is absent; run python scripts/extract-art.py")
+udea-assets-compiler/src/test/kotlin/dev/wildware/udea/assets/compiler/atlas/MobaArt.kt:21: * The tree is gitignored (`scripts/extract-art.py` reproduces it), so tests that need it check
 ```
 
-with, out of `moba/build/test-results/test/TEST-…MobaReplayProofTest.xml`:
+**The four in `udea-assets-compiler` are correct and were left alone**, which is the more useful
+finding. `MobaArt.root` is `TestPaths.repoRoot.resolve("moba/src/main/resources/assets/sprites")`
+— the full 327-sheet corpus — and `scripts/extract-art.py` is the only thing that writes it.
+`scripts/stage-moba-art.py` stages 33 sheets for six characters at a *different* root and would
+not satisfy them; repointing those four messages at it would have been a wrong fix that read as a
+right one. That corrected my own `extract-art.py` docstring, which had said "kept for provenance"
+and undersold it (`442b9b2`). See §7 for the real thing sitting underneath them.
 
-```
-a recording whose input was altered at t301 replayed to the ORIGINAL hash stream,
-which means the replay is not reading the recorded input at all
-```
+The rest of the sweep:
 
-The arithmetic: `corruptAxisAt` wrote the constant `(-1f, 0f)`, and `Pilot.sample` draws each axis
-from `rng.nextInt(3) - 1f`, so `(-1, 0)` is 1 of 9 equiprobable pairs. When the pilot already held
-it at t301 the write changed nothing, the replay was legitimately bit-exact, and the assertion
-failed with a message that positively denies the cause. The pilot is seeded from
-`System.nanoTime()`, so it is a fresh draw every build. `(8/9)^5 = 0.55` is why `HANDOFF.md`'s
-recorded 5/5 was never evidence against it.
+| Searched | Found |
+|---|---|
+| `grep -rln "stage-moba-art"` | `README.md`, `.gitignore`, `LICENSE`, `docs/art-assets.md`, both scripts, and `.claude/{WAVE.md,agents/engineer.md,agents/team-lead.md,skills/dev-team/SKILL.md}` — every one names the working script. The `.claude/` agent instructions were already correct and were left alone |
+| `grep -rn "moba/src/main/resources/assets/sprites"` | `.gitignore`, `LICENSE`, `docs/art-assets.md`, both scripts, `MobaArt.kt` — real, still gitignored, and named as an *excluded* or *test-corpus* path, never as a `:moba` build input |
+| Paths named in `LICENSE` | machine-checked, step 4, against a real staging run |
 
-I changed my mind on one argument and not on scope: **I cannot report a green build while a test in
-my own module fails one run in nine**, and one run in nine that assertion was checking a recording
-that had not been mutated — item 3 on the closed reject list, in this module, found during this
-ticket. It now negates the recorded axis, sends the one idle case `(0, 0)` somewhere definite so the
-rule is total, and `check`s that what it wrote differs from what it read, so a later edit picking a
-rule that can land on the recorded value fails loudly at the mutation site rather than forty lines
-later. Soak: **20 runs, `--rerun-tasks` each so the pilot is a fresh draw, 20 green.** Twenty clean
-runs miss a 1-in-9 flake 9.5% of the time, so the soak is corroboration and the diff is the
-argument.
+### What the issue left open that I ruled on
 
-**The boundary, because "fixed" is easy to misread.** The fix is on this branch and **unmerged**,
-so the flake is still live on `origin/example` and on every branch diffed against it. A developer
-who hits it on `example` has not found a regression; they have found the defect `72aae75` is
-waiting to fix. dev-154's brief states the same boundary from the other side.
+- *Whether to correct `README.md` instead of adding a `LICENSE`.* Neither: both existed and
+  already agreed. Corrected one stale phrase (`the options and the recommendation` → `the options
+  and the decision taken`) and added the missing staging step, because the README is the front
+  door and it did not say the game cannot build until the art is staged.
+- *Whether `scripts/extract-art.py` should be deleted.* Kept. It is the only producer of the
+  assets-compiler's test corpus (above), and deleting a file is less reversible than correcting
+  its docstring.
+- *Whether to touch `.gitignore`.* One comment line. It said the wave copied "thirty-four sheets";
+  the real number is 33, which the evidence command prints from a real run. Following the
+  standards on counts in comments, the number is **deleted** rather than corrected — the property
+  it was carrying does not go stale, and a corrected number would have gone stale again on the
+  next character added. No rule changed.
+- *Whether to add a second copy of the staging command to `README.md`.* Yes, because that is where
+  a fresh cloner looks — and step 6 was added in the same commit so the two copies cannot drift
+  (M5).
 
-**`5fbc158` — a KDoc count in `udea-gradle` that *this branch* falsifies.**
-`UdeaScanAssetsTask`'s KDoc costed a rescan out as "nineteen scripts, 127 declarations".
-`udea-gradle` is dev-152's this wave, so my first instinct was to report it and not touch it —
-and that instinct was wrong for a reason `dev-154` supplied by checking rather than assuming: the
-sentence is **correct at `origin/example`** (they measured `[udeaPackBundle] assets.udeapak: 127
-asset(s)` there), and it is my three item scripts that take it to 22 and 147. A diff that changes
-the thing counted has to change the sentence too, and leaving it would be landing a false statement
-I created.
+### Deliberately not in this diff
 
-It is one KDoc paragraph and no code. Following the standards rather than my own instinct, the
-number is **replaced by the property it was evidence for** — "a couple of dozen scripts declaring a
-couple of hundred assets", and the fork dominates either way — rather than renumbered to 22/147,
-which would go stale on the next asset anybody authors. The old numbers and the fact that they moved
-are recorded in the paragraph, so the next reader knows why there is no number rather than assuming
-nobody measured.
+No `docs/contracts/` change: nothing here needed one. No asset-pipeline change (#88/#89, out of
+scope). No change to `moba/`, `udea-gas/`, `udea-replay/`, `udea-gradle/`, `.github/workflows/`
+or the two generated protocol files — those belong to #132 and #152 this wave. Nothing in the diff
+is Kotlin.
 
 ---
 
 ## 3. `sh gradlew build`
 
-Green at the reported SHA, `1698eb0`:
+Run at the reviewed commit `ad6eac3`, as `clean` with the **build cache off**, so every task really
+executes rather than being served a previous verdict. Launched only after a waiter confirmed no
+*Udea* `gradlew` client had been running for three consecutive 20-second samples.
+(`build-tip.log`.)
 
 ```
-$ JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew clean build --console=plain
+sh gradlew clean build --no-build-cache --console=plain
 ...
-BUILD SUCCESSFUL in 1m 16s
-229 actionable tasks: 146 executed, 69 from cache, 14 up-to-date
-```
-
-Test totals swept out of every `build/test-results/**/*.xml` immediately afterwards:
-**365 suites, 2445 tests, 0 failures, 0 errors, 34 skipped.** `:moba:test` executed rather than
-coming from the cache.
-
-The 34 skipped are the GL tests skipping with no `$DISPLAY` — 25 across `udea-render/gl` and
-`udea-agent-host/gl` — plus 9 in `udea-assets-compiler`'s `ReproducibilityTest` and
-`AtlasPackerTest`. The GL 25 are run for real below.
-
-**It took four attempts to get that run, and the three failures were the box.** Recorded because
-"it went green on the fourth try" is the sort of sentence that should come with its three:
-
-| Attempt | Foreign Gradle builds on the box | Failed |
-|---|---|---|
-| 1 (`build`) | 2-3, load ~9 | `GraphBudgetTest`, `DaemonLatencyBudgetTest` ×2, `Phase2ExitTest`, `udeaPackGate` — **plus** four `MigratedCorpus*`/`MobaWarmEdit` failures that were **mine**: the stale asset counts of §2, fixed rather than re-run |
-| 2 (`clean build --no-build-cache`) | 3, load ~20 | `GraphBudgetTest`, `CharacterMoverBudgetTest`, `DaemonLatencyBudgetTest` ×2 |
-| 3 (`build`) | 10, load ~53 | `DaemonLatencyBudgetTest` ×2 |
-| 4 (`clean build`) | 8, load ~33 | **none** |
-
-Every one of the budget failures is a wall-clock deadline, and every one passes alone on the same commit — §4 has
-the solo numbers, measured rather than asserted. The tell the contract names holds: a *different*
-subset failed each time.
-
-One failure in that list was **not** the box and is fixed on this branch: attempt 3 also went red on
-`MobaReplayProofTest`, which is the ~1-in-9 flake §2 covers.
-
-### GL, run for real
-
-This ticket touches **no GL** — nothing in the diff is in `udea-render` or the render half of
-`udea-agent-host`. Run anyway, because a green `build` is not evidence about GL and the omission is
-a finding:
-
-```
-$ xvfb-run -a -s "-screen 0 1280x720x24" \
-    env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
-    JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem \
-    sh gradlew udeaGlTest udeaAgentGlTest -Pudea.render.requireGl=true --console=plain
+FAILURE: Build completed with 2 failures.
 ...
+BUILD FAILED in 1m 31s
+185 actionable tasks: 183 executed, 2 up-to-date
+```
+
+**183 tasks executed and exactly two failed. Both are latency budgets, and nothing else failed.**
+
+| Task | Test | In the full build | Alone | Budget |
+|---|---|---|---|---|
+| `:udea-assets-compiler:udeaDaemonBudget` | warm reload decision | median **1190ms** `[1190, 1391, 967, 753]` | median **166ms** `[196, 148, 166, 139]` | — |
+| `:udea-assets-compiler:udeaDaemonBudget` | warm validate | median **733ms** `[88, 860, 667, 733]` | median **110ms** `[9, 125, 110, 104]` | 300ms |
+| `:udea-assets-compiler:udeaPackGate` | graph deserialisation | median **22.96ms**, best 13.93ms | median **4.81ms**, best 4.23ms | 15ms |
+
+Re-run alone exactly as the contract asks — `--rerun --no-build-cache` on each, so neither
+replayed a cached verdict (`daemonbudget-solo.log`, `packgate-solo.log`):
+
+```
+DaemonLatencyBudgetTest > a warm reload of one script decides inside the edit-to-observe budget() STANDARD_OUT
+    warm reload decision: median 166ms over 4 samples [196, 148, 166, 139]
+DaemonLatencyBudgetTest > a warm validate of one edited script is under 300ms() STANDARD_OUT
+    warm validate of one script: median 110ms over 4 samples [9, 125, 110, 104]
+
+BUILD SUCCESSFUL in 6s
+```
+
+```
+GraphBudgetTest > deserialising a graph larger than the example tree stays inside the budget() STANDARD_OUT
+    graph deserialisation: best=4.226689ms median=4.806348ms over 2000 assets (budget 15ms)
+
+BUILD SUCCESSFUL in 7s
+```
+
+**That is the box, and `--no-build-cache` is its worst case by construction** — a 183-task
+parallel build *is* the load these tests are being asked to keep a deadline under. 166ms alone
+against 1190ms in-build is seven-fold, and 166ms matches the contract's documented "median 170ms
+over 4 samples" for a solo run almost exactly. `udeaPackGate` is the same species, in a different
+task and not named in the contract, so it is worth recording that it fails the same way and
+recovers the same way: 4.81ms alone against a 15ms budget it missed at 22.96ms under the build.
+
+Worth one line because it corrects the obvious reading: **it is not the load average.** `uptime`
+said 14.60 when the failing build launched and 16.87 when the passing solo run did. What differs
+is contention from the build's own concurrent tasks at that instant, not the machine's one-minute
+average.
+
+Then `sh gradlew build`, which re-executes everything the failed run left not up-to-date
+(`build-tip-followup.log`):
+
+```
+BUILD SUCCESSFUL in 9s
+198 actionable tasks: 19 executed, 12 from cache, 167 up-to-date
+```
+
+**Test results, and one number deliberately not quoted.** Counting every `<testsuite>` in
+`**/build/test-results/` inside this worktree afterwards (`count-tests.py`, `test-count.txt`):
+
+```
+worktree=/srv/ssd1/workspace/Udea/.claude/worktrees/agent-ae07475ff2761864b
+suites=333 tests=2181 failures=0 errors=0 skipped=34
+```
+
+**`failures=0 errors=0` is the claim; `tests=2181` is not.** That total counts result files that
+happen to be on disk, and which ones are depends on which test tasks executed rather than being
+served from cache — the same census after an earlier sequence at `4046061` read
+`suites=362 tests=2420`. Neither is "the number of tests in this repository", so neither is
+offered as one. `skipped=34` *is* stable across both censuses, and §7 says why it is not
+incidental.
+
+### GL
+
+**This ticket does not touch GL.** The diff is a licence, a README, an asset manifest, one
+`.gitignore` comment and two Python scripts; nothing in it is on a compile classpath and nothing
+in it opens a context, so an `xvfb` run is not evidence about anything this branch changed. It was
+run anyway, because it is cheap and because a green `sh gradlew build` is explicitly not evidence
+about GL. The task outputs were deleted first and `--no-build-cache` passed, so both tasks really
+executed rather than replaying a cached verdict:
+
+```
+rm -rf udea-render/build/test-results/udeaGlTest udea-render/build/reports/tests/udeaGlTest \
+       udea-agent-host/build/test-results/udeaAgentGlTest udea-agent-host/build/reports/tests/udeaAgentGlTest
+
+xvfb-run -a -s "-screen 0 1280x720x24" \
+  env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+  sh gradlew udeaGlTest udeaAgentGlTest -Pudea.render.requireGl=true --no-build-cache
+```
+
+```
 > Task :udea-agent-host:udeaAgentGlTest
 > Task :udea-render:udeaGlTest
 
-BUILD SUCCESSFUL in 6s
-41 actionable tasks: 2 executed, 39 up-to-date
+BUILD SUCCESSFUL in 5s
+32 actionable tasks: 2 executed, 30 up-to-date
 ```
 
-`udeaGlTest` 18 tests / 0 failures / **0 skipped**; `udeaAgentGlTest` 8 / 0 / **0 skipped**. Both
-ran for real; neither skipped. `:moba:runLaneShot` under the same xvfb wrapper is green and wrote
-the three lane PNGs in §6.
-
-### The gates outside `check`
-
 ```
-$ sh gradlew udeaVerifyModuleGraph udeaVerifyNoLegacyDependencies udeaVerifyAgentsMd \
-             udeaVerifyMigration udeaLegacyReport udeaVerifyDeterminism
-BUILD SUCCESSFUL in 1s
-83 actionable tasks: 83 up-to-date
+udeaGlTest + udeaAgentGlTest under xvfb, -Pudea.render.requireGl=true: tests=26 failures=0 skipped=0
 ```
 
-`:moba:runLaneShot` under xvfb: green, three PNGs (§6). `:moba:runUdpProof` not run — it is red on
-`example` before this branch and nothing here claims to have moved it.
+The first attempt came back `FROM-CACHE` in 939ms and would have been worthless as evidence; the
+deletion above is why the second one is not.
+
+In the default build 25 of those 26 skip. The one that does not is `OffscreenBackendTest >
+Headless is refused rather than quietly opening a window()`, which asserts a refusal and needs no
+context — that is the whole of the 25-versus-26 difference, established by diffing the two name
+lists rather than waved at.
+
+### An earlier, loaded run — where the replay flake showed up
+
+Before any of the above, `sh gradlew build` was run at load ~8 with `melon-merge` mid-scenario and
+**four** tasks failed (`build-loaded-firstrun.log`, kept because it is the only record of the
+flake): `CharacterMoverBudgetTest` at median 10.611ms against 4.0ms, `DaemonLatencyBudgetTest` at
+704ms and 481ms, `Phase2ExitTest` at 1169ms against 1000ms — all load — and `MobaReplayProofTest`,
+which is **not** a timing test and is analysed in §7. All four passed on the next run.
+
+Provenance note: that log predates the move out of the shared scratchpad (§7), so it is
+corroborated rather than sole-sourced — its contents match what the run printed at the time, it
+names this worktree seven times and no other worktree once, and every number quoted above is in it
+at lines 426, 505, 517, 527 and 538.
 
 ---
 
-## 4. Failures that were the box, and one that was not a regression
+## 4. Images
 
-**Load-flake set.** A first `sh gradlew build` and a later `clean build --no-build-cache` both failed
-on wall-clock budget tests while two or three *other agents'* Gradle builds were on the box (load
-17-21). Every one passed alone, on the same commit:
+`/srv/ssd1/workspace/Udea/build/debug-screenshots/issue154-fresh-clone-renders.png`
 
-| Test | Under load | Alone |
-|---|---|---|
-| `GraphBudgetTest` graph deserialisation | 28.07ms (budget 15ms) | best 6.77ms, **median 7.35ms** |
-| `DaemonLatencyBudgetTest` warm reload | 925ms, 759ms, 1628ms, 622ms across four loaded runs | **137ms** `[146, 137, 134, 124]`, and **305ms** `[386, 305, 265, 269]` at the final SHA |
-| `DaemonLatencyBudgetTest` warm validate | 390ms, 486ms, 528ms, 437ms (budget 300ms) | **112ms** `[9, 147, 112, 109]`, and **205ms** `[23, 293, 166, 205]` at the final SHA |
-| `CharacterMoverBudgetTest` | median 6.975ms (budget 4ms) | not re-run alone; `dev-154` measured 2.163ms |
-| `Phase2ExitTest` agent→world | 1169ms | **391ms** |
-| `MobaWarmEditBudgetTest` | (failed on a stale count, §2) | **max 148ms, median 135ms**, budget 3000ms |
-
-The tell is the one the contract names: a *different* thing failed each time.
-
-**`:moba:runNetProof` — checked against the baseline before believing it.** This branch changes the
-wire contract, so I ran the agreement proof. One of its three scenarios came back
-`perfect units DISAGREED`, which reads exactly like a regression I had caused.
-
-It is not. I checked out `origin/example` detached in this worktree and ran the same task three
-times, then came back and ran it three times on the branch:
+**Rendered from a genuinely fresh checkout**, not from this worktree. A first draft of this
+caption said "a fresh checkout" while the pixels had actually come from my own tree with art
+already staged — nearly true, and not the claim criterion 5 makes — so it was redone properly:
+`git worktree add --detach … HEAD`, then the documented step, then the renderer, all inside that
+tree. The transcript (`fresh-shot.log`):
 
 ```
-origin/example (866ba0a), 3 runs      issue-132 (92ae5e0), 3 runs
-  perfect        units DISAGREED        perfect        units DISAGREED
-  150ms+5% loss  units AGREED           150ms+5% loss  units AGREED
-  TRELLO_8       units AGREED           TRELLO_8       units AGREED
+=== before the documented step ===
+moba/assets/sprites/arrow/arrow.png
+moba/assets/sprites/arrow/arrow.udea.kts
+moba/assets/sprites/champion_idle.png
+=== the documented step ===
+staged 33 sheets into /tmp/udea-issue154-agent-ae07475ff2761864b/freshshot/moba/assets/sprites
+=== after ===
+36
+=== render ===
+...
+[moba.shot] /tmp/udea-issue154-agent-ae07475ff2761864b/freshshot/moba/build/reports/udea/roster.png 1280x720 at tick 20, 6 characters
+BUILD SUCCESSFUL in 17s
 ```
 
-Identical, 3/3 on each side. The perfect-link disagreement predates this branch. (Note it is
-`runNetProof`, the in-process proof — **not** the `runUdpProof` that `HANDOFF.md` records as red; a
-reader should not merge the two.)
+Three files before — the arrow and the placeholder that `.gitignore` excepts, which is exactly
+what a clone carries — and 36 after, being those three plus the 33 the step staged.
 
-What the same output *does* say about this branch, and the reason it is worth quoting:
+**What it shows.** Six characters, drawn from the staged sheets on a real GL context: orc,
+orc_elite, priest, skeleton, soldier, wizard, left to right. **What it proves:** criterion 5 past
+the validator and into pixels. "A tree the `moba` build can consume" is a weaker claim than a tree
+it actually draws from, and this is the stronger one. **What it also shows:** four of those six —
+orc_elite, priest, skeleton, wizard — are the paid-pack directories `LICENSE` now names and
+excludes by name.
 
-```
-mine: 14 replicated component types on the wire: CharacterView, Player, Position, Combatant,
-      Projectile, Inventory, LaneCreep, LaneState, Tower, Wallet, GameUnit, MatchState, Respawn,
-      Attributes
-base: 13 replicated component types on the wire: CharacterView, Player, Position, Combatant,
-      Projectile, LaneCreep, LaneState, Tower, Wallet, GameUnit, MatchState, Respawn, Attributes
-```
+**What it does not show, before anyone reads it as a fault:** the fifth figure is lying down. That
+is the soldier mid-animation at tick 20 in a scene that cycles each character's clips; it is not
+clipping, a broken sheet, or anything this branch changed. Nothing in the frame is cut off at an
+edge or overlapping a neighbour.
 
-`Inventory` is genuinely on the wire, and both lossy scenarios still agree on the 28-unit roster
-with it there.
+**There is one image, and that is honest rather than lazy.** The "before" state of this ticket is
+a build failure — a page of `UDEA0032` — which is text, and it is spliced in §1 at step 1 of the
+evidence command. A second picture of a documentation change would be manufactured.
 
 ---
 
-## 5. Driving the real game, and why there is no picture of the feature
+## 5. The issue, criterion by criterion
 
-**There is no picture of a champion carrying an item, and there cannot be one from this branch.**
-Issue #132 puts item icon art out of scope; nothing in `moba` renders an inventory; and a HUD panel
-is neither asked for nor in a file this ticket owns. Building one to have something to photograph
-would be building a harness for the evidence rather than for the game. So the feature's evidence is
-the test transcript in §1 and the live reading below, and the pictures in §6 are **regression
-controls** — labelled as such rather than passed off as the feature.
+**☑ 1. A `LICENSE` file exists and the README's claim matches it.**
+Both were already true on `origin/example` (`3f962bb`) — see §2. What this branch adds is that it
+is now *checked*: `check_readme_matches_licence` reads `LICENSE`'s first line, finds `README.md`'s
+own licence section, and requires the name to appear there. Proved green at step `[5/6]`
+(`README.md's licence section and LICENSE agree on 'MIT'`), and red by **M3**. That `LICENSE`
+exists at all is asserted by `read()` — a checkout without it fails with *"a fresh checkout of
+HEAD has no LICENSE"* rather than an `IndexError` (`9281c6f`).
 
-What I did drive, on a live `:moba:run -PdebugPort=7842` under xvfb (`Offscreen`, 51 tools —
-read off `/tools`, not assumed):
+**☑ 2. The licence text explicitly excludes third-party assets and names them.**
+`LICENSE`'s exclusion list names `example/src/main/resources/assets/sprites/` (calling out
+`wizard/`, `priest/`, `skeleton/`, `orc_elite/` as the paid pack), `moba/assets/sprites/` — **new
+on this branch, and the one that mattered** — `moba/src/main/resources/assets/sprites/`,
+`moba/raw-assets/`, and `example/src/main/resources/assets/sounds/`. Proved green at step `[4/6]`
+(`LICENSE covers all 33 staged file(s)`), derived from the destinations a real staging run
+created; proved red by **M2**, which is a literal revert to `origin/example`'s `LICENSE`.
 
-```
-$ curl -s http://127.0.0.1:7842/health
-{"ok":true,"frame":246,"tick":246,"paused":false,"renderMode":"Offscreen","role":"standalone","sessionId":"s-e1ad"}
+**☑ 3. A decision on the existing `example/` art is recorded with its reasoning, and acted on.**
+`docs/art-assets.md` → **The earlier recommendation, and why it no longer holds** → **The
+decision**. Option 1, with three reasons in the order they carry weight, what is still open for
+the owner, and the exact change to make if the owner disagrees. Commented on the issue at
+[#issuecomment-5479874268](https://github.com/wildware-uk/Udea/issues/154#issuecomment-5479874268).
+*Acted on* means the bytes were deliberately left where they are and the `Status: undecided` line
+is gone; the reversible half of the work — stating the position rather than implying it — is done,
+and §7 shows the tree carries nothing new.
 
-[moba.agent] asset daemon: ok=true 6469ms 147 assets over .../moba/assets
-[moba.agent] listening on http://127.0.0.1:7842 in Offscreen with 51 tools
-```
+**☑ 4. `docs/art-assets.md` states the mechanism for obtaining the art and why it is not in the
+repo.** New **Getting the art** section, with the command in a marked block, what it copies and
+from where, why the copies stay gitignored, and a subsection saying flatly that
+`scripts/extract-art.py` is not that step and why not. The mechanism decision and its three
+rejected alternatives are under **The ongoing mechanism for `moba`'s art**; commented at
+[#issuecomment-5479877730](https://github.com/wildware-uk/Udea/issues/154#issuecomment-5479877730).
+Proved by **M1** (the manifest naming the wrong script goes red) and **M5** (the README drifting
+from the manifest goes red).
 
-Then, paused at tick 247:
-
-```
-$ curl -s "http://127.0.0.1:7842/command?cmd=world.query_entities&with=Inventory\
-&fields=slot0,slot1,slot2,slot3,slot4,slot5,trinket"
-{"accepted":true,"commandId":3,"frame":1326}
-
-$ curl -s http://127.0.0.1:7842/state -o live-state-d.json     # then, out of that file,
-$ python3 -c "import json; ...; print(result with id 3)"       # the entry for command 3:
-{
- "id": 3,
- "ok": true,
- "result": {
-  "total": 1, "offset": 0, "returned": 1, "hasMore": false,
-  "entities": [ { "id": 0, "slot0": -1, "slot1": -1, "slot2": -1, "slot3": -1,
-                  "slot4": -1, "slot5": -1, "trinket": -1 } ]
- }
-}
-```
-
-One champion, seven empty slots — which is correct for a match where nobody has shopped, and is the
-reading that proves the component reached the generated surface end to end. **What it does not
-show** is a purchase: there is no shop tool, deliberately (§2), so the only way to buy over the
-bridge would be a write to `Inventory`, which is refused by design. Buying is proved by §1.
-
-The instance was closed with `cmd=close` and confirmed gone (`pgrep -af "[d]ebugPort=784"` empty).
-
-The same query against the **previous** commit answered, verbatim,
-`no component named Inventory; registered: GameUnit, MatchState, Position` — that is the
-before-state, and it is why the second commit exists.
+**☑ 5. A fresh clone plus the documented extraction step produces a tree the `moba` build can
+consume — proven by running it.** This is the evidence command, and it is the whole of §1. It
+takes a genuinely clean checkout of `HEAD`, proves `:moba:udeaValidateAssets` **fails** first (25
+× `UDEA0032`), runs the step the *document* names rather than one hardcoded in the check, and
+proves validation then passes. Red under **M4** (the negative control), **M1** (wrong script) and
+**M6** (a step that stages but leaves the build broken). Rendered as pixels in §4.
 
 ---
 
-## 6. Images
+## 6. Regenerated files, and the state of the branch
 
-All three in `/srv/ssd1/workspace/Udea/build/debug-screenshots/`.
+**Nothing was regenerated.** `udea-codegen/net-protocol.lock` and
+`udea-codegen/src/test/resources/expected-generated-hashes.txt` are untouched — this branch adds
+and removes no replicated component, so no id moved by anything. `:udea-codegen:udeaCheckProtocolLock`
+and `:moba:udeaCheckProtocolLock` both ran green in every build above. #132 is regenerating both
+this wave; this branch will not conflict with it.
 
-| File | What it shows | What it proves |
-|---|---|---|
-| `issue132-game-runs-with-shop.png` | `render.screenshot` from the live instance at tick 247: the brawl, the HUD, 5 orcs / 11 soldiers / 9 undead | The game boots, ticks and draws with `ItemModule` in the definition and every component id after `ability.Projectile` shifted by one. A **regression control**, not the feature. |
-| `issue132-lane-still-draws-wave.png` | `:moba:runLaneShot` wave frame, tick 272, wave 1 walking | The lane renders on a real GL context after the wire contract changed |
-| `issue132-lane-still-draws-clash.png` | `:moba:runLaneShot` clash frame, tick 642, both towers and the meeting point | Same, at the frame with the most on it. I looked at both: towers, aggro cones, health bars and the ability bar are all where they were |
+```
+$ git diff --stat 866ba0a
+ .gitignore                    |   2 +-
+ LICENSE                       |  21 ++-
+ README.md                     |  13 +-
+ docs/art-assets.md            | 136 ++++++++++++++++----
+ scripts/extract-art.py        |  21 ++-
+ scripts/verify-art-staging.py | 291 ++++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 454 insertions(+), 30 deletions(-)
+```
+
+**On mutation M4**, which force-committed the 33 gitignored sheets to make the negative control
+fail. It was a local commit on this branch, never pushed, and removed with `git reset --hard`. The
+blobs it referenced already existed in the object database — the staged files are byte-identical
+copies of `example/src/main/resources/assets/sprites/` — so no new paid-pack content entered the
+repository at any point. After the reset:
+
+```
+$ git ls-files moba/assets/sprites/
+moba/assets/sprites/arrow/arrow.png
+moba/assets/sprites/arrow/arrow.udea.kts
+moba/assets/sprites/champion_idle.png
+```
+
+Three tracked files: exactly what `origin/example` has — the `.gitignore` exceptions for the arrow
+and the placeholder, and nothing from the pack.
+
+**`gradlew`'s mode bit is untouched.** `chmod +x` was applied and reverted, and `git status` is
+clean of it. Every Gradle invocation in this brief is `sh gradlew`.
 
 ---
 
-## 7. The acceptance criteria, one by one
+## 7. Things found and deliberately left
 
-Criteria 2 and 3 belong to **#166** and are not claimed here.
+**1. `MobaReplayProofTest > a corrupted recording is caught at the tick it was corrupted()` is a
+~1-in-9 flake.** It failed in the earlier loaded run (§3) and has not recurred in any run since,
+including the definitive one. It is **not** a timing test and it is **not** mine — this diff
+contains no Kotlin — and `moba/` is #132's this wave, so it was sent to `dev-132` with the
+numbers rather than fixed here. `dev-132` confirmed the analysis and has since **fixed it on
+`issue-132-shop-and-items`** (`72aae75`) after the flake fired on its own build: the mutation now
+negates the recorded axis instead of writing a constant, sends the one idle case `(0, 0)`
+somewhere definite so the rule is total, and `check`s that what it wrote differs from what it
+read, so a future rule that can land on the recorded value fails at the mutation site rather than
+forty lines later. Soak: 20 runs with `--rerun-tasks`, 20 green.
 
-### ☑ 1. `RecipeTest`: buying a finished item consumes owned components, refunds the recipe difference correctly, and fails cleanly with insufficient gold
+**Which does not make it fixed for this branch, and the distinction matters.** That fix is on
+#132, unmerged. The defect is present on `origin/example` and therefore on the tree a reviewer
+diffs this branch against, so `sh gradlew build` here can still hit it — as §3's loaded run did.
+If it goes red on a reviewer's machine on that test, it is this, not this branch.
 
-`moba/src/test/kotlin/dev/wildware/moba/item/RecipeTest.kt`, 8 tests, all through `ShopSystem` on a
-real tick of the shipped definition.
-
-| Clause | Test | Goes red under |
-|---|---|---|
-| consumes owned components | `buying a finished item consumes its components and charges the difference` — asserts the two parts are **gone** from the inventory, not merely paid for | M1, M2, M4 |
-| refunds the difference **correctly** | same test (both parts owned), plus `a component the champion does not own is not discounted` (one owned — the case a shop that credits every component whether owned or not passes), plus `a recipe naming one component twice needs two of it`, plus `a recipe trades in a finished component, not the parts inside it` | M1, M2, M4, M8 |
-| fails cleanly with insufficient gold | `a purchase with too little gold is refused and moves nothing` — a typed `ShopRefusal.InsufficientGold`, **and** the purse untouched, **and** the inventory untouched. "Cleanly" is three assertions: a shop that took what it could and delivered nothing would satisfy "the purchase did not happen" | M3 |
-| the boundary underneath it | `a purchase with exactly enough gold succeeds and leaves nothing` — without it, "refused when short" is satisfied by a shop that refuses everything | M2 |
-
-Prices are read off the catalogue rather than written as literals, so what is asserted is the
-*relationship* (`paid == shelf - parts`) and a balance pass moves both sides at once.
-
-### ☑ 4. `udeaValidateAssets` passes on the whole item tree, including a negative test that a recipe referencing a nonexistent component is a build error with file, line and did-you-mean
-
-Positive half, on the real tree:
-
-```
-> Task :moba:udeaValidateAssets
-[udeaValidateAssets] 147 asset(s), 0 diagnostic(s)
-
-> Task :moba:udeaPackBundle
-[udeaPackBundle] assets.udeapak: 147 asset(s), 38 sheet(s), 1 atlas page(s), 101450 bytes
-```
-
-Negative half, `ItemRecipeValidatorTest` — every fixture a real `.udea.kts` on disk through the real
-passes 1, 2 and 3:
-
-| Test | Asserts | Red under |
-|---|---|---|
-| `a well priced item tree produces no diagnostics at all` | **the control.** A fence that fires on a healthy tree is as wrong as one that stays quiet on a broken one | — (it is the control) |
-| `a recipe naming a component that does not exist is a located build error` | `UDEA0004`, `Severity.Error`, `assetId=item/greatsword`, `causedBy=item/whetstoen`, **"did you mean `item/whetstone`?"** in the message, a span whose path ends `item/shop.udea.kts`, starts `udea-assets-compiler/` (repo-relative) and has a positive line number. Run through the **pipeline**, because that is what `udeaValidateAssets` runs | M4 |
-| `a recipe pointing at something that is not an item is a kind mismatch` | `UDEA0013` naming both kinds | M4, M5 |
-| `an item that costs less than its components fails the build` | `UDEA0037`, with the arithmetic in the message | M4, M6 |
-| `an item that is its own component fails the build` | `UDEA0037`, other arm | M4 |
-| `an unresolved component is not also reported as a pricing failure` | one defect, one diagnostic | — |
-
-`ShopProofTest > every finished item in the bundle costs at least its parts` re-checks the same
-property at **runtime**, against the bytes that shipped rather than the source tree.
-
-### Scope bullets outside the numbered criteria
-
-| Scope bullet | Where |
-|---|---|
-| `item/*.udea.kts` kind: cost, stats, components, unique, granted ability, passive | `udea-assets/Item.kt`, `AssetScope.item(...)`, `moba/assets/item/*.udea.kts` |
-| ~20 items, ≥8 finished, real build paths, component cost refund | **20 items, 10 with build paths, 2 trinkets** — the census `ShopProofTest` prints out of the packed bundle. §2 |
-| ≥3 with actives, ≥3 with uniques | **4** declare `grantedAbility` (3 finished + 1 trinket); **6** declare `unique`, across **3** groups — `fortified` ×3, `vitality` ×2, `sharpened` ×1. Schema only; #166 acts on them |
-| `Inventory`, 6 slots + trinket, `@Net` `OwnerOnly` | `ItemComponents.kt`. **Declared, not enforced — §2** |
-| buy | `RecipeTest` throughout |
-| sell at reduced value | `ShopProofTest > selling returns a reduced price and empties the slot` (exact value **and** the two inequalities that say the number means something) |
-| recipe combine on purchase | `RecipeTest`, plus `a full inventory can still combine two of its own slots` |
-| only in the fountain radius | `the shop refuses a champion who has walked out of the fountain` — **both** directions, one unit outside and one unit inside, measured off `FOUNTAIN_RADIUS` |
-| only while alive | `the shop refuses a corpse` — killed the way the game kills, by zeroing health and letting `DeathSystem` take the `Combatant` |
-
-### A rewind across a purchase — the gap I found by looking for one, and what it taught
-
-Writing this section is what produced `ShopProofTest > a rewind restores what the champion was
-carrying and what it had spent`. `ItemModule.snapshotTypes()`'s KDoc claimed an inventory a rewind
-did not restore would be "a champion whose gold came back and whose items did not", and **nothing
-checked it** — a claim in my own diff that nothing showed, which is the question §7 is here to ask.
-
-The first version of that test failed, and the two ways it was wrong are worth more than the test:
-
-1. **It wrote gold onto the `Wallet` and snapshotted in the same breath.** The ring captures at a
-   tick boundary, so the write was not in the keyframe, and the rewind correctly restored the gold
-   the champion had at the top of that tick: **zero**. That reads exactly like a `Wallet` that does
-   not survive a rewind, and I nearly filed it as a #131 defect. It is not one — `Wallet` restores
-   fine, and the fix was a `host.run(1)` before the snapshot.
-2. **Its keyframe was an empty inventory, so its inventory assertion could not fail.** A champion
-   whose inventory is never restored is re-granted a fresh `Inventory()` by `InventoryGrantSystem`,
-   and a fresh one is empty — so "restored to empty" and "never restored" are the same seven `-1`s.
-   The inventory half **passed** in that run while the purse half failed, and it passed by agreeing
-   with a freshly granted component. That is the contract's "an empty fixture is not a neutral one",
-   met in the wild, in a test I had just written a KDoc paragraph about avoiding it in.
-
-It now buys a blade **before** the keyframe, so the state it rewinds to predates the later purchases
-without being the default. **M12** is the mutation that proves it, and its failure is the KDoc's
-sentence word for word — gold back, items not:
+**Provenance, stated because it matters.** The failing run's own `[replay] mutation at t301 ->
+bit-exact: …` line is **gone**: `clean` removed the result XML and the next run overwrote it with
+a pass. I searched for it before writing that sentence rather than assuming —
+`grep -rl "mutation at t301 -> bit-exact" /tmp /srv/ssd1/workspace/Udea` returns only this brief,
+its template and the copy of the template, i.e. no surviving program output. So the two lines
+below are **prose quoting what I read at the time**, not a transcript, and should be treated as
+such. What *is* still on disk is the failure itself, in
+`build-loaded-firstrun.log` at lines 538–539:
 
 ```
-[rewind] keyframe t8  carrying [item/blade, -, -, -, -, -, -] gold=9650
-[rewind] drifted  t10 carrying [item/greatsword, -, -, -, -, -, -] gold=9250
-[rewind] after    t8  carrying [item/greatsword, -, -, -, -, -, -] gold=9650   <- M12
-[rewind] after    t8  carrying [item/blade, -, -, -, -, -, -] gold=9650        <- as committed
+MobaReplayProofTest > a corrupted recording is caught at the tick it was corrupted() FAILED
+    org.opentest4j.AssertionFailedError at MobaReplayProofTest.kt:279
 ```
 
-### What I still did not exercise
+and the assertion at line 279 is `assertFalse(verification.isBitExact, "a recording whose input
+was altered at $corruptedAt replayed to the ORIGINAL hash stream, which means the replay is not
+reading the recorded input at all")`, which is reached only when the corrupted recording replayed
+identically. The two lines I read from the XML at the time were `[replay] PASS RATE 5/5 over 2000
+ticks each` and `[replay] mutation at t301 -> bit-exact: 600 tick(s) from t1 replayed to the
+recorded hash stream, every tick`.
 
-- **A second match.** The inventory dies with the entity on a scene swap, which is asserted nowhere.
-- **Two champions shopping in one tick.** The queue is FIFO and per-order, so it should be fine;
-  nothing proves it.
-- **`ShopRefusal.NoRoom` for a trinket when the trinket slot is full** *is* covered
-  (`a trinket fits when the six carried slots do not` buys a second one and asserts the refusal).
+**The healthy case, which is a live artefact** — `replay-passing.xml`, the same file after the
+follow-up run, showing what the assertion normally sees:
 
----
-
-## 8. The mutation diffs
-
-Each block is the literal `git diff` from that mutation's run, under
-`/tmp/udea-issue132-agent-a5b3c68bd564f1fda/mut/M*.diff`. Hunk headers kept; nothing retyped.
-
-**M1 — components not consumed** (6 red: 5 × `RecipeTest`, `ShopProofTest > a full inventory can still combine two of its own slots`)
-```diff
-@@ -303,7 +303,6 @@ public class ShopSystem(
-         var tradedIn = 0
-         for (slot in 0 until Inventory.CARRIED) {
-             if (consumed and (1 shl slot) == 0) continue
--            inventory.place(slot, null)
-             tradedIn++
-         }
-         val destination = if (entry.item.trinket) Inventory.TRINKET else inventory.firstFreeCarried()
+```
+[replay] PASS RATE 5/5 over 2000 ticks each
+[replay] mutation at t301 -> replay diverged at t301 (300 tick(s) matched first): recorded hash 1712918382653841550, replayed -3308067780182703200
 ```
 
-**M2 — no recipe difference** (5 red, all `RecipeTest`)
-```diff
-@@ -133,7 +133,7 @@ public object ShopRules {
-             if (consumed and (1 shl slot) == 0) continue
-             traded += catalog.at(inventory, slot)?.item?.cost ?: 0
-         }
--        return entry.item.cost - traded
-+        return entry.item.cost
-     }
+**The cause, and the arithmetic of the explanation matches the size of the effect.** The message's
+own conclusion — "the replay is not reading the recorded input at all" — is wrong.
+`corruptAxisAt` writes a **constant**:
+
+```
+MobaReplayProofTest.kt:324:                slots[0].setAxis(MobaControls.MOVE_AXIS.value, -1f, 0f)
 ```
 
-**M3 — no affordability check** (1 red: `RecipeTest > a purchase with too little gold is refused and moves nothing`)
-```diff
-@@ -296,9 +296,7 @@ public class ShopSystem(
-             return ShopOutcome.Refused(order.champion, ShopRefusal.NoRoom)
-         }
-         val price = ShopRules.priceFor(inventory, catalog, entry, consumed)
--        if (wallet.gold < price) {
--            return ShopOutcome.Refused(order.champion, ShopRefusal.InsufficientGold)
--        }
-+        // mutation: no affordability check
- 
-         var tradedIn = 0
-         for (slot in 0 until Inventory.CARRIED) {
+and the pilot draws each axis independently from three values:
+
+```
+MobaReplayProofTest.kt:94:                moveX = rng.nextInt(3) - 1f
+MobaReplayProofTest.kt:95:                moveY = rng.nextInt(3) - 1f
 ```
 
-**M4 — a recipe as a list of id strings** (11 red: all 4 compiler-side, 5 × `RecipeTest`, 2 × `ShopProofTest`)
-```diff
-@@ -688,7 +688,7 @@ public class AssetScope(
-         name,
-         "cost" to cost,
-         "stats" to LinkedHashMap(stats),
--        "components" to components.map { it.expecting<Item>() },
-+        "components" to components.map { it.id },
-         "unique" to unique,
-         "grantedAbility" to grantedAbility?.expecting<Ability>(),
-         "passive" to passive?.expecting<GameplayEffect>(),
-```
+`(-1, 0)` is one of those nine equiprobable pairs. When the pilot happens to be holding exactly
+`(-1, 0)` at t301, the "corruption" writes the value that is already there, the replay is
+legitimately bit-exact, and the test fails while the machinery is working perfectly. The pilot is
+seeded `Random(System.nanoTime())`, so it is a fresh draw every build.
 
-**M5 — the typed stamp dropped, reference kept** (1 red: `ItemRecipeValidatorTest > a recipe pointing at something that is not an item is a kind mismatch`)
-```diff
-@@ -688,7 +688,7 @@ public class AssetScope(
-         name,
-         "cost" to cost,
-         "stats" to LinkedHashMap(stats),
--        "components" to components.map { it.expecting<Item>() },
-+        "components" to components.map { it },
-         "unique" to unique,
-         "grantedAbility" to grantedAbility?.expecting<Ability>(),
-         "passive" to passive?.expecting<GameplayEffect>(),
-```
+**1/9 ≈ 11% per build is derived from the source, not measured** — I did not sample it, and say so
+rather than presenting a read as a rate. It is consistent with `HANDOFF.md`'s recorded *"the
+in-suite mutation at t301 diverged at t301 in 5/5"*: five clean runs has probability (8/9)⁵ ≈ 55%,
+so that 5/5 was never evidence against this.
 
-**M6 — UDEA0037's pricing arm removed** (1 red: `ItemRecipeValidatorTest > an item that costs less than its components fails the build`)
-```diff
-@@ -242,7 +242,7 @@ public object ItemRecipeValidator : AssetValidator {
- 
-             val cost = costs.getValue(item.id)
-             val parts = components.sumOf { costs.getValue(it.id) }
--            if (cost >= parts) continue
-+            continue
-             val listed = components.joinToString { "`${it.id}` at ${costs.getValue(it.id)}" }
-             diagnostics += AssetValidationRules.ITEM_RECIPE.diagnostic(
-                 message = "`${item.id}` costs $cost gold but is built from components worth " +
-```
+**2. 34 tests skip in a default `sh gradlew build`, in exactly two families.** Enumerated from the
+result XML after the definitive run, and both are the shape the standards warn about — a green build that
+tested nothing:
 
-**M7 — no fountain check** (2 red: both `ShopProofTest` fountain tests)
-```diff
-@@ -278,9 +278,7 @@ public class ShopSystem(
-             val spawn = entity.getOrNull(Respawn) ?: return refused
- 
-             if (Corpse in entity) return ShopOutcome.Refused(order.champion, ShopRefusal.Dead)
--            if (!ShopRules.inFountain(position.x, position.y, spawn.spawnX, spawn.spawnY)) {
--                return ShopOutcome.Refused(order.champion, ShopRefusal.OutsideFountain)
--            }
-+            // mutation: no fountain check
-             return when (order) {
-                 is ShopOrder.Buy -> buy(order, wallet, inventory)
-                 is ShopOrder.Sell -> sell(order, wallet, inventory)
-```
+- **25 GL tests** (`GlCaptureTest`, `GlCaptureDeterminismTest`, `GlOverlayIsolationTest`,
+  `OffscreenBackendTest`, `OffscreenRenderToolsTest`, `OverlayCaptureIsolationTest`), because
+  `$DISPLAY` is empty and `-Pudea.render.requireGl` defaults to `false`. Run for real under
+  `xvfb` in §3: 26 tests, 0 failures, 0 skipped.
+- **9 art-corpus tests** — `AtlasPackerTest` ×7 and `ReproducibilityTest` ×2 — because
+  `MobaArt.available` is false. `moba/src/main/resources/assets/sprites` does not exist in any
+  checkout here (`ls`: `No such file or directory`), and only `scripts/extract-art.py` can create
+  it, which needs the two paid archives. **So the atlas determinism and pack reproducibility tests
+  run on the owner's machine and skip everywhere else** — including CI. This is pre-existing and
+  already named in `MobaArt`'s own KDoc (*"That is a real hole and it is named here rather than
+  hidden"*), and it is out of scope for #154. It is the most valuable thing this ticket turned up
+  that this ticket is not allowed to fix, and it deserves an issue: `scripts/stage-moba-art.py`
+  cannot substitute, because the corpus size *is* the point of those tests.
 
-**M8 — one slot satisfies two components** (1 red: `RecipeTest > a recipe naming one component twice needs two of it`)
-```diff
-@@ -105,7 +105,6 @@ public object ShopRules {
-         for (component in entry.componentIndices) {
-             for (slot in 0 until Inventory.CARRIED) {
-                 val bit = 1 shl slot
--                if (claimed and bit != 0) continue
-                 if (inventory.rawAt(slot) != component) continue
-                 claimed = claimed or bit
-                 break
-```
+**3. The scratchpad the harness calls "session-specific" is shared between every agent on this
+repository, and a collision in it is silent.** Not a Udea defect, but it is the reason every
+transcript above was re-run, and it is the most dangerous thing this ticket touched.
 
-**M9 — room ignores the slots the purchase frees** (1 red: `ShopProofTest > a full inventory can still combine two of its own slots`)
-```diff
-@@ -149,7 +149,7 @@ public object ShopRules {
-         if (entry.item.trinket) return inventory.isEmpty(Inventory.TRINKET)
-         var free = 0
-         for (slot in 0 until Inventory.CARRIED) {
--            if (inventory.isEmpty(slot) || consumed and (1 shl slot) != 0) free++
-+            if (inventory.isEmpty(slot)) free++
-         }
-         return free > 0
-     }
-```
+`/tmp/claude-1000/-srv-ssd1-workspace-Udea/<uuid>/scratchpad/` is the same directory for #154,
+#132 and #152. I wrote a six-mutation pass to `mut/M1.log` … `mut/M6.log`; #132's mutation runner
+writes the same names. When I went to splice `M1.log` it began `Reusing configuration cache.` and
+ended with a `:moba:test` failure — `RecipeTest`, `ShopProofTest` — whose report path was
+`…/agent-a5b3c68bd564f1fda/`, which is #132's worktree, not mine.
 
-**M10 — no aliveness check** (1 red: `ShopProofTest > the shop refuses a corpse`)
-```diff
-@@ -277,7 +277,7 @@ public class ShopSystem(
-             val inventory = entity.getOrNull(Inventory) ?: return refused
-             val spawn = entity.getOrNull(Respawn) ?: return refused
- 
--            if (Corpse in entity) return ShopOutcome.Refused(order.champion, ShopRefusal.Dead)
-+            // mutation: no aliveness check
-             if (!ShopRules.inFountain(position.x, position.y, spawn.spawnX, spawn.spawnY)) {
-                 return ShopOutcome.Refused(order.champion, ShopRefusal.OutsideFountain)
-             }
-```
+**Nothing errored.** The file existed, was the right size, was recently modified, and was about a
+different branch. What caught it was that my runner had printed `exit 1` and
+`repository: …/agent-ae07475ff2761864b` for each mutation, and the saved bytes disagreed with what
+the run had said — the check ran correctly and the artefact was replaced afterwards. Reading only
+the first line of the file would still have looked right.
 
-**M11 — a sale returns the full price** (1 red: `ShopProofTest > selling returns a reduced price and empties the slot`)
-```diff
-@@ -78,7 +78,7 @@ public object ShopRules {
-     public const val NO_SLOTS: Int = 0
- 
-     /** Gold returned for selling an item that cost [cost]. */
--    public fun sellValue(cost: Int): Int = cost * SELL_PERCENT / 100
-+    public fun sellValue(cost: Int): Int = cost
- 
-     /** Whether a champion at ([x], [y]) is inside the fountain at ([spawnX], [spawnY]). */
-     public fun inFountain(x: Float, y: Float, spawnX: Float, spawnY: Float): Boolean {
-```
+An ownership audit of that directory, matching each file's contents against the three worktree
+paths, found files from all three agents interleaved — and, worse, that `mut/M*.diff` and
+`mut/M*.failing` contain no absolute path at all, so ownership cannot be established from their
+contents in either direction. Warned #132 and #152; #152 confirmed two files of its own in there
+and re-verified both against their destinations rather than inspecting them, which is the right
+test — an absolute path inside a file proves who wrote it *at some point*, not who wrote it last.
 
-**M12 — `Inventory` absent from the snapshot registry** (1 red: `ShopProofTest > a rewind restores what the champion was carrying and what it had spent`)
-```diff
-@@ -87,7 +87,7 @@ public class ItemModule(
-     public companion object {
- 
-         /** @see ItemModule.Companion */
--        public fun snapshotTypes(): List<ReplicatedComponentType<*>> = listOf(
-+        public fun snapshotTypes(): List<ReplicatedComponentType<*>> = emptyList<ReplicatedComponentType<*>>().ifEmpty { listOf(
-             fleksComponentType(
-                 InventoryReplicator,
-                 ComponentSchema.of(
-@@ -97,6 +97,6 @@ public class ItemModule(
-                 ),
-                 Inventory,
-             ) { Inventory() },
--        )
-+        ) }.let { emptyList<ReplicatedComponentType<*>>() }
-     }
- }
-```
+**Rule for whoever writes the wave handoff:** a generic filename in that directory is a silent
+cross-branch overwrite. Key the path to the worktree.
 
-(`NO_SLOTS` is `private` on the branch as committed — the M11 diff was taken before the
-public-surface trim in `92ae5e0`, and the mutated line is the one below it either way.)
+**4. `common/build.gradle.kts` and `gradle-plugin/build.gradle.kts` publish POMs declaring
+Apache-2.0** while `README.md` and `LICENSE` say MIT. `docs/art-assets.md` already records this
+and the reasoning for leaving it: both modules are deleted in Phase 6, so letting them go with the
+modules is the cheapest correct fix. A `mavenLocal` publish made before then carries the wrong
+licence. Not touched.
 
----
+**5. The provenance of `example/src/main/resources/assets/sounds/` is recorded nowhere.**
+`LICENSE` excludes it until somebody establishes it, which is the right conservative default.
+Establishing it is not something an agent can do.
 
-## 9. Regenerated files, and by how much the ids moved
-
-Three files, each rewritten by its own task, never by hand.
-
-**`net-components.lock`** — hand-edited, as it is meant to be: one name added.
-`dev.wildware.moba.item.Inventory` sorts between `ability.Projectile` and `lane.LaneCreep`.
-
-**`moba/net-protocol.lock`** — `sh gradlew :moba:udeaWriteProtocolLock`.
-`Inventory` takes **id 7**, and every moba component after it moves up by **one**:
-`lane.LaneCreep` 7→8, `lane.LaneState` 8→9, `lane.LastHit` 9→10, `lane.Tower` 10→11,
-`lane.Wallet` 11→12, `level.GameUnit` 12→13, `match.MatchState` 13→14, `match.Respawn` 14→15.
-`protoHash` **0xdf75 → 0xea9f**.
-
-```diff
--component 7 dev.wildware.moba.lane.LaneCreep
-+component 7 dev.wildware.moba.item.Inventory
-+  field 0 slot0 i32:32
-+  field 1 slot1 i32:32
-+  field 2 slot2 i32:32
-+  field 3 slot3 i32:32
-+  field 4 slot4 i32:32
-+  field 5 slot5 i32:32
-+  field 6 trinket i32:32
-+component 8 dev.wildware.moba.lane.LaneCreep
-   field 0 goldBounty i32:32
-   field 1 heading i32:32:oncreate
-```
-
-Read that diff for the `OwnerOnly` point in §2: seven plain `i32:32` tokens with no visibility
-marker, two lines above `heading`'s `i32:32:oncreate`, which is what a declaration the wire *does*
-honour looks like in the same file.
-
-**`udea-codegen/net-protocol.lock`** — `sh gradlew :udea-codegen:udeaWriteProtocolLock`.
-The six fixture components move **15-20 → 16-21**; `protoHash` **0x0140 → 0xf167**.
-
-**`udea-codegen/src/test/resources/expected-generated-hashes.txt`** —
-`sh gradlew :udea-codegen:test -Pudea.updateGeneratedHashes=true`. **Seven** hashes moved: the six
-fixture replicators (whose emitted `typeId` shifted) plus `CodegenFixturesNetProtocol.kt`. The
-agent-state and tool files are unchanged, which is the right shape — nothing about them moved.
-
-Nothing has shipped against any of these ids: no recorded replay and no connected client decodes
-with them.
-
----
-
-## 10. Self-review against the reject list
-
-Read against `docs/engineering-standards.md` §8 and `AGENTS.md`'s "Do not", both closed lists.
-
-- **§1 smells** — no top-level `var`, no mutable singleton (`ShopService` is constructed by
-  `ItemModule` and injected), no god object, every wire/disk field self-describing, no stringly-typed
-  domain (`UniqueName` is a value class; a slot holds an `AssetIndex` value with the `Int` storage
-  justified against `Tower.targetRaw`'s precedent), no string-concatenated codegen, no silent
-  failure (every refusal is a typed `ShopRefusal`), no reflection, no linear scan on a per-tick path
-  (`netIds.resolveOrNull` is O(1); `ItemCatalog` is an array read), no magic buffer.
-- **A `public` declaration nobody outside the module uses** — swept in `92ae5e0`.
-  `ItemCatalog.EMPTY`, `ShopService.pending` and `Inventory.itemAt` had no callers and are deleted;
-  `ItemCatalog.atRaw` and `ShopRules.NO_SLOTS` had none outside their own files and are private.
-- **A test that cannot fail** — §1 and §8. Twelve mutations, every test file represented, control
-  runs on both sides. The `ItemRecipeValidatorTest` control (`a well priced item tree produces no
-  diagnostics at all`) is the known-negative for the four validator tests.
-- **Generated code by string concatenation** — none; the packer emits `PackValue`s.
-- **A new field on `GameContext`** — none. `ShopService` reaches the world through
-  `builder.service(KEY, …)`, the same door `LaneService` uses.
-- **Wall clock or unseeded randomness in simulation** — none in the diff.
-  `ShopSystem` reads no clock at all; `ShopService`'s queue is an `ArrayDeque` (insertion order);
-  `ItemCatalog.byId` is a `HashMap` that is **only ever looked up, never iterated**, with the ordered
-  answer being `entries`, built from `registry.ids` — that is written into its KDoc so a reviewer
-  does not have to work it out.
-- **`TODO()`, stubbed return, swallowed exception** — none. The one `check` in `ShopSystem.buy`
-  fires only on a disagreement between `hasRoomFor` and `firstFreeCarried`, which is a defect in that
-  file rather than a state a player can reach, and it fails loudly rather than writing to slot −1.
-- **Copy-pasted logic differing only in a constant** — the seven-way `when` in `Inventory.rawAt`/
-  `place` is the closest thing, and it is the honest cost of a component with no arrays; the "which
-  slot" arithmetic lives in exactly those two functions and nowhere else.
-- **`by net(...)`, a second snapshot codec, setter instrumentation** — none.
-- **A new module depending on `common`** — none; `udeaVerifyNoLegacyDependencies` green.
-- **GL outside `udea-render`** — none.
-- **A presentation system as a Fleks system** — none; nothing here draws.
-- **A module arrow pointing upward** — none; `udeaVerifyModuleGraph` green.
-- **A `docs/contracts/` file changed** — **none.** `git diff origin/example...HEAD --name-only`
-  has no `docs/contracts/` entry.
-- **`fieldNames[i]` == FieldMask bit *i* == FieldStore index *i*** — held.
-  `InventoryReplicator.fieldNames` is `["slot0","slot1","slot2","slot3","slot4","slot5","trinket"]`,
-  and `ItemModule.snapshotTypes()` passes `List(Inventory.CAPACITY) { FieldKind.Int }` — **derived**
-  from the capacity rather than transcribed, and every one of the seven fields really is an `Int`, so
-  a kind cannot be typed wrong at the right length here.
-- **A duration expressed in seconds or milliseconds rather than a `Tick`** — the diff contains no
-  duration at all. Gold is `Int`; the sell rate is integer percent, so the arithmetic truncates
-  identically on a server, a client and a replay.
-- **`AGENTS.md`'s module table stale** — no module moved; `udeaVerifyAgentsMd` green.
-
----
-
-## 11. Files
-
-**New** — `udea-assets/…/Item.kt`; `moba/assets/item/{components,finished,trinkets}.udea.kts`;
-`moba/src/main/…/item/{ItemComponents,ItemCatalog,ShopRules,ShopSystem,ItemModule}.kt`;
-`moba/src/test/…/item/{ShopHarness,RecipeTest,ShopProofTest}.kt`;
-`udea-assets-compiler/src/test/…/validate/ItemRecipeValidatorTest.kt`.
-
-**Changed, outside the shop** — `moba/src/test/…/replay/MobaReplayProofTest.kt` (`72aae75`) and
-`udea-gradle/…/UdeaAssetsPlugin.kt` (`5fbc158`, KDoc only). Both are argued in §2 and both say so
-in their commit subjects.
-
-**Changed** — `udea-assets/…/{Names.kt, pack/AssetCodecs.kt}`;
-`udea-assets-compiler/…/{AssetKind, AssetScope, gen/DslKinds, gen/AccessorGenerator,
-pack/GraphPacker, validate/AssetValidationRules, validate/AssetValidator,
-validate/GraphValidators}.kt`; the four `udea-assets-compiler` tests carrying stale counts;
-`moba/src/main/…/MobaGame.kt`; `moba/src/agent/…/MobaAgent.kt`; the three lock files.
-
-**`gradlew` shows as `M` in `git status` and is deliberately not staged** — it is the `chmod +x` the
-contract prescribes for this box, and a mode flip on the wrapper is not part of this change.
+**6. `docs/decisions/phase-log.md` still has no entries**, through seven phases; `HANDOFF.md`
+records that. This decision is recorded in `docs/art-assets.md` because that is where the issue
+puts it, not in the phase log.

@@ -1,4 +1,23 @@
-"""Extract the Tiny RPG character packs into the moba module, normalised."""
+"""How the committed Tiny RPG frames were unpacked from the two purchased archives.
+
+**This is not a build step and it will not give a fresh clone a tree `:moba` can build.** Run
+`python3 scripts/stage-moba-art.py` for that; `docs/art-assets.md` is the record of why.
+
+Three things stop it being a fresh-clone step. It reads the two **paid** archives by exact
+filename from a hardcoded Windows `~\\Downloads`; its destination is an absolute path on the
+author's own machine; and it writes lowercased, un-hyphenated names (`sprites/wizard/idle.png`)
+under `moba/src/main/resources/assets/sprites/`, while `moba/assets/character/*.udea.kts` name
+`sprites/wizard/Wizard-Idle.png` under `moba/assets/`. Neither the asset root nor the filenames
+match what the packed bundle reads.
+
+**It is still the only thing that produces its output**, which is why it is kept rather than
+deleted. `moba/src/main/resources/assets/sprites/` is the full 327-sheet corpus, and
+`udea-assets-compiler`'s `MobaArt` resolves exactly that path: the atlas determinism and pack
+reproducibility tests read it and `assumeTrue` themselves away when it is absent. Those tests
+therefore run on a machine that has the two archives and skip everywhere else - a hole their own
+KDoc names rather than hides. Do not repoint them at `scripts/stage-moba-art.py`: that stages 33
+sheets for six characters, and the corpus is the point of those tests.
+"""
 import os, re, zipfile, collections
 
 DL = os.path.expanduser(r"~\Downloads")

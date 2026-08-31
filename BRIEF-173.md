@@ -1,13 +1,13 @@
 # BRIEF-173 — the FIR-checker gate has never run
 
-**SHA: 252f0df**
+**SHA: 6fe116f**
 
-*(the last implementation commit. `BRIEF-173.md` lands on top of it as the branch head — a brief
-cannot name the commit that contains it, so the branch head SHA is in the handover message and
-`git log --oneline -1` on `issue-173-checker-probe-classpath` gives it.)*
+*(the whole change, and this brief. A brief cannot name the commit that contains it, so there is
+exactly one commit on top of `6fe116f` — the branch head — and it edits nothing but this line.
+`git diff 6fe116f HEAD` is that one-line diff.)*
 
 Branch `issue-173-checker-probe-classpath`, off `origin/example` at `7942823`.
-Four commits: `90e44e3`, `e2e708d`, `536df6f`, `252f0df`.
+Commits: `90e44e3`, `e2e708d`, `536df6f`, `252f0df`, `6fe116f`, then the SHA line.
 
 ---
 
@@ -271,7 +271,8 @@ from `UdeaCompilerPluginWiring.appliesTo`. The `module=`/`probe=` read is scoped
 `checkers-fire:` job block, because a `module=` line anywhere else in this workflow would
 otherwise answer a different question with the same confidence.
 
-Each mutation below was applied to a clean `252f0df` worktree, run, and reverted; the diffs are
+Each mutation below was applied to a clean `252f0df` worktree (the step and the test are
+byte-identical at `6fe116f`, which only edits the runner script's header comment), run, and reverted; the diffs are
 `git diff` output from that worktree, not descriptions. The command in every row is
 `sh gradlew -p build-logic test --tests 'dev.wildware.udea.build.CompilerPluginSwitchTest'`, and
 the run is 8 tests in each case. Failure messages come from the `<failure message=…>` attributes of
@@ -382,7 +383,7 @@ admin has to make it.
 
 ## 3. The build
 
-### `sh gradlew build`, no exclusions, on `252f0df`
+### `sh gradlew build`, no exclusions, on `252f0df` — the last commit that changes a build input
 
 Run from a `clean`, on a quiet box:
 
@@ -642,7 +643,7 @@ lines the issue quotes.
 
 ### The class, not just the instance
 
-The finding is "a document names the module the probe lives in". The census, run on `252f0df`
+The finding is "a document names the module the probe lives in". The census, run on `252f0df` (unchanged at `6fe116f`)
 (`BRIEF-173.md`'s own hits filtered out, since it is this document):
 
 ```
@@ -677,16 +678,19 @@ $ git diff --stat origin/example HEAD -- udea-codegen/
 (no output)
 ```
 
-The whole diff, at `252f0df`:
+The whole diff, at `6fe116f`:
 
 ```
 $ git diff --stat origin/example HEAD
- .github/workflows/ci.yml                           | 110 ++++++++++++++---
- .../udea/build/CompilerPluginSwitchTest.kt         | 132 +++++++++++++++++++++
- docs/compiler-plugin.md                            |  27 +++--
- scripts/run-checkers-fire.sh                       | 103 ++++++++++++++++
- 4 files changed, 349 insertions(+), 23 deletions(-)
+ .github/workflows/ci.yml                           | 110 +++-
+ BRIEF-173.md                                       | 693 +++++++++++++++++++++
+ .../udea/build/CompilerPluginSwitchTest.kt         | 132 ++++
+ docs/compiler-plugin.md                            |  27 +-
+ scripts/run-checkers-fire.sh                       | 106 ++++
+ 5 files changed, 1045 insertions(+), 23 deletions(-)
 ```
+
+Four of those five are the change; the fifth is this document.
 
 `gradlew` is **not** in it. It is `M` in `git status` on this box because the wrapper is checked in
 without the executable bit and both CI and `scripts/run-checkers-fire.sh` `chmod +x` it; the mode

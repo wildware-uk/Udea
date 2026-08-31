@@ -2,11 +2,13 @@
 #
 # Run the `checkers-fire` CI job's own step on this machine.
 #
-# The job asks the one question no other gate in this repository asks: does a `@Net val`
-# written into a real module's real source set actually stop a real `compileKotlin`, with the
-# right rule id at the right symbol? For the whole of Phase 0 it had never got far enough to
-# find out (issue #173), and a job that has never run is indistinguishable on the Actions page
-# from one that is failing for the reason everything else is failing.
+# The question the job asks is: does a `@Net val` written into a real module's real source set
+# actually stop a real `compileKotlin`, with the right rule id at the right symbol?
+# `:udea-compiler-plugin:test` answers it for throwaway sources under a directly driven
+# compiler, and `udeaVerifyCompilerPlugin` answers "is the jar on the resolved classpath"; this
+# job is where the two meet a module the repository really builds. For the whole of Phase 0 it
+# had never got far enough to find out (issue #173), and a job that has never run is
+# indistinguishable on the Actions page from one failing for the reason everything else is.
 #
 # The step is **extracted from `.github/workflows/ci.yml` and executed**, not transcribed here.
 # A transcription is a second implementation of the gate, and two implementations of a gate
@@ -25,9 +27,10 @@
 #
 # Two things this script does that the Actions runner does for the job, and one it undoes:
 #
-#   * `JAVA_HOME` is pointed at a JDK 21 if the caller has not set one. Gradle 8.13 does not
-#     support the JDK 25 that is first on this box's PATH, and its entire error message is the
-#     string `25.0.2`.
+#   * `JAVA_HOME` is **set** to a JDK 21, overriding whatever is exported, unless
+#     `UDEA_JAVA_HOME` names one deliberately. Gradle 8.13 does not support the JDK 25 this box
+#     exports as `JAVA_HOME`, and its entire error message is the string `25.0.2` — which
+#     arrives as an empty diagnostic list and reads exactly like the checkers not firing.
 #   * `chmod +x ./gradlew`, which the job has a step for, because the wrapper is checked in
 #     without the executable bit. The mode is **restored on exit** if it was not set before, so
 #     running this does not leave `M gradlew` in `git status` for a reviewer to trip over.

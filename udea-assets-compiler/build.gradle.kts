@@ -1,3 +1,5 @@
+import dev.wildware.udea.build.CharacterArtStaging
+
 plugins {
     id("udea.kotlin-build-tool")
 }
@@ -73,6 +75,20 @@ tasks.withType<Test>().configureEach {
     inputs.dir(rootProject.layout.projectDirectory.dir("example/src/main/resources/assets"))
         .withPropertyName("exampleAssetCorpus")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+
+    // Part of that first tree is **produced**, so these tasks have to be ordered after the task
+    // that produces it. `moba/assets/sprites` is gitignored licensed art and
+    // `:moba:udeaStageCharacterArt` copies it in from the tree that holds it (issue #170); Gradle
+    // rejects the whole graph rather than the tests, with "uses this output of task
+    // ':moba:udeaStageCharacterArt' without declaring an explicit or implicit dependency".
+    //
+    // Naming a task of `:moba` from an engine module is worth a sentence, because it looks like
+    // an arrow pointing the wrong way and is not one. This is not a classpath edge -
+    // `UDEA-MG-*` and `UDEA-LEGACY-001` read resolved configurations, and this module resolves
+    // nothing of `:moba` - it is build ordering for a corpus these tests already read by path,
+    // deliberately, and have since `MigratedCorpusCompilesTest` was written. The alternative is
+    // an undeclared read of a file another task writes, which is the flake Gradle is describing.
+    dependsOn(":moba:${CharacterArtStaging.TASK}")
 
     // The script classpath used by AssetCompilerTest, and the classpath the forked worker is
     // launched with. It is this module's own test runtime classpath, which is what makes the

@@ -67,12 +67,22 @@ public class ItemCatalog private constructor(
     /** How many items this build ships. */
     public val size: Int get() = entries.size
 
+    /**
+     * Items by id, for [find].
+     *
+     * A hash map, and it is **never iterated** - only looked up. Standards section 4 bans an
+     * iteration-order-dependent collection *where the order affects output*, and the ordered
+     * answer to "every item, in a fixed order" is [entries], which is built from `registry.ids`.
+     * Anything walking the catalogue walks that.
+     */
+    private val byId: Map<String, ItemEntry> = entries.associateBy { it.item.id.value }
+
     /** The entry at [index], or null when that slot is not an item. O(1). */
     public fun at(index: AssetIndex): ItemEntry? =
         if (index.value in byIndex.indices) byIndex[index.value] else null
 
     /** The entry for the raw slot value an [Inventory] holds, or null. */
-    public fun atRaw(raw: Int): ItemEntry? =
+    private fun atRaw(raw: Int): ItemEntry? =
         if (raw in byIndex.indices) byIndex[raw] else null
 
     /** The entry in [slot] of [inventory], or null when the slot is empty. */
@@ -87,22 +97,17 @@ public class ItemCatalog private constructor(
      */
     public fun find(id: AssetId): ItemEntry? = byId[id.value]
 
-    private val byId: Map<String, ItemEntry> = entries.associateBy { it.item.id.value }
-
     override fun toString(): String = "ItemCatalog(${entries.size} items)"
 
     public companion object {
-
-        /** A catalogue with nothing in it: what a definition assembled without an item tree gets. */
-        public val EMPTY: ItemCatalog = ItemCatalog(emptyArray(), emptyList())
 
         /**
          * Reads every [Item] out of [registry].
          *
          * Walks `registry.ids`, which is slot order, so [entries] is deterministic. A graph with
-         * no items yields [EMPTY] rather than a failure: a definition assembled without an item
-         * tree is a legitimate build, and the shop then refuses every order by naming the item it
-         * could not find rather than by failing to start.
+         * no items yields an empty catalogue rather than a failure: a definition assembled
+         * without an item tree is a legitimate build, and the shop then refuses every order by
+         * naming the item it could not find rather than by failing to start.
          */
         public fun read(registry: AssetRegistry): ItemCatalog {
             val byIndex = arrayOfNulls<ItemEntry>(registry.size)

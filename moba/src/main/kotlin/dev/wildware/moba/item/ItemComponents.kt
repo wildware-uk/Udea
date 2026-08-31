@@ -28,12 +28,13 @@ import dev.wildware.udea.assets.AssetIndex
  *
  * The same reason `Tower.targetRaw` holds an `Int` and not a `NetId`: the generated replicator
  * needs a kind `FieldLowering` knows, and `AssetIndex` is a value class over a `val`, which
- * lowering refuses because `Replicator.apply` could not restore it. The typed form is what
- * [itemAt] and [place] take, so nothing outside this class does the unwrapping.
+ * lowering refuses because `Replicator.apply` could not restore it. [place] takes the typed form,
+ * so nothing outside this class unwraps one, and [ItemCatalog.at] is what turns a slot back into
+ * an item - which is the only thing a reader ever wants a slot for.
  *
- * An `AssetIndex` is also the *only* asset identity a snapshot may hold - `Ref.slot`'s own KDoc
- * says so - because it is stable across a hot reload. An inventory holding an asset id string
- * would be a rewind that restored an item by a name the reloaded graph had moved.
+ * An `AssetIndex` is also the *only* asset identity a snapshot may hold - `Ref.resolvedIndex`'s
+ * own KDoc says so - because it is stable across a hot reload. An inventory holding an asset id
+ * string would be a rewind that restored an item by a name the reloaded graph had moved.
  *
  * ## `visibility = OwnerOnly`, and what it does today
  *
@@ -52,7 +53,7 @@ public class Inventory(
      * The first of the six carried slots: an item's [AssetIndex] value, or [EMPTY].
      *
      * The six are separate fields rather than an array for the reason in the class KDoc, and
-     * they are read and written through [itemAt] and [place] rather than by name, so that the
+     * they are read and written through [rawAt] and [place] rather than by name, so that the
      * "which slot" arithmetic exists in exactly one place.
      */
     @Net(visibility = Visibility.OwnerOnly) public var slot0: Int = EMPTY,
@@ -76,7 +77,7 @@ public class Inventory(
 ) : Component<Inventory> {
 
     /**
-     * The item in [slot], or [AssetIndex.NONE]-shaped emptiness as [EMPTY].
+     * The [AssetIndex] value in [slot], or [EMPTY].
      *
      * @param slot `0 until` [CAPACITY]; [TRINKET] is the trinket.
      */
@@ -92,10 +93,6 @@ public class Inventory(
             else -> trinket
         }
     }
-
-    /** The item in [slot] as an asset index, or null when the slot is empty. */
-    public fun itemAt(slot: Int): AssetIndex? =
-        rawAt(slot).let { if (it == EMPTY) null else AssetIndex(it) }
 
     /** Whether [slot] holds nothing. */
     public fun isEmpty(slot: Int): Boolean = rawAt(slot) == EMPTY

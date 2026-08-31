@@ -75,7 +75,7 @@ public object ShopRules {
     public const val SELL_PERCENT: Int = 70
 
     /** A slot mask with nothing in it: no component of the order was found in the inventory. */
-    public const val NO_SLOTS: Int = 0
+    private const val NO_SLOTS: Int = 0
 
     /** Gold returned for selling an item that cost [cost]. */
     public fun sellValue(cost: Int): Int = cost * SELL_PERCENT / 100

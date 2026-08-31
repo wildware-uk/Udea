@@ -142,9 +142,6 @@ public class ShopService {
     /** Queues a sale of [slot] for [champion]. */
     public fun sell(champion: NetId, slot: Int): Unit = submit(ShopOrder.Sell(champion, slot))
 
-    /** How many orders are waiting. */
-    public val pending: Int get() = queued.size
-
     /** Called by [ShopSystem] at the top of its tick. Not part of the public shop. */
     internal fun beginTick() {
         lastOutcomes.clear()

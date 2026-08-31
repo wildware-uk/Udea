@@ -382,6 +382,29 @@ public object DriftFixture {
     /** The classpath resource the PR fixture is read from. */
     public const val PR_RESOURCE: String = "/fixtures/drift-3600.udearep"
 
+    /**
+     * The nightly fixture's length: ten times the PR fixture's, in the gate's own unit.
+     *
+     * A tick count and not a duration, deliberately. At the fixed 60Hz of `AGENTS.md`'s tick
+     * model it is ten minutes of simulated play, and issue #165 describes it that way - but a
+     * number of seconds written down anywhere in this tree is a number that stops being true the
+     * day somebody changes the rate, and every deadline, ring slot and baseline here is a `Tick`
+     * for exactly that reason.
+     *
+     * Why longer at all: the PR fixture's minute is enough to catch a divergence that starts
+     * early, and the whole family of defects this gate is for - a `Math.sin` table, a
+     * `HashMap` iteration order, an accumulated float - can take a great many ticks to move
+     * anything the world hash covers. That is why it runs nightly rather than on a pull request:
+     * issue #152's scope bullet says the long fixture must not block a PR.
+     */
+    public const val NIGHTLY_TICKS: Int = 36_000
+
+    /** The name the nightly fixture is checked in under, and the name a digest header carries. */
+    public const val NIGHTLY_FIXTURE: String = "drift-36000.udearep"
+
+    /** The classpath resource the nightly fixture is read from. */
+    public const val NIGHTLY_RESOURCE: String = "/fixtures/drift-36000.udearep"
+
     /** How this game names itself in a recording header. */
     public const val GAME_ID: String = "udea-replay-equality-fixture"
 
@@ -412,4 +435,39 @@ public object DriftFixture {
         axes = listOf("drift/move"),
         actions = listOf("drift/pulse"),
     )
+}
+
+/**
+ * The checked-in recordings of this world, as the two jobs that replay them name them.
+ *
+ * A list rather than a count, so adding a third is an addition here and nothing else has to be
+ * corrected. `--fixture` on [DriftDigestMain] resolves against it, so a `ci.yml` typo names the
+ * fixtures that do exist instead of failing somewhere inside a classpath lookup.
+ */
+public enum class DriftFixtureKind(
+    /** The file's name, as it is checked in and as a digest header carries it. */
+    public val fixtureName: String,
+    /** Where a replay reads it from, on the classpath. */
+    public val resource: String,
+    /** How long it is. */
+    public val ticks: Int,
+) {
+
+    /** The one a pull request replays: `replay-equality`, on every push. */
+    PR(DriftFixture.PR_FIXTURE, DriftFixture.PR_RESOURCE, DriftFixture.PR_TICKS),
+
+    /** The one the nightly replays: ten times as long, and never on a pull request. */
+    NIGHTLY(DriftFixture.NIGHTLY_FIXTURE, DriftFixture.NIGHTLY_RESOURCE, DriftFixture.NIGHTLY_TICKS),
+    ;
+
+    public companion object {
+
+        /** The kind called [name], or a failure that lists the ones there are. */
+        public fun byName(name: String): DriftFixtureKind =
+            entries.firstOrNull { it.fixtureName == name }
+                ?: throw IllegalArgumentException(
+                    "no fixture is called '$name'; this world has " +
+                        entries.joinToString(", ") { it.fixtureName },
+                )
+    }
 }

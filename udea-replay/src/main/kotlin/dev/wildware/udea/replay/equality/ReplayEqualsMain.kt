@@ -1,5 +1,6 @@
 package dev.wildware.udea.replay.equality
 
+import dev.wildware.udea.core.Tick
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.stream.Collectors
@@ -156,6 +157,7 @@ public object ReplayEqualsMain {
         }
 
         var worst = EXIT_EQUAL
+        val divergentTicks = ArrayList<Tick?>(digests.size - 1)
         for (index in 1 until digests.size) {
             val result = try {
                 ReplayEquality.replayEquals(reference, digests[index])
@@ -165,8 +167,13 @@ public object ReplayEqualsMain {
                 continue
             }
             report.append("\n\n").append(result.describe())
+            divergentTicks += result.tick
             if (!result.isEqual && worst == EXIT_EQUAL) worst = EXIT_DIVERGED
         }
+        // Issue #165: the summary tells a reader how to reproduce this on their own machine, on a
+        // green run as well as a red one. Rendered by a class with tests rather than assembled in
+        // a workflow step - see `ReplayBisectGuide`.
+        report.append(ReplayBisectGuide.render(reference.header.fixture, divergentTicks))
         return worst
     }
 

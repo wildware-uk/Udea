@@ -237,7 +237,7 @@ def main():
 
         before = tree_files(clean)
 
-        print(f"\n[2/6] running the documented step in the clean tree")
+        print("\n[2/6] running the documented step in the clean tree")
         for line in step:
             code, out = run(["sh", "-c", line], clean)
             print(("  " + out.strip()).replace("\n", "\n  "))

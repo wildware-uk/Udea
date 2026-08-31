@@ -633,7 +633,11 @@ jobs:
             exit 1
           fi
 
-          {
+          # Built once and written twice: to the job summary, which is where a person reads
+          # it, and to stdout, which is where the run log keeps it. A summary is not in the
+          # log and cannot be fetched with `gh api`, so a gate whose only evidence is the
+          # summary is a gate nobody can quote afterwards.
+          summary=$(
             echo "### The FIR checkers fail a real build"
             echo
             echo "| Rule | Symbol | Reported at |"
@@ -645,7 +649,9 @@ jobs:
             echo "produced carried a UDEA rule id, so nothing here is a compile that failed for"
             echo "some other reason. The same file compiles clean under"
             echo "\`-Pudea.compilerPlugin.enabled=false\`."
-          } >> "$GITHUB_STEP_SUMMARY"
+          )
+          echo "$summary"
+          echo "$summary" >> "$GITHUB_STEP_SUMMARY"
 
   kotlin-upgrade-probe:
     # Spec 3.2's version policy: the K2 plugin is the most Kotlin-version-fragile thing in the

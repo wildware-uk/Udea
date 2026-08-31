@@ -936,7 +936,32 @@ the run-3 failure message above is showing.
 
 It also means I ran `clean` in the main repository's checkout. Its build outputs were rebuilt by
 the same command and it is green; its tracked tree was never touched, and `git -C
-/srv/ssd1/workspace/Udea status --short` shows only `?? .claude/worktrees/`.
+/srv/ssd1/workspace/Udea status --short` shows only `?? .claude/worktrees/`. It did cost one thing
+that is not a build output — the screenshot gallery lives under that same `build/` — and R2.4a
+below deals with it.
+
+### R2.4a The image, and why it has a new timestamp
+
+`clean` in the main repository also removed `/srv/ssd1/workspace/Udea/build/`, which is where the
+screenshot gallery lives — so my wrong-repo run deleted round 1's
+`issue170-roster-from-staged-art.png`. It is not recoverable from anywhere else; I searched the
+box for it (`find / -name "issue170*.png"`) and got nothing.
+
+It is regenerated at `e69b01d`, by the same command §5 names, in this worktree — whose
+`moba/assets/sprites/` the build filled, since nothing on this branch stages it by hand:
+
+```
+> Task :moba:runShot
+[moba.shot] /srv/ssd1/workspace/Udea/.claude/worktrees/agent-aae42d941ef837a54/moba/build/reports/udea/roster.png 1280x720 at tick 19, 6 characters
+
+BUILD SUCCESSFUL in 2s
+```
+
+Copied back to `/srv/ssd1/workspace/Udea/build/debug-screenshots/issue170-roster-from-staged-art.png`
+under the same name §5 uses. I looked at it rather than trusting the `6 characters` counter: six
+sprites draw on the grass — orc, orc elite, priest, skeleton, soldier, wizard — with real pixels
+and real weapons, none clipped or against an edge. It is the same claim §5 made, re-proved on the
+round-2 SHA rather than a restored copy of the old file.
 
 ---
 

@@ -310,8 +310,9 @@ class ReplayEqualityProofTest {
         // tests above exercise is never reached with the right base in CI.
         //
         // Two here - `udeaReplayDigest`, the self-test's own, and `udeaReplayEquals`, the join
-        // both CI jobs run. `:moba:udeaReplayDigest` is the third and `MobaReplayEqualityTest`
-        // asserts it against `moba`'s build script, because this test cannot read that file.
+        // both CI jobs run. `:moba:udeaReplayDigest` is the third, and it is fenced by
+        // `MobaReplayEqualityTest > the digest task tells its entry point which directory the
+        // workspace is` against `moba`'s own build script, which this test cannot read.
         assertContains(
             buildScript,
             "val workspaceRoot: String = rootProject.layout.projectDirectory.asFile.absolutePath",

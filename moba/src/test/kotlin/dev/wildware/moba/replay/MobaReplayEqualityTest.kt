@@ -244,10 +244,136 @@ class MobaReplayEqualityTest {
         // Without this the proof would keep passing while asserting about a tick nothing plants
         // at any more - and `MobaFixture.PLANT_TICK` is what the test above uses, so the two
         // halves of the same claim would be about different ticks.
+        assertContains(buildScript, "val replayPlantTick = \"${MobaFixture.PLANT_TICK.value}\"")
+    }
+
+    @Test
+    fun `the digest task tells its entry point which directory the workspace is`() {
+        // Issue #169, for the third `udeaReplayDigest` in this tree. `-Pudea.replay.out` is
+        // workspace-relative, and a `JavaExec` with no `workingDir` resolves a relative path
+        // against the *project* directory - so without this argument the leg would write into
+        // `moba/digests/` while `actions/upload-artifact` globs `digests/` under
+        // `$GITHUB_WORKSPACE`, the upload would trip `if-no-files-found: error`, and the join
+        // would never run because it declares `needs:` the leg job.
+        //
+        // No test can execute this join, because a Gradle build script is on no classpath. What
+        // is checkable is that the argument is still there, and that the value it is given is the
+        // repository root rather than this project. `ReplayEqualityPathsTest` covers what
+        // `ReplayDigestCli.parse` then does with it, and section 5 of BRIEF-172 has the executed
+        // end-to-end run.
+        assertContains(
+            buildScript,
+            "val replayWorkspaceRoot: String = rootProject.layout.projectDirectory.asFile.absolutePath",
+        )
+        assertEquals(
+            1, Regex("""add\("--workspace"\)""").findAll(buildScript).count(),
+            "`:moba:udeaReplayDigest` is the one task here that takes a workspace-relative path " +
+                "and it must pass --workspace exactly once; the build script has " +
+                "${Regex("""add\("--workspace"\)""").findAll(buildScript).count()}",
+        )
+    }
+
+    @Test
+    fun `the build script fence reads what the compiler reads, not what is switched off`() {
+        // The control for `commentsStripped`, which decides what the two tests above see. Kotlin
+        // block comments **nest**, so one stray slash-star inside a KDoc runs to the end of the
+        // file and switches off every task registered after it - which has already happened once
+        // in `udea-replay/build.gradle.kts`, silently, because none of those tasks is wired into
+        // `check`. A fence reading the raw text would have seen the registrations and passed.
+        val ordinary = commentsStripped(
+            """
+            val live = "kept"
+            // val lineCommented = "gone"
+            /* val blockCommented = "gone" */
+            /** A KDoc. */
+            val alsoLive = "kept"
+            val stringWithOpener = "literal /* not a comment"
+            """.trimIndent(),
+        )
+
+        assertContains(ordinary, "val live")
+        assertContains(ordinary, "val alsoLive")
+        assertContains(ordinary, "literal /* not a comment")
+        assertTrue("lineCommented" !in ordinary, "a line comment survived the strip:\n$ordinary")
+        assertTrue("blockCommented" !in ordinary, "a block comment survived the strip:\n$ordinary")
+
+        val nested = commentsStripped(
+            """
+            val beforeIt = "kept"
+            /** A KDoc naming a path with a slash-star in it: reports/x/*.txt */
+            tasks.register("udeaSwallowed") { }
+            """.trimIndent(),
+        )
+
+        assertContains(nested, "val beforeIt")
+        assertTrue(
+            "udeaSwallowed" !in nested,
+            "the stripper thinks a registration after an unclosed nested comment is live; the " +
+                "Kotlin compiler does not, and that disagreement is the whole defect:\n$nested",
+        )
+
+        // And that the real build script is read through it: this file's own KDoc names the
+        // plant tick in prose, so a raw read would pass the test above for the wrong reason.
         assertContains(
             Files.readString(projectDir.resolve("build.gradle.kts")),
-            "val replayPlantTick = \"${MobaFixture.PLANT_TICK.value}\"",
+            "`MobaFixture.PLANT_TICK`, as a literal.",
         )
+        assertTrue(
+            "`MobaFixture.PLANT_TICK`, as a literal." !in buildScript,
+            "the stripped copy still carries a KDoc line, so these fences are reading prose",
+        )
+    }
+
+    /**
+     * `moba/build.gradle.kts` with everything the Kotlin compiler ignores taken out.
+     *
+     * Duplicated from `ReplayEqualityProofTest`'s rather than shared, and the reason is the module
+     * table. `udea-replay` may not depend on `moba`, so the shared home would have to be
+     * `udea-replay`'s test-fixtures variant - which would put `DriftWorld`, `DriftComponents` and
+     * 730KB of checked-in `.udearep` resources on `moba`'s test runtime classpath, and that
+     * classpath is the one `:moba:udeaReplayDigest` runs a CI leg on. Two helpers are not worth
+     * adding a compile and a jar to every leg of a job already measured at 302s (BRIEF-172 §5).
+     * Each copy carries its own control, above, so neither is an unfenced fence.
+     */
+    private val buildScript: String by lazy {
+        commentsStripped(Files.readString(projectDir.resolve("build.gradle.kts")))
+    }
+
+    /**
+     * [source] with its Kotlin comments removed, leaving only what the compiler acts on.
+     *
+     * Nesting is the point: Kotlin block comments nest, so one stray opener inside a KDoc runs to
+     * the file's end and switches off everything after it. String literals are tracked so a path
+     * in a string cannot open a comment that is not there.
+     */
+    private fun commentsStripped(source: String): String {
+        val out = StringBuilder(source.length)
+        var depth = 0
+        var inString = false
+        var index = 0
+        while (index < source.length) {
+            val two = if (index + 1 < source.length) source.substring(index, index + 2) else ""
+            when {
+                depth > 0 && two == "/*" -> { depth++; index += 2 }
+                depth > 0 && two == "*/" -> { depth--; index += 2 }
+                depth > 0 -> {
+                    // Newlines survive, so a line-oriented assertion still sees the right shape.
+                    if (source[index] == '\n') out.append('\n')
+                    index++
+                }
+                inString && source[index] == '\\' -> { out.append(source, index, index + 2); index += 2 }
+                inString && source[index] == '"' -> { inString = false; out.append('"'); index++ }
+                inString -> { out.append(source[index]); index++ }
+                source[index] == '"' -> { inString = true; out.append('"'); index++ }
+                two == "/*" -> { depth = 1; index += 2 }
+                two == "//" -> {
+                    while (index < source.length && source[index] != '\n') index++
+                }
+
+                else -> { out.append(source[index]); index++ }
+            }
+        }
+        return out.toString()
     }
 
     /** One leg, replayed in this process, optionally carrying the plant. */

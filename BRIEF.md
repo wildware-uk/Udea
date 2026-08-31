@@ -19,19 +19,22 @@ Branch `issue-172-replay-gate-at-moba`, off `origin/example` at `db477f4`.
 | [33444043104](https://github.com/wildware-uk/Udea/actions/runs/33444043104) | `933dfff` | dispatch | criteria 1 and the nightly |
 | [33444524021](https://github.com/wildware-uk/Udea/actions/runs/33444524021) | `933dfff` | dispatch, `replay_plant_ulp_at: 1200` | criterion 2 |
 
-**Every run above is on `933dfff`, and the head of this branch is `063c792` plus this file.** The
-difference is two commits and neither can change what a leg does:
+**Every run the acceptance criteria rest on is on `933dfff`** — the first row of the table is the
+cold-cache measurement and nothing else. The head of this branch is `063c792` plus this file, and
+the difference is two commits, neither of which can change what a leg does:
 
 - `4c86fba` is **test-only** — it adds `MobaReplayEqualityTest > the digest task tells its entry
   point which directory the workspace is` and the comment stripper its build-script fences read
   through.
 - `063c792` is **comment-only** — it replaces five counts ("twenty-seven AI units", "six green
-  legs", a KDoc counting a job's own lines) with the property behind them, in KDoc and YAML
-  comments.
+  legs", a KDoc counting a job's own lines) with the property behind them. It touches `ci.yml`,
+  `moba/build.gradle.kts`, `determinism-audit.md` and two `moba` test sources, and in every one of
+  them the change is inside a `#` or a KDoc: **no executable line moved.**
 
-So no `src/main`, no Gradle task, no `ci.yml` step and no checked-in fixture moved after `933dfff`,
+So after `933dfff`: no `src/main`, no Gradle task body, no `ci.yml` step and no checked-in fixture,
 and the legs run the identical command over the identical bytes. `git diff 933dfff 063c792 --stat`
-and `git log -p 933dfff..063c792` are the check.
+and `git log -p 933dfff..063c792` are the check — read the second, because the first will show
+`ci.yml` and `moba/build.gradle.kts` and only the patch shows that what moved in them is prose.
 
 Run [33445413997](https://github.com/wildware-uk/Udea/actions/runs/33445413997) is on `9afecf5`,
 which is `063c792` plus an earlier draft of this file, and its three `replay-equality` legs and

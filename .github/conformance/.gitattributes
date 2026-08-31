@@ -1,0 +1,10 @@
+# The vendored `game-bridge-mcp` sources are hashed byte for byte, so git must never translate
+# them. Without this, a checkout with `core.autocrlf=true` writes CRLF into working files that
+# were committed with LF, and every recorded hash stops describing the file on disk - a red gate
+# on one developer's machine and green everywhere else, for no change anybody made.
+#
+# That is not hypothetical here. Issue #171: three of the six hashes in `VENDORED.json` were
+# recorded from CRLF bytes while the files were committed with LF, and the gate had never once
+# passed. `-text` is the fence that stops the same shape arriving from a checkout instead of
+# from a person.
+vendor/** -text

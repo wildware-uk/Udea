@@ -8,11 +8,11 @@
     "path": "src/"
   },
   "files": {
-    "client.ts": "9d50faeeb78759ba6b0d9588456215a7b36f807ad22cb42880431bfeae9a7c42",
-    "config.ts": "d2d9deec6a00df8303bb44ab281d19826f6d731c372dae8b9f40afeb006863d4",
+    "client.ts": "c104dad0f6aeab470ccf89e5fee375074af2fd671a616a9a99942ddaf3924c0b",
+    "config.ts": "9bf2b4ed1a76255fb13d639df408039525f9c15cd38a2fa1389efbbab984a211",
     "errors.ts": "9e5f8be1f9e8a6e2f10532a073f8a41cdc9a3affb17feac0bade983325f9f1c5",
     "launcher.ts": "44c9c02973f2e204a9203488502d81a3c3781cb62b5d9b49a6109f1d7952e004",
-    "manifest.ts": "3f51bf137d2229bea6cb406ae43e17cf09760fb2cd716da331c5f01c35b4b982",
+    "manifest.ts": "9e4fe7f213fa5aba6dc2ba9e845733e3054a7caf5810c1d23a571d578997e5f1",
     "registry.ts": "cedb317d5a167ad39455b2ea4cf18feee12b299dfca830abdb4e672cec12821c"
   }
 }

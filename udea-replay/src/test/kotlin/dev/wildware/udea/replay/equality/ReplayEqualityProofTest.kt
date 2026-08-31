@@ -1,6 +1,7 @@
 package dev.wildware.udea.replay.equality
 
 import dev.wildware.udea.replay.InputSample
+import dev.wildware.udea.replay.equality.fixture.DriftDigestMain
 import dev.wildware.udea.replay.equality.fixture.DriftFixture
 import dev.wildware.udea.replay.equality.fixture.DriftFixtureRecorder
 import java.nio.file.Files
@@ -9,6 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * The wiring nobody else checks: the build script, the checked-in bytes, and the CI workflow.
@@ -103,6 +105,150 @@ class ReplayEqualityProofTest {
             "each matrix leg must label its own digest, or a divergence names neither side",
         )
     }
+
+    // --- issue #169: the two ends of a path that have to name one directory -------------------
+    //
+    // Every leg since #152 wrote its digest into `udea-replay/digests/` while
+    // `actions/upload-artifact` globbed `digests/*.udeaeq` under `$GITHUB_WORKSPACE`. The two
+    // spellings were identical, so no assertion comparing the *strings* would have caught it -
+    // what differed was the directory each was resolved against, and only one side of that pair
+    // is code. These tests therefore resolve both: the workflow's own argument goes through the
+    // entry point CI runs, and the answer is compared against the directory Actions globs.
+
+    /** `$GITHUB_WORKSPACE`: what `actions/checkout` roots a workflow's relative paths at. */
+    private val workspace: Path get() = projectDir.parent
+
+    @Test
+    fun `a leg's digest lands in the directory its upload step globs`() {
+        val requested = gradlePropertyInWorkflow("out")
+        val written = DriftDigestMain.parse(
+            arrayOf("--workspace", workspace.toString(), "--label", "leg", "--out", requested),
+        ).out
+
+        // Not `Path.of`: a glob is not a legal Windows path and this test runs on the
+        // `windows-latest` leg of the `build` job too.
+        val glob = stepValue("Upload this leg's digest stream", "path")
+        val globbedDirectory = workspace.resolve(glob.substringBeforeLast('/')).normalize()
+
+        assertEquals(
+            globbedDirectory, written.parent,
+            "the leg writes its digest to a directory the upload step does not glob. That is " +
+                "issue #169: the upload trips `if-no-files-found: error`, and because " +
+                "`replay-equality-join` declares `needs: replay-equality` the join never runs " +
+                "and nothing is ever compared.",
+        )
+        assertTrue(
+            globMatches(glob.substringAfterLast('/'), written.fileName.toString()),
+            "the upload globs '${glob.substringAfterLast('/')}', which does not match the file " +
+                "the leg writes, '${written.fileName}'",
+        )
+    }
+
+    @Test
+    fun `the join compares the directory the workflow downloads into`() {
+        val downloadedInto = ReplayEqualityPaths.resolve(
+            workspace, stepValue("Download every leg's digest", "path"),
+        )
+        val compared = ReplayEqualsMain.parse(
+            arrayOf("--workspace", workspace.toString(), gradlePropertyInWorkflow("streams")),
+        ).streams
+
+        assertEquals(
+            listOf(downloadedInto), compared,
+            "the join reads digest streams from somewhere other than where the download step " +
+                "put them. The same defect as the leg's, one job further on, and it would " +
+                "report `EXIT_UNUSABLE` rather than a verdict.",
+        )
+    }
+
+    @Test
+    fun `both entry points the workflow runs are told which directory the workspace is`() {
+        // The one join in this chain that no test can execute, because a Gradle build script is
+        // not on any classpath: the two `JavaExec` tasks have to pass `--workspace`, or the
+        // resolution the tests above exercise is never reached with the right base in CI.
+        assertContains(
+            buildScript,
+            "val workspaceRoot: String = rootProject.layout.projectDirectory.asFile.absolutePath",
+        )
+        val passes = Regex("\"--workspace\"").findAll(buildScript).count()
+        assertEquals(
+            2, passes,
+            "`udeaReplayDigest` and `udeaReplayEquals` are the two tasks ci.yml runs and both " +
+                "must pass --workspace; found $passes occurrence(s) in the build script",
+        )
+    }
+
+    @Test
+    fun `the workflow reads the verdict out of the file the join writes`() {
+        // Derived rather than asserted twice: the join writes `summary.md` into the report
+        // directory this build script declares, and the publish step reads a path relative to
+        // the workspace. Two literals that happen to agree is exactly the shape of #169.
+        val reportDir = Regex(
+            """val replayEqualityDir: Provider<Directory> =\s*layout\.buildDirectory\.dir\("([^"]+)"\)""",
+        ).find(buildScript)?.groupValues?.get(1)
+            ?: fail("the build script no longer declares replayEqualityDir the way this test reads it")
+
+        assertContains(workflow, "${projectDir.fileName}/build/$reportDir/summary.md")
+    }
+
+    @Test
+    fun `exactly one leg carries the planted divergence`() {
+        // `replay_plant_ulp_at` exists to prove the gate can still fail on a real run. A plant is
+        // deterministic, so three legs all carrying it agree with each other, the join reports
+        // EQUAL, and the run that was supposed to go red comes back green. One leg, or the proof
+        // proves the opposite of what it claims.
+        assertContains(workflow, "replay_plant_ulp_at")
+        assertContains(workflow, "udea.replay.plantUlpAt")
+        val planted = Regex("(?m)^\\s*plant: true\\s*$").findAll(workflow).count()
+        assertEquals(
+            1, planted,
+            "the replay-equality matrix marks $planted leg(s) `plant: true`; it must mark one",
+        )
+    }
+
+    /** The value `ci.yml` hands `-Pudea.replay.<name>`, with its Actions expressions stood in for. */
+    private fun gradlePropertyInWorkflow(name: String): String {
+        val found = Regex("-Pudea\\.replay\\.$name=(.+)").findAll(workflow)
+            .map { it.groupValues[1].trim() }.toList()
+        assertEquals(
+            1, found.size,
+            "ci.yml should hand -Pudea.replay.$name to exactly one step; found $found",
+        )
+        return substituteExpressions(found.single())
+    }
+
+    /** The value of [key] inside the `ci.yml` step called [stepName]. */
+    private fun stepValue(stepName: String, key: String): String {
+        val start = workflow.indexOf("- name: $stepName")
+        assertTrue(start >= 0, "ci.yml has no step named '$stepName'")
+        val rest = workflow.substring(start + "- name: $stepName".length)
+        val end = rest.indexOf("\n      - ").let { if (it < 0) rest.length else it }
+        val block = rest.substring(0, end)
+        val value = Regex("(?m)^\\s*$key:\\s*(\\S.*)$").find(block)?.groupValues?.get(1)?.trim()
+            ?: fail("the ci.yml step '$stepName' has no `$key:` line in:\n$block")
+        return substituteExpressions(value)
+    }
+
+    /**
+     * `${'$'}{{ matrix.os }}` becomes a stand-in, so a path can be compared as a shape.
+     *
+     * The leftover check is the point of doing it here rather than inline: an unexpanded `${'$'}{{`
+     * in a compared path would make every comparison below true of a string neither side ever
+     * sees, which is a check that runs against the wrong subject.
+     */
+    private fun substituteExpressions(raw: String): String {
+        val expanded = Regex("\\$\\{\\{\\s*matrix\\.\\w+\\s*}}").replace(raw, "LEG")
+        assertTrue(
+            !expanded.contains("\${{"),
+            "this test only knows how to stand in for `matrix.*`; '$expanded' still carries an " +
+                "Actions expression, so comparing it would compare a string no runner ever sees",
+        )
+        return expanded
+    }
+
+    /** Whether [name] matches [glob], where `*` runs up to a path separator. */
+    private fun globMatches(glob: String, name: String): Boolean =
+        Regex(glob.split("*").joinToString("[^/\\\\]*") { Regex.escape(it) }).matches(name)
 
     @Test
     fun `the determinism job no longer claims this file has no replay-equality gate`() {

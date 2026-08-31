@@ -17,9 +17,15 @@ import kotlin.system.exitProcess
  *
  * ```
  * java -cp <udea-replay and udea-core> dev.wildware.udea.replay.equality.ReplayEqualsMain \
+ *   --workspace /home/runner/work/Udea/Udea \
  *   --summary build/reports/udea/replay-equality/summary.md \
- *   build/replay-equality/leg-a.udeaeq build/replay-equality/leg-b.udeaeq
+ *   digests
  * ```
+ *
+ * Every path is resolved through [ReplayEqualityPaths] against `--workspace`, for the reason
+ * issue #169 records: the directory the join compares has to be the directory
+ * `actions/download-artifact` wrote into, and a relative path inherited from whatever launched
+ * the JVM is not that directory.
  *
  * Exit code 0 when every leg agrees, 1 when they do not, 2 when the inputs cannot be compared at
  * all. Three codes rather than two, because "Windows and Linux disagree about a float" and "you
@@ -36,26 +42,61 @@ public object ReplayEqualsMain {
     /** The inputs were unusable: too few, missing, or describing different fixtures. */
     public const val EXIT_UNUSABLE: Int = 2
 
-    @JvmStatic
-    public fun main(args: Array<String>) {
-        var summaryPath: Path? = null
-        val inputs = ArrayList<Path>()
+    /** The join's command line, with every path already resolved against the workspace. */
+    public class Options(
+        /** Where the rendered verdict goes, or `null`. Absolute when present. */
+        public val summary: Path?,
+        /** The files and directories to read digest streams from. Absolute, unexpanded. */
+        public val streams: List<Path>,
+    )
+
+    /**
+     * Reads the join's command line and resolves its paths, without touching the disk.
+     *
+     * Separate from [main] for the same reason `DriftDigestMain.parse` is: it lets a test hand
+     * this the `-Pudea.replay.streams` value `ci.yml` passes and check the answer against the
+     * directory `actions/download-artifact` was told to write into.
+     */
+    public fun parse(args: Array<String>): Options {
+        var summaryPath: String? = null
+        var workspace: Path = ReplayEqualityPaths.defaultWorkspace()
+        val streams = ArrayList<String>()
         var at = 0
         while (at < args.size) {
             when (val arg = args[at]) {
                 "--summary" -> {
                     require(at + 1 < args.size) { "--summary needs a path after it" }
-                    summaryPath = Path.of(args[at + 1])
+                    summaryPath = args[at + 1]
+                    at++
+                }
+
+                ReplayEqualityPaths.WORKSPACE_OPTION -> {
+                    require(at + 1 < args.size) {
+                        "${ReplayEqualityPaths.WORKSPACE_OPTION} needs a directory after it"
+                    }
+                    workspace = Path.of(args[at + 1]).toAbsolutePath().normalize()
                     at++
                 }
 
                 else -> {
                     require(!arg.startsWith("--")) { "unknown option '$arg'" }
-                    inputs += expand(Path.of(arg))
+                    streams += arg
                 }
             }
             at++
         }
+        return Options(
+            summary = summaryPath?.let { ReplayEqualityPaths.resolve(workspace, it) },
+            streams = streams.map { ReplayEqualityPaths.resolve(workspace, it) },
+        )
+    }
+
+    @JvmStatic
+    public fun main(args: Array<String>) {
+        val options = parse(args)
+        val summaryPath = options.summary
+        val inputs = ArrayList<Path>()
+        for (stream in options.streams) inputs += expand(stream)
         inputs.sort()
 
         val report = StringBuilder()
@@ -78,6 +119,18 @@ public object ReplayEqualsMain {
      * information.
      */
     public fun run(inputs: List<Path>, report: StringBuilder): Int {
+        // Named before the count, because "you handed me one file" and "the directory you named
+        // is not there" read identically once the second has been collapsed into a count of one.
+        // Issue #169 is what that reads like from the other end of a CI log.
+        val missing = inputs.filter { !Files.isRegularFile(it) }
+        if (missing.isNotEmpty()) {
+            report.append("replay-equality was pointed at ").append(missing.size)
+                .append(" path(s) that are not readable digest streams:")
+                .append(missing.joinToString("") { "\n  $it" })
+                .append("\nEach is either absent or not a regular file. A leg that did not ")
+                .append("produce a stream is a different failure from two legs that disagree.")
+            return EXIT_UNUSABLE
+        }
         if (inputs.size < 2) {
             report.append("replay-equality needs at least two digest streams; got ")
                 .append(inputs.size).append(inputs.joinToString("") { "\n  $it" })

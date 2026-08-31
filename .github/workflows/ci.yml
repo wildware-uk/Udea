@@ -40,6 +40,13 @@ on:
           One-component-edit threshold in milliseconds for the `ksp-incremental-budget` job.
         required: false
         default: "40000"
+      replay_plant_ulp_at:
+        description: >-
+          Plant a one-ulp divergence at this tick on the single `replay-equality` leg the
+          matrix marks `plant: true`, to prove the cross-OS gate still fails. 1200 is the
+          tick `DriftFixture.PLANT_TICK` names. Leave it empty for an honest run.
+        required: false
+        default: ""
 
 # A superseded run is a run whose answer nobody wants. Cancelling them is what keeps the
 # windows-latest leg affordable.
@@ -1132,6 +1139,12 @@ jobs:
           - os: ubuntu-latest
             distribution: corretto
             vendor: Amazon
+            # The leg `replay_plant_ulp_at` plants on, and **exactly one leg carries it**. A
+            # planted divergence is deterministic: three legs all carrying the same plant agree
+            # with each other, the join reports EQUAL, and a run whose whole purpose was to watch
+            # the gate fail comes back green. One leg diverging from the other two is the shape a
+            # real cross-OS float defect has, so it is the shape the proof uses.
+            plant: true
     steps:
       - name: Start the clock
         id: clock
@@ -1153,6 +1166,14 @@ jobs:
         shell: bash
         run: chmod +x ./gradlew
 
+      # `-Pudea.replay.out` is workspace-relative, and that is only safe because
+      # `udeaReplayDigest` hands `DriftDigestMain` a `--workspace` naming the repository root -
+      # a `JavaExec` on its own would resolve this against `udea-replay/`, which is issue #169
+      # and is why no join step ever ran. `ReplayEqualityProofTest` drives the entry point with
+      # this exact string and checks the answer against the upload glob below.
+      #
+      # The trailing expression is empty on every ordinary run. It is how `replay_plant_ulp_at`
+      # reaches the one leg the matrix marks `plant: true`.
       - name: Replay the fixture and write this leg's digest
         shell: bash
         run: >-
@@ -1160,6 +1181,7 @@ jobs:
           -Pudea.replay.label=${{ matrix.os }}/${{ matrix.distribution }}-17
           -Pudea.replay.jvmVendor=${{ matrix.vendor }}
           -Pudea.replay.out=digests/${{ matrix.os }}-${{ matrix.distribution }}.udeaeq
+          ${{ matrix.plant && github.event.inputs.replay_plant_ulp_at && format('-Pudea.replay.plantUlpAt={0}', github.event.inputs.replay_plant_ulp_at) || '' }}
           --stacktrace
 
       # The digest, named by leg so the join step can tell the three apart by filename alone.
@@ -1237,6 +1259,9 @@ jobs:
             exit 1
           fi
 
+      # Workspace-relative for the same reason, and resolved the same way: `udeaReplayEquals`
+      # passes `ReplayEqualsMain` a `--workspace`, so `digests` here is the directory the
+      # download step above wrote into rather than `udea-replay/digests`.
       - name: Compare every leg
         shell: bash
         run: >-

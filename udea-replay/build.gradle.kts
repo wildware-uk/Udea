@@ -84,6 +84,17 @@ tasks.withType<Test>().configureEach {
     inputs.file(rootProject.layout.projectDirectory.file(".github/workflows/ci.yml"))
         .withPropertyName("ciWorkflow")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // `ReplayEqualityPathsTest` reads this one for the single fact about it that no behaviour can
+    // reach: that the digest entry point still calls its own post-condition. Nothing a caller can
+    // hand today's recorder makes it return without writing, so the check that catches the day
+    // one does is the check nothing else would notice the loss of. Declared for the same reason
+    // the two above are.
+    inputs.file(
+        layout.projectDirectory.file(
+            "src/testFixtures/kotlin/dev/wildware/udea/replay/equality/fixture/DriftDigestMain.kt",
+        ),
+    ).withPropertyName("driftDigestMainSource")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 // --- the cross-OS replay-equality gate (issue #152) -------------------------------------------
@@ -105,6 +116,24 @@ tasks.withType<Test>().configureEach {
 
 val replayEqualityDir: Provider<Directory> =
     layout.buildDirectory.dir("reports/udea/replay-equality")
+
+/**
+ * The base every relative path handed to these tasks is resolved against: the repository root.
+ *
+ * Issue #169. A `JavaExec` with no `workingDir` inherits the *project* directory, so
+ * `-Pudea.replay.out=digests/x.udeaeq` wrote into `udea-replay/digests/` while
+ * `actions/upload-artifact` globbed `*.udeaeq` under `$GITHUB_WORKSPACE/digests`. Both spellings
+ * were the same and both were resolved somewhere else; the upload failed, and because
+ * `replay-equality-join` declares `needs: replay-equality` the join has never executed on any
+ * run of this repository.
+ *
+ * `rootProject`'s directory is what `actions/checkout` makes `$GITHUB_WORKSPACE`, and it is also
+ * where `./gradlew` is normally typed, so one relative path now means one directory to Actions,
+ * to Gradle and to a developer. It is passed as an argument rather than set as `workingDir`
+ * because an argument is a value `ReplayEqualityPaths.resolve` can be tested against - see
+ * `ReplayEqualityProofTest`, which drives the entry points with the workflow's own strings.
+ */
+val workspaceRoot: String = rootProject.layout.projectDirectory.asFile.absolutePath
 
 /** The classpath every entry point below runs on: this module, its fixtures and `udea-core`. */
 val equalityClasspath: FileCollection = sourceSets["testFixtures"].runtimeClasspath
@@ -158,8 +187,11 @@ tasks.register<JavaExec>("udeaReplayDigest") {
         .orElse(replayEqualityDir.map { "${it.asFile}/local.udeaeq" })
     val plantAt = providers.gradleProperty("udea.replay.plantUlpAt")
     val reports = replayEqualityDir
+    val workspace = workspaceRoot
     argumentProviders.add {
         buildList {
+            add("--workspace")
+            add(workspace)
             add("--label")
             add(label.get())
             add("--out")
@@ -210,8 +242,13 @@ tasks.register<JavaExec>("udeaReplayEquals") {
     val streams = providers.gradleProperty("udea.replay.streams")
         .orElse(replayEqualityDir.map { it.asFile.absolutePath })
     val reports = replayEqualityDir
+    val workspace = workspaceRoot
     argumentProviders.add {
-        listOf("--summary", "${reports.get().asFile}/summary.md", streams.get())
+        listOf(
+            "--workspace", workspace,
+            "--summary", "${reports.get().asFile}/summary.md",
+            streams.get(),
+        )
     }
 }
 

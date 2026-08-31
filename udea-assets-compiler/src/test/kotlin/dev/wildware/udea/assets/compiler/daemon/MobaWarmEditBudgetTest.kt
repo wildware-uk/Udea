@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Path
 import kotlin.io.path.copyTo
 import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 import kotlin.io.path.relativeTo
@@ -27,9 +28,12 @@ import kotlin.test.assertTrue
  * it measures the *decision* half only - the daemon says "this compiles" and touches nothing. Two
  * things spec 6's Phase 2 number is about are missing from it:
  *
- * - **the real tree.** `moba/assets` is nineteen scripts and 127 assets, one of which is a level
- *   with twenty-seven entities. Every reload re-walks that graph, re-packs every value and diffs
- *   the result against the last-good one, and none of that appears in a three-script fixture.
+ * - **the real tree.** `moba/assets` is the game's whole authored corpus - its characters, its
+ *   abilities, its effects, its controls, its shop, and a level with twenty-seven entities in it.
+ *   Every reload re-walks that graph, re-packs every value and diffs the result against the
+ *   last-good one, and none of that appears in a three-script fixture. What the corpus is *made
+ *   of* is the point here; how many files it happens to be is not, and a count in this paragraph
+ *   would go stale on the next asset somebody authored.
  * - **the whole edit-to-observe path.** Validate is the first of four steps. What an agent waits
  *   for is: the file is written, the daemon recompiles it, the candidate graph packs, the delta is
  *   decided, and the *new typed value* is the one the graph serves.
@@ -37,8 +41,8 @@ import kotlin.test.assertTrue
  * ## What is inside the measurement and what is not
  *
  * Inside: the file write, `reload`, one script compile, the scan, the reference walk, `PackedValues`
- * over the whole 127-asset graph, the structural-change check, the diff, `commit`, and reading the
- * new `SpriteSheet.scale` back out.
+ * over the whole graph, the structural-change check, the diff, `commit`, and reading the new
+ * `SpriteSheet.scale` back out.
  *
  * Outside, and stated rather than hidden: the last leg into the running process. `AssetHotReload`
  * takes the same `GraphDelta` this produces and swaps it into the live `AssetRegistry` at a barrier
@@ -84,7 +88,15 @@ class MobaWarmEditBudgetTest {
             "the game's own corpus must be valid before it is timed:\n" +
                 started.diagnostics.joinToString("\n") { "${it.ruleId} ${it.message}" },
         )
-        assertEquals(127, daemon.ids.size, "the corpus this benchmark is about")
+        // Non-empty, not an exact count. The budget is about the *cost of walking the real
+        // corpus*, and that cost tracks whatever the corpus currently holds - so an exact number
+        // here would be a second thing to edit every time somebody authors an asset, and would
+        // fail for a reason that is not a regression. It was 127 when this was written and 147
+        // once the shop's twenty items landed.
+        assertTrue(
+            daemon.ids.isNotEmpty(),
+            "the daemon loaded no assets, so this would be timing an empty walk",
+        )
 
         val script = root.resolve("character/orc.udea.kts")
         val original = script.readText()
@@ -141,7 +153,7 @@ class MobaWarmEditBudgetTest {
     private fun copyCorpus(): Path {
         val source = TestPaths.repoRoot.resolve("moba/assets")
         assertTrue(
-            AssetCompiler.scriptsUnder(source).size == 19,
+            source.exists() && AssetCompiler.scriptsUnder(source).isNotEmpty(),
             "this benchmark is about the game's one asset root; $source is not it",
         )
         val target = TestPaths.scratch("daemon/moba-warm-edit/assets")

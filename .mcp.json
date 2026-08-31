@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "game-bridge": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/srv/ssd1/workspace/game-bridge-mcp/dist/cli.js",
+        "--scan-range",
+        "7840-7859"
+      ],
+      "env": {}
+    }
+  }
+}

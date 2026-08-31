@@ -95,11 +95,15 @@ and 6 whole-suite failures while the solver's own separation floor failed at all
 a chaotic system being fitted to a test count. **Installing it is one line; the balance pass over
 unit health and damage is the work.**
 
-**3. There is no replay-equality gate in CI.** `determinism-audit.md` and the `determinism` job's
-own comment both point at a cross-OS `replay-equality` job as *the* gate — and it does not exist
-(issue #152). The determinism job says so in capitals itself. This matters because **Phase 7's
-exit criterion is bit-exact replay on two OS/JVM combinations**, and today the replay proof runs
-on one machine. Phase 7 is not done.
+**3. The replay-equality gate exists but covers the engine's world, not `moba`'s.** Issue #152
+added the cross-OS `replay-equality` job to `.github/workflows/ci.yml`: three legs (Linux and
+Windows on Temurin, Linux on Corretto) replay a checked-in `.udearep` headless, upload a per-tick
+digest of every value `WorldHasher` folds, and a join step names the first differing tick, entity,
+component and field. The fixture it replays is `udea-replay`'s own float-heavy world, **not** a
+`moba` 5v5 match — a checked-in `moba` recording is refused by `BuildIdentity` the moment the
+protocol or the control asset moves, and regenerating fixtures is issue #165. So Phase 7's
+"bit-exact replay on two OS/JVM combinations" is now gated in CI, and the gate does not yet see
+`moba`'s gameplay float paths. Wiring `moba` in is one task registration once #165 lands.
 
 ---
 
@@ -141,8 +145,10 @@ The honest ordering of what is next:
 
 1. **The lossy-UDP divergence.** It is red now, it is understood only as a symptom, and it blocks
    any repeat of the convergence claim.
-2. **The `replay-equality` CI job**, because without it Phase 7 cannot be closed and the
-   determinism story rests on a scanner that its own audit says is insufficient.
+2. **A `moba` fixture for the `replay-equality` CI job.** The job itself landed with #152 and is
+   generic over any `ReplayWorld` that can capture a snapshot — `MobaReplayWorld` already can —
+   but it replays `udea-replay`'s own fixture, so no `moba` float path is under the gate yet.
+   That needs #165's `--update-replay-fixtures` first, or the fixture is unmaintainable.
 3. **The Phase 7 checkpoint entry** in `phase-log.md` — cheap, and it is the mechanism that was
    supposed to catch exactly the drift this file is documenting.
 4. **The physics balance pass**, if the fight is what you care about. One line to install; the

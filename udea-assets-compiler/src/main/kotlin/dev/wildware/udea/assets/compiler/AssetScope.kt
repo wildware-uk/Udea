@@ -10,6 +10,7 @@ import dev.wildware.udea.assets.Control
 import dev.wildware.udea.assets.Effect
 import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.GameplayEffect
+import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpawnRecipe
@@ -645,6 +646,56 @@ public class AssetScope(
     )
 
     /**
+     * One shop item: its price, its recipe, and what carrying it does.
+     *
+     * ## Why [components] is a list of references and not a list of names
+     *
+     * It is the whole of issue #132's fourth acceptance criterion. A recipe naming an item that
+     * nothing declares is `UDEA0004` here - a build error with a file, a line and a did-you-mean -
+     * and a recipe pointing at a `soundCue` is `UDEA0013`. Written as a `List<String>` it would be
+     * neither: it would be a null at shop time, in a match, with the build green.
+     *
+     * The stamp is `expecting<Item>()` and not `expecting<AssetData>()`, so the second check is a
+     * real one. That is only possible because [dev.wildware.udea.assets.Item] is a published kind;
+     * see its KDoc for why the kind is the engine's rather than the game's.
+     *
+     * @param cost total gold. What a champion who owns none of [components] pays. The counter
+     *   price is derived - see [dev.wildware.udea.assets.Item.cost] - and `ItemRecipeValidator`
+     *   fails the build when it is below the sum of the components' own costs.
+     * @param stats flat attribute modifiers by authored attribute name, the shape
+     *   [character]'s `attributes` uses and for the same reason: an `AttributeId` is an index
+     *   into a table only a running game has.
+     * @param unique the unique group this item's passive belongs to, or absent. Two items sharing
+     *   one grant a single instance between them - which is issue #166's system, not this file's.
+     * @param grantedAbility an *active*: the ability carrying it grants. Stamped `Ability`, so a
+     *   typo is a build error rather than an item whose active does nothing.
+     * @param passive the effect carrying it applies. Stamped `GameplayEffect`, as [ability]'s
+     *   `cooldown` is.
+     * @param trinket whether it occupies the trinket slot rather than one of the six.
+     */
+    public fun item(
+        name: String,
+        cost: Int,
+        stats: Map<String, Float> = emptyMap(),
+        components: List<Ref> = emptyList(),
+        unique: String? = null,
+        grantedAbility: Ref? = null,
+        passive: Ref? = null,
+        trinket: Boolean = false,
+    ): Unit = declare(
+        AssetKind.of<Item>(),
+        "item",
+        name,
+        "cost" to cost,
+        "stats" to LinkedHashMap(stats),
+        "components" to components.map { it.expecting<Item>() },
+        "unique" to unique,
+        "grantedAbility" to grantedAbility?.expecting<Ability>(),
+        "passive" to passive?.expecting<GameplayEffect>(),
+        "trinket" to trinket,
+    )
+
+    /**
      * The generic escape for a kind this provisional DSL does not model.
      *
      * Present so a fixture can exercise a kind without this class growing a function per kind
@@ -714,6 +765,7 @@ public class AssetScope(
             "ability",
             "gameplayEffect",
             "effect",
+            "item",
             "key",
             "mouse",
             "vec",

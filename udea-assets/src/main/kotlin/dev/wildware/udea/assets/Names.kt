@@ -64,6 +64,31 @@ public value class GameplayTagName(public val value: String) {
 }
 
 /**
+ * The name of a **unique group**: the thing two items may not both grant.
+ *
+ * A distinct type from [GameplayTagName] for exactly the reason [EntityTagName] is one. A gameplay
+ * tag is asked about ("is this unit stunned"); a unique name is *compared* ("do these two items
+ * grant the same passive"), and it names a group rather than a state. Both were a `String` in the
+ * old tree, and passing one where the other was meant is an item that stacks with itself.
+ *
+ * The comparison is what makes it worth a type at all: the whole of a unique passive is that two
+ * copies grant one instance, so the equality that decides it should not be an equality between two
+ * values that merely happen to be strings.
+ */
+@JvmInline
+public value class UniqueName(public val value: String) {
+
+    init {
+        require(value.isNotBlank()) { "a UniqueName must name a group; it was blank" }
+        require(value.none { it.isWhitespace() }) {
+            "a UniqueName must not contain whitespace: '$value'"
+        }
+    }
+
+    override fun toString(): String = value
+}
+
+/**
  * A phantom-typed class name: `UClass<AbilityExec>` is a [TypeName] the validator has checked names
  * a subtype of `AbilityExec`.
  *

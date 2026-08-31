@@ -49,8 +49,14 @@ package dev.wildware.udea.core.snapshot
  */
 public object WorldHasher {
 
-    /** FNV-1a 64-bit offset basis. */
-    private const val OFFSET_BASIS: Long = -0x340d631b7bdddcdbL // 0xcbf29ce484222325
+    /**
+     * FNV-1a 64-bit offset basis: where [fold] starts.
+     *
+     * Public alongside [fold] and for the same reason - a caller that folds the same values in
+     * the same order must start from the same place, or it recomputes a different number and
+     * concludes the wrong thing.
+     */
+    public const val OFFSET_BASIS: Long = -0x340d631b7bdddcdbL // 0xcbf29ce484222325
 
     /** FNV-1a 64-bit prime. */
     private const val PRIME: Long = 0x100000001b3L
@@ -109,8 +115,25 @@ public object WorldHasher {
         return hash
     }
 
-    /** One 64-bit value, byte by byte, least significant first. */
-    private fun fold(hash: Long, value: Long): Long {
+    /**
+     * One 64-bit value, byte by byte, least significant first.
+     *
+     * ## Why this is public
+     *
+     * Phase 7's cross-OS `replay-equality` gate uploads, per tick, the *inputs* this hash folds
+     * rather than only the hash - because a `Long` that differs names no field, and spec 7 asks
+     * for the first differing tick **and field**. That artifact is only worth anything if its
+     * cell set is provably the same set of values [hash] folded, in the same order, and the only
+     * way to prove it is to fold the cells and get the hash back.
+     *
+     * The alternative was a second FNV-1a written out beside the first, which is the copy-paste
+     * §1 of the engineering standards exists to forbid and would be the worst possible place to
+     * have it: two implementations of a determinism gate's hash that agree until one is edited.
+     *
+     * Not on a per-tick path in the engine - [hash] inlines nothing and calls this itself. A
+     * digest writer calls it once per folded value while writing a build artifact.
+     */
+    public fun fold(hash: Long, value: Long): Long {
         var result = hash
         var remaining = value
         repeat(Long.SIZE_BYTES) {

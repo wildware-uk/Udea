@@ -18,7 +18,7 @@ val ktxVersion = "1.13.1-rc1"
 
 dependencies {
     api("com.kotcrab.vis:vis-ui:1.5.7")
-    api("io.github.quillraven.fleks:Fleks:2.13-SNAPSHOT")
+    api(libs.fleks)
     implementation("org.reflections:reflections:0.10.2")
     testImplementation(kotlin("test"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")

@@ -23,6 +23,7 @@ import dev.wildware.udea.assets.EntityTagName
 import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.GameplayTagName
+import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.LightingConfig
 import dev.wildware.udea.assets.ModifierKind
@@ -37,6 +38,7 @@ import dev.wildware.udea.assets.SpriteAnimationSet
 import dev.wildware.udea.assets.SpriteSheet
 import dev.wildware.udea.assets.TypeName
 import dev.wildware.udea.assets.UiConfig
+import dev.wildware.udea.assets.UniqueName
 import dev.wildware.udea.assets.Vec2
 import dev.wildware.udea.assets.uClass
 
@@ -273,6 +275,23 @@ public class AssetCodecs private constructor(
                         animationSet = fields.ref("animationSet", SpriteAnimationSet::class),
                         animation = fields.text("animation"),
                         duration = fields.float("duration"),
+                    )
+                }
+                put(Item::class) { fields ->
+                    Item(
+                        id = fields.id,
+                        cost = fields.int("cost", 0),
+                        stats = fields.record("stats").let { record ->
+                            record.names.associateWith { record.float(it) }
+                        },
+                        components = fields.refList("components", Item::class),
+                        // Absent rather than blank for "no unique group": `UniqueName` refuses a
+                        // blank value, so an item with no unique has no field at all and this
+                        // reads null - the same shape `Ability.range` uses for "no range check".
+                        unique = fields.textOrNull("unique")?.let(::UniqueName),
+                        grantedAbility = fields.refOrNull("grantedAbility", Ability::class),
+                        passive = fields.refOrNull("passive", GameplayEffect::class),
+                        trinket = fields.bool("trinket", false),
                     )
                 }
             },

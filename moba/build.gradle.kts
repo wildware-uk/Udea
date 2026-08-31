@@ -101,6 +101,16 @@ dependencies {
 udeaAgent {
     name.set("moba")
     flagsPackage.set("dev.wildware.moba.agent")
+    // Off the engine default of 7820-7839, and stated rather than inherited.
+    //
+    // The development box that runs this repository also runs `melon-merge`, whose
+    // `game-bridge-mcp` scans `7777,7811-7829`. A bridge does not check whose game answered a
+    // port - it lists whatever is listening in its range - so the overlapping half of the
+    // default range means either project's bridge can enumerate, drive and `stop_instance` the
+    // other's game. That is not a warning either side gets: it looks like an instance vanishing.
+    // 7840-7859 is disjoint from every range that box scans, and `.mcp.json` here scans the same
+    // twenty ports, so the two toolchains cannot see each other at all.
+    portRange.set("7840-7859")
 }
 
 /**

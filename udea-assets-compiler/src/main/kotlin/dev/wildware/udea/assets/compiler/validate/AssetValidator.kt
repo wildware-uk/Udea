@@ -89,6 +89,7 @@ public class AssetValidatorPipeline(
             UnresolvedReferenceValidator,
             ReferenceTypeValidator,
             BlueprintCycleValidator,
+            ItemRecipeValidator,
             MissingFileValidator,
             SpriteSheetGeometryValidator,
             AnimationNotifyValidator,

@@ -10,6 +10,7 @@ import dev.wildware.udea.assets.Control
 import dev.wildware.udea.assets.Effect
 import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.GameplayEffect
+import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpawnRecipe
@@ -132,6 +133,7 @@ public object GraphPacker {
         "character" to Schema { it.character() },
         "gameplayEffect" to Schema { it.gameplayEffect() },
         "effect" to Schema { it.effect() },
+        "item" to Schema { it.item() },
     )
 
     /** The DSL words this packer maps onto a runtime type, sorted. For `DslCoverageTest`. */
@@ -154,6 +156,7 @@ public object GraphPacker {
         "character" to fqn(Character::class.qualifiedName),
         "gameplayEffect" to fqn(GameplayEffect::class.qualifiedName),
         "effect" to fqn(Effect::class.qualifiedName),
+        "item" to fqn(Item::class.qualifiedName),
     )
 
     private fun fqn(name: String?): String = requireNotNull(name)
@@ -392,6 +395,52 @@ public object GraphPacker {
             ref("animationSet", SpriteAnimationSet::class)?.let { put("animationSet", it) }
             put("animation", PackValue.Text(asset.fields["animation"] as? String ?: ""))
             put("duration", PackValue.F32(floatOf("duration", 1F)))
+        }
+
+        /**
+         * A shop item.
+         *
+         * `stats` is sorted for [refRecord]'s reason: a `LinkedHashMap` preserves *authoring*
+         * order, so re-ordering two lines of a `mapOf(...)` would change the bytes without
+         * changing what the item is, and two packs of one tree must agree byte for byte.
+         *
+         * `unique` is written only when the author gave one. `UniqueName` refuses a blank value,
+         * so an item with no unique group must have no field at all rather than an empty string -
+         * the reader would otherwise construct one and throw with the game already opening.
+         */
+        fun item(): Map<String, PackValue> = buildMap {
+            int("cost", default = 0)
+            put(
+                "stats",
+                PackValue.Fields.of(
+                    (asset.fields["stats"] as? Map<*, *>).orEmpty().entries
+                        .mapNotNull { (key, value) ->
+                            val attribute = key as? String ?: return@mapNotNull null
+                            val magnitude = value as? Float ?: return@mapNotNull null
+                            attribute to (PackValue.F32(magnitude) as PackValue)
+                        }
+                        .sortedBy { it.first }
+                        .toMap(),
+                ),
+            )
+            put(
+                "components",
+                PackValue.Items(
+                    (asset.fields["components"] as? List<*>).orEmpty().mapNotNull { value ->
+                        val component = value as? Ref ?: return@mapNotNull null
+                        resolve(component, Item::class)?.let { PackValue.Ref(it, component.id) }
+                    },
+                ),
+            )
+            (asset.fields["unique"] as? String)?.let { put("unique", PackValue.Text(it)) }
+            (asset.fields["grantedAbility"] as? Ref)?.let { ability ->
+                resolve(ability, Ability::class)?.let { put("grantedAbility", PackValue.Ref(it, ability.id)) }
+            }
+            (asset.fields["passive"] as? Ref)?.let { passive ->
+                resolve(passive, GameplayEffect::class)
+                    ?.let { put("passive", PackValue.Ref(it, passive.id)) }
+            }
+            bool("trinket", default = false)
         }
 
         /**

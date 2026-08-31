@@ -8,7 +8,7 @@ import com.github.quillraven.fleks.*
  * @throws [FleksNoSuchEntityComponentException] if the [entity][Entity] does not have such a component.
  */
 context(world: World)
-operator fun <T : Component<out Any>> Entity.get(componentType: ComponentType<T>) =
+inline operator fun <reified T : Component<*>> Entity.get(componentType: ComponentType<T>): T =
     with(world) { this@get[componentType] }
 
 /**
@@ -16,7 +16,7 @@ operator fun <T : Component<out Any>> Entity.get(componentType: ComponentType<T>
  * or null if the [entity][Entity] does not have such a [component][Component].
  */
 context(world: World)
-fun <T : Component<out Any>> Entity.getOrNull(componentType: ComponentType<T>) =
+inline fun <reified T : Component<*>> Entity.getOrNull(componentType: ComponentType<T>): T? =
     with(world) { this@getOrNull.getOrNull(componentType) }
 
 /**

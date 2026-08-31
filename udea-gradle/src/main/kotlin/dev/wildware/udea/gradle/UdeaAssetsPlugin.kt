@@ -153,16 +153,20 @@ public abstract class UdeaAssetTask : DefaultTask() {
  * [UdeaAssetTask.sources] is every file under the asset root - scripts, PNGs and audio - because
  * the *pack* has to be out of date when an image changes. Pass 1 reads none of that: it parses
  * `.udea.kts` and nothing else. So a change confined to art made this task fork a JVM, build a
- * `KotlinCoreEnvironment` and re-parse nineteen unchanged scripts to produce a byte-identical
+ * `KotlinCoreEnvironment` and re-parse **every** unchanged script to produce a byte-identical
  * document, and `udeaGenerateAccessors` then re-ran behind it.
  *
  * [scan] skips the fork entirely in that case. That is the whole of the incrementality here and
  * the limit is deliberate rather than unfinished:
  *
- * - **Measured, the fork is the cost.** On this corpus - nineteen scripts, 127 declarations - a
- *   whole-tree rescan is about 1.6s wall, and almost all of it is JVM start-up plus building the
- *   PSI environment. Re-parsing eighteen small files that were going to be parsed anyway is not
- *   where the time goes, so per-file scoping would buy a fraction of a second and cost a merge.
+ * - **Measured, the fork is the cost.** On `moba/assets` - a couple of dozen scripts declaring a
+ *   couple of hundred assets - a whole-tree rescan is about 1.6s wall, and almost all of it is JVM
+ *   start-up plus building the PSI environment. Re-parsing the handful of small files that were
+ *   going to be parsed anyway is not where the time goes, so per-file scoping would buy a fraction
+ *   of a second and cost a merge. (This sentence used to cost it out as "nineteen scripts, 127
+ *   declarations". Both were true when measured and both moved the moment somebody authored an
+ *   asset - the shop of issue #132 took them to 22 and 147. The claim that matters is which side
+ *   of the ratio the time is on, and that does not move with the corpus.)
  * - **The merge cannot be lossless today.** Scoping the scan to changed files means carrying the
  *   unchanged files' results forward out of the previous `declarations.json`, and that document
  *   deliberately holds declarations and references and **not** diagnostics. `UDEA0020` (a

@@ -1,0 +1,15 @@
+replay equality FAILED at t1200 (1200 tick(s) matched first)
+  fixture drift-3600.udearep
+  A = 'expected-leg'  [<os>; <jvm>]
+  B = 'planted-leg'  [<os>; <jvm>]
+  world hash: -7000854319554458987 against 8365181117672703832
+  1 differing cell(s):
+    NetId(#0@0) dev.wildware.udea.replay.equality.fixture.Drifter.x
+      A = <float> (0x40d21532)
+      B = <float> (0x40d21533)
+      the preceding 5 tick(s) of this cell:
+        t1195  agreed  A = <float> (0x40e21dda), B = <float> (0x40e21dda)
+        t1196  agreed  A = <float> (0x40dee75d), B = <float> (0x40dee75d)
+        t1197  agreed  A = <float> (0x40dba9f7), B = <float> (0x40dba9f7)
+        t1198  agreed  A = <float> (0x40d871e9), B = <float> (0x40d871e9)
+        t1199  agreed  A = <float> (0x40d5460a), B = <float> (0x40d5460a)

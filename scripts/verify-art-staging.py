@@ -266,11 +266,6 @@ def main():
     try:
         print(f"clean tree: {clean}")
 
-        # The wrapper is checked in WITHOUT the executable bit - CI's first step after checkout
-        # is `chmod +x ./gradlew` - so the documented step is given the same treatment here
-        # rather than being rewritten into something a reader would not type.
-        os.chmod(os.path.join(clean, "gradlew"), 0o755)
-
         # Read from the clean tree, not the working tree: every artefact under test - the
         # manifest, the build, LICENSE and README - must be the committed one.
         step = documented_step(read(clean, MANIFEST))
@@ -312,6 +307,15 @@ def main():
         before = tree_files(clean)
 
         print("\n[3/7] running the documented step in the clean tree")
+        # The wrapper is checked in WITHOUT the executable bit - CI's first step after checkout is
+        # `chmod +x ./gradlew` - so the documented step is given the same treatment rather than
+        # being rewritten into something no reader would type. The bit is put back before step 4
+        # looks at `git status`, because a mode change is a change: leaving it on would make this
+        # script's own convenience read as the build dirtying the checkout, and turning
+        # `core.fileMode` off to hide it would blind the check to a real one.
+        wrapper = os.path.join(clean, "gradlew")
+        mode = os.stat(wrapper).st_mode
+        os.chmod(wrapper, mode | 0o111)
         for line in step:
             code, out = run(["sh", "-c", line], clean)
             print(("  " + out.strip()[-4000:]).replace("\n", "\n  "))
@@ -320,6 +324,8 @@ def main():
                     f"the step {MANIFEST} documents exited {code}: {line!r}. "
                     "The documentation names a command a fresh clone cannot use."
                 )
+
+        os.chmod(wrapper, mode)
 
         print("\n[4/7] the build must have staged the art, packed it, and left the tree clean")
         appeared = sorted(tree_files(clean) - before)

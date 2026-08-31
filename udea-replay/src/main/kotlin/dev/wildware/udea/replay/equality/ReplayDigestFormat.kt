@@ -87,8 +87,6 @@ public class ReplayDigestWriter internal constructor(
     private val header: ReplayDigestHeader,
 ) : AutoCloseable {
 
-    private var ticksWritten: Int = 0
-
     private val scratch: CellBuffer = CellBuffer()
     private var slotOwnerScratch: IntArray = IntArray(INITIAL_SLOT_OWNERS)
 
@@ -115,9 +113,6 @@ public class ReplayDigestWriter internal constructor(
             }
         }
     }
-
-    /** How many ticks have been written so far. */
-    public val tickCount: Int get() = ticksWritten
 
     /**
      * Writes one tick's cells and its hash.
@@ -147,7 +142,6 @@ public class ReplayDigestWriter internal constructor(
             out.writeInt(cells.fieldAt(index))
             out.writeLong(cells.valueAt(index))
         }
-        ticksWritten++
     }
 
     override fun close() {
@@ -279,30 +273,41 @@ public class ReplayDigestWriter internal constructor(
 }
 
 /**
- * A growable, primitive-backed run of cells for one tick.
+ * A growable, primitive-backed run of cells: one type, used by both the writer and the reader.
  *
- * Parallel arrays rather than a list of objects: the writer refills this once per tick for the
- * whole fixture, and a per-cell object would make a 3600-tick run several hundred thousand
- * allocations for a file it is about to gzip anyway.
+ * Parallel arrays rather than a list of objects, because the writer refills it once per tick for a
+ * whole fixture and the reader fills it once for a whole file — a per-cell object would make a
+ * 3600-tick stream several hundred thousand allocations either way.
+ *
+ * One class and not two. The writer wants [clear] and a [DigestScope]; the reader wants the raw
+ * ordinal byte the file carries and [toDigest]. That is three methods of difference over identical
+ * storage and identical growth, and two copies of `grow()` differing in nothing is exactly the
+ * copy-paste §1 of the engineering standards names.
  */
-private class CellBuffer {
+private class CellBuffer(initialCapacity: Int = SMALL) {
 
     var size: Int = 0
         private set
 
-    private var scopes = ByteArray(INITIAL)
-    private var netIds = IntArray(INITIAL)
-    private var typeIds = IntArray(INITIAL)
-    private var fields = IntArray(INITIAL)
-    private var values = LongArray(INITIAL)
+    private var scopes = ByteArray(initialCapacity)
+    private var netIds = IntArray(initialCapacity)
+    private var typeIds = IntArray(initialCapacity)
+    private var fields = IntArray(initialCapacity)
+    private var values = LongArray(initialCapacity)
 
+    /** Empties it and keeps every buffer, ready for the next tick. */
     fun clear() {
         size = 0
     }
 
     fun add(scope: DigestScope, netId: Int, typeId: Int, field: Int, value: Long) {
+        add(scope.ordinal.toByte(), netId, typeId, field, value)
+    }
+
+    /** The reader's form: the scope arrives as the ordinal byte the file carries. */
+    fun add(scope: Byte, netId: Int, typeId: Int, field: Int, value: Long) {
         if (size == scopes.size) grow()
-        scopes[size] = scope.ordinal.toByte()
+        scopes[size] = scope
         netIds[size] = netId
         typeIds[size] = typeId
         fields[size] = field
@@ -316,6 +321,22 @@ private class CellBuffer {
     fun fieldAt(index: Int): Int = fields[index]
     fun valueAt(index: Int): Long = values[index]
 
+    /** The cells so far, trimmed, as the digest a comparison walks. */
+    fun toDigest(
+        header: ReplayDigestHeader,
+        hashes: LongArray,
+        offsets: IntArray,
+    ): ReplayDigest = ReplayDigest(
+        header = header,
+        hashes = hashes,
+        offsets = offsets,
+        scopes = scopes.copyOf(size),
+        netIds = netIds.copyOf(size),
+        typeIds = typeIds.copyOf(size),
+        fields = fields.copyOf(size),
+        values = values.copyOf(size),
+    )
+
     private fun grow() {
         val capacity = scopes.size * 2
         scopes = scopes.copyOf(capacity)
@@ -325,8 +346,12 @@ private class CellBuffer {
         values = values.copyOf(capacity)
     }
 
-    private companion object {
-        const val INITIAL: Int = 1024
+    companion object {
+        /** One tick's worth, for the writer, which clears between ticks. */
+        const val SMALL: Int = 1024
+
+        /** A whole file's worth, for the reader, which never clears. */
+        const val LARGE: Int = 1 shl 16
     }
 }
 
@@ -388,7 +413,7 @@ public object ReplayDigestIo {
 
         val hashes = LongArray(header.tickCount)
         val offsets = IntArray(header.tickCount + 1)
-        val cells = GrowingCells()
+        val cells = CellBuffer(CellBuffer.LARGE)
         for (index in 0 until header.tickCount) {
             hashes[index] = input.readLong()
             val count = input.readInt()
@@ -474,55 +499,4 @@ public object ReplayDigestIo {
 
     private const val GZIP_BUFFER: Int = 64 * 1024
     private const val HEX: Int = 16
-}
-
-/** The reader's accumulator: the same parallel-array layout [ReplayDigest] holds. */
-private class GrowingCells {
-
-    var size: Int = 0
-        private set
-
-    private var scopes = ByteArray(INITIAL)
-    private var netIds = IntArray(INITIAL)
-    private var typeIds = IntArray(INITIAL)
-    private var fields = IntArray(INITIAL)
-    private var values = LongArray(INITIAL)
-
-    fun add(scope: Byte, netId: Int, typeId: Int, field: Int, value: Long) {
-        if (size == scopes.size) grow()
-        scopes[size] = scope
-        netIds[size] = netId
-        typeIds[size] = typeId
-        fields[size] = field
-        values[size] = value
-        size++
-    }
-
-    fun toDigest(
-        header: ReplayDigestHeader,
-        hashes: LongArray,
-        offsets: IntArray,
-    ): ReplayDigest = ReplayDigest(
-        header = header,
-        hashes = hashes,
-        offsets = offsets,
-        scopes = scopes.copyOf(size),
-        netIds = netIds.copyOf(size),
-        typeIds = typeIds.copyOf(size),
-        fields = fields.copyOf(size),
-        values = values.copyOf(size),
-    )
-
-    private fun grow() {
-        val capacity = scopes.size * 2
-        scopes = scopes.copyOf(capacity)
-        netIds = netIds.copyOf(capacity)
-        typeIds = typeIds.copyOf(capacity)
-        fields = fields.copyOf(capacity)
-        values = values.copyOf(capacity)
-    }
-
-    private companion object {
-        const val INITIAL: Int = 1 shl 16
-    }
 }

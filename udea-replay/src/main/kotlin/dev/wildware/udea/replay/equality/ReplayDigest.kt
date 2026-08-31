@@ -251,13 +251,23 @@ public class ReplayDigest internal constructor(
  * A `data class` rather than a packed `Long` because it is built once per compared cell inside an
  * offline join step, never on a simulation path, and a packed key is unreadable in exactly the
  * failure it exists to explain.
+ *
+ * ## Why two of these are raw ints and not the domain types
+ *
+ * A key has to be able to say **no entity** and **no component type**, because more than half the
+ * cells in a stream belong to neither — the clock, the random streams, the id allocator and the
+ * roster's own shape. `NetId` can say it ([NetId.NONE]) and is exposed as [netId]; `ComponentTypeId`
+ * cannot, because its constructor refuses a negative id, so a raw int carrying
+ * [ReplayDigestCells.NO_TYPE_ID] is the only representation that survives the round trip through a
+ * file. That is a storage decision at a serialisation boundary, not a domain concept written as a
+ * bare `Int`: nothing outside this file computes with either number, they are only compared.
  */
 public data class DigestCellKey(
     /** Which part of the world. */
     public val scope: DigestScope,
     /** `NetId.raw`, or `NetId.NONE.raw` for a cell that belongs to no entity. */
     public val netIdRaw: Int,
-    /** `ComponentTypeId.raw`, or [ReplayDigestCells.NO_TYPE_ID]. */
+    /** `ComponentTypeId.raw`, or [ReplayDigestCells.NO_TYPE_ID] when no component applies. */
     public val typeIdRaw: Int,
     /** Scope-dependent; see [ReplayDigestCells]. */
     public val field: Int,

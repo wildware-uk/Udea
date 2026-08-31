@@ -1,5 +1,6 @@
 package dev.wildware.udea.replay.equality
 
+import dev.wildware.udea.core.Tick
 import dev.wildware.udea.replay.ReplayRecording
 import dev.wildware.udea.replay.ReplayWorld
 import dev.wildware.udea.replay.ReplayWorldFactory
@@ -23,7 +24,7 @@ public class ReplayDigestRun(
     /** How many ticks were replayed and written. */
     public val ticks: Int,
     /** The first tick at which this run disagreed with the recording's own hashes, or `null`. */
-    public val firstRecordedMismatch: dev.wildware.udea.core.Tick?,
+    public val firstRecordedMismatch: Tick?,
     /** How many ticks disagreed with the recording's own hashes. */
     public val recordedMismatches: Int,
     /** Wall-clock milliseconds the replay took. A build measurement, never simulation input. */
@@ -96,7 +97,7 @@ public object ReplayDigestRecorder {
 
         val startedAt = System.nanoTime()
         var mismatches = 0
-        var firstMismatch: dev.wildware.udea.core.Tick? = null
+        var firstMismatch: Tick? = null
         val world = factory.create(recording.firstTick)
         try {
             check(world.tick == recording.firstTick) {
@@ -137,14 +138,14 @@ public object ReplayDigestRecorder {
     }
 
     /** The JVM, as the header records it. Vendor and version, because both can move the last bit. */
-    public fun describeJvm(): String = buildString {
+    private fun describeJvm(): String = buildString {
         append(System.getProperty("java.vm.vendor", "unknown-vendor"))
         append(' ').append(System.getProperty("java.vm.name", "unknown-vm"))
         append(' ').append(System.getProperty("java.version", "unknown-version"))
     }
 
     /** The operating system, as the header records it. */
-    public fun describeOs(): String =
+    private fun describeOs(): String =
         System.getProperty("os.name", "unknown-os") + " " + System.getProperty("os.arch", "unknown-arch")
 
     private const val NANOS_PER_MILLI: Long = 1_000_000L

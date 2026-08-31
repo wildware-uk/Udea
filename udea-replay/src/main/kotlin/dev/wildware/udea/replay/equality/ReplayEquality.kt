@@ -330,6 +330,14 @@ public object ReplayEquality {
         return map
     }
 
+    /**
+     * One earlier tick's value for [key], or `null` when the cell did not exist then.
+     *
+     * A linear walk of that tick's cells rather than an index, and deliberately so: it runs at most
+     * `MAX_REPORTED * HISTORY_TICKS` times, only once a divergence has already been found, and only
+     * in a process whose entire job is rendering one failure. Building a map per history tick would
+     * cost more than the scan it replaced.
+     */
     private fun valueOf(
         digest: ReplayDigest,
         index: Int,

@@ -32,6 +32,12 @@ class DivergenceReportFormatTest {
 
     private val lead = NetId.of(index = 0, generation = 0)
 
+    private companion object {
+        /** `DigestBuilder.DRIFTER`'s type id and the field index of its `x`. */
+        const val DRIFTER_TYPE_ID: Int = 1
+        const val DRIFTER_X: Int = 0
+    }
+
     /** A three-cell world: a roster of one, a clock, and one random word. */
     private fun world(
         label: String,
@@ -107,6 +113,13 @@ class DivergenceReportFormatTest {
         assertContains(rendered, "NetId(")
         assertContains(rendered, "dev.wildware.udea.replay.equality.fixture.Drifter.x")
         assertNamesSomething(rendered)
+
+        // The machine-readable half of the same answer. A report a person can read and a tool
+        // cannot act on would send an agent back to parsing the prose it just printed.
+        assertEquals(
+            DigestCellKey(DigestScope.Component, lead.raw, DRIFTER_TYPE_ID, DRIFTER_X),
+            result.divergences.single().key,
+        )
     }
 
     @Test
@@ -136,6 +149,40 @@ class DivergenceReportFormatTest {
         val message = failure.message.orEmpty()
         assertContains(message, "every cell matches")
         assertContains(message, "corrupt")
+    }
+
+    @Test
+    fun `two runs that share a hash but not their cells are still caught, and named`() {
+        // A 64-bit summary can in principle be shared by two different worlds. The comparison
+        // therefore walks the cells as well as the hash, and this forges the case that separates
+        // the two: a stream whose recorded hash is the honest one's while its `x` is not.
+        //
+        // Without it the cell walk would be untestable - every honest divergence moves the hash
+        // too, so the hash check alone would answer every case and the cell walk could be deleted
+        // with nothing going red.
+        val honest = world("A")
+        val collided = DigestBuilder("B")
+            .corruptTick(
+                hash = honest.hashAt(0),
+                DigestBuilder.rowCount(1),
+                DigestBuilder.rosterNetId(lead),
+                DigestBuilder.presence(lead, 0, 0b1L),
+                DigestBuilder.componentType(),
+                DigestBuilder.componentSlots(1),
+                DigestBuilder.float(lead, 0, 1.0000001f),
+                DigestBuilder.float(lead, 1, 2f),
+                DigestBuilder.clock(7L),
+                DigestBuilder.rng(0, 0xABCDL),
+                DigestBuilder.handle(ReplayDigestCells.HANDLE_NEXT_FRESH, 3L),
+            )
+            .build()
+        assertEquals(honest.hashAt(0), collided.hashAt(0), "the forgery must share the hash")
+
+        val result = ReplayEquality.replayEquals(honest, collided)
+
+        assertFalse(result.isEqual, "equal hashes are not equal worlds")
+        assertContains(result.describe(), "dev.wildware.udea.replay.equality.fixture.Drifter.x")
+        assertNamesSomething(result.describe())
     }
 
     @Test

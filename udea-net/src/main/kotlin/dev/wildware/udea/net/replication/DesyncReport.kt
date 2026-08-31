@@ -29,6 +29,20 @@ public data class Desync(
  * Only `@Net` fields are compared. A `@Sim` field is snapshotted and never replicated, so the
  * client having no value for it is correct, and reporting it would fill the report with noise
  * that can never be fixed.
+ *
+ * ## `@Net(visibility = OwnerOnly)` is compared, deliberately
+ *
+ * Since issue #167 a client is not sent the owner-only fields of an entity it does not own, so
+ * this reports one row per such field per foreign entity for a session that is perfectly
+ * converged. That is not an oversight and it is not filtered, for two reasons that pull the same
+ * way. This is handed a server store and a client store and is never told who owns what, so the
+ * only filter available is "drop owner-only everywhere" - which would also stop it reporting a
+ * genuine desync on an owner's *own* private field, the case an operator most needs to see. And
+ * a report that names the field it is not being sent is a true answer to "what does this client
+ * not have", which is the question `net.desync_report` is asked.
+ *
+ * The number that has to be quiet in a converged session is a *hash*, not this, and `moba`'s
+ * `NetStateProbe` narrows its fold accordingly.
  */
 public object DesyncReport {
 

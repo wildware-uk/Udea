@@ -11,6 +11,7 @@ import dev.wildware.udea.net.bits.BitBufferOverflow
 import dev.wildware.udea.net.bits.BitBufferReader
 import dev.wildware.udea.net.bits.BitBufferWriter
 import dev.wildware.udea.net.input.JitterBuffer
+import dev.wildware.udea.net.rpc.RpcOwnership
 import dev.wildware.udea.net.transport.LoopbackNetwork
 import dev.wildware.udea.net.transport.PeerId
 import dev.wildware.udea.net.transport.Transport
@@ -68,6 +69,28 @@ public class ReplicationServer(
 
     /** Who may see what. All-visible until the relevancy issue lands. */
     public val relevancy: RelevancySet = RelevancySet.ALL_VISIBLE,
+
+    /**
+     * Which connection owns which entity, which is what `@Net(visibility = OwnerOnly)` turns on
+     * (issue #167).
+     *
+     * ## Why the RPC's ownership type and not a second one
+     *
+     * [RpcOwnership] already answers exactly the question the writer has to ask — "the connection
+     * that owns this entity, or [dev.wildware.udea.net.transport.PeerId.SERVER] if none does" —
+     * and a game already has one instance of it, because the generated RPC guard reads it to
+     * refuse a datagram. Minting a second ownership registry beside it would be a second thing
+     * that can disagree with the first, and this class' own `writeRemovals` says why that is the
+     * shape to avoid: "the roster already exists ... and a second one is a second thing that can
+     * disagree". Here the disagreement would be silent and in the leaking direction — a champion
+     * the RPC guard says a peer owns, and the packer says it does not.
+     *
+     * The default is the safe one: [RpcOwnership.NONE] makes every entity server-owned, so no
+     * client is any entity's owner and every owner-only field is stripped from every packet. A
+     * session that has not been told who owns what sends nothing private to anybody, which is
+     * the failure that loses data rather than the one that leaks it.
+     */
+    public val ownership: RpcOwnership = RpcOwnership.NONE,
 
     /** Priority growth. */
     private val accumulator: PriorityAccumulator = PriorityAccumulator(),
@@ -347,12 +370,16 @@ public class ReplicationServer(
             val cursor = section.cursor()
             val baselineTick = state.baselineTickOf(netId)
             val delta = collectBaselines(state, netId, baselineTick)
+            // The one place per entity per recipient where ownership is asked. It is the whole of
+            // the per-recipient part of the packet: everything else about this section is the same
+            // for every client, which is why the ring can stay one shared structure.
+            val owns = ownership.ownerOf(netId) == state.peer
             val written = try {
                 if (!delta) {
                     if (baselineTick != ClientReplicationState.NO_BASELINE) baselineRecoveries++
-                    section.writeCreate(out, fields, row)
+                    section.writeCreate(out, fields, row, owns)
                 } else {
-                    section.writeUpdate(out, fields, row, baselines)
+                    section.writeUpdate(out, fields, row, baselines, owns)
                 }
             } catch (overflow: BitBufferOverflow) {
                 // The datagram filled mid-entity. Both rollbacks together: the bytes, and the

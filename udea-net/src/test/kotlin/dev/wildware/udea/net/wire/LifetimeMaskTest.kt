@@ -87,7 +87,7 @@ class LifetimeMaskTest {
 
         val createOut = BitBufferWriter(buffer)
         writer.begin()
-        writer.writeCreate(createOut, first.fields, first.fields.rowOf(netId))
+        writer.writeCreate(createOut, first.fields, first.fields.rowOf(netId), recipientOwnsEntity = true)
         writer.end(createOut)
 
         val deltaOut = BitBufferWriter(ByteArray(512))
@@ -98,6 +98,7 @@ class LifetimeMaskTest {
             second.fields.rowOf(netId),
             first.fields,
             first.fields.rowOf(netId),
+            recipientOwnsEntity = true,
         )
         writer.end(deltaOut)
 
@@ -137,7 +138,7 @@ class LifetimeMaskTest {
         val out = BitBufferWriter(ByteArray(512))
         val writer = SnapshotWriter(registry)
         writer.begin()
-        writer.writeCreate(out, current.fields, current.fields.rowOf(netId))
+        writer.writeCreate(out, current.fields, current.fields.rowOf(netId), recipientOwnsEntity = true)
         writer.end(out)
 
         val recovered = ReplicaStore(registry)
@@ -157,7 +158,7 @@ class LifetimeMaskTest {
         val out = BitBufferWriter(ByteArray(512))
         val writer = SnapshotWriter(registry)
         writer.begin()
-        writer.writeCreate(out, snapshot.fields, snapshot.fields.rowOf(netId))
+        writer.writeCreate(out, snapshot.fields, snapshot.fields.rowOf(netId), recipientOwnsEntity = true)
         writer.end(out)
 
         val moverIndex = registry.indexOf(MoverReplicator.typeId)

@@ -180,6 +180,21 @@ public class MobaHostSession(
     /** This build's protocol. A client on another build is refused by name. */
     public val protocol: ProtocolDescriptor = MobaNet.protocol(registry)
 
+    /**
+     * Which connection owns which champion.
+     *
+     * Two readers, one registry. The generated ownership guard reads it to refuse a datagram
+     * that would fire a champion somebody else drives, and [replication] reads it to decide
+     * whether a recipient may be told a champion's `@Net(visibility = OwnerOnly)` fields
+     * (issue #167). Every id it has not been told about answers [PeerId.SERVER] - which is every
+     * AI unit on the field, every arrow in flight, and every id that does not exist - so an
+     * unknown entity is nobody's, and its private fields go to nobody.
+     *
+     * Declared above [replication] because that is where it is read; the two used to sit the
+     * other way round, and Kotlin's initialisation order is what says so rather than a comment.
+     */
+    public val ownership: ChampionOwnership = ChampionOwnership()
+
     /** The packer. Handed the ring, never a copy of it. */
     public val replication: ReplicationServer = ReplicationServer(
         registry = registry,
@@ -188,6 +203,11 @@ public class MobaHostSession(
         ring = ring,
         budget = budget,
         relevancy = fog ?: RelevancySet.ALL_VISIBLE,
+        // The same [ownership] the RPC guard reads, deliberately (issue #167). One registry of
+        // who drives which champion answers both "may this datagram fire that ability" and "may
+        // this client be told what is in that inventory"; two would be two things that can
+        // disagree, and the disagreement would be silent in the leaking direction.
+        ownership = ownership,
         mtu = mtu,
     )
 
@@ -231,12 +251,6 @@ public class MobaHostSession(
      */
     private val router: PlayerIntents = PlayerIntents { self -> byChampion[self.raw]?.intent }
 
-    /**
-     * Which connection owns which champion. The generated ownership guard reads this and nothing
-     * else, and every id it has not been told about answers [PeerId.SERVER] - which is every AI
-     * unit on the field, every arrow in flight, and every id that does not exist.
-     */
-    public val ownership: ChampionOwnership = ChampionOwnership()
 
     /** Every RPC this build speaks. A client shares it, so the wire indices agree. */
     public val rpcRegistry: RpcRegistry = AbilityRpc.registry()

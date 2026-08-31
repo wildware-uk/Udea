@@ -1,10 +1,12 @@
 package dev.wildware.udea.net.harness
 
 import dev.wildware.udea.core.Tick
+import dev.wildware.udea.core.snapshot.ComponentRegistry
 import dev.wildware.udea.core.snapshot.WorldSnapshot
 import dev.wildware.udea.net.replication.BandwidthBudget
 import dev.wildware.udea.net.replication.ReplicationClient
 import dev.wildware.udea.net.replication.ReplicationServer
+import dev.wildware.udea.net.rpc.RpcOwnership
 import dev.wildware.udea.net.transport.NetConditions
 import dev.wildware.udea.net.transport.NetEndpoint
 import dev.wildware.udea.net.transport.NetHarness
@@ -24,6 +26,15 @@ internal class ReplicationSession(
     conditions: NetConditions = NetConditions.PERFECT,
     budgetBytes: Int = BandwidthBudget.DEFAULT_BYTES_PER_PACKET,
     jitterCapacity: Int = dev.wildware.udea.net.input.JitterBuffer.DEFAULT_CAPACITY,
+    /** The component set this session speaks. Widened only by the tests that need [Loadout]. */
+    registry: ComponentRegistry = NetTestComponents.registry(),
+    /**
+     * Who owns what, for `@Net(visibility = OwnerOnly)` (issue #167).
+     *
+     * The server's own default is [RpcOwnership.NONE] and this repeats it rather than omitting
+     * the argument, so that a reader of a test that *does* pass one can see what it is replacing.
+     */
+    ownership: RpcOwnership = RpcOwnership.NONE,
     /** Runs on the server immediately before each tick's capture, to move the world. */
     private val mutate: (Tick) -> Unit = {},
     /** Runs on each client immediately before its send, to produce input. */
@@ -31,7 +42,7 @@ internal class ReplicationSession(
 ) {
 
     val harness: NetHarness = NetHarness(clientCount, seed, initialConditions = conditions)
-    val world: NetTestWorld = NetTestWorld(seed)
+    val world: NetTestWorld = NetTestWorld(seed, registry)
     val protocol: ProtocolDescriptor = ProtocolDescriptor.of(world.registry)
 
     val server: ReplicationServer = ReplicationServer(
@@ -40,6 +51,7 @@ internal class ReplicationSession(
         transport = harness.transport(PeerId.SERVER),
         ring = world.ring,
         budget = BandwidthBudget(budgetBytes),
+        ownership = ownership,
         jitterCapacity = jitterCapacity,
     )
 

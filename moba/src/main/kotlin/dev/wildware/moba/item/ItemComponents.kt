@@ -36,16 +36,18 @@ import dev.wildware.udea.assets.AssetIndex
  * own KDoc says so - because it is stable across a hot reload. An inventory holding an asset id
  * string would be a rewind that restored an item by a name the reloaded graph had moved.
  *
- * ## `visibility = OwnerOnly`, and what it does today
+ * ## `visibility = OwnerOnly`, and what it does
  *
- * Issue #132 specifies it, and it is declared here as the statement of intent it is. **Nothing
- * enforces it today.** `Visibility` has been in `udea-annotations` since Phase 0 and no consumer
- * reads it: `udea-codegen`'s `ComponentModelBuilder` never looks at the argument and `udea-net`'s
- * `SnapshotWriter` has no per-recipient mask stripping, so every client holding this entity is
- * sent every field of this component. That is the same state `lifetime` was in before issue #114
- * turned it into bytes not sent, and issue #167 is the ticket that does the same for this one.
- * Until it lands, this is a declaration and not a guarantee, and this paragraph is here so that
- * nobody reads the annotation as one.
+ * Issue #132 specified it and nothing enforced it: `udea-codegen` never read the argument and
+ * `udea-net` had no per-recipient stripping, so every client holding this entity was sent every
+ * field of this component. Issue #167 made it real. `ComponentModelBuilder` now reads the
+ * argument, `InventoryReplicator` declares an `ownerOnlyMask` over all seven slots, and
+ * `SnapshotWriter` intersects it away for any recipient that is not the champion's owner
+ * according to `MobaHostSession.ownership` - the same registry the RPC guard reads.
+ *
+ * Every field here is owner-only, so a non-owner is sent no record for this component at all
+ * rather than a partial one, and `InventoryVisibilityTest` is what says so against two live
+ * clients rather than against a mask.
  */
 @Replicated
 public class Inventory(

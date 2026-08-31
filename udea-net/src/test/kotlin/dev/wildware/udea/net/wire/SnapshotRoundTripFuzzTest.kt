@@ -67,9 +67,16 @@ class SnapshotRoundTripFuzzTest {
                 val baselineTick = baselineTicks[netId.raw]
                 val baseline = baselineTick?.let { world.ring.nearestAtOrBefore(it) }
                 if (baseline == null || baseline.tick != baselineTick) {
-                    writer.writeCreate(out, current.fields, row)
+                    writer.writeCreate(out, current.fields, row, recipientOwnsEntity = true)
                 } else {
-                    writer.writeUpdate(out, current.fields, row, baseline.fields, baseline.fields.rowOf(netId))
+                    writer.writeUpdate(
+                        out,
+                        current.fields,
+                        row,
+                        baseline.fields,
+                        baseline.fields.rowOf(netId),
+                        recipientOwnsEntity = true,
+                    )
                 }
             }
             writer.end(out)

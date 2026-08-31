@@ -46,6 +46,7 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
         val enumConstants: List<String>?,
         val quantisation: Quantisation?,
         val createOnly: Boolean,
+        val ownerOnly: Boolean,
     ) {
         val name: String = path.joinToString(".")
     }
@@ -108,6 +109,7 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
                 enumConstants = candidate.enumConstants,
                 quantisation = candidate.quantisation,
                 createOnly = candidate.createOnly,
+                ownerOnly = candidate.ownerOnly,
             )
         }
         return ReplicatedComponent(
@@ -154,7 +156,14 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
         // capture-and-diff happened to see it move. `udea-net`'s `LifetimePolicy` already
         // refuses to put such a field in an `Update`; what was missing is any generated
         // replicator ever *saying* it has one.
-        val createOnly = net && property.lifetimeIsOnCreate()
+        val createOnly = net && property.netEnumArgumentIs(LIFETIME_ARGUMENT, ON_CREATE)
+
+        // Issue #167, and the same shape of defect as #114 with the failure pointing the other
+        // way: an unread `lifetime` costs bandwidth, an unread `visibility` sends a field the
+        // author had said was private to one connection. `udea-net`'s `VisibilityPolicy` does the
+        // stripping; what was missing is any generated replicator ever *saying* it has an
+        // owner-only field.
+        val ownerOnly = net && property.netEnumArgumentIs(VISIBILITY_ARGUMENT, OWNER_ONLY)
 
         val quantisation = if (property.hasAnnotation(AnnotationNames.Q)) {
             if (!type.isFloat()) {
@@ -189,6 +198,7 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
                         enumConstants = lowering.enumConstants,
                         quantisation = quantisation,
                         createOnly = createOnly,
+                        ownerOnly = ownerOnly,
                     )
                 }
             }
@@ -214,6 +224,9 @@ internal class ComponentModelBuilder(private val logger: KSPLogger) {
                             // `lifetime = OnCreate` vector is create-only. Anything else would
                             // let half a spawn position ride deltas.
                             createOnly = createOnly,
+                            // And for the same reason on the other axis: half an owner-only
+                            // vector reaching a non-owner is a leak, not a partial one.
+                            ownerOnly = ownerOnly,
                         )
                     }
                 }
@@ -338,25 +351,30 @@ private inline fun <reified T> KSAnnotation.argument(name: String): T? =
     arguments.firstOrNull { it.name?.asString() == name }?.value as? T
 
 /**
- * Whether this property's `@Net` declares `lifetime = OnCreate`.
+ * Whether this property's `@Net` declares `[argument] = [constant]`.
  *
  * The argument is compared **by the enum constant's simple name**, read off whatever KSP hands
  * back for an enum-valued argument — a `KSType`, a `KSClassDeclaration` or, on a Java-view
- * declaration, a plain string. Resolving it to `dev.wildware.udea.annotations.Lifetime` instead
- * would put a hard dependency from the processor onto the annotation module's classes at
- * *processing* time, which `AnnotationNames`' whole design avoids: `udea-codegen` runs inside
- * the compiler and addresses annotations by name.
+ * declaration, a plain string. Resolving it to the annotation module's enums instead would put a
+ * hard dependency from the processor onto their classes at *processing* time, which
+ * `AnnotationNames`' whole design avoids: `udea-codegen` runs inside the compiler and addresses
+ * annotations by name.
  *
- * Absent means [dev.wildware.udea.annotations.Lifetime.Always], which is the annotation's own
- * default. Defaulting the *other* way would silently stop replicating a field.
+ * Absent means the annotation's own default — `Lifetime.Always`, `Visibility.All` — and every
+ * default in that vocabulary is the one that keeps a field being sent to everybody who was
+ * already getting it. Defaulting the *other* way would silently stop replicating a field, or
+ * silently stop showing it to a client that has always been shown it.
+ *
+ * One function for both arguments rather than one each: they differ only in which name and which
+ * constant they are looking for, and two copies would be two places for the KSP-shape handling
+ * above to be got right.
  */
-private fun KSPropertyDeclaration.lifetimeIsOnCreate(): Boolean {
+private fun KSPropertyDeclaration.netEnumArgumentIs(argument: String, constant: String): Boolean {
     val net = annotations.firstOrNull {
         it.annotationType.resolve().declaration.qualifiedName?.asString() == AnnotationNames.NET
     } ?: return false
-    val argument = net.arguments.firstOrNull { it.name?.asString() == LIFETIME_ARGUMENT }?.value
-        ?: return false
-    return argument.toString().substringAfterLast('.') == ON_CREATE
+    val value = net.arguments.firstOrNull { it.name?.asString() == argument }?.value ?: return false
+    return value.toString().substringAfterLast('.') == constant
 }
 
 /** The `@Net` argument that carries the lifetime. */
@@ -364,5 +382,11 @@ private const val LIFETIME_ARGUMENT = "lifetime"
 
 /** `dev.wildware.udea.annotations.Lifetime.OnCreate`, by simple name. */
 private const val ON_CREATE = "OnCreate"
+
+/** The `@Net` argument that carries the visibility. */
+private const val VISIBILITY_ARGUMENT = "visibility"
+
+/** `dev.wildware.udea.annotations.Visibility.OwnerOnly`, by simple name. */
+private const val OWNER_ONLY = "OwnerOnly"
 
 private fun KSType.isFloat(): Boolean = declaration.qualifiedName?.asString() == "kotlin.Float"

@@ -61,6 +61,12 @@ internal object ReplicatorEmitter {
             builder.addSuperinterface(NetNames.CREATE_ONLY_FIELDS)
         }
 
+        // Issue #167, opted into on the same terms and independently: `lifetime` and `visibility`
+        // are separate declarations, so a component may implement either marker, both or neither.
+        if (component.ownerOnlyFields.isNotEmpty()) {
+            builder.addSuperinterface(NetNames.OWNER_ONLY_FIELDS)
+        }
+
         builder.addProperty(
             PropertySpec.builder("FIELD_COUNT", INT, KModifier.PUBLIC, KModifier.CONST)
                 .addKdoc("The number of `@Net` plus `@Sim` fields; the width of every mask here.")
@@ -114,6 +120,20 @@ internal object ReplicatorEmitter {
                     .build(),
             )
         }
+        if (component.ownerOnlyFields.isNotEmpty()) {
+            builder.addProperty(
+                PropertySpec.builder("ownerOnlyMask", CoreNames.FIELD_MASK, KModifier.OVERRIDE)
+                    .addKdoc(
+                        "`@Net(visibility = OwnerOnly)` fields: the connection that owns the " +
+                            "entity is sent them and every other recipient has them stripped, " +
+                            "from its creates as well as its updates (issue #167). A subset of " +
+                            "[netMask], because an owner-only field is still a `@Net` field - " +
+                            "it just reaches one client.",
+                    )
+                    .initializer(maskInitializer(component.ownerOnlyFields))
+                    .build(),
+            )
+        }
 
         builder.addFunction(capture(component))
         builder.addFunction(diff(component))
@@ -159,7 +179,9 @@ internal object ReplicatorEmitter {
                 field.index,
                 field.name,
                 when {
+                    field.createOnly && field.ownerOnly -> "`@Net(OnCreate, OwnerOnly)` — create only, owner only"
                     field.createOnly -> "`@Net(OnCreate)` — create only"
+                    field.ownerOnly -> "`@Net(OwnerOnly)` — owner only"
                     field.net -> "`@Net` — net and all"
                     else -> "`@Sim` — all only"
                 },

@@ -28,10 +28,22 @@ import dev.wildware.udea.net.bits.writeZigZag
  */
 public enum class EntityOp(public val code: Int) {
 
-    /** Full state: every `@Net` field, create-only fields included. */
+    /**
+     * Full state: every `@Net` field this recipient may see, create-only fields included.
+     *
+     * "This recipient may see" and not "every `@Net` field", because `@Net(visibility =
+     * OwnerOnly)` is stripped from a non-owner's create as well as from its deltas (issue #167).
+     * A full state that leaked would leak on the first packet and then never again, which is the
+     * hardest version of the bug to notice.
+     */
     Create(0),
 
-    /** Delta against the baseline. Create-only fields are stripped (issue #114). */
+    /**
+     * Delta against the baseline.
+     *
+     * Create-only fields are stripped (issue #114), and so are the owner-only fields of a
+     * recipient that does not own the entity (issue #167).
+     */
     Update(1),
 
     /** The entity no longer exists anywhere. */
@@ -196,25 +208,40 @@ public class SnapshotWriter(
     }
 
     /**
-     * Writes a full-state `Create` for [row] of [current].
+     * Writes a full-state `Create` for [row] of [current], for one recipient.
      *
      * Uses [LifetimePolicy.fullMask], so `@Net(lifetime = OnCreate)` fields are present here and
-     * only here. Writes every component the entity carries whose `@Net` mask is non-empty.
+     * only here. Writes every component the entity carries whose `@Net` mask is non-empty **and
+     * whose fields this recipient may see**: a `Create` is a full state, and a full state that
+     * ignored [VisibilityPolicy] would hand every owner-only field to every client on the first
+     * packet (issue #167).
      *
+     * @param recipientOwnsEntity whether the client this packet is being written for owns the
+     *   entity, which is the only thing `@Net(visibility = OwnerOnly)` turns on. Stated at every
+     *   call site rather than defaulted, because a default is exactly how a new caller leaks.
      * @return the number of components written.
      */
-    public fun writeCreate(out: BitWriter, current: WorldFieldStore, row: Int): Int {
+    public fun writeCreate(
+        out: BitWriter,
+        current: WorldFieldStore,
+        row: Int,
+        recipientOwnsEntity: Boolean,
+    ): Int {
         single.clear()
-        return writeEntity(out, current, row, EntityOp.Create, single)
+        return writeEntity(out, current, row, EntityOp.Create, single, recipientOwnsEntity)
     }
 
     /**
-     * Writes a delta `Update` for [row] against [baselineRow] of [baseline].
+     * Writes a delta `Update` for [row] against [baselineRow] of [baseline], for one recipient.
      *
      * Emits nothing at all — not even an entity header — when no replicated field differs, which
      * is what makes a quiet entity free. A component present now and absent from the baseline is
-     * written in full, because the baseline holds no bits for it to be a delta against.
+     * written in full, because the baseline holds no bits for it to be a delta against — and
+     * "in full" still means [VisibilityPolicy]'s full, or that recovery path would be the hole
+     * every owner-only field eventually falls through.
      *
+     * @param recipientOwnsEntity whether the client this packet is being written for owns the
+     *   entity. See [writeCreate].
      * @return the number of components written; zero means nothing was emitted.
      */
     public fun writeUpdate(
@@ -223,10 +250,11 @@ public class SnapshotWriter(
         row: Int,
         baseline: WorldFieldStore,
         baselineRow: Int,
+        recipientOwnsEntity: Boolean,
     ): Int {
         single.clear()
         single.add(baseline, baselineRow)
-        return writeEntity(out, current, row, EntityOp.Update, single)
+        return writeEntity(out, current, row, EntityOp.Update, single, recipientOwnsEntity)
     }
 
     /**
@@ -247,8 +275,12 @@ public class SnapshotWriter(
      * written is provably already right. There is no probability in it and no repair message.
      *
      * A component absent now but present in any of [baselines] is written as a **removal**
-     * record, which is how a component the server dropped stops existing on a client.
+     * record, which is how a component the server dropped stops existing on a client — except to
+     * a recipient that was never sent any field of it, for which the record would name a
+     * component that client has never held (issue #167).
      *
+     * @param recipientOwnsEntity whether the client this packet is being written for owns the
+     *   entity. See [writeCreate].
      * @return the number of component records written; zero means nothing was emitted.
      */
     public fun writeUpdate(
@@ -256,7 +288,8 @@ public class SnapshotWriter(
         current: WorldFieldStore,
         row: Int,
         baselines: BaselineSet,
-    ): Int = writeEntity(out, current, row, EntityOp.Update, baselines)
+        recipientOwnsEntity: Boolean,
+    ): Int = writeEntity(out, current, row, EntityOp.Update, baselines, recipientOwnsEntity)
 
     /** Writes a [EntityOp.Destroy] or [EntityOp.Leave] record for [netId]. */
     public fun writeRemoval(out: BitWriter, netId: NetId, op: EntityOp) {
@@ -281,6 +314,7 @@ public class SnapshotWriter(
         row: Int,
         op: EntityOp,
         baselines: BaselineSet,
+        recipientOwnsEntity: Boolean,
     ): Int {
         val netId = current.netIdAt(row)
         var written = 0
@@ -288,12 +322,23 @@ public class SnapshotWriter(
         var headerWritten = false
         for (componentIndex in 0 until registry.size) {
             val replicator = registry.typeAt(componentIndex).replicator
+            // What this recipient may be told about this component at all (issue #167). Asked
+            // once per component per recipient and intersected into whatever the op decides
+            // below, so there is one place an owner-only field can be dropped and it covers the
+            // create, the full resend and the delta together.
+            val visible = VisibilityPolicy.visibleMask(replicator, recipientOwnsEntity)
             val present = current.isPresent(row, componentIndex)
 
             if (!present) {
                 // Present in a state the client may be holding and gone now: say so, or the
                 // client keeps a component the server has dropped for the rest of the session.
                 if (op == EntityOp.Create || !anyBaselineHas(baselines, componentIndex)) continue
+                // Unless this recipient was never sent a field of it in the first place, which
+                // is what an entirely owner-only component is to a non-owner - `moba`'s
+                // `Inventory` is exactly that shape. Removing something a client never held
+                // names nothing. The `netMask` half keeps a `@Sim`-only component behaving as it
+                // did before this issue: its mask is empty for everybody, not by visibility.
+                if (MaskOps.isEmpty(visible) && MaskOps.isNotEmpty(replicator.netMask)) continue
                 if (!headerWritten) {
                     writeEntityHeader(out, netId, op)
                     headerWritten = true
@@ -331,7 +376,12 @@ public class SnapshotWriter(
                 }
                 MaskOps.and(changed, delta)
             }
-            if (MaskOps.isEmpty(mask)) continue
+            // The whole of the per-recipient stripping: one `and`, after the op has decided
+            // which fields it wants. Clearing a bit, never renumbering one - the field mask
+            // `Replicator.write` puts on the wire is fixed width, so the surviving fields keep
+            // the indices `fieldNames` and the `FieldStore` address them by.
+            val visibleMask = MaskOps.and(mask, visible)
+            if (MaskOps.isEmpty(visibleMask)) continue
 
             if (!headerWritten) {
                 writeEntityHeader(out, netId, op)
@@ -339,7 +389,7 @@ public class SnapshotWriter(
             }
             out.writeVarInt(replicator.typeId.raw - previousTypeId)
             previousTypeId = replicator.typeId.raw
-            replicator.write(store, slot, mask, out)
+            replicator.write(store, slot, visibleMask, out)
             written++
         }
         if (headerWritten) out.writeVarInt(0)

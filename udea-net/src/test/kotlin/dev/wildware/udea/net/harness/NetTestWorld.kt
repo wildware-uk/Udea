@@ -31,18 +31,20 @@ import dev.wildware.udea.core.snapshot.SnapshotService
 import dev.wildware.udea.core.snapshot.WorldSnapshot
 import dev.wildware.udea.core.snapshot.fleksComponentType
 import dev.wildware.udea.net.wire.CreateOnlyFields
+import dev.wildware.udea.net.wire.OwnerOnlyFields
 
 /**
- * Two replicated components for the networking tests, written by hand.
+ * The replicated components for the networking tests, written by hand.
  *
  * By hand and not generated, for the reason `TransformReplicator` is: `udea-codegen` must not be
- * the author of the specification it is measured against. They also carry the two properties
- * this module needs and `udea-core`'s fixtures do not:
+ * the author of the specification it is measured against. They also carry the declarations this
+ * module needs to have something to enforce against, which `udea-core`'s fixtures do not:
  *
- * - a `@Sim` field (`spawnTick`), so a test can assert it never reaches the wire;
- * - a `@Net(lifetime = OnCreate)` field (`teamId`), so issue #114's stripping has something to
- *   strip. `MoverReplicator` declares it through [CreateOnlyFields], which is the marker
- *   `udea-codegen` will implement when it emits `CREATE_ONLY_MASK`.
+ * - a `@Sim` field ([Mover.spawnTick]), so a test can assert it never reaches the wire;
+ * - a `@Net(lifetime = OnCreate)` field ([Mover.teamId]), so issue #114's stripping has something
+ *   to strip. `MoverReplicator` declares it through [CreateOnlyFields];
+ * - a `@Net(visibility = OwnerOnly)` field ([Loadout.gold]), so issue #167's stripping does.
+ *   `LoadoutReplicator` declares it through [OwnerOnlyFields].
  */
 internal class Mover(
     /** `@Net`. */
@@ -222,20 +224,37 @@ internal object VitalsReplicator : Replicator<Vitals> {
 /** The registry both peers in a test share. */
 internal object NetTestComponents {
 
-    fun registry(): ComponentRegistry = ComponentRegistry(
-        listOf(
-            fleksComponentType(
-                MoverReplicator,
-                ComponentSchema.of(MoverReplicator, "Mover", MoverReplicator.kinds),
-                Mover,
-            ) { Mover() },
-            fleksComponentType(
-                VitalsReplicator,
-                ComponentSchema.of(VitalsReplicator, "Vitals", VitalsReplicator.kinds),
-                Vitals,
-            ) { Vitals() },
-        ),
-    )
+    private fun mover() = fleksComponentType(
+        MoverReplicator,
+        ComponentSchema.of(MoverReplicator, "Mover", MoverReplicator.kinds),
+        Mover,
+    ) { Mover() }
+
+    private fun vitals() = fleksComponentType(
+        VitalsReplicator,
+        ComponentSchema.of(VitalsReplicator, "Vitals", VitalsReplicator.kinds),
+        Vitals,
+    ) { Vitals() }
+
+    private fun loadout() = fleksComponentType(
+        LoadoutReplicator,
+        ComponentSchema.of(LoadoutReplicator, "Loadout", LoadoutReplicator.kinds),
+        Loadout,
+    ) { Loadout() }
+
+    fun registry(): ComponentRegistry = ComponentRegistry(listOf(mover(), vitals()))
+
+    /**
+     * [registry] plus [Loadout], for the tests that need an owner-only field (issue #167).
+     *
+     * A registry of its own rather than a third entry in [registry], so that every existing test
+     * — `SnapshotLayoutGoldenTest`'s pinned hex above all — keeps speaking exactly the protocol
+     * it was written against. `Loadout` takes the next `ComponentTypeId` after `Vitals`, so an
+     * entity carrying only the first two encodes byte for byte the same in either registry;
+     * `packetsAreUnchangedForAComponentThatDeclaresNoOwnerOnlyField` is what checks that claim
+     * rather than assuming it.
+     */
+    fun registryWithLoadout(): ComponentRegistry = ComponentRegistry(listOf(mover(), vitals(), loadout()))
 }
 
 /**
@@ -275,11 +294,18 @@ internal class NetTestWorld(
         ctx.scenes.requestScene(SceneId("arena"))
     }
 
-    /** Spawns an entity carrying [Mover], and [Vitals] when [withVitals]. */
-    fun spawn(x: Float, y: Float, teamId: Int = 0, withVitals: Boolean = true): NetId {
+    /** Spawns an entity carrying [Mover], [Vitals] when [withVitals] and [Loadout] when [withLoadout]. */
+    fun spawn(
+        x: Float,
+        y: Float,
+        teamId: Int = 0,
+        withVitals: Boolean = true,
+        withLoadout: Boolean = false,
+    ): NetId {
         val entity: Entity = world.entity {
             it += Mover(x, y, teamId, ctx.clock.tick)
             if (withVitals) it += Vitals()
+            if (withLoadout) it += Loadout()
         }
         return netIds.allocate(entity)
     }
@@ -303,6 +329,12 @@ internal class NetTestWorld(
         return with(world) { entity[Vitals] }
     }
 
+    /** The live [Loadout] of [netId]. */
+    fun loadout(netId: NetId): Loadout {
+        val entity = netIds.resolveOrNull(netId) ?: error("$netId is not live")
+        return with(world) { entity[Loadout] }
+    }
+
     /** Advances the clock and captures the world into the ring. Returns the committed snapshot. */
     fun captureTick(): WorldSnapshot {
         sim.step()
@@ -310,5 +342,103 @@ internal class NetTestWorld(
         snapshots.captureInto(slot)
         ring.commit(slot)
         return slot
+    }
+}
+
+/**
+ * A third component whose middle field is private to the entity's owner (issue #167).
+ *
+ * Hand-written for the reason [Mover] is, and shaped for one property the generated components
+ * cannot be relied on to have: the owner-only field is **not** the last index. A stripping
+ * implementation that compacted the surviving fields instead of clearing a bit would still
+ * decode, and would put [level] where [gold] belongs — so an owner-only field at the end would
+ * let that defect pass.
+ *
+ * It also carries public fields alongside the private one, which is the case `Inventory` in
+ * `moba` does not exercise: every field of that component is owner-only, so a non-owner is sent
+ * no record for it at all and a partial mask is never written.
+ */
+internal class Loadout(
+    /** `@Net(visibility = OwnerOnly)` — the private field, at index 0. */
+    var gold: Int = 0,
+    /** `@Net` — public, at index 1, after the private one. */
+    var level: Int = 0,
+    /** `@Net` — public, at index 2. */
+    var weapon: Int = 0,
+) : Component<Loadout> {
+    override fun type(): ComponentType<Loadout> = Loadout
+
+    companion object : ComponentType<Loadout>()
+}
+
+internal object LoadoutReplicator : Replicator<Loadout>, OwnerOnlyFields {
+
+    const val GOLD = 0
+    const val LEVEL = 1
+    const val WEAPON = 2
+    const val FIELD_COUNT = 3
+
+    val kinds: List<FieldKind> = listOf(FieldKind.Int, FieldKind.Int, FieldKind.Int)
+
+    override val typeId: ComponentTypeId = ComponentTypeId(3)
+
+    override val fieldNames: List<String> = listOf("gold", "level", "weapon")
+
+    override val netMask: FieldMask = MaskOps.lowest(FIELD_COUNT)
+
+    override val allMask: FieldMask = MaskOps.lowest(FIELD_COUNT)
+
+    override val ownerOnlyMask: FieldMask = MaskOps.of(GOLD)
+
+    override fun capture(component: Loadout, store: FieldStore, slot: Int) {
+        store.setInt(slot, GOLD, component.gold)
+        store.setInt(slot, LEVEL, component.level)
+        store.setInt(slot, WEAPON, component.weapon)
+    }
+
+    override fun diff(store: FieldStore, slotA: Int, slotB: Int): FieldMask {
+        var mask = MaskOps.EMPTY
+        if (store.getInt(slotA, GOLD) != store.getInt(slotB, GOLD)) mask = MaskOps.set(mask, GOLD)
+        if (store.getInt(slotA, LEVEL) != store.getInt(slotB, LEVEL)) mask = MaskOps.set(mask, LEVEL)
+        if (store.getInt(slotA, WEAPON) != store.getInt(slotB, WEAPON)) mask = MaskOps.set(mask, WEAPON)
+        return mask
+    }
+
+    override fun write(store: FieldStore, slot: Int, mask: FieldMask, out: BitWriter) {
+        if (MaskOps.isEmpty(mask)) return
+        MaskOps.writeTo(mask, out, FIELD_COUNT)
+        if (MaskOps.test(mask, GOLD)) out.writeInt(store.getInt(slot, GOLD))
+        if (MaskOps.test(mask, LEVEL)) out.writeInt(store.getInt(slot, LEVEL))
+        if (MaskOps.test(mask, WEAPON)) out.writeInt(store.getInt(slot, WEAPON))
+    }
+
+    override fun read(src: BitReader, store: FieldStore, slot: Int): FieldMask {
+        val mask = MaskOps.readFrom(src, FIELD_COUNT)
+        if (MaskOps.test(mask, GOLD)) store.setInt(slot, GOLD, src.readInt())
+        if (MaskOps.test(mask, LEVEL)) store.setInt(slot, LEVEL, src.readInt())
+        if (MaskOps.test(mask, WEAPON)) store.setInt(slot, WEAPON, src.readInt())
+        return mask
+    }
+
+    override fun apply(store: FieldStore, slot: Int, component: Loadout, mask: FieldMask) {
+        if (MaskOps.test(mask, GOLD)) component.gold = store.getInt(slot, GOLD)
+        if (MaskOps.test(mask, LEVEL)) component.level = store.getInt(slot, LEVEL)
+        if (MaskOps.test(mask, WEAPON)) component.weapon = store.getInt(slot, WEAPON)
+    }
+
+    override fun getField(component: Loadout, fieldIndex: Int): Any? = when (fieldIndex) {
+        GOLD -> component.gold
+        LEVEL -> component.level
+        WEAPON -> component.weapon
+        else -> throw NoSuchFieldIndexException("Loadout", fieldIndex, FIELD_COUNT)
+    }
+
+    override fun setField(component: Loadout, fieldIndex: Int, value: Any?) {
+        when (fieldIndex) {
+            GOLD -> component.gold = value as Int
+            LEVEL -> component.level = value as Int
+            WEAPON -> component.weapon = value as Int
+            else -> throw NoSuchFieldIndexException("Loadout", fieldIndex, FIELD_COUNT)
+        }
     }
 }

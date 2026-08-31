@@ -31,8 +31,12 @@ difference is two commits and neither can change what a leg does:
 
 So no `src/main`, no Gradle task, no `ci.yml` step and no checked-in fixture moved after `933dfff`,
 and the legs run the identical command over the identical bytes. `git diff 933dfff 063c792 --stat`
-and `git log -p 933dfff..063c792` are the check; a sixth run on `063c792` was pushed and is linked
-in the report to the lead.
+and `git log -p 933dfff..063c792` are the check.
+
+Run [33445413997](https://github.com/wildware-uk/Udea/actions/runs/33445413997) is on `9afecf5`,
+which is `063c792` plus an earlier draft of this file, and its three `replay-equality` legs and
+`join` are green over `moba-3600.udearep`. So criterion 1 holds on a commit whose *code* is
+identical to HEAD's, and the only thing that has moved since is the paragraph you are reading.
 
 ---
 

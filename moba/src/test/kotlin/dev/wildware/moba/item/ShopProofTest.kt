@@ -5,6 +5,7 @@ import dev.wildware.moba.ability.Corpse
 import dev.wildware.moba.match.Respawn
 import dev.wildware.udea.assets.AssetId
 import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.core.loop.RewindResult
 import dev.wildware.udea.gas.Attributes
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -263,6 +264,83 @@ class ShopProofTest {
         assertEquals(ShopRefusal.NoSuchChampion, outcome.reason)
         assertEquals(1000, game.wallet().gold, "the champion's purse must not have been touched")
         assertEquals(0, game.inventory().occupied)
+    }
+
+    /**
+     * A rewind puts back what the champion was carrying and what it had spent.
+     *
+     * ## The claim this exists to stop being unproven
+     *
+     * `ItemModule.snapshotTypes()`'s KDoc says an inventory a rewind did not restore would be
+     * "a champion whose gold came back and whose items did not". That was a sentence in a KDoc
+     * with nothing checking it - the exact shape of the defect this repository has already
+     * shipped once: a component missing from `MobaGame.componentRegistry` is not *partly*
+     * captured, it is **invisible** to capture, and nothing goes red.
+     *
+     * ## The keyframe holds one item, not none, and that is the whole design
+     *
+     * An empty fixture is a specific state, not a neutral one. A champion whose inventory was
+     * never restored is re-granted a fresh `Inventory()` by [InventoryGrantSystem], and a fresh
+     * one is **empty** - so a test that rewound from six items to zero would pass against a
+     * restore that did nothing at all, because "restored to empty" and "never restored" are the
+     * same seven `-1`s. So a blade is bought *before* the keyframe, and the assertion after the
+     * rewind is that the blade is back and the greatsword is gone.
+     *
+     * That is not hypothetical. The first version of this test took its keyframe on an empty
+     * inventory, and its inventory assertion passed while the purse assertion failed - it was
+     * agreeing with a freshly granted component rather than with a restored one.
+     *
+     * ## Why there is a tick between the last purchase and the snapshot
+     *
+     * The ring captures at a tick boundary, so a write made *after* the capture for the current
+     * tick is not in it. The first version wrote the gold straight onto the `Wallet` and
+     * snapshotted in the same breath; the rewind then correctly restored the gold the champion
+     * had at the top of that tick - zero - which reads exactly like a `Wallet` that does not
+     * survive a rewind. It is not one, and `Wallet` restores fine. Stepping a tick first is what
+     * puts the state this test is about inside the keyframe.
+     */
+    @Test
+    fun `a rewind restores what the champion was carrying and what it had spent`() {
+        val game = ShopHarness.boot()
+        val host = game.host
+        game.grant(10_000)
+        assertIs<ShopOutcome.Bought>(game.buy(Items.BLADE))
+        // One tick, so the keyframe below contains the purchase rather than the state before it.
+        host.run(1)
+
+        host.time.pause()
+        val keyframe = host.time.snapshot()
+        val carriedAtKeyframe = game.contents()
+        val goldAtKeyframe = game.wallet().gold
+        println("[rewind] keyframe t${host.tick.value} carrying $carriedAtKeyframe gold=$goldAtKeyframe")
+        assertEquals(
+            setOf(Items.BLADE),
+            game.carried(),
+            "the keyframe must hold something, or a restore that did nothing would satisfy this",
+        )
+
+        assertIs<ShopOutcome.Bought>(game.buy(Items.WHETSTONE))
+        assertIs<ShopOutcome.Bought>(game.buy(Items.GREATSWORD))
+        println("[rewind] drifted t${host.tick.value} carrying ${game.contents()} gold=${game.wallet().gold}")
+        assertEquals(setOf(Items.GREATSWORD), game.carried(), "the step must change what is carried")
+        assertTrue(
+            game.wallet().gold < goldAtKeyframe,
+            "the step must cost something, or the rewind proves nothing about the purse",
+        )
+
+        val travelled = (host.tick.value - keyframe.tick.value).toInt()
+        val result = host.time.rewind(travelled)
+        assertTrue(result is RewindResult.Rewound, "rewind refused: $result")
+        assertEquals(keyframe.tick, host.tick, "the clock did not land on the keyframe")
+        println("[rewind] after t${host.tick.value} carrying ${game.contents()} gold=${game.wallet().gold}")
+
+        assertEquals(
+            carriedAtKeyframe,
+            game.contents(),
+            "the inventory did not come back to the keyframe's; a component invisible to capture " +
+                "looks exactly like this once InventoryGrantSystem re-grants an empty one",
+        )
+        assertEquals(goldAtKeyframe, game.wallet().gold, "the gold did not come back")
     }
 
     /**

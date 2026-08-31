@@ -23,7 +23,7 @@ JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew \
   --console=plain
 ```
 
-24 tests: `RecipeTest` (8), `ShopProofTest` (10), `ItemRecipeValidatorTest` (6). Every purchase in
+25 tests: `RecipeTest` (8), `ShopProofTest` (11), `ItemRecipeValidatorTest` (6). Every purchase in
 the first two runs through `ShopService` and is carried out by `ShopSystem` on a real tick of the
 shipped `MobaGame.definition()`; nothing calls `ShopRules` directly.
 
@@ -33,9 +33,9 @@ PNG named below. Nothing here is retyped from memory, and §2 records the one nu
 
 ### Proof it goes red
 
-Eleven mutations, each a shape the code plausibly *could* have had with one behaviour removed, each
+Twelve mutations, each a shape the code plausibly *could* have had with one behaviour removed, each
 run through the command above. **The literal `git diff` of every one is in §8**, taken from the run,
-not retyped. Control before and after: 24 ran, 0 failed.
+not retyped. Control before and after: all of them ran, 0 failed.
 
 | # | What is removed | Red |
 |---|---|---|
@@ -50,6 +50,7 @@ not retyped. Control before and after: 24 ran, 0 failed.
 | M9 | `hasRoomFor` ignores the slots the purchase frees | 1 |
 | M10 | no aliveness check | 1 |
 | M11 | `sellValue` returns the full shelf price | 1 |
+| M12 | `Inventory` removed from `ItemModule.snapshotTypes()` | 1 |
 
 **Two things worth reading rather than skimming.**
 
@@ -228,6 +229,11 @@ rule that can land on the recorded value fails loudly at the mutation site rathe
 later. Soak: **20 runs, `--rerun-tasks` each so the pilot is a fresh draw, 20 green.** Twenty clean
 runs miss a 1-in-9 flake 9.5% of the time, so the soak is corroboration and the diff is the
 argument.
+
+**The boundary, because "fixed" is easy to misread.** The fix is on this branch and **unmerged**,
+so the flake is still live on `origin/example` and on every branch diffed against it. A developer
+who hits it on `example` has not found a regression; they have found the defect `72aae75` is
+waiting to fix. dev-154's brief states the same boundary from the other side.
 
 **`5fbc158` — a KDoc count in `udea-gradle` that *this branch* falsifies.**
 `UdeaScanAssetsTask`'s KDoc costed a rescan out as "nineteen scripts, 127 declarations".
@@ -488,12 +494,41 @@ property at **runtime**, against the bytes that shipped rather than the source t
 | only in the fountain radius | `the shop refuses a champion who has walked out of the fountain` — **both** directions, one unit outside and one unit inside, measured off `FOUNTAIN_RADIUS` |
 | only while alive | `the shop refuses a corpse` — killed the way the game kills, by zeroing health and letting `DeathSystem` take the `Combatant` |
 
-### What I did not exercise
+### A rewind across a purchase — the gap I found by looking for one, and what it taught
+
+Writing this section is what produced `ShopProofTest > a rewind restores what the champion was
+carrying and what it had spent`. `ItemModule.snapshotTypes()`'s KDoc claimed an inventory a rewind
+did not restore would be "a champion whose gold came back and whose items did not", and **nothing
+checked it** — a claim in my own diff that nothing showed, which is the question §7 is here to ask.
+
+The first version of that test failed, and the two ways it was wrong are worth more than the test:
+
+1. **It wrote gold onto the `Wallet` and snapshotted in the same breath.** The ring captures at a
+   tick boundary, so the write was not in the keyframe, and the rewind correctly restored the gold
+   the champion had at the top of that tick: **zero**. That reads exactly like a `Wallet` that does
+   not survive a rewind, and I nearly filed it as a #131 defect. It is not one — `Wallet` restores
+   fine, and the fix was a `host.run(1)` before the snapshot.
+2. **Its keyframe was an empty inventory, so its inventory assertion could not fail.** A champion
+   whose inventory is never restored is re-granted a fresh `Inventory()` by `InventoryGrantSystem`,
+   and a fresh one is empty — so "restored to empty" and "never restored" are the same seven `-1`s.
+   The inventory half **passed** in that run while the purse half failed, and it passed by agreeing
+   with a freshly granted component. That is the contract's "an empty fixture is not a neutral one",
+   met in the wild, in a test I had just written a KDoc paragraph about avoiding it in.
+
+It now buys a blade **before** the keyframe, so the state it rewinds to predates the later purchases
+without being the default. **M12** is the mutation that proves it, and its failure is the KDoc's
+sentence word for word — gold back, items not:
+
+```
+[rewind] keyframe t8  carrying [item/blade, -, -, -, -, -, -] gold=9650
+[rewind] drifted  t10 carrying [item/greatsword, -, -, -, -, -, -] gold=9250
+[rewind] after    t8  carrying [item/greatsword, -, -, -, -, -, -] gold=9650   <- M12
+[rewind] after    t8  carrying [item/blade, -, -, -, -, -, -] gold=9650        <- as committed
+```
+
+### What I still did not exercise
 
 - **A second match.** The inventory dies with the entity on a scene swap, which is asserted nowhere.
-- **A rewind across a purchase.** `Inventory` is in `MobaGame.componentRegistry`, so
-  `SnapshotRestoreProofTest`'s coverage check covers it structurally, but no test buys an item,
-  rewinds past the purchase and asserts the slot is empty again. That is the test I would add next.
 - **Two champions shopping in one tick.** The queue is FIFO and per-order, so it should be fine;
   nothing proves it.
 - **`ShopRefusal.NoRoom` for a trinket when the trinket slot is full** *is* covered
@@ -649,6 +684,27 @@ Each block is the literal `git diff` from that mutation's run, under
      public fun inFountain(x: Float, y: Float, spawnX: Float, spawnY: Float): Boolean {
 ```
 
+**M12 — `Inventory` absent from the snapshot registry** (1 red: `ShopProofTest > a rewind restores what the champion was carrying and what it had spent`)
+```diff
+@@ -87,7 +87,7 @@ public class ItemModule(
+     public companion object {
+ 
+         /** @see ItemModule.Companion */
+-        public fun snapshotTypes(): List<ReplicatedComponentType<*>> = listOf(
++        public fun snapshotTypes(): List<ReplicatedComponentType<*>> = emptyList<ReplicatedComponentType<*>>().ifEmpty { listOf(
+             fleksComponentType(
+                 InventoryReplicator,
+                 ComponentSchema.of(
+@@ -97,6 +97,6 @@ public class ItemModule(
+                 ),
+                 Inventory,
+             ) { Inventory() },
+-        )
++        ) }.let { emptyList<ReplicatedComponentType<*>>() }
+     }
+ }
+```
+
 (`NO_SLOTS` is `private` on the branch as committed — the M11 diff was taken before the
 public-surface trim in `92ae5e0`, and the mutated line is the one below it either way.)
 
@@ -712,7 +768,7 @@ Read against `docs/engineering-standards.md` §8 and `AGENTS.md`'s "Do not", bot
 - **A `public` declaration nobody outside the module uses** — swept in `92ae5e0`.
   `ItemCatalog.EMPTY`, `ShopService.pending` and `Inventory.itemAt` had no callers and are deleted;
   `ItemCatalog.atRaw` and `ShopRules.NO_SLOTS` had none outside their own files and are private.
-- **A test that cannot fail** — §1 and §8. Eleven mutations, every test file represented, control
+- **A test that cannot fail** — §1 and §8. Twelve mutations, every test file represented, control
   runs on both sides. The `ItemRecipeValidatorTest` control (`a well priced item tree produces no
   diagnostics at all`) is the known-negative for the four validator tests.
 - **Generated code by string concatenation** — none; the packer emits `PackValue`s.

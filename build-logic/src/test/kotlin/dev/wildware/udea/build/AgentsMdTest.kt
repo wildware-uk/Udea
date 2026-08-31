@@ -81,8 +81,9 @@ class AgentsMdTest {
      *
      * That is the thing worth fixing rather than the red itself. `udeaVerifyAgentsMd` is what
      * makes `CLAUDE.md`'s "a stale `AGENTS.md` is a correctness bug" a checkable claim, and on
-     * Windows the same red arrived whether the document was stale or perfect. A gate that
-     * cannot tell its own subject apart is not a gate.
+     * Windows this class was red on a **perfect** `AGENTS.md` - so a red there said nothing
+     * about whether the document was stale. A gate that cannot tell its own subject apart is
+     * not a gate.
      *
      * No Windows checkout is needed to hold that: the translation is what a checkout does to
      * the bytes, and doing it here reaches the same code with the same input.

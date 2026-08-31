@@ -160,13 +160,26 @@ is the only lever, and it must not become a prerequisite for anything.
   the wiring live it is a real degrade-path test rather than a second copy of the `build` job.
   **This job must be configured as a required status check on `master`.** A workflow file
   cannot assert that; it is a repository branch-protection setting, set once by hand.
-- **`checkers-fire`** writes a `@Net val` and a `@Q`-annotated `Int` into `udea-gradle`'s real
-  source set, asserts the build fails with `UDEA0001` and `UDEA0003` at the computed
-  `line:column` of each property name, then asserts the same file compiles clean with the flag
-  off. It is the only gate that answers "does a defect in a real module stop a real build?", and
-  for a whole phase the answer was no while every other gate was green. To run it by hand, write
-  such a component into any `udea-*` module and compile it. **Required status check on
-  `master`.**
+- **`checkers-fire`** writes a `@Net val` and a `@Q`-annotated `Int` into `udea-assets`'s real
+  main source set, asserts the build fails, asserts every diagnostic it failed with carries a
+  `UDEA` rule id, asserts `UDEA0001` and `UDEA0003` land at the computed `line:column` of each
+  property name, then asserts the same file compiles clean with the flag off. It is the only
+  gate that answers "does a defect in a real module stop a real build?", and for a whole phase
+  the answer was no while every other gate was green. To run it by hand, write such a component
+  into any `udea-*` module and compile it. **Required status check on `master`.**
+
+  Two things about the module it probes are load-bearing, and issue #173 is what taught them.
+  The probe was in `udea-gradle`, which is the one module in the repository whose main source
+  tree is compiled **twice**: `build-logic/build.gradle.kts` adds
+  `../udea-gradle/src/main/kotlin` to `build-logic`'s own source set so that `:moba` can apply
+  `UdeaAgentPlugin`. `:build-logic:compileKotlin` therefore reached the probe first, with
+  neither `udea-annotations` nor the K2 plugin on it, and answered with unresolved references —
+  so the job had never once reached a checker, in either direction. And because the step's only
+  discriminator was "did `UDEA0001` appear at this line", a probe that never compiled looked
+  from the log like a checker that had stopped firing. Hence the middle assertion above: "the
+  probe failed for a reason that is not a checker" is now its own named outcome, and
+  `CompilerPluginSwitchTest` fails if the probe is ever moved back into a doubly-compiled tree
+  or into one of the three modules `UdeaCompilerPluginWiring.EXCLUSIONS` keeps the plugin off.
 - **`udeaVerifyPluginOptional`** (`./gradlew :udea-compiler-plugin:udeaVerifyPluginOptional`)
   fails if any production source under a `udea-*` module or `moba` references a
   `dev.wildware.udea.compiler.` type. Test sources are exempt. An empty scan is a failure, not

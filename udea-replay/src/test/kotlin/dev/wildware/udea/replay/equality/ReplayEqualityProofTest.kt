@@ -146,9 +146,14 @@ class ReplayEqualityProofTest {
 
     @Test
     fun `the join compares the directory the workflow downloads into`() {
-        val downloadedInto = ReplayEqualityPaths.resolve(
-            workspace, stepValue("Download every leg's digest", "path"),
-        )
+        // Resolved with `Path.resolve` and not with `ReplayEqualityPaths`. Both sides of this
+        // comparison running through the same function would agree with each other however
+        // wrong that function was, which is a check that always answers about its own subject.
+        // Measured: with the resolution reverted to the pre-#169 shape, the version of this test
+        // that used `ReplayEqualityPaths` on both sides still passed while the leg's did not.
+        val downloadedInto = workspace
+            .resolve(stepValue("Download every leg's digest", "path"))
+            .toAbsolutePath().normalize()
         val compared = ReplayEqualsMain.parse(
             arrayOf("--workspace", workspace.toString(), gradlePropertyInWorkflow("streams")),
         ).streams

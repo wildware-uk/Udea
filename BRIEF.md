@@ -1,6 +1,9 @@
 # Issue #132 — the shop, the items and the inventory
 
-92ae5e0
+f3fe456
+
+(The code is complete at `92ae5e0`; this commit adds only this file. Every build transcript below
+was run at `92ae5e0`, and §3 records a re-run of `sh gradlew build` at `f3fe456` itself.)
 
 Branch `issue-132-shop-and-items`, off `origin/example` at `866ba0a`.
 Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a5b3c68bd564f1fda`.
@@ -187,16 +190,60 @@ I grepped the class rather than fixing only what broke. `ExampleScanTest`, `Asse
 nineteen scripts, 127 declarations" in a KDoc. `moba/assets` is 22 scripts and 147 assets now.
 `udea-gradle` is **dev-152's this wave**, so it is reported rather than edited.
 
-### Passed on rather than fixed
+### Two commits that are not shop work, and why they are here anyway
 
-`MobaReplayProofTest > a corrupted recording is caught at the tick it was corrupted` is a ~1-in-9
-flake in my module. `dev-154` hit it and diagnosed it; I checked the arithmetic and it holds:
-`corruptAxisAt` writes the constant `(-1f, 0f)` (`MobaReplayProofTest.kt:324`) and `Pilot.sample`
-draws each axis from `rng.nextInt(3) - 1f` (lines 94-95), so `(-1, 0)` is 1 of 9 equiprobable pairs
-and a t301 sample that already equals it makes the "corruption" a no-op. `(8/9)^5 ≈ 0.55`, so
-`HANDOFF.md`'s recorded 5/5 was never evidence against it. **Not fixed here**: it is unrelated to
-the shop and an unexplained `MobaReplayProofTest.kt` hunk in a diff about items costs a review round.
-Passed to the lead to route. It did not fire in any of my runs.
+Both are flagged in their own commit subjects so a reviewer is not surprised by them mid-diff.
+
+**`72aae75` — `MobaReplayProofTest`'s mutation could be a silent no-op, ~1 run in 9.**
+`dev-154` diagnosed it on their branch; I said I would leave it off mine, and then **it fired on my
+own `sh gradlew build` at `f3fe456`**:
+
+```
+MobaReplayProofTest > a corrupted recording is caught at the tick it was corrupted() FAILED
+    org.opentest4j.AssertionFailedError at MobaReplayProofTest.kt:279
+
+203 tests completed, 1 failed
+```
+
+with, out of `moba/build/test-results/test/TEST-…MobaReplayProofTest.xml`:
+
+```
+a recording whose input was altered at t301 replayed to the ORIGINAL hash stream,
+which means the replay is not reading the recorded input at all
+```
+
+The arithmetic: `corruptAxisAt` wrote the constant `(-1f, 0f)`, and `Pilot.sample` draws each axis
+from `rng.nextInt(3) - 1f`, so `(-1, 0)` is 1 of 9 equiprobable pairs. When the pilot already held
+it at t301 the write changed nothing, the replay was legitimately bit-exact, and the assertion
+failed with a message that positively denies the cause. The pilot is seeded from
+`System.nanoTime()`, so it is a fresh draw every build. `(8/9)^5 = 0.55` is why `HANDOFF.md`'s
+recorded 5/5 was never evidence against it.
+
+I changed my mind on one argument and not on scope: **I cannot report a green build while a test in
+my own module fails one run in nine**, and one run in nine that assertion was checking a recording
+that had not been mutated — item 3 on the closed reject list, in this module, found during this
+ticket. It now negates the recorded axis, sends the one idle case `(0, 0)` somewhere definite so the
+rule is total, and `check`s that what it wrote differs from what it read, so a later edit picking a
+rule that can land on the recorded value fails loudly at the mutation site rather than forty lines
+later. Soak: **20 runs, `--rerun-tasks` each so the pilot is a fresh draw, 20 green.** Twenty clean
+runs miss a 1-in-9 flake 9.5% of the time, so the soak is corroboration and the diff is the
+argument.
+
+**`5fbc158` — a KDoc count in `udea-gradle` that *this branch* falsifies.**
+`UdeaScanAssetsTask`'s KDoc costed a rescan out as "nineteen scripts, 127 declarations".
+`udea-gradle` is dev-152's this wave, so my first instinct was to report it and not touch it —
+and that instinct was wrong for a reason `dev-154` supplied by checking rather than assuming: the
+sentence is **correct at `origin/example`** (they measured `[udeaPackBundle] assets.udeapak: 127
+asset(s)` there), and it is my three item scripts that take it to 22 and 147. A diff that changes
+the thing counted has to change the sentence too, and leaving it would be landing a false statement
+I created.
+
+It is one KDoc paragraph and no code. Following the standards rather than my own instinct, the
+number is **replaced by the property it was evidence for** — "a couple of dozen scripts declaring a
+couple of hundred assets", and the fork dominates either way — rather than renumbered to 22/147,
+which would go stale on the next asset anybody authors. The old numbers and the fact that they moved
+are recorded in the paragraph, so the next reader knows why there is no number rather than assuming
+nobody measured.
 
 ---
 
@@ -707,6 +754,10 @@ Read against `docs/engineering-standards.md` §8 and `AGENTS.md`'s "Do not", bot
 `moba/src/main/…/item/{ItemComponents,ItemCatalog,ShopRules,ShopSystem,ItemModule}.kt`;
 `moba/src/test/…/item/{ShopHarness,RecipeTest,ShopProofTest}.kt`;
 `udea-assets-compiler/src/test/…/validate/ItemRecipeValidatorTest.kt`.
+
+**Changed, outside the shop** — `moba/src/test/…/replay/MobaReplayProofTest.kt` (`72aae75`) and
+`udea-gradle/…/UdeaAssetsPlugin.kt` (`5fbc158`, KDoc only). Both are argued in §2 and both say so
+in their commit subjects.
 
 **Changed** — `udea-assets/…/{Names.kt, pack/AssetCodecs.kt}`;
 `udea-assets-compiler/…/{AssetKind, AssetScope, gen/DslKinds, gen/AccessorGenerator,

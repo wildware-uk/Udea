@@ -166,3 +166,94 @@ public object BlueprintCycleValidator : AssetValidator {
     /** How many nodes of a cycle a message spells out before eliding. */
     public const val MAX_RENDERED: Int = 12
 }
+
+/**
+ * An item's recipe cannot be priced.
+ *
+ * ## Why the cost check is here and not on the model
+ *
+ * `dev.wildware.udea.assets.Item` holds `Ref`s to its components, not their costs, so it cannot
+ * check its own arithmetic in an `init` block: a recipe's price is a property of the graph. This
+ * is the pass that has the graph.
+ *
+ * The arithmetic it protects is one subtraction. A finished item's authored `cost` is what a
+ * champion with an empty inventory pays; a champion who already owns a component pays `cost`
+ * minus that component's own `cost`. Author `cost` below the sum of the components and that
+ * subtraction goes negative, and the shop pays a champion to press buy. Nothing downstream would
+ * report it - a negative price is an ordinary integer - so it is reported here, where the author
+ * can still see the line.
+ *
+ * ## Direct components only, and why that is the whole check
+ *
+ * A recipe consumes the components it *names*, not their components' components: buying a
+ * finished item takes the parts out of the inventory, and a part of a part is not in the
+ * inventory - it was consumed when the part was bought. So the sum is over direct components, no
+ * walk, no recursion, and no cycle can make this validator loop.
+ *
+ * A cycle is still nonsense and is still caught, but as its own arm: an item that lists itself is
+ * a purchase that consumes what it produces.
+ *
+ * ## What it stays silent about
+ *
+ * A component reference that resolves to nothing, or to something that is not an item. Those are
+ * `UDEA0004` and `UDEA0013`, reported by [UnresolvedReferenceValidator] and
+ * [ReferenceTypeValidator] with a span and a did-you-mean, and a second rule id for one defect is
+ * what `DiagnosticSink`'s root-cause ranking exists to prevent.
+ */
+public object ItemRecipeValidator : AssetValidator {
+
+    /** The DSL word this validator reads. Only an `item(...)` has a recipe. */
+    public const val ITEM_KIND: String = "item"
+
+    /** The field holding the recipe. */
+    public const val COMPONENTS_FIELD: String = "components"
+
+    /** The field holding the shelf price. */
+    public const val COST_FIELD: String = "cost"
+
+    override val rules: List<UdeaRule> = listOf(AssetValidationRules.ITEM_RECIPE)
+
+    override fun validate(context: ValidationContext): List<UdeaDiagnostic> {
+        val items = context.graph.assets.values.filter { it.kind == ITEM_KIND }
+        if (items.isEmpty()) return emptyList()
+
+        val costs = items.associate { it.id to (it.fields[COST_FIELD] as? Int ?: 0) }
+        val diagnostics = mutableListOf<UdeaDiagnostic>()
+
+        for (item in items.sortedBy { it.id }) {
+            val components = (item.fields[COMPONENTS_FIELD] as? List<*>)
+                .orEmpty()
+                .filterIsInstance<Ref>()
+            // A component that resolves to nothing is UDEA0004's, and summing a cost this pass
+            // cannot know would turn one defect into two under two rule ids.
+            if (components.any { it.id !in costs }) continue
+
+            val self = components.firstOrNull { it.id == item.id }
+            if (self != null) {
+                diagnostics += AssetValidationRules.ITEM_RECIPE.diagnostic(
+                    message = "`${item.id}` lists itself as one of its own components, so buying " +
+                        "it would consume the copy it is producing. Remove it from " +
+                        "`$COMPONENTS_FIELD`.",
+                    span = context.spanFor(item, self.origin),
+                    assetId = item.id,
+                )
+                continue
+            }
+
+            val cost = costs.getValue(item.id)
+            val parts = components.sumOf { costs.getValue(it.id) }
+            if (cost >= parts) continue
+            val listed = components.joinToString { "`${it.id}` at ${costs.getValue(it.id)}" }
+            diagnostics += AssetValidationRules.ITEM_RECIPE.diagnostic(
+                message = "`${item.id}` costs $cost gold but is built from components worth " +
+                    "$parts ($listed). A finished item's cost is what a champion with none of " +
+                    "them pays, and one who owns a component pays the difference - so a cost " +
+                    "below the parts is a shop that pays gold out on a purchase. Raise " +
+                    "`$COST_FIELD` to at least $parts, or drop a component.",
+                span = context.spanFor(item, components.firstOrNull()?.origin),
+                assetId = item.id,
+            )
+        }
+        return diagnostics
+    }
+}

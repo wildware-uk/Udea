@@ -126,6 +126,29 @@ public object AssetValidationRules {
             "assets it was checking",
     )
 
+    /**
+     * An item's recipe cannot be priced.
+     *
+     * A finished item's authored cost is the price on the shelf, and the price at the counter is
+     * derived from it: a champion who already owns a component pays the difference. Two shapes
+     * make that arithmetic meaningless, and both are caught here rather than at shop time:
+     *
+     * - an item whose cost is **below** the sum of its components' costs, which is a shop that
+     *   pays a champion gold to press the buy button;
+     * - an item that lists **itself** as a component, which is a purchase that consumes the thing
+     *   it is producing.
+     *
+     * Neither is expressible as a `require` on `dev.wildware.udea.assets.Item`, because an item
+     * holds references to its components and not their costs - the arithmetic is a property of
+     * the *graph*, which is what pass 3 is.
+     */
+    public val ITEM_RECIPE: UdeaRule = UdeaRule(
+        id = "UDEA0037",
+        defaultSeverity = Severity.Error,
+        description = "an item's recipe cannot be priced: it costs less than the components it " +
+            "is built from, or it lists itself as one of them",
+    )
+
     /** Every rule pass 3 mints locally, in id order. */
     public val all: List<UdeaRule> = listOf(
         DUPLICATE_ID,
@@ -135,6 +158,7 @@ public object AssetValidationRules {
         NOTIFY_RANGE,
         NONDETERMINISTIC_ASSET,
         VALIDATOR_FAILED,
+        ITEM_RECIPE,
     ).sortedBy { it.id }
 
     /** The reserved band, asserted by `ModuleContractTest`. */

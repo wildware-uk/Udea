@@ -11,6 +11,7 @@ import dev.wildware.udea.assets.Control
 import dev.wildware.udea.assets.Effect
 import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.GameplayEffect
+import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpriteAnimation
@@ -131,6 +132,7 @@ public object AssetKindHierarchy {
         Character::class,
         GameplayEffect::class,
         Effect::class,
+        Item::class,
     ).associateBy { requireNotNull(it.qualifiedName) }
 
     /** For each known kind, every name it is also an instance of. */

@@ -101,10 +101,10 @@ class GeneratedVisibilityTest {
     }
 
     @Test
-    fun `the two independent stripping declarations compose on one field`(@TempDir workDir: File) {
+    fun `lifetime and visibility compose on one field`(@TempDir workDir: File) {
         // `lifetime` and `visibility` answer different questions - *when* a field is sent and *to
-        // whom* - so a field may carry both, and the generated object has to implement both
-        // markers rather than the later declaration replacing the earlier.
+        // whom* - so a field may carry both, and the generated object has to implement each
+        // marker rather than the later declaration replacing the earlier.
         val generated = run(
             workDir,
             """

@@ -52,20 +52,11 @@ internal object ReplicatorEmitter {
             .addKdoc(kdoc(component))
             .addSuperinterface(CoreNames.REPLICATOR.parameterizedBy(component.className))
 
-        // Issue #114. Opted into rather than always present: implementing it names a udea-net
-        // type, and a component with no `lifetime = OnCreate` field would be declaring an empty
-        // mask at the cost of a module dependency. `LifetimePolicy` already reads an absent
-        // declaration as "nothing is create-only", which is the true answer for such a
-        // component rather than a fallback.
-        if (component.createOnlyFields.isNotEmpty()) {
-            builder.addSuperinterface(NetNames.CREATE_ONLY_FIELDS)
-        }
-
-        // Issue #167, opted into on the same terms and independently: `lifetime` and `visibility`
-        // are separate declarations, so a component may implement either marker, both or neither.
-        if (component.ownerOnlyFields.isNotEmpty()) {
-            builder.addSuperinterface(NetNames.OWNER_ONLY_FIELDS)
-        }
+        // The stripping markers are declared here, ahead of the members, so that whichever of
+        // them this component has follow `Replicator<T>` in the supertype list in
+        // `strippingDeclarations` order. Their masks are added after `allMask`, from the same
+        // list, so the two never disagree about which markers were implemented.
+        for (declaration in strippingDeclarations(component)) builder.addSuperinterface(declaration.marker)
 
         builder.addProperty(
             PropertySpec.builder("FIELD_COUNT", INT, KModifier.PUBLIC, KModifier.CONST)
@@ -107,30 +98,11 @@ internal object ReplicatorEmitter {
                 .initializer("%T.lowest(FIELD_COUNT)", CoreNames.MASK_OPS)
                 .build(),
         )
-        if (component.createOnlyFields.isNotEmpty()) {
+        for (declaration in strippingDeclarations(component)) {
             builder.addProperty(
-                PropertySpec.builder("createOnlyMask", CoreNames.FIELD_MASK, KModifier.OVERRIDE)
-                    .addKdoc(
-                        "`@Net(lifetime = OnCreate)` fields: a Create and a full resend carry " +
-                            "them, every Update strips them (issue #114). A subset of " +
-                            "[netMask], because a create-only field is still a `@Net` " +
-                            "field - it just never rides a delta.",
-                    )
-                    .initializer(maskInitializer(component.createOnlyFields))
-                    .build(),
-            )
-        }
-        if (component.ownerOnlyFields.isNotEmpty()) {
-            builder.addProperty(
-                PropertySpec.builder("ownerOnlyMask", CoreNames.FIELD_MASK, KModifier.OVERRIDE)
-                    .addKdoc(
-                        "`@Net(visibility = OwnerOnly)` fields: the connection that owns the " +
-                            "entity is sent them and every other recipient has them stripped, " +
-                            "from its creates as well as its updates (issue #167). A subset of " +
-                            "[netMask], because an owner-only field is still a `@Net` field - " +
-                            "it just reaches one client.",
-                    )
-                    .initializer(maskInitializer(component.ownerOnlyFields))
+                PropertySpec.builder(declaration.propertyName, CoreNames.FIELD_MASK, KModifier.OVERRIDE)
+                    .addKdoc(declaration.kdoc)
+                    .initializer(maskInitializer(declaration.fields))
                     .build(),
             )
         }
@@ -144,6 +116,70 @@ internal object ReplicatorEmitter {
         builder.addFunction(setField(component))
         return builder.build()
     }
+
+    /**
+     * One opt-in `udea-net` marker a generated replicator may implement, and the mask it carries.
+     *
+     * @param marker the interface `udea-net`'s policy object casts to.
+     * @param propertyName the `FieldMask` override that interface declares.
+     * @param fields the fields the mask is over, in bit-index order. Never empty: an empty one is
+     *   not emitted at all.
+     * @param kdoc what the generated property says about itself.
+     */
+    private data class StrippingDeclaration(
+        val marker: ClassName,
+        val propertyName: String,
+        val fields: List<ReplicatedField>,
+        val kdoc: String,
+    )
+
+    /**
+     * The stripping declarations [component] actually has, in a fixed order.
+     *
+     * `lifetime` and `visibility` are independent declarations of identical *shape*: an opt-in
+     * marker in `udea-net` carrying one `FieldMask` over a subset of `netMask`, emitted only when
+     * the component has such a field. Written once rather than twice, because two copies that
+     * differ only in which name they use is how the second one acquires a bug the first does not.
+     *
+     * Opting in rather than always implementing both matters: naming a `udea-net` type puts
+     * `udea-net` on the generated file's compile classpath, and a component with none of these
+     * fields would be paying a module dependency for a mask that says nothing. `LifetimePolicy`
+     * and `VisibilityPolicy` both read an absent declaration as "nothing is stripped", which for
+     * such a component is the true answer and not a fallback.
+     *
+     * The order here is the order the supertype list and the properties are emitted in, so it is
+     * a wire-visible decision in the sense that `expected-generated-hashes.txt` pins it.
+     */
+    private fun strippingDeclarations(component: ReplicatedComponent): List<StrippingDeclaration> =
+        buildList {
+            if (component.createOnlyFields.isNotEmpty()) {
+                add(
+                    StrippingDeclaration(
+                        marker = NetNames.CREATE_ONLY_FIELDS,
+                        propertyName = "createOnlyMask",
+                        fields = component.createOnlyFields,
+                        kdoc = "`@Net(lifetime = OnCreate)` fields: a Create and a full resend carry " +
+                            "them, every Update strips them (issue #114). A subset of " +
+                            "[netMask], because a create-only field is still a `@Net` " +
+                            "field - it just never rides a delta.",
+                    ),
+                )
+            }
+            if (component.ownerOnlyFields.isNotEmpty()) {
+                add(
+                    StrippingDeclaration(
+                        marker = NetNames.OWNER_ONLY_FIELDS,
+                        propertyName = "ownerOnlyMask",
+                        fields = component.ownerOnlyFields,
+                        kdoc = "`@Net(visibility = OwnerOnly)` fields: the connection that owns the " +
+                            "entity is sent them and every other recipient has them stripped, " +
+                            "from its creates as well as its updates (issue #167). A subset of " +
+                            "[netMask], because an owner-only field is still a `@Net` field - " +
+                            "it just reaches one client.",
+                    ),
+                )
+            }
+        }
 
     /**
      * The `typeId` override, kept as its own function because it is the one member of the

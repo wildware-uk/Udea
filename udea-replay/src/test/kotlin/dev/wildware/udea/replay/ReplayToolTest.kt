@@ -152,10 +152,16 @@ class ReplayToolTest {
      */
     @Test
     fun `no generated replay tool is missing from the module`() {
-        val resource = ReplayToolModules::class.java.classLoader
-            .getResource("udea/UdeaReplay-agent-tools.json")
-        assertTrue(resource != null, "the KSP manifest fragment was not emitted or not packaged")
-        val manifest = Path.of(resource!!.toURI()).readText()
+        // Read as a stream, not through `Path.of(url.toURI())`. Once this module publishes test
+        // fixtures the project's own jar joins the test runtime classpath, so the fragment
+        // resolves to a `jar:` URL and `Path.of` throws `FileSystemNotFoundException` - a test
+        // that fails for a packaging reason having nothing to do with what it asserts. A stream
+        // reads the same bytes from a directory and from a jar.
+        val manifest = ReplayToolModules::class.java.classLoader
+            .getResourceAsStream("udea/UdeaReplay-agent-tools.json")
+            ?.use { it.readBytes().decodeToString() }
+        assertTrue(manifest != null, "the KSP manifest fragment was not emitted or not packaged")
+        manifest!!
         val declared = ReplayToolModules.Replay.tools.map { it.name }
         val generated = Regex("\"name\"\\s*:\\s*\"(replay\\.[a-z_]+)\"")
             .findAll(manifest)

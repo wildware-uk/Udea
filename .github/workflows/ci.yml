@@ -8,9 +8,9 @@
 # `build-logic` for every module that emits a protocol), and the allocation budgets (spec 4 of
 # the engineering standards) via `udeaSnapshotBudget` and `udeaBenchTickLoop`.
 #
-# The `game-bridge-mcp` conformance run is the `bridge-conformance` job at the foot of this
-# file: its own job and not a step, because it needs a JVM and Node at once and it needs a game
-# process left running while something else drives it.
+# The `game-bridge-mcp` conformance run is the `bridge-conformance` job below: its own job and
+# not a step, because it needs a JVM and Node at once and it needs a game process left running
+# while something else drives it.
 
 name: CI
 
@@ -971,9 +971,10 @@ jobs:
     # reference scan cannot see nondeterminism laundered through Fleks internals, through an
     # interface call whose receiver happens to be a `HashMap` built elsewhere, or through the
     # float divergence this job measures but cannot prevent. The gate is the `WorldHasher`
-    # snapshot-equivalence test and the cross-OS `replay-equality` job that issue #152 adds on
-    # top of `:udea-replay`'s headless replay. Until that job exists, THIS FILE CONTAINS NO
-    # REPLAY-EQUALITY GATE, and nobody should read a green tick here as one.
+    # snapshot-equivalence test and the cross-OS `replay-equality` job at the foot of this file,
+    # which issue #152 added on top of `:udea-replay`'s headless replay. A green tick *here* is
+    # still not one there: if the two ever disagree, the replay result wins and this scanner
+    # grows a rule.
     name: determinism (${{ matrix.os }}, ${{ matrix.distribution }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -1018,5 +1019,198 @@ jobs:
           path: |
             build/reports/udea/determinism.txt
             build-logic/build/reports/tests/test/**
+          if-no-files-found: error
+          retention-days: 7
+
+  replay-equality:
+    # **The determinism gate.** Issue #152, and spec section 7 says so in as many words: the
+    # bytecode scanner above "produces false confidence", and the row of `determinism-audit.md`
+    # §1 that matters most reads, in full, "The cross-OS `replay-equality` CI job. Nothing else."
+    #
+    # ## What each leg does
+    #
+    # Replays a checked-in `.udearep` headless and writes one `.udeaeq` digest stream: per tick,
+    # every value `WorldHasher.hash(WorldSnapshot)` folds, keyed by `NetId`, component type and
+    # field index. Not just the hash - a hash that differs names nothing, and Phase 7's exit
+    # criterion is the first differing tick **and field**.
+    #
+    # `ReplayDigestWriter` refolds its own cells into the world hash and refuses to write a tick
+    # that does not reproduce it, so "the cells are exactly what the hash covers" is enforced on
+    # every tick of every run rather than asserted once. That is what makes the `join` step below
+    # able to promise it will never print a bare hash mismatch.
+    #
+    # ## Two dimensions, not two OSes on one JVM
+    #
+    # `windows-latest` is the second operating system and `corretto` is the second JVM, matching
+    # the `determinism` job's pair. The vendor is passed to Gradle explicitly rather than left to
+    # toolchain auto-detection: `setup-java` sets `JAVA_HOME`, but Gradle also finds whatever JDKs
+    # the runner image ships, so two legs asking only for "17" can both resolve to the same vendor
+    # and the second axis silently stops existing while both legs stay green. Each digest header
+    # records the vendor it really ran on and the join step prints all of them, so the claim is
+    # checkable in the log rather than assumed from this file.
+    #
+    # ## Nothing here is logic
+    #
+    # Every decision - what to replay, what to write down, what counts as a divergence, how to
+    # render one, which exit code to use - lives in `:udea-replay`'s `main` classes and is covered
+    # by `CrossPlatformDivergenceTest`, `DivergenceReportFormatTest`, `ReplayDigestTest` and the
+    # five-process `:udea-replay:udeaReplayEqualityProof`. Nobody can run GitHub Actions locally,
+    # so anything expressed only here would be unverifiable until it had already gone wrong once.
+    name: replay-equality (${{ matrix.os }}, ${{ matrix.distribution }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            distribution: temurin
+            vendor: Adoptium
+          - os: windows-latest
+            distribution: temurin
+            vendor: Adoptium
+          # The second JVM, on the OS whose runners are cheapest. `determinism-audit.md` §3.1
+          # measured `Math.sin` disagreeing with `StrictMath.sin` on 3.4% of sampled inputs on a
+          # single JVM; two independent builds are under no obligation to disagree in the same
+          # places, and no bytecode rule can see the difference because the bytecode is identical.
+          - os: ubuntu-latest
+            distribution: corretto
+            vendor: Amazon
+    steps:
+      - name: Start the clock
+        id: clock
+        shell: bash
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: ${{ matrix.distribution }}
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: Replay the fixture and write this leg's digest
+        shell: bash
+        run: >-
+          ./gradlew :udea-replay:udeaReplayDigest
+          -Pudea.replay.label=${{ matrix.os }}/${{ matrix.distribution }}-17
+          -Pudea.replay.jvmVendor=${{ matrix.vendor }}
+          -Pudea.replay.out=digests/${{ matrix.os }}-${{ matrix.distribution }}.udeaeq
+          --stacktrace
+
+      # The digest, named by leg so the join step can tell the three apart by filename alone.
+      - name: Upload this leg's digest stream
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-digest-${{ matrix.os }}-${{ matrix.distribution }}
+          path: digests/*.udeaeq
+          if-no-files-found: error
+          retention-days: 7
+
+      # Criterion 6: the added PR wall time, measured rather than estimated, on a green run as
+      # well as a red one. Whole-job seconds, not the replay's own - checkout, JDK setup and the
+      # Gradle build are wall time a pull request pays for too.
+      - name: Report this leg's wall time
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          elapsed=$(( $(date +%s) - ${{ steps.clock.outputs.started }} ))
+          echo "| ${{ matrix.os }} / ${{ matrix.distribution }}-17 | ${elapsed}s |" \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo "replay-equality leg wall time: ${elapsed}s"
+          if [ "$elapsed" -gt 240 ]; then
+            echo "::warning::this leg took ${elapsed}s, over the 240s budget issue #152 states."
+          fi
+
+  replay-equality-join:
+    # The verdict. Downloads every leg's digest and runs `ReplayEqualsMain` over the set.
+    #
+    # Its own job rather than a step, because it is the only thing here that needs *all* the legs
+    # and it must run even when one of them is red - a leg that failed to produce a digest is a
+    # different failure from two legs that disagree, and collapsing the two would report a broken
+    # runner as a determinism defect.
+    #
+    # It needs no game and no simulation: `ReplayEqualsMain` reads nothing but the files.
+    name: replay-equality (join)
+    runs-on: ubuntu-latest
+    needs: replay-equality
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: Download every leg's digest
+        uses: actions/download-artifact@v4
+        with:
+          pattern: replay-digest-*
+          path: digests
+          merge-multiple: true
+
+      - name: List what arrived
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -la digests
+          count=$(find digests -name '*.udeaeq' | wc -l)
+          echo "$count digest stream(s)"
+          # Two is the minimum that proves anything, and `ReplayEqualsMain` says so itself with
+          # exit code 2. Failing here as well means the log names the missing leg rather than
+          # only the count.
+          if [ "$count" -lt 2 ]; then
+            echo "::error::only $count digest stream(s) arrived; replay equality needs at least two."
+            exit 1
+          fi
+
+      - name: Compare every leg
+        shell: bash
+        run: >-
+          ./gradlew :udea-replay:udeaReplayEquals
+          -Pudea.replay.streams=digests
+          --stacktrace
+
+      # The rendered verdict, on a green run as well as a red one. A gate you can only read once
+      # you have blown it tells nobody what headroom it had - the same reason the `build` job
+      # publishes its measured budgets unconditionally.
+      - name: Publish the verdict
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          summary=udea-replay/build/reports/udea/replay-equality/summary.md
+          {
+            echo "## replay-equality"
+            echo
+            echo '```'
+            cat "$summary" 2>/dev/null || echo "no summary was produced"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the verdict and the digests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-equality-verdict
+          path: |
+            udea-replay/build/reports/udea/replay-equality/**
+            digests/*.udeaeq
           if-no-files-found: error
           retention-days: 7

@@ -364,8 +364,28 @@ BUILD SUCCESSFUL in 36s
 
 15.245 ms to 2.467 ms and 471 ms to 140 ms is a factor of six on the same commit, minutes apart,
 at the same load average — it is contention inside the build's own 24-way parallelism, not
-anything this branch does. Nothing in the diff is reachable from `CharacterMoverBudgetTest` or
-`DaemonLatencyBudgetTest`: both drive their own fixtures.
+anything this branch does.
+
+The sharpest version of that control came at the end, on `a966e29` and by accident. `sh gradlew
+build` failed `udeaDaemonBudget` at load 20.8 with `warm validate ... median 533ms` and `warm
+reload ... median 764ms`; `sh gradlew :udea-assets-compiler:udeaDaemonBudget --rerun-tasks`,
+immediately afterwards and at **load 20.7**, gave:
+
+```
+    warm reload decision: median 236ms over 4 samples [256, 236, 228, 233]
+    warm validate of one script: median 128ms over 4 samples [12, 128, 125, 133]
+BUILD SUCCESSFUL in 21s
+```
+
+Same commit, same minute, same load average, four times faster. So it is not "the box is loaded"
+in general — it is this build's own parallelism competing with a task that measures latency. These
+gates are *on* `check` (`udea-assets-compiler/build.gradle.kts` wires `udeaDaemonBudget` into it
+explicitly), which is why every full build meets them and why the dev-team contract names this
+exact set as the one to re-run alone before concluding anything. A final `sh gradlew build` after
+that solo run is green in 1m 5s, with `udeaPhase2Exit` executing rather than cached, and passing.
+
+Nothing in the diff is reachable from `CharacterMoverBudgetTest` or `DaemonLatencyBudgetTest`:
+both drive their own fixtures.
 
 The same two tasks failed under the same conditions earlier in the session and passed the same way
 (`logs/issue170-budgets-alone.log`), and `dev-171` reported the identical pattern independently on

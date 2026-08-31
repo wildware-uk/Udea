@@ -1,12 +1,12 @@
-4c86fba
+063c792
 
 # BRIEF-172 — the determinism gate replays the game, not a world written not to drift
 
-`4c86fba` is the change: every file in this ticket's diff except this one, and the commit every
-number below was measured against. This brief is the commit on top of it and touches nothing else —
-`git log --oneline -2` and `git show --stat HEAD` show that, so the branch tip and `4c86fba` are
-the same code. (A SHA cannot name its own commit, which is why the top line is the code's rather
-than `HEAD`'s; `BRIEF-170.md` and `BRIEF-171.md` do the same.)
+`063c792` is the change: every file in this ticket's diff except this one. This brief is the commit
+on top of it and touches nothing else — `git log --oneline -2` and `git show --stat HEAD` show
+that, so the branch tip and `063c792` are the same code. (A SHA cannot name its own commit, which
+is why the top line is the code's rather than `HEAD`'s; `BRIEF-170.md` and `BRIEF-171.md` do the
+same.)
 
 Branch `issue-172-replay-gate-at-moba`, off `origin/example` at `db477f4`.
 
@@ -19,12 +19,20 @@ Branch `issue-172-replay-gate-at-moba`, off `origin/example` at `db477f4`.
 | [33444043104](https://github.com/wildware-uk/Udea/actions/runs/33444043104) | `933dfff` | dispatch | criteria 1 and the nightly |
 | [33444524021](https://github.com/wildware-uk/Udea/actions/runs/33444524021) | `933dfff` | dispatch, `replay_plant_ulp_at: 1200` | criterion 2 |
 
-`933dfff` is this brief's parent. The commits after it are **test-only**: `4c86fba` adds
-`MobaReplayEqualityTest > the digest task tells its entry point which directory the workspace is`
-and the comment stripper its build-script fences read through, and this one adds `BRIEF.md`.
-Neither touches `ci.yml`, `moba/build.gradle.kts`, any `src/main`, or a checked-in fixture, so the
-`replay-equality` legs run the identical command over the identical bytes. `git diff 933dfff HEAD
---stat` is the check.
+**Every run above is on `933dfff`, and the head of this branch is `063c792` plus this file.** The
+difference is two commits and neither can change what a leg does:
+
+- `4c86fba` is **test-only** — it adds `MobaReplayEqualityTest > the digest task tells its entry
+  point which directory the workspace is` and the comment stripper its build-script fences read
+  through.
+- `063c792` is **comment-only** — it replaces five counts ("twenty-seven AI units", "six green
+  legs", a KDoc counting a job's own lines) with the property behind them, in KDoc and YAML
+  comments.
+
+So no `src/main`, no Gradle task, no `ci.yml` step and no checked-in fixture moved after `933dfff`,
+and the legs run the identical command over the identical bytes. `git diff 933dfff 063c792 --stat`
+and `git log -p 933dfff..063c792` are the check; a sixth run on `063c792` was pushed and is linked
+in the report to the lead.
 
 ---
 
@@ -118,9 +126,9 @@ their own fixture.
 
 Both jobs now replay `moba`. `replay-equality` replays `moba-3600.udearep` on every push;
 `replay-equality-nightly` replays `moba-36000.udearep`. Each is a real match with the champion
-piloted by a fixed-seed `java.util.Random`, and everything else — twenty-seven AI units, the lane,
-the creeps, the towers, the projectiles, the abilities, the shop, the match loop — reproduced from
-the seed. The recording carries one peer's input, which is the design `MobaReplay` already had.
+piloted by a fixed-seed `java.util.Random`, and everything else — the AI units, the lane, the
+creeps, the towers, the projectiles, the abilities, the shop, the match loop — reproduced from the
+seed. The recording carries one peer's input, which is the design `MobaReplay` already had.
 
 `DriftWorld` stays checked in as the gate's **self-test**. It is the only place a divergence of
 exactly one ulp on exactly one field at exactly one tick can be arranged over a world whose

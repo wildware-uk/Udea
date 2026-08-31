@@ -1,8 +1,30 @@
-SHA_PLACEHOLDER
+4c86fba
 
 # BRIEF-172 — the determinism gate replays the game, not a world written not to drift
 
+`4c86fba` is the change: every file in this ticket's diff except this one, and the commit every
+number below was measured against. This brief is the commit on top of it and touches nothing else —
+`git log --oneline -2` and `git show --stat HEAD` show that, so the branch tip and `4c86fba` are
+the same code. (A SHA cannot name its own commit, which is why the top line is the code's rather
+than `HEAD`'s; `BRIEF-170.md` and `BRIEF-171.md` do the same.)
+
 Branch `issue-172-replay-gate-at-moba`, off `origin/example` at `db477f4`.
+
+### Which Actions run is on which commit
+
+| run | commit | event | what it is evidence of |
+|---|---|---|---|
+| [33441678513](https://github.com/wildware-uk/Udea/actions/runs/33441678513) | `8bf85ad` | push | the **cold-cache** leg times of section 5, and nothing else |
+| [33443701286](https://github.com/wildware-uk/Udea/actions/runs/33443701286) | `933dfff` | push | criterion 1, and the warm leg times |
+| [33444043104](https://github.com/wildware-uk/Udea/actions/runs/33444043104) | `933dfff` | dispatch | criteria 1 and the nightly |
+| [33444524021](https://github.com/wildware-uk/Udea/actions/runs/33444524021) | `933dfff` | dispatch, `replay_plant_ulp_at: 1200` | criterion 2 |
+
+`933dfff` is this brief's parent. The commits after it are **test-only**: `4c86fba` adds
+`MobaReplayEqualityTest > the digest task tells its entry point which directory the workspace is`
+and the comment stripper its build-script fences read through, and this one adds `BRIEF.md`.
+Neither touches `ci.yml`, `moba/build.gradle.kts`, any `src/main`, or a checked-in fixture, so the
+`replay-equality` legs run the identical command over the identical bytes. `git diff 933dfff HEAD
+--stat` is the check.
 
 ---
 
@@ -128,9 +150,10 @@ Each is also a comment on issue #172 so it is reviewable there.
 
 1. **3600 and 36000 ticks, unchanged from the drift fixtures.**
    ([comment](https://github.com/wildware-uk/Udea/issues/172#issuecomment-5485133081)) The issue
-   asks for a shorter tick count if `moba` blows the 240s budget. The windows leg **does** blow it
-   — 302s — and the tick count is not why: see section 5. Rejected: halving the fixture, which
-   would buy back under a second of a 302-second leg.
+   asks for a shorter tick count if `moba` blows the 240s budget. It does not: 27s, 38s and 54s
+   against `DriftWorld`'s 32s, 38s and 49s. Section 5 has the numbers, including the 302s I nearly
+   reported as a finding and why it was a cold cache rather than a cost. Rejected: halving the
+   fixture, which would have bought back a second in a leg where a second is not the problem.
 2. **I changed `ReplayBisectGuide`, which the issue's "Out of scope" bullet 2 forbids.**
    ([comment](https://github.com/wildware-uk/Udea/issues/172#issuecomment-5485134323)) It printed
    `./gradlew :udea-replay:udeaReplayDigest -Pudea.replay.fixture=moba-3600.udearep`, which exits
@@ -155,11 +178,13 @@ Each is also a comment on issue #172 so it is reviewable there.
    its next-step item 2 asked for exactly this ticket. Both are false once this merges. It is the
    lead's file, so flagging it here: two paragraphs, no other agent's subject.
 
-### Open question I did not settle
+### One thing worth knowing that is not a defect
 
-The windows leg's 302s against #152's 240s budget. Section 5 has the measurement and three options;
-I did none of them because the measurement that chooses between them is the second CI run's, and
-because the budget line is a `::warning::` rather than a failure. Somebody should pick one.
+The **first** CI run on any new branch will emit the leg's `::warning::`, because a cold Gradle
+cache costs a leg ~250s where a warm one costs ~40s. That is true of every job in this workflow;
+this ticket only makes it visible, because `replay-equality` is the job that prints its own wall
+time. Section 5 has both samples. I considered raising the budget or slicing `moba`'s test source
+set out of the leg's classpath, and did neither, because with a warm cache there is nothing to fix.
 
 ---
 
@@ -300,32 +325,61 @@ the live game stepped tick by tick, not a rendering of the fixture, and they are
 
 ---
 
-## 5. The 240s budget, measured
+## 5. The 240s budget, measured — and the finding I retracted
 
 The issue asks for the leg wall time in the job summary against #152's 240s budget. The step that
-prints it is unchanged, so it is there on every run. The numbers, spliced from the leg logs of run
-[33441678513](https://github.com/wildware-uk/Udea/actions/runs/33441678513) (this branch,
-`moba-3600.udearep`) and run
-[33438832167](https://github.com/wildware-uk/Udea/actions/runs/33438832167) (`example` at the
-branch point, `drift-3600.udearep`):
+prints it is unchanged, so it is there on every run, green or red.
 
-| leg | replay, drift | wall, drift | replay, moba | wall, moba |
-|---|---|---|---|---|
-| ubuntu-latest / temurin | 394ms | 32s | 1964ms | 212s |
-| ubuntu-latest / corretto | 461ms | 38s | 1863ms | 195s |
-| windows-latest / temurin | 449ms | 49s | 2462ms | **302s** |
+**The first run on this branch said the windows leg took 302s and I nearly reported that as a
+finding.** It was the first run on a *new* branch, so `gradle/actions/setup-gradle` had no cache
+entry for the ref and every leg rebuilt the world from nothing. The next push says 54s.
 
-**The windows leg is over budget, and no tick count fixes it.** The replay grew by ~1.5s. The other
-~250s is that `:moba:udeaReplayDigest` has to build the game — KSP over `moba`, the asset pipeline,
-`udea-render`, `udea-net`, `udea-gas`, `udea-assets-compiler` and `moba`'s test source set — where
-`:udea-replay:udeaReplayDigest` built `udea-core` and one module's fixtures.
+| leg | drift, [33438832167](https://github.com/wildware-uk/Udea/actions/runs/33438832167) | moba, [33441678513](https://github.com/wildware-uk/Udea/actions/runs/33441678513) (**cold**) | moba, [33443701286](https://github.com/wildware-uk/Udea/actions/runs/33443701286) (warm) |
+|---|---|---|---|
+| ubuntu-latest / temurin | 32s | 212s | **27s** |
+| ubuntu-latest / corretto | 38s | 195s | **38s** |
+| windows-latest / temurin | 49s | 302s | **54s** |
+| *replay itself, ubuntu/temurin* | *394ms* | *1964ms* | *2038ms* |
+| *replay itself, windows* | *449ms* | *2462ms* | *2644ms* |
+| *digest bytes, ubuntu/temurin* | *1,626,969* | *2,326,517* | *2,326,517* |
 
-Run 33441678513 was the **first** run on a new branch, so `gradle/actions/setup-gradle` had no cache
-entry for the ref. RUN2_LEGS_PLACEHOLDER
+Run 33438832167 is `example` at the branch point, replaying `drift-3600.udearep`; both others are
+this branch replaying `moba-3600.udearep`. Nothing but the cache differs between the two `moba`
+columns — same fixture, same tick count, same matrix.
 
-The three options, in the order I would try them, are on the issue. I did none of them: the budget
-line is a `::warning::` rather than a failure, so the leg is green and says its own number, and the
-measurement that chooses between the options is the second run's.
+**So replaying the game costs about what replaying the fixture world cost**: 27/38/54 against
+32/38/49. The replay itself is genuinely ~1.5s slower per leg and that disappears into a leg whose
+wall time is checkout, JDK setup and a Gradle build. **The 240s budget is not threatened.**
+
+What *is* true, and narrower than what I first wrote: **the first CI run on any new branch will
+emit the `::warning::`**, because a cold cache costs ~250s a leg. A reader who sees it should look
+at the second run before acting on it. I have withdrawn the three mitigations I proposed on the
+issue for a problem that turned out not to exist; the correction and both wrong versions are left
+visible [there](https://github.com/wildware-uk/Udea/issues/172#issuecomment-5485133081).
+
+### `--workspace` resolves to the repository root, executed rather than asserted
+
+Issue #169's defect, for the third `udeaReplayDigest` in this tree. The workflow's exact `--out`
+string, run by hand from the worktree root:
+
+```
+$ sh gradlew :moba:udeaReplayDigest -Pudea.replay.label=ubuntu-latest/temurin-17 \
+    -Pudea.replay.out=digests/ubuntu-latest-temurin.udeaeq
+ubuntu-latest/temurin-17: replayed 3600 tick(s) in 1717ms into ubuntu-latest-temurin.udeaeq
+  2326516 bytes at /srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8b9947d3dbda0c54/digests/ubuntu-latest-temurin.udeaeq
+
+$ ls -la digests/
+-rw-rw-r--  1 shaun users 2326516 Aug 31 21:58 ubuntu-latest-temurin.udeaeq
+$ git rev-parse --show-toplevel
+/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8b9947d3dbda0c54
+$ ls moba/digests
+ls: cannot access 'moba/digests': No such file or directory
+```
+
+The repository root, which is what `actions/checkout` makes `$GITHUB_WORKSPACE` and what
+`actions/upload-artifact` globs — **not** `moba/digests/`, which is where a `JavaExec` with no
+`--workspace` would have put it. `MobaReplayEqualityTest > the digest task tells its entry point
+which directory the workspace is` is the fence, and mutations M9 and M10 are it going red.
 
 ---
 
@@ -333,11 +387,59 @@ measurement that chooses between the options is the second run's.
 
 ### ☑ 1. A real Actions run shows all three `replay-equality` legs and the `join` green, replaying a `moba` fixture
 
-RUN_GREEN_PLACEHOLDER
+**Run [33443701286](https://github.com/wildware-uk/Udea/actions/runs/33443701286)** (push,
+`4c86fba`'s parent `933dfff`) and **run
+[33444043104](https://github.com/wildware-uk/Udea/actions/runs/33444043104)** (dispatch, same code)
+both show it. From the second's `replay-equality (join)` log:
+
+```
+replay equality holds: 3600 tick(s) of 'moba-3600.udearep' are cell-for-cell identical
+  A = 'ubuntu-latest/corretto-17'  [Linux amd64; Amazon.com Inc. OpenJDK 64-Bit Server VM 17.0.20.1]
+  B = 'ubuntu-latest/temurin-17'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20.1]
+  B = 'windows-latest/temurin-17'  [Windows Server 2025 amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20.1]
+```
+
+*(the three `A =`/`B =` lines are the distinct leg identities the join printed across its two
+pairwise comparisons, collected with `sort -u`; they are not four consecutive lines of the log. The
+`holds:` line is verbatim.)*
+
+Three legs green, two operating systems, two JVM vendors, and the fixture named in the verdict is
+`moba-3600.udearep`.
 
 ### ☑ 2. `replay_plant_ulp_at` on the `moba` fixture makes the join report a divergence naming a real `moba` component and field
 
-RUN_PLANTED_PLACEHOLDER
+**Run [33444524021](https://github.com/wildware-uk/Udea/actions/runs/33444524021)**, a
+`workflow_dispatch` with `replay_plant_ulp_at: 1200`. `replay-equality (join)` is **red**, and the
+three legs are green — which is the shape it has to have: a leg that fails to produce a digest is a
+different failure from two legs that disagree. From that job's log, one consecutive block:
+
+```
+replay equality FAILED at t1200 (1199 tick(s) matched first)
+  fixture moba-3600.udearep
+  A = 'ubuntu-latest/corretto-17'  [Linux amd64; Amazon.com Inc. OpenJDK 64-Bit Server VM 17.0.20.1]
+  B = 'windows-latest/temurin-17'  [Windows Server 2025 amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20.1]
+  world hash: 367776917239456302 against -7461869609382314053
+  1 differing cell(s):
+    NetId(#0@0) dev.wildware.moba.Position.x
+      A = 303.34372 (0x4397abff)
+      B = 303.3437 (0x4397abfe)
+      the preceding 5 tick(s) of this cell:
+        t1195  agreed  A = 300.34366 (0x43962bfd), B = 300.34366 (0x43962bfd)
+        t1196  agreed  A = 300.94366 (0x439678ca), B = 300.94366 (0x439678ca)
+        t1197  agreed  A = 301.54367 (0x4396c597), B = 301.54367 (0x4396c597)
+        t1198  agreed  A = 302.14368 (0x43971264), B = 302.14368 (0x43971264)
+        t1199  agreed  A = 302.74368 (0x43975f31), B = 302.74368 (0x43975f31)
+```
+
+`dev.wildware.moba.Position.x` — a real `moba` component and a real field, at the tick the input
+named, with the five preceding ticks agreeing.
+
+Two things in that block are worth reading rather than skimming. `A` is `ubuntu-latest/corretto`,
+which is the one leg the matrix marks `plant: true`; the join printed the *same* divergence against
+the ubuntu-temurin leg as against the windows one, so the two honest legs agreed with each other on
+Windows and Linux (`0x4397abfe` both) while the planted one is one ulp away (`0x4397abff`). And the
+report says `1 differing cell(s)` — one ulp on one field of one entity showed up as exactly one
+cell, on the tick it was planted.
 
 Locally, the same claim through `:moba:udeaReplayEqualityProof` (section 1) and through
 `MobaReplayEqualityTest > a planted one-ulp divergence is caught and names a real moba component
@@ -408,7 +510,24 @@ It did **not** turn out too large or too slow to check in: the recording is 586,
 digest 19,533,419, against 665,794 and 16,466,747 for `drift-36000`. Numbers and the artefact
 arithmetic are in section 5 and in `ci.yml`'s own comment.
 
-RUN_NIGHTLY_PLACEHOLDER
+**Run [33444043104](https://github.com/wildware-uk/Udea/actions/runs/33444043104)** shows all
+three nightly legs and `replay-equality-nightly (join)` green over the long fixture:
+
+```
+replay equality holds: 36000 tick(s) of 'moba-36000.udearep' are cell-for-cell identical
+  A = 'nightly/ubuntu-latest/corretto-17'  [Linux amd64; Amazon.com Inc. OpenJDK 64-Bit Server VM 17.0.20.1]
+  B = 'nightly/ubuntu-latest/temurin-17'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20.1]
+  B = 'nightly/windows-latest/temurin-17'  [Windows Server 2025 amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20.1]
+```
+
+*(same collection caveat as criterion 1: the `holds:` line is verbatim and the three leg identities
+are `sort -u` over the join's two comparisons.)*
+
+**That is the result this ticket exists to make possible**, and as far as I can tell it is the first
+time this repository has established it: ten minutes of a real `moba` match — every replicated
+field of every unit, plus the RNG state and the id allocator, on each of 36,000 ticks — is bit-exact
+across Windows Server 2025 and Linux, and across Amazon Corretto and Eclipse Adoptium. Nightly leg
+wall times were 90s (windows), 156s and 166s (ubuntu), and the replay itself 13.7-15.4s.
 
 ### ☑ Scope: the fixture is regenerable by a documented command, not by hand
 
@@ -436,6 +555,12 @@ run rather than retyped. Failing names are parsed out of the JUnit XML rather th
 | M6 | `ci.yml`: `- -Pudea.replay.fixture=moba-36000.udearep` / `+ drift-36000.udearep` on the nightly | `MobaReplayEqualityTest > every fixture the workflow names is one this game has` — *no fixture is called 'drift-36000.udearep'; this world has moba-3600.udearep, moba-36000.udearep* |
 | M7 | M2's diff, against the **evidence command** rather than the test suite | `:moba:udeaReplayEqualityProof` fails — transcript in section 1 |
 | M8 | `moba/build.gradle.kts`: `- val replayPlantTick = "1200"` / `+ "1500"` | `MobaReplayEqualityTest > the proof task plants at the tick this game declares` |
+| M9 | `moba/build.gradle.kts`: the two lines `- add("--workspace")` / `- add(workspace)` deleted from `udeaReplayDigest` | `MobaReplayEqualityTest > the digest task tells its entry point which directory the workspace is` — *it must pass --workspace exactly once; the build script has 0 ==> expected: <1> but was: <0>* |
+| M10 | the same two lines **commented out** rather than deleted (`+ // add("--workspace")`) | the same test, the same message — which is the point: the fence reads a comment-stripped copy, so a switched-off line does not count as a live one |
+
+M9 and M10 are a pair on purpose. M9 proves the assertion fires; M10 proves the *helper under it*
+does, on the real file — Kotlin block comments nest, and one stray slash-star in a KDoc has already
+switched off every task registered below it in `udea-replay/build.gradle.kts` once, silently.
 
 M4 is worth reading twice: moving the *pilot seed* (M3) does **not** fail
 `MobaReplayFixturesCurrentTest`, because a `BuildIdentity` does not cover the pilot — only the
@@ -456,6 +581,11 @@ that only it catches.
 - **`ReplayBisectGuideTest > the reproduction command names the project that owns the fixture`**
   asserts both directions (`:moba` for a `moba` fixture, `:udea-replay` for a drift one), so it is
   not a fence that only knows one answer.
+- **`MobaReplayEqualityTest > the build script fence reads what the compiler reads, not what is
+  switched off`** — the control for the comment stripper the two build-script fences read through,
+  in both directions and against the **real** file: it asserts that a KDoc line survives a raw read
+  of `moba/build.gradle.kts` and does not survive the strip, so the fences cannot be passing
+  because they are reading prose. M10 is the same claim from the failing side.
 - **`ReplayEqualityPathsTest > a stream with bytes in it passes and reports its size`** (existing)
   is the positive case for the post-condition.
 - **The evidence command's task graph** was checked against `origin/example` (section 1): it does
@@ -525,18 +655,55 @@ tasks between run 33441678513 (mine) and run 33438832167 (`example` at `db477f4`
 | `determinism (windows-latest, temurin/corretto)` | `:test` — `AgentsMdTest > a row for a module that has been deleted fails`, `CompilerPluginSwitchTest > the checkers-fire probe is not written into a tree build-logic compiles a second time`, `CompilerPluginSwitchTest > the checkers-fire probe is in a module the K2 plugin is actually applied to` | `:test` — the same three | yes |
 | `clean build under budget` | **passes** (81,418ms) | **fails** (97,716ms, budget 90,000ms) | — |
 
+### One more, seen once in four runs, in code this branch does not touch
+
+`gl tests (xvfb)` failed on run 33444043104 and passed on 33441678513, 33443701286 and 33444524021
+— four runs of near-identical code, one red:
+
+```
+OffscreenBackendTest > closing the backend stops the render thread() FAILED
+    org.opentest4j.AssertionFailedError at OffscreenBackendTest.kt:206
+        Caused by: dev.wildware.udea.render.backend.GlContextException at OffscreenBackendTest.kt:206
+            Caused by: java.util.concurrent.CancellationException at OffscreenBackendTest.kt:206
+```
+
+A shutdown race on the GL thread in `udea-render`, a module this branch does not modify. All 18
+`udeaGlTest` tests pass locally under xvfb with `--rerun` (section 3). Flagging it because one
+sample in four is exactly the rate at which a flake gets attributed to whoever is unlucky, and
+because I would rather it be written down before somebody else meets it.
+
 The windows `:udea-assets-compiler:test` and the `determinism` `AgentsMdTest` /
 `CompilerPluginSwitchTest` failures are issue **#176**, which dev-176 is fixing on its own branch —
 CRLF in checked-in golden files under a `core.autocrlf=true` checkout. `udeaPhase2Exit` and
 `udeaDaemonBudget` are the wall-clock latency budgets, red under CI runner load exactly as they are
 under `melon-merge` load here (section 3).
 
-**`clean build under budget` is the one that differs, and I cannot yet attribute it.** It measures
-`udeaAssemble`, which of my change compiles exactly one new file (`ReplayDigestCli.kt`, ~230 lines
-in `udea-replay/src/main`) plus small edits — nothing in `moba/src/test` is in `udeaAssemble` at
-all. 230 lines cannot be 16 seconds in a build whose whole `:moba:compileKotlin` takes 8.5s. The
-two samples I have from `example` are 81,418ms and 66,671ms, a 22% spread between consecutive runs,
-so 97,716ms is one sample outside a two-sample range. CLEAN_BUILD_RUN2_PLACEHOLDER
+**`clean build under budget` failed on run 33441678513 and passed on run 33443701286**, the same
+cold-cache-then-warm pair as the leg times in section 5:
+
+The red one, from `mine-clean-budget.log` (the saved `--log-failed` output of job 99651148467):
+
+```
+##[error]clean build took 97716 ms, over the 90000 ms budget (spec 6, Phase 0 exit)
+```
+
+The other three, from `cleanbudget-history.txt` (the saved output of the script that fetched them).
+Its own first line is truncated at `ove` by an Actions line break, which is why the red one is
+quoted above from its own log rather than from here:
+
+```
+run 33441678513 job 99651148467: clean build took 97716 ms, ove
+run 33443701286 job 99657686646: clean build took 66890 ms, within the 90000 ms budget
+run 33438832167 job 99641769151: clean build took 81418 ms, within the 90000 ms budget
+run 33437939749 job 99638839477: clean build took 66671 ms, within the 90000 ms budget
+```
+
+The last two are `example`: consecutive runs of a tree this branch had not touched, differing by
+22%.
+
+66,890ms against `example`'s 66,671ms is as close as two samples of this measurement get. That is
+the whole answer: my change adds one new file to `udeaAssemble` (`ReplayDigestCli.kt`, ~230 lines
+in `udea-replay/src/main`) and nothing in `moba/src/test` is in `udeaAssemble` at all.
 
 ---
 
@@ -598,7 +765,8 @@ seconds; no GL outside `udea-render`; no presentation system as a Fleks system;
   build-script fence for that forwarding (`ReplayEqualityProofTest > the test task forwards the
   regeneration flag to the JVM that reads it`); `moba` has the same `systemProperty` line but no
   fence over it. I ran the flag by hand and it regenerated (that is how the checked-in bytes were
-  made), so it works today; nothing would catch it being deleted.
+  made), so it works today; nothing would catch it being deleted. The stripper and `buildScript`
+  are now in `MobaReplayEqualityTest`, so adding that fence is three lines for whoever wants it.
 - **A second peer.** The recording carries one peer, as `MobaReplay` was already designed. A
   two-peer recording is a different ticket.
 - **The `36000`-tick fixture end to end locally.** I replayed it once to measure (section 5) but

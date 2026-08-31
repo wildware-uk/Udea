@@ -44,7 +44,8 @@ on:
         description: >-
           Plant a one-ulp divergence at this tick on the single `replay-equality` leg the
           matrix marks `plant: true`, to prove the cross-OS gate still fails. 1200 is the
-          tick `DriftFixture.PLANT_TICK` names. Leave it empty for an honest run.
+          tick `MobaFixture.PLANT_TICK` names, and it lands on the champion's `Position.x`.
+          Leave it empty for an honest run.
         required: false
         default: ""
 

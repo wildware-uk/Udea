@@ -39,7 +39,7 @@ internal object UdeaReplicatedPropertyChecker : FirPropertyChecker(MppCheckerKin
         if (UdeaFieldTypes.isUnresolved(type)) return
 
         val name = declaration.symbol.callableId.asSingleFqName().asString()
-        val source = declaration.source
+        val source = declaration.returnTypeRef.source
 
         // Only a *directly stored* val is the defect: a composite `@Net val position: Vector2`
         // is legal, because `Replicator.apply` restores it by writing `position.x`/`position.y`

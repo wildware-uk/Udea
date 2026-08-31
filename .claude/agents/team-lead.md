@@ -194,9 +194,13 @@ gates the next one:
 
 1. **The lossy-UDP divergence.** `:moba:runUdpProof` is red under 5% loss, 5/5. It is understood only
    as a symptom and it blocks any repeat of the convergence claim.
-2. **The `replay-equality` CI job (#152).** Phase 7's exit criterion is bit-exact replay on two
-   OS/JVM combinations, and today the replay proof runs on one machine. Phase 7 is not done without
-   it.
+2. **What Phase 7 still owes.** The `replay-equality` job **shipped** on `example` at `a1d5217`
+   (#152) - the 3600-tick PR fixture, the two-JVM axis and field-level divergence rendering are all
+   in CI. Do not dispatch it again. What is outstanding is a real Actions run of it, #165's nightly
+   36000-tick fixture and `--update-replay-fixtures`, and pointing the gate at `moba` rather than
+   `udea-replay`'s own `DriftWorld` (a checked-in `moba` `.udearep` is refused by `BuildIdentity`
+   the moment `protoHash` moves, which #132 then did). Marking the job required for merge is branch
+   protection - the owner's, not an agent's.
 3. **The Phase 7 checkpoint entry** in `docs/decisions/phase-log.md` — cheap, and it is the mechanism
    that was supposed to catch exactly the drift `HANDOFF.md` is documenting.
 4. **The physics balance pass.** `MobaPhysicsModule` is built, tested and not installed. Installing it

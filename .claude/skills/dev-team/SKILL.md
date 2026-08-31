@@ -79,17 +79,22 @@ rule is that nothing *waits* on them.
 
 **The integration branch is `example`, not `master`.**
 
-`master` is at `ce7db67`. `example` is at `4d4b471` and carries all of Phase 7 -
-`udea-replay`, the determinism verifier, the CI workflow, the lane economy.
+`master` is at `ce7db67`. `example` carries all of Phase 7 - `udea-replay`, the
+determinism verifier, the CI workflow, the lane economy - plus everything every
+wave since has merged. It moves; read `git log --oneline -1 example` rather than
+trusting a SHA written here.
 `HANDOFF.md` says merging `example` into `master` "is a decision somebody should
 make deliberately rather than find already made", and it is the owner's to make.
 So: developers branch from `origin/example`, you merge into `example`, and you
 push `origin example`. Nothing this team does touches `master`.
 
-Read `HANDOFF.md` before your first dispatch. It names what is red
-(`:moba:runUdpProof` under loss), what is built but not installed
-(`MobaPhysicsModule`), and what Phase 7 still owes (the cross-OS
-`replay-equality` CI job, issue #152).
+Read `.claude/WAVE.md` first and `HANDOFF.md` second. `HANDOFF.md` names what is
+red (`:moba:runUdpProof` under loss) and what is built but not installed
+(`MobaPhysicsModule`), but its Phase 7 section is **out of date**: the cross-OS
+`replay-equality` job shipped at `a1d5217` (#152). What Phase 7 still owes is a
+real Actions run, #165's nightly fixture, and pointing the gate at `moba`.
+`WAVE.md` is the last lead's handoff and it supersedes `HANDOFF.md` wherever the
+two disagree.
 
 ## Roles
 

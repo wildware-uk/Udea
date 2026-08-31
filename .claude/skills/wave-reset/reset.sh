@@ -1,32 +1,42 @@
 #!/usr/bin/env bash
-# Wave reset: clear the lead's context, then restart the loop in the fresh
-# session with the goal and the handoff carried inside the restart command.
+# Wave reset: stop the lead's current turn, clear its context, then restart the
+# loop in the fresh session with the goal and the handoff carried in.
 #
 # Nothing is written to disk. Everything the next session needs travels in the
-# command this script sends after the clear, so there is no handoff file to go
-# stale, to be half-written, or to be forgotten.
+# submissions this script sends, so there is no handoff file to go stale, to be
+# half-written, or to be forgotten.
 #
-# Order matters and is easy to get backwards:
-#   1. /clear goes FIRST and immediately. It kills the turn that sends it.
-#   2. The restart goes SECOND, from a detached subshell, after the clear has
-#      finished tearing down and rebuilding the session.
+# It sends ONE key and THREE submissions, in this order, and the order is the
+# whole point:
 #
-# The subshell is what survives step 1. A second tool call would not.
+#   0. Escape          - stops the agent flow that is running right now.
+#   1. /clear          - tears the session down and rebuilds it.
+#   2. /goal <goal>    - reinstates the standing objective, into an IDLE session.
+#   3. <command> <prompt> - restarts the loop with the handoff. Sent LAST
+#                           because it is the one that starts long work.
+#
+# WHY THE GOAL GOES BEFORE THE RESTART. It used to go after, and the goal was
+# silently lost every time. `/dev-team` begins a turn that runs for minutes, so
+# a `/goal` typed behind it does not execute as a command at all - the harness
+# delivers it to the running turn as a mid-turn user message, where it reads as
+# a remark rather than as the standing objective. The session then works with no
+# goal set and nobody notices, because a swallowed goal looks exactly like a
+# goal that was never passed. Sent into an idle session it executes normally.
+#
+# WHY THE ESCAPE. The lead calls this script from inside a tool call, so a turn
+# is by definition in flight. `/clear` typed under a running turn is queued
+# behind it rather than clearing anything. Escape stops the flow first so every
+# submission after it lands at an idle prompt.
+#
+# EVERY send is scheduled from a detached subshell. The Escape kills the turn
+# that launched this script, so nothing in the foreground survives to send the
+# rest - the subshell is what does.
 #
 # Usage:
 #   reset.sh --goal "<the standing goal>" --prompt "<one or two sentences>"
 #   reset.sh "<goal>" "<prompt>"                    # positional, same order
 #   reset.sh --goal ... --prompt ... --delay 5      # default delay is 3
 #   reset.sh --goal ... --prompt ... --command /foo # default is /dev-team
-#
-# After the clear the script sends TWO submissions, in this order:
-#   1. "<command> <prompt>"  Enter     - restarts the loop with the handoff
-#   2. "/goal <goal>"        Enter     - reinstates the standing objective
-#
-# They are two prompts, not one line. A slash command opens the completion menu
-# as it is typed, and an Enter sent in the same send-keys call selects from that
-# menu instead of submitting. The text and its Enter go in separate calls, with
-# a pause between, so the menu settles first.
 #
 # The GOAL is the thing that must outlive the clear - the standing objective the
 # session was pursuing. Copy it through verbatim; a cleared session that has
@@ -40,6 +50,7 @@ set -euo pipefail
 
 DELAY=3
 STEP_DELAY=1
+LEAD_DELAY=2
 GOAL=""
 PROMPT=""
 COMMAND="/dev-team"
@@ -54,14 +65,16 @@ while [[ $# -gt 0 ]]; do
     --command) COMMAND="${2:-}"; shift 2 ;;
     --goal-command) GOAL_COMMAND="${2:-}"; shift 2 ;;
     --step-delay)   STEP_DELAY="${2:-}";   shift 2 ;;
+    --lead-delay)   LEAD_DELAY="${2:-}";   shift 2 ;;
     --goal=*)    GOAL="${1#*=}";    shift ;;
     --prompt=*)  PROMPT="${1#*=}";  shift ;;
     --delay=*)   DELAY="${1#*=}";   shift ;;
     --command=*) COMMAND="${1#*=}"; shift ;;
     --goal-command=*) GOAL_COMMAND="${1#*=}"; shift ;;
     --step-delay=*)   STEP_DELAY="${1#*=}";   shift ;;
+    --lead-delay=*)   LEAD_DELAY="${1#*=}";   shift ;;
     -h|--help)
-      sed -n '2,38p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,47p' "$0" | sed 's/^# \{0,1\}//'
       exit 0 ;;
     -*)
       echo "reset.sh: unknown option $1" >&2
@@ -87,16 +100,13 @@ if [[ -z "$PROMPT" ]]; then
   exit 2
 fi
 
-if ! [[ "$DELAY" =~ ^[0-9]+$ ]]; then
-  echo "reset.sh: --delay must be a whole number of seconds, got '$DELAY'." >&2
-  exit 2
-fi
-
-if ! [[ "$STEP_DELAY" =~ ^[0-9]+$ ]]; then
-  echo "reset.sh: --step-delay must be a whole number of seconds, got" >&2
-  echo "'$STEP_DELAY'." >&2
-  exit 2
-fi
+for pair in "delay:$DELAY" "step-delay:$STEP_DELAY" "lead-delay:$LEAD_DELAY"; do
+  name="${pair%%:*}"; value="${pair#*:}"
+  if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+    echo "reset.sh: --$name must be a whole number of seconds, got '$value'." >&2
+    exit 2
+  fi
+done
 
 # tmux send-keys ends the line at a newline, so an embedded one would submit a
 # half-written command and leave the rest as a stray prompt. Collapse instead.
@@ -123,24 +133,40 @@ if ! tmux list-panes -a -F '#{pane_id}' | grep -qx "$PANE"; then
   exit 1
 fi
 
-# Step 2, scheduled before step 1 runs but landing after it. Each submission is
-# typed, allowed to settle so the slash-command menu closes, then submitted with
-# its own Enter.
+# Every submission is typed, allowed to settle so the slash-command completion
+# menu closes, then submitted with its own Enter. An Enter sent in the same
+# send-keys call selects from that menu instead of submitting - which looks
+# exactly like the reset not firing.
+submit() {
+  tmux send-keys -t "$PANE" "$1"
+  sleep "$STEP_DELAY"
+  tmux send-keys -t "$PANE" Enter
+}
+
 (
+  # Let the tool call that launched this script return before the Escape lands.
+  sleep "$LEAD_DELAY"
+
+  # 0. Stop the running flow, so everything after this lands at an idle prompt.
+  tmux send-keys -t "$PANE" Escape
+  sleep "$STEP_DELAY"
+
+  # 1. Clear. Then wait out the teardown and rebuild: a submission that lands
+  #    during it is swallowed silently.
+  submit "/clear"
   sleep "$DELAY"
-  tmux send-keys -t "$PANE" "$RESTART"
-  sleep "$STEP_DELAY"
-  tmux send-keys -t "$PANE" Enter
-  sleep "$STEP_DELAY"
-  tmux send-keys -t "$PANE" "$GOAL_LINE"
-  sleep "$STEP_DELAY"
-  tmux send-keys -t "$PANE" Enter
+
+  # 2. The goal, into an idle session, where it executes as a command.
+  submit "$GOAL_LINE"
+  sleep "$DELAY"
+
+  # 3. The restart, last, because it is the one that runs for minutes.
+  submit "$RESTART"
 ) >/dev/null 2>&1 &
 disown
 
-# Step 1.
-tmux send-keys -t "$PANE" "/clear" Enter
-
-echo "reset.sh: /clear sent to $PANE; restart follows in ${DELAY}s as:"
-echo "  $RESTART"
+echo "reset.sh: scheduled on $PANE, starting in ${LEAD_DELAY}s:"
+echo "  Escape"
+echo "  /clear"
 echo "  $GOAL_LINE"
+echo "  $RESTART"

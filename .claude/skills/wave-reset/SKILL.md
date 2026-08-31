@@ -76,8 +76,8 @@ cheerfully do the wrong next thing.
 On this project the goal is usually a phase, because the phases are what the
 work is organised around and each has a stated exit criterion. For example:
 
-> Close out Phase 7: bit-exact replay proven on two OS/JVM combinations, with
-> the cross-OS replay-equality job actually in CI.
+> Close out Phase 7: the replay-equality gate pointed at `moba` and proven by a
+> real Actions run, with the nightly 36000-tick fixture behind it.
 
 **The prompt.** One or two sentences: where the work stands and what to do
 first. Not a ledger.
@@ -123,8 +123,8 @@ was meant to restart the loop. Run the script that ships with this skill:
 
 ```bash
 .claude/skills/wave-reset/reset.sh \
-  --goal "Close out Phase 7: bit-exact replay on two OS/JVM combinations, with the cross-OS replay-equality job actually in CI." \
-  --prompt "The lossy-UDP divergence in runUdpProof is still red and understood only as a symptom; pick that up before #152."
+  --goal "Close out Phase 7: the replay-equality gate pointed at moba and proven by a real Actions run, with the nightly 36000-tick fixture behind it." \
+  --prompt "The lossy-UDP divergence in runUdpProof is still red and understood only as a symptom; pick that up before #165." 
 ```
 
 Both arguments are required. `--delay` (seconds, default 3), `--step-delay`
@@ -140,22 +140,36 @@ It does exactly five things:
 2. Flattens newlines and tabs in both arguments to single spaces. `tmux
    send-keys` ends the line at a newline, so an embedded one would submit half a
    command and leave the rest sitting as a stray prompt.
-3. Schedules the restart from a **detached** subshell. The subshell is what
-   survives the clear — a second tool call would never run, because `/clear`
-   kills the turn that sends it.
+3. Schedules **everything** from a **detached** subshell — the Escape included.
+   The subshell is what survives; a second tool call would never run, because
+   the Escape kills the turn that launched the script.
 4. Types each submission and sends its Enter as a **separate** `send-keys`
    call, `--step-delay` seconds apart. A slash command opens the completion
    menu as it is typed, and an Enter in the same call selects from that menu
    instead of submitting — which looks exactly like the reset not firing.
-5. Sends `/clear` to the lead's own pane, last.
+5. Sends one key and three submissions to the lead's own pane, in a fixed order.
 
-What it schedules is **two prompts, not one line**. The loop restarts first,
-carrying the handoff; the standing objective follows as its own command:
+What it schedules is **one key and three prompts**, and the order is the whole
+point:
 
 ```
-/dev-team WHERE THIS LEFT OFF: <prompt>
-/goal <goal>
+Escape                             # stop the flow that is running right now
+/clear                             # tear the session down and rebuild it
+/goal <goal>                       # the standing objective, into an IDLE session
+/dev-team WHERE THIS LEFT OFF: ... # last, because it runs for minutes
 ```
+
+**The Escape is not optional.** The lead calls the script from inside a tool
+call, so a turn is by definition in flight, and a `/clear` typed under a running
+turn queues behind it rather than clearing anything.
+
+**The goal goes BEFORE the restart, and this is the fix for a bug that lost it
+every single time.** `/dev-team` begins a turn that runs for minutes, so a
+`/goal` typed behind it never executes as a command at all — the harness hands
+it to the running turn as a mid-turn user message, where it reads as a passing
+remark rather than as the standing objective. The session then works with no
+goal set and nobody notices, because a swallowed goal is indistinguishable from
+a goal that was never passed. Sent into an idle session it executes normally.
 
 The pane is read from `$TMUX_PANE`, never hardcoded. Three seconds rather than
 one: `/clear` tears down and rebuilds the session, and a follow-up that lands
@@ -171,9 +185,11 @@ backgrounded subshell is the supported shape.
 The lead cannot check its own reset, because it no longer exists. So the FRESH
 session checks instead, as its first act:
 
-- Both submissions arrived: the restart carrying a handoff, then `/goal`. If
-  either arrived bare, or only one landed, the follow-up was swallowed during
-  the teardown — say so rather than guessing at what the wave was doing.
+- Both submissions arrived: `/goal` first, then the restart carrying a handoff.
+  If the goal never landed, or either arrived bare, it was swallowed during the
+  teardown — say so rather than guessing at what the wave was doing. A session
+  with no goal set is the failure this script exists to prevent; check it before
+  you dispatch anything.
 - `ListAgents` is empty, confirming nothing was orphaned.
 - The repo is clean, `git worktree list` holds no strays, and
   `git log --oneline -5 origin/example` plus `gh issue list` say what actually

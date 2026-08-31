@@ -149,14 +149,41 @@ both coherent by construction; `common`/`gradle-plugin` POMs declaring Apache-2.
   boundary, so I added none. It remains the mechanism that was supposed to catch exactly this
   drift.
 
-### Orchestration docs that are now wrong
+### Orchestration docs that were wrong — FIXED at the wave-1/wave-2 boundary
 
 `HANDOFF.md` item 3 said "There is no replay-equality gate in CI"; dev-152 corrected it in-branch.
-The same claim survives in **four `.claude/` files** — this one (now fixed), `.claude/agents/team-lead.md`,
-`.claude/skills/dev-team/SKILL.md` and `.claude/skills/wave-reset/SKILL.md`. dev-152 correctly
-left them alone mid-wave rather than editing the harness under a running team. **Fix them before
-the next dispatch**, along with the four-task budget family and the shared-scratchpad trap, both of
-which the developer contract still gets wrong.
+The same claim survived in four `.claude/` files. dev-152 correctly left them alone mid-wave rather
+than editing the harness under a running team. **All four are now corrected**, between waves with
+no team running:
+
+- `.claude/WAVE.md` (this file), fixed during wave 1.
+- `.claude/agents/team-lead.md:197` — the "prefer what unblocks a phase" list. Item 2 now says the
+  job **shipped** at `a1d5217` and names what Phase 7 actually still owes: a real Actions run,
+  #165's nightly, and pointing the gate at `moba`.
+- `.claude/skills/dev-team/SKILL.md` — "what Phase 7 still owes (the cross-OS `replay-equality` CI
+  job, issue #152)" replaced, and it now says to read `WAVE.md` **before** `HANDOFF.md`, because
+  `HANDOFF.md`'s Phase 7 section is stale and nobody is updating it. The hardcoded `example` SHA
+  (`4d4b471`) is gone too — it said to read `git log` instead, since that line goes stale every wave.
+- `.claude/skills/wave-reset/SKILL.md:79,126` — the example goal, which was the achieved one.
+
+Still outstanding in the developer contract: the four-task budget family and the shared-scratchpad
+trap. Put both in every dispatch prompt verbatim until the contract itself carries them.
+
+### `reset.sh` lost the goal on every reset, and that is fixed too
+
+The script sent `/clear`, then the `/dev-team` restart, then `/goal`. **The goal never executed.**
+`/dev-team` begins a turn that runs for minutes, so a `/goal` typed behind it is not read as a
+command at all — the harness delivers it into the running turn as a mid-turn user message, where it
+reads as a passing remark. Every wave since this script was written has run with no standing goal
+set, and it was invisible because a swallowed goal looks exactly like a goal nobody passed.
+
+The new order is one key and three submissions: **`Escape`, `/clear`, `/goal <goal>`, then the
+restart last.** The Escape is what makes the rest land — the lead calls the script from inside a
+tool call, so a turn is always in flight, and a `/clear` typed under a running turn queues behind it
+instead of clearing. Everything is scheduled from the detached subshell now, the Escape included,
+because the Escape kills the turn that launched the script.
+
+**Verify it fired before dispatching anything.** The goal arriving is the thing to check.
 
 ---
 

@@ -41,8 +41,15 @@ public object ReplayDigestFormat {
     /** `UDEAEQ01` in ASCII. Fails a truncated or mistyped file at byte 0 rather than at tick 0. */
     public const val MAGIC: Long = 0x5544454145513031L
 
-    /** Bumped when the layout changes. A reader refuses a version it does not know. */
-    public const val VERSION: Int = 1
+    /**
+     * Bumped when the layout changes. A reader refuses a version it does not know.
+     *
+     * `2` added `ReplayDigestHeader.gradleProject` after `os`. A `.udeaeq` is an ephemeral CI
+     * artefact - written by a leg, downloaded by the join, deleted after seven days - and none is
+     * checked in anywhere, so a bump costs no migration and buys a reader that refuses a stale
+     * stream by name instead of misreading a string as a tick count.
+     */
+    public const val VERSION: Int = 2
 
     /** The extension a digest stream is written under. */
     public const val EXTENSION: String = ".udeaeq"
@@ -99,6 +106,7 @@ public class ReplayDigestWriter internal constructor(
         out.writeUTF(header.gameVersion)
         out.writeUTF(header.jvm)
         out.writeUTF(header.os)
+        out.writeUTF(header.gradleProject)
         out.writeLong(header.firstTick.value)
         out.writeInt(header.tickCount)
         out.writeInt(header.components.size)
@@ -444,6 +452,7 @@ public object ReplayDigestIo {
         val gameVersion = input.readUTF()
         val jvm = input.readUTF()
         val os = input.readUTF()
+        val gradleProject = input.readUTF()
         val firstTick = Tick(input.readLong())
         val tickCount = input.readInt()
         if (tickCount < 0 || tickCount > ReplayDigestFormat.MAX_TICKS) {
@@ -487,6 +496,7 @@ public object ReplayDigestIo {
             fixture = fixture,
             gameId = gameId,
             gameVersion = gameVersion,
+            gradleProject = gradleProject,
             firstTick = firstTick,
             tickCount = tickCount,
             jvm = jvm,

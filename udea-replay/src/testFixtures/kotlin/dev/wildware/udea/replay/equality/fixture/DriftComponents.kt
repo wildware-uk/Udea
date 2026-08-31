@@ -18,20 +18,26 @@ import dev.wildware.udea.core.snapshot.FieldKind
 import dev.wildware.udea.core.snapshot.fleksComponentType
 
 /**
- * The two components of the `replay-equality` fixture world.
+ * The two components of the `replay-equality` **self-test** world.
  *
- * ## Why this world exists and is not `moba`
+ * ## What this world is for, now that the CI legs replay `moba`
  *
- * `ReplayEngineTest` already argues the general case: the real game answers "does the game
- * reproduce" and a small world answers "does the machinery report the truth", and only the second
- * one can be perturbed by exactly one ulp on exactly one field at exactly one tick.
+ * Issue #172 pointed the six `replay-equality` legs at `moba`, so this world no longer answers
+ * "is the game deterministic". It answers the other question, and it is the only thing that can:
+ * "does the machinery report the truth". `ReplayEngineTest` argues the general case - the real
+ * game answers whether the game reproduces, and a small world answers whether a divergence is
+ * caught and named. `:udea-replay:udeaReplayEqualityProof` plants one ulp on one field of one
+ * entity at one tick here, and `CrossPlatformDivergenceTest` pins the rendered failure against a
+ * checked-in expected output.
  *
- * There is a second, sharper reason here. A checked-in `.udearep` carries a `BuildIdentity` -
+ * The reason the gate could not start here has since been removed, and it is worth recording that
+ * it *was* removed rather than argued away. A checked-in `.udearep` carries a `BuildIdentity` -
  * root seed, `protoHash`, asset graph hash, input schema hash - and is refused the moment any of
- * the four moves. `moba`'s protocol hash moves whenever a replicated component is added, which is
- * ordinary gameplay work, so a `moba` fixture needs the `--update-replay-fixtures` regeneration
- * flag before it can be maintained rather than merely landed. This fixture's identity is a
- * function of nothing but this file.
+ * the four moves; `moba`'s protocol hash moves whenever a replicated component is added, which is
+ * ordinary gameplay work. Issue #165 shipped `--update-replay-fixtures`, so a `moba` fixture can
+ * now be maintained rather than merely landed, and `MobaReplayFixturesCurrentTest` fails on the
+ * machine that moved the id with the one command that rebuilds it. This world's identity is still
+ * a function of nothing but this file, which is why the self-test does not need that machinery.
  *
  * The replicators are hand-written, exactly as `TransformReplicator` and `SnapshotComponents` are
  * and for the same reason: nothing here carries `@Replicated`, so nothing here moves

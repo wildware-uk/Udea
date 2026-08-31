@@ -3,6 +3,7 @@ package dev.wildware.udea.replay.equality
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.replay.ReplayRecording
 import dev.wildware.udea.replay.equality.fixture.DriftComponents
+import dev.wildware.udea.replay.equality.fixture.DriftDigestMain
 import dev.wildware.udea.replay.equality.fixture.DriftFixture
 import dev.wildware.udea.replay.equality.fixture.DriftFixtureRecorder
 import dev.wildware.udea.replay.equality.fixture.DriftWorld
@@ -135,6 +136,7 @@ class CrossPlatformDivergenceTest {
             output = out,
             label = label,
             fixture = DriftFixture.PR_FIXTURE,
+            gradleProject = DriftDigestMain.GRADLE_PROJECT,
         )
         return ReplayDigestIo.read(out)
     }

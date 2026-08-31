@@ -73,6 +73,7 @@ internal class DigestBuilder(
             tickCount = hashes.size,
             jvm = "test-jvm",
             os = "test-os",
+            gradleProject = ":udea-replay",
             components = components,
         ),
         hashes = hashes.toLongArray(),

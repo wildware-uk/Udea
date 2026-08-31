@@ -34,6 +34,21 @@ public class ReplayDigestHeader(
     public val jvm: String,
     /** `os.name` and `os.arch` of the machine that produced the stream. Recorded, not asserted. */
     public val os: String,
+    /**
+     * The Gradle project whose `udeaReplayDigest` produced this stream, e.g. `:moba`.
+     *
+     * Carried because the join step has to tell a reader how to reproduce a divergence and cannot
+     * work it out: `ReplayEqualsMain` reads nothing but the files, and since issue #172 two
+     * different projects each register a `udeaReplayDigest` over their own fixtures. The block
+     * `ReplayBisectGuide` renders used to name `:udea-replay` unconditionally, which after #172
+     * printed a command that fails - `no fixture is called 'moba-3600.udearep'` - as the
+     * instruction for reproducing a red gate.
+     *
+     * Deliberately **not** part of [incomparabilitiesAgainst]. It is a function of the game, and
+     * the game is already pinned there by [gameId], [gameVersion] and [fixture]; adding a fourth
+     * name for the same fact would refuse a comparison for a reason none of the three could.
+     */
+    public val gradleProject: String,
     /** Every component type the capture registry held, in ascending type id. */
     public val components: List<DigestComponentInfo>,
 ) {

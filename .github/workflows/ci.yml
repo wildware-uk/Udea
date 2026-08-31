@@ -1176,6 +1176,22 @@ jobs:
     # field index. Not just the hash - a hash that differs names nothing, and Phase 7's exit
     # criterion is the first differing tick **and field**.
     #
+    # ## What it replays, since issue #172: `moba`, and not a fixture world
+    #
+    # `moba-3600.udearep` is a minute of a real match - the champion piloted by a specified LCG,
+    # twenty-seven AI units, the lane, the towers, the projectiles, the abilities and the match
+    # loop, all reproduced from the seed. Until #172 these legs replayed `DriftWorld`, a
+    # purpose-built fixture that routes its trigonometry through `StrictMath` because its author
+    # knew exactly which call was the trap: a world *written to be deterministic*, so three green
+    # legs reported the health of their own fixture. `moba` was not written that way and is the
+    # thing Phase 7 exists to make deterministic.
+    #
+    # `DriftWorld` stays checked in as the gate's **self-test**: `:udea-replay:udeaReplayEqualityProof`
+    # plants a one-ulp divergence into it across five processes on one machine, and
+    # `CrossPlatformDivergenceTest` pins the rendered cross-platform failure against a checked-in
+    # expected output. `:moba:udeaReplayEqualityProof` does the same for this fixture, naming
+    # `Position.x`.
+    #
     # `ReplayDigestWriter` refolds its own cells into the world hash and refuses to write a tick
     # that does not reproduce it, so "the cells are exactly what the hash covers" is enforced on
     # every tick of every run rather than asserted once. That is what makes the `join` step below
@@ -1193,11 +1209,15 @@ jobs:
     #
     # ## Nothing here is logic
     #
-    # Every decision - what to replay, what to write down, what counts as a divergence, how to
-    # render one, which exit code to use - lives in `:udea-replay`'s `main` classes and is covered
-    # by `CrossPlatformDivergenceTest`, `DivergenceReportFormatTest`, `ReplayDigestTest` and the
-    # five-process `:udea-replay:udeaReplayEqualityProof`. Nobody can run GitHub Actions locally,
-    # so anything expressed only here would be unverifiable until it had already gone wrong once.
+    # Every decision - what to write down, what counts as a divergence, how to render one, which
+    # exit code to use, and every option on the leg's own command line - lives in `:udea-replay`'s
+    # `main` classes (`ReplayDigestCli`, `ReplayDigestRecorder`, `ReplayEquality`) and is covered
+    # by `CrossPlatformDivergenceTest`, `DivergenceReportFormatTest`, `ReplayDigestTest`,
+    # `ReplayEqualityProofTest` and `MobaReplayEqualityTest`, plus the two five-process proofs
+    # `:udea-replay:udeaReplayEqualityProof` and `:moba:udeaReplayEqualityProof`. What is `moba`'s
+    # own - its fixtures, its world, its component registry, and what a plant perturbs - is
+    # `MobaDigestMain`, which is six lines. Nobody can run GitHub Actions locally, so anything
+    # expressed only here would be unverifiable until it had already gone wrong once.
     name: replay-equality (${{ matrix.os }}, ${{ matrix.distribution }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -1245,17 +1265,17 @@ jobs:
         run: chmod +x ./gradlew
 
       # `-Pudea.replay.out` is workspace-relative, and that is only safe because
-      # `udeaReplayDigest` hands `DriftDigestMain` a `--workspace` naming the repository root -
-      # a `JavaExec` on its own would resolve this against `udea-replay/`, which is issue #169
-      # and is why no join step ever ran. `ReplayEqualityProofTest` drives the entry point with
+      # `:moba:udeaReplayDigest` hands `MobaDigestMain` a `--workspace` naming the repository
+      # root - a `JavaExec` on its own would resolve this against `moba/`, which is issue #169
+      # and is why no join step ever ran. `MobaReplayEqualityTest` drives the entry point with
       # this exact string and checks the answer against the upload glob below.
       #
       # The trailing expression is empty on every ordinary run. It is how `replay_plant_ulp_at`
       # reaches the one leg the matrix marks `plant: true`.
-      - name: Replay the fixture and write this leg's digest
+      - name: Replay the moba fixture and write this leg's digest
         shell: bash
         run: >-
-          ./gradlew :udea-replay:udeaReplayDigest
+          ./gradlew :moba:udeaReplayDigest
           -Pudea.replay.label=${{ matrix.os }}/${{ matrix.distribution }}-17
           -Pudea.replay.jvmVendor=${{ matrix.vendor }}
           -Pudea.replay.out=digests/${{ matrix.os }}-${{ matrix.distribution }}.udeaeq
@@ -1393,28 +1413,38 @@ jobs:
     #
     # ## What is different, and what deliberately is not
     #
-    # One thing: `-Pudea.replay.fixture`. `drift-36000.udearep` is ten times the recording the
-    # PR job replays, checked in beside it and reconciled by the same `--update-replay-fixtures`
-    # that reconciles that one - see `ReplayFixturesCurrentTest`. Everything else - the two
+    # One thing: `-Pudea.replay.fixture`. `moba-36000.udearep` is ten times the recording the
+    # gate replays, checked in beside it and reconciled by the same `--update-replay-fixtures`
+    # that reconciles that one - see `MobaReplayFixturesCurrentTest`. Everything else - the two
     # operating systems, the second JVM vendor, the digest format, the join - is identical,
     # because the question it asks is identical and only the length of the answer differs.
     #
+    # It replays `moba` too, and that is issue #172 rather than #165. Leaving the *more sensitive*
+    # gate aimed at the world written to be deterministic would have been the wrong half to move:
+    # ten minutes of simulated play is exactly where a drift too small to shift the world hash
+    # inside a minute has a chance to surface.
+    #
     # There is no `plant: true` leg here. The plant proves the gate can fail, and it is proven on
-    # every push by the job above and by `udeaReplayEqualityProof`; carrying it here as well would
-    # buy nothing and would make `ReplayEqualityProofTest`'s "exactly one leg" fence a fence over
-    # two jobs' worth of legs.
+    # every push by the job above and by `:moba:udeaReplayEqualityProof`; carrying it here as well
+    # would buy nothing and would make the "exactly one leg" fence a fence over two jobs' worth of
+    # legs.
     #
-    # ## Measured, on run 33430551297, which is this job's own first execution
+    # ## Measured, on the run this job's leg-time step prints
     #
-    # The replay itself was 3630ms for 36000 ticks against 640ms for 3600 on the same OS and JVM -
-    # so a leg's wall time is still checkout, JDK and the Gradle build, and the extra replay
-    # disappears into that: 85s, 88s and 92s for the three nightly legs against 97s for a gate leg
-    # on the same run, one sample each. Far inside the 240s a gate leg is budgeted at.
+    # The wall times per leg are in each run's job summary, unconditionally, so the figure to read
+    # is that run's rather than one written down here. What is worth writing down is the shape,
+    # because it is what makes the length affordable: a leg's wall time is checkout, JDK setup and
+    # the Gradle build, and the replay disappears into it.
     #
-    # What it does add is artefact. A 36000-tick digest stream is 16,466,747 bytes against the PR
-    # fixture's 1,626,969, so one nightly run uploads 47.1MiB across its three legs, at the same
-    # seven-day retention. That is the number to revisit if the storage bill ever matters, and
-    # `retention-days` below is the lever.
+    # The replay's own cost, measured locally on one machine at `moba-3600` and `moba-36000`:
+    # 1918ms for 3600 ticks and 14940ms for 36000, both single samples on an idle-ish box. So the
+    # nightly's extra thirteen seconds sit on top of a leg the gate already budgets 240s for.
+    #
+    # What the length does add is artefact. A 36000-tick `moba` digest stream is 19,533,419 bytes
+    # against the gate fixture's 2,326,497, so one nightly run uploads 55.9MiB across its three
+    # legs at the same seven-day retention - against 47.1MiB when this job replayed `drift-36000`.
+    # That is the number to revisit if the storage bill ever matters, and `retention-days` below is
+    # the lever.
     name: replay-equality-nightly (${{ matrix.os }}, ${{ matrix.distribution }})
     # Never on a pull request. `workflow_dispatch` is here so the job can be proven to run without
     # waiting a day for the cron; it is how issue #165's own evidence was produced.
@@ -1455,11 +1485,11 @@ jobs:
         shell: bash
         run: chmod +x ./gradlew
 
-      - name: Replay the 36000-tick fixture and write this leg's digest
+      - name: Replay the 36000-tick moba fixture and write this leg's digest
         shell: bash
         run: >-
-          ./gradlew :udea-replay:udeaReplayDigest
-          -Pudea.replay.fixture=drift-36000.udearep
+          ./gradlew :moba:udeaReplayDigest
+          -Pudea.replay.fixture=moba-36000.udearep
           -Pudea.replay.label=nightly/${{ matrix.os }}/${{ matrix.distribution }}-17
           -Pudea.replay.jvmVendor=${{ matrix.vendor }}
           -Pudea.replay.out=nightly-digests/${{ matrix.os }}-${{ matrix.distribution }}.udeaeq

@@ -48,19 +48,29 @@ public object ReplayBisectGuide {
     /**
      * The block, for a run of [fixture] over legs that diverged at [divergentTicks] or did not.
      *
+     * @param gradleProject the project that owns [fixture], from
+     *   [ReplayDigestHeader.gradleProject]. Read off the stream rather than written down here,
+     *   because since issue #172 two projects each register a `udeaReplayDigest` over their own
+     *   fixtures and neither can resolve the other's name: this block used to say `:udea-replay`
+     *   unconditionally, so the instruction for reproducing a red `moba` gate was a command that
+     *   fails with `no fixture is called 'moba-3600.udearep'`.
      * @param divergentTicks one entry per pair compared: the tick that pair first disagreed at,
      *   or `null` where it agreed. The **earliest** is the one a reader is sent to, and taking
      *   the minimum here rather than at the call site is what makes it testable: two legs can
      *   diverge from the reference at different ticks, in either order, and every later one may
      *   be a consequence of the earlier.
      */
-    public fun render(fixture: String, divergentTicks: List<Tick?>): String = buildString {
+    public fun render(
+        fixture: String,
+        gradleProject: String,
+        divergentTicks: List<Tick?>,
+    ): String = buildString {
         val divergentTick = divergentTicks.filterNotNull().minOrNull()
         append("\n\n--- reproducing this locally ---\n")
         append("Both halves of the gate, in five processes on one machine:\n")
-        append("  ./gradlew :udea-replay:udeaReplayEqualityProof\n")
+        append("  ./gradlew ").append(gradleProject).append(":udeaReplayEqualityProof\n")
         append("This leg on its own, against the same recording:\n")
-        append("  ./gradlew :udea-replay:udeaReplayDigest")
+        append("  ./gradlew ").append(gradleProject).append(":udeaReplayDigest")
         append(" -Pudea.replay.fixture=").append(fixture)
         append(" -Pudea.replay.label=mine\n")
 

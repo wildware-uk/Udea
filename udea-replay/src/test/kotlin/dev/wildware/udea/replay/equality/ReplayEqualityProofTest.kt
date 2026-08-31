@@ -1,7 +1,6 @@
 package dev.wildware.udea.replay.equality
 
 import dev.wildware.udea.replay.InputSample
-import dev.wildware.udea.replay.equality.fixture.DriftDigestMain
 import dev.wildware.udea.replay.equality.fixture.DriftFixture
 import dev.wildware.udea.replay.equality.fixture.DriftFixtureKind
 import dev.wildware.udea.replay.fixture.ReplayFixtures
@@ -18,10 +17,23 @@ import kotlin.test.fail
  * The wiring nobody else checks: the build script, the checked-in bytes, and the CI workflow.
  *
  * Everything the `replay-equality` job does is a class with a `main` so that it can be tested, but
- * three joins between those classes and their callers are plain text and would otherwise drift in
- * silence: the tick the Gradle proof plants at, the entry points `ci.yml` names, and whether the
- * checked-in fixture can be rebuilt at all. Each is one assertion here and none of them can be
+ * several joins between those classes and their callers are plain text and would otherwise drift
+ * in silence: the tick the Gradle proof plants at, the entry points `ci.yml` names, and whether
+ * the checked-in fixture can be rebuilt at all. Each is one assertion here and none of them can be
  * caught by anything else.
+ *
+ * ## What this class covers after issue #172, and what `MobaReplayEqualityTest` does
+ *
+ * The CI legs replay `moba`, so anything that has to be resolved **through a game** - the leg's
+ * `--out`, the fixture the nightly names - is asserted in `moba`, by `MobaReplayEqualityTest`,
+ * against `MobaDigestMain`. A fence here that parsed those with `DriftFixtureKind.entries` would
+ * run, return a true answer, and be about a leg nobody runs: the shape of check this repository
+ * keeps finding.
+ *
+ * What stays here is what `udea-replay` still owns on those jobs - the join step, which is
+ * `:udea-replay:udeaReplayEquals` and is game-agnostic by construction; the workflow's own shape,
+ * which is neither game's; this module's build script; and the drift fixtures, which are now the
+ * gate's self-test rather than what CI replays.
  */
 class ReplayEqualityProofTest {
 
@@ -90,7 +102,7 @@ class ReplayEqualityProofTest {
     }
 
     @Test
-    fun `the checked-in fixture is regenerable, input for input`() {
+    fun `the checked-in self-test fixture is regenerable, input for input`() {
         // Regenerated from the specified `java.util.Random` LCG, so this holds on any JVM.
         //
         // The recorded *hash* stream is deliberately not compared. Those hashes are whatever the
@@ -125,20 +137,46 @@ class ReplayEqualityProofTest {
     }
 
     @Test
-    fun `the workflow runs the entry points these tests cover, and no logic of its own`() {
-        // `ci.yml` cannot be executed here, so what is checkable is that it delegates: the job
-        // must invoke the two Gradle tasks and must not reimplement the comparison in shell.
+    fun `both joins run this module's comparison task and reimplement nothing in shell`() {
+        // `ci.yml` cannot be executed here, so what is checkable is that it delegates. The join is
+        // the half `udea-replay` still owns after issue #172: `ReplayEqualsMain` reads nothing but
+        // the `.udeaeq` files, which is what lets one job rule on three legs of a game it could
+        // not build.
         //
         // Against `workflowCode` rather than the raw file: a job that had been commented out
         // would satisfy every one of these against the raw text, and a step nobody runs is
         // exactly what this class exists to notice.
         assertContains(workflowCode, "replay-equality")
-        assertContains(workflowCode, "udeaReplayDigest")
-        assertContains(workflowCode, "udeaReplayEquals")
+        for (job in listOf(PR_JOIN_JOB, NIGHTLY_JOIN_JOB)) {
+            assertContains(
+                jobBlock(job), ":udea-replay:udeaReplayEquals",
+                message = "the '$job' job no longer runs this module's comparison task",
+            )
+        }
         assertTrue(
             workflowCode.contains("udea.replay.label"),
             "each matrix leg must label its own digest, or a divergence names neither side",
         )
+    }
+
+    @Test
+    fun `the legs run the game's digest task and not this module's`() {
+        // The whole of issue #172 in one assertion, from the side that used to own the leg.
+        // `:udea-replay:udeaReplayDigest` still exists and still replays `DriftWorld` - it is the
+        // gate's self-test - so nothing would fail if a leg quietly went back to it: three green
+        // legs would report the health of a world written to be deterministic, which is the
+        // defect #172 exists to close.
+        for (job in listOf(PR_JOB, NIGHTLY_JOB)) {
+            val block = jobBlock(job)
+            assertContains(
+                block, ":moba:udeaReplayDigest",
+                message = "the '$job' job no longer replays the game",
+            )
+            assertTrue(
+                ":udea-replay:udeaReplayDigest" !in block,
+                "the '$job' job replays this module's self-test fixture again:\n$block",
+            )
+        }
     }
 
     @Test
@@ -212,9 +250,16 @@ class ReplayEqualityProofTest {
 
     @Test
     fun `a leg's digest lands in the directory its upload step globs`() {
+        // Parsed with `DriftFixtureKind.entries`, and that is the leg's own answer rather than an
+        // approximation of it. `--out` resolution is `ReplayEqualityPaths.resolve` and never
+        // consults the fixture list at all: the list is reached only by `--fixture`, which is a
+        // different option on a different line of the job. So this asks `ReplayDigestCli.parse` -
+        // the exact function `:moba:udeaReplayDigest` runs - the exact question the leg asks it.
+        // What the list *would* change, `MobaReplayEqualityTest` covers against `moba`'s own.
         val requested = gradlePropertyInJob(PR_JOB, "out")
-        val written = DriftDigestMain.parse(
+        val written = ReplayDigestCli.parse(
             arrayOf("--workspace", workspace.toString(), "--label", "leg", "--out", requested),
+            DriftFixtureKind.entries,
         ).out
 
         // Not `Path.of`: a glob is not a legal Windows path and this test runs on the
@@ -259,10 +304,14 @@ class ReplayEqualityProofTest {
     }
 
     @Test
-    fun `both entry points the workflow runs are told which directory the workspace is`() {
+    fun `this module's entry points are told which directory the workspace is`() {
         // The one join in this chain that no test can execute, because a Gradle build script is
-        // not on any classpath: the two `JavaExec` tasks have to pass `--workspace`, or the
-        // resolution the tests above exercise is never reached with the right base in CI.
+        // not on any classpath: a `JavaExec` has to pass `--workspace`, or the resolution the
+        // tests above exercise is never reached with the right base in CI.
+        //
+        // Two here - `udeaReplayDigest`, the self-test's own, and `udeaReplayEquals`, the join
+        // both CI jobs run. `:moba:udeaReplayDigest` is the third and `MobaReplayEqualityTest`
+        // asserts it against `moba`'s build script, because this test cannot read that file.
         assertContains(
             buildScript,
             "val workspaceRoot: String = rootProject.layout.projectDirectory.asFile.absolutePath",
@@ -270,8 +319,8 @@ class ReplayEqualityProofTest {
         val passes = Regex("\"--workspace\"").findAll(buildScript).count()
         assertEquals(
             2, passes,
-            "`udeaReplayDigest` and `udeaReplayEquals` are the two tasks ci.yml runs and both " +
-                "must pass --workspace; found $passes occurrence(s) in the build script",
+            "`udeaReplayDigest` and `udeaReplayEquals` both take a workspace-relative path and " +
+                "both must pass --workspace; found $passes occurrence(s) in the build script",
         )
     }
 
@@ -351,22 +400,6 @@ class ReplayEqualityProofTest {
     }
 
     @Test
-    fun `the nightly replays the long fixture and the PR job replays the short one`() {
-        // Derived from the enum rather than restated: the workflow names a fixture by string and
-        // `DriftFixtureKind.byName` is what resolves it, so a typo here is a job that fails
-        // inside a classpath lookup at three in the morning.
-        val named = gradlePropertyInJob(NIGHTLY_JOB, "fixture")
-
-        assertEquals(DriftFixtureKind.NIGHTLY, DriftFixtureKind.byName(named))
-        assertTrue(
-            "-Pudea.replay.fixture" !in jobBlock(PR_JOB),
-            "the PR job now names a fixture explicitly. Issue #152's scope says the long fixture " +
-                "must not block a pull request, and `DriftDigestMain` defaults to the short one, " +
-                "so the PR job naming one at all is how it would come to replay the long one.",
-        )
-    }
-
-    @Test
     fun `the nightly never runs on a pull request and the gate always does`() {
         // The whole reason this is a second job. A leg cannot be skipped by event without the
         // runner starting anyway, so the condition has to be on the job.
@@ -395,8 +428,9 @@ class ReplayEqualityProofTest {
         // never that the code was wrong - it was that two identical-looking spellings resolved
         // against two different directories.
         val requested = gradlePropertyInJob(NIGHTLY_JOB, "out")
-        val written = DriftDigestMain.parse(
+        val written = ReplayDigestCli.parse(
             arrayOf("--workspace", workspace.toString(), "--label", "leg", "--out", requested),
+            DriftFixtureKind.entries,
         ).out
 
         val glob = stepValue("Upload this nightly leg's digest stream", "path")
@@ -411,6 +445,25 @@ class ReplayEqualityProofTest {
             globMatches(glob.substringAfterLast('/'), written.fileName.toString()),
             "the nightly upload globs '${glob.substringAfterLast('/')}', which does not match " +
                 "'${written.fileName}'",
+        )
+    }
+
+    @Test
+    fun `the nightly names a fixture and the gate names none`() {
+        // Which fixture is a fact about the game, so `MobaReplayEqualityTest` resolves the name
+        // through `MobaFixtureKind.byName`. What is checkable from here is the property issue
+        // #152's scope bullet states and this module's entry point implements: a leg that names
+        // no fixture replays the short one, so the gate naming one at all is how it would come to
+        // replay the long one on every push.
+        assertTrue(
+            gradlePropertyInJob(NIGHTLY_JOB, "fixture").isNotEmpty(),
+            "the nightly job no longer names a fixture, so it replays the gate's short one",
+        )
+        assertTrue(
+            "-Pudea.replay.fixture" !in jobBlock(PR_JOB),
+            "the gate job now names a fixture explicitly. `ReplayDigestCli.parse` defaults to the " +
+                "first fixture the game declares, which is the short one, so the gate naming one " +
+                "at all is how it would come to replay the long one on every push.",
         )
     }
 

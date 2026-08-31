@@ -4,13 +4,18 @@ import dev.wildware.udea.replay.BuildIdentity
 import dev.wildware.udea.replay.InputSample
 import dev.wildware.udea.replay.ReplayRecorder
 import dev.wildware.udea.replay.ReplayRecording
+import dev.wildware.udea.replay.equality.ReplayFixtureRef
 import dev.wildware.udea.replay.fixture.ReplayFixture
 import dev.wildware.udea.replay.fixture.ReplayFixtures
 import java.nio.file.Path
 import java.util.Random
 
 /**
- * Writes and reads the checked-in `.udearep` the `replay-equality` job replays.
+ * Writes and reads the checked-in `.udearep` files the `replay-equality` gate's self-test replays.
+ *
+ * Since issue #172 the CI legs replay `moba`; these are what `udeaReplayEqualityProof` and
+ * `CrossPlatformDivergenceTest` plant into, which is how the machinery is shown to be able to
+ * fail at all.
  *
  * ## The pilot is a specified LCG, on purpose
  *
@@ -48,9 +53,8 @@ public object DriftFixtureRecorder {
      * `InputSample.setPressCount` takes `0..255` and refuses anything else - a press count is one
      * byte on the wire, and every game that sends one sends a rolling counter that wraps. The
      * fixture pilot ignored that and kept a lifetime total, which fitted only because the
-     * 3600-tick fixture presses roughly `3600 / PULSE_ODDS` = 150 times. The 36000-tick fixture
-     * of issue #165 is ten times as long, so its pilot presses ten times as many times; recording
-     * it threw
+     * 3600-tick fixture presses roughly `3600 / PULSE_ODDS` = 150 times. The 36000-tick fixture is
+     * ten times as long, so its pilot presses ten times as many times; recording it threw
      * `a press count must be in 0..255, was 256 for action 'drift/pulse'` partway through - so
      * the length of every fixture this world can have was capped by a limit nothing named.
      *
@@ -117,7 +121,7 @@ public object DriftFixtureRecorder {
     )
 
     /** Reads one checked-in fixture from the classpath. */
-    public fun readCheckedIn(kind: DriftFixtureKind = DriftFixtureKind.PR): ReplayRecording {
+    public fun readCheckedIn(kind: ReplayFixtureRef = DriftFixtureKind.PR): ReplayRecording {
         val bytes = checkNotNull(javaClass.getResourceAsStream(kind.resource)) {
             "${kind.resource} is not on the classpath. It is checked in under " +
                 "udea-replay/src/testFixtures/resources; rebuild it with " +

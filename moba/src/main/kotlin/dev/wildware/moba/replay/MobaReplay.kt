@@ -151,7 +151,17 @@ public object MobaReplay {
      * different game, and the resulting divergence would point at a tick whose cause was in the
      * ticks this factory invented.
      */
-    public fun worlds(): ReplayWorldFactory = ReplayWorldFactory { firstTick ->
+    public fun worlds(): ReplayWorldFactory = ReplayWorldFactory(::replayWorld)
+
+    /**
+     * [worlds]' one world, typed, so a caller that decorates one does not have to cast.
+     *
+     * The cross-OS gate's planted leg wraps this (see `PlantedMobaWorld` in the test source set),
+     * and a `ReplayWorldFactory` hands back the interface. Naming the concrete builder here is a
+     * line; a cast at the wrapping site is a line that is wrong the first day a second
+     * implementation exists.
+     */
+    public fun replayWorld(firstTick: Tick): MobaReplayWorld {
         val host = bootHeadless()
         check(host.tick == firstTick) {
             "a fresh headless moba comes up at ${host.tick} and this recording starts at " +
@@ -159,7 +169,7 @@ public object MobaReplay {
                 "would mean running ticks whose input is not in the recording, and the replay " +
                 "would then diverge over a history this factory made up"
         }
-        MobaReplayWorld(host)
+        return MobaReplayWorld(host)
     }
 
     /** Copies one tick of [intent] into [sample]. Allocation-free; called per tick while recording. */

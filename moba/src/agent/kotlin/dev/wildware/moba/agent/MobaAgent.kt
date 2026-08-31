@@ -12,6 +12,8 @@ import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.GameUnitReplicator
 import dev.wildware.moba.level.MobaBlueprints
 import dev.wildware.moba.level.Team
+import dev.wildware.moba.item.Inventory
+import dev.wildware.moba.item.InventoryReplicator
 import dev.wildware.moba.match.MatchState
 import dev.wildware.moba.match.MatchStateReplicator
 import dev.wildware.moba.entry.MobaEntry
@@ -274,7 +276,7 @@ public object MobaAgent {
         val worldTools = WorldToolset(
             world = host.world,
             components = AgentComponentIndex(
-                listOf(positionAccess(), unitAccess(), matchAccess()),
+                listOf(positionAccess(), unitAccess(), matchAccess(), inventoryAccess()),
             ),
             netIds = host.ctx[CoreModule.NET_IDS],
             bridge = bridge,
@@ -418,6 +420,32 @@ public object MobaAgent {
         name = "MatchState",
         replicator = MatchStateReplicator,
         componentType = MatchState,
+    )
+
+    /**
+     * `Inventory`, so what a champion is carrying is readable without a screenshot.
+     *
+     * This ticket's shop has no drawn surface - item icon art is out of scope in issue #132 and
+     * nothing renders an inventory yet - so without this line the whole feature is invisible from
+     * outside the process and there is nothing for an agent to look at. With it,
+     * `world.query_entities with=Inventory fields=Inventory` is a champion's six slots and its
+     * trinket, read off the **authoritative component** rather than off a mirror, and running it
+     * either side of a purchase is what shows that the purchase happened.
+     *
+     * Each slot reads back as the `AssetIndex` an [dev.wildware.moba.item.Inventory] stores, or
+     * `-1` for empty. That is a slot in the packed graph, so `assets.list` turns it into an id -
+     * the same indirection a snapshot uses, and the reason a rewind across a hot reload restores
+     * the right item rather than the right *name*.
+     *
+     * Nothing here is agent-writable, for `matchAccess`'s reason with a sharper edge: a caller
+     * that could write a slot could hand itself `item/aegis` without paying for it, and every
+     * later reading of the economy would be a statement about that write rather than about the
+     * game. Buying goes through `ShopService`, which charges.
+     */
+    private fun inventoryAccess(): AgentComponentType = agentComponent(
+        name = "Inventory",
+        replicator = InventoryReplicator,
+        componentType = Inventory,
     )
 
     /**

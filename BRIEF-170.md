@@ -1,13 +1,21 @@
 # BRIEF-170 — a clone builds `:moba`, and nobody types anything
 
+**Round 2's SHA is `e69b01d`** — the commit that carries the round-2 change. Round 2 is the
+section at the bottom of this file, beginning `# Round 2 — e69b01d`; the eight sections above it
+are round 1's and are unchanged. The rest of this preamble is round 1's and still describes it.
+
 `d6a04a4` — the merge of `origin/example` into this branch, and the SHA the linked Actions run
 below was built from. `HEAD` is that plus further commits of this file alone; a self-naming SHA is
 impossible, since writing one into a file changes it. `git diff --stat d6a04a4..HEAD` is
-`BRIEF-170.md` and nothing else.
+`BRIEF-170.md` and nothing else. *[Round 2: that was true at `05ab99d`. `HEAD` now also carries the
+merge `0bb6e07` and the four-document fix `e69b01d`; `git diff --stat 05ab99d..d6a04a4` is still
+empty of anything but this file.]*
 
 Branch `issue-170-moba-art-clean-clone`, branched from `origin/example` at `7942823` and merged up
 to `efab1d0` (which is `origin/example` with #171 and #173 in it). The merge was clean; `git diff
---name-only origin/example..HEAD` is this branch's fourteen files and nothing of theirs.
+--name-only origin/example..HEAD` is this branch's fourteen files and nothing of theirs. *[Round 2:
+merged up again to `7691b3d`, and that command now lists eighteen — those fourteen plus the four
+under `.claude/`.]*
 
 Every `logs/...` filename below is a real file in
 `/tmp/claude-1000/-srv-ssd1-workspace-Udea/a3ee2737-1b26-4f77-96b3-6805f45c796f/scratchpad/logs/`

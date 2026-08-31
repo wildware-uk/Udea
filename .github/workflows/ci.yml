@@ -1326,12 +1326,17 @@ jobs:
     # buy nothing and would make `ReplayEqualityProofTest`'s "exactly one leg" fence a fence over
     # two jobs' worth of legs.
     #
-    # ## Measured, on the box this branch was developed on
+    # ## Measured, on run 33430551297, which is this job's own first execution
     #
-    # The replay itself is 3080ms for 36000 ticks against 411ms for 3600, so a leg's wall time is
-    # still checkout, JDK and the Gradle build and this adds under three seconds to it. What it
-    # does add is artefact: a 36000-tick digest stream is 16,466,736 bytes against the PR
-    # fixture's 1,626,953, so one nightly run uploads about 50MB across its three legs.
+    # The replay itself was 3630ms for 36000 ticks against 640ms for 3600 on the same OS and JVM -
+    # so a leg's wall time is still checkout, JDK and the Gradle build, and the extra replay
+    # disappears into that: 85s, 88s and 92s for the three nightly legs against 97s for a gate leg
+    # on the same run, one sample each. Far inside the 240s a gate leg is budgeted at.
+    #
+    # What it does add is artefact. A 36000-tick digest stream is 16,466,747 bytes against the PR
+    # fixture's 1,626,969, so one nightly run uploads 47.1MiB across its three legs, at the same
+    # seven-day retention. That is the number to revisit if the storage bill ever matters, and
+    # `retention-days` below is the lever.
     name: replay-equality-nightly (${{ matrix.os }}, ${{ matrix.distribution }})
     # Never on a pull request. `workflow_dispatch` is here so the job can be proven to run without
     # waiting a day for the cron; it is how issue #165's own evidence was produced.

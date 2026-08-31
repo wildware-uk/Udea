@@ -402,7 +402,19 @@ tasks.register("udeaReplayEqualityProof") {
         }
         // `Tick.toString()` renders `t1200`, and the report has to name the tick, the entity, the
         // component and field, and five ticks of that field's history - spec 7's four.
-        val required = listOf("at t$expectedTick", "Drifter.x", "NetId(", "the preceding 5 tick(s)")
+        //
+        // The last two are issue #165's: what CI publishes has to tell a reader how to reproduce
+        // this on one machine, with the tick to land on already worked out. `ReplayBisectGuide`
+        // renders it and `ReplayBisectGuideTest` covers the renderer; this is the only thing that
+        // checks the rendered block actually reaches the file the job summary prints.
+        val required = listOf(
+            "at t$expectedTick",
+            "Drifter.x",
+            "NetId(",
+            "the preceding 5 tick(s)",
+            "--- reproducing this locally ---",
+            "replay.seek    {\"tick\": ${expectedTick.toInt() - 1}}",
+        )
         for (needle in required) {
             check(plantedReport.contains(needle)) {
                 "the planted divergence report does not contain '$needle', so it does not name " +

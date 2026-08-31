@@ -80,7 +80,7 @@ class SnapshotLayoutGoldenTest {
         val createFrames = FrameWriter(createOut)
         val createPayload = createFrames.beginMessage(MessageType.Snapshot)
         writer.begin()
-        writer.writeCreate(createPayload, first.fields, first.fields.rowOf(netId))
+        writer.writeCreate(createPayload, first.fields, first.fields.rowOf(netId), recipientOwnsEntity = true)
         writer.end(createPayload)
         createFrames.endMessage()
 
@@ -96,6 +96,7 @@ class SnapshotLayoutGoldenTest {
             second.fields.rowOf(netId),
             first.fields,
             first.fields.rowOf(netId),
+            recipientOwnsEntity = true,
         )
         writer.end(deltaPayload)
         deltaFrames.endMessage()

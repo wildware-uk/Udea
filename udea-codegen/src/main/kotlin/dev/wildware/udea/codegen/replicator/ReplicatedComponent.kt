@@ -115,6 +115,10 @@ internal data class Quantisation(val bits: Int, val min: Float, val max: Float) 
  *   full resend and is stripped from every delta (issue #114). Only ever `true` when [net] is,
  *   because a `@Sim` field never reaches a packet of any kind and "written once on a wire it
  *   is never on" is not a statement about anything.
+ * @param ownerOnly `true` for `@Net(visibility = OwnerOnly)`: the field reaches the connection
+ *   that owns the entity and is stripped from every other recipient's packet, create included
+ *   (issue #167). Only ever `true` when [net] is, for [createOnly]'s reason. Independent of
+ *   [createOnly]: one says when a field is sent, the other says to whom.
  */
 internal data class ReplicatedField(
     val path: List<String>,
@@ -127,6 +131,7 @@ internal data class ReplicatedField(
     val enumConstants: List<String>?,
     val quantisation: Quantisation?,
     val createOnly: Boolean = false,
+    val ownerOnly: Boolean = false,
 ) {
     /** The Kotlin property path; also the entry in `Replicator.fieldNames`. */
     val name: String = path.joinToString(".")
@@ -135,15 +140,18 @@ internal data class ReplicatedField(
      * What `net-protocol.lock` records for this field, and therefore what `protoHash` covers.
      *
      * The rule is that **every declaration a peer must agree on appears here**, not merely
-     * the field's width. Two changes make that more than the bit count:
+     * the field's width. What the two peers must agree on is what the bits *mean*, and a
+     * declaration can change that while moving no bit at all:
      *
-     * - a `@Q` range change reinterprets every packet without moving a single bit, so the
-     *   bounds are in the token (`q:12:-3.1416:3.1416`);
-     * - reordering an enum's constants remaps every ordinal without moving a single bit, so
-     *   the constants are in the token (`enum:32:Standing,Crouching,Sprinting`).
+     * - a `@Q` range change reinterprets every packet, so the bounds are in the token
+     *   (`q:12:-3.1416:3.1416`);
+     * - reordering an enum's constants remaps every ordinal, so the constants are in the token
+     *   (`enum:32:Standing,Crouching,Sprinting`);
+     * - `lifetime` changes which packets carry the field, so `:oncreate` is in the token;
+     * - `visibility` changes which recipients carry it, so `:owneronly` is in the token.
      *
-     * Both were invisible to a token of `q:12` / `enum:32`, which is the same defect in two
-     * places: a lock that pins the layout and not the meaning.
+     * Every one of those was invisible to a token of `q:12` / `enum:32`, which is one defect in
+     * several places: a lock that pins the layout and not the meaning.
      */
     val wireDescription: String = buildString {
         when {
@@ -158,6 +166,14 @@ internal data class ReplicatedField(
         // there. Both decode every packet the other sends without complaint and disagree about
         // the value for the rest of the match, so it has to reach `protoHash`.
         if (createOnly) append(":oncreate")
+        // Visibility is part of the token for lifetime's reason, and the argument is worth
+        // stating rather than inheriting: a peer that thinks `gold` is `All` expects the server
+        // to send it for every champion; a peer that thinks it is `OwnerOnly` expects it for
+        // one. Both decode every packet the other sends without complaint, and the difference is
+        // a permanent disagreement about what a client is owed. After `:oncreate` and never
+        // before it, because the token is hashed: two builds that agreed about the field and
+        // spelled its description in the other order would refuse each other's handshake.
+        if (ownerOnly) append(":owneronly")
     }
 }
 
@@ -193,4 +209,14 @@ internal data class ReplicatedComponent(
      * already have.
      */
     val createOnlyFields: List<ReplicatedField> get() = fields.filter { it.createOnly }
+
+    /**
+     * The `@Net(visibility = OwnerOnly)` fields, in bit-index order.
+     *
+     * Empty for all but a handful of components, and that emptiness is load-bearing for the same
+     * reason [createOnlyFields]' is: the generated object only implements `udea-net`'s
+     * `OwnerOnlyFields` when this is non-empty, so a module with no owner-only field never gains
+     * a reference to `udea-net` it did not already have — and no packet gains a byte.
+     */
+    val ownerOnlyFields: List<ReplicatedField> get() = fields.filter { it.ownerOnly }
 }

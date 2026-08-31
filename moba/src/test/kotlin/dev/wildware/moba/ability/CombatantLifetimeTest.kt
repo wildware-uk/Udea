@@ -82,7 +82,7 @@ class CombatantLifetimeTest {
         val writer = SnapshotWriter(registry)
         val createOut = BitBufferWriter(ByteArray(BUFFER_BYTES))
         writer.begin()
-        writer.writeCreate(createOut, first.fields, first.fields.rowOf(orc))
+        writer.writeCreate(createOut, first.fields, first.fields.rowOf(orc), recipientOwnsEntity = true)
         writer.end(createOut)
 
         val updateOut = BitBufferWriter(ByteArray(BUFFER_BYTES))
@@ -93,6 +93,7 @@ class CombatantLifetimeTest {
             second.fields.rowOf(orc),
             first.fields,
             first.fields.rowOf(orc),
+            recipientOwnsEntity = true,
         )
         writer.end(updateOut)
 

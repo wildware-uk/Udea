@@ -108,6 +108,18 @@ internal object NetNames {
      * it is the accurate answer.
      */
     val CREATE_ONLY_FIELDS: ClassName = ClassName(WIRE, "CreateOnlyFields")
+
+    /**
+     * `OwnerOnlyFields`, implemented **only** by a replicator that has a
+     * `@Net(visibility = OwnerOnly)` field (issue #167).
+     *
+     * Conditional for [CREATE_ONLY_FIELDS]' reason, and independently of it: this and
+     * [CREATE_ONLY_FIELDS] answer different questions - *to whom* a field is sent and *when* -
+     * so a component may implement either, both or neither. `VisibilityPolicy` reads an absent
+     * declaration as "nothing is owner-only", which is the accurate answer for a component whose
+     * fields are all `visibility = All` rather than a fallback.
+     */
+    val OWNER_ONLY_FIELDS: ClassName = ClassName(WIRE, "OwnerOnlyFields")
 }
 
 /**

@@ -9,6 +9,7 @@ import dev.wildware.udea.core.snapshot.ColumnarFieldStore
 import dev.wildware.udea.core.snapshot.ComponentRegistry
 import dev.wildware.udea.core.snapshot.FieldKind
 import dev.wildware.udea.core.snapshot.WorldFieldStore
+import dev.wildware.udea.net.wire.VisibilityPolicy
 
 /**
  * "Do these three processes hold the same world?", answered as one number.
@@ -24,6 +25,21 @@ import dev.wildware.udea.core.snapshot.WorldFieldStore
  *
  * So this folds the `@Net` set and only the `@Net` set - the closure of what replication
  * actually promises to deliver. A difference here is a genuine desync.
+ *
+ * ## Minus the owner-only fields, since issue #167
+ *
+ * `@Net(visibility = OwnerOnly)` narrowed what that promise is. A champion's `Inventory` is
+ * replicated to the connection that drives it and stripped from every other client's packet, so
+ * a server-versus-client fold that included it reports a difference on **every** champion the
+ * comparing client does not own, in a perfectly converged session - which is the `@Sim` mistake
+ * in a new place. What every relevant client is promised is `netMask and ownerOnlyMask.inv()`,
+ * and that is what folds here.
+ *
+ * The narrowing is real and worth stating rather than hiding: this number no longer says
+ * anything about whether an owner received its own private fields. That claim needs to know who
+ * owns what, which this has no way to be told, so it is made where the ownership is - `moba`'s
+ * `InventoryVisibilityTest` and `udea-net`'s `OwnerOnlyVisibilityTest`, both against live
+ * clients.
  *
  * ## Canonical, not bitwise
  *
@@ -79,7 +95,10 @@ public object NetStateProbe {
         for (component in 0 until registry.size) {
             if (!fields.isPresent(row, component)) continue
             val type = registry.typeAt(component)
-            val mask = type.replicator.netMask
+            // What every relevant client is promised, which since issue #167 is not the whole
+            // `@Net` set: an owner-only field reaches one connection, so folding it would report
+            // a desync against every client that is not that one.
+            val mask = VisibilityPolicy.visibleMask(type.replicator, recipientOwnsEntity = false)
             if (MaskOps.isEmpty(mask)) continue
             if (!include(type.componentClass.simpleName ?: "")) continue
             val schema = type.schema

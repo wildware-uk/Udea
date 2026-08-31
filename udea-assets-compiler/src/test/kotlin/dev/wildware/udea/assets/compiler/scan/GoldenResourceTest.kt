@@ -25,11 +25,8 @@ class GoldenResourceTest {
 
     @Test
     fun `a translated copy is refused, and the failure names the cause and the file`() {
-        val committed = GoldenResource.bytes(GoldenResource.EXAMPLE_DECLARATIONS)
-        val translated = committed.toString(Charsets.UTF_8).replace("\n", "\r\n").toByteArray()
-
         val failure = assertFailsWith<IllegalStateException> {
-            GoldenResource.untranslated(GoldenResource.EXAMPLE_DECLARATIONS, translated)
+            GoldenResource.untranslated(GoldenResource.EXAMPLE_DECLARATIONS, TRANSLATED)
         }
 
         val message = failure.message.orEmpty()
@@ -37,18 +34,31 @@ class GoldenResourceTest {
         assertTrue("core.autocrlf" in message, message)
         assertTrue(".gitattributes" in message, message)
         // The count, so the failure says how much was translated rather than only that it was.
-        assertTrue("${committed.toString(Charsets.UTF_8).count { it == '\n' }} carriage" in message, message)
+        assertTrue("3 carriage return(s)" in message, message)
     }
 
     @Test
     fun `an untranslated copy is returned unchanged`() {
-        // The control for the test above. A fence that refuses everything is as wrong as one
-        // that refuses nothing, and this is the case the whole suite runs on every green build.
-        val committed = GoldenResource.bytes(GoldenResource.EXAMPLE_DECLARATIONS)
+        // The control for the test above, and it is not a formality: a fence that refuses
+        // everything is as wrong as one that refuses nothing, and this is the case the rest of
+        // the suite runs on every green build.
+        assertEquals(UNTRANSLATED, GoldenResource.untranslated(GoldenResource.EXAMPLE_DECLARATIONS, COMMITTED))
+    }
 
-        assertEquals(
-            committed.toString(Charsets.UTF_8),
-            GoldenResource.untranslated(GoldenResource.EXAMPLE_DECLARATIONS, committed),
-        )
+    private companion object {
+
+        /**
+         * A fixture rather than the real golden, on purpose.
+         *
+         * The two tests above are about the fence, not about this checkout - that is the first
+         * test's job. Deriving them from the file on disk would make all three fail together
+         * the moment one CRLF copy arrived, which reports one defect three times and buries the
+         * one of them that is actually about the tree.
+         */
+        const val UNTRANSLATED: String = "{\n  \"files\": []\n}\n"
+
+        val COMMITTED: ByteArray = UNTRANSLATED.toByteArray(Charsets.UTF_8)
+
+        val TRANSLATED: ByteArray = UNTRANSLATED.replace("\n", "\r\n").toByteArray(Charsets.UTF_8)
     }
 }

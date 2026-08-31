@@ -1,4 +1,9 @@
-ded18b4
+3334113
+
+*(The commit that adds this line is `3334113`'s child and touches only this file — a file cannot
+state the hash of the commit containing it. `3334113` is the SHA to review: `git diff
+origin/example..3334113` is the whole change. `git log --oneline 3334113..HEAD` shows the brief-only
+commits after it.)*
 
 # Issue #165 — replay-equality nightly fixture, regeneration flag and bisect job summary
 
@@ -933,10 +938,17 @@ Two of those runs were cancelled part-way by the workflow's own
 The jobs quoted above had all reached a terminal state before the cancellation; where one had not,
 I have not quoted it.
 
-**The Actions evidence was produced at `b06b2bc`.** The only commit after it, `ded18b4`, moves the
-earliest-divergence selection into `ReplayBisectGuide.render` so it can be tested — it changes no
-workflow, no fixture and no rendered output for the single-pair case those runs exercised. That is
-checkable: `git diff b06b2bc..ded18b4 --stat`.
+**The Actions evidence was produced at `b06b2bc`.** Two commits land after it and neither can move
+what those runs showed:
+
+- `ded18b4` moves the earliest-divergence selection into `ReplayBisectGuide.render` so it can be
+  tested. For the single-pair case those runs exercised it renders the same text.
+- `3334113` adds this brief and rewrites a comment block inside the nightly job, replacing the
+  locally-estimated cost with the numbers that run actually produced. No step, no condition and no
+  property changed.
+
+Both are checkable: `git diff b06b2bc..HEAD -- .github/workflows/ci.yml` is comment-only, and
+`git diff b06b2bc..HEAD --stat` names the rest.
 
 ## 9. Regenerated files
 

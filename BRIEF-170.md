@@ -1,7 +1,8 @@
 # BRIEF-170 — a clone builds `:moba`, and nobody types anything
 
 `a966e29` — the last commit that touches anything but this file. `HEAD` is that commit plus this
-brief, and one further commit is unavoidable: writing a SHA into a file changes the SHA.
+brief (two commits of it), and a self-naming SHA is impossible: writing one into a file changes
+it. `git log --oneline a966e29..HEAD` shows only `BRIEF-170.md`.
 
 Branch `issue-170-moba-art-clean-clone`, off `origin/example` (`7942823`).
 

@@ -625,6 +625,13 @@ jobs:
           done
           [ "$status" -eq 0 ] || exit 1
 
+          # Echoed on the *success* path as well, not only on the failure paths. Both gradle
+          # invocations write to a temporary directory that the EXIT trap removes, so without
+          # this a green run leaves a log saying only that it expected something - and a gate
+          # whose passing evidence is not in its own log is a gate nobody can quote later.
+          echo "the compilation reported, and every line of it is a UDEA rule:"
+          cat "$logs/errors.log"
+
           # The same source, the same module, the flag flipped. This is the half that makes the
           # degrade procedure in docs/compiler-plugin.md a procedure rather than a hope.
           if ! ./gradlew ":${module}:compileKotlin" -Pudea.compilerPlugin.enabled=false --console=plain > "$logs/disabled.log" 2>&1; then
@@ -632,6 +639,8 @@ jobs:
             grep -E '^e: ' "$logs/disabled.log" || tail -n 40 "$logs/disabled.log"
             exit 1
           fi
+          echo "-Pudea.compilerPlugin.enabled=false, the same file, :${module}:compileKotlin:"
+          grep -E '^BUILD ' "$logs/disabled.log" || tail -n 3 "$logs/disabled.log"
 
           # Built once and written twice: to the job summary, which is where a person reads
           # it, and to stdout, which is where the run log keeps it. A summary is not in the

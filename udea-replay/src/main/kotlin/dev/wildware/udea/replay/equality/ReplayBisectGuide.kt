@@ -46,11 +46,16 @@ public object ReplayBisectGuide {
     )
 
     /**
-     * The block, for a run of [fixture] that diverged at [divergentTick] or did not diverge.
+     * The block, for a run of [fixture] over legs that diverged at [divergentTicks] or did not.
      *
-     * @param divergentTick the first tick two legs disagreed at, or `null` when they agreed.
+     * @param divergentTicks one entry per pair compared: the tick that pair first disagreed at,
+     *   or `null` where it agreed. The **earliest** is the one a reader is sent to, and taking
+     *   the minimum here rather than at the call site is what makes it testable: two legs can
+     *   diverge from the reference at different ticks, in either order, and every later one may
+     *   be a consequence of the earlier.
      */
-    public fun render(fixture: String, divergentTick: Tick?): String = buildString {
+    public fun render(fixture: String, divergentTicks: List<Tick?>): String = buildString {
+        val divergentTick = divergentTicks.filterNotNull().minOrNull()
         append("\n\n--- reproducing this locally ---\n")
         append("Both halves of the gate, in five processes on one machine:\n")
         append("  ./gradlew :udea-replay:udeaReplayEqualityProof\n")

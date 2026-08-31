@@ -42,7 +42,7 @@ class ReplayBisectGuideTest {
     fun `the guide prints every tool it lists, so the list is not decoration`() {
         // Without this the list above could be correct and the rendered text could name something
         // else entirely - a fence on a constant nothing reads.
-        val rendered = ReplayBisectGuide.render(FIXTURE, divergentTick = Tick(1_200L))
+        val rendered = ReplayBisectGuide.render(FIXTURE, listOf(Tick(1_200L)))
 
         for (tool in ReplayBisectGuide.TOOLS) assertContains(rendered, tool)
     }
@@ -52,7 +52,7 @@ class ReplayBisectGuideTest {
         // Not the divergent tick. `replay.seek` lands *on* the tick given and the interesting
         // step is the one into the divergence, so seeking to the divergence itself has already
         // run the step a reader wants to watch.
-        val rendered = ReplayBisectGuide.render(FIXTURE, divergentTick = Tick(1_200L))
+        val rendered = ReplayBisectGuide.render(FIXTURE, listOf(Tick(1_200L)))
 
         assertContains(rendered, "\"tick\": 1199")
         assertContains(rendered, "t1200")
@@ -64,7 +64,7 @@ class ReplayBisectGuideTest {
         // The boundary the arithmetic above has: tick zero has no preceding tick to land on, and
         // a `replay.seek` to -1 is refused by `ReplaySession`, so the guide would be handing a
         // reader a call that cannot work.
-        val rendered = ReplayBisectGuide.render(FIXTURE, divergentTick = Tick(0L))
+        val rendered = ReplayBisectGuide.render(FIXTURE, listOf(Tick(0L)))
 
         assertTrue(
             "-1" !in rendered,
@@ -74,11 +74,35 @@ class ReplayBisectGuideTest {
     }
 
     @Test
+    fun `the guide lands on the earliest tick any pair diverged at, not the first pair's`() {
+        // Three legs is two pairs, and they can disagree with the reference at different ticks in
+        // either order. The earlier is the one to land on: every later divergence may be a
+        // consequence of it, and a reader sent to the later one bisects a symptom.
+        val laterFirst = ReplayBisectGuide.render(FIXTURE, listOf(Tick(9_000L), Tick(1_200L)))
+        val earlierFirst = ReplayBisectGuide.render(FIXTURE, listOf(Tick(1_200L), Tick(9_000L)))
+
+        assertEquals(earlierFirst, laterFirst, "the order the pairs were compared in changed the answer")
+        assertContains(laterFirst, "\"tick\": 1199")
+        assertTrue("9000" !in laterFirst, "the guide sent the reader to the later divergence:\n$laterFirst")
+    }
+
+    @Test
+    fun `one pair agreeing does not hide another pair's divergence`() {
+        // A `null` in the list is a pair that agreed, and it must not be treated as "no
+        // divergence anywhere" - with three legs, one agreeing pair is the normal shape of a
+        // single bad leg.
+        val rendered = ReplayBisectGuide.render(FIXTURE, listOf(null, Tick(1_200L)))
+
+        assertContains(rendered, "\"tick\": 1199")
+        assertTrue("no divergence" !in rendered, "a divergence was reported as none:\n$rendered")
+    }
+
+    @Test
     fun `with nothing to bisect the guide says so and still says how to run it`() {
         // A green summary is read too - by somebody who wants to run the gate before they push,
         // which is the whole reason the reproduction command is in it. Rendering nothing here
         // would make the block appear only in the situation where nobody has time to read it.
-        val rendered = ReplayBisectGuide.render(FIXTURE, divergentTick = null)
+        val rendered = ReplayBisectGuide.render(FIXTURE, listOf(null, null))
 
         assertContains(rendered, "no divergence")
         assertContains(rendered, "udeaReplayEqualityProof")
@@ -93,7 +117,7 @@ class ReplayBisectGuideTest {
     fun `the reproduction command names the fixture that actually diverged`() {
         // Two fixtures exist and the nightly replays the long one; a reproduction command that
         // always named the short one would run a different recording and find nothing.
-        val rendered = ReplayBisectGuide.render("drift-36000.udearep", divergentTick = Tick(9_000L))
+        val rendered = ReplayBisectGuide.render("drift-36000.udearep", listOf(Tick(9_000L)))
 
         assertContains(rendered, "-Pudea.replay.fixture=drift-36000.udearep")
         assertEquals(

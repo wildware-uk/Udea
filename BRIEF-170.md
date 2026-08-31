@@ -627,3 +627,411 @@ above.
 - **A second sprite tree.** The task is registered by one game. Whether
   `registerCharacterArtStaging()` generalises to a second game is untested, and it is written
   narrowly enough that it should be re-read rather than reused as-is if a second one appears.
+
+---
+---
+
+# Round 2 — `e69b01d`
+
+`e69b01d` is the commit that carries the round-2 change. `HEAD` is that plus further commits of
+this file alone, for the same reason §0 gives: a file cannot name the SHA that contains it.
+`git diff --stat e69b01d..HEAD` is `BRIEF-170.md` and nothing else.
+
+The branch is now merged up to `origin/example` at `7691b3d` (#173 `c74c730`, #171 `efab1d0`,
+#165 `7691b3d`). The merge commit is `0bb6e07` and it was textually clean — #165 touches
+`udea-replay/` and `ci.yml`'s `replay-equality` blocks, and this branch touches neither.
+
+Round 2's `logs/...` filenames are **not** §0's directory. Every one below is a real file in
+**`/tmp/i170r2/`** on this box, written by the run it is quoted from, and every block quoted from
+one is spliced rather than retyped. §0's logs are still where §0 says they are.
+
+```
+$ git diff --stat 0bb6e07 e69b01d
+ .claude/WAVE.md                  | 19 +++++++++----------
+ .claude/agents/engineer.md       | 30 ++++++++++++++----------------
+ .claude/agents/team-lead.md      |  8 +++++---
+ .claude/skills/dev-team/SKILL.md | 23 +++++++++++------------
+ 4 files changed, 39 insertions(+), 41 deletions(-)
+```
+
+Four markdown files under `.claude/`, and nothing else. `git diff --name-only origin/example..HEAD`
+is the fourteen files §0 lists plus these four — eighteen — and no build input among the new ones.
+
+---
+
+## R2.1 The finding
+
+`review-170-r1` failed `05ab99d` on exactly one finding, and passed everything else. What follows
+is the finding **as relayed to me by the lead**, not the reviewer's own report, which I have not
+read — the quoted fragments are the lead's quotations of it:
+
+> Four **tracked** documents still order their reader to run `scripts/stage-moba-art.py`, which
+> this branch deletes. Three of them are imperatives, not passing mentions:
+>
+> - `.claude/skills/dev-team/SKILL.md:339` — "STAGE THE ART FIRST, OR THE BUILD CANNOT PASS … Run
+>   it once, before your first build."
+> - `.claude/agents/engineer.md:58` — the same block, including "Nothing else tells you this."
+> - `.claude/agents/team-lead.md:242` — "The developer prompt **MUST** contain … `python3
+>   scripts/stage-moba-art.py` before the first build." **This one is self-replicating**: it
+>   mandates copying the now-broken command into every future developer prompt.
+> - `.claude/WAVE.md:28` and `:48` — "Do this in every review checkout and every trial merge."
+
+Classed under reject-list item 21 — a document left telling a reader to run something that no
+longer exists. The reviewer's own words on the rest, again as relayed: *"The change itself is good
+work and I couldn't break it."*
+
+### This was not an oversight by the previous developer, and the record should say so
+
+The previous developer found all four itself, listed them with line numbers, and asked the lead
+whether to patch them. It was told not to, and it complied. At that moment the files were
+**correct**: `scripts/stage-moba-art.py` still existed on `origin/example`, and three reviewers
+were working from detached checkouts that needed it — `.claude/WAVE.md:48` is precisely why they
+were told to run it.
+
+That reasoning expired when #171, #173 and #165 merged and this became the last ticket of the
+wave. The gap was the lead's call; the reviewer was right to catch it anyway; and the fix belongs
+in the same diff as the deletion that causes it. Nothing here is a correction of the previous
+developer's work.
+
+---
+
+## R2.2 What the four documents now say
+
+`AGENTS.md` already gained the corrected sentence in round 1 (lines 177–180 on this branch), so
+this is that same edit in four more places, in each document's own register.
+
+| File | Before | After |
+|---|---|---|
+| `.claude/skills/dev-team/SKILL.md` | inside the developer-contract block copied into every developer prompt: *"STAGE THE ART FIRST, OR THE BUILD CANNOT PASS … Run it once, before your first build. NOTHING ELSE TELLS YOU THIS"* | *"THERE IS NO ART STEP, AND YOU TYPE NOTHING."* Names `:moba:udeaStageCharacterArt`, says the build stages it ahead of the asset pipeline on every build, says `git status` stays clean, and says a `UDEA0032` about a `spritePath` is a **real defect** in the developer's change |
+| `.claude/agents/engineer.md` | section *"Stage the art first, or the build cannot pass"*, with the command and *"Nothing else tells you this."* | section *"There is no art step, and you type nothing"*, same substance. The `example/`-deletion coupling note is **kept**, because it is still true: `CharacterArtStaging.SOURCE_TREE` is `example/src/main/resources/assets/sprites`, so deleting those files under #142 would still break every fresh checkout |
+| `.claude/agents/team-lead.md` | item 5 of *"The developer prompt MUST contain"*: **run the script before the first build** | item 5 **inverted**: *"No art-staging step, and do not add one."* It says why (the build stages it), says the old line named a script that no longer exists, and tells the lead what to put in the prompt instead. The self-replication stops rather than merely going quiet |
+| `.claude/WAVE.md` | `:28` *"`scripts/stage-moba-art.py` fixes it … and nothing in CI runs it"*; `:48` a fenced `cd /tmp/<checkout> && python3 scripts/stage-moba-art.py` under *"Do this in every review checkout and every trial merge"*, ending *"Put it in the reviewer prompt."* | both corrected **in place and in the past tense**: what was true then, that #170 ended it, and that a detached checkout now builds `moba` on its own — run nothing, put no staging line in the reviewer prompt |
+
+`WAVE.md` is the lead's journal and the lead is rewriting it wholesale after this merges, so it is
+corrected rather than rewritten: two hunks, no restructuring, no new headings.
+
+### Two things I decided, and what to change if you disagree
+
+**1. `team-lead.md` item 5 is inverted rather than deleted.** Deleting it and renumbering 6–9 was
+the alternative. I inverted it because the failure mode is a lead reading an older prompt and
+copying the line forward; a list with a gap where the instruction used to be does not push back on
+that, and a numbered item saying *"do not add one"* does. To overturn: delete item 5 and renumber.
+
+**2. `scripts/verify-art-staging.py` step 7 was left alone.** It already fences `README.md`
+against naming a staging script, and extending it to fence `.claude/` too would turn this brief's
+`git grep` into a test that fails when it drifts — which is what §"counting is a claim" would
+prefer. I did not do it because round 2's scope from the lead is the four documents and explicitly
+not the evidence script, and putting unreviewed work in front of a round-3 reviewer is the larger
+harm. It is a good follow-up ticket; the hook is `NO_STAGING_SCRIPT` in that file's step 7.
+
+---
+
+## R2.3 The grep, before and after
+
+The finding's own proof. `git grep` against the two commits rather than a working-tree `grep`, so
+anyone can reproduce both halves from any checkout — and because `grep` on this box is a shell
+function wrapping **ugrep**, which skips gitignored directories and would not have been reading
+the same set of files.
+
+Before, on the SHA the reviewer failed. Only the four documents are shown; the `BRIEF*` hits are
+elided and are dealt with below:
+
+```
+$ git grep -n "stage-moba-art" 05ab99d -- '*.md'
+...
+05ab99d:.claude/WAVE.md:28:   and `bridge-conformance`. `scripts/stage-moba-art.py` fixes it from art **already committed**
+05ab99d:.claude/WAVE.md:48:cd /tmp/<checkout> && python3 scripts/stage-moba-art.py
+05ab99d:.claude/agents/engineer.md:58:    python3 scripts/stage-moba-art.py
+05ab99d:.claude/agents/team-lead.md:242:5. **`python3 scripts/stage-moba-art.py` before the first build** — the sprites are gitignored, so a
+05ab99d:.claude/skills/dev-team/SKILL.md:339:    python3 scripts/stage-moba-art.py
+...
+```
+
+After. This is the **complete** non-`BRIEF` output, unelided:
+
+```
+$ git grep -n "stage-moba-art" e69b01d -- '*.md' | grep -v BRIEF
+e69b01d:.claude/WAVE.md:30:   ahead of the asset pipeline on every build, and `scripts/stage-moba-art.py` is deleted.
+e69b01d:.claude/WAVE.md:47:up to then ran `python3 scripts/stage-moba-art.py` by hand — I did it on all three trial merges,
+e69b01d:.claude/agents/team-lead.md:244:   nothing typed. Older prompts carried a `python3 scripts/stage-moba-art.py` line; that script no
+e69b01d:docs/art-assets.md:33:`scripts/stage-moba-art.py` did the copying, it was named here and in `README.md`, and **nothing
+e69b01d:docs/art-assets.md:227:`scripts/stage-moba-art.py`, because that script did not exist yet. It arrived two commits later
+e69b01d:docs/art-assets.md:231:$ git log --oneline --diff-filter=A -- scripts/stage-moba-art.py
+```
+
+Every surviving line is history and says so in its own sentence. `docs/art-assets.md` was already
+past tense on this branch in round 1. The three new ones name the script in order to say it is
+**deleted** and that copying its command forward is wrong.
+
+What is *not* in that output is the point: **no imperative survives.** The two `BRIEF` files —
+`BRIEF.md` (#154's, from wave 1) and this one — are transcripts of what was true when they were
+written, and are left saying it.
+
+### The class, not the instance
+
+The finding named four files. I searched for the class it belongs to — *any tracked document
+instructing a reader to stage the art by hand* — rather than only the literal script name, since a
+document could describe the step without naming the file. Run at `e69b01d`, reduced to the files
+it hits:
+
+```
+$ grep -rn "stage-moba-art\|udeaStageCharacterArt\|UDEA0032\|assets/sprites\|stage the art\|STAGE THE ART" .claude/ | sed 's/:.*//' | sort | uniq -c
+      5 .claude/agents/engineer.md
+      3 .claude/agents/team-lead.md
+      5 .claude/skills/dev-team/SKILL.md
+      6 .claude/WAVE.md
+```
+
+The four documents the finding named, and no fifth file. I also read the reviewer-dispatch and
+trial-merge sections of `team-lead.md` and `SKILL.md` — every hit of `grep -rn "detach\|worktree
+add"` across those two files — because `WAVE.md:48` said *"Put it in the reviewer prompt"* and a
+copy could have landed there: **it had not.** Neither file's reviewer-prompt template carries a
+staging step.
+
+So: **nothing else.** The sweep is clean, and that sentence is the result of having run it rather
+than of not having found anything by accident.
+
+---
+
+## R2.4 `sh gradlew build`
+
+Four runs at `e69b01d`, and the first three of them are worth reporting together because two are
+not measurements.
+
+**1. `sh gradlew build`, warm** — `logs/build-e69b01d.log`:
+
+```
+BUILD SUCCESSFUL in 18s
+214 actionable tasks: 23 executed, 191 up-to-date
+```
+
+**2. `sh gradlew clean build`** — `logs/cleanbuild-worktree-e69b01d.log`:
+
+```
+BUILD SUCCESSFUL in 15s
+235 actionable tasks: 139 executed, 80 from cache, 16 up-to-date
+```
+
+Both are green and **neither is evidence about the budget tasks**, which is the trap the lead
+named: every one of them replays out of the build cache rather than measuring anything.
+
+```
+$ grep -n "udeaDaemonBudget\|udeaPackGate\|udeaBenchCharacterMover\|udeaBenchTickLoop\|udeaPhase2Exit" logs/cleanbuild-worktree-e69b01d.log
+342:> Task :udea-core:udeaBenchTickLoop FROM-CACHE
+343:> Task :udea-core:udeaBenchCharacterMover FROM-CACHE
+363:> Task :udea-assets-compiler:udeaPackGate FROM-CACHE
+364:> Task :udea-assets-compiler:udeaDaemonBudget FROM-CACHE
+437:> Task :udea-agent-host:udeaPhase2Exit FROM-CACHE
+```
+
+**3. `sh gradlew clean build --no-build-cache`**, so that everything actually executes —
+`logs/nocache-e69b01d.log`:
+
+```
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':udea-assets-compiler:udeaDaemonBudget'.
+> There were failing tests. See the report at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-aae42d941ef837a54/udea-assets-compiler/build/reports/tests/udeaDaemonBudget/index.html
+
+* Try:
+> Run with --scan to get full insights.
+
+BUILD FAILED in 1m 16s
+189 actionable tasks: 186 executed, 3 up-to-date
+```
+
+That is #175, and here is the matched control rather than an appeal to the issue number. Under
+load — a load this build's own twenty parallel modules created, `uptime` gave `load average: 8.46`
+seconds after it ended:
+
+```
+DaemonLatencyBudgetTest > a warm validate of one edited script is under 300ms() STANDARD_OUT
+    warm validate of one script: median 529ms over 4 samples [47, 529, 793, 466]
+
+DaemonLatencyBudgetTest > a warm validate of one edited script is under 300ms() FAILED
+    org.opentest4j.AssertionFailedError at DaemonLatencyBudgetTest.kt:60
+
+2 tests completed, 2 failed
+```
+
+Alone on the quiet box, twenty seconds later, same commit, same worktree, `--rerun-tasks` so it
+cannot come from the cache — `logs/daemonbudget-solo-e69b01d.log`:
+
+```
+> Task :udea-assets-compiler:udeaDaemonBudget
+
+DaemonLatencyBudgetTest > a warm reload of one script decides inside the edit-to-observe budget() STANDARD_OUT
+    warm reload decision: median 129ms over 4 samples [164, 129, 129, 116]
+
+DaemonLatencyBudgetTest > a warm validate of one edited script is under 300ms() STANDARD_OUT
+    warm validate of one script: median 103ms over 4 samples [8, 104, 103, 97]
+
+BUILD SUCCESSFUL in 15s
+24 actionable tasks: 24 executed
+```
+
+529ms → 103ms against a 300ms budget, under a minute apart on one machine — the failing run ended
+at about `20:24:30` and the solo run finished at `20:25:12`, `uptime` reading `8.46` then `6.68`.
+The box, not the branch. `review-170-r1` measured the same shape on `udeaBenchCharacterMover`
+(16.3ms under load → 2.147ms alone on the branch → 2.086ms alone on `origin/example`); those are
+its numbers as relayed by the lead, not mine.
+
+**4. `sh gradlew build` again**, after the budget task had passed alone — `logs/build-final-e69b01d.log`:
+
+```
+BUILD SUCCESSFUL in 11s
+205 actionable tasks: 21 executed, 14 from cache, 170 up-to-date
+```
+
+Across the four runs, the `build/test-results` tree at the end holds **2541 tests, 0 failures,
+0 errors, 34 skipped** over 381 suite XMLs, counted by summing the `<testsuite>` attributes rather
+than reading a console line:
+
+```
+$ cat logs/testcount-final-e69b01d.txt
+suite xml files: 381
+tests=2541 failures=2 errors=0 skipped=34
+```
+
+The two `failures` in that count are **not** in the `build` graph and are **not** new. They are
+`build-logic`'s `KotlinPinCheckTest`, in an XML stamped `19:57:04` — the previous developer's
+session, an hour before mine, in `build-logic/build/`, which a root `clean` does not touch. §4
+above already ran this to ground: there is no JDK 17 on this box, those two tests spin up a TestKit
+build that asks for one, and round 1 checked the identical failure on a detached `origin/example`
+at `7942823`. `sh gradlew build` never runs them — no `:build-logic:test` line appears in any of
+the four logs above. Excluding that one stale suite, the executed total is **2539 tests,
+0 failures**.
+
+### GL
+
+Unchanged from §4: this ticket touches no GL, and round 2 touches four markdown files. No xvfb run
+is owed. `udeaGlTest` and `udeaAgentGlTest` are in the `check` graph and came `FROM-CACHE`, which
+is exactly why that is not being offered as GL evidence.
+
+### A build of mine that was green about the wrong repository
+
+Worth recording because it read as success and was not, and because it is a hazard for the next
+agent on this box rather than anything about this branch.
+
+My first `clean build` was launched with `run_in_background: true` and no `cd`. A backgrounded
+command starts in the **session** working directory, not in the one previous foreground calls had
+`cd`'d into — the tool says so on the way out: *"Session cwd remains /srv/ssd1/workspace/Udea;
+directory changes made by the backgrounded command do not apply to subsequent commands."* So it
+ran in the **main repository, on branch `example`**, and returned `BUILD SUCCESSFUL in 15s`.
+
+Nothing errored. I caught it because a task I expected was missing from the log:
+
+```
+$ grep -c -i "stagecharacterart" logs/cleanbuild-WRONG-REPO-main-checkout.log
+0
+```
+
+`:moba:udeaStageCharacterArt` does not exist on `example`. Confirmed by mtime rather than by
+inference — `/srv/ssd1/workspace/Udea/moba/build/libs/moba-1.0-SNAPSHOT.jar` was written at
+`20:21:28`, matching that run, while the worktree's was still the previous developer's `19:52:22`.
+Every run reported above was re-run in the worktree with `pwd` and `git rev-parse --short HEAD`
+echoed by the same command line, which is what the `/srv/ssd1/.../agent-aae42d941ef837a54` path in
+the run-3 failure message above is showing.
+
+It also means I ran `clean` in the main repository's checkout. Its build outputs were rebuilt by
+the same command and it is green; its tracked tree was never touched, and `git -C
+/srv/ssd1/workspace/Udea status --short` shows only `?? .claude/worktrees/`.
+
+---
+
+## R2.5 The evidence command
+
+**Unchanged, and a documentation edit does not move it.** Saying so plainly is better than
+inventing a second command for four markdown files, so this section adds the `git grep` above as
+the finding's proof and re-runs the ticket's command to show the merge did not break it.
+
+```
+JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem python3 scripts/verify-art-staging.py
+```
+
+Re-run at `e69b01d`, after the merge up to `7691b3d` — `logs/evidence-e69b01d.log`:
+
+```
+[4/7] the build must have staged the art, packed it, and left the tree clean
+  33 sheet(s) staged, moba/build/udea/pack/assets.udeapak packed, `git status` clean
+
+[5/7] LICENSE must exclude wherever the build put the art
+  LICENSE covers all 33 staged file(s)
+
+[6/7] README.md's licence claim must match LICENSE
+  README.md's licence section and LICENSE agree on 'MIT'
+
+[7/7] README.md must not name a staging script
+  README.md names no script, consistent with docs/art-assets.md
+
+OK: a fresh clone builds :moba with no manual step, and the licence covers the art.
+```
+
+Its proof that it goes red is §1's and is unchanged: round 1 reverted the fix twice, two different
+ways, and `review-170-r1` re-did it independently in a throwaway worktree and watched it exit 1 at
+step 3 with the 25 `UDEA0032` errors back.
+
+The round-2 change is verified by the `git grep` in R2.3, which is an executed transcript against
+two commits rather than a unit test. That is the honest form here: there is no test in this
+repository that reads `.claude/`, and inventing one inside a scope the lead closed would be worse
+than the sentence.
+
+---
+
+## R2.6 The matched CI control, folded in as the lead asked
+
+Round 1 offered these and the lead held them back so a commit would not land under a running
+review. Both are re-checked here against the GitHub API rather than transcribed from the lead's
+message.
+
+**The control.** `git diff --name-only efab1d0..d6a04a4` is fourteen files and nothing else — the
+list in §0 — so `example`'s run and the branch's run differ by this change alone:
+
+```
+$ gh run view 33432054044 --json headSha,headBranch,conclusion --jq '"sha=\(.headSha[0:7]) branch=\(.headBranch) conclusion=\(.conclusion)"'
+sha=efab1d0 branch=example conclusion=failure
+
+$ gh run view 33432681337 --json headSha,headBranch,conclusion --jq ...
+sha=d6a04a4 branch=issue-170-moba-art-clean-clone ... conclusion=failure
+```
+
+Job by job, both runs, filtered to the jobs in question:
+
+| Job | `example` @ `efab1d0` (run 33432054044) | branch @ `d6a04a4` (run 33432681337) |
+|---|---|---|
+| `clean build under budget` | **failure** (99624368164) | **success** (99626429710) |
+| `determinism (ubuntu-latest, temurin)` | **failure** (99624401701) | **success** (99626455911) |
+| `determinism (ubuntu-latest, corretto)` | **failure** (99624368643) | **success** (99626430056) |
+| `determinism (windows-latest, temurin)` | failure (99624368908) | failure (99626460517) |
+| `determinism (windows-latest, corretto)` | failure (99624369665) | failure (99626430284) |
+| `the FIR checkers fail a real build` | success (99624406879) | success (99626428132) |
+
+Three jobs **red on `example` and green on the branch**, with the tree differing by this change
+alone. That is a stronger criterion-1 argument than §5's absence-based one, and `review-170-r1`
+reached the same conclusion by its own route (`grep -c UDEA0032` = 0 on all three `moba`-building
+legs, against 50 on the baseline).
+
+The two Windows determinism legs are red in **both** columns. They are #176 (CRLF in
+`ExampleScanTest` and `AgentsMdTest`) and this branch neither causes nor fixes them. Note what
+this table does *not* say: it is not a claim that the branch's run is green overall. It is not —
+conclusion `failure`, on those two Windows jobs.
+
+**The second sample on the checkers job.** `the FIR checkers fail a real build` had gone red
+earlier and was re-run; job `99626428132` above is that re-run, same run and same commit, and it
+is green. The earlier red was a Kotlin daemon dying at startup, correctly caught by #173's new
+guard — the guard doing its job, not a defect on this branch.
+
+---
+
+## R2.7 What round 2 did not exercise
+
+- **A CI run at `e69b01d`.** The branch is pushed to `origin` at this SHA, so one will exist, but
+  nothing in the round-2 diff is a CI input and I am not offering it as evidence. It will also be
+  red overall, on #176's two Windows determinism legs, exactly as `d6a04a4` was. The control above
+  is at `d6a04a4`.
+- **A reader following the corrected documents.** The proof that no imperative survives is a
+  `git grep`; the proof that the *replacement* is followable is that `AGENTS.md` has carried the
+  same sentence since round 1 and round 1's own worktree built from it with nothing typed.
+- **`.claude/` under any verifier.** Nothing in the build reads those four files, which is exactly
+  why the finding was possible and why R2.2's second decision names the follow-up.

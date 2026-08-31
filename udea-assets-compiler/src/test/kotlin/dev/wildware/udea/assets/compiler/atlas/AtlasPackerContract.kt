@@ -75,13 +75,13 @@ internal abstract class AtlasPackerContract {
             "${corpus.name}: characters",
         )
         assertTrue(sheets.all { it.rows == 1 }, "every sheet is a one-row strip")
+        val square = CorpusShape.FRAME_SIZE to CorpusShape.FRAME_SIZE
         assertEquals(
-            setOf(CorpusShape.FRAME_SIZE to CorpusShape.FRAME_SIZE),
+            setOf(square),
             scanned.map { it.frameWidth to it.frameHeight }.toSet(),
             "every frame must be one size, or the id tie-break stops being what decides the " +
                 "layout; the odd sheets are " +
-                scanned.filter { it.frameWidth != CorpusShape.FRAME_SIZE || it.frameHeight != CorpusShape.FRAME_SIZE }
-                    .map { it.input.id },
+                scanned.filterNot { (it.frameWidth to it.frameHeight) == square }.map { it.input.id },
         )
     }
 

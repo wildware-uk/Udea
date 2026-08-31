@@ -122,10 +122,11 @@ internal object SpriteSheetScan {
     /**
      * Width and height from the PNG header, without decoding a single pixel.
      *
-     * `ImageIO.read` would decode all 2269 frames every time a corpus is scanned, and the gate
-     * scans one eleven times - tens of seconds of work to learn two numbers per file. The
-     * reader's `getWidth`/`getHeight` read `IHDR` and stop, and a file that is not a decodable
-     * image still fails here, because no reader claims it.
+     * Every test in the gate scans its corpus afresh - deliberately, since two separate walks are
+     * what `two packs of the whole art corpus produce identical atlas pages` is about - and
+     * `ImageIO.read` would decode every frame of it each time, tens of seconds of work to learn
+     * two numbers per file. The reader's `getWidth`/`getHeight` read `IHDR` and stop, and a file
+     * that is not a decodable image still fails here, because no reader claims it.
      */
     private fun dimensionsOf(file: Path): Pair<Int, Int> {
         ImageIO.createImageInputStream(file.toFile()).use { stream ->

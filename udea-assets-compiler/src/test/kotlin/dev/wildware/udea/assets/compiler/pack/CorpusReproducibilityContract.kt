@@ -101,7 +101,12 @@ internal abstract class CorpusReproducibilityContract {
         assertTrue(sheets.isNotEmpty(), "${corpus.name} has no sheets under its sample character")
         val packer = AtlasPacker()
 
-        val a = PackFixture.bundle(first, first.resolve(ASSETS), "$checkoutPrefix-atlas-a", packer.pack(sheets))
+        val a = PackFixture.bundle(
+            first,
+            first.resolve(ASSETS),
+            "$checkoutPrefix-atlas-a",
+            packer.pack(sheets),
+        )
         val b = PackFixture.bundle(
             second,
             second.resolve(ASSETS),

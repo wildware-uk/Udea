@@ -116,8 +116,9 @@ internal object SyntheticArt : SpriteCorpus {
      * [sheets] counts summing to exactly [frames].
      *
      * The cycle is walked, then the shortfall or excess is spread one frame at a time from the
-     * front, which is deterministic and terminates because the correction is bounded by the
-     * cycle's own deviation from the mean.
+     * front. Deterministic, and it terminates because every pass of the loop moves `remaining`
+     * exactly one step closer to zero; the `check` below is what catches a shape that would need
+     * to take a sheet's last frame away to balance.
      */
     private fun frameCounts(sheets: Int, frames: Int): IntArray {
         val counts = IntArray(sheets) { FRAME_COUNT_CYCLE[it % FRAME_COUNT_CYCLE.size] }
@@ -169,10 +170,11 @@ internal object SyntheticArt : SpriteCorpus {
         // The bar's length codes the frame index, so two frames of one sheet differ in shape as
         // well as in colour and a swapped pair is visible rather than merely unequal.
         val barWidth = BORDER + 1 + frame * 2
-        val left = frame * CorpusShape.FRAME_SIZE
-        for (y in 0 until CorpusShape.FRAME_SIZE) {
-            for (x in 0 until CorpusShape.FRAME_SIZE) {
-                val onBorder = x < BORDER || y < BORDER || x >= CorpusShape.FRAME_SIZE - BORDER || y >= CorpusShape.FRAME_SIZE - BORDER
+        val size = CorpusShape.FRAME_SIZE
+        val left = frame * size
+        for (y in 0 until size) {
+            for (x in 0 until size) {
+                val onBorder = x < BORDER || y < BORDER || x >= size - BORDER || y >= size - BORDER
                 val onBar = y in BAR_TOP until BAR_TOP + BAR_HEIGHT && x in BORDER until barWidth
                 sheet.argb[y * sheet.width + left + x] = when {
                     onBorder -> border

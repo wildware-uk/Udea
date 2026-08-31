@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * The control for [AtlasPackerContract]: the fixture a determinism test would *naturally* have
@@ -66,8 +65,16 @@ internal class SmallFixtureContrastTest {
         )
     }
 
+    /**
+     * Named for what it runs, not for the counterfactual it illustrates.
+     *
+     * With the tie-break in place - which is the only way this suite ever runs - the layout is
+     * order-independent, and so it is for the corpus. The interesting half is that this one stays
+     * green when the tie-break is deleted and the corpus tests do not, and that is established by
+     * an executed mutation transcript in `BRIEF-168.md`, not by anything here.
+     */
     @Test
-    fun `a fixture of three frame sizes is laid out identically whether or not the tie-break exists`() {
+    fun `three sheets of three frame sizes lay out the same in either order`() {
         val fixture = variedSizeFixture()
         val sizes = fixture.associate { it.input.id to (it.frameWidth to it.frameHeight) }
         val sheets = fixture.map { it.input }
@@ -100,9 +107,10 @@ internal class SmallFixtureContrastTest {
             corpus.map { it.frameWidth to it.frameHeight }.distinct().size,
             "every frame in the corpus must share one size",
         )
-        assertTrue(
-            corpus.sumOf { it.input.frameCount } == CorpusShape.FRAMES,
-            "so the tie is ${CorpusShape.FRAMES}-way, not ${corpus.sumOf { it.input.frameCount }}-way",
+        assertEquals(
+            CorpusShape.FRAMES,
+            corpus.sumOf { it.input.frameCount },
+            "and the tie has to be that many frames wide, which is what a small fixture cannot be",
         )
     }
 

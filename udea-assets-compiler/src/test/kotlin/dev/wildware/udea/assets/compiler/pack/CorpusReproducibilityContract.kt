@@ -68,7 +68,9 @@ internal abstract class CorpusReproducibilityContract {
      * `<corpus>-forward-page-NN.png` and `<corpus>-reversed-page-NN.png`. The assertion below
      * says those two sets are the same bytes, so a person can check the gate's claim by looking
      * at two pictures - and when a tie-break breaks, the difference is a wall of colour in a
-     * different order rather than two hashes that disagree.
+     * different order rather than two hashes that disagree. They are written *before* the
+     * assertions for that reason: on a red run the two pages that disagree are what you want on
+     * disk, and an assertion that threw first would have left nothing.
      */
     @Test
     fun `two packs of the whole art corpus produce identical atlas pages`() {
@@ -89,7 +91,7 @@ internal abstract class CorpusReproducibilityContract {
         assertEquals(first.sheetRanges, second.sheetRanges)
     }
 
-    /** A bundle carrying real atlas pages is byte-identical across two packs. */
+    /** A bundle carrying atlas pages is byte-identical across two packs. */
     @Test
     fun `a bundle carrying atlas pages is byte-identical across two packs`() {
         requireCorpus()

@@ -8,9 +8,14 @@ import java.nio.file.Path
  *
  * Issue #89 says to pack this rather than a toy fixture, and the difference is not decorative.
  * The corpus is 2269 frames of one size, which is the exact case where a packer's tie-break
- * decides everything - with every frame 100x100, sorting by area leaves 2269 items in whatever
- * order they arrived, and the arrival order is `Files.walk`'s. A three-sheet fixture would have
- * passed a determinism test that this corpus fails.
+ * decides everything: [AtlasPacker] orders by `(height desc, width desc, id asc)`, and with every
+ * frame 100x100 the first two keys separate nothing, so without the id tie-break all 2269 land in
+ * whatever order they arrived - which is `Files.walk`'s, and therefore the filesystem's.
+ *
+ * The fixture somebody writes instead is a few sheets of *different* sizes, and that one is
+ * totally ordered by height before the tie-break is ever consulted: it passes a determinism test
+ * this corpus fails. [SmallFixtureContrastTest] is that fixture, kept as the control, and the
+ * pair of them is what makes the assertion worth its seconds.
  *
  * ## The tree is gitignored, and that used to mean the tests did not run
  *
@@ -37,7 +42,13 @@ internal object MobaArt : SpriteCorpus {
 
     override val root: Path = TestPaths.repoRoot.resolve("moba/src/main/resources/assets/sprites")
 
-    /** Present in both Tiny RPG packs, and the character the pixel-level tests have always used. */
+    /**
+     * The character the pixel-level tests have always used.
+     *
+     * Not asserted to exist here, because this file cannot see the tree on a machine without the
+     * archives; `AtlasPackerContract.sampleCharacter` fails with "has no sheets under" if the name
+     * ever stops matching what `scripts/extract-art.py` writes.
+     */
     override val sampleCharacter: String = "sprites/champions/archer/"
 
     /** What a skip says, so the message names the one script that can produce this tree. */

@@ -23,14 +23,42 @@ gate exists to catch, and would agree with itself while the real client failed.
 
 `vendor/VENDORED.json` records the upstream repository, commit and the SHA-256 of every copied
 file. `npm run verify-vendor` recomputes them, so an edit to a vendored file - a "small fix" to
-make a test pass - is a red gate rather than a quiet fork. Refreshing the copy is deliberate:
-re-copy the files, re-run `verify-vendor`, and update the hashes and the commit in the same
-diff somebody reads.
+make a test pass - is a red gate rather than a quiet fork.
 
-Only the files the contract assertions need are copied: `client.ts`, `manifest.ts`, `errors.ts`,
-and `config.ts` with `registry.ts` behind it. `server.ts`, `bridge.ts` and `cli.ts` are the MCP
-server around the client and depend on `@modelcontextprotocol/sdk`; they add a dependency and no
-assertion, so they stay out.
+**The copies are upstream's bytes with nothing adjusted.** No import rewriting, no shim, no
+`.js` extension fixups: every file imports what upstream imports, with upstream's own `./x.js`
+specifiers, which is why files nothing here calls directly are vendored too - they are what the
+imported ones reach for. If a future refresh ever does need an adjustment, describe it in this
+section, because the recorded hash cannot: a hash says the bytes are what somebody recorded, not
+that they are what upstream published.
+
+### Refreshing the copy
+
+1. Re-copy the files from upstream `src/` **without any line-ending translation**.
+2. Update `source.commit` and `source.commitDate` in `vendor/VENDORED.json` by hand - those are
+   provenance, and no tool can know them.
+3. `npm run record-vendor`, which rewrites the hashes from the bytes now on disk.
+4. Read the diff. It is the claim that this directory holds upstream's code and not a fork.
+
+Step 3 exists because its absence was a bug. `VENDORED.json` shipped with three of its six
+hashes recorded from the upstream sources **with CRLF line endings** while the files themselves
+were committed with LF, so `verify-vendor` had never once passed and every step behind it -
+the launch declaration, the headless boot, the live client - had never run (issue #171). The
+verifying side had code behind it; the recording side had a person and a terminal. Now both
+call `scripts/vendor-hash.mjs`, and `npm run test:vendor` asserts that the committed manifest is
+byte-identical to what the recorder writes, so a hand-typed hash cannot survive review even if
+it happens to be right.
+
+`record-vendor` refuses to record bytes containing a CR, and `vendor/**` is pinned `-text` in
+`.gitattributes`. Raw-byte hashing makes the recorder and the verifier agree about whatever is
+on disk, so a converted copy would be recorded converted, verified converted, and pass for ever
+while silently no longer being upstream's code. That is the one shape the hashes cannot see, and
+it is the shape that actually happened.
+
+Only the files the contract assertions need are copied, plus whatever those reach for: the set is
+`vendor/*.ts`, and `npm run test:vendor` fails if `VENDORED.json` and that directory disagree
+about it. `server.ts`, `bridge.ts` and `cli.ts` are the MCP server around the client and depend
+on `@modelcontextprotocol/sdk`; they add a dependency and no assertion, so they stay out.
 
 ## Running it
 
@@ -43,6 +71,10 @@ cd .github/conformance
 npm install
 npm test               # UDEA_AGENT_PORT defaults to 7820
 ```
+
+`npm run test:vendor` is the half that needs neither a JVM nor a running game: it verifies the
+vendored copy and asserts the manifest describes it. Run it from anywhere with
+`npm --prefix .github/conformance run test:vendor`.
 
 CI does the same thing in the `bridge-conformance` job of `.github/workflows/ci.yml`.
 

@@ -945,7 +945,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
-          npm run verify-vendor
+          npm run test:vendor
           npm run build
 
       # The launch declaration, generated on a clean checkout and then parsed by the bridge's

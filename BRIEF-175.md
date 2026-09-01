@@ -443,6 +443,20 @@ One slowdown per gate, applied to **production** code, run alone and serially ex
 reverted with `git checkout --` afterwards. Each row's diff is the literal `git diff` from the same
 invocation that produced its number.
 
+| Gate | Slowdown | Budget | Measured | Test that failed |
+|---|---|---|---|---|
+| `:udea-core:udeaSnapshotBudget` | each field copied 40x | 1 000 000 ns | 1 565 460 ns | `the median capture of a thousand entities is inside its one millisecond budget` |
+| `:udea-core:udeaBenchTickLoop` | systems run 64x a tick | 50.0 ms | 60.692433 ms | `six hundred ticks at two hundred entities run inside the fifty millisecond budget` |
+| `:udea-core:udeaBenchCharacterMover` | broadphase walks 40 units further | 4.0 ms | 11.479492 ms | `200 movers replayed 60 times fit in the per-frame budget` |
+| `:udea-assets-compiler:udeaDaemonBudget` | `compileInto` sleeps 400 ms | 300 / 500 ms | 520 / 604 ms | `a warm validate…`, `a warm reload…` |
+| `:udea-assets-compiler:udeaGraphBudget` | 300 more passes over the graph bytes | 15 ms | 18.385553 ms | `deserialising a graph larger than the example tree stays inside the budget` |
+| `:udea-agent:udeaDigestBudget` | digest renders 60x | 300 000 ns | 314 786 ns | `a build at 500 entities stays under the time budget` |
+| `:udea-agent:udeaQueryBudget` | query scans 80x | 1 000 000 ns | 1 322 812 ns | `a query over 500 entities returning 20 stays under a millisecond` |
+| `:udea-agent-host:udeaPhase2Exit` | `compileInto` sleeps 800 ms | 300 ms | 812 ms | `a typo'd reference is rejected…` (and the apply budget) |
+
+Each row's diff, the run that produced its number, and — where it matters — the mutations that were
+tried first and did **not** work, are below.
+
 ### `:udea-core:udeaSnapshotBudget` — the capture copies each field forty times
 
 ```diff

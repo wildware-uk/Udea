@@ -118,6 +118,30 @@ val outerBuildInputs: FileCollection = files(
     rootDir.resolve("../AGENTS.md"),
     rootDir.resolve("../docs/contracts.lock"),
     fileTree(rootDir.resolve("../docs/contracts")),
+
+    // The determinism pair, and the serious one of the five issue #180 found.
+    //
+    // `AuditTest` and `AllowlistParserTest` are the enforcement behind spec section 6's third
+    // Phase 7 exit criterion, "the allowlist is a reviewed artefact, not a dumping ground":
+    // they are what makes a malformed, stale or unreasoned entry fail the build. Undeclared,
+    // they came back UP-TO-DATE across an edit to the allowlist - so the gate that keeps the
+    // allowlist honest was absent at the only moment it does anything, and the build was green
+    // while it was absent. `FloatPortabilityTest` reads the audit for the same reason: it
+    // measures a divergence it cannot assert on, and asserts instead that the audit still tells
+    // the reader which CI job is the only thing that can catch it.
+    rootDir.resolve("../determinism-allowlist.txt"),
+    rootDir.resolve("../determinism-audit.md"),
+
+    // `UdeaVersionsTest` is the Kotlin-version pin read straight out of the catalog, and
+    // `GradleFixture` copies the catalog into every TestKit fixture it builds. A version bump
+    // is exactly the edit those want to run on, and exactly the edit that left them cached.
+    rootDir.resolve("../gradle/libs.versions.toml"),
+
+    // `TrelloMapTest` reads the spec and the map and asserts they account for each other, so
+    // either one moving on its own is the whole point of it. Both were undeclared, which made
+    // it a comparison of two files nothing re-read.
+    rootDir.resolve("../docs/migration/trello-map.md"),
+    rootDir.resolve("../docs/superpowers/specs/2026-08-22-udea-ai-native-rewrite-design.md"),
     fileTree(rootDir.resolve("..")) {
         include("*/build.gradle.kts")
         include("build.gradle.kts")
@@ -134,9 +158,60 @@ val outerBuildInputs: FileCollection = files(
     },
 )
 
+/**
+ * `build-logic`'s own sources, declared because several tests read them as *text*.
+ *
+ * They already reach `test` as compiled classes, which is a different object from the source
+ * file: compile avoidance means an edit confined to a comment produces byte-identical classes
+ * and leaves the task UP-TO-DATE. `CompilerPluginSwitchTest` and `OuterBuildInputsTest` both
+ * scan the text, and `OuterBuildInputsTest` deliberately reads comments too, so a path named on
+ * a commented-out line still has to be declared. Without these two lines that scan is served
+ * from cache across exactly the edits it reads.
+ */
+val buildLogicSources: FileCollection = files(
+    fileTree(rootDir.resolve("src/main/kotlin")),
+    fileTree(rootDir.resolve("src/test/kotlin")),
+)
+
 tasks.test {
     useJUnitPlatform()
     inputs.files(outerBuildInputs)
         .withPropertyName("outerBuildSources")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(buildLogicSources)
+        .withPropertyName("buildLogicSources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
+    // The manifest `OuterBuildInputsTest` checks itself against: every declared file above, as
+    // a repository-relative path, under the system property that test names.
+    //
+    // It asks "is this file an input of the task I am running in?", and the only honest answer
+    // is the collection Gradle actually resolved. Re-deriving it by regex over this script would
+    // put a second, differently-wrong parser between the assertion and its subject, which is
+    // this defect's own shape one level up.
+    //
+    // A `CommandLineArgumentProvider` rather than `systemProperty` so the trees are walked when
+    // the task runs: walking them while this script is configured would make every edit under
+    // `moba/src` invalidate the configuration cache for the whole build. The two locals exist
+    // for the same reason - the lambda has to close over a FileCollection and a File and
+    // nothing else, because a lambda that reaches back into the script cannot be serialized
+    // into the configuration cache at all.
+    //
+    // The property name is spelt out on both sides rather than shared through a constant,
+    // because a build script cannot use a class its own project compiles. That duplication is
+    // safe in the direction that matters: if the two ever disagree, the test finds no manifest
+    // and fails saying so, rather than finding an empty one and passing on anything.
+    val manifestSources: FileCollection = outerBuildInputs + buildLogicSources
+    val manifestRoot: File = rootDir.parentFile.canonicalFile
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            val manifest = manifestSources.files.asSequence()
+                .map { it.canonicalFile }
+                .filter { it.isFile }
+                .map { it.relativeTo(manifestRoot).invariantSeparatorsPath }
+                .sorted()
+                .joinToString("\n")
+            listOf("-Dudea.declaredTestInputs=$manifest")
+        },
+    )
 }

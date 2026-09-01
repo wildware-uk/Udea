@@ -13,7 +13,7 @@ package dev.wildware.udea.gradle.ci
  *   per job on purpose: "this invocation runs nothing but the budgets" is a claim about a single
  *   `./gradlew` line, and a job-wide join would let a warm-up step launder a `build` into it.
  */
-data class WorkflowJob(
+internal data class WorkflowJob(
     val id: String,
     val runsOn: List<String>,
     val steps: List<String>,
@@ -39,7 +39,7 @@ data class WorkflowJob(
  * `jobs:` key, or a `jobs:` block with no jobs in it - rather than returning an empty list, which
  * is the failure mode that would make every assertion built on it vacuous.
  */
-object WorkflowJobs {
+internal object WorkflowJobs {
 
     /** Every job of [yaml], in file order. */
     fun parse(yaml: String): List<WorkflowJob> {

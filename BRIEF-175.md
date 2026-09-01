@@ -1,7 +1,7 @@
-c4b436d
+0f69ba7
 
 *(That is the last commit of the change. If `HEAD` is one beyond it, the difference is this line
-alone — `git diff c4b436d HEAD -- .` will say so.)*
+alone — `git diff 0f69ba7 HEAD -- .` will say so.)*
 
 # BRIEF-175 — the latency budgets get a runner to themselves
 

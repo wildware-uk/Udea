@@ -110,13 +110,23 @@ notice either being got wrong again.
 | **Command** | `./gradlew udeaLatencyBudgets --no-parallel --max-workers=1` |
 | **Aggregate** | `udeaLatencyBudgets` in the root `build.gradle.kts`; its members are listed there |
 | **Wiring gate** | `:udea-gradle:LatencyBudgetJobTest`, which reads the workflow and the root script |
+| **Census gate** | `:udea-gradle:WallClockBudgetCensusTest`, which reads every test source in the repository |
 
-Every gate in this repository that asserts a number of milliseconds is on this list. Until issue
-#175 they hung off `check`, so each was timed while nineteen other modules compiled on the same
-cores, and **a wall-clock measurement taken during a parallel build measures the build**. Some of
-them failed on both runner images for that reason alone, on a branch that had touched none of them;
-`udeaDigestBudget` and `udeaQueryBudget` had not failed yet and are here because they are the same
-kind of thing, not because they had caused trouble.
+Every gate in this repository that asserts a number of milliseconds is on this list, and since
+issue #182 that is a checked claim rather than a stated one: `WallClockBudgetCensusTest` reads
+every Kotlin test source in the tree and requires each one that touches a wall clock to be either a
+member of the aggregate or a row in its own census saying what the reading is instead — a timeout,
+a seed, a printed figure or a ratio. A new timing test is red until somebody decides which.
+
+That check exists because the list has been declared complete three times. Until issue #175 these
+gates hung off `check`, so each was timed while nineteen other modules compiled on the same cores,
+and **a wall-clock measurement taken during a parallel build measures the build**. Some of them
+failed on both runner images for that reason alone, on a branch that had touched none of them. #175
+enumerated a set, found `udeaDigestBudget` and `udeaQueryBudget` while wiring them, and left two
+behind. `review-175-r1` found those two and filed #182. #182's own work found three more that no
+issue had named — `AssetCompilerTest`'s one-second warm compile, `PhysicsRebuildTest`'s 2 ms rebuild
+and `NetHarnessTest`'s two-second session bound. Every one of those enumerations was honest, and
+every one was a snapshot.
 
 They are not on `check` any more, and that is not the same as switching them off: they run on
 every push, on both operating systems, as hard gates, in a job that has the runner to itself.
@@ -133,13 +143,28 @@ launcher, JDK 17 toolchain, Gradle 8.13, another project's GL suite running alon
 | Snapshot capture, 1 000 entities | `:udea-core:udeaSnapshotBudget` | 1 000 000 ns | 84 272 ns | 11.9x |
 | Assembled tick loop, 600 ticks at 200 entities | `:udea-core:udeaBenchTickLoop` | 50 ms | 6.159 ms | 8.1x |
 | 200 movers x 60 replays (12 000 `move` calls) | `:udea-core:udeaBenchCharacterMover` | 4.0 ms | 1.85 ms (best of 25) | 2.2x |
+| Physics rebuild, 500 bodies | `:udea-core:udeaPhysicsRebuildBudget` | 2 000 us | 549 us | 3.6x |
 | Warm validate of one edited script | `:udea-assets-compiler:udeaDaemonBudget` | 300 ms | 128 ms | 2.3x |
 | Warm reload decision | `:udea-assets-compiler:udeaDaemonBudget` | 500 ms | 228 ms | 2.2x |
 | Graph deserialisation, 2 000 assets | `:udea-assets-compiler:udeaGraphBudget` | 15 ms | 4.79 ms | 3.1x |
+| Warm pass-1 scan of the example tree | `:udea-assets-compiler:udeaScanBudget` | 200 ms | 58.08 ms | 3.4x |
+| Warm edit of moba's real corpus, edit to observe | `:udea-assets-compiler:udeaWarmEditBudget` | 3 000 ms | 167 ms (max of 5) | 18x |
 | Tier-0 digest build, 500 entities | `:udea-agent:udeaDigestBudget` | 300 000 ns | 7 810 ns | 38x |
 | Entity query, 500 entities returning 20 | `:udea-agent:udeaQueryBudget` | 1 000 000 ns | 21 060 ns | 47x |
 | Agent patch to running world, over HTTP | `:udea-agent-host:udeaPhase2Exit` | 1 000 ms | 445 ms | 2.2x |
 | Typo'd reference rejected | `:udea-agent-host:udeaPhase2Exit` | 300 ms | 16 ms | 18.8x |
+
+### Two wall-clock assertions issue #182 dropped rather than moved
+
+Not everything that reads a clock is worth a task. Two of the five #182 found were assertions
+whose subject was already covered by something machine-independent in the same file, so they were
+deleted and the better assertion left in place. Both are recorded here because a deleted gate is
+exactly the kind of thing a later reader assumes was an oversight.
+
+| Was | Where | What asserts it now |
+|---|---|---|
+| Warm asset compile under 1 s | `AssetCompilerTest` | `assertEquals(scripts.size, warm.cacheHits)` in the same test. The only way the warm path becomes slow is by missing the cache, and the hit count says so exactly, on any machine. |
+| A 600-tick 4-client session under 2 s | `NetHarnessTest` | `Thread.sleep` added to `NoWallClockInTransportTest`'s banned list. The bound was a 40x-headroom proxy for "the harness does not sleep"; the source scan asserts that property directly, by file and line. |
 
 The headroom column is the useful one and it is why none of these numbers was widened: every
 gate was already inside its budget by a factor, and the reds were contention rather than cost.

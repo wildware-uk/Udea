@@ -43,6 +43,8 @@ class CharacterMoverBudgetTest {
 
     @Test
     fun `200 movers replayed 60 times fit in the per-frame budget`() {
+        LatencyBudget.measuredBy(TASK)
+
         val geometry = MoverScenario.geometry()
         val config = MoverScenario.config()
         val mover = CharacterMover()

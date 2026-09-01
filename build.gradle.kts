@@ -162,12 +162,29 @@ val udeaAssemble by tasks.registering {
 // Adding a budget here is what puts it under the CI job and under that test. Do not add anything
 // else: a task in this list is one whose number is a duration, and a correctness gate parked here
 // would be a correctness gate nobody runs on `check`.
+//
+// ## Why the list is no longer the enumeration (issue #182)
+//
+// This list has been declared complete three times and been wrong twice. #175 enumerated a set,
+// found `udeaDigestBudget` and `udeaQueryBudget` while wiring them, and left two behind.
+// `review-175-r1` found those two and filed #182.
+// #182's own work found three the issue had not named - a one-second warm compile in
+// `AssetCompilerTest`, a 2ms rebuild in `PhysicsRebuildTest` and a two-second bound in
+// `NetHarnessTest`. Each enumeration was honest and each was a snapshot.
+//
+// So the aggregate's description is now checked rather than trusted. `:udea-gradle`'s
+// `WallClockBudgetCensusTest` reads every test source in the repository and requires each one
+// that touches a wall clock to be either a member of this list or a row in its own census saying
+// what the reading is instead. A new timing test is red until somebody decides which.
 val latencyBudgetTasks = listOf(
     ":udea-core:udeaSnapshotBudget",
     ":udea-core:udeaBenchTickLoop",
     ":udea-core:udeaBenchCharacterMover",
+    ":udea-core:udeaPhysicsRebuildBudget",
     ":udea-assets-compiler:udeaDaemonBudget",
     ":udea-assets-compiler:udeaGraphBudget",
+    ":udea-assets-compiler:udeaScanBudget",
+    ":udea-assets-compiler:udeaWarmEditBudget",
     ":udea-agent:udeaDigestBudget",
     ":udea-agent:udeaQueryBudget",
     ":udea-agent-host:udeaPhase2Exit",
@@ -206,6 +223,16 @@ val latencyBudgetTaskNames: Set<String> = latencyBudgetTasks.map { it.substringA
 
 subprojects {
     tasks.withType<Test>().configureEach {
+        // Which task is running this JVM, for `LatencyBudget.measuredBy` (issue #182). A budget is
+        // held out of `build` by one `filter.excludeTestsMatching` line in a build script, and
+        // deleting that line puts it back inside the parallel build - where it may stay green for
+        // a long time, because these gates are sized to catch a regression rather than to detect a
+        // busy machine. Nothing else in the repository can see which task ran a test, so the
+        // answer is handed to the JVM at the only moment it is known. Set on every test task, not
+        // only the budgets: the value has to be wrong for the guard to fire, and an absent
+        // property is how a budget run by `test` would look if only the budgets were told.
+        systemProperty("udea.testTaskPath", path)
+
         if (name in latencyBudgetTaskNames) {
             outputs.upToDateWhen { false }
             outputs.cacheIf("a wall-clock measurement is about this machine, not about these inputs") {

@@ -28,6 +28,8 @@ class TickLoopBudgetTest {
 
     @Test
     fun `six hundred ticks at two hundred entities run inside the fifty millisecond budget`() {
+        LatencyBudget.measuredBy(":udea-core:udeaBenchTickLoop")
+
         // Warm first, then measure, then take the median of at least five runs: a cold 600-tick
         // run is dominated by class loading and would make the gate flaky rather than strict.
         repeat(WARMUP_RUNS) { runOnce() }

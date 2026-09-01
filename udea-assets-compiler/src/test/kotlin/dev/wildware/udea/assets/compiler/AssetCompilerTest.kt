@@ -135,15 +135,26 @@ class AssetCompilerTest {
     }
 
     /**
-     * The warm path: a second invocation with unchanged inputs hits the compiled-script jar
-     * cache and finishes the corpus in under a second.
+     * The warm path: a second invocation with unchanged inputs hits the compiled-script jar cache
+     * and produces the same graph.
      *
-     * The cold number is printed rather than asserted — it is what the escape-hatch go/no-go
-     * in issue #87 compares against, and pinning it would be pinning the speed of whichever
-     * machine runs CI.
+     * ## Both numbers are printed, and neither is asserted (issue #182)
+     *
+     * The cold one never was — the KDoc here already said pinning it "would be pinning the speed
+     * of whichever machine runs CI", which is the whole of issue #175 written down before #175
+     * existed. The warm one was, at one second, and it should not have been: this class runs
+     * inside `:udea-assets-compiler:test`, so that stopwatch was read while nineteen other modules
+     * compiled beside it. It is the third gate #182 turned up that nobody had listed, after the
+     * two the issue named.
+     *
+     * It is dropped rather than moved onto `udeaLatencyBudgets`, because the assertion two lines
+     * below already catches the regression it was for and catches it better: the only way the warm
+     * path becomes slow is by not hitting the cache, and `warm.cacheHits` says whether it hit the
+     * cache exactly, on any machine, at any load. A second-long line over the same property is a
+     * weaker test of it that can also fail for reasons that are not about this code at all.
      */
     @Test
-    fun `a warm invocation hits the script cache and is under one second`() {
+    fun `a warm invocation hits the script cache and produces the same graph`() {
         val cache = TestPaths.scratch("warm-cache")
         val scripts = Fixtures.scripts()
 
@@ -159,7 +170,6 @@ class AssetCompilerTest {
         println("AssetCompiler Script mode: cold=$coldElapsed warm=$warmElapsed for ${scripts.size} scripts")
         assertEquals(scripts.size, warm.cacheHits, "every script should have been served from cache")
         assertEquals(cold.graph, warm.graph, "a cached compile must produce the same graph")
-        assertTrue(warmElapsed.inWholeMilliseconds < 1000, "warm invocation took $warmElapsed, budget is 1s")
     }
 
     /**

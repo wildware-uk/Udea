@@ -51,6 +51,8 @@ class Phase2ExitTest {
 
     @Test
     fun `an agent patches an asset value and the running game reflects it in under a second`() {
+        LatencyBudget.measuredBy(TASK)
+
         instance { game ->
             warm(game)
 

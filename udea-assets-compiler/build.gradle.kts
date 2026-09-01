@@ -121,8 +121,27 @@ tasks.withType<Test>().configureEach {
 // wider budget. The number lives in `DaemonLatencyBudgetTest`, where moving it is a diff.
 val daemonBudgetTestClass = "dev.wildware.udea.assets.compiler.daemon.DaemonLatencyBudgetTest"
 
+/**
+ * The two budgets issue #182 moved off `check`, and one that #175 had already moved.
+ *
+ * `MobaWarmEditBudgetTest` gates spec 6's Phase 2 edit-to-observe deadline over `moba`'s real
+ * corpus, and `WarmScanBudgetTest` gates issue #85's warm pass-1 scan at 200ms. Both were inside
+ * `:udea-assets-compiler:test` until #182, which put them on the same footing as the daemon
+ * budget above: a wall-clock number measured beside nineteen Kotlin compilations is a measurement
+ * of the compilations.
+ *
+ * The correctness halves stayed behind. `MobaWarmEditTest` asserts the delta a warm edit produces
+ * and `ExampleScanTest` asserts everything else pass 1 does, both on `check` where they belong,
+ * because neither answer changes with the machine.
+ */
+val budgetTestClasses = listOf(
+    daemonBudgetTestClass,
+    "dev.wildware.udea.assets.compiler.daemon.MobaWarmEditBudgetTest",
+    "dev.wildware.udea.assets.compiler.scan.WarmScanBudgetTest",
+)
+
 tasks.named<Test>("test") {
-    filter.excludeTestsMatching(daemonBudgetTestClass)
+    budgetTestClasses.forEach { filter.excludeTestsMatching(it) }
 }
 
 tasks.register<Test>("udeaDaemonBudget") {
@@ -131,6 +150,24 @@ tasks.register<Test>("udeaDaemonBudget") {
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     filter.includeTestsMatching(daemonBudgetTestClass)
+    testLogging.showStandardStreams = true
+}
+
+tasks.register<Test>("udeaWarmEditBudget") {
+    group = "verification"
+    description = "Gates spec 6 Phase 2: an edit of moba's real corpus is observed under 3s."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    filter.includeTestsMatching("dev.wildware.udea.assets.compiler.daemon.MobaWarmEditBudgetTest")
+    testLogging.showStandardStreams = true
+}
+
+tasks.register<Test>("udeaScanBudget") {
+    group = "verification"
+    description = "Gates issue #85's warm pass-1 scan of the example tree: under 200ms."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    filter.includeTestsMatching("dev.wildware.udea.assets.compiler.scan.WarmScanBudgetTest")
     testLogging.showStandardStreams = true
 }
 

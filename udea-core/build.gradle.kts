@@ -18,8 +18,10 @@ dependencies {
     // Long. JVM erasure hides a value class, so the check has to run on Kotlin's reflection.
     testImplementation(kotlin("reflect"))
 
-    // `LatencyBudget`, the contention note the three budget tests below end their failure
-    // messages with (issue #175). A test-scope edge to the zero-dependency leaf: it adds the
+    // `LatencyBudget`: the contention note every budget test in `budgetTestClasses` below ends its
+    // failure message with, and the `measuredBy` guard each one opens with, which refuses to let a
+    // budget be measured by any task but its own (issues #175 and #182). A test-scope edge to the
+    // zero-dependency leaf: it adds the
     // fixture and nothing else, and it puts no GL, no gdx and no new runtime dependency anywhere
     // near the headless kernel.
     testImplementation(testFixtures(project(":udea-diagnostics")))
@@ -89,6 +91,10 @@ val budgetTestClasses = listOf(
     "dev.wildware.udea.core.snapshot.SnapshotBudgetTest",
     "dev.wildware.udea.core.snapshot.TickLoopBudgetTest",
     "dev.wildware.udea.core.movement.CharacterMoverBudgetTest",
+    // Split out of `PhysicsRebuildTest` by issue #182. It had never been listed as a latency
+    // budget by anybody, so a 2ms line was read inside every parallel `build` - and passed, which
+    // is why nobody noticed. The rest of that class is reproducibility and stays on `check`.
+    "dev.wildware.udea.core.physics.PhysicsRebuildBudgetTest",
 )
 
 tasks.named<Test>("test") {
@@ -139,6 +145,23 @@ tasks.register<Test>("udeaBenchCharacterMover") {
     testLogging.showStandardStreams = true
 }
 
-// No `check` wiring. The three tasks above are reached through the root's `udeaLatencyBudgets`,
+/**
+ * The spec 3.4 restore gate: 500 bodies rebuilt from their components inside an eighth of a frame.
+ *
+ * Its own task for the reason the three above have theirs, and it took issue #182 to give it one:
+ * it asserts a number of microseconds, and it was doing that from inside `:udea-core:test`.
+ * `PhysicsRebuildBudgetTest`'s KDoc has the remedy when it fails, and the remedy is never a wider
+ * budget.
+ */
+tasks.register<Test>("udeaPhysicsRebuildBudget") {
+    group = "verification"
+    description = "Gates the physics rebuild at 500 bodies: under 2ms median."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    filter.includeTestsMatching("dev.wildware.udea.core.physics.PhysicsRebuildBudgetTest")
+    testLogging.showStandardStreams = true
+}
+
+// No `check` wiring. The four tasks above are reached through the root's `udeaLatencyBudgets`,
 // which the `latency-budgets` CI job runs serially on both runner images. Putting one back here
 // puts a millisecond measurement back inside a parallel build, which is issue #175.

@@ -25,6 +25,12 @@ plugins {
     // wall clock" would be four answers to a question that has one. Root also keeps the switch
     // that disables the gate out of the build script of the module it polices.
     id("udea.determinism-check")
+
+    // And once more, for the same reason (issue #174): `docs/contracts/` is declared frozen in
+    // `AGENTS.md` and nothing enforced it, so a contract several modules independently
+    // implement could move in any commit and the build stayed green. The question is about the
+    // repository rather than about a module, so the gate belongs where the other two do.
+    id("udea.contract-freeze")
 }
 
 group = "dev.wildware.udea"

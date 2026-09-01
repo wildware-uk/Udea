@@ -4,6 +4,7 @@ import dev.wildware.udea.agent.AllocationProbe
 import dev.wildware.udea.agent.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import dev.wildware.udea.diagnostics.bench.LatencyBudget
 import kotlin.test.assertTrue
 
 /**
@@ -67,7 +68,8 @@ class EntityQueryBudgetTest {
         println("query over $ENTITIES entities: median ${median}ns (budget ${BUDGET_NANOS}ns)")
         assertTrue(
             median <= BUDGET_NANOS,
-            "query median was ${median}ns, over the ${BUDGET_NANOS}ns budget",
+            "query median was ${median}ns, over the ${BUDGET_NANOS}ns budget. " +
+                LatencyBudget.contentionNote(":udea-agent:udeaQueryBudget"),
         )
     }
 

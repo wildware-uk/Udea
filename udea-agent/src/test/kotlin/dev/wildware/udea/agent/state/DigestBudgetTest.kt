@@ -1,6 +1,7 @@
 package dev.wildware.udea.agent.state
 
 import dev.wildware.udea.agent.AllocationProbe
+import dev.wildware.udea.diagnostics.bench.LatencyBudget
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -8,9 +9,10 @@ import kotlin.test.assertTrue
  * The Phase 1 exit gate: **digest <0.3ms at 500 entities**, and a build that allocates nothing
  * but the document it publishes.
  *
- * Run by `udeaDigestBudget` and wired into `check`, not into `test` - the same shape as the
- * Phase 0 budgets in `udea-core`, and for the same reason: an advisory print is a budget nobody
- * notices breaking. The numbers live in [DigestBudgets]; if this fails on slower hardware the
+ * Run by `udeaDigestBudget`, which hangs off the root's `udeaLatencyBudgets` and not off `check`
+ * - the same shape as the Phase 0 budgets in `udea-core`, and for the same two reasons: an
+ * advisory print is a budget nobody notices breaking, and a wall-clock number measured inside a
+ * parallel build is a number about the build (issue #175). The numbers live in [DigestBudgets]; if this fails on slower hardware the
  * remedy is to build the digest less often, never to widen the number.
  *
  * Timing here uses a real clock deliberately, unlike every other test in the module. It is
@@ -31,7 +33,8 @@ class DigestBudgetTest {
         )
         assertTrue(
             median <= DigestBudgets.BUILD_NANOS,
-            "digest build median was ${median}ns, over the ${DigestBudgets.BUILD_NANOS}ns budget",
+            "digest build median was ${median}ns, over the ${DigestBudgets.BUILD_NANOS}ns budget. " +
+                LatencyBudget.contentionNote(":udea-agent:udeaDigestBudget"),
         )
     }
 

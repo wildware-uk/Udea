@@ -59,4 +59,22 @@ tasks.test {
     dependsOn(udeaWritePluginClasspath)
     inputs.file(handOff).withPropertyName("pluginUnderTestClasspathFile")
     systemProperty("udea.gradle.pluginClasspathFile", handOff.get().asFile.absolutePath)
+
+    // `LatencyBudgetJobTest` reads the CI workflow and the root build script (issue #175): the
+    // two halves of "the latency budgets are measured on a runner that has nothing else on it"
+    // live one in Gradle and one in YAML, and nothing but a test can hold them together.
+    //
+    // Both are declared as inputs, and that is not tidiness. A test task whose up-to-date check
+    // sees only Kotlin sources and a classpath stays UP-TO-DATE when `ci.yml` changes, and Gradle
+    // re-publishes the previous, passing report - the same defect `udea-assets-compiler`'s build
+    // script records against its asset corpus. A workflow gate whose subject is not an input is a
+    // gate that reports whatever it last saw.
+    val root = rootProject.layout.projectDirectory
+    systemProperty("udea.repoRoot", root.asFile.absolutePath)
+    inputs.file(root.file(".github/workflows/ci.yml"))
+        .withPropertyName("ciWorkflow")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(root.file("build.gradle.kts"))
+        .withPropertyName("rootBuildScript")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

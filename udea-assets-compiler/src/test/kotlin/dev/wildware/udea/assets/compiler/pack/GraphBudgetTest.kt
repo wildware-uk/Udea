@@ -2,6 +2,7 @@ package dev.wildware.udea.assets.compiler.pack
 
 import dev.wildware.udea.assets.compiler.TestPaths
 import dev.wildware.udea.assets.pack.BundleReader
+import dev.wildware.udea.diagnostics.bench.LatencyBudget
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -28,6 +29,15 @@ import kotlin.time.TimeSource
  *
  * The number is printed on every run, so a machine that is merely slow shows up as a number
  * near the line rather than as a mysterious red.
+ *
+ * ## Where it is measured
+ *
+ * On `udeaGraphBudget`, split out of `udeaPackGate` by issue #175 and reached through the root's
+ * `udeaLatencyBudgets`. `udeaPackGate`'s other tests ask whether two builds produce identical
+ * bytes, which is true or false regardless of what else the machine is doing; this one asks how
+ * long nine deserialisations take, which is not. On this box the same decoder medians 4.8ms alone
+ * and 18.1ms inside a parallel build, against a 15ms budget - so measured beside the build it
+ * fails on a machine three times inside its budget.
  */
 class GraphBudgetTest {
 
@@ -35,7 +45,7 @@ class GraphBudgetTest {
     fun `deserialising a graph larger than the example tree stays inside the budget`() {
         val bytes = BundleWriter.write(BundleContent(assets = syntheticGraph()))
 
-        // Warm: the first open pays for class loading and JIT, which is not what the budget is
+        // Warm: the first opens pay for class loading and JIT, which is not what the budget is
         // about - the shipped game's first open pays it too, but under a JVM that has already
         // loaded most of the stdlib.
         repeat(WARMUP) { BundleReader.open(bytes).use { } }
@@ -51,7 +61,8 @@ class GraphBudgetTest {
 
         assertTrue(
             median <= BUDGET,
-            "deserialising $ASSETS assets took a median of $median, over the $BUDGET budget",
+            "deserialising $ASSETS assets took a median of $median, over the $BUDGET budget. " +
+                LatencyBudget.contentionNote(TASK),
         )
     }
 
@@ -79,13 +90,44 @@ class GraphBudgetTest {
     }.sortedBy { it.id }
 
     private companion object {
+        /** The task that measures this, and the one to re-run alone before believing a red. */
+        const val TASK = ":udea-assets-compiler:udeaGraphBudget"
+
         /** Issue #89's number. */
         val BUDGET = 15.milliseconds
 
         /** Comfortably above the 83-declaration example tree and a real game's asset count. */
         const val ASSETS = 2000
 
-        const val WARMUP = 5
+        /**
+         * Forty, and it was five until a CI run made the difference visible.
+         *
+         * Unlike every other budget in this repository, this one's warm-up is counted in calls to
+         * the *measured* method rather than in units of inner work: five `open`s is five
+         * invocations, where `CharacterMoverBudgetTest`'s five warm-up frames are sixty thousand
+         * calls to `move`. Five is not enough for the decoder to be compiled, so the samples that
+         * followed were partly of a warming JVM.
+         *
+         * Measured on the development box, five runs each, back to back:
+         *
+         * | warm-up | medians                                  | best            |
+         * |---------|------------------------------------------|-----------------|
+         * | 5       | 5.61, 6.30, 8.47, 6.36, 7.70 ms          | 5.20 - 7.04 ms  |
+         * | 40      | 4.84, 4.94, 5.03, 4.73, 4.79 ms          | 4.58 - 4.71 ms  |
+         *
+         * A 1.51x spread becomes a 1.06x one, and the number itself drops. `ubuntu-latest` showed
+         * the same thing at CI scale on two runs of identical bytes: median 9.124ms on Actions run
+         * 33450534282 and 16.140ms on 33452620665, the second over the budget with even its *best*
+         * sample at 15.561ms - a whole window of a JVM that had not finished compiling.
+         *
+         * This is not a wider budget and it is the opposite of a weaker gate: the budget is
+         * untouched at 15ms and the measured median falls, so the gate now catches a smaller
+         * regression than it could before. The same experiment was run against
+         * `udeaBenchCharacterMover`, which needs no such change - 5 frames there and 40 give
+         * 2.02-2.18ms and 2.20-2.30ms, the same number.
+         */
+        const val WARMUP = 40
+
         const val SAMPLES = 9
     }
 }

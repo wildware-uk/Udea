@@ -1,6 +1,7 @@
 package dev.wildware.udea.core.snapshot
 
 import dev.wildware.udea.core.alloc.AllocationProbe
+import dev.wildware.udea.diagnostics.bench.LatencyBudget
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -51,7 +52,8 @@ class SnapshotBudgetTest {
             median <= SnapshotBudgets.CAPTURE_NANOS,
             "capture of ${SnapshotBudgets.CAPTURE_ENTITIES} entities took a median of ${median}ns " +
                 "against a ${SnapshotBudgets.CAPTURE_NANOS}ns budget. Do not loosen this number: " +
-                "raise sparseInterval with SnapshotRing.degrade() instead (spec 7).",
+                "raise sparseInterval with SnapshotRing.degrade() instead (spec 7). " +
+                LatencyBudget.contentionNote(":udea-core:udeaSnapshotBudget"),
         )
     }
 

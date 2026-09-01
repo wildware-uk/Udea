@@ -17,14 +17,27 @@ dependencies {
     // ReplicatorApiShapeTest asserts the frozen signature exposes FieldMask and never a raw
     // Long. JVM erasure hides a value class, so the check has to run on Kotlin's reflection.
     testImplementation(kotlin("reflect"))
+
+    // `LatencyBudget`, the contention note the three budget tests below end their failure
+    // messages with (issue #175). A test-scope edge to the zero-dependency leaf: it adds the
+    // fixture and nothing else, and it puts no GL, no gdx and no new runtime dependency anywhere
+    // near the headless kernel.
+    testImplementation(testFixtures(project(":udea-diagnostics")))
 }
 
 // --- Phase 0 budget gates (spec 6 exit criteria, spec 7 risk row) -----------------------------
 //
 // These are hard CI gates, not aspirations: one structure carries time travel, replication
-// baselines and rollback, so a capture that allocates degrades three features at once. Both
-// tasks are wired into `check`, and both are excluded from `test` so a normal test run does not
-// pay for them twice.
+// baselines and rollback, so a capture that allocates degrades three features at once. Each is
+// excluded from `test` so a normal test run does not pay for it twice.
+//
+// They hang off the root's `udeaLatencyBudgets` and no longer off `check` (issue #175). Every
+// number here is a wall-clock duration, and a wall-clock duration measured while the other
+// nineteen modules compile is a measurement of the build: `udeaBenchCharacterMover` medians
+// 2.0-2.2ms alone against a 4.0ms budget on this box and blows straight through it inside a
+// parallel `build`. The root build script carries the full reasoning, including why this is not
+// the same thing as switching the gates off - they are measured on both runner images on every
+// push, by a CI job that has the runner to itself.
 //
 // The documented remedy when one fails on slower hardware is `SnapshotRing.degrade()` — raise
 // `sparseInterval`, keeping the full sixty-second rewind window at lower keyframe density.
@@ -83,7 +96,7 @@ tasks.named<Test>("test") {
 }
 
 /** Capture under 1ms at 1000 entities, allocation-free, ring under 64MB. */
-val udeaSnapshotBudget = tasks.register<Test>("udeaSnapshotBudget") {
+tasks.register<Test>("udeaSnapshotBudget") {
     group = "verification"
     description = "Gates snapshot capture at 1000 entities: <1ms median, zero allocation, <64MB ring."
     testClassesDirs = sourceSets.test.get().output.classesDirs
@@ -95,7 +108,7 @@ val udeaSnapshotBudget = tasks.register<Test>("udeaSnapshotBudget") {
 }
 
 /** The Phase 0 demo: 200 entities, 600 ticks, <50ms, zero allocation, identical hash stream. */
-val udeaBenchTickLoop = tasks.register<Test>("udeaBenchTickLoop") {
+tasks.register<Test>("udeaBenchTickLoop") {
     group = "verification"
     description =
         "Gates the assembled tick loop at 200 entities and 600 ticks: <50ms median, zero " +
@@ -116,7 +129,7 @@ val udeaBenchTickLoop = tasks.register<Test>("udeaBenchTickLoop") {
  * twice. `CharacterMoverBudgetTest`'s KDoc has the remedy when it fails, and the remedy is never
  * a larger constant.
  */
-val udeaBenchCharacterMover = tasks.register<Test>("udeaBenchCharacterMover") {
+tasks.register<Test>("udeaBenchCharacterMover") {
     group = "verification"
     description =
         "Gates CharacterMover at 200 movers x 60 replay steps: under a quarter of a 60Hz frame."
@@ -126,6 +139,6 @@ val udeaBenchCharacterMover = tasks.register<Test>("udeaBenchCharacterMover") {
     testLogging.showStandardStreams = true
 }
 
-tasks.named("check") {
-    dependsOn(udeaSnapshotBudget, udeaBenchTickLoop, udeaBenchCharacterMover)
-}
+// No `check` wiring. The three tasks above are reached through the root's `udeaLatencyBudgets`,
+// which the `latency-budgets` CI job runs serially on both runner images. Putting one back here
+// puts a millisecond measurement back inside a parallel build, which is issue #175.

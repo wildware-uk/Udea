@@ -323,9 +323,10 @@ public class ReplicationServer(
             }
             state.markDestroyPending(netId, tick)
             if (op == EntityOp.Leave) leaveWrites++
-            // Recorded like any other entity in the packet, so the ack that confirms the datagram
-            // is what retires the id — and an unacked removal is simply written again next tick.
-            state.recordSent(netId, seq, tick)
+            // Recorded *as a removal*, so the ack that confirms the datagram retires the id and
+            // is never mistaken for the client acknowledging that it holds one — and an unacked
+            // removal is simply written again next tick.
+            state.recordRemovalSent(netId, seq, tick)
         }
     }
 

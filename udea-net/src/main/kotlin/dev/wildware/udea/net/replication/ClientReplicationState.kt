@@ -158,14 +158,35 @@ public class ClientReplicationState(
         priorities[index] += amount
     }
 
-    /** Records that [netId] rode packet [seq], sent at [tick]. Zeroes its accumulated priority. */
+    /** Records that [netId]'s **state** rode packet [seq], sent at [tick]. Zeroes its priority. */
     public fun recordSent(netId: NetId, seq: Int, tick: Tick) {
         val index = netId.index
         ensureIndices(index + 1)
         priorities[index] = 0f
         lastSentTicks[index] = tick.value
         pushPending(index, tick.value)
-        record(seq).add(netId)
+        record(seq).add(netId, removal = false)
+    }
+
+    /**
+     * Records that [netId]'s **removal** rode packet [seq], sent at [tick].
+     *
+     * Separate from [recordSent] because the two mean opposite things to [applyAck], and the ack
+     * path cannot tell them apart from a [NetId] alone: one says the client is being given the
+     * entity, the other says it is being told the entity is gone. Recording a removal as an
+     * ordinary send is what let a late ack for a `Destroy` install a baseline for a corpse - see
+     * the class KDoc of `RecycledIndexAckTest`.
+     *
+     * No tick is pushed onto the unacknowledged-send list either. That list is "states the client
+     * might be holding", and a packet whose only mention of the entity was the record saying it
+     * was gone is not one of them.
+     */
+    public fun recordRemovalSent(netId: NetId, seq: Int, tick: Tick) {
+        val index = netId.index
+        ensureIndices(index + 1)
+        priorities[index] = 0f
+        lastSentTicks[index] = tick.value
+        record(seq).add(netId, removal = true)
     }
 
     /** Opens a record for an outgoing packet and returns its sequence number. */
@@ -298,6 +319,10 @@ public class ClientReplicationState(
             val netId = NetId.ofRaw(slot.netIds[position])
             val index = netId.index
             ensureIndices(index + 1)
+            if (slot.removalAt(position)) {
+                confirmRemoval(index, netId, slot.tick.value)
+                continue
+            }
             if (baselineGenerations[index] != netId.generation) {
                 // A different occupant of this index: a genuinely new entity, whatever the old
                 // one's fate was.
@@ -309,23 +334,37 @@ public class ClientReplicationState(
             }
             prunePending(index, slot.tick.value)
             when (slotStates[index]) {
-                // The client has confirmed the removal. The index may now be reused, and every
-                // later ack naming this generation is a duplicate confirmation to be ignored.
-                DESTROY_PENDING -> {
-                    // Only a packet that left at or after the removal started being written can
-                    // have carried it. An older one in flight proves nothing about the corpse.
-                    if (slot.tick.value >= destroyTicks[index]) {
-                        slotStates[index] = RETIRED
-                        baselineTicks[index] = NO_BASELINE
-                        destroyTicks[index] = NO_BASELINE
-                    }
-                }
+                // A state record cannot confirm a removal: no state is packed for an index whose
+                // `Destroy` is outstanding, so anything arriving here left *before* the entity
+                // died and proves nothing about the corpse. [confirmRemoval] is the only thing
+                // that retires a slot.
+                DESTROY_PENDING -> Unit
 
                 RETIRED -> Unit
 
                 else -> if (slot.tick.value > baselineTicks[index]) baselineTicks[index] = slot.tick.value
             }
         }
+    }
+
+    /**
+     * Retires [index] because the client confirmed [netId]'s removal in a packet sent at [tick].
+     *
+     * Says nothing about any other generation. A removal confirmation for an index that has since
+     * been handed to somebody else is simply spent: the corpse it names is gone from both ends,
+     * and the occupant that replaced it has a tracking state of its own that this must not touch.
+     * Treating one as evidence about the *current* occupant is what resurrected dead generations
+     * and left an index removing them one per tick for the rest of the session.
+     */
+    private fun confirmRemoval(index: Int, netId: NetId, tick: Long) {
+        if (baselineGenerations[index] != netId.generation) return
+        if (slotStates[index] != DESTROY_PENDING) return
+        // Only a packet that left at or after the removal started being written can have carried
+        // it. An older one in flight proves nothing about the corpse.
+        if (tick < destroyTicks[index]) return
+        slotStates[index] = RETIRED
+        baselineTicks[index] = NO_BASELINE
+        destroyTicks[index] = NO_BASELINE
     }
 
     /** Appends [tick] to [index]'s unacknowledged-send list, or marks the list overflowed. */
@@ -403,6 +442,9 @@ public class ClientReplicationState(
         var acked: Boolean = false
         var inUse: Boolean = false
         var netIds: IntArray = IntArray(32)
+
+        /** Per entry: whether the record was a removal rather than state. */
+        var removals: BooleanArray = BooleanArray(32)
         var count: Int = 0
 
         fun reset(seq: Int, tick: Tick) {
@@ -413,10 +455,16 @@ public class ClientReplicationState(
             count = 0
         }
 
-        fun add(netId: NetId) {
-            if (count == netIds.size) netIds = netIds.copyOf(netIds.size * 2)
+        fun add(netId: NetId, removal: Boolean) {
+            if (count == netIds.size) {
+                netIds = netIds.copyOf(netIds.size * 2)
+                removals = removals.copyOf(removals.size * 2)
+            }
+            removals[count] = removal
             netIds[count++] = netId.raw
         }
+
+        fun removalAt(position: Int): Boolean = removals[position]
     }
 
     public companion object {

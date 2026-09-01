@@ -28,6 +28,30 @@ has eight mutations of `ci.yml` with the same treatment, including two controls.
 
 On `origin/example` the command does not even resolve: there is no `udeaLatencyBudgets` task there.
 
+Run verbatim on the final tree, at load average `10.12 6.09 7.22`:
+
+```
+    phase 2 exit: typo'd reference rejected in 10ms (median of [291, 9, 10])
+    phase 2 exit: agent request -> running world observed changed in 400ms
+    warm reload decision: median 201ms over 4 samples [222, 201, 174, 139]
+    warm validate of one script: median 122ms over 4 samples [9, 129, 115, 122]
+    graph deserialisation: best=4.578545ms median=5.144035ms over 2000 assets (budget 15ms)
+    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) best 1.771ms, median 2.207ms, worst 2.829ms, budget 4.0ms
+    udeaBenchTickLoop: 600 ticks at 200 entities, median 6.540328ms, p95 7.094107ms, budget 50.0ms
+    udeaSnapshotBudget: capture of 1000 entities median 83421ns, p95 88632ns, budget 1000000ns
+> Task :udea-gradle:test UP-TO-DATE
+BUILD SUCCESSFUL in 18s
+57 actionable tasks: 6 executed, 51 up-to-date
+```
+
+`6 executed` is the six budgets: they cannot be up to date and cannot be cached, by construction
+(section 8). `:udea-gradle:test` **can** be, and correctly so — it is a source-reading correctness
+test whose inputs are `ci.yml`, the root build script and its own sources, all declared, so
+`UP-TO-DATE` there means "those files have not moved since it last passed" rather than "it did not
+check". On a fresh checkout, or after any edit to either file, it executes. That asymmetry is
+deliberate and it is the whole of section 8: a stopwatch's input is the machine, and a file-reader's
+input is the file.
+
 ---
 
 ## 2. Summary

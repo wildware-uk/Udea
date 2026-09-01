@@ -27,6 +27,8 @@ class SnapshotBudgetTest {
 
     @Test
     fun `the median capture of a thousand entities is inside its one millisecond budget`() {
+        LatencyBudget.measuredBy(":udea-core:udeaSnapshotBudget")
+
         val sim = SnapshotWorld(idCapacity = SnapshotBudgets.CAPTURE_ENTITIES * 2)
         sim.spawn(SnapshotBudgets.CAPTURE_ENTITIES)
         repeat(30) { sim.step() }

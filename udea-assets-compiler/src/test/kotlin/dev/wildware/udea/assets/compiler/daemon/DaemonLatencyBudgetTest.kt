@@ -36,6 +36,8 @@ class DaemonLatencyBudgetTest {
 
     @Test
     fun `a warm validate of one edited script is under 300ms`() {
+        LatencyBudget.measuredBy(TASK)
+
         val fixture = DaemonFixture("latency").writeBaseline()
         assertTrue(fixture.daemon.start().ok, "the budget corpus must be valid before it is timed")
 

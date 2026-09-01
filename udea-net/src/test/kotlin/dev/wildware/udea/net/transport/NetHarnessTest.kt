@@ -59,17 +59,29 @@ class NetHarnessTest {
         return harness
     }
 
+    /**
+     * ## Where the "no sleeps" half of this went (issue #182)
+     *
+     * It used to be a two-second wall-clock bound on the whole session: a harness that slept a
+     * frame per tick would take 600 x 16ms and blow through it. That worked, and it was a
+     * stopwatch inside `:udea-net:test`, which is on `check`, which is on `build` - so it was
+     * read while nineteen modules compiled beside it, and it was one of the gates neither issue
+     * #175 nor issue #182 had listed.
+     *
+     * It is dropped rather than moved onto `udeaLatencyBudgets`, because "no sleeps" is now
+     * asserted directly and better: `NoWallClockInTransportTest` bans `Thread.sleep` from the
+     * source of the packages that decide what leaves and when, `NetHarness` among them. That is
+     * exact, it names the file and line, and it gives the same answer on any machine - where the
+     * old bound was a 40x-headroom proxy that could only ever fail long after the fact.
+     */
     @Test
-    fun `a four client six hundred tick session runs on one thread with no sleeps`() {
+    fun `a four client six hundred tick session runs on one thread`() {
         val startedOn = Thread.currentThread()
         val startedThreads = Thread.activeCount()
-        val began = System.nanoTime()
         val harness = runSession(seed = 7L, conditions = NetConditions.TRELLO_8)
-        val elapsedMillis = (System.nanoTime() - began) / 1_000_000
 
         assertEquals(Tick(600), harness.clock.tick)
         assertTrue(harness.log.size > 5_000, "a 600-tick 4-client session logged only ${harness.log.size} events")
-        assertTrue(elapsedMillis < 2_000, "600 ticks took ${elapsedMillis}ms, over the two second bound")
         assertEquals(startedOn, Thread.currentThread(), "the harness moved work to another thread")
         assertTrue(
             Thread.activeCount() <= startedThreads,

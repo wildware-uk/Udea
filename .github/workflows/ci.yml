@@ -7,11 +7,18 @@
 # drift check (`udeaCheckProtocolLock`, registered by `registerNetProtocolLock` in
 # `build-logic` for every module that emits a protocol).
 #
-# The **wall-clock latency budgets are not among them** - `udeaSnapshotBudget`,
-# `udeaBenchTickLoop`, `udeaBenchCharacterMover`, `udeaDaemonBudget`, `udeaGraphBudget` and
-# `udeaPhase2Exit` are measured by the `latency-budgets` job below, which runs them serially
-# with nothing else on the runner. Issue #175 has the reasoning; the short version is that a
-# millisecond measured while nineteen modules compile is a measurement of the compilation.
+# The **wall-clock latency budgets are not among them.** Every gate in this repository that
+# asserts a number of milliseconds hangs off `udeaLatencyBudgets`, and the `latency-budgets` job
+# below runs that aggregate serially with nothing else on the runner. Issue #175 has the
+# reasoning; the short version is that a millisecond measured while nineteen modules compile is a
+# measurement of the compilation.
+#
+# The membership is `latencyBudgetTasks` in the root build script, and it is named here rather
+# than listed because a list in a comment is a count that goes stale: this sentence enumerated six
+# tasks while the aggregate held eight, and issue #182 then added three more. `:udea-gradle`'s
+# `WallClockBudgetCensusTest` is what keeps the aggregate itself honest - it reads every test
+# source in the repository and requires each wall-clock reading to be either a member of that list
+# or a censused non-budget.
 #
 # The `game-bridge-mcp` conformance run is the `bridge-conformance` job below: its own job and
 # not a step, because it needs a JVM and Node at once and it needs a game process left running

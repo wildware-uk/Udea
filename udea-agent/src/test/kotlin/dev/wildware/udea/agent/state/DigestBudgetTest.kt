@@ -22,6 +22,8 @@ class DigestBudgetTest {
 
     @Test
     fun `a build at 500 entities stays under the time budget`() {
+        LatencyBudget.measuredBy(":udea-agent:udeaDigestBudget")
+
         val fixture = DigestFixture(entityCount = DigestBudgets.ENTITIES)
         fill(fixture)
 

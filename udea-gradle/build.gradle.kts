@@ -77,4 +77,17 @@ tasks.test {
     inputs.file(root.file("build.gradle.kts"))
         .withPropertyName("rootBuildScript")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+
+    // `WallClockBudgetCensusTest` reads every test source in the repository (issue #182), so every
+    // test source in the repository is an input. Without this the census is checked against
+    // whatever the tree looked like the last time `:udea-gradle` itself changed, and the first
+    // thing a stale fence misses is the timing test somebody added yesterday - which is the exact
+    // failure the fence exists to stop.
+    inputs.files(
+        root.asFileTree.matching {
+            include("*/src/test/**/*.kt", "*/src/testFixtures/**/*.kt")
+            include("*/*/src/test/**/*.kt", "*/*/src/testFixtures/**/*.kt")
+            exclude("**/build/**")
+        },
+    ).withPropertyName("repositoryTestSources").withPathSensitivity(PathSensitivity.RELATIVE)
 }

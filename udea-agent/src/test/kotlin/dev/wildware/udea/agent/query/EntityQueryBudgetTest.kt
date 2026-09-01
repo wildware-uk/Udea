@@ -39,6 +39,8 @@ class EntityQueryBudgetTest {
 
     @Test
     fun `a query over 500 entities returning 20 stays under a millisecond`() {
+        LatencyBudget.measuredBy(":udea-agent:udeaQueryBudget")
+
         val harness = harnessOf(ENTITIES)
         val query = EntityQueryParser.parse(
             harness.index,

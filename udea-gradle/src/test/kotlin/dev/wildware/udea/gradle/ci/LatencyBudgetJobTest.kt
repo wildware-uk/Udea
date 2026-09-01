@@ -125,30 +125,12 @@ class LatencyBudgetJobTest {
      * The task paths the root build script hangs on `udeaLatencyBudgets`.
      *
      * Read out of `build.gradle.kts` rather than listed here, so adding a budget to the aggregate
-     * also puts it under this test without anybody remembering to. `//` tails are stripped first:
-     * a member named only in a comment is not a member, and a slicer that reads raw lines is how
-     * a source-reading fence gets defeated. An empty or missing list fails rather than passing
-     * over nothing.
+     * also puts it under this test without anybody remembering to. Moved into
+     * [LatencyBudgetAggregate] by issue #182, when `WallClockBudgetCensusTest` became a second
+     * reader of the same list: two copies of the membership would be two things to keep in step,
+     * which is the defect the single list exists to prevent.
      */
-    private fun aggregateMembers(): List<String> {
-        val script = File(repoRoot, "build.gradle.kts").readText()
-        val begin = script.indexOf(MEMBER_LIST)
-        assertTrue(
-            begin >= 0,
-            "build.gradle.kts no longer declares `$MEMBER_LIST`, so this test cannot tell which " +
-                "tasks the latency job is responsible for",
-        )
-        val body = script.substring(begin + MEMBER_LIST.length).substringBefore("\n)")
-            .lines()
-            .joinToString("\n") { it.substringBefore("//") }
-        val members = MEMBER.findAll(body).map { it.groupValues[1] }.toList()
-        assertTrue(
-            members.isNotEmpty(),
-            "`$MEMBER_LIST` parsed to no task paths. A budget list that reads as empty makes " +
-                "every assertion built on it vacuous.",
-        )
-        return members
-    }
+    private fun aggregateMembers(): List<String> = LatencyBudgetAggregate.members()
 
     /**
      * The words of [this] that Gradle would read as task names: not flags, not the wrapper, and
@@ -157,12 +139,7 @@ class LatencyBudgetJobTest {
     private fun String.gradleTaskTokens(): List<String> = split(Regex("\\s+"))
         .filter { it.isNotBlank() && !it.startsWith("-") && !it.endsWith("gradlew") }
 
-    private val repoRoot: File
-        get() = File(
-            checkNotNull(System.getProperty("udea.repoRoot")) {
-                "udea.repoRoot is not set; the test task must pass the repository root"
-            },
-        )
+    private val repoRoot: File get() = LatencyBudgetAggregate.repoRoot
 
     private val workflow: File get() = File(repoRoot, ".github/workflows/ci.yml")
 
@@ -170,13 +147,8 @@ class LatencyBudgetJobTest {
         /** The root aggregate every latency measurement hangs off. */
         const val AGGREGATE = "udeaLatencyBudgets"
 
-        /** The declaration in `build.gradle.kts` this test reads the membership out of. */
-        const val MEMBER_LIST = "val latencyBudgetTasks = listOf("
-
         /** What turns the build cache off for a measurement, in the root build script. */
         const val CACHE_GUARD = "outputs.cacheIf("
-
-        val MEMBER = Regex("\"(:[A-Za-z0-9:_-]+)\"")
 
         /**
          * What makes the invocation exclusive. `--no-parallel` stops Gradle running project tasks

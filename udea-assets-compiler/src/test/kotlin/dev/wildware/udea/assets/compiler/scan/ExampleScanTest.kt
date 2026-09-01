@@ -11,8 +11,6 @@ import kotlin.io.path.writeText
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeSource
 
 /**
  * Pass 1 against the real example tree (issue #85).
@@ -23,6 +21,11 @@ import kotlin.time.TimeSource
  * things on first contact that no fixture would have: the whole corpus is CRLF (see
  * [UdeaDeclarationScanner.normalizeLineEndings]), and `character/wizard` references an ability
  * nothing declares.
+ *
+ * The 200ms warm-scan budget that used to be one of these tests is now `WarmScanBudgetTest`, on
+ * `udeaLatencyBudgets` rather than on `check` (issue #182): a stopwatch read inside a parallel
+ * build reads the build. Everything left here gives the same answer on a busy machine as on an
+ * idle one.
  */
 class ExampleScanTest {
 
@@ -158,27 +161,6 @@ class ExampleScanTest {
         }
         assertEquals(outputs[0], outputs[1])
         assertEquals(goldenText(), outputs[0], "a relocated checkout must still match the golden")
-    }
-
-    /**
-     * The warm-scan budget from issue #85.
-     *
-     * Measured over a scanner whose PSI environment is already built, because that is the
-     * daemon's steady state: the environment is created once and reused across rescans. A
-     * cold measurement here would be measuring `KotlinCoreEnvironment`'s constructor, which
-     * no rescan pays for.
-     */
-    @Test
-    fun `a warm scan of the whole tree is under 200ms`() {
-        scanner().use { scanner ->
-            scanner.scanTree() // warm the PSI environment and the JIT
-            scanner.clearCache()
-            val start = TimeSource.Monotonic.markNow()
-            val report = scanner.scanTree()
-            val elapsed = start.elapsedNow()
-            assertEquals(19, report.files.size)
-            assertTrue(elapsed < 200.milliseconds, "warm scan took $elapsed, budget is 200ms")
-        }
     }
 
     /** The per-file cache: a rescan of unchanged bytes reuses every result. */

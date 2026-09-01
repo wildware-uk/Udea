@@ -43,6 +43,8 @@ class GraphBudgetTest {
 
     @Test
     fun `deserialising a graph larger than the example tree stays inside the budget`() {
+        LatencyBudget.measuredBy(TASK)
+
         val bytes = BundleWriter.write(BundleContent(assets = syntheticGraph()))
 
         // Warm: the first opens pay for class loading and JIT, which is not what the budget is

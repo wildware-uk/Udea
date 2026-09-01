@@ -27,46 +27,6 @@ import kotlin.test.assertTrue
  */
 class PhysicsRebuildTest {
 
-    /**
-     * A world of [bodyCount] entities whose components depend only on their [NetId] index.
-     *
-     * [reverseSpawnOrder] changes the order the entities are *created* in while leaving the
-     * id-to-component mapping identical, which is what makes "spawn order must not leak into
-     * the rebuild order" a checkable claim rather than a restatement of the loop.
-     */
-    private class Fixture(val bodyCount: Int, reverseSpawnOrder: Boolean = false) {
-        val netIds = NetIdIndex(capacity = 1024, entityCapacity = 1024)
-        val world: World = configureWorld(1024) {}
-        val ids: List<NetId> = (0 until bodyCount).map { NetId.of(it, 0) }
-
-        init {
-            val order = if (reverseSpawnOrder) (bodyCount - 1) downTo 0 else 0 until bodyCount
-            for (index in order) {
-                val entity = world.entity {
-                    it += PhysicsBody(
-                        kind = if (index % 3 == 0) BodyKind.Static else BodyKind.Dynamic,
-                        x = index * 1.5f,
-                        y = index * -0.25f,
-                        angle = index * 0.01f,
-                        linearX = index.toFloat(),
-                        linearY = -index.toFloat(),
-                        angularVelocity = index * 0.5f,
-                        awake = index % 5 != 0,
-                    )
-                    // Added in an order that is deliberately not shapeOrder, so a rebuild that
-                    // trusted component-add order would produce the wrong fixture sequence.
-                    if (index % 2 == 0) it += Circle(radius = 1f)
-                    it += Box(halfWidth = 1f, halfHeight = 2f)
-                    if (index % 4 == 0) it += Capsule()
-                }
-                netIds.bind(entity, ids[index])
-            }
-        }
-
-        fun bodyOf(id: NetId): PhysicsBody =
-            with(world) { checkNotNull(netIds.resolveOrNull(id)) { "$id is not live" }[PhysicsBody] }
-    }
-
     /** A body's whole observable state, as a string, so a diff points at the field that moved. */
     private fun describe(physics: NoOpPhysicsWorld, handle: BodyHandle): String {
         val pose = physics.poseOf(handle, BodyPose())
@@ -79,8 +39,8 @@ class PhysicsRebuildTest {
 
     @Test
     fun `bodies are created in ascending NetId order whatever order they were spawned in`() {
-        val forwards = Fixture(bodyCount = 32)
-        val backwards = Fixture(bodyCount = 32, reverseSpawnOrder = true)
+        val forwards = PhysicsRebuildFixture(bodyCount = 32)
+        val backwards = PhysicsRebuildFixture(bodyCount = 32, reverseSpawnOrder = true)
 
         val a = SpyPhysicsWorld().also { it.rebuildFrom(forwards.world, forwards.netIds) }
         val b = SpyPhysicsWorld().also { it.rebuildFrom(backwards.world, backwards.netIds) }
@@ -101,7 +61,7 @@ class PhysicsRebuildTest {
 
     @Test
     fun `fixtures are created in shapeOrder, not component-add order`() {
-        val fixture = Fixture(bodyCount = 4)
+        val fixture = PhysicsRebuildFixture(bodyCount = 4)
         val physics = NoOpPhysicsWorld()
         physics.rebuildFrom(fixture.world, fixture.netIds)
 
@@ -113,7 +73,7 @@ class PhysicsRebuildTest {
 
     @Test
     fun `rebuilding twice from the same components produces identical bodies`() {
-        val fixture = Fixture(bodyCount = 64)
+        val fixture = PhysicsRebuildFixture(bodyCount = 64)
         val physics = NoOpPhysicsWorld()
 
         physics.rebuildFrom(fixture.world, fixture.netIds)
@@ -128,7 +88,7 @@ class PhysicsRebuildTest {
 
     @Test
     fun `the rebuild is identical across 100 runs`() {
-        val fixture = Fixture(bodyCount = 24)
+        val fixture = PhysicsRebuildFixture(bodyCount = 24)
         val reference = SpyPhysicsWorld().also { it.rebuildFrom(fixture.world, fixture.netIds) }.events.toList()
 
         repeat(100) { run ->
@@ -140,7 +100,7 @@ class PhysicsRebuildTest {
 
     @Test
     fun `stale bodies are destroyed, so the body count matches the components exactly`() {
-        val fixture = Fixture(bodyCount = 16)
+        val fixture = PhysicsRebuildFixture(bodyCount = 16)
         val physics = NoOpPhysicsWorld()
 
         // A world that has been running: bodies exist, and some of them belong to entities the
@@ -160,7 +120,7 @@ class PhysicsRebuildTest {
 
     @Test
     fun `an entity with a body but no NetId is skipped rather than given an arbitrary position`() {
-        val fixture = Fixture(bodyCount = 4)
+        val fixture = PhysicsRebuildFixture(bodyCount = 4)
         fixture.world.entity { it += PhysicsBody(x = 99f) }
 
         val physics = NoOpPhysicsWorld()
@@ -180,7 +140,7 @@ class PhysicsRebuildTest {
         // solver) that a system created a body for directly, with no NetId. `rebuildFrom`
         // destroys every body but only rewrites the handles the plan covers, so this one is
         // the entity whose `handle` can outlive the body it names.
-        val fixture = Fixture(bodyCount = 4)
+        val fixture = PhysicsRebuildFixture(bodyCount = 4)
         val orphan = PhysicsBody(x = 99f)
         fixture.world.entity { it += orphan }
         val physics = NoOpPhysicsWorld()
@@ -214,7 +174,7 @@ class PhysicsRebuildTest {
         // PhysicsRebuildPlan rather than in NoOpPhysicsWorld, or the next backend re-implements
         // the loop and re-introduces the dangling handle. SpyPhysicsWorld is a second
         // implementation writing the same three lines a Box2D backend would.
-        val fixture = Fixture(bodyCount = 3)
+        val fixture = PhysicsRebuildFixture(bodyCount = 3)
         val orphan = PhysicsBody(x = 7f)
         fixture.world.entity { it += orphan }
         val physics = SpyPhysicsWorld()
@@ -228,36 +188,11 @@ class PhysicsRebuildTest {
     }
 
     @Test
-    fun `rebuilding 500 bodies completes in under 2ms`() {
-        val fixture = Fixture(bodyCount = 500)
-        val physics = NoOpPhysicsWorld()
-
-        // Warm the JIT: a first-run figure measures interpretation, not the rebuild.
-        repeat(20) { physics.rebuildFrom(fixture.world, fixture.netIds) }
-
-        val samples = LongArray(21)
-        for (index in samples.indices) {
-            val start = System.nanoTime()
-            physics.rebuildFrom(fixture.world, fixture.netIds)
-            samples[index] = System.nanoTime() - start
-        }
-        samples.sort()
-        val medianNanos = samples[samples.size / 2]
-
-        println("PhysicsRebuildTest: 500 bodies rebuilt in ${medianNanos / 1000}us (median of ${samples.size})")
-        assertEquals(500, physics.bodyCount)
-        assertTrue(
-            medianNanos < 2_000_000L,
-            "rebuilding 500 bodies took ${medianNanos / 1000}us, over the 2000us budget",
-        )
-    }
-
-    @Test
     fun `a context built by hand still gets a physics world that rebuilds`() {
         // Guards the seam rather than the algorithm: `SnapshotService.applyNow` calls
         // `ctx.physics.rebuildFrom(world, netIds)`, so every context must have something there.
         val ctx = testGameContext()
-        val fixture = Fixture(bodyCount = 3)
+        val fixture = PhysicsRebuildFixture(bodyCount = 3)
         ctx.physics.rebuildFrom(fixture.world, fixture.netIds)
         assertEquals(3, ctx.physics.bodyCount)
 

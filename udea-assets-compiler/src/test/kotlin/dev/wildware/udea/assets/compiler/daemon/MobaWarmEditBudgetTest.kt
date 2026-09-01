@@ -1,21 +1,7 @@
 package dev.wildware.udea.assets.compiler.daemon
 
-import dev.wildware.udea.assets.AssetId
-import dev.wildware.udea.assets.SpriteSheet
-import dev.wildware.udea.assets.compiler.AssetCompiler
-import dev.wildware.udea.assets.compiler.TestPaths
+import dev.wildware.udea.diagnostics.bench.LatencyBudget
 import org.junit.jupiter.api.Test
-import java.nio.file.Path
-import kotlin.io.path.copyTo
-import kotlin.io.path.createDirectories
-import kotlin.io.path.exists
-import kotlin.io.path.isRegularFile
-import kotlin.io.path.readText
-import kotlin.io.path.relativeTo
-import kotlin.io.path.walk
-import kotlin.io.path.writeText
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -40,128 +26,87 @@ import kotlin.test.assertTrue
  *
  * ## What is inside the measurement and what is not
  *
- * Inside: the file write, `reload`, one script compile, the scan, the reference walk, `PackedValues`
- * over the whole graph, the structural-change check, the diff, `commit`, and reading the new
- * `SpriteSheet.scale` back out.
+ * Inside, and nothing else: [MobaWarmEdit.edit] - the file write, `reload`, one script compile, the
+ * scan, the reference walk, `PackedValues` over the whole graph, the structural-change check, the
+ * diff, `commit`, and reading the new `SpriteSheet.scale` back out.
  *
  * Outside, and stated rather than hidden: the last leg into the running process. `AssetHotReload`
  * takes the same `GraphDelta` this produces and swaps it into the live `AssetRegistry` at a barrier
  * inside `Simulation.step` - one tick, 16ms at 60Hz - and `Phase2ExitTest` gates *that* leg end to
- * end over HTTP at one second. So the number here is the part this repository had never measured
- * over the corpus a person actually edits.
+ * end over HTTP at one second. Also outside: everything [MobaWarmEdit.verify] asserts, which
+ * `MobaWarmEditTest` runs on `check`.
  *
- * The corpus is **copied** into `build/tmp/scratch` first. A benchmark that edited `moba/assets`
- * would leave the game's own asset tree modified when it failed halfway.
+ * ## Why it is the maximum, and why that survived issue #182
  *
- * ## Why it is a range and a median, not one run
+ * Six edits are made, the first is discarded as the warm-up (it pays for classloading the
+ * scripting host - about two seconds on this machine, which is start-up and not the editing loop),
+ * and the **maximum** of the rest is what the budget is asserted against.
  *
- * A single sample of a JIT-warming, disk-touching operation is a number, not a measurement. Six
- * edits are made, the first is discarded as the warm-up (it pays for classloading the scripting
- * host - about two seconds on this machine, which is start-up and not the editing loop), and the
- * **maximum** of the rest is what the budget is asserted against. Median would let one edit in
- * three miss the budget and still be reported green.
+ * Issue #182 asked whether that should become a median, because #175 made exactly that change to
+ * `DaemonLatencyBudgetTest`'s reload gate - where the maximum of five was "the worst scheduling
+ * hiccup in a two-minute window rather than anything about the daemon", measured at 172ms alone
+ * and 528ms beside a full build. It should not, for two reasons that are specific to this gate:
+ *
+ * - **the tail here is not noise.** Measured on this repository's box at a load average of 1.17,
+ *   the five counted samples were `[147, 131, 132, 127, 142]` - a 16% spread between fastest and
+ *   slowest, not the two-to-four times that made the maximum meaningless there.
+ * - **the criterion is a deadline, not a throughput.** "An asset edit is observed in under three
+ *   seconds" is a claim about every edit a person makes. A median would let one edit in three miss
+ *   the deadline and still report green, which is a different and weaker claim than the one spec 6
+ *   states.
+ *
+ * A median would also have made the gate strictly easier to pass, and this repository does not buy
+ * that without a demonstration that it still catches the regression it is for.
+ *
+ * ## Where it is measured
+ *
+ * On `udeaLatencyBudgets`, through `:udea-assets-compiler:udeaWarmEditBudget`, and no longer inside
+ * `check` (issue #182). [LatencyBudget.measuredBy] refuses to let it run anywhere else.
+ *
+ * If it fails, the remedy is the daemon's incremental scope - re-walk less of the graph - never a
+ * wider budget.
  */
 class MobaWarmEditBudgetTest {
 
-    /** Spec 6 Phase 2: an asset edit is observed in under three seconds. */
-    private val budgetMs = 3_000L
-
-    /** Six edits, five counted. */
-    private val iterations = 6
-
-    /** The sheet whose authored scale every iteration moves. */
-    private val probed = AssetId("character/orc_idle_sheet")
-
     @Test
     fun `a warm edit of the real moba corpus is observed in under three seconds`() {
-        val root = copyCorpus()
-        val daemon = AssetDaemon(
-            repoRoot = TestPaths.repoRoot,
-            assetRoot = root,
-            scriptClasspath = TestPaths.compilerClasspath,
-            cacheDirectory = TestPaths.scratch("daemon/moba-warm-edit/cache"),
-        )
+        LatencyBudget.measuredBy(TASK)
 
-        val started = daemon.start()
-        assertTrue(
-            started.ok,
-            "the game's own corpus must be valid before it is timed:\n" +
-                started.diagnostics.joinToString("\n") { "${it.ruleId} ${it.message}" },
-        )
-        // Non-empty, not an exact count. The budget is about the *cost of walking the real
-        // corpus*, and that cost tracks whatever the corpus currently holds - so an exact number
-        // here would be a second thing to edit every time somebody authors an asset, and would
-        // fail for a reason that is not a regression. It was 127 when this was written and 147
-        // once the shop's twenty items landed.
-        assertTrue(
-            daemon.ids.isNotEmpty(),
-            "the daemon loaded no assets, so this would be timing an empty walk",
-        )
+        val harness = MobaWarmEdit("moba-warm-edit")
+        harness.start()
 
-        val script = root.resolve("character/orc.udea.kts")
-        val original = script.readText()
         val samples = mutableListOf<Long>()
-
-        repeat(iterations) { iteration ->
-            // A different number every time, so the compiled-script jar cache can never answer
-            // the edit and turn this into a measurement of a hash lookup.
-            val scale = "1.${70 + iteration}F"
-            val edited = original.replace("val orcScale = 1.88F", "val orcScale = $scale")
-            assertTrue(edited != original, "the benchmark's own edit did not change the file")
-
+        repeat(ITERATIONS) { iteration ->
             val began = System.nanoTime()
-            script.writeText(edited)
-            val outcome = daemon.reload(listOf(script))
-            val applied = assertIs<ReloadOutcome.Applied>(
-                outcome,
-                "a scale change is an ordinary value change, not a shape change: $outcome",
-            )
-            daemon.commit()
-            val observed = assertIs<SpriteSheet>(daemon.value(probed.value))
+            val edit = harness.edit(iteration)
             val elapsedMs = (System.nanoTime() - began) / 1_000_000
 
-            assertEquals(scale.removeSuffix("F").toFloat(), observed.scale)
-            assertTrue(
-                probed in applied.changedIds,
-                "the delta an `AssetHotReload` would push does not name $probed: ${applied.changedIds}",
-            )
-            // Five sheets share `orcScale`, so the delta is the five of them and nothing else.
-            assertEquals(5, applied.changedIds.size, "changed: ${applied.changedIds}")
-
+            harness.verify(edit)
             if (iteration > 0) samples += elapsedMs
         }
 
         println(
-            "moba warm edit -> observed: max ${samples.max()}ms, median ${samples.sorted()[samples.size / 2]}ms, " +
-                "min ${samples.min()}ms over ${samples.size} samples $samples " +
-                "(budget ${budgetMs}ms, corpus ${daemon.ids.size} assets)",
+            "moba warm edit -> observed: max ${samples.max()}ms, " +
+                "median ${samples.sorted()[samples.size / 2]}ms, min ${samples.min()}ms over " +
+                "${samples.size} samples $samples " +
+                "(budget ${BUDGET_MS}ms, corpus ${harness.assetCount} assets)",
         )
         assertTrue(
-            samples.max() <= budgetMs,
-            "spec 6 Phase 2 gates an asset edit at ${budgetMs}ms; the slowest of $samples missed it",
+            samples.max() <= BUDGET_MS,
+            "spec 6 Phase 2 gates an asset edit at ${BUDGET_MS}ms; the slowest of $samples " +
+                "missed it. " + LatencyBudget.contentionNote(TASK),
         )
     }
 
-    /**
-     * `moba/assets`, copied whole into scratch.
-     *
-     * Whole and not scripts-only: the daemon's reference walk is over ids, but a corpus missing its
-     * PNGs would be a different tree from the one this claims to measure the day a validator that
-     * reads files is added to the reload path.
-     */
-    @OptIn(kotlin.io.path.ExperimentalPathApi::class)
-    private fun copyCorpus(): Path {
-        val source = TestPaths.repoRoot.resolve("moba/assets")
-        assertTrue(
-            source.exists() && AssetCompiler.scriptsUnder(source).isNotEmpty(),
-            "this benchmark is about the game's one asset root; $source is not it",
-        )
-        val target = TestPaths.scratch("daemon/moba-warm-edit/assets")
-        for (file in source.walk().filter { it.isRegularFile() }) {
-            val destination = target.resolve(file.relativeTo(source).toString())
-            destination.parent?.createDirectories()
-            file.copyTo(destination, overwrite = true)
-        }
-        return target
+    private companion object {
+
+        /** The task that measures this, and the one to re-run alone before believing a red. */
+        const val TASK = ":udea-assets-compiler:udeaWarmEditBudget"
+
+        /** Spec 6 Phase 2: an asset edit is observed in under three seconds. */
+        const val BUDGET_MS = 3_000L
+
+        /** Six edits, five counted. */
+        const val ITERATIONS = 6
     }
 }

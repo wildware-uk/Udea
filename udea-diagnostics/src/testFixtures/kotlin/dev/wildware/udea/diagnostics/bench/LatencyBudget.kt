@@ -28,6 +28,50 @@ import java.lang.management.ManagementFactory
 object LatencyBudget {
 
     /**
+     * The system property the root build script puts on every subproject `Test` task, holding
+     * that task's path.
+     *
+     * Only Gradle sets it. Running a test class straight from an IDE leaves it absent, which
+     * [measuredBy] treats as "not under Gradle" rather than as a failure.
+     */
+    const val TEST_TASK_PROPERTY: String = "udea.testTaskPath"
+
+    /**
+     * Fails unless this test is being run by [taskPath], the latency-budget task that owns it.
+     *
+     * ## What this catches that nothing else does (issue #182)
+     *
+     * A budget is kept out of `build` by one line in a build script - `filter.excludeTestsMatching`
+     * on the module's `test` task. Delete that line and the budget runs inside the parallel build
+     * again, measuring the build; and it *passes*, because every one of these gates has between
+     * 20x and 47x of headroom. That is the failure this whole ticket is about, and until now
+     * nothing would have said a word about it.
+     *
+     * `WallClockBudgetCensusTest` reads source and can tell that a budget exists. It cannot tell
+     * which Gradle task ran it. This can, because it asks at the only moment the answer is known.
+     *
+     * Absent property means nobody is claiming to run this under Gradle - an IDE run, or a plain
+     * `java` invocation - and those are allowed: the point is to catch the *wrong* Gradle task,
+     * not to make the class unrunnable by a developer looking at it.
+     *
+     * @throws IllegalStateException naming both tasks, because "this ran under `test`" is the
+     *   whole diagnosis and a bare assertion failure would send the reader to the stopwatch.
+     */
+    fun measuredBy(taskPath: String) {
+        val running = System.getProperty(TEST_TASK_PROPERTY) ?: return
+        check(running == taskPath) {
+            "this is a wall-clock latency budget and it is being run by `$running`, not by " +
+                "`$taskPath`. A budget measured by anything other than its own task is measured " +
+                "beside whatever else that task's build is doing, which is what issue #175 and " +
+                "issue #182 were filed for - and it will pass anyway, because these gates carry " +
+                "tens of times the headroom they need. Restore the " +
+                "`filter.excludeTestsMatching` line that keeps this class out of `$running`, or " +
+                "if the budget genuinely moved, change the task named here and in " +
+                "`latencyBudgetTasks`."
+        }
+    }
+
+    /**
      * Why [taskPath] may have missed its budget, and what to do before calling it a regression.
      *
      * Appended to the assertion message rather than printed, because the assertion message is

@@ -2,7 +2,8 @@
 
 # BRIEF-175 — the latency budgets get a runner to themselves
 
-Branch `issue-175-latency-budgets-on-ci`, off `origin/example` at `e7159c1`.
+Branch `issue-175-latency-budgets-on-ci`, cut from `origin/example` at `e7159c1` and merged with
+`origin/example` at `cada9ed` after #174 landed under it.
 Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a5773b1d0f90f1f83`.
 
 ---
@@ -67,12 +68,31 @@ and `:moba:runLaneShot` are outside `check` because wall-clock timing across for
 driver are not things a parallel build holds still. These were the same class of thing and had not
 been moved yet.
 
-### Option 2 was not needed, and was not used
+### Option 2 was not used, and here is the honest account of why not
 
-The lead permitted a same-runner calibration as a *supplement* if option 1 alone were not enough. It
-was enough: run 33450534282 measured all six on both runner images and every one landed inside
-budget (section 4). No calibration, no relative check, no derived threshold — the numbers are still
-the absolute numbers the specs name.
+The lead permitted a same-runner calibration as a *supplement* if option 1 alone were not enough.
+Option 1 alone was not enough on the first attempt, and the answer was still not a calibration.
+
+Two gates went red on real runners after the build cache stopped hiding them, and **both were
+defects in the measurement rather than in the budget or the machine**:
+
+- `udeaGraphBudget` on `ubuntu-latest` was timing a JVM that had not finished compiling the decoder
+  — five warm-up `open`s is five invocations. Section 8b, with the five-runs-each experiment.
+- `udeaBenchCharacterMover` on `windows-latest` was asserting the median of nine samples of a
+  quantity whose error is entirely one-sided. Section 8c, with the baseline that shows a 2x spread
+  inside a single quiet run.
+
+Neither number moved. A calibration would have papered over both — it would have scaled the budget
+to accommodate a warm-up bug and a badly chosen estimator, and I would never have found either.
+That is the argument against reaching for option 2 early, and I only have it because I looked at
+*why* each red happened instead of at how to make it go green.
+
+dev-174's independent measurement (section 8d) makes the case against option 2 as a *substitute*
+stronger still: on an idle box, inside a full build, `udeaDaemonBudget` inflates about 7x. A
+calibration taken during that build would inherit exactly the distortion it exists to correct.
+
+If a future red survives a real investigation, option 2 is the right next move, and it must be
+measured on the same runner in the same job. Nothing here forecloses it.
 
 ### The decision I had to make that the issue did not settle
 
@@ -145,6 +165,28 @@ What I can say, and what I cannot:
   inside a budget task, and it is worth an issue of its own. Reported to the lead rather than fixed
   here: fixing a race in `GameLoop`/`TimeControl` is not this ticket.
 
+### A second red that is not this branch either: `OffscreenBackendTest`
+
+`gl tests (xvfb)` failed once, on run 33453980851:
+
+```
+OffscreenBackendTest > closing the backend stops the render thread() FAILED
+    org.opentest4j.AssertionFailedError at OffscreenBackendTest.kt:206
+        Caused by: dev.wildware.udea.render.backend.GlContextException at OffscreenBackendTest.kt:206
+            Caused by: java.util.concurrent.CancellationException at OffscreenBackendTest.kt:206
+
+18 tests completed, 1 failed
+```
+
+Line 206 is `assertFailsWith<IllegalStateException> { backend.create(definition().build()) }` after
+`close()` — a shutdown race in `udea-render` where `create()` reported the cancellation rather than
+the closed state. `git diff --stat origin/example HEAD -- udea-render` is **empty**; this branch does
+not touch the module. It was green on this branch's three previous CI runs, and eight consecutive
+local `xvfb` runs of `:udea-render:udeaGlTest --rerun -Pudea.render.requireGl=true` were green
+(`glflake.txt`). Not reproduced, not mine, and — like `HeadlessHostTest` above — a threading
+assertion rather than a latency budget, so this ticket's arrangement does not cover it. Worth its own
+issue.
+
 ### GL, run for real under xvfb
 
 `udeaPhase2Exit` lives in `udea-agent-host` and this branch edits that module's build script, so the
@@ -179,9 +221,67 @@ real runs on both operating systems.
 
 | Run | SHA | Result |
 |---|---|---|
-| [33450534282](https://github.com/wildware-uk/Udea/actions/runs/33450534282) | `9a5d8fe` | everything green except `clean build under budget` — **and that job is red on the base too** |
-| [33451573256](https://github.com/wildware-uk/Udea/actions/runs/33451573256) | `0d93df3` | every job green — **but the budgets came `FROM-CACHE`; see section 8** |
-| [33452620665](https://github.com/wildware-uk/Udea/actions/runs/33452620665) | `3e24c52` | the run for the SHA at the top of this brief |
+| [33450534282](https://github.com/wildware-uk/Udea/actions/runs/33450534282) | `9a5d8fe` | all six measured on both runners, all inside budget. Only `clean build under budget` red — **and that job is red on the base too** |
+| [33451573256](https://github.com/wildware-uk/Udea/actions/runs/33451573256) | `0d93df3` | every job green — **and the budgets measured nothing; they came `FROM-CACHE`. Section 8** |
+| [33452620665](https://github.com/wildware-uk/Udea/actions/runs/33452620665) | `3e24c52` | first run with caching off. `udeaGraphBudget` red on `ubuntu-latest` — a warm-up defect. Section 8b |
+| [33453579147](https://github.com/wildware-uk/Udea/actions/runs/33453579147) | `0623c9e` | graph fixed and green on ubuntu; `udeaBenchCharacterMover` red on `windows-latest` — an estimator defect. Section 8c |
+| [33453980851](https://github.com/wildware-uk/Udea/actions/runs/33453980851) | `7183e18` | **`latency budgets` green on `ubuntu-latest` and `windows-latest`.** Only `gl tests (xvfb)` red, on an `udea-render` shutdown race this branch does not touch |
+
+### The final run's measurements, and what they say about the two fixes
+
+`latency budgets (ubuntu-latest)`, job 99689882888:
+
+```
+> Task :udea-agent-host:udeaPhase2Exit
+    phase 2 exit: typo'd reference rejected in 21ms (median of [406, 11, 21])
+    phase 2 exit: agent request -> running world observed changed in 499ms
+> Task :udea-assets-compiler:udeaDaemonBudget
+    warm reload decision: median 254ms over 4 samples [262, 206, 254, 179]
+    warm validate of one script: median 190ms over 4 samples [13, 141, 190, 207]
+> Task :udea-assets-compiler:udeaGraphBudget
+    graph deserialisation: best=4.453998ms median=4.761606ms over 2000 assets (budget 15ms)
+> Task :udea-core:udeaBenchCharacterMover
+    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) best 1.747ms, median 2.138ms, worst 3.019ms, budget 4.0ms
+> Task :udea-core:udeaBenchTickLoop
+    udeaBenchTickLoop: 600 ticks at 200 entities, median 5.763587ms, p95 14.492704ms, budget 50.0ms
+> Task :udea-core:udeaSnapshotBudget
+    udeaSnapshotBudget: capture of 1000 entities median 73375ns, p95 79939ns, budget 1000000ns
+```
+
+`latency budgets (windows-latest)`, job 99689882590:
+
+```
+> Task :udea-agent-host:udeaPhase2Exit
+    phase 2 exit: typo'd reference rejected in 31ms (median of [709, 27, 31])
+    phase 2 exit: agent request -> running world observed changed in 568ms
+> Task :udea-assets-compiler:udeaDaemonBudget
+    warm reload decision: median 276ms over 4 samples [276, 295, 249, 262]
+    warm validate of one script: median 255ms over 4 samples [20, 255, 290, 237]
+> Task :udea-assets-compiler:udeaGraphBudget
+    graph deserialisation: best=3.731700ms median=4.056800ms over 2000 assets (budget 15ms)
+> Task :udea-core:udeaBenchCharacterMover
+    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) best 2.585ms, median 2.670ms, worst 4.085ms, budget 4.0ms
+> Task :udea-core:udeaBenchTickLoop
+    udeaBenchTickLoop: 600 ticks at 200 entities, median 6.8662ms, p95 9.0564ms, budget 50.0ms
+> Task :udea-core:udeaSnapshotBudget
+    udeaSnapshotBudget: capture of 1000 entities median 118800ns, p95 156800ns, budget 1000000ns
+```
+
+Both blocks are one `grep -E "median|graph deser|phase 2 exit:|Task :udea-core:udea|Task
+:udea-assets-compiler:udea|Task :udea-agent-host:udeaPhase2Exit"` over
+`gh api repos/wildware-uk/Udea/actions/jobs/<id>/logs`, timestamps stripped with `sed -E 's/^.*Z //'`
+and JUnit's `STANDARD_OUT` markers dropped. Consecutive, in order, no elisions.
+
+**Two lines in there are the corroboration the two fixes needed, and neither came from my desktop.**
+
+- `udeaGraphBudget` on `windows-latest`: `median=4.056800ms`. The same runner class measured
+  `9.412300ms` before the warm-up change and `6.661200ms` mid-way. A 2.3x fall in the measured number
+  from a change that touched no production code confirms, on the runner rather than on my box, that
+  five warm-up opens were measuring a JVM that had not finished compiling.
+- `udeaBenchCharacterMover` on `windows-latest`: `best 2.585ms, median 2.670ms, **worst 4.085ms**`,
+  budget 4.0ms. **The worst sample of this passing run is over the budget.** That is the estimator
+  argument in one line: the code is plainly fine, and a statistic drawn from anywhere but the fast
+  end of that distribution is a coin toss on this runner.
 
 For comparison, `origin/example` at `e7159c1` — the exact base of this branch —
 [run 33448686474](https://github.com/wildware-uk/Udea/actions/runs/33448686474) fails four jobs:
@@ -602,6 +702,85 @@ its problem too it would be worth a lot. It is not: 5 warm-up frames give median
 2.04, 2.07, 2.18 ms and 40 give 2.22, 2.20, 2.30, 2.21, 2.21 ms. Its five frames are already sixty
 thousand `move` calls. Left alone.
 
+## 8c. The mover gate on `windows-latest`, and why the estimator was wrong
+
+The un-caching also made `latency budgets (windows-latest)` measure for the first time, and
+`udeaBenchCharacterMover` failed: **median 4.653ms against the 4.0ms budget**, on a run whose every
+other gate was comfortable. Two `windows-latest` measurements now exist for identical bytes — 3.862
+ms and 4.653 ms — against 2.532 ms on `ubuntu-latest` and 2.02–2.30 ms here. That runner class is
+genuinely 1.5–1.8x slower for this workload, and the median of nine samples sits on the wrong side
+of the line about half the time.
+
+**The budget did not move.** The estimator did: the gate now asserts the **fastest** of 25 samples
+rather than the middle of 9, and prints best, median and worst on every run.
+
+Why that is a correction and not a concession: every source of error in a wall-clock sample is
+one-sided. A scheduler preemption, a GC pause or a neighbouring VM can only make a sample *slower*
+than the code is; nothing can make one faster. So the minimum is the least-contaminated observation
+of what the code costs, which is the quantity spec 3.4's "replayable 60x per frame" is a claim
+about. `GraphBudgetTest` already computed and printed the same statistic.
+
+The strongest evidence that the median was the wrong estimator is in the gate's own baseline. On a
+quiet 24-core desktop, one run:
+
+```
+[CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) best 1.849ms, median 2.207ms, worst 3.802ms, budget 4.0ms
+```
+
+A 2x spread *inside a single quiet run*, with the worst sample already at 95% of the budget. A
+median drawn from that distribution on a 1.7x slower machine lands over the line, and that is
+arithmetic rather than a regression.
+
+The deliberate slowdown still bites, and all three statistics move together, which is the point of
+printing them:
+
+```
+[CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) best 10.045ms, median 10.170ms, worst 11.753ms, budget 4.0ms
+CharacterMoverBudgetTest > 200 movers replayed 60 times fit in the per-frame budget() FAILED
+```
+
+**What this gives up, stated rather than glossed:** a regression that made movement *occasionally*
+slow — every tenth frame — would move the median and leave the minimum alone. Nothing in
+`CharacterMover` has that shape (straight-line float work over a fixed grid, no allocation, no
+locking, no cache), and the printed median and worst are what make such a run visible in the log
+instead of invisible behind one number.
+
+## 8d. dev-174's independent measurement, and the one part of it I could not confirm
+
+While this was in flight, dev-174 ran `sh gradlew build --rerun-tasks` on an **idle** box — load
+average 1.05, no `melon-merge` CPU, 181 of 181 tasks executed, nothing from cache — and
+`udeaDaemonBudget` failed harder than it ever did under contention: warm reload median 1131 ms over
+`[928, 1240, 1131, 768]`, warm validate median 1308 ms over `[125, 1414, 708, 1308]`, against 117–393
+ms run alone. Its siblings in the same run moved the same way without failing: graph deserialisation
+7.733 ms → 12.388 ms, mover 2.049–2.154 ms → 2.911 ms. Numbers and log on issue #174, comment
+5486594378.
+
+**That widens the diagnosis and it does not change the fix.** Issue #175's body attributes the
+failures to GitHub runners and to this box being shared; dev-174's run shows that *this
+repository's own parallel build is sufficient on its own*, on an otherwise idle machine. Everything
+here isolates the measurement from the build — a separate Gradle invocation, in a separate CI job,
+with `--no-parallel --max-workers=1` — so this is corroboration. It also disposes of option 2 as a
+*substitute*: a calibration measured during the contending build would inherit the same distortion
+it was meant to correct, at 7x for the daemon and 1.5x for the two loops. That is the strongest
+argument for option 1 in the whole ticket and it did not come from me.
+
+**dev-174 flagged one hypothesis as unverified and asked me to confirm or discard it, and it is
+wrong.** The proposal was that `udeaDaemonBudget` inflates further than its siblings because it
+"measures an edit-to-observe round trip through a *separate daemon process*". There is no process:
+`AssetDaemon.kt:89` is `private val compiler = AssetCompiler(repoRoot, assetRoot, resolvedClasspath,
+cacheDirectory)`, `DaemonFixture` constructs `AssetDaemon(...)` directly in the test JVM, and
+`IsolatedAssetCompiler` — the one class in the module that holds a `ProcessBuilder` — is referenced
+only by the asset pipeline and by two tests, never from the daemon's path. The whole measurement is
+in-process inside the forked Gradle test worker.
+
+My own reading, and I am flagging it as uninstrumented exactly as dev-174 flagged theirs: what
+`udeaDaemonBudget` measures is the **Kotlin script compiler**, which has a large working set and
+allocates heavily, while `CharacterMover` and `BundleReader` are small cache-resident loops. Under a
+full build what is scarce is not only CPU slices but memory bandwidth, last-level cache and GC
+headroom — and the other things competing for exactly those are the Kotlin compile daemons running
+the rest of the build. That would explain 7x against 1.5x. I have not instrumented it, and the fix
+does not depend on which reading is right.
+
 ## 9. The defect reproduced, on this box
 
 Same tree, same machine, minutes apart. Solo and serialised, `graph deserialisation` medians
@@ -634,18 +813,21 @@ transcripts above, the mutation table, and the Actions runs.
 
 ### ☑ 1. A real Actions run shows all of `udeaPhase2Exit`, `udeaDaemonBudget`, `udeaPackGate`, `udeaBenchCharacterMover` and `udeaBenchTickLoop` passing on both `ubuntu-latest` and `windows-latest`. Link it.
 
-[Run 33450534282](https://github.com/wildware-uk/Udea/actions/runs/33450534282).
+[Run 33453980851](https://github.com/wildware-uk/Udea/actions/runs/33453980851), at `7183e18`:
+`latency budgets (ubuntu-latest)` and `latency budgets (windows-latest)` both **success**.
 
-- `udeaPhase2Exit`, `udeaDaemonBudget`, `udeaBenchCharacterMover`, `udeaBenchTickLoop`: in the
-  `latency budgets` job on both images, **executed** (not cached, not skipped) with their measured
-  numbers printed — the two log splices in section 4.
+- `udeaPhase2Exit`, `udeaDaemonBudget`, `udeaBenchCharacterMover`, `udeaBenchTickLoop`: in that job
+  on both images, **executed** — not cached, not skipped — with their measured numbers printed. The
+  two log splices are in section 4. Caching cannot answer them (section 8), so a green there is a
+  measurement and not a replay.
 - `udeaPackGate`: in the `build` job, green on `build (ubuntu-latest)` and `build (windows-latest)`.
   It keeps the reproducibility and atlas tests and stays on `check`; the 15ms deserialisation budget
   moved out of it into `udeaGraphBudget`, which is in the latency job and green on both.
 - `udeaSnapshotBudget` and `udeaGraphBudget` are not named by the criterion but are in the same
   family and are measured by the same job on both images.
 
-The later run for the head SHA is [33452620665](https://github.com/wildware-uk/Udea/actions/runs/33452620665).
+The one red job in that run is `gl tests (xvfb)`, on an `udea-render` shutdown race in a module this
+branch does not touch; section 3 has the evidence.
 
 ### ☑ 2. The gates still fail when the code is genuinely slower. Show a deliberate regression going red.
 
@@ -676,9 +858,10 @@ origin/example HEAD` lists neither file.
 
 ## 13. What I did not exercise
 
-- **A red `latency-budgets` job on a real runner.** Every deliberate slowdown was run on this box.
-  Pushing a knowingly-slow commit to see the CI job go red would have cost a run and told me nothing
-  the six local transcripts do not, but it is a gap and I am naming it.
+- **A red `latency-budgets` job from a deliberate slowdown.** Every mutation was run on this box.
+  The job *has* gone red on real runners twice, both times for measurement defects this branch then
+  fixed (sections 8b and 8c), so the job is demonstrably capable of failing on CI - but not yet
+  from an injected regression.
 - **A second machine class.** The measured numbers are from this box and from GitHub's hosted
   runners. Nothing says what these budgets do on a two-core runner or on macOS.
 - **The `HeadlessHostTest` race.** Observed once, not reproduced in six loaded attempts, not fixed.

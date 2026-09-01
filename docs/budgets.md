@@ -130,7 +130,7 @@ launcher, JDK 17 toolchain, Gradle 8.13, another project's GL suite running alon
 |---|---|---|---|---|
 | Snapshot capture, 1 000 entities | `:udea-core:udeaSnapshotBudget` | 1 000 000 ns | 84 272 ns | 11.9x |
 | Assembled tick loop, 600 ticks at 200 entities | `:udea-core:udeaBenchTickLoop` | 50 ms | 6.159 ms | 8.1x |
-| 200 movers x 60 replays (12 000 `move` calls) | `:udea-core:udeaBenchCharacterMover` | 4.0 ms | 2.302 ms | 1.7x |
+| 200 movers x 60 replays (12 000 `move` calls) | `:udea-core:udeaBenchCharacterMover` | 4.0 ms | 1.85 ms (best of 25) | 2.2x |
 | Warm validate of one edited script | `:udea-assets-compiler:udeaDaemonBudget` | 300 ms | 128 ms | 2.3x |
 | Warm reload decision | `:udea-assets-compiler:udeaDaemonBudget` | 500 ms | 228 ms | 2.2x |
 | Graph deserialisation, 2 000 assets | `:udea-assets-compiler:udeaGraphBudget` | 15 ms | 4.79 ms | 3.1x |

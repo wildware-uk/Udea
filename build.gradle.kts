@@ -135,10 +135,15 @@ val udeaAssemble by tasks.registering {
 //
 // They were, and they could not pass on a GitHub runner. `check` runs inside `build`, so each of
 // these was measured while nineteen other modules compiled on the same cores, and a wall-clock
-// measurement taken during a parallel build measures the build. The same code, on this box:
-// warm daemon reload medians 195ms alone and 646ms inside a full build; graph deserialisation
-// medians 4.8ms alone and 18.1ms inside one, against a 15ms budget. Three waves of developers
-// each rediscovered that by re-running the task solo.
+// measurement taken during a parallel build measures the build.
+//
+// Measured on this box, same tree, minutes apart: graph deserialisation medians 4.8ms run alone
+// and serialised, and 18.1ms run `--parallel` beside a full build - against a 15ms budget, so the
+// same bytes pass and fail depending only on how they were invoked. The most extreme figure comes
+// from dev-174's independent run on an *idle* box (`sh gradlew build --rerun-tasks`, 181 of 181
+// tasks executed, recorded on issue #174): the warm daemon reload medianed 1131ms inside the build
+// against 117-393ms alone. This repository's own parallel build is enough on its own; a shared
+// machine is not required. Three waves of developers each rediscovered it by re-running solo.
 //
 // ## Why this is not "take them off `check` and forget them"
 //

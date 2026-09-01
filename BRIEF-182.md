@@ -1,9 +1,12 @@
-47ea8e8
+ef6b2b7
 
 # BRIEF-182 — the last wall-clock budgets left `build`, and the sentence that said so is now checked
 
 Branch `issue-182-remaining-wall-clock-budgets`, off `origin/example` at `293649b`.
 Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a937a08ec67e02f7e`.
+
+`ef6b2b7` is the last commit of the change; anything after it writes this SHA down, which is the
+same arrangement BRIEF-175 used. The `clean build` in section 5 was run on `ef6b2b7`'s tree.
 
 ---
 
@@ -17,7 +20,7 @@ sh gradlew udeaLatencyBudgets --no-parallel --max-workers=1
 support the default Temurin 25.0.2 and says so in one line, `25.0.2`.)
 
 It runs all **eleven** members of the aggregate — the eight #175 left, plus the three this ticket
-moved — with the runner to itself. Green on `47ea8e8`, at load average 7.06. The whole run is
+moved — with the runner to itself. Green at load average 7.06, on `47ea8e8` — the tree this measures is unchanged by the two commits after it, which touch `BRIEF-182.md`, comments and two unused declarations. The whole run is
 `scratchpad/evidence-green-47ea8e8.txt`; the budget tasks in it are what this returns, and the
 lines it drops are the compile and up-to-date tasks Gradle interleaves between them:
 
@@ -818,7 +821,7 @@ are the census below.
 
 ### ☑ 1. `sh gradlew build` runs no wall-clock latency assertion, on any module. Show it — a task list, not a claim.
 
-**The task list.** `sh gradlew build --dry-run` on `47ea8e8` emits **421** task lines
+**The task list.** `sh gradlew build --dry-run` emits **421** task lines
 (`scratchpad/build-dryrun.txt`, `grep -c '^:'`). Grepping that list for every member of the
 aggregate returns nothing:
 

@@ -203,7 +203,8 @@ jobs:
 
   latency-budgets:
     # Issue #175: **a wall-clock latency measurement taken beside a parallel build measures the
-    # build**, so the six gates that assert a number of milliseconds get a runner to themselves.
+    # build**, so every gate that asserts a number of milliseconds gets a runner to itself. The
+    # list is `latencyBudgetTasks` in the root build script; this job runs the aggregate over it.
     #
     # ## The defect
     #
@@ -244,7 +245,7 @@ jobs:
     # nothing is being measured yet. So the warm-up step compiles in parallel like any other job,
     # and only the step that takes the readings is serialised. The Gradle daemon survives between
     # steps, so the measuring invocation finds its inputs up to date and does nothing but run the
-    # six test tasks.
+    # budget test tasks.
     name: latency budgets (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:

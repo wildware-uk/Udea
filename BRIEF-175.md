@@ -298,7 +298,67 @@ real runs on both operating systems.
 | [33451573256](https://github.com/wildware-uk/Udea/actions/runs/33451573256) | `0d93df3` | every job green — **and the budgets measured nothing; they came `FROM-CACHE`. Section 8** |
 | [33452620665](https://github.com/wildware-uk/Udea/actions/runs/33452620665) | `3e24c52` | first run with caching off. `udeaGraphBudget` red on `ubuntu-latest` — a warm-up defect. Section 8b |
 | [33453579147](https://github.com/wildware-uk/Udea/actions/runs/33453579147) | `0623c9e` | graph fixed and green on ubuntu; `udeaBenchCharacterMover` red on `windows-latest` — an estimator defect. Section 8c |
-| [33453980851](https://github.com/wildware-uk/Udea/actions/runs/33453980851) | `7183e18` | **`latency budgets` green on `ubuntu-latest` and `windows-latest`.** Only `gl tests (xvfb)` red, on an `udea-render` shutdown race this branch does not touch |
+| [33453980851](https://github.com/wildware-uk/Udea/actions/runs/33453980851) | `7183e18` | `latency budgets` green on both runners. Only `gl tests (xvfb)` red, on an `udea-render` shutdown race this branch does not touch |
+| [33454757933](https://github.com/wildware-uk/Udea/actions/runs/33454757933) | `0956ce2` | green, `gl tests (xvfb)` included — which is what makes the red above a flake rather than a claim |
+| [33455297779](https://github.com/wildware-uk/Udea/actions/runs/33455297779) | `fa42ab0` | **the eight-gate tree: `latency budgets` green on `ubuntu-latest` and `windows-latest`, all eight executed** |
+
+### The eight-gate run, both runners
+
+`latency budgets (ubuntu-latest)`, job 99694123235:
+
+```
+> Task :udea-agent:udeaDigestBudget
+    digest build at 500 entities: median 9219ns (budget 300000ns), 1611 chars
+> Task :udea-agent:udeaQueryBudget
+    query over 500 entities: median 28289ns (budget 1000000ns)
+> Task :udea-agent-host:udeaPhase2Exit
+    phase 2 exit: typo'd reference rejected in 13ms (median of [372, 11, 13])
+    phase 2 exit: agent request -> running world observed changed in 610ms
+> Task :udea-assets-compiler:udeaDaemonBudget
+    warm reload decision: median 250ms over 4 samples [213, 267, 250, 191]
+    warm validate of one script: median 154ms over 4 samples [11, 161, 154, 142]
+> Task :udea-assets-compiler:udeaGraphBudget
+    graph deserialisation: best=5.217929ms median=5.454962ms over 2000 assets (budget 15ms)
+> Task :udea-core:udeaBenchCharacterMover
+    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) best 1.907ms, median 2.177ms, worst 3.725ms, budget 4.0ms
+> Task :udea-core:udeaBenchTickLoop
+    udeaBenchTickLoop: 600 ticks at 200 entities, median 5.812468ms, p95 6.371146ms, budget 50.0ms
+> Task :udea-core:udeaSnapshotBudget
+    udeaSnapshotBudget: capture of 1000 entities median 70859ns, p95 77019ns, budget 1000000ns
+```
+
+`latency budgets (windows-latest)`, job 99694123336:
+
+```
+> Task :udea-agent:udeaDigestBudget
+    digest build at 500 entities: median 7700ns (budget 300000ns), 1611 chars
+> Task :udea-agent:udeaQueryBudget
+    query over 500 entities: median 20500ns (budget 1000000ns)
+> Task :udea-agent-host:udeaPhase2Exit
+    phase 2 exit: typo'd reference rejected in 19ms (median of [522, 19, 18])
+    phase 2 exit: agent request -> running world observed changed in 385ms
+> Task :udea-assets-compiler:udeaDaemonBudget
+    warm reload decision: median 216ms over 4 samples [274, 216, 178, 169]
+    warm validate of one script: median 167ms over 4 samples [13, 157, 167, 187]
+> Task :udea-assets-compiler:udeaGraphBudget
+    graph deserialisation: best=4.766700ms median=6.782100ms over 2000 assets (budget 15ms)
+> Task :udea-core:udeaBenchCharacterMover
+    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) best 2.031ms, median 2.285ms, worst 4.419ms, budget 4.0ms
+> Task :udea-core:udeaBenchTickLoop
+    udeaBenchTickLoop: 600 ticks at 200 entities, median 5.6125ms, p95 5.8303ms, budget 50.0ms
+> Task :udea-core:udeaSnapshotBudget
+    udeaSnapshotBudget: capture of 1000 entities median 76600ns, p95 130200ns, budget 1000000ns
+```
+
+Same pipeline as the blocks below: one `grep -E` over `gh api repos/wildware-uk/Udea/actions/jobs/<id>/logs`,
+timestamps stripped, `STANDARD_OUT` markers and the digest's scaling line dropped. Consecutive, in
+order, no elisions. Every task line is bare — no `FROM-CACHE`, no `UP-TO-DATE` — so all eight were
+measured on both images.
+
+**`windows-latest` says the estimator thing again, and this is the second independent time:**
+`best 2.031ms, median 2.285ms, worst 4.419ms` against a 4.0ms budget. The slowest of twenty-five
+samples is over the line on a run where the code is plainly fine. That is what a median of nine was
+being asked to survive.
 
 ### The final run's measurements, and what they say about the two fixes
 
@@ -942,8 +1002,9 @@ transcripts above, the mutation table, and the Actions runs.
 
 ### ☑ 1. A real Actions run shows all of `udeaPhase2Exit`, `udeaDaemonBudget`, `udeaPackGate`, `udeaBenchCharacterMover` and `udeaBenchTickLoop` passing on both `ubuntu-latest` and `windows-latest`. Link it.
 
-[Run 33453980851](https://github.com/wildware-uk/Udea/actions/runs/33453980851), at `7183e18`:
-`latency budgets (ubuntu-latest)` and `latency budgets (windows-latest)` both **success**.
+[Run 33455297779](https://github.com/wildware-uk/Udea/actions/runs/33455297779), at `fa42ab0`:
+`latency budgets (ubuntu-latest)` and `latency budgets (windows-latest)` both **success**, with all
+eight gates executed and their numbers printed — the two log splices are in section 4.
 
 - `udeaPhase2Exit`, `udeaDaemonBudget`, `udeaBenchCharacterMover`, `udeaBenchTickLoop`: in that job
   on both images, **executed** — not cached, not skipped — with their measured numbers printed. The
@@ -955,8 +1016,8 @@ transcripts above, the mutation table, and the Actions runs.
 - `udeaSnapshotBudget` and `udeaGraphBudget` are not named by the criterion but are in the same
   family and are measured by the same job on both images.
 
-The one red job in that run is `gl tests (xvfb)`, on an `udea-render` shutdown race in a module this
-branch does not touch; section 3 has the evidence.
+`gl tests (xvfb)` is green in that run and in 33454757933, having failed once in 33453980851 on an
+`udea-render` shutdown race in a module this branch does not touch; section 3 has the evidence.
 
 ### ☑ 2. The gates still fail when the code is genuinely slower. Show a deliberate regression going red.
 

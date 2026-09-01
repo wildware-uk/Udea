@@ -168,6 +168,8 @@ val latencyBudgetTasks = listOf(
     ":udea-core:udeaBenchCharacterMover",
     ":udea-assets-compiler:udeaDaemonBudget",
     ":udea-assets-compiler:udeaGraphBudget",
+    ":udea-agent:udeaDigestBudget",
+    ":udea-agent:udeaQueryBudget",
     ":udea-agent-host:udeaPhase2Exit",
 )
 

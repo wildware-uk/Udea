@@ -111,10 +111,12 @@ notice either being got wrong again.
 | **Aggregate** | `udeaLatencyBudgets` in the root `build.gradle.kts`; its members are listed there |
 | **Wiring gate** | `:udea-gradle:LatencyBudgetJobTest`, which reads the workflow and the root script |
 
-Six gates assert a number of milliseconds. Until issue #175 they hung off `check`, so every one
-of them was timed while nineteen other modules compiled on the same cores, and **a wall-clock
-measurement taken during a parallel build measures the build**. They failed on both runner images
-for that reason alone, on a branch that had touched none of them.
+Every gate in this repository that asserts a number of milliseconds is on this list. Until issue
+#175 they hung off `check`, so each was timed while nineteen other modules compiled on the same
+cores, and **a wall-clock measurement taken during a parallel build measures the build**. Some of
+them failed on both runner images for that reason alone, on a branch that had touched none of them;
+`udeaDigestBudget` and `udeaQueryBudget` had not failed yet and are here because they are the same
+kind of thing, not because they had caused trouble.
 
 They are not on `check` any more, and that is not the same as switching them off: they run on
 every push, on both operating systems, as hard gates, in a job that has the runner to itself.
@@ -134,6 +136,8 @@ launcher, JDK 17 toolchain, Gradle 8.13, another project's GL suite running alon
 | Warm validate of one edited script | `:udea-assets-compiler:udeaDaemonBudget` | 300 ms | 128 ms | 2.3x |
 | Warm reload decision | `:udea-assets-compiler:udeaDaemonBudget` | 500 ms | 228 ms | 2.2x |
 | Graph deserialisation, 2 000 assets | `:udea-assets-compiler:udeaGraphBudget` | 15 ms | 4.79 ms | 3.1x |
+| Tier-0 digest build, 500 entities | `:udea-agent:udeaDigestBudget` | 300 000 ns | 7 810 ns | 38x |
+| Entity query, 500 entities returning 20 | `:udea-agent:udeaQueryBudget` | 1 000 000 ns | 21 060 ns | 47x |
 | Agent patch to running world, over HTTP | `:udea-agent-host:udeaPhase2Exit` | 1 000 ms | 445 ms | 2.2x |
 | Typo'd reference rejected | `:udea-agent-host:udeaPhase2Exit` | 300 ms | 16 ms | 18.8x |
 

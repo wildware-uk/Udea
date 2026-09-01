@@ -274,6 +274,7 @@ jobs:
           ./gradlew
           :udea-core:testClasses
           :udea-assets-compiler:testClasses
+          :udea-agent:testClasses
           :udea-agent-host:testClasses
           --stacktrace
 

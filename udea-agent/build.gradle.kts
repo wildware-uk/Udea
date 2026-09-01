@@ -14,6 +14,11 @@ dependencies {
     // consumer compiling against `WorldToolset` needs them resolvable.
     implementation(project(":udea-annotations"))
 
+    // `LatencyBudget`, the contention note the two budget tests below end their failure
+    // messages with (issue #175). Test scope, and `udea-diagnostics` is the zero-dependency
+    // leaf, so this adds the fixture and nothing else.
+    testImplementation(testFixtures(project(":udea-diagnostics")))
+
     // The processor over *this module's* main source set. The reverse edge exists too -
     // `udea-codegen`'s tests compile against `udea-agent` so the generated code they exercise
     // is dispatched through the real `ToolIndex` - and the two do not form a task cycle:
@@ -162,7 +167,7 @@ tasks.named<Test>("test") {
 }
 
 /** The digest under 0.3ms at 500 entities, and allocating nothing but the document. */
-val udeaDigestBudget = tasks.register<Test>("udeaDigestBudget") {
+tasks.register<Test>("udeaDigestBudget") {
     group = "verification"
     description = "Gates the Tier-0 digest at 500 entities: <0.3ms median, zero render allocation."
     testClassesDirs = sourceSets.test.get().output.classesDirs
@@ -174,7 +179,7 @@ val udeaDigestBudget = tasks.register<Test>("udeaDigestBudget") {
 }
 
 /** A query over 500 entities returning 20, under 1ms and with bounded allocation. */
-val udeaQueryBudget = tasks.register<Test>("udeaQueryBudget") {
+tasks.register<Test>("udeaQueryBudget") {
     group = "verification"
     description = "Gates entity query at 500 entities returning 20: <1ms median, bounded allocation."
     testClassesDirs = sourceSets.test.get().output.classesDirs
@@ -183,6 +188,10 @@ val udeaQueryBudget = tasks.register<Test>("udeaQueryBudget") {
     testLogging.showStandardStreams = true
 }
 
-tasks.named("check") {
-    dependsOn(udeaDigestBudget, udeaQueryBudget)
-}
+// No `check` wiring. Both are wall-clock measurements, so they hang off the root's
+// `udeaLatencyBudgets` and are taken by the `latency-budgets` CI job with the runner to itself
+// (issue #175). They were not among the gates that job was built for - they had not failed - and
+// they are the same class of thing, which is the whole reason they are here: the root's list says
+// "every gate in this repository that asserts a number of milliseconds", and a list that quietly
+// excludes two is a list nobody can trust.
+

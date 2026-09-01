@@ -17,40 +17,43 @@ Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a5773b1d0f90f1f83`.
 JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew udeaLatencyBudgets :udea-gradle:test --no-parallel --max-workers=1
 ```
 
-It measures all six wall-clock budgets serially, exactly as the `latency-budgets` CI job does, and
+It measures every wall-clock budget serially, exactly as the `latency-budgets` CI job does, and
 it runs `LatencyBudgetJobTest`, which is the half that reads `.github/workflows/ci.yml` and the root
 build script and asserts the CI job still exists, still runs serially, still covers both runner
 images, and still cannot be answered from the build cache.
 
 **It goes red when the feature is reverted, and when the code is genuinely slower.** Section 5 has
 one deliberate slowdown per gate with its literal `git diff` and its measured number, and section 6
-has eight mutations of `ci.yml` with the same treatment, including two controls.
+has eight mutations of `ci.yml` with the same treatment, including two controls. Every member of
+the aggregate has a row.
 
 On `origin/example` the command does not even resolve: there is no `udeaLatencyBudgets` task there.
 
-Run verbatim on the final tree, at load average `10.12 6.09 7.22`:
+Run verbatim on the final tree:
 
 ```
-    phase 2 exit: typo'd reference rejected in 10ms (median of [291, 9, 10])
-    phase 2 exit: agent request -> running world observed changed in 400ms
-    warm reload decision: median 201ms over 4 samples [222, 201, 174, 139]
-    warm validate of one script: median 122ms over 4 samples [9, 129, 115, 122]
-    graph deserialisation: best=4.578545ms median=5.144035ms over 2000 assets (budget 15ms)
-    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) best 1.771ms, median 2.207ms, worst 2.829ms, budget 4.0ms
-    udeaBenchTickLoop: 600 ticks at 200 entities, median 6.540328ms, p95 7.094107ms, budget 50.0ms
-    udeaSnapshotBudget: capture of 1000 entities median 83421ns, p95 88632ns, budget 1000000ns
-> Task :udea-gradle:test UP-TO-DATE
-BUILD SUCCESSFUL in 18s
-57 actionable tasks: 6 executed, 51 up-to-date
+    digest build at 500 entities: median 7810ns (budget 300000ns), 1611 chars
+    query over 500 entities: median 21060ns (budget 1000000ns)
+    phase 2 exit: typo'd reference rejected in 10ms (median of [19, 10, 9])
+    phase 2 exit: agent request -> running world observed changed in 539ms
+    warm reload decision: median 163ms over 4 samples [184, 151, 163, 149]
+    warm validate of one script: median 132ms over 4 samples [13, 146, 116, 132]
+    graph deserialisation: best=4.606187ms median=5.305469ms over 2000 assets (budget 15ms)
+    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) best 1.702ms, median 2.207ms, worst 3.265ms, budget 4.0ms
+    udeaBenchTickLoop: 600 ticks at 200 entities, median 6.387117ms, p95 7.881723ms, budget 50.0ms
+    udeaSnapshotBudget: capture of 1000 entities median 85502ns, p95 132082ns, budget 1000000ns
+> Task :udea-gradle:test
+BUILD SUCCESSFUL in 45s
+61 actionable tasks: 11 executed, 50 up-to-date
 ```
 
-`6 executed` is the six budgets: they cannot be up to date and cannot be cached, by construction
+Ten measured numbers from eight tasks — `udeaDaemonBudget` and `udeaPhase2Exit` each gate two. The
+budget tasks always execute: they cannot be up to date and cannot be cached, by construction
 (section 8). `:udea-gradle:test` **can** be, and correctly so — it is a source-reading correctness
-test whose inputs are `ci.yml`, the root build script and its own sources, all declared, so
+test whose inputs are `ci.yml`, the root build script and its own sources, all declared, so an
 `UP-TO-DATE` there means "those files have not moved since it last passed" rather than "it did not
-check". On a fresh checkout, or after any edit to either file, it executes. That asymmetry is
-deliberate and it is the whole of section 8: a stopwatch's input is the machine, and a file-reader's
-input is the file.
+check". That asymmetry is deliberate and it is the whole of section 8: a stopwatch's input is the
+machine, and a file-reader's input is the file.
 
 ---
 
@@ -58,16 +61,18 @@ input is the file.
 
 ### What was wrong
 
-Six gates in this repository assert a number of milliseconds. All six hung off `check`, `check` runs
-inside `build`, so every one of them was timed while nineteen other modules compiled on the same
-cores. **A wall-clock measurement taken during a parallel build measures the build.** They failed on
+Every gate in this repository that asserts a number of milliseconds hung off `check`, `check` runs
+inside `build`, so each was timed while nineteen other modules compiled on the same cores. **A
+wall-clock measurement taken during a parallel build measures the build.** Several of them failed on
 `ubuntu-latest` and on `windows-latest` on run 33428671524 — the first run that reached them at all,
 because before #170 the build died at `:moba:udeaPackBundle` — on a branch that had touched none of
 them. Three waves of developers each rediscovered the cause by re-running the task solo.
 
 ### What I did — issue #175's option 1
 
-- A root aggregate, **`udeaLatencyBudgets`**, holds the six. They come off `check`.
+- A root aggregate, **`udeaLatencyBudgets`**, holds them. They come off `check`. The list is in the
+  root build script; it has eight members, and section 2's last subsection is how it got from six to
+  eight.
 - A **`latency-budgets` CI job**, matrixed over `ubuntu-latest` and `windows-latest`, compiles in one
   step and then measures in a step of its own with `--no-parallel --max-workers=1`.
 - **`LatencyBudgetJobTest`** (in `:udea-gradle`, on `check`) holds the two halves together. It reads
@@ -123,22 +128,52 @@ measured on the same runner in the same job. Nothing here forecloses it.
 
 ### The decision I had to make that the issue did not settle
 
-**Where the shared contention note lives.** Six failure messages across three modules need the same
-sentence; written out six times that is copy-pasted logic differing only in a task name, which
+**Where the shared contention note lives.** Ten failure messages across four modules need the same
+sentence; written out ten times that is copy-pasted logic differing only in a task name, which
 engineering-standards §8 rejects. It went into `udea-diagnostics`' **test fixtures**, and
-`udea-core`, `udea-assets-compiler` and `udea-agent-host` take a `testImplementation(testFixtures(...))`
-edge to it. Rejected: `udea-core`'s existing fixtures (would drag Fleks onto the asset compiler's
+`udea-core`, `udea-assets-compiler`, `udea-agent` and `udea-agent-host` take a
+`testImplementation(testFixtures(...))` edge to it. Rejected: `udea-core`'s existing fixtures (would drag Fleks onto the asset compiler's
 test classpath), `udea-annotations` (a compile-time vocabulary the codegen reads), `main` sources of
 any module (a contention note has no business in the jar a game loads), and `build-logic` (owned by
 `dev-174` this wave). Commented on the issue. To overturn: move the object, keep the call sites.
+
+### The count claim I made, checked, and found wrong
+
+The root build script said "every gate in this repository that asserts a number of *milliseconds*",
+and the brief said "six gates". Both were exhaustiveness claims, and I had not enumerated the space.
+So I did, late, and it cost me a round:
+
+```
+$ grep -rn "udeaDigestBudget" --include="*.kts" --include="*.kt" . | grep -v /build/
+udea-agent/build.gradle.kts:165:val udeaDigestBudget = tasks.register<Test>("udeaDigestBudget") {
+udea-agent/build.gradle.kts:187:    dependsOn(udeaDigestBudget, udeaQueryBudget)
+```
+
+`udea-agent` has two more: `udeaDigestBudget` (digest build under 300 000 ns at 500 entities) and
+`udeaQueryBudget` (a query over 500 entities under 1 000 000 ns). Both wall-clock, both on `check`,
+both measured inside the parallel build, neither in the issue's list and neither in my aggregate.
+`DigestBudgetTest`'s own KDoc even says "Timing here uses a real clock deliberately".
+
+They had not failed, which is why nobody had noticed them, and the reason is visible the moment they
+are measured properly: 7 810 ns against 300 000 ns and 21 060 ns against 1 000 000 ns — 38x and 47x
+of headroom. That is luck rather than design; the mover had 1.7x and failed.
+
+**Both are now in the aggregate**, off `check`, with the contention note on their failure messages
+and with a deliberate slowdown apiece in section 5. Fixing the sentence and leaving them would have
+been fixing the instance I was shown by my own grep and not the class.
+
+The general lesson, and it is this repository's own: an exhaustiveness claim costs one word to write
+and a full enumeration to check. The root comment now states the property — every gate that asserts
+milliseconds is in that list — and the list is right there under it, so an addition is visible in the
+diff rather than contradicted by it.
 
 ### Ownership note
 
 I was assigned `ci.yml`, the three modules' build files and the budget test classes. I also touched
 the **root `build.gradle.kts`** (it is where this repository puts cross-tree aggregates —
 `udeaAssemble`, `udeaVerifyModuleGraph` — and there was nowhere else to put one), plus
-`udea-diagnostics/build.gradle.kts`, `udea-gradle/build.gradle.kts`, `docs/budgets.md` and one row of
-`docs/module-graph.md`. None is `dev-174`'s (`build-logic/`, `AGENTS.md`, a contracts lock file).
+`udea-diagnostics/build.gradle.kts`, `udea-gradle/build.gradle.kts`, `udea-agent`'s build file and
+its two budget tests (the class sweep above), `docs/budgets.md` and one row of `docs/module-graph.md`. None is `dev-174`'s (`build-logic/`, `AGENTS.md`, a contracts lock file).
 **No file under `docs/contracts/` was changed, and none needed to be.**
 
 ---
@@ -147,11 +182,11 @@ the **root `build.gradle.kts`** (it is where this repository puts cross-tree agg
 
 ### Cold, `clean build`, no exclusions, on the final tree — **green**
 
-Load average when it started, from `build-clean-load.txt`: `4.90 4.33 7.12`.
+Load average when it started, from `build-last-load.txt`: `16.71 13.30 10.16`.
 
 ```
-BUILD SUCCESSFUL in 19s
-234 actionable tasks: 147 executed, 71 from cache, 16 up-to-date
+BUILD SUCCESSFUL in 22s
+232 actionable tasks: 147 executed, 70 from cache, 15 up-to-date
 Configuration cache entry stored.
 ```
 
@@ -162,10 +197,16 @@ background runner reported a `BUILD FAILED` as "exit code 0" because the 0 was a
 `echo "exit $?"` of the wrapper. Every capture here reads Gradle's own `$?` and every one is
 cross-checked against the log's own verdict.)
 
-Totalled over every JUnit report the tree wrote: **2550 tests, 34 skipped, 0 failures and 0 errors.**
+Totalled over every JUnit report the tree wrote: **2543 tests, 34 skipped, 0 failures and 0 errors.**
 The 34 skips are the documented `RealArt*` pair and friends, which skip without the paid Tiny RPG
 archives. `udeaVerifyContracts` — dev-174's freeze gate, merged in under this branch — runs and
 passes; nothing here touches `docs/contracts/`.
+
+**2543 and not 2550, and the seven are accounted for.** An earlier `clean build` on this branch
+totalled 2550. `DigestBudgetTest` has four cases and `EntityQueryBudgetTest` three; both classes came
+off `check` when the class sweep moved their tasks onto the aggregate, so `build` no longer runs
+them — the aggregate does, on every push, on both runners. 2550 − 4 − 3 = 2543. A test count that
+drops is worth subtracting rather than waving at, and this one subtracts exactly.
 
 An earlier `clean build` on the pre-merge tree gave `BUILD SUCCESSFUL in 31s`, `233 actionable
 tasks: 142 executed, 75 from cache, 16 up-to-date`, and in that one `:udea-core:test` was served
@@ -560,6 +601,48 @@ real, the cost to look for is in allocation and reference binding, not in the se
 `300ms`. The apply budget failed in the same run. Same file as the row above, at twice the delay,
 because this gate measures a whole HTTP round trip and has more slack in front of the compile.
 
+### `:udea-agent:udeaDigestBudget` — the digest renders sixty times over
+
+```diff
+--- a/udea-agent/src/main/kotlin/dev/wildware/udea/agent/state/StateDigest.kt
++++ b/udea-agent/src/main/kotlin/dev/wildware/udea/agent/state/StateDigest.kt
+@@ -133,6 +133,7 @@ public class StateDigest(
+     /** Builds and publishes unconditionally. [publishIfDue] is the one the loop calls. */
+     public fun publish() {
+         val startedAt = clock.nowNanos()
++        repeat(60) { renderInto() }
+         lastLength = renderInto()
+         val document = json.toString()
+         lastBuildNanos = clock.nowNanos() - startedAt
+```
+
+`314 786 ns` against the `300 000 ns` budget. `4 tests completed, 1 failed` — only the timing test;
+the three assertions about what the digest contains and how it scales stayed green.
+
+The first attempt at this row was aimed at `AgentStateIndex.publish` and moved the number not at all
+(8 110 ns against a 7 810 ns baseline), because that is a *source* the digest walks and not the
+render the budget times. `StateDigest.renderInto` is the measured call, and the clock brackets it
+directly at `StateDigest.kt:135-138`.
+
+### `:udea-agent:udeaQueryBudget` — the query engine runs its scan eighty times over
+
+```diff
+--- a/udea-agent/src/main/kotlin/dev/wildware/udea/agent/query/EntityQueryEngine.kt
++++ b/udea-agent/src/main/kotlin/dev/wildware/udea/agent/query/EntityQueryEngine.kt
+@@ -65,6 +65,10 @@ public class EntityQueryEngine(
+     public fun run(query: EntityQuery, out: Json): QuerySummary {
++        repeat(80) { out.reset(); runOnce(query, out) }
++        return runOnce(query, out)
++    }
++
++    private fun runOnce(query: EntityQuery, out: Json): QuerySummary {
+```
+
+`1 322 812 ns` against the `1 000 000 ns` budget. `3 tests completed, 2 failed` — the timing test and,
+inevitably, the sibling that asserts allocation is bounded, since eighty scans allocate eighty times
+as much. That second failure is a consequence of the mutation rather than a second finding, and I am
+naming it rather than leaving a reader to wonder.
+
 ### And every one of those failures carries the contention note
 
 Spliced from `udea-core/build/test-results/udeaBenchTickLoop/TEST-…xml` on the `repeat(64)` run:
@@ -863,10 +946,12 @@ branch does not touch; section 3 has the evidence.
 
 ### ☑ 2. The gates still fail when the code is genuinely slower. Show a deliberate regression going red.
 
-Section 5: six gates, six slowdowns in production code, six literal diffs, six measured numbers over
-budget, each with the failing test named. Plus the two rejected mutations and the one wrong mutation,
-because a table whose rows cannot be reproduced from their own description is a table nobody can
-audit.
+Section 5: every member of the aggregate, one slowdown apiece in production code, each with its
+literal `git diff`, its measured number over budget and its failing test named. Plus the mutations
+that were tried and rejected and the two that were simply wrong, because a table whose rows cannot be
+reproduced from their own description is a table nobody can audit — and because what a failed
+mutation ruled out (the graph budget is not bound by `GraphSection.decode`; the digest budget does
+not time `AgentStateIndex.publish`) is worth as much as what a successful one showed.
 
 ### ☑ 3. The chosen approach is commented here with the alternatives and how to overturn it.
 

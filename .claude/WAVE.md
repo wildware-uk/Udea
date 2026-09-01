@@ -1,144 +1,141 @@
-# Wave handoff — 2026-08-31, wave 4
+# Wave handoff — 2026-09-01, waves 4–6
 
-**Two tickets dispatched, two merged, both at review round 1 with zero findings between them.**
+**Six tickets dispatched, six merged, every one at review round 1 with zero findings.**
 
-`example` went `db477f4 → 32eab56 → d1526f9`, both pushed. `master` untouched at `ce7db67`.
+`example` went `db477f4 → 32eab56 → d1526f9 → e7159c1 → cada9ed → 293649b → c3c3c41 → 784f614`,
+all pushed. `master` untouched at `ce7db67`, as `HANDOFF.md` reserves.
 
-| Issue | What merged | Commit |
-|---|---|---|
-| #172 | The determinism gate replays the game, not a world written not to drift | `32eab56` |
-| #176 | A Windows checkout stops defeating the gates that read their own subject | `d1526f9` |
+| Wave | Issue | What merged | Commit |
+|---|---|---|---|
+| 4 | #172 | The determinism gate replays the game, not a world written not to drift | `32eab56` |
+| 4 | #176 | A Windows checkout stops defeating the gates that read their own subject | `d1526f9` |
+| 5 | #174 | `docs/contracts/` frozen by a lock the build reads | `cada9ed` |
+| 5 | #175 | The latency budgets measure latency, not the build contending with them | `293649b` |
+| 6 | #180 | `build-logic` tests declare the files they read, and a guard finds the sixth | `c3c3c41` |
+| 6 | #182 | The wall-clock census, and the five gates still inside the build | `784f614` |
 
-Worktrees left on disk: `.claude/worktrees/agent-a8b9947d3dbda0c54` (#172),
-`agent-a6181135d60b20d17` (#176). Nobody asked for them to go.
+**CI on `example` at `784f614` (run `33462366896`): 24 jobs, 24 green, 0 red.** The first fully
+green run in this sequence. Wave 3 opened at 10 red.
 
----
-
-## The wave in one sentence
-
-**Phase 7's last clause closed: the gate now replays `moba`, and it has been watched failing on it.**
-
-#152 and #169 built a working cross-OS gate and pointed it at `DriftWorld` — a world that routes its
-trigonometry through `StrictMath` on purpose. A green matrix reported the health of its own fixture.
-Both legs now replay a recorded `moba` match: `moba-3600.udearep` on every push, `moba-36000.udearep`
-nightly. `DriftWorld` stays as the gate's self-test.
-
-**The result worth keeping:** 36,000 ticks of a real match — every replicated field of every unit,
-plus the RNG state and the id allocator — are cell-for-cell identical across Windows Server 2025 and
-Linux, and across Corretto and Adoptium. First time this repository has established that about the
-game rather than about a purpose-built world.
-
-**And the gate has been seen to fail on it.** Run `33444524021`, dispatched with
-`replay_plant_ulp_at: 1200`: join RED, `FAILED at t1200`, one differing cell,
-`dev.wildware.moba.Position.x`, `0x4397abfe` vs `0x4397abff`. A gate nobody has watched fail is
-unverified; this one is not.
+Worktrees left on disk under `.claude/worktrees/`, none removed: `agent-a8b9947d3dbda0c54` (#172),
+`agent-a6181135d60b20d17` (#176), `agent-a3feddd0686493e0b` (#174), `agent-a5773b1d0f90f1f83` (#175),
+`agent-a9ffff83bda14fb94` (#180), `agent-a937a08ec67e02f7e` (#182).
 
 ---
 
-## What CI on `example` looks like now
+## The three waves in one sentence
 
-Run `33448310887` at `d1526f9`: **18 green, 4 red** (was 16 green / 6 red at `32eab56`, and
-10 red at the start of wave 3).
+**Every gate in this repository was asked the same question — *does it run, and can it fail?* — and
+five of them answered no.**
 
-**Newly green this wave:** `determinism (windows-latest, temurin)` and
-`determinism (windows-latest, corretto)` — both were red on CRLF, and both are the jobs that actually
-run `AgentsMdTest`. `clean build under budget` also recovered.
+| Found green having measured nothing | How |
+|---|---|
+| The cross-OS `replay-equality` matrix | Replayed `DriftWorld`, written to be deterministic (#172) |
+| `AgentsMdTest` on Windows | Failed on CRLF, so it reported the same red whether `AGENTS.md` was stale or not (#176) |
+| `docs/contracts/` | Declared frozen; nothing read the files (#174) |
+| The `latency budgets` CI job, first green run | Both runners served all six gates `FROM-CACHE` (#175) |
+| `build-logic`'s own tests | Undeclared inputs, so `UP-TO-DATE` after an edit to the file they police (#180) |
+| `udeaPhysicsRebuildBudget` | Worst sample **over** its budget in both full runs, inside a green build (#182) |
 
-**Still red, and every one maps to a filed issue:**
+Three of those were caught by the developer against its own work, before any reviewer saw it.
 
-| Job | Failing task | Issue |
-|---|---|---|
-| `build (ubuntu-latest)` | `:udea-assets-compiler:udeaDaemonBudget`, `:udea-assets-compiler:udeaPackGate` | **#175** |
-| `build (windows-latest)` | `:udea-agent-host:udeaPhase2Exit` — **and nothing else now** | **#175** |
-| `build with the K2 plugin disabled` | same budgets | **#175** |
-| `gl tests (xvfb)` | `OffscreenBackendTest` shutdown flake | **#178** |
+---
 
-`build (windows-latest)`'s second failure used to be `:udea-assets-compiler:test` — the CRLF bug.
-It is gone. **The branch removed a failure and added none.**
+## What is now enforced by code rather than declared
+
+- **`docs/contracts/`** — `docs/contracts.lock` (SHA-256 per file), `udeaVerifyContracts` on `check`,
+  rules `UDEA-FRZ-001/002/003` covering edit, add, delete, rename, directory deleted, lock deleted.
+  Route out is a **named task**, `udeaWriteContractLock`, deliberately not a `-P` flag: a `-P` flag
+  can be passed to a whole `build` and re-baseline the freeze as a side effect, which is the act the
+  gate refuses.
+- **Wall-clock budgets** — eleven, all on `udeaLatencyBudgets`, measured by their own CI job on both
+  runner images with `--no-parallel --max-workers=1`, never cacheable, never up-to-date-able.
+  `WallClockBudgetCensusTest` reads every test source and requires each clock reading to be a member
+  of the aggregate or a census row saying what it is instead. `LatencyBudget.measuredBy` refuses a
+  budget measured by any task but its own. **Four enumerations were needed before the census existed;
+  it is what makes a fifth unnecessary.**
+- **`build-logic` test inputs** — the five files declared, plus `OuterBuildInputsTest`, which compares
+  reads found in test sources against *the collection Gradle actually resolved*, handed over as a
+  manifest rather than regexed out of the build script.
+- **Phase 7** — the gate replays `moba` on every push (`moba-3600`) and nightly (`moba-36000`), and
+  **has been watched failing on it**: run `33444524021`, planted ulp, join red, naming
+  `dev.wildware.moba.Position.x` at t1200.
 
 ---
 
 ## Read this before you dispatch anything
 
-### Phase 7's checkpoint is open as #179 and it is waiting on one word
+### The developer contract changed twice and the old advice is now wrong
 
-`docs/decisions/phase-log.md` has **no entries through seven phases**, and the reason recorded in it
-is that the eight checkpoint issues could not be opened — the automation's credentials got
-`403 Resource not accessible by personal access token`. **That limit no longer applies.**
+- **The latency budgets are NOT on `check`.** A green `sh gradlew build` does not cover them. Run
+  `sh gradlew udeaLatencyBudgets --no-parallel --max-workers=1`. **The old "they fail under load,
+  re-run them alone" advice is obsolete** — if one fails inside a `build` now, something was wired
+  back onto `check` and that is a real finding.
+- **`udeaVerifyContracts` IS on `check`.** Do not edit `docs/contracts/`; if a ticket needs a
+  contract's content changed, it stops and says so.
+- **`:build-logic:test` does not run in the root `build`** — `grep -c 'build-logic:test'` over a full
+  build log is 0. CI runs it as its own `-p build-logic` steps. A green `build` never covered it.
 
-So **#179, `Phase 7 checkpoint: decide whether to continue`**, is now open, with all three spec
-section 6 exit criteria ticked and evidenced:
+### Two pre-existing failures on this box that are not yours
 
-- replay equality on ≥2 OS/JVM combinations — met, and on `moba`
-- divergence as first differing tick **and field**, not a failing hash — met, run `33444524021`
-- the allowlist is a reviewed artefact, not a dumping ground — met: `determinism-allowlist.txt`
-  carries **zero exception entries**, only two version pins, behind a 233-line
-  `determinism-audit.md` and a parser where `ALLOW004` fails the build on a stale entry
+- **`KotlinPinCheckTest` x2** — no JDK 17 installed here and `GradleFixture` writes a
+  `settings.gradle.kts` with no foojay resolver. Fails identically on a clean `example`; confirmed
+  three times this run. It lives in `build-logic`, so it looks like your fault if you are working
+  there.
+- **`:moba:runUdpProof`** under 5% loss. `HANDOFF.md` documents it.
 
-**The one-word decision was deliberately left blank.** Spec section 7's mitigation for the top risk
-is that *a person* says out loud whether to continue; an agent writing "continue" into an append-only
-log that forbids hindsight edits empties it of the only thing it does. Do not fill it in for them.
+### `example/`'s corpus is NOT committed with CRLF, whatever #176's body says
 
-Note what #179 says and a future lead should not gloss: **Phase 7 landed while Phases 3–6 still carry
-open work** (#127–#135, #141–#145, #103). Spec section 8's open question 3 anticipated exactly that,
-so it reads as deliberate — but "past Phase 7" is not "past Phases 3–6" here.
+Measured, not reasoned: every **text** blob under `example/` is LF in the repository. The 1914 CR
+bytes that exist there are **all inside `.png` and `.ogg` files** — binary payload. Option 3
+(`* text=auto eol=lf`) remains the trap, for a better reason than the one recorded: it would put 80
+binary blobs on git's `text=auto` heuristic. Corrected on #176.
 
-### Two corrections this wave produced
+### The estimator question has been settled twice, in opposite directions, both times by measurement
 
-**`example/`'s corpus is NOT committed with CRLF, and #176's body says it is.** Measured rather than
-reasoned: every **text** blob under `example/` is LF in the repository, and the CRs a Windows checkout
-shows come from the checkout filter. The 1914 CR bytes that do exist in the tree are **all inside
-`.png` and `.ogg` files** — binary payload, not line endings.
-
-Option 3 (`* text=auto eol=lf`) is still the trap, for a better reason: it would put **80 binary
-blobs** on git's `text=auto` binary-detection heuristic. The correction is commented on #176 rather
-than filed, because a corrected premise belongs where it will be quoted from.
-
-**Acceptance criteria can name a job that cannot run the test.** #176's criterion 1 asked for
-`build (windows-latest)` to pass `AgentsMdTest`. `build-logic` is an *included build*
-(`settings.gradle.kts:3`), so the root `build` never runs its tests and that job cannot ever run that
-class. It runs in `determinism (windows-latest, *)`. Worth checking when writing a criterion that
-names a job.
-
-### The wall-clock budgets will waste your time if you let them
-
-`:udea-assets-compiler:udeaDaemonBudget`, `:udea-core:udeaBenchCharacterMover`,
-`:udea-agent-host:udeaPhase2Exit` and `udeaPackGate`/`GraphBudgetTest` fail inside a full `build`
-under load and pass alone. This wave they went red for the lead twice and for both reviewers once
-each, at loads between 10 and 22 — the box is shared with `melon-merge`'s dev team.
-
-Measured alone: `udeaDaemonBudget` 170–187ms against ~900ms; `udeaBenchCharacterMover`
-2.049–2.154ms against 4.0ms; warm validate 124ms against 300ms. **Re-run alone before concluding
-anything**, and that is #175's whole subject.
+`udeaBenchCharacterMover` moved from median-of-9 to **best-of-25** (#175): one-sided error, and the
+tail was over the line on a run where the code was fine. `udeaWarmEditBudget` **keeps
+`samples.max()`** (#182): 19.6% spread against the daemon gate's 37%, and a per-edit deadline makes
+the tail the subject. **Measure before choosing; do not reason by analogy from either.**
 
 ---
 
 ## Left for the owner
 
-- **#179 — the Phase 7 checkpoint. One word: continue, stop, or re-plan**, and the entry in
-  `phase-log.md` in the same change that closes it. Everything else on that issue is filled in.
-- **Mark `replay-equality` and `the FIR checkers fail a real build` as required status checks.**
-  Carried from wave 3. Branch protection; no agent can set it. Both produce a verdict and both have
-  now been seen to fail for the right reason — `replay-equality` on a `moba` fixture as of this wave.
-- **Run `sh gradlew :udea-assets-compiler:udeaPackGate --rerun` once locally.** Carried from wave 2
-  and now more interesting: `udeaPackGate` is failing in CI too, and #168's contract derives frame
-  size from the images and asserts every frame is 100x100. If a real corpus is not uniform, relax the
-  uniformity assertion, not the corpus.
+- **#179 — the Phase 7 checkpoint. One word: continue, stop, or re-plan**, plus the entry in
+  `docs/decisions/phase-log.md` in the same change that closes it. All three spec section 6 exit
+  criteria are ticked with evidence on the issue; the decision was deliberately left blank, because
+  spec section 7's mitigation for the top risk is that *a person* says it out loud, and an agent
+  writing "continue" into an append-only log empties it of the only thing it does. **That file still
+  has no entries through seven phases.** Note the issue also records that Phase 7 landed while
+  Phases 3–6 still carry open work, so answering it in isolation could imply more than is true.
+- **Mark `replay-equality`, `latency budgets` and `the FIR checkers fail a real build` as required
+  status checks.** Branch protection; no agent can set it. All three now produce a verdict and all
+  three have been seen to fail for the right reason.
+- **Run `sh gradlew :udea-assets-compiler:udeaPackGate --rerun` once locally.** Carried from wave 2.
+  #168's contract derives frame size from the images and asserts every frame is 100x100; a real
+  corpus that is not uniform will newly fail on your machine only. Relax the uniformity assertion,
+  not the corpus.
 - **Whether `example` merges into `master`.** Still yours, still untouched.
-- **Two orphan `Xvfb` servers** (`:104` at 16h, `:99` at 5h, both parentless). Left again: the box is
-  shared and neither is provably ours.
 
 ---
 
 ## Pick up next
 
-1. **#175** — three of the four remaining red jobs. The wall-clock budgets cannot pass on a loaded
-   runner, and four waves have now paid the re-run tax.
-2. **#178** — the last red. The GL flake on the only job that makes the GL surface pass-or-fail.
-3. **#174** — `docs/contracts/` is declared frozen and nothing enforces it. Every other cross-cutting
-   agreement here has a verifier task; this one has a reviewer's attention. It is the single
-   remaining gap in "every frozen contract enforced by code rather than only declared".
-4. **#166** — item actives and unique passives. Untouched for two waves.
+1. **#178** — the `gl tests (xvfb)` `OffscreenBackendTest` shutdown flake. Passed in the final run,
+   but it is a flake with four recorded occurrences and it is the only job making the GL surface
+   pass-or-fail. `dev-172` recorded the newest detail: a `CancellationException` at
+   `OffscreenBackendTest.kt:206`, on a branch touching no GL code.
+2. **#183** — two more tests reading repo files their build script does not declare
+   (`udea-annotations`, `udea-codegen`), neither script declaring any inputs at all. Same class as
+   #180, one module out. Includes the question of whether #180's guard should generalise.
+3. **#181** — `clean build under budget` flips red and green on identical work. Now has **seven**
+   data points and a recorded swing of **21 806 ms** (#182's runs), wider than the 13 558 ms the
+   issue records. It already runs in isolation, so it needs a better-conditioned measurement.
+4. **#184** — `udeaWarmEditBudget`'s 3000 ms line measures ~180 ms now it runs alone. One constant
+   doing two jobs badly: a product contract and a regression threshold.
+5. **#166** — item actives and unique passives. Untouched for three waves.
 
-**Do not run #175 and #176-shaped work in the same wave** — both live in `udea-assets-compiler`.
-That collision is why #175 was held back this wave; it is now free to run.
+**Roster note:** #183 and #184 are disjoint (different modules) and either pairs safely with #178.
+Memory is the ceiling on this box, not cores — it is shared with `melon-merge`'s dev team, and
+~3.5G per developer against what `free -g` reports available is the budget that held all three waves.

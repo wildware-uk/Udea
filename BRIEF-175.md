@@ -955,8 +955,14 @@ not time `AgentStateIndex.publish`) is worth as much as what a successful one sh
 
 ### ☑ 3. The chosen approach is commented here with the alternatives and how to overturn it.
 
-Commented on issue #175: the option taken, the two rejected and why, where the shared contention note
-lives and what was rejected for it, and what to change to overturn each.
+Two comments on issue #175. [The first](https://github.com/wildware-uk/Udea/issues/175#issuecomment-5486647361):
+the option taken, the two rejected and why, the two decisions the issue did not settle
+(`udeaGraphBudget`'s split out of `udeaPackGate`, and where the shared contention note lives) each
+with what was rejected and what to change to overturn it, the caching defect I introduced and caught,
+and the two adjacent findings — `clean build under budget` and the `HeadlessHostTest` race — that
+want issues of their own.
+[The second](https://github.com/wildware-uk/Udea/issues/175#issuecomment-5486756863): the correction
+to my own exhaustiveness claim and the two gates the class sweep added.
 
 ### ☑ 4. No budget number is widened without the KDoc that forbids it being addressed explicitly.
 
@@ -968,8 +974,15 @@ Section 7. No number moved, so the KDoc is honoured rather than argued around.
 
 **None.** `udea-codegen/net-protocol.lock` and
 `udea-codegen/src/test/resources/expected-generated-hashes.txt` are untouched: this branch adds and
-removes no replicated component and changes no production source, so no id moved. `git diff --stat
-origin/example HEAD` lists neither file.
+removes no replicated component, so no id moved. `git diff --stat origin/example HEAD` lists neither
+file.
+
+**No production source is in the committed diff at all.**
+`git diff --stat origin/example HEAD -- '*/src/main/*'` returns nothing. Six production files were
+edited during the mutation runs — `StateDigest.kt`, `EntityQueryEngine.kt`, `BundleReader.kt`,
+`SnapshotService.kt`, `Simulation.kt`, `StaticCollision.kt` — and every one was reverted with
+`git checkout --` by the script that applied it. The change is build scripts, test sources, test
+fixtures, `ci.yml` and docs.
 
 ---
 

@@ -1,4 +1,8 @@
-3e24c52
+59b0aec
+
+*(That is the commit carrying the change and the brief. `HEAD` is one commit later and differs from
+it only in this line and in the final build transcript below — `git diff 59b0aec HEAD` shows one
+file.)*
 
 # BRIEF-175 — the latency budgets get a runner to themselves
 
@@ -118,26 +122,31 @@ the **root `build.gradle.kts`** (it is where this repository puts cross-tree agg
 
 ## 3. `sh gradlew build`, real output
 
-### Cold, `clean build`, no exclusions — **green**
+### Cold, `clean build`, no exclusions, on the final tree — **green**
 
-Load average when it started, from `build3-loadavg-start.txt`: `9.72 15.25 15.46`.
+Load average when it started, from `build-clean-load.txt`: `4.90 4.33 7.12`.
 
 ```
-> Task :moba:build
-> Task :udea-gradle:test
-> Task :udea-gradle:check
-> Task :udea-gradle:build
-
-BUILD SUCCESSFUL in 31s
-233 actionable tasks: 142 executed, 75 from cache, 16 up-to-date
+BUILD SUCCESSFUL in 19s
+234 actionable tasks: 147 executed, 71 from cache, 16 up-to-date
 Configuration cache entry stored.
 ```
 
+Zero lines matching `^> Task .*FAILED`, and `gradle exit 0` — read from `$?` immediately after the
+redirected `gradlew` in the same command, with nothing between, and cross-checked against
+`BUILD SUCCESSFUL` in the log rather than trusted on its own. (dev-174's note is well taken: their
+background runner reported a `BUILD FAILED` as "exit code 0" because the 0 was a trailing
+`echo "exit $?"` of the wrapper. Every capture here reads Gradle's own `$?` and every one is
+cross-checked against the log's own verdict.)
+
 Totalled over every JUnit report the tree wrote: **2550 tests, 34 skipped, 0 failures and 0 errors.**
 The 34 skips are the documented `RealArt*` pair and friends, which skip without the paid Tiny RPG
-archives. `:udea-core:test` was served `FROM-CACHE` in that run, so it was forced to execute
-separately and it is green: `> Task :udea-core:test` → `BUILD SUCCESSFUL in 7s`, 436 tests, 0
-skipped, 0 failures.
+archives. `udeaVerifyContracts` — dev-174's freeze gate, merged in under this branch — runs and
+passes; nothing here touches `docs/contracts/`.
+
+An earlier `clean build` on the pre-merge tree gave `BUILD SUCCESSFUL in 31s`, `233 actionable
+tasks: 142 executed, 75 from cache, 16 up-to-date`, and in that one `:udea-core:test` was served
+`FROM-CACHE`, so it was forced to execute separately and is green: 436 tests, 0 skipped, 0 failures.
 
 ### The first attempt was red, and it was not this branch
 

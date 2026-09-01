@@ -6,7 +6,7 @@ import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
 
 /**
- * A world of [bodyCount] entities whose components depend only on their [NetId] index.
+ * A world of `bodyCount` entities whose components depend only on their [NetId] index.
  *
  * [reverseSpawnOrder] changes the order the entities are *created* in while leaving the
  * id-to-component mapping identical, which is what makes "spawn order must not leak into the
@@ -17,7 +17,7 @@ import dev.wildware.udea.core.identity.NetIdIndex
  * classes need the same world, and building it twice is how the thing being measured stops being
  * the thing being asserted about.
  */
-internal class PhysicsRebuildFixture(val bodyCount: Int, reverseSpawnOrder: Boolean = false) {
+internal class PhysicsRebuildFixture(bodyCount: Int, reverseSpawnOrder: Boolean = false) {
     val netIds = NetIdIndex(capacity = 1024, entityCapacity = 1024)
     val world: World = configureWorld(1024) {}
     val ids: List<NetId> = (0 until bodyCount).map { NetId.of(it, 0) }

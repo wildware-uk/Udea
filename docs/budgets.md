@@ -122,7 +122,7 @@ That check exists because the list has been declared complete three times. Until
 gates hung off `check`, so each was timed while nineteen other modules compiled on the same cores,
 and **a wall-clock measurement taken during a parallel build measures the build**. Some of them
 failed on both runner images for that reason alone, on a branch that had touched none of them. #175
-enumerated five, found `udeaDigestBudget` and `udeaQueryBudget` while wiring them, and left two
+enumerated a set, found `udeaDigestBudget` and `udeaQueryBudget` while wiring them, and left two
 behind. `review-175-r1` found those two and filed #182. #182's own work found three more that no
 issue had named — `AssetCompilerTest`'s one-second warm compile, `PhysicsRebuildTest`'s 2 ms rebuild
 and `NetHarnessTest`'s two-second session bound. Every one of those enumerations was honest, and

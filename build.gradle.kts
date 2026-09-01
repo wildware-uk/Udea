@@ -165,8 +165,9 @@ val udeaAssemble by tasks.registering {
 //
 // ## Why the list is no longer the enumeration (issue #182)
 //
-// This list has been declared complete three times and been wrong twice. #175 enumerated five,
-// found two more while wiring them, and left two. `review-175-r1` found those two and filed #182.
+// This list has been declared complete three times and been wrong twice. #175 enumerated a set,
+// found `udeaDigestBudget` and `udeaQueryBudget` while wiring them, and left two behind.
+// `review-175-r1` found those two and filed #182.
 // #182's own work found three the issue had not named - a one-second warm compile in
 // `AssetCompilerTest`, a 2ms rebuild in `PhysicsRebuildTest` and a two-second bound in
 // `NetHarnessTest`. Each enumeration was honest and each was a snapshot.
@@ -224,12 +225,12 @@ subprojects {
     tasks.withType<Test>().configureEach {
         // Which task is running this JVM, for `LatencyBudget.measuredBy` (issue #182). A budget is
         // held out of `build` by one `filter.excludeTestsMatching` line in a build script, and
-        // deleting that line puts it back inside the parallel build *and leaves it green*, because
-        // every one of these gates carries tens of times the headroom it needs. Nothing else in
-        // the repository can see which task ran a test, so the answer is handed to the JVM at the
-        // only moment it is known. Set on every test task, not only the budgets: the value has to
-        // be wrong for the guard to fire, and an absent property is how a budget run by `test`
-        // would look if only the budgets were told.
+        // deleting that line puts it back inside the parallel build - where it may stay green for
+        // a long time, because these gates are sized to catch a regression rather than to detect a
+        // busy machine. Nothing else in the repository can see which task ran a test, so the
+        // answer is handed to the JVM at the only moment it is known. Set on every test task, not
+        // only the budgets: the value has to be wrong for the guard to fire, and an absent
+        // property is how a budget run by `test` would look if only the budgets were told.
         systemProperty("udea.testTaskPath", path)
 
         if (name in latencyBudgetTaskNames) {

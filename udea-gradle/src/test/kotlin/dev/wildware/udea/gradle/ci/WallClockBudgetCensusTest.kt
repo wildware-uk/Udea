@@ -11,8 +11,9 @@ import kotlin.test.assertTrue
  *
  * ## Why a sentence needs a test
  *
- * Issue #175 moved five gates off `check`, found two more while doing it, and left two behind.
- * `review-175-r1` found those two. Working #182 found three the issue had not named either -
+ * Issue #175 moved a set of gates off `check`, found `udeaDigestBudget` and `udeaQueryBudget`
+ * while doing it, and left two behind. `review-175-r1` found those two. Working #182 found three
+ * the issue had not named either -
  * `AssetCompilerTest`'s one-second warm compile, `PhysicsRebuildTest`'s 2ms rebuild and
  * `NetHarnessTest`'s two-second session bound. Three enumerations, three different answers, and
  * every one of them was written down as complete at the time.

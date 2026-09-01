@@ -53,7 +53,7 @@ internal class MobaWarmEdit(label: String) {
 
     private val original: String = script.readText()
 
-    val daemon: AssetDaemon = AssetDaemon(
+    private val daemon: AssetDaemon = AssetDaemon(
         repoRoot = TestPaths.repoRoot,
         assetRoot = root,
         scriptClasspath = TestPaths.compilerClasspath,

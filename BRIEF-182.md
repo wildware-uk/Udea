@@ -219,10 +219,22 @@ Delete the one line that holds a budget out of `test`:
 
 ```diff
 diff --git a/udea-core/build.gradle.kts b/udea-core/build.gradle.kts
-index f207336..712f843 100644
+index f207336..13346ca 100644
 --- a/udea-core/build.gradle.kts
 +++ b/udea-core/build.gradle.kts
-@@ -94,7 +94,6 @@ val budgetTestClasses = listOf(
+@@ -21,9 +21,8 @@ dependencies {
+     // `LatencyBudget`: the contention note every budget test in `budgetTestClasses` below ends its
+     // failure message with, and the `measuredBy` guard each one opens with, which refuses to let a
+     // budget be measured by any task but its own (issues #175 and #182). A test-scope edge to the
+-    // zero-dependency leaf: it adds the
+-    // fixture and nothing else, and it puts no GL, no gdx and no new runtime dependency anywhere
+-    // near the headless kernel.
++    // zero-dependency leaf: it adds the fixture and nothing else, and it puts no GL, no gdx and no
++    // new runtime dependency anywhere near the headless kernel.
+     testImplementation(testFixtures(project(":udea-diagnostics")))
+ }
+ 
+@@ -94,7 +93,6 @@ val budgetTestClasses = listOf(
      // Split out of `PhysicsRebuildTest` by issue #182. It had never been listed as a latency
      // budget by anybody, so a 2ms line was read inside every parallel `build` - and passed, which
      // is why nobody noticed. The rest of that class is reproducibility and stays on `check`.
@@ -251,7 +263,7 @@ The message itself, one physical line, unwrapped, from
 `scratchpad/mut-exclusion-report.xml`:
 
 ```
-java.lang.IllegalStateException: this is a wall-clock latency budget and it is being run by `:udea-core:test`, not by `:udea-core:udeaPhysicsRebuildBudget`. A budget measured by anything other than its own task is measured beside whatever else that task's build is doing, which is what issue #175 and issue #182 were filed for - and it will pass anyway, because these gates carry tens of times the headroom they need. Restore the `filter.excludeTestsMatching` line that keeps this class out of `:udea-core:test`, or if the budget genuinely moved, change the task named here and in `latencyBudgetTasks`.
+java.lang.IllegalStateException: this is a wall-clock latency budget and it is being run by `:udea-core:test`, not by `:udea-core:udeaPhysicsRebuildBudget`. A budget measured by anything other than its own task is measured beside whatever else that task's build is doing, which is what issue #175 and issue #182 were filed for. It may well still pass, and that is the worse outcome: nobody learns the measurement stopped meaning anything. Restore the `filter.excludeTestsMatching` line that keeps this class out of `:udea-core:test`, or if the budget genuinely moved, change the task named here and in `latencyBudgetTasks`.
 ```
 
 **This mutation was not only a demonstration.** Partway through the ticket a `git checkout --` of
@@ -617,31 +629,30 @@ document, and 26 test/testFixtures sources.
 JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew clean build --console=plain
 ```
 
-Run on the committed tree at `47ea8e8`, exit 0. Load average at start `6.65 9.00 10.12`, at finish
-`9.07 9.44 10.25` (`scratchpad/build-clean-load.txt`) — `melon-merge`'s scenario suite was on the
-box throughout, which is now a non-event for this command and was the point of the ticket.
+Run at `925009b` plus this brief, exit 0, on a quiet box: load average `0.51 3.76 6.90` at the
+start and `2.88 3.98 6.78` at the finish (`scratchpad/build-clean-load.txt`).
 
 The last twelve lines of `scratchpad/build-clean-full.txt`, contiguous:
 
 ```
-> Task :check
-> Task :build
-> Task :udea-compiler-plugin:test
-> Task :udea-compiler-plugin:check
-> Task :udea-compiler-plugin:build
-> Task :moba:test
 > Task :moba:check
 > Task :moba:build
+> Task :udea-assets-compiler:udeaPackGate
+> Task :udea-assets-compiler:check
+> Task :udea-assets-compiler:build
+> Task :udea-agent-host:test
+> Task :udea-agent-host:check
+> Task :udea-agent-host:build
 
-BUILD SUCCESSFUL in 16s
-223 actionable tasks: 142 executed, 74 from cache, 7 up-to-date
-Configuration cache entry reused.
+BUILD SUCCESSFUL in 1m 3s
+232 actionable tasks: 147 executed, 69 from cache, 16 up-to-date
+Configuration cache entry stored.
 ```
 
-**Read `16s` as "142 tasks executed, 74 served from the build cache", not as a cold-build time.**
-`clean` deletes the output directories, not the Gradle build cache, so most of the compilation came
-back from it. What the run does establish is that every `check` task executed and passed, over
-every report it produced (`scratchpad/count-tests.py`, saved as `scratchpad/q-test-count.txt`):
+**Read `1m 3s` as "147 tasks executed, 69 served from the build cache", not as a cold-build time.**
+`clean` deletes the output directories, not the Gradle build cache, so some of the compilation came
+back from it — the number CI measures with a cold cache is the 76 943 ms above. What this run
+establishes is that every `check` task executed and passed, over every report it produced (`scratchpad/count-tests.py`, saved as `scratchpad/q-test-count.txt`):
 
 ```
 suites=379 tests=2549 failures=0 errors=0 skipped=34
@@ -652,55 +663,55 @@ The 34 skips are the GL suites with no `$DISPLAY`, unchanged by this branch.
 `sh gradlew udeaVerifyModuleGraph udeaVerifyNoLegacyDependencies udeaVerifyAgentsMd
 udeaVerifyContracts` — `BUILD SUCCESSFUL`, 43 tasks up to date.
 
-CI on the pushed branch: run **33459621243**,
-<https://github.com/wildware-uk/Udea/actions/runs/33459621243> — includes the `latency budgets
-(ubuntu-latest)` and `latency budgets (windows-latest)` legs, which is the first time the three new
-gates are measured on a runner rather than on this box.
+CI on the pushed branch, two runs:
 
-Every job in that run is green **except `clean build under budget`**, which needs more than a
-pointer at #181 — see below. Both `latency budgets` legs passed, which is the first time the three
-new gates have been measured on a runner rather than on this box.
+| Run | Result |
+|---|---|
+| 33459621243 (`47ea8e8`) | every job green except `clean build under budget` — see below |
+| 33460801863 (`925009b`, `BRIEF-182.md` only) | **every job green**, `clean build under budget` included |
+
+<https://github.com/wildware-uk/Udea/actions/runs/33460801863>. Both runs pass
+`latency budgets (ubuntu-latest)` and `latency budgets (windows-latest)`, which is the first time
+the three gates this ticket moved have been measured on a runner rather than on this box.
 
 **Not mine, and pre-existing on `origin/example`:** `KotlinPinCheckTest` (no JDK 17 on this box),
 the `gl tests (xvfb)` `OffscreenBackendTest` shutdown flake (#178), and `:moba:runUdpProof` under
 5% loss. None of them is touched by this diff.
 
-### `clean build under budget`: what I can and cannot say
+### `clean build under budget`: it was the runner, and the second sample says so
 
-It failed on my branch:
+The first push failed that job:
 
 ```
 ##[error]clean build took 98749 ms, over the 90000 ms budget (spec 6, Phase 0 exit)
 ```
 
-That is #181's gate, which the ticket says explicitly is not mine and which already has an issue
-for being badly conditioned. **I am not going to leave it there, because the numbers do not quite
-let me.** Two runs of `origin/example` within the hour, from the same job:
+That is #181's gate, which the ticket says is not mine — but 98 749 ms was **above** the
+81 426-94 984 ms range #181 records across five runs of identical work, and above the two nearest
+mainline samples, so pointing at #181 and moving on would have been a plausible reading of a
+summary rather than a check. The discriminating experiment is another sample, so I took one:
+pushing `BRIEF-182.md` re-runs the whole workflow over a commit that changes one markdown file and
+nothing the build compiles.
 
 | Ref | Run | Measured |
 |---|---|---|
 | `example` | 33457093150 | `clean build took 82636 ms, within the 90000 ms budget` |
 | `example` | 33460337882 | `clean build took 77598 ms, within the 90000 ms budget` |
-| this branch | 33459621243 | `clean build took 98749 ms, over the 90000 ms budget` |
+| this branch | 33459621243 | `clean build took 98749 ms, over the 90000 ms budget (spec 6, Phase 0 exit)` |
+| this branch, + a markdown file | 33460801863 | `clean build took 76943 ms, within the 90000 ms budget` |
 
-16-21 seconds above the two nearest mainline samples, and above the 81 426-94 984 ms range #181
-records across five runs of identical work. **One sample is not a measurement, and I will not
-assert either way from it.** What I can say about the mechanism:
+**21 806 ms between two runs of the same branch whose only difference is a document.** That settles
+it: the first reading was the runner, not this change, and run 33460801863 is green on every job.
+Both `latency budgets` legs pass on both runner images, which is the three new gates measured on a
+runner rather than on this box.
 
-- The one place this branch changes *what `build` executes* makes it **cheaper**, not dearer.
-  `MobaWarmEditBudgetTest` used to run inside `:udea-assets-compiler:test`: a full copy of
-  `moba/assets`, a daemon start and **six** warm edits, each a real Kotlin script compile. It is
-  gone from `test`. What replaced it, `MobaWarmEditTest`, does the same setup and **two** edits.
-- Everything else it adds to `build` is source to compile — about 1 350 lines across four modules —
-  plus a repo-wide source walk in `:udea-gradle:test` that reads roughly 500 small files. Neither
-  is a plausible sixteen seconds.
-- So the arithmetic does not support "this branch made the clean build 20% slower", and it does not
-  refute it either, because the gate's own recorded variance for identical work is 13 558 ms and
-  five samples is not a distribution.
-
-The discriminating experiment is another sample, and pushing this brief takes one. Whatever it
-says, the reviewer should read this against #181 rather than against this ticket: the gate measures
-a whole cold build on a shared runner, which is the same family of defect one scale up.
+Two things it is worth handing on rather than closing here. The mechanism was always against the
+first reading: the one place this branch changes *what `build` executes* makes it **cheaper** —
+`MobaWarmEditBudgetTest` used to run inside `:udea-assets-compiler:test` with a full copy of
+`moba/assets`, a daemon start and **six** warm edits, each a real Kotlin script compile, and what
+replaced it on `check` does the same setup and **two**. And the 21 806 ms swing is itself a new
+data point for #181, wider than the 13 558 ms that issue records; the transcript lines are in
+`scratchpad/ci-cleanbuild-33459621243.txt`.
 
 ---
 
@@ -737,9 +748,9 @@ a budget nobody notices is inside `build`. The stripping is what stops it over-r
 `DeterminismScannerTest` holds `System.nanoTime()` in Java fixture text, `NoWallClockInTransportTest`
 holds it in a planted string, `NonLiteralIdTest` holds `System.currentTimeMillis()` inside an asset
 script it compiles, `GasArchitectureTest` and `FileValidatorTest` hold them in banned-word lists.
-All five fall out correctly and none of them needed a census row.
+Every one of those falls out correctly and none of them needed a census row.
 
-### What it found: 29 files read a clock; eleven assert an elapsed value
+### What it found on `origin/example` at `293649b`: 29 files read a clock, eleven assert an elapsed value
 
 **Already on the aggregate before this ticket (8):**
 
@@ -782,6 +793,11 @@ value.
 | **a seed** — `Random(System.nanoTime())`, so a proof does not repeat one run | `MobaReplayProofTest`, `ReplayEngineTest`, `ReplayToolTest` |
 | **printed, not asserted** | `AssetCompilerTest` (after this change), `TranspilerParityTest`, `WorkerTest` |
 | **a ratio** — two readings from the same machine divided, so the machine cancels | `NetIdIndexTest` (resolution at 64 000 ids over resolution at 64: an O(1) claim, not a duration) |
+
+After the change the same scan finds **28**: `ExampleScanTest`, `PhysicsRebuildTest` and
+`NetHarnessTest` no longer read a clock at all, and `WarmScanBudgetTest` and
+`PhysicsRebuildBudgetTest` are new. Ten of the 28 declare themselves budgets; the other eighteen
+are the census below.
 
 ### The honest limits of the enumeration
 
@@ -1022,18 +1038,18 @@ markers and requires each resulting segment to appear as a **consecutive, in-ord
 the artefacts; `verify-diffs.py` does the same for the nine `diff` blocks against the saved
 `git diff` output of each mutation. Their final runs:
 
-```
-9 diff blocks in the brief, 10 saved .diff artefacts
-every diff block appears verbatim in a saved .diff artefact
-checked 34 spliced segments against 2036 artefacts
+Their combined output is saved as `scratchpad/q-verify.txt`. It is not quoted here, because
+quoting it would add another segment for the checker to find and the numbers in the quote would be
+one run behind for ever — the same staleness this repository keeps writing down about counts in
+comments. What it says is: every one of the nine `diff` blocks appears verbatim in a saved
+`git diff` artefact, and of the spliced segments exactly two are not found.
 
-2 SEGMENT(S) NOT FOUND AS A CONSECUTIVE RUN IN ANY ARTEFACT:
-
-----------------------------------------------------------------------
-sh gradlew udeaLatencyBudgets --no-parallel --max-workers=1
-----------------------------------------------------------------------
-JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew clean build --console=plain
-```
+**It went green once for a bad reason, and that is worth recording rather than quietly fixing.**
+`q-verify.txt` is written into the same directory the checker reads, and it *prints the segments it
+could not find* — so on the next run those two lines matched themselves and it reported "every
+segment found verbatim and in order". A check that ran, returned the answer I wanted, and ran
+against the wrong subject. The fix is four lines and a comment at the top of `verify-brief.py`
+excluding its own output; the honest result is the two above.
 
 The two it will not clear are the two commands a reader is meant to run, which have no transcript
 by definition. Everything else in this document clears.

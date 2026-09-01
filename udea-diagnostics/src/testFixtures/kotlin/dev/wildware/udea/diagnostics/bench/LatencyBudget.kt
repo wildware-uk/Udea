@@ -42,10 +42,11 @@ object LatencyBudget {
      * ## What this catches that nothing else does (issue #182)
      *
      * A budget is kept out of `build` by one line in a build script - `filter.excludeTestsMatching`
-     * on the module's `test` task. Delete that line and the budget runs inside the parallel build
-     * again, measuring the build; and it *passes*, because every one of these gates has between
-     * 20x and 47x of headroom. That is the failure this whole ticket is about, and until now
-     * nothing would have said a word about it.
+     * on the module's `test` task. Delete that line and the budget is measured inside the parallel
+     * build again, and there is no good outcome: it either passes, in which case nobody learns
+     * that the measurement stopped meaning anything, or it goes red for a reason that is not the
+     * code, which is the three-waves-of-developers story issue #175 records. That is the failure
+     * this whole ticket is about, and until now nothing would have said a word about it.
      *
      * `WallClockBudgetCensusTest` reads source and can tell that a budget exists. It cannot tell
      * which Gradle task ran it. This can, because it asks at the only moment the answer is known.
@@ -63,8 +64,8 @@ object LatencyBudget {
             "this is a wall-clock latency budget and it is being run by `$running`, not by " +
                 "`$taskPath`. A budget measured by anything other than its own task is measured " +
                 "beside whatever else that task's build is doing, which is what issue #175 and " +
-                "issue #182 were filed for - and it will pass anyway, because these gates carry " +
-                "tens of times the headroom they need. Restore the " +
+                "issue #182 were filed for. It may well still pass, and that is the worse " +
+                "outcome: nobody learns the measurement stopped meaning anything. Restore the " +
                 "`filter.excludeTestsMatching` line that keeps this class out of `$running`, or " +
                 "if the budget genuinely moved, change the task named here and in " +
                 "`latencyBudgetTasks`."

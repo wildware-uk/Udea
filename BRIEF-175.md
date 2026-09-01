@@ -875,6 +875,17 @@ origin/example HEAD` lists neither file.
   runners. Nothing says what these budgets do on a two-core runner or on macOS.
 - **The `HeadlessHostTest` race.** Observed once, not reproduced in six loaded attempts, not fixed.
   Section 3.
+- **The `OffscreenBackendTest` shutdown race.** Observed once on a runner, not reproduced in eight
+  local `xvfb` runs, not fixed, and in a module this branch does not touch. Section 3.
+- **The margin on `udeaBenchCharacterMover`.** The estimator change bought real headroom on
+  `windows-latest` — best 2.585ms against 4.0ms — but the *worst* sample of that same passing run was
+  4.085ms. The distribution's tail is still over the line on that runner class. Nothing here says
+  what happens if GitHub's Windows image gets slower.
+- **Whether the six warm-ups are right anywhere else.** I checked two: `GraphBudgetTest` (wrong, and
+  fixed) and `CharacterMoverBudgetTest` (right, and left alone). `SnapshotBudgetTest`,
+  `TickLoopBudgetTest`, `DaemonLatencyBudgetTest` and `Phase2ExitTest` were not put through the same
+  five-runs-at-two-settings experiment. The question to ask of each is the one that caught the graph
+  budget: **is the warm-up counted in calls to the measured method, or in units of work?**
 - **Whether `clean build under budget` will stay green.** It flipped twice in three runs. Not this
   ticket's job to settle, and section 4 says so with the numbers.
 - **A concurrent `latency-budgets` job on the same physical host.** GitHub gives each job a fresh VM,

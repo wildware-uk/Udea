@@ -103,6 +103,21 @@ val outerBuildInputs: FileCollection = files(
     rootDir.resolve("../.github/workflows/ci.yml"),
     rootDir.resolve("../docs/compiler-plugin.md"),
     rootDir.resolve("../docs/module-graph.md"),
+
+    // `ContractFreezeTest` reads the frozen documents, the lock that freezes them, and the
+    // section of `AGENTS.md` that names the gate; all three are outside anything Gradle would
+    // otherwise associate with this module. Without these lines the test stays UP-TO-DATE
+    // across an edit to a contract, the deletion of the lock, and an `AGENTS.md` that stops
+    // naming the route out - which are exactly the edits it exists to notice, and a freeze
+    // gate that passes from cache is a freeze that is not happening.
+    //
+    // `AGENTS.md` also closes the same hole for `AgentsMdTest`, which has read the real file
+    // since issue #138 without it being declared. That gate's *task* (`udeaVerifyAgentsMd`)
+    // declares it properly, so nothing escaped - but the unit half could go stale across the
+    // one edit it watches.
+    rootDir.resolve("../AGENTS.md"),
+    rootDir.resolve("../docs/contracts.lock"),
+    fileTree(rootDir.resolve("../docs/contracts")),
     fileTree(rootDir.resolve("..")) {
         include("*/build.gradle.kts")
         include("build.gradle.kts")

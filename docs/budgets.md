@@ -133,7 +133,7 @@ launcher, JDK 17 toolchain, Gradle 8.13, another project's GL suite running alon
 | 200 movers x 60 replays (12 000 `move` calls) | `:udea-core:udeaBenchCharacterMover` | 4.0 ms | 2.302 ms | 1.7x |
 | Warm validate of one edited script | `:udea-assets-compiler:udeaDaemonBudget` | 300 ms | 128 ms | 2.3x |
 | Warm reload decision | `:udea-assets-compiler:udeaDaemonBudget` | 500 ms | 228 ms | 2.2x |
-| Graph deserialisation, 2 000 assets | `:udea-assets-compiler:udeaGraphBudget` | 15 ms | 7.533 ms | 2.0x |
+| Graph deserialisation, 2 000 assets | `:udea-assets-compiler:udeaGraphBudget` | 15 ms | 4.79 ms | 3.1x |
 | Agent patch to running world, over HTTP | `:udea-agent-host:udeaPhase2Exit` | 1 000 ms | 445 ms | 2.2x |
 | Typo'd reference rejected | `:udea-agent-host:udeaPhase2Exit` | 300 ms | 16 ms | 18.8x |
 
@@ -141,6 +141,28 @@ The headroom column is the useful one and it is why none of these numbers was wi
 gate was already inside its budget by a factor, and the reds were contention rather than cost.
 It also says what a regression has to be worth before a gate notices — the two `udea-core`
 benches would absorb an eight-fold slowdown, so they are floors and not tripwires.
+
+### Warm-up is part of the measurement, and one gate did not have enough
+
+`udeaGraphBudget` measured a median of 9.124 ms on `ubuntu-latest` in one Actions run and 16.140 ms
+in the next, on identical bytes, with even its *best* sample at 15.561 ms. Five warm-up `open`s were
+five invocations of the measured method, so the samples that followed were partly of a JVM that had
+not finished compiling the decoder. On the development box, five runs each, back to back:
+
+| warm-up | medians | best |
+|---|---|---|
+| 5 | 5.61, 6.30, 8.47, 6.36, 7.70 ms | 5.20 – 7.04 ms |
+| 40 | 4.84, 4.94, 5.03, 4.73, 4.79 ms | 4.58 – 4.71 ms |
+
+A 1.51x run-to-run spread becomes 1.06x, and the number falls. **The budget did not move**; the
+measurement got honest, and the gate got stricter in the sense that matters — the smallest
+regression it can reliably distinguish from noise is now much smaller than the noise band it used
+to have.
+
+The same experiment was run against `udeaBenchCharacterMover` and it needs no such change: 5 warm-up
+frames and 40 give 2.02–2.18 ms and 2.20–2.30 ms. Its five frames are sixty thousand calls to
+`move`, which is why. **Warm-up here is counted in calls to the measured method, not in units of
+work** — that is the distinction to check before adding a budget to this list.
 
 ### When one goes red
 

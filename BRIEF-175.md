@@ -1,0 +1,691 @@
+3e24c52
+
+# BRIEF-175 — the latency budgets get a runner to themselves
+
+Branch `issue-175-latency-budgets-on-ci`, off `origin/example` at `e7159c1`.
+Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a5773b1d0f90f1f83`.
+
+---
+
+## 1. The evidence command
+
+```
+JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew udeaLatencyBudgets :udea-gradle:test --no-parallel --max-workers=1
+```
+
+It measures all six wall-clock budgets serially, exactly as the `latency-budgets` CI job does, and
+it runs `LatencyBudgetJobTest`, which is the half that reads `.github/workflows/ci.yml` and the root
+build script and asserts the CI job still exists, still runs serially, still covers both runner
+images, and still cannot be answered from the build cache.
+
+**It goes red when the feature is reverted, and when the code is genuinely slower.** Section 5 has
+one deliberate slowdown per gate with its literal `git diff` and its measured number, and section 6
+has eight mutations of `ci.yml` with the same treatment, including two controls.
+
+On `origin/example` the command does not even resolve: there is no `udeaLatencyBudgets` task there.
+
+---
+
+## 2. Summary
+
+### What was wrong
+
+Six gates in this repository assert a number of milliseconds. All six hung off `check`, `check` runs
+inside `build`, so every one of them was timed while nineteen other modules compiled on the same
+cores. **A wall-clock measurement taken during a parallel build measures the build.** They failed on
+`ubuntu-latest` and on `windows-latest` on run 33428671524 — the first run that reached them at all,
+because before #170 the build died at `:moba:udeaPackBundle` — on a branch that had touched none of
+them. Three waves of developers each rediscovered the cause by re-running the task solo.
+
+### What I did — issue #175's option 1
+
+- A root aggregate, **`udeaLatencyBudgets`**, holds the six. They come off `check`.
+- A **`latency-budgets` CI job**, matrixed over `ubuntu-latest` and `windows-latest`, compiles in one
+  step and then measures in a step of its own with `--no-parallel --max-workers=1`.
+- **`LatencyBudgetJobTest`** (in `:udea-gradle`, on `check`) holds the two halves together. It reads
+  the real workflow and the real root script, so neither can drift from the other silently.
+- Every budget failure now ends with **`LatencyBudget.contentionNote`**: this machine's processor
+  count, its one-minute load average at the moment the budget was missed, and the exact command that
+  re-runs that one task alone. That is the rediscovery cost the issue asked to remove.
+- `udeaGraphBudget` is **split out of `udeaPackGate`**. Byte-identical `.udeapak` output is a
+  determinism claim that gives the same answer on a busy machine; the 15ms deserialisation median is
+  a stopwatch that does not. The split is also what lets `udeaPackGate` stay on `check`, which
+  matters: the `build` job's "Assert the atlas determinism tests ran and none skipped" step reads
+  that task's own JUnit reports.
+- **No budget number is widened.** Not one constant moved. Section 7 covers acceptance criterion 4.
+
+### Why this is not option 3
+
+Option 3 — "take them off `check` and run them only where the machine is known" — is ranked last by
+the issue because it quietly means nobody measures latency in CI. These are measured **on every
+push, on both runner images, as hard gates**, in a job that has the runner to itself. Coming off
+`check` is the mechanism, not the outcome: you cannot make one task exclusive inside a parallel
+Gradle invocation, so exclusivity requires a separate invocation and therefore a separate job.
+
+It is also the arrangement this repository already uses for this exact reason. `:moba:runUdpProof`
+and `:moba:runLaneShot` are outside `check` because wall-clock timing across forked JVMs and a GL
+driver are not things a parallel build holds still. These were the same class of thing and had not
+been moved yet.
+
+### Option 2 was not needed, and was not used
+
+The lead permitted a same-runner calibration as a *supplement* if option 1 alone were not enough. It
+was enough: run 33450534282 measured all six on both runner images and every one landed inside
+budget (section 4). No calibration, no relative check, no derived threshold — the numbers are still
+the absolute numbers the specs name.
+
+### The decision I had to make that the issue did not settle
+
+**Where the shared contention note lives.** Six failure messages across three modules need the same
+sentence; written out six times that is copy-pasted logic differing only in a task name, which
+engineering-standards §8 rejects. It went into `udea-diagnostics`' **test fixtures**, and
+`udea-core`, `udea-assets-compiler` and `udea-agent-host` take a `testImplementation(testFixtures(...))`
+edge to it. Rejected: `udea-core`'s existing fixtures (would drag Fleks onto the asset compiler's
+test classpath), `udea-annotations` (a compile-time vocabulary the codegen reads), `main` sources of
+any module (a contention note has no business in the jar a game loads), and `build-logic` (owned by
+`dev-174` this wave). Commented on the issue. To overturn: move the object, keep the call sites.
+
+### Ownership note
+
+I was assigned `ci.yml`, the three modules' build files and the budget test classes. I also touched
+the **root `build.gradle.kts`** (it is where this repository puts cross-tree aggregates —
+`udeaAssemble`, `udeaVerifyModuleGraph` — and there was nowhere else to put one), plus
+`udea-diagnostics/build.gradle.kts`, `udea-gradle/build.gradle.kts`, `docs/budgets.md` and one row of
+`docs/module-graph.md`. None is `dev-174`'s (`build-logic/`, `AGENTS.md`, a contracts lock file).
+**No file under `docs/contracts/` was changed, and none needed to be.**
+
+---
+
+## 3. `sh gradlew build`, real output
+
+### Cold, `clean build`, no exclusions — **green**
+
+Load average when it started, from `build3-loadavg-start.txt`: `9.72 15.25 15.46`.
+
+```
+> Task :moba:build
+> Task :udea-gradle:test
+> Task :udea-gradle:check
+> Task :udea-gradle:build
+
+BUILD SUCCESSFUL in 31s
+233 actionable tasks: 142 executed, 75 from cache, 16 up-to-date
+Configuration cache entry stored.
+```
+
+Totalled over every JUnit report the tree wrote: **2550 tests, 34 skipped, 0 failures and 0 errors.**
+The 34 skips are the documented `RealArt*` pair and friends, which skip without the paid Tiny RPG
+archives. `:udea-core:test` was served `FROM-CACHE` in that run, so it was forced to execute
+separately and it is green: `> Task :udea-core:test` → `BUILD SUCCESSFUL in 7s`, 436 tests, 0
+skipped, 0 failures.
+
+### The first attempt was red, and it was not this branch
+
+An earlier `sh gradlew build` at load `~17`, with another agent's full Udea build running beside it,
+failed one test:
+
+```
+HeadlessHostTest > time pause stops a free-running host, and its ticks are the loop's() FAILED
+org.opentest4j.AssertionFailedError: every tick run() runs must go through the loop, or totalTicks
+— the number the agent is given for how far the game has got — is fiction ==> expected: <26003> but
+was: <26002>
+```
+
+What I can say, and what I cannot:
+
+- **This branch changes no production source anywhere.** `git diff --stat origin/example -- udea-core/src/main udea-core/src/test/kotlin/dev/wildware/udea/core/host udea-core/src/testFixtures`
+  is empty; the whole branch touches build scripts, test sources, test fixtures, `ci.yml` and docs.
+- It passed immediately on a re-run alone, and the `clean build` above is green.
+- I tried to reproduce it: six runs of that test with twelve CPU spinners alongside, at load averages
+  of 8.9, 30.6, 34.6, 34.2, 36.8 and 33.5 — **all six green** (`flake.txt`).
+- So: **observed once, not reproduced in six attempts.** My synthetic load is CPU spin, which is not
+  the same thing as a JIT- and GC-heavy parallel Kotlin compile, so that negative result is weaker
+  than it looks. I am not claiming it is a flake and I am not claiming it is a defect. It is a
+  seventh wall-clock-sensitive assertion in this repository, it lives inside `test` rather than
+  inside a budget task, and it is worth an issue of its own. Reported to the lead rather than fixed
+  here: fixing a race in `GameLoop`/`TimeControl` is not this ticket.
+
+### GL, run for real under xvfb
+
+`udeaPhase2Exit` lives in `udea-agent-host` and this branch edits that module's build script, so the
+GL half was run rather than assumed. Both tasks were forced to execute — the first attempt reported
+`:udea-render:udeaGlTest FROM-CACHE`, which asserts nothing:
+
+```
+xvfb-run -a -s "-screen 0 1280x720x24" \
+  env JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+  sh gradlew udeaGlTest --rerun udeaAgentGlTest --rerun -Pudea.render.requireGl=true
+```
+
+```
+> Task :udea-agent-host:udeaAgentGlTest
+> Task :udea-render:udeaGlTest
+BUILD SUCCESSFUL in 7s
+```
+
+Counted out of the JUnit XML rather than trusted to the exit code, because a skipped GL test reports
+as a pass: `udea-render/build/test-results/udeaGlTest: tests=18 skipped=0 failures=0` and
+`udea-agent-host/build/test-results/udeaAgentGlTest: tests=8 skipped=0 failures=0`.
+
+Note `JAVA_HOME` is inside the `env` list. Written the way `AGENTS.md` gives it, `xvfb-run`'s `env`
+drops it and Gradle fails with the entire message `* What went wrong:` / `25.0.2`.
+
+---
+
+## 4. The Actions runs
+
+`.github/workflows/ci.yml` is `on: push` with no branch filter, so pushing the topic branch produced
+real runs on both operating systems.
+
+| Run | SHA | Result |
+|---|---|---|
+| [33450534282](https://github.com/wildware-uk/Udea/actions/runs/33450534282) | `9a5d8fe` | everything green except `clean build under budget` — **and that job is red on the base too** |
+| [33451573256](https://github.com/wildware-uk/Udea/actions/runs/33451573256) | `0d93df3` | every job green — **but the budgets came `FROM-CACHE`; see section 8** |
+| [33452620665](https://github.com/wildware-uk/Udea/actions/runs/33452620665) | `3e24c52` | the run for the SHA at the top of this brief |
+
+For comparison, `origin/example` at `e7159c1` — the exact base of this branch —
+[run 33448686474](https://github.com/wildware-uk/Udea/actions/runs/33448686474) fails four jobs:
+`build (ubuntu-latest)`, `build (windows-latest)`, `build with the K2 plugin disabled` and
+`clean build under budget`. This branch turns the first three green.
+
+### What the runners actually measured
+
+Run 33450534282, `latency budgets (ubuntu-latest)` (job 99679190384), spliced from its log:
+
+```
+> Task :udea-agent-host:udeaPhase2Exit
+    phase 2 exit: typo'd reference rejected in 16ms (median of [430, 15, 16])
+    phase 2 exit: agent request -> running world observed changed in 492ms
+> Task :udea-assets-compiler:udeaDaemonBudget
+    warm reload decision: median 273ms over 4 samples [273, 284, 244, 209]
+    warm validate of one script: median 175ms over 4 samples [12, 175, 170, 181]
+> Task :udea-assets-compiler:udeaGraphBudget
+    graph deserialisation: best=9.001414ms median=9.124261ms over 2000 assets (budget 15ms)
+> Task :udea-core:udeaBenchCharacterMover
+    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) median 2.532ms, budget 4.0ms
+> Task :udea-core:udeaBenchTickLoop
+    udeaBenchTickLoop: 600 ticks at 200 entities, median 6.0207ms, p95 6.184097ms, budget 50.0ms
+> Task :udea-core:udeaSnapshotBudget
+    udeaSnapshotBudget: capture of 1000 entities median 85470ns, p95 94373ns, budget 1000000ns
+```
+
+Same run, `latency budgets (windows-latest)` (job 99679190424):
+
+```
+> Task :udea-agent-host:udeaPhase2Exit
+    phase 2 exit: typo'd reference rejected in 25ms (median of [676, 24, 25])
+    phase 2 exit: agent request -> running world observed changed in 528ms
+> Task :udea-assets-compiler:udeaDaemonBudget
+    warm reload decision: median 277ms over 4 samples [269, 298, 249, 277]
+    warm validate of one script: median 260ms over 4 samples [18, 260, 368, 198]
+> Task :udea-assets-compiler:udeaGraphBudget
+    graph deserialisation: best=8.950501ms median=9.412300ms over 2000 assets (budget 15ms)
+> Task :udea-core:udeaBenchCharacterMover
+    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) median 3.862ms, budget 4.0ms
+> Task :udea-core:udeaBenchTickLoop
+    udeaBenchTickLoop: 600 ticks at 200 entities, median 6.6421ms, p95 7.243ms, budget 50.0ms
+> Task :udea-core:udeaSnapshotBudget
+    udeaSnapshotBudget: capture of 1000 entities median 73601ns, p95 144299ns, budget 1000000ns
+```
+
+Both blocks are the output of the same `grep -E "median|graph deser|phase 2 exit:|Task :udea-core:udea|Task :udea-assets-compiler:udea|Task :udea-agent-host:udeaPhase2Exit"`
+over `gh run view --job <id> --log`, with the Actions timestamp prefix stripped by
+`sed -E 's/^.*Z //'` and JUnit's `STANDARD_OUT` marker lines dropped. Each block is a consecutive,
+in-order run of that grep's output with no elisions.
+
+**Two things in there deserve to be said out loud rather than left in the table.**
+
+- `udeaBenchCharacterMover` on `windows-latest` measured **3.862ms against a 4.0ms budget — 3.5%
+  headroom.** That gate is now measured in the best conditions CI can offer and it is still nearly
+  touching the line. It is the one most likely to be the next red, and when it is, it will probably
+  still not be a regression. I did not widen it (see section 7) and I do not think it should be
+  widened; I think it should be watched, and this paragraph is so that the next person does not
+  discover the margin the hard way.
+- `warm validate` on `windows-latest` produced a 368ms sample against a 300ms budget and passed on a
+  260ms median. The median statistic is doing real work, exactly as its KDoc says.
+
+### `clean build under budget` — pre-existing, and itself an instance of this ticket's thesis
+
+| Where | Measured | Budget | Result |
+|---|---|---|---|
+| `origin/example` @ `e7159c1`, run 33448686474 | 93 544 ms | 90 000 ms | red |
+| this branch @ `9a5d8fe`, run 33450534282 | 94 984 ms | 90 000 ms | red |
+| this branch @ `0d93df3`, run 33451573256 | — | 90 000 ms | **green** |
+
+It was red before this branch existed, and it flips between red and green on the same runner class
+with no relevant code change — which is this ticket's argument, one level up, about a whole-build
+budget that already has a job to itself. **This branch cannot have moved it:**
+`./gradlew udeaAssemble --dry-run` lists **zero** `testFixtures` tasks, so the one Kotlin compilation
+this branch adds (`:udea-diagnostics:compileTestFixturesKotlin`) is not in the measured graph at all.
+The 1 440 ms between the two red numbers is runner variance.
+
+Out of scope: the issue names five tasks and none of them is this job, and it already runs in
+isolation, so option 1 has nothing left to give it. Commented on the issue as an adjacent finding.
+
+---
+
+## 5. Acceptance criterion 2 — each gate still fails when the code is genuinely slower
+
+One slowdown per gate, applied to **production** code, run alone and serially exactly as CI runs it,
+reverted with `git checkout --` afterwards. Each row's diff is the literal `git diff` from the same
+invocation that produced its number.
+
+### `:udea-core:udeaSnapshotBudget` — the capture copies each field forty times
+
+```diff
+--- a/udea-core/src/main/kotlin/dev/wildware/udea/core/snapshot/SnapshotService.kt
++++ b/udea-core/src/main/kotlin/dev/wildware/udea/core/snapshot/SnapshotService.kt
+@@ -199,8 +199,10 @@ public class SnapshotService(
+                 val type = registry.typeAt(component)
+                 if (!type.isPresent(world, entity)) continue
+                 val slot = fields.claimSlot(row, component)
+-                check(type.captureInto(world, entity, fields.storeAt(component), slot)) {
+-                    "${registry.schemaAt(component).typeName} vanished from $netId mid-capture"
++                repeat(40) {
++                    check(type.captureInto(world, entity, fields.storeAt(component), slot)) {
++                        "${registry.schemaAt(component).typeName} vanished from $netId mid-capture"
++                    }
+                 }
+             }
+         }
+```
+
+`1 565 460 ns` against the `1 000 000 ns` budget. One test failed — the timing one; the allocation
+and ring-size tests in the same class stayed green, which is what tells you the mutation slowed the
+capture rather than breaking it.
+
+**The first attempt at this row was wrong and is worth recording.** Repeating the whole visitor pass
+(`repeat(20) { netIds.forEachLive(captureVisitor) }`) reddened all three tests with
+`IllegalArgumentException: rows must be appended in ascending NetId order; NetId(#0@0) does not
+follow NetId(#999@0)` — it broke an invariant instead of taking longer, so every red figure it
+produced was about nothing. The mutation above repeats the idempotent field copy into the slot that
+was already claimed, which is the real shape of "capture got slower", and the arithmetic agrees:
+84 272 ns baseline, 771 175 ns at `repeat(20)`, predicted 1 496 000 ns at `repeat(40)`, measured
+1 565 460 ns.
+
+### `:udea-core:udeaBenchTickLoop` — the loop runs its systems sixty-four times a tick
+
+```diff
+--- a/udea-core/src/main/kotlin/dev/wildware/udea/core/loop/Simulation.kt
++++ b/udea-core/src/main/kotlin/dev/wildware/udea/core/loop/Simulation.kt
+@@ -111,7 +111,7 @@ public class WorldSimulation(
+ 
+     override fun step() {
+         barrier.drain(world, ctx)
+-        world.update(dt)
++        repeat(64) { world.update(dt) }
+         ctx.clock.advance()
+         stepCount++
+```
+
+`60.692433ms` against `50.0ms`. `6 tests completed, 1 failed` — only the timing test.
+
+`repeat(16)` was tried first and produced `19.719863ms`, which passes. That is information rather
+than a failed attempt: it says `world.update(dt)` is only about 0.90ms of the 6.16ms this gate
+measures, and the rest is the barrier, the clock and the ring capture. The prediction from those two
+points — `6.16 + 63 × 0.90 ≈ 62.9ms` — lands 3.6% from the measured 60.69ms.
+
+### `:udea-core:udeaBenchCharacterMover` — the broadphase query walks forty world units further
+
+```diff
+--- a/udea-core/src/main/kotlin/dev/wildware/udea/core/movement/StaticCollision.kt
++++ b/udea-core/src/main/kotlin/dev/wildware/udea/core/movement/StaticCollision.kt
+@@ -86,10 +86,10 @@ public class StaticCollision private constructor(
+         }
+         if (segmentCount == 0 || columns == 0 || rows == 0) return 0
+ 
+-        val firstColumn = columnOf(minX)
+-        val lastColumn = columnOf(maxX)
+-        val firstRow = rowOf(minY)
+-        val lastRow = rowOf(maxY)
++        val firstColumn = columnOf(minX - 40f)
++        val lastColumn = columnOf(maxX + 40f)
++        val firstRow = rowOf(minY - 40f)
++        val lastRow = rowOf(maxY + 40f)
+ 
+         val stamp = scratch.nextStamp()
+         var found = 0
+```
+
+`11.479492ms` against `4.0ms`. `2 tests completed, 1 failed` — the sibling test that asserts the
+benchmark's movers are actually colliding stayed green, so the physics is unchanged and only the
+work went up.
+
+Two mutations were tried and rejected before this one, and both are informative. `SUBSTEP_FRACTION`
+from `0.5f` to `0.05f` gave `2.812ms` — still passing — because `MAX_SUBSTEPS` caps the sweep at 8
+and these movers rarely reach it. Widening the query by `4f` gave `3.670ms`, also passing. So the
+mover's cost is dominated by the broadphase walk rather than by substepping, which is worth knowing
+if this gate ever does go red for real.
+
+### `:udea-assets-compiler:udeaDaemonBudget` — the daemon takes 400ms longer per script
+
+```diff
+--- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
++++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
+@@ -274,6 +274,7 @@ public class AssetDaemon(
+      * than making it better, and the warm jar cache means it costs a map lookup per unchanged file.
+      */
+     private fun compileInto(target: MutableMap<Path, List<DeclaredAsset>>, file: Path): List<UdeaDiagnostic> {
++        Thread.sleep(400)
+         val scan = scanner.scanFiles(listOf(file))
+         val result = compiler.compile(listOf(file), scan.referenceSpanIndex())
+```
+
+Warm validate `520ms` against `300ms`; warm reload `604ms` against `500ms`. Both tests failed.
+
+**A `Thread.sleep` is a blunter mutation than the others and it is here for a measured reason.** The
+realistic version — compile each script six times instead of once — was tried first and made the
+daemon *no slower at all*: validate went 128ms → 143ms and reload went 228ms → 178ms. The warm jar
+cache answers compiles two through six. That is the cache working, and it is precisely why
+`DaemonLatencyBudgetTest` asserts `report.recompiled > 0`: without that assertion the budget could be
+met by measuring cache hits. The consequence for anyone testing this gate later is that you cannot
+simulate a slower compiler by making it repeat itself, so the slowdown has to be added explicitly.
+
+### `:udea-assets-compiler:udeaGraphBudget` — the decoder makes three hundred more passes over the graph bytes
+
+```diff
+--- a/udea-assets/src/main/kotlin/dev/wildware/udea/assets/pack/BundleReader.kt
++++ b/udea-assets/src/main/kotlin/dev/wildware/udea/assets/pack/BundleReader.kt
+@@ -166,6 +166,9 @@ public object BundleReader {
+                     "no eager '${BundleFormat.GRAPH_SECTION}' section; a bundle whose graph is " +
+                         "streamed could not be opened at all",
+                 )
++            var sink = 0
++            repeat(300) { for (b in graphBytes) sink += b }
++            check(sink != Int.MIN_VALUE)
+             val decoded = GraphSection.decode(graphBytes, codecs)
+             val registry = AssetRegistry(decoded.values, contentHash, AssetGraphLog())
+             registry.bindPacked(decoded.binder)
+```
+
+`best=18.269882ms median=18.385553ms` against the unchanged `15ms` budget — every one of the nine
+samples over the line. Work proportional to the data, which is the shape of "the format costs more
+per asset". Calibrated rather than guessed: 100 passes gave `median=9.614014ms` from a `4.7ms`
+baseline, so ~4.9 ms per 100 passes, predicting `19.4ms` at 300 against `18.39ms` measured.
+
+**Three mutations were tried and rejected first, and what they ruled out is worth having.** Opening
+the bundle four times gave `6.06ms`; opening it six times, each binding the registry, gave `8.95ms`;
+decoding the graph section four times gave `5.58ms`. None is close to 4x or 6x. So the ~4.8 ms this
+gate measures is **not** dominated by `GraphSection.decode`, and repeating a whole parse of the same
+byte array within one call is answered largely by the CPU cache. If this gate ever goes red for
+real, the cost to look for is in allocation and reference binding, not in the section decoder.
+
+### `:udea-agent-host:udeaPhase2Exit` — the daemon takes 800ms longer per script
+
+```diff
+--- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
++++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
+@@ -274,6 +274,7 @@ public class AssetDaemon(
+      * than making it better, and the warm jar cache means it costs a map lookup per unchanged file.
+      */
+     private fun compileInto(target: MutableMap<Path, List<DeclaredAsset>>, file: Path): List<UdeaDiagnostic> {
++        Thread.sleep(800)
+         val scan = scanner.scanFiles(listOf(file))
+         val result = compiler.compile(listOf(file), scan.referenceSpanIndex())
+```
+
+`2 tests completed, 2 failed`. The rejection budget: `median was 812ms [1268, 812, 812]` against
+`300ms`. The apply budget failed in the same run. Same file as the row above, at twice the delay,
+because this gate measures a whole HTTP round trip and has more slack in front of the compile.
+
+### And every one of those failures carries the contention note
+
+Spliced from `udea-core/build/test-results/udeaBenchTickLoop/TEST-…xml` on the `repeat(64)` run:
+
+```
+org.opentest4j.AssertionFailedError: the assembled loop took a median of 60.692433ms against a
+50.0ms budget (p95 61.092282ms). This is the Phase 0 exit number; do not widen it. This is a
+wall-clock latency measurement, and a wall-clock measurement taken beside a parallel build measures
+the build. It is meant to be taken by the `latency-budgets` CI job, which runs `udeaLatencyBudgets`
+with `--no-parallel --max-workers=1` and has the runner to itself (issue #175). This machine has 24
+processors and its one-minute load average was 12.58 when the budget was missed. Before recording
+this as a regression, re-run it alone: `./gradlew :udea-core:udeaBenchTickLoop --rerun-tasks
+--no-parallel --max-workers=1`. Passing alone means the machine was busy and the code is no slower;
+failing alone means the code is slower, and the remedy is the one this test's KDoc names, never a
+wider budget.
+```
+
+(That block is one continuous XML `message` attribute, hard-wrapped here for width and not otherwise
+altered. The unwrapped original is in the test-results XML named above.)
+
+---
+
+## 6. The CI-wiring gate, and that it can fail
+
+`LatencyBudgetJobTest` is the failing-test-first half. Written before the workflow job existed and
+run against `origin/example`'s `ci.yml`:
+
+```
+LatencyBudgetJobTest > the measuring invocation has the runner to itself() FAILED
+LatencyBudgetJobTest > every runner the build job covers has a latency job of its own() FAILED
+```
+
+Eight mutations of the real `ci.yml`, each applied, run, and reverted:
+
+| # | Mutation | Result |
+|---|---|---|
+| 1 | the `latency-budgets` job deleted outright | **2 failed** — `the measuring invocation…`, `every runner…` |
+| 2 | `--no-parallel` dropped from the measuring step | **1 failed** — `the measuring invocation…` |
+| 3 | `--max-workers=1` dropped from the measuring step | **1 failed** — `the measuring invocation…` |
+| 4 | `windows-latest` dropped from the latency job's matrix | **1 failed** — `every runner…` |
+| 5 | `build` added to the measuring invocation | **1 failed** — `the measuring invocation…` |
+| 6 | `:udea-core:udeaBenchTickLoop` added to the `build` job's step | **1 failed** — `no other step…` |
+| 7 | **control:** the measuring step commented out rather than deleted | **2 failed** — the comment does not satisfy the gate |
+| 8 | **control:** a comment *about* the job added, job intact | **green** — the gate does not fail on prose |
+
+Rows 7 and 8 are the pair that matters. A workflow gate that greps the raw file passes row 7;
+`WorkflowJobs` drops every line whose first non-blank character is `#` before it reads anything, and
+`WorkflowJobsTest` runs that control in both directions on a fixture as well.
+
+The literal diffs for all eight, and the full transcript, are in the run I kept:
+`…/scratchpad/dev175/mutations.txt`. They are `sed`/`python` edits of `ci.yml` and every one is
+reproducible from the script beside it, `mutate.sh`.
+
+A ninth, for the caching guard added in section 8: deleting the `outputs.upToDateWhen { false }` /
+`outputs.cacheIf(...)` block from the root script gives
+`LatencyBudgetJobTest > a latency budget is never up to date and never served from the build cache() FAILED`,
+and putting it back gives `BUILD SUCCESSFUL`.
+
+---
+
+## 7. Acceptance criterion 4 — no budget number was widened
+
+Not one constant moved. `git diff origin/example` touches no line containing a budget value:
+`WARM_VALIDATE_BUDGET_MS`, `WARM_RELOAD_BUDGET_MS`, `BUDGET_APPLY_MS`, `BUDGET_REJECT_MS`,
+`BUDGET_MS`, `GraphBudgetTest.BUDGET`, `SnapshotBudgets.CAPTURE_NANOS` and `SnapshotBudgets.LOOP_NANOS`
+are byte-identical to the base.
+
+`DaemonLatencyBudgetTest`'s KDoc says the remedy is never a wider budget, and nothing here argues
+around it — the measured headroom says the numbers were never the problem. Solo and serialised on
+this box, every gate is inside its budget by a factor of 1.7x to 18.8x (the table is in
+`docs/budgets.md`). A number that a machine meets with 1.7x to 18.8x to spare, and misses when
+nineteen compilers are running, was not too tight.
+
+The one place a number *is* uncomfortable is `udeaBenchCharacterMover` on `windows-latest` at 3.862ms
+against 4.0ms, and I have deliberately left it alone and flagged it in section 4 instead.
+
+---
+
+## 8. The defect I found in my own change
+
+**Run 33451573256 was green and had measured nothing.** It was a docs-only commit, so every budget
+task had identical inputs, and both runners reported all six `FROM-CACHE` and finished the job in
+24 seconds:
+
+```
+> Task :udea-agent-host:udeaPhase2Exit FROM-CACHE
+> Task :udea-assets-compiler:udeaDaemonBudget FROM-CACHE
+> Task :udea-assets-compiler:udeaGraphBudget FROM-CACHE
+> Task :udea-core:udeaBenchCharacterMover FROM-CACHE
+> Task :udea-core:udeaBenchTickLoop FROM-CACHE
+> Task :udea-core:udeaSnapshotBudget FROM-CACHE
+> Task :udeaLatencyBudgets UP-TO-DATE
+```
+
+A `Test` task is cacheable by default and Gradle was right by its own rules. But the input to a
+stopwatch is the machine, and the machine is not in the cache key — so a cached green says "this was
+fast on some runner once". That is the same shape as a skipped test reported as a pass, which this
+repository has already closed twice (the GL tests, the atlas tests), arriving through a third door.
+
+Fixed in `3e24c52`: both switches off, configured once in the root beside the list.
+`upToDateWhen { false }` because the previous run's outputs are not an answer about this run's
+machine, and `cacheIf(…) { false }` because a task that is not up to date still consults the cache
+before executing. Proved by running the aggregate twice back to back — the second invocation
+re-executed all six with fresh numbers:
+
+```
+> Task :udea-agent-host:udeaPhase2Exit
+> Task :udea-assets-compiler:udeaDaemonBudget
+> Task :udea-assets-compiler:udeaGraphBudget
+> Task :udea-core:udeaBenchCharacterMover
+> Task :udea-core:udeaBenchTickLoop
+> Task :udea-core:udeaSnapshotBudget
+BUILD SUCCESSFUL in 22s
+51 actionable tasks: 6 executed, 45 up-to-date
+```
+
+`LatencyBudgetJobTest` gained a fourth case that goes red if either switch is removed.
+
+---
+
+## 8b. The second defect the un-caching exposed — and why it is a warm-up, not a budget
+
+Turning the cache off made run 33452620665 the first run that measured on the head SHA, and
+`latency budgets (ubuntu-latest)` went **red**:
+
+```
+> Task :udea-assets-compiler:udeaGraphBudget FAILED
+    graph deserialisation: best=15.560638ms median=16.139871ms over 2000 assets (budget 15ms)
+GraphBudgetTest > deserialising a graph larger than the example tree stays inside the budget() FAILED
+```
+
+Two runs of identical bytes on the same runner image: `median=9.124261ms` on 33450534282 and
+`median=16.139871ms` here. Not a blip — the *best* of nine samples was also over, so the whole
+window was slow. `windows-latest` in the same run measured 9.412300 ms and every other gate in the
+same job measured normally (`warm reload 273ms`, `warm validate 174ms` — within 1ms of the good
+run), so the runner was not uniformly slow. Something about this one JVM was.
+
+**It is warm-up, and the experiment says so.** `GraphBudgetTest`'s warm-up is five `open`s — five
+invocations of the measured method — where `CharacterMoverBudgetTest`'s five warm-up frames are
+sixty thousand calls to `move`. Five runs each on this box, back to back:
+
+```
+--- WARMUP=5 ---
+    graph deserialisation: best=5.204926ms median=5.609173ms over 2000 assets (budget 15ms)
+    graph deserialisation: best=5.749495ms median=6.298004ms over 2000 assets (budget 15ms)
+    graph deserialisation: best=7.041636ms median=8.469701ms over 2000 assets (budget 15ms)
+    graph deserialisation: best=5.676944ms median=6.361186ms over 2000 assets (budget 15ms)
+    graph deserialisation: best=6.420317ms median=7.696018ms over 2000 assets (budget 15ms)
+--- WARMUP=40 ---
+    graph deserialisation: best=4.711198ms median=4.842521ms over 2000 assets (budget 15ms)
+    graph deserialisation: best=4.673117ms median=4.942202ms over 2000 assets (budget 15ms)
+    graph deserialisation: best=4.642698ms median=5.030153ms over 2000 assets (budget 15ms)
+    graph deserialisation: best=4.578666ms median=4.728058ms over 2000 assets (budget 15ms)
+    graph deserialisation: best=4.635857ms median=4.794449ms over 2000 assets (budget 15ms)
+```
+
+A 1.51x run-to-run spread becomes 1.06x, and the number itself falls. `WARMUP` is now 40.
+
+**This is not a widened budget and it is not a weaker gate.** The 15 ms constant is untouched; what
+changed is that the measurement is now of a compiled decoder rather than a warming one. The gate's
+useful sensitivity goes *up*: at a ±1.5x noise band a 1.5x regression is indistinguishable from a
+quiet Tuesday, and at ±1.06x it is not.
+
+The honest cost, stated: the measured median drops from ~6–8 ms to ~4.8 ms against a fixed 15 ms
+budget, so the multiple a regression must reach before this gate trips rises from about 2x to about
+3.1x. I think that is the right trade — a gate nobody can trust gets switched off, which is the
+outcome issue #175 exists to prevent — but it is a trade and not a free win.
+
+**I checked the same thing on the gate with the tightest CI margin rather than assuming.**
+`udeaBenchCharacterMover` measured 3.862 ms against 4.0 ms on `windows-latest`, so if warm-up were
+its problem too it would be worth a lot. It is not: 5 warm-up frames give medians of 2.02, 2.06,
+2.04, 2.07, 2.18 ms and 40 give 2.22, 2.20, 2.30, 2.21, 2.21 ms. Its five frames are already sixty
+thousand `move` calls. Left alone.
+
+## 9. The defect reproduced, on this box
+
+Same tree, same machine, minutes apart. Solo and serialised, `graph deserialisation` medians
+`7.532527ms` against its 15ms budget. Run `--parallel` while another agent's full Udea build was on
+the box, at load average `17.54`:
+
+```
+    graph deserialisation: best=14.513335ms median=18.117027ms over 2000 assets (budget 15ms)
+GraphBudgetTest > deserialising a graph larger than the example tree stays inside the budget() FAILED
+> Task :udea-assets-compiler:udeaGraphBudget FAILED
+BUILD FAILED in 20s
+```
+
+2.4x, from identical bytes, decided entirely by whether anything else was running. That is the whole
+ticket in one pair of numbers.
+
+---
+
+## 10. Images
+
+**This ticket has nothing to photograph, and an invented screenshot would be worse than none.** It
+changes CI wiring, Gradle task graph membership, and the text of six assertion messages. Nothing it
+does is visible in a frame of the game: no simulation behaviour changed, no production source
+changed at all, and `moba` renders exactly what it rendered before. The evidence is the executed
+transcripts above, the mutation table, and the Actions runs.
+
+---
+
+## 11. The issue, criterion by criterion
+
+### ☑ 1. A real Actions run shows all of `udeaPhase2Exit`, `udeaDaemonBudget`, `udeaPackGate`, `udeaBenchCharacterMover` and `udeaBenchTickLoop` passing on both `ubuntu-latest` and `windows-latest`. Link it.
+
+[Run 33450534282](https://github.com/wildware-uk/Udea/actions/runs/33450534282).
+
+- `udeaPhase2Exit`, `udeaDaemonBudget`, `udeaBenchCharacterMover`, `udeaBenchTickLoop`: in the
+  `latency budgets` job on both images, **executed** (not cached, not skipped) with their measured
+  numbers printed — the two log splices in section 4.
+- `udeaPackGate`: in the `build` job, green on `build (ubuntu-latest)` and `build (windows-latest)`.
+  It keeps the reproducibility and atlas tests and stays on `check`; the 15ms deserialisation budget
+  moved out of it into `udeaGraphBudget`, which is in the latency job and green on both.
+- `udeaSnapshotBudget` and `udeaGraphBudget` are not named by the criterion but are in the same
+  family and are measured by the same job on both images.
+
+The later run for the head SHA is [33452620665](https://github.com/wildware-uk/Udea/actions/runs/33452620665).
+
+### ☑ 2. The gates still fail when the code is genuinely slower. Show a deliberate regression going red.
+
+Section 5: six gates, six slowdowns in production code, six literal diffs, six measured numbers over
+budget, each with the failing test named. Plus the two rejected mutations and the one wrong mutation,
+because a table whose rows cannot be reproduced from their own description is a table nobody can
+audit.
+
+### ☑ 3. The chosen approach is commented here with the alternatives and how to overturn it.
+
+Commented on issue #175: the option taken, the two rejected and why, where the shared contention note
+lives and what was rejected for it, and what to change to overturn each.
+
+### ☑ 4. No budget number is widened without the KDoc that forbids it being addressed explicitly.
+
+Section 7. No number moved, so the KDoc is honoured rather than argued around.
+
+---
+
+## 12. Regenerated files
+
+**None.** `udea-codegen/net-protocol.lock` and
+`udea-codegen/src/test/resources/expected-generated-hashes.txt` are untouched: this branch adds and
+removes no replicated component and changes no production source, so no id moved. `git diff --stat
+origin/example HEAD` lists neither file.
+
+---
+
+## 13. What I did not exercise
+
+- **A red `latency-budgets` job on a real runner.** Every deliberate slowdown was run on this box.
+  Pushing a knowingly-slow commit to see the CI job go red would have cost a run and told me nothing
+  the six local transcripts do not, but it is a gap and I am naming it.
+- **A second machine class.** The measured numbers are from this box and from GitHub's hosted
+  runners. Nothing says what these budgets do on a two-core runner or on macOS.
+- **The `HeadlessHostTest` race.** Observed once, not reproduced in six loaded attempts, not fixed.
+  Section 3.
+- **Whether `clean build under budget` will stay green.** It flipped twice in three runs. Not this
+  ticket's job to settle, and section 4 says so with the numbers.
+- **A concurrent `latency-budgets` job on the same physical host.** GitHub gives each job a fresh VM,
+  so `--no-parallel --max-workers=1` is exclusivity within the job and not exclusivity on the
+  hypervisor. Option 2's calibration exists for that residue and was not needed at these headrooms;
+  if a future red is traced to a noisy neighbour VM, that is when to reach for it.

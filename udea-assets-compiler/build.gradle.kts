@@ -195,7 +195,7 @@ val packGateClasses = listOf(
  * "Two clean builds produce a byte-identical `.udeapak`" is a determinism claim: it gives the
  * same answer on a busy machine as on an idle one, so it belongs on `check` where every build
  * runs it. `GraphBudgetTest` asserts a *median of nine timings* against 15ms, which on this box
- * is 7.6ms alone and 31.4ms inside a parallel build - the same decoder, twice the budget apart,
+ * is 4.8ms alone and 18.1ms inside a parallel build - the same decoder, either side of the line,
  * because the measurement is of the machine. It belongs with the other latency gates, on the
  * root's `udeaLatencyBudgets`, measured by a CI job that has the runner to itself.
  *

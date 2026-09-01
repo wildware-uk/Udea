@@ -131,7 +131,7 @@ val udeaAssemble by tasks.registering {
 // these was measured while nineteen other modules compiled on the same cores, and a wall-clock
 // measurement taken during a parallel build measures the build. The same code, on this box:
 // warm daemon reload medians 195ms alone and 646ms inside a full build; graph deserialisation
-// medians 7.6ms alone and 31.4ms inside one, against a 15ms budget. Three waves of developers
+// medians 4.8ms alone and 18.1ms inside one, against a 15ms budget. Three waves of developers
 // each rediscovered that by re-running the task solo.
 //
 // ## Why this is not "take them off `check` and forget them"

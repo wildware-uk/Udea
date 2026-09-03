@@ -177,6 +177,16 @@ public class Lwjgl3Backend private constructor(
     }
 
     /**
+     * Whether the render loop is still running, asked without waiting for anything.
+     *
+     * Internal, and here for one caller: `OffscreenBackendTest` has to be able to say "the
+     * loop stopped" as a fact rather than as a consequence of some later call throwing, or a
+     * [close] that quietly ran out its shutdown budget would leave the suite asserting only
+     * that a refusal happened and not that the thing being refused had gone.
+     */
+    internal val renderLoopRunning: Boolean get() = gl.isRunning
+
+    /**
      * Disposes the pipeline on the render thread, then stops the context.
      *
      * In that order: `dispose` releases GL objects and must happen where they were made, and

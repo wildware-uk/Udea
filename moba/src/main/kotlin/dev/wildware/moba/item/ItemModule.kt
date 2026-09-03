@@ -1,5 +1,6 @@
 package dev.wildware.moba.item
 
+import dev.wildware.moba.ability.MobaAbilityModule
 import dev.wildware.moba.lane.ChampionSystem
 import dev.wildware.udea.core.GameContextBuilder
 import dev.wildware.udea.core.module.SimPhase
@@ -9,6 +10,7 @@ import dev.wildware.udea.core.snapshot.ComponentSchema
 import dev.wildware.udea.core.snapshot.FieldKind
 import dev.wildware.udea.core.snapshot.ReplicatedComponentType
 import dev.wildware.udea.core.snapshot.fleksComponentType
+import dev.wildware.udea.gas.GasServices
 
 /**
  * The shop and the things it sells.
@@ -39,6 +41,16 @@ import dev.wildware.udea.core.snapshot.fleksComponentType
 public class ItemModule(
     /** Every item this build ships. See [ItemCatalog]. */
     public val catalog: ItemCatalog,
+    /**
+     * This game's effect table indices and tag vocabulary.
+     *
+     * The whole `MobaAbilityModule` rather than the three values off it, for the reason the
+     * catalogue is a parameter at all: an `AttributeId` and a `GameplayEffectTable` index are
+     * indices into *one* table, so a module handed them separately is four chances to build a
+     * game whose item bonuses index a different table from the one its units were dressed with.
+     * Handing in the object they all came from makes that unreachable rather than unlikely.
+     */
+    private val combat: MobaAbilityModule,
 ) : UdeaModule {
 
     override val name: String get() = "moba-item"
@@ -52,6 +64,16 @@ public class ItemModule(
      */
     public val service: ShopService = ShopService()
 
+    /**
+     * Every item's strings resolved into table positions, once, at module construction.
+     *
+     * Built here rather than inside each system so the two share one, and so an item naming a stat
+     * or a passive this game cannot apply fails while a definition is being assembled - which is
+     * before a world exists, let alone a player who paid for the bonus. See [ItemBonusTable].
+     */
+    private val bonuses: ItemBonusTable =
+        ItemBonusTable.of(catalog, combat.effects, combat.abilities.table)
+
     override fun context(builder: GameContextBuilder) {
         builder.service(ShopService.KEY, service)
     }
@@ -62,6 +84,25 @@ public class ItemModule(
             after(ChampionSystem::class)
             after(InventoryGrantSystem::class)
         }
+        // Both `after(ShopSystem)`, so a purchase made on this tick is on the champion's stats and
+        // on its ability bar on this tick rather than on the next. Both are reconcilers - they ask
+        // what the inventory says rather than what the shop did - so the edge is about latency and
+        // not about correctness: without it they would be one tick behind, and never wrong.
+        registry.add(
+            SimPhase.Gameplay,
+            { ctx ->
+                ItemPassiveSystem(
+                    bonuses = bonuses,
+                    effects = combat.effects,
+                    applier = ctx[GasServices.KEY].applier,
+                    magnitudeTag = combat.tags.dataItemStat,
+                )
+            },
+        ) { after(ShopSystem::class) }
+        registry.add(
+            SimPhase.Gameplay,
+            { ctx -> ItemActiveSystem(bonuses, ctx[GasServices.KEY].activation) },
+        ) { after(ShopSystem::class) }
     }
 
     override fun toString(): String = "ItemModule($catalog, $service)"

@@ -15,6 +15,11 @@ import dev.wildware.udea.core.identity.NetId
  */
 internal class GasFixture(
     authority: AbilityAuthority = AbilityAuthority.All,
+    /**
+     * Which slots cool down together. [CooldownSharing.None] is the default, so every test written
+     * before groups existed goes on asserting about slots that cool down alone.
+     */
+    sharing: CooldownSharing = CooldownSharing.None,
 ) {
 
     val tags: GameplayTagTable = GameplayTagTable.of(
@@ -162,7 +167,7 @@ internal class GasFixture(
     val applier: EffectApplier = EffectApplier(effectTable, handles, cues)
 
     val activation: AbilityActivation =
-        AbilityActivation(abilityTable, effectTable, execs, applier, cues, authority)
+        AbilityActivation(abilityTable, effectTable, execs, applier, cues, authority, sharing)
 
     val recompute: AttributeRecompute = AttributeRecompute(effectTable, attributeTable, handles)
 
@@ -187,6 +192,10 @@ internal class GasFixture(
 
         fun cooldownRemaining(slot: Int, now: Tick): Int =
             activation.cooldownRemaining(abilities, effects, slot, now)
+
+        /** Grants through [AbilityActivation.grant], which adopts the slot's group cooldown. */
+        fun grant(slot: Int, abilityIndex: Int, now: Tick) =
+            activation.grant(abilities, effects, slot, abilityIndex, now)
 
         /** Applies [effectIndex] to this unit, staging [magnitudes] first. */
         fun apply(

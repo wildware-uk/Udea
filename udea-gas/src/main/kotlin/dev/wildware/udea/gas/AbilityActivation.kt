@@ -23,6 +23,47 @@ public fun interface AbilityAuthority {
 }
 
 /**
+ * A set of ability slots that cool down together.
+ *
+ * A property of the **slot**, never of the [AbilityDef], and that distinction is the whole of it:
+ * one definition can be both a champion's own ability and the active an item grants — `moba`'s
+ * `item/aegis` grants `ability/priest_heal`, which is also the priest's own ability — so a group
+ * stored on the definition would put the champion's heal and the item's heal in one group and
+ * cool them down together, which is precisely the independence an item active must have.
+ *
+ * [NONE] means "this slot cools down alone", which is every slot in a game that declares no
+ * sharing.
+ */
+@JvmInline
+public value class CooldownGroup(public val index: Int) {
+    override fun toString(): String = if (index < 0) "CooldownGroup.NONE" else "CooldownGroup#$index"
+
+    public companion object {
+        /** The group that shares with nothing. */
+        public val NONE: CooldownGroup = CooldownGroup(-1)
+    }
+}
+
+/**
+ * Which ability slots share a cooldown, as a policy the game supplies once.
+ *
+ * World-level and not per-entity: a slot layout is a property of the game's ability bar, so there
+ * is nothing here for a snapshot to carry and no two entities that can disagree about it. A game
+ * wanting "the item slots share one cooldown" writes one lambda; [None] is what every other game
+ * gets, and it is the default on [AbilityActivation].
+ */
+public fun interface CooldownSharing {
+
+    /** The group [slot] cools down with, or [CooldownGroup.NONE] when it cools down alone. */
+    public fun groupOf(slot: Int): CooldownGroup
+
+    public companion object {
+        /** Every slot cools down alone. */
+        public val None: CooldownSharing = CooldownSharing { CooldownGroup.NONE }
+    }
+}
+
+/**
  * Gates activation on cooldowns, costs and blocking tags, and runs in-flight activations.
  *
  * World-free on purpose: it takes the two components and a tick, so every rule it enforces can be
@@ -47,6 +88,8 @@ public class AbilityActivation(
     private val applier: EffectApplier,
     private val cues: GasCueQueue,
     private val authority: AbilityAuthority = AbilityAuthority.All,
+    /** Which slots cool down together. See [CooldownSharing]. */
+    private val sharing: CooldownSharing = CooldownSharing.None,
 ) {
 
     /** Reused for the "which tags does this entity have right now" question. Never allocated per call. */
@@ -137,9 +180,11 @@ public class AbilityActivation(
 
         if (def.cooldownEffectIndex >= 0) {
             val ticks = effectiveCooldownTicks(def, attributes)
-            instance.cooldownHandle = applier.begin(def.cooldownEffectIndex)
+            val handle = applier.begin(def.cooldownEffectIndex)
                 .magnitude(def.cooldownTag, ticks.toFloat())
                 .applyTo(effects, attributes, now, targetId = self, source = self)
+            instance.cooldownHandle = handle
+            shareCooldown(abilities, slot, handle)
         }
 
         instance.instanceId = abilities.nextInstanceId()
@@ -182,6 +227,78 @@ public class AbilityActivation(
                 }
             }
             slot++
+        }
+    }
+
+    /**
+     * Grants [abilityIndex] into [slot], adopting whatever cooldown its group is already serving.
+     *
+     * The group-aware replacement for [Abilities.grant], which resets the instance and therefore
+     * clears its cooldown handle. Without the adoption a shared cooldown has a hole in it that a
+     * player finds in one match: with `moba`'s two item slots sharing one cooldown, firing the
+     * active in the first slot and then *buying* a second active would hand the new slot a fresh
+     * instance with [EffectHandle.INVALID] on it, so the group's cooldown would not apply to it
+     * and the second active would fire immediately.
+     *
+     * The handle is taken from the peer with the most cooldown left, so what the new slot adopts
+     * is the cooldown a player can see rather than whichever peer happened to be scanned first.
+     *
+     * ## What it does not do
+     *
+     * A group whose every slot is ungranted holds no handle, so emptying every slot in a group
+     * and granting into one again starts with no cooldown. In `moba` that is "sell both item
+     * actives and buy another one", which costs more gold than the cooldown is worth; closing it
+     * needs the group's cooldown stored somewhere other than on the slots, which is a replicated
+     * component this issue deliberately does not add.
+     */
+    public fun grant(
+        abilities: Abilities,
+        effects: GameplayEffects,
+        slot: Int,
+        abilityIndex: Int,
+        now: Tick,
+    ) {
+        abilities.grant(slot, abilityIndex)
+        val group = sharing.groupOf(slot)
+        if (group == CooldownGroup.NONE) return
+
+        var best = EffectHandle.INVALID
+        var bestRemaining = 0
+        var peer = 0
+        while (peer < abilities.slotCount) {
+            if (peer != slot && sharing.groupOf(peer) == group) {
+                val remaining = cooldownRemaining(abilities, effects, peer, now)
+                if (remaining > bestRemaining) {
+                    bestRemaining = remaining
+                    best = abilities.instanceAt(peer).cooldownHandle
+                }
+            }
+            peer++
+        }
+        if (!best.isInvalid) abilities.instanceAt(slot).cooldownHandle = best
+    }
+
+    /**
+     * Points every other slot in [slot]'s cooldown group at [handle].
+     *
+     * Every slot in the group and not only the granted ones: an ungranted slot that is later
+     * granted through [Abilities.grant] resets anyway, and one granted through [grant] reads the
+     * peers — so writing to all of them is what makes an empty item slot hold the group's cooldown
+     * for whatever is bought into it next.
+     *
+     * It can never shorten a cooldown already running, because [canActivate] refuses every member
+     * of a group while any member's handle resolves to a live application: nothing in the group
+     * can activate, so nothing in the group can overwrite.
+     */
+    private fun shareCooldown(abilities: Abilities, slot: Int, handle: EffectHandle) {
+        val group = sharing.groupOf(slot)
+        if (group == CooldownGroup.NONE) return
+        var peer = 0
+        while (peer < abilities.slotCount) {
+            if (peer != slot && sharing.groupOf(peer) == group) {
+                abilities.instanceAt(peer).cooldownHandle = handle
+            }
+            peer++
         }
     }
 

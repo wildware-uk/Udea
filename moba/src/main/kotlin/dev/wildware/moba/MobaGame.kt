@@ -169,7 +169,7 @@ public object MobaGame {
                 // for the life of one host - a reload during a match does not re-price the shop -
                 // which is the same bargain `CharacterAnimation.roster` makes, stated rather than
                 // discovered.
-                ItemModule(ItemCatalog.read(MobaAssets.registry)),
+                ItemModule(ItemCatalog.read(MobaAssets.registry), combat),
                 RenderModule(),
             ) + extraModules,
             // The registry is built over **this** module's attribute table and not a fresh

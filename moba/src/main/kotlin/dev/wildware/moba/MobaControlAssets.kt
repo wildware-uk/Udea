@@ -220,5 +220,7 @@ public object MobaControlAssets {
     public val EXPECTED_KEYS: Map<String, Int> = mapOf(
         MobaControls.ATTACK to Input.Keys.SPACE,
         MobaControls.ATTACK_2 to Input.Keys.Q,
+        MobaControls.ITEM_1 to Input.Keys.E,
+        MobaControls.ITEM_2 to Input.Keys.R,
     )
 }

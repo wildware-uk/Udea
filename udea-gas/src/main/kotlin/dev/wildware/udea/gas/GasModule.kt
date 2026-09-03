@@ -79,6 +79,13 @@ public class GasModule(
     public val execs: AbilityExecRegistry,
     /** Which entities this simulation may activate abilities on. */
     public val authority: AbilityAuthority = AbilityAuthority.All,
+    /**
+     * Which ability slots cool down together.
+     *
+     * A game with an item-active slot on its bar declares it here, and gets a cooldown that is
+     * shared across those slots and independent of the champion's own. See [CooldownSharing].
+     */
+    public val sharing: CooldownSharing = CooldownSharing.None,
     /** Cue queue capacity, for a host that expects an unusually busy or unusually idle world. */
     cueCapacity: Int = GasCueQueue.DEFAULT_CAPACITY,
 ) : UdeaModule {
@@ -107,7 +114,7 @@ public class GasModule(
 
     /** Gates and runs activations. */
     public val activation: AbilityActivation =
-        AbilityActivation(abilities, effects, execs, applier, cues, authority)
+        AbilityActivation(abilities, effects, execs, applier, cues, authority, sharing)
 
     /** The per-tick recompute. */
     public val recompute: AttributeRecompute = AttributeRecompute(effects, attributes, handles)

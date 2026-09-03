@@ -66,15 +66,23 @@ class MobaAuthoredContentTest {
         val authored = everyAsset(GameplayEffect::class.java).map { it.id.value }.sorted()
 
         assertEquals(
-            listOf(
-                MobaEffects.COOLDOWN,
-                MobaEffects.COST_MANA,
-                MobaEffects.DAMAGE,
-                MobaEffects.HEAL,
-                MobaEffects.HEAL_OVER_TIME,
-                MobaEffects.PASSIVE_HEALTH_REGEN,
-                MobaEffects.STUN,
-            ).sorted(),
+            (
+                listOf(
+                    MobaEffects.COOLDOWN,
+                    MobaEffects.COST_MANA,
+                    MobaEffects.DAMAGE,
+                    MobaEffects.DEAD,
+                    MobaEffects.HEAL,
+                    MobaEffects.HEAL_OVER_TIME,
+                    MobaEffects.PASSIVE_HEALTH_REGEN,
+                    MobaEffects.STUN,
+                ) +
+                    // The item bonuses, from the same two lists `MobaEffects.create` builds the
+                    // table out of - so an effect added to one and not authored in
+                    // `assets/item/stats.udea.kts` fails here by name.
+                    MobaEffects.ITEM_STATS.map { it.effect } +
+                    MobaEffects.ITEM_PASSIVES.map { it.effect }
+                ).sorted(),
             authored,
             "`ability/gameplay_effects.udea.kts` and `MobaEffects` disagree about which effects exist",
         )

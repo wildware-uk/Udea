@@ -5,7 +5,17 @@ import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.moba.MobaGame
 import dev.wildware.moba.MobaModule
 import dev.wildware.moba.ability.CharacterAttributes
+import dev.wildware.moba.ability.Corpse
+import dev.wildware.moba.ability.MobaTags
+import dev.wildware.moba.MobaControls
 import dev.wildware.moba.Player
+import dev.wildware.moba.PlayerControlSystem
+import dev.wildware.udea.gas.Abilities
+import dev.wildware.udea.gas.ActivationResult
+import dev.wildware.udea.gas.AttributeId
+import dev.wildware.udea.gas.Attributes
+import dev.wildware.udea.gas.GameplayEffects
+import dev.wildware.udea.gas.GasServices
 import dev.wildware.moba.Position
 import dev.wildware.moba.entry.MobaEntry
 import dev.wildware.moba.lane.Wallet
@@ -14,6 +24,9 @@ import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.CoreModule
+import dev.wildware.udea.render.input.ActionId
+import dev.wildware.udea.render.input.InjectedIntent
+import dev.wildware.udea.render.input.IntentState
 
 /**
  * A booted headless `moba`, with the champion standing in its own fountain.
@@ -42,7 +55,17 @@ internal class ShopHarness private constructor(
      * five call sites to prevent, and the one `LaneProofTest` takes the same precaution against.
      */
     val combat: CharacterAttributes,
+    /** This world's tag vocabulary, for an assertion about *which* tag blocked an activation. */
+    val tags: MobaTags,
 ) {
+
+    /** The one activation path, the applier and the tables, off the built context. */
+    val gas: GasServices = host.ctx[GasServices.KEY]
+
+    /** Where [tap] writes. Installed as this host's intent source; see [tap]. */
+    private val injected = InjectedIntent(MobaControls.BINDINGS.catalog).also {
+        host.ctx[IntentState.KEY].source = it
+    }
 
     /** Where orders go in and outcomes come out. Off the definition's own module. */
     val shop: ShopService = host.ctx[ShopService.KEY]
@@ -60,6 +83,87 @@ internal class ShopHarness private constructor(
 
     /** Its six slots and its trinket. */
     fun inventory(): Inventory = with(host.world) { champion()[Inventory] }
+
+    /** Its stats. `current` is what an item bonus moves; `base` is what damage writes. */
+    fun attributes(): Attributes = with(host.world) { champion()[Attributes] }
+
+    /** Its ability bar: two of its kind's and `UnitBlueprint.ITEM_SLOTS` for item actives. */
+    fun abilities(): Abilities = with(host.world) { champion()[Abilities] }
+
+    /** Every effect applied to it right now. */
+    fun effects(): GameplayEffects = with(host.world) { champion()[GameplayEffects] }
+
+    /** The champion's `current` value of [id]. */
+    fun stat(id: AttributeId): Float = attributes().current(id)
+
+    /** How many applications of the effect named [name] the champion is carrying. */
+    fun applied(name: String): Int {
+        val defIndex = gas.effects.indexOf(name)
+        val effects = effects()
+        var count = 0
+        for (slot in 0 until effects.count) if (effects.defIndexAt(slot) == defIndex) count++
+        return count
+    }
+
+    /** Runs [ticks] ticks. */
+    fun run(ticks: Int) {
+        host.run(ticks)
+    }
+
+    /**
+     * The ability name in [slot], or `-` when the slot holds nothing.
+     *
+     * A name and not an index, so a failure says `ability/orc_elite_spin` rather than `1`.
+     */
+    fun abilityIn(slot: Int): String {
+        val instance = abilities().instanceAt(slot)
+        return if (!instance.isGranted) "-" else gas.abilities.defAt(instance.abilityIndex).name
+    }
+
+    /** Ticks until [slot] comes off cooldown, `0` when it is ready. */
+    fun cooldown(slot: Int): Int =
+        gas.activation.cooldownRemaining(abilities(), effects(), slot, host.tick)
+
+    /** Whether [slot] would activate right now, and if not, why. Mutates nothing. */
+    fun canActivate(slot: Int): ActivationResult =
+        gas.activation.canActivate(championId(), abilities(), attributes(), effects(), slot, host.tick)
+
+    /** Activates [slot] through the one activation path this game has, and says what happened. */
+    fun activate(slot: Int): ActivationResult =
+        gas.activation.activate(championId(), abilities(), attributes(), effects(), slot, host.tick)
+
+    /**
+     * Presses [action] and runs the tick that samples it.
+     *
+     * [InjectedIntent] is what `input.tap` drives over HTTP and it is the *same* `IntentState` a
+     * keyboard writes, so `PlayerControlSystem` cannot tell one from the other. A press here is a
+     * press - which is what makes an assertion about it evidence that the **key** fires an item
+     * active, rather than evidence that an ability can be activated by calling the activation
+     * object directly.
+     */
+    fun tap(action: ActionId) {
+        injected.tap(action)
+        host.run(1)
+    }
+
+    /** The one `PlayerControlSystem` this host runs, for its counters. */
+    fun control(): PlayerControlSystem = host.world.system<PlayerControlSystem>()
+
+    /**
+     * Kills the champion where it stands and runs the tick that retires it.
+     *
+     * Writes the `health` **base**, because damage is an instant effect and instant effects write
+     * `base` - so this is the same number a killing blow would have reduced, and `DeathSystem`
+     * sees the same zero it would have seen.
+     */
+    fun kill() {
+        attributes().setBase(combat.health, 0f)
+        host.run(1)
+        check(with(host.world) { champion().getOrNull(Corpse) } != null) {
+            "the champion still has no Corpse a tick after its health was zeroed; `DeathSystem` " +
+                "is what retires it and it runs in SimPhase.Gameplay"
+        }
+    }
 
     /**
      * The catalogue entry for [id], failing loudly rather than returning null.
@@ -131,12 +235,11 @@ internal class ShopHarness private constructor(
             loadPhysicsNatives()
             val definition = MobaGame.definition()
             val catalog = definition.modules.filterIsInstance<ItemModule>().single().catalog
-            val attributes = definition.modules.filterIsInstance<MobaModule>().single()
-                .combat.attributes
+            val combat = definition.modules.filterIsInstance<MobaModule>().single().combat
             val host = GameHost(RenderMode.Headless, definition, null)
             MobaEntry.seed(host)
             host.run(WARMUP_TICKS)
-            val harness = ShopHarness(host, catalog, attributes)
+            val harness = ShopHarness(host, catalog, combat.attributes, combat.tags)
             with(host.world) {
                 val champion = harness.champion()
                 checkNotNull(champion.getOrNull(Wallet)) { "no wallet after $WARMUP_TICKS ticks" }
@@ -183,4 +286,9 @@ internal object Items {
     const val WARHAMMER = "item/warhammer"
     const val SCOUTING_TOTEM = "item/scouting_totem"
     const val WARDING_LENS = "item/warding_lens"
+    const val SENTINEL_GREAVES = "item/sentinel_greaves"
+    const val BLOODLETTER = "item/bloodletter"
+    const val ARCHMAGE_STAFF = "item/archmage_staff"
+    const val AEGIS = "item/aegis"
+    const val PHOENIX_CHARM = "item/phoenix_charm"
 }

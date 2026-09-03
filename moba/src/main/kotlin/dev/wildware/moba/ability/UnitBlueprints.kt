@@ -8,6 +8,8 @@ import dev.wildware.udea.core.blueprint.BlueprintId
 import dev.wildware.udea.gas.Abilities
 import dev.wildware.udea.gas.AttributeTable
 import dev.wildware.udea.gas.Attributes
+import dev.wildware.udea.gas.CooldownGroup
+import dev.wildware.udea.gas.CooldownSharing
 import dev.wildware.udea.gas.GameplayEffects
 
 /**
@@ -99,8 +101,11 @@ public class UnitBlueprint(
         System.arraycopy(attributes.base, 0, attributes.current, 0, attributes.base.size)
 
         val granted = Abilities(ABILITY_SLOTS)
+        // `KIND_SLOTS` and not `ABILITY_SLOTS`: the slots above it are the item bar, and a kind
+        // that declared three abilities would otherwise be granted its third into the slot
+        // `ItemActiveSystem` grants a bought active into - two writers of one slot.
         var slot = 0
-        while (slot < kind.abilities.size && slot < ABILITY_SLOTS) {
+        while (slot < kind.abilities.size && slot < KIND_SLOTS) {
             granted.grant(slot, kind.abilities[slot])
             slot++
         }
@@ -118,13 +123,75 @@ public class UnitBlueprint(
 
     public companion object {
         /**
-         * Slots every unit gets.
+         * Slots a unit's own kind may fill.
          *
-         * Two, because every character in the corpus has a basic attack and at most one special.
-         * `Abilities.DEFAULT_SLOTS` is six - a champion's four plus two item actives - and six
-         * empty slots per unit is six instances per unit that nothing will ever grant.
+         * Two, because every character in the corpus has a basic attack and at most one special,
+         * and because `PlayerControlSystem.SLOT_PRIMARY`/`SLOT_SECONDARY` are the two keys bound
+         * to them.
          */
-        public const val ABILITY_SLOTS: Int = 2
+        public const val KIND_SLOTS: Int = 2
+
+        /**
+         * How many item actives a champion may hold at once.
+         *
+         * Two, and it is a game-design number rather than a technical one: a MOBA inventory is six
+         * items and a trinket, more of which may declare an active than a player could sensibly
+         * bind. `ItemActiveSystem` fills these in inventory-slot order and grants no more.
+         */
+        public const val ITEM_SLOTS: Int = 2
+
+        /**
+         * Slots every unit gets: the kind's own, then [ITEM_SLOTS] for the actives items grant.
+         *
+         * ## Why the count is the same for a creep and for a champion
+         *
+         * [dev.wildware.udea.gas.AbilitiesReplicator] refuses to apply a captured
+         * [Abilities] of one slot count onto a component with another - it says so in as many
+         * words - so a slot count that varied by what an entity turned out to be would be a
+         * rewind that failed on the entity whose slot count had changed since the capture. One
+         * number for every unit makes that unreachable rather than unlikely.
+         *
+         * The cost is two [dev.wildware.udea.gas.AbilityInstance]s per creep that nothing will
+         * grant, which is what the two-slot version of this KDoc was avoiding when a champion had
+         * nothing to put in them. A champion does now: only a champion carries an inventory, so
+         * only a champion is granted anything into [ITEM_SLOT_FIRST] and above.
+         */
+        public const val ABILITY_SLOTS: Int = KIND_SLOTS + ITEM_SLOTS
+
+        /**
+         * The first slot an item active is granted into.
+         *
+         * Item actives sit **above** a kind's own slots so that adding one never moves the slot a
+         * key fires: `attack` is slot 0 on every unit in this game whether or not it is carrying
+         * anything.
+         */
+        public const val ITEM_SLOT_FIRST: Int = KIND_SLOTS
+
+        /**
+         * Whether [slot] is one of the item-active slots rather than one of a kind's own.
+         *
+         * A function and not a range literal at every call site, because "which slots are the item
+         * bar" is the arithmetic `PlayerControlSystem`, `ItemActiveSystem`, the HUD and
+         * [ITEM_COOLDOWN_SHARING] all have to agree on.
+         */
+        public fun isItemSlot(slot: Int): Boolean = slot in ITEM_SLOT_FIRST until ABILITY_SLOTS
+
+        /**
+         * The item bar as one shared cooldown, and every other slot on its own.
+         *
+         * This is the "shared item-cooldown slot" of issue #166 in one line: firing either item
+         * active starts a cooldown both of them wait out, and neither of a champion's own two
+         * slots is in the group, so a champion ability and an item active never cool down
+         * together. See [CooldownSharing] for why the group belongs to the slot and not to the
+         * ability definition - `item/aegis` grants `ability/priest_heal`, which is also the
+         * priest's own slot-one ability, and a group on the definition would make the two share.
+         */
+        public val ITEM_COOLDOWN_SHARING: CooldownSharing = CooldownSharing { slot ->
+            if (isItemSlot(slot)) ITEM_COOLDOWN_GROUP else CooldownGroup.NONE
+        }
+
+        /** The one group [ITEM_COOLDOWN_SHARING] hands out. */
+        private val ITEM_COOLDOWN_GROUP: CooldownGroup = CooldownGroup(0)
     }
 }
 

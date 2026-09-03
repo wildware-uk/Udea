@@ -13,16 +13,22 @@
 // on purpose: two numbers that must agree and no compiler that checks they do is exactly the
 // drift `MobaAuthoredContentTest` was written to close, one level down.
 //
-// ## `unique`, `grantedAbility` and `passive` are declared and not yet acted on
+// ## `unique`, `grantedAbility` and `passive`, and what reads each
 //
-// Issue #166 owns the systems: `ItemPassiveSystem` applying `stats` as GAS effects, unique
-// deduplication so two `unique/fortified` items grant one instance, and item actives on a shared
-// item-cooldown slot. They are authored here rather than left for that ticket because a schema
-// field that arrives later is an asset tree that has to be re-authored later - and because a
-// reference is only checked at build time if something declares it as a reference. Point
-// `grantedAbility` at an id nothing declares and this file fails to build today.
+// #132 authored these three and nothing acted on them; #166 built the systems that do.
 //
-// The abilities and the effect below are the ones this game already ships. They are placeholders
+// - `stats` is applied by `ItemPassiveSystem` as one `item/stat_*` effect per attribute, summed
+//   over everything carried. Two strength items move one number rather than stacking two effects.
+// - `passive` is the item's *named* bonus, and `unique` is what deduplicates it: two items in one
+//   unique group grant one instance of it between them, and the lowest inventory slot is the one
+//   that grants it. Their `stats` still stack - only the named passive does not, which is what the
+//   genre means by the words. An item with a `passive` and no `unique` (`item/bloodletter`,
+//   `item/archmage_staff`) grants one per copy.
+// - `grantedAbility` is an *active*: `ItemActiveSystem` grants it into a slot on the ability bar
+//   above a champion's own two, and those slots share one cooldown that a champion's own abilities
+//   are not part of. `MobaControls.ITEM_1` and `ITEM_2` are the keys that fire them.
+//
+// The abilities below are the ones this game already ships. They are placeholders
 // in the sense that a warhammer swinging the orc elite's spin is not the final design; they are
 // **not** placeholders in the sense of naming nothing - each resolves, and `UDEA0013` would
 // refuse one that named an effect where an ability belongs.
@@ -33,7 +39,7 @@ item(
     stats = mapOf("strength" to 18F),
     components = listOf(reference("item/blade"), reference("item/whetstone")),
     unique = "unique/sharpened",
-    passive = reference("ability/passive_health_regen"),
+    passive = reference("item/passive_sharpened"),
 )
 
 item(
@@ -49,9 +55,10 @@ item(
 item(
     name = "bulwark",
     cost = 1100, // cloak 300 + plate 500 + 300 to combine
-    stats = mapOf("armour" to 40F, "health" to 100F),
+    stats = mapOf("armour" to 40F, "maxHealth" to 100F),
     components = listOf(reference("item/cloak"), reference("item/plate")),
     unique = "unique/fortified",
+    passive = reference("item/passive_fortified"),
 )
 
 item(
@@ -63,30 +70,32 @@ item(
     // issue #166's `UniquePassiveTest` needs, and there has to be a pair in the tree for it to
     // have one.
     unique = "unique/fortified",
+    passive = reference("item/passive_fortified"),
 )
 
 item(
     name = "lifestone",
     cost = 650, // vial 250 + band 200 + 200 to combine
-    stats = mapOf("health" to 200F),
+    stats = mapOf("maxHealth" to 200F),
     components = listOf(reference("item/vial"), reference("item/band")),
     unique = "unique/vitality",
+    passive = reference("item/passive_vitality"),
 )
 
 item(
     name = "bloodletter",
     cost = 900, // blade 350 + vial 250 + 300 to combine
-    stats = mapOf("strength" to 12F, "health" to 100F),
+    stats = mapOf("strength" to 12F, "maxHealth" to 100F),
     components = listOf(reference("item/blade"), reference("item/vial")),
-    passive = reference("ability/passive_health_regen"),
+    passive = reference("item/passive_vigour"),
 )
 
 item(
     name = "archmage_staff",
     cost = 850, // gem 400 + whetstone 150 + 300 to combine
-    stats = mapOf("mana" to 200F, "strength" to 10F),
+    stats = mapOf("maxMana" to 200F, "strength" to 10F),
     components = listOf(reference("item/gem"), reference("item/whetstone")),
-    passive = reference("ability/passive_health_regen"),
+    passive = reference("item/passive_vigour"),
 )
 
 item(
@@ -104,17 +113,19 @@ item(
 item(
     name = "aegis",
     cost = 1700, // bulwark 1100 + vial 250 + 350 to combine
-    stats = mapOf("armour" to 55F, "health" to 250F),
+    stats = mapOf("armour" to 55F, "maxHealth" to 250F),
     components = listOf(reference("item/bulwark"), reference("item/vial")),
     unique = "unique/fortified",
+    passive = reference("item/passive_fortified"),
     grantedAbility = reference("ability/priest_heal"),
 )
 
 item(
     name = "phoenix_charm",
     cost = 1500, // lifestone 650 + gem 400 + 450 to combine
-    stats = mapOf("health" to 250F, "mana" to 150F),
+    stats = mapOf("maxHealth" to 250F, "maxMana" to 150F),
     components = listOf(reference("item/lifestone"), reference("item/gem")),
     unique = "unique/vitality",
+    passive = reference("item/passive_vitality"),
     grantedAbility = reference("ability/priest_heal"),
 )

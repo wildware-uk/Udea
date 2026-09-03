@@ -17,9 +17,19 @@
 //
 // ## The attribute names
 //
-// Short names - `health`, `strength`, `armour` - matching what `character/soldier.udea.kts`
+// Short names - `maxHealth`, `strength`, `armour` - matching what `character/soldier.udea.kts`
 // writes in its own `attributes` map. They are interned into an `AttributeId` by a running game
 // (`CharacterAttributes`), which is why the authored form is a name; see `Item`'s KDoc.
+// `MobaEffects.ITEM_STATS` is the list of names that exist, and `ItemPassiveSystem` refuses one
+// that is not on it by name rather than dropping the bonus.
+//
+// These said `health` and `mana` until issue #166 gave them something to do. They are the
+// ceilings now, and that is a correction rather than a retune: `health` is declared
+// `max = value(maxHealth)`, and `AttributeRecompute` clamps each modifier against that bound as it
+// applies it - so an infinite additive modifier on `health` is discarded in full on any unit at
+// full health, which is every champion walking out of its own fountain. A `+80 health` vial would
+// have been a stat that visibly did nothing. Raising the ceiling is also what the genre means by
+// the words.
 
 item(
     name = "blade",
@@ -48,19 +58,19 @@ item(
 item(
     name = "vial",
     cost = 250,
-    stats = mapOf("health" to 80F),
+    stats = mapOf("maxHealth" to 80F),
 )
 
 item(
     name = "band",
     cost = 200,
-    stats = mapOf("health" to 40F),
+    stats = mapOf("maxHealth" to 40F),
 )
 
 item(
     name = "gem",
     cost = 400,
-    stats = mapOf("mana" to 100F),
+    stats = mapOf("maxMana" to 100F),
 )
 
 item(

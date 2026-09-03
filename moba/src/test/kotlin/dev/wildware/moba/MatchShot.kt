@@ -2,15 +2,21 @@ package dev.wildware.moba
 
 import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.moba.ability.Combatant
+import dev.wildware.moba.ability.UnitBlueprint
 import dev.wildware.moba.entry.MobaEntry
+import dev.wildware.moba.item.ShopService
+import dev.wildware.moba.lane.Wallet
 import dev.wildware.moba.match.MatchPhase
 import dev.wildware.moba.match.MatchService
+import dev.wildware.udea.assets.AssetId
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.gas.Abilities
+import dev.wildware.udea.gas.GameplayEffects
+import dev.wildware.udea.gas.GasServices
 import dev.wildware.udea.render.capture.CaptureResult
 import dev.wildware.udea.render.input.InjectedIntent
 import dev.wildware.udea.render.input.IntentState
@@ -41,6 +47,23 @@ import kotlin.system.exitProcess
  * | `hud.png` | a human can read their own health, their cooldowns and the score |
  * | `spin.png` | the elite orc special has art of its own and it is on screen when it fires |
  * | `result.png` | a match ends and the game says who won |
+ * | `item_bar.png` | two bought items put their actives on the bar, beside the champion's own |
+ * | `item_fired.png` | firing one item active leaves the champion's own two ready |
+ *
+ * The last two are issue #166's, and they are here rather than in a harness of their own because
+ * this one already boots the shipped game with a GL context, drives it through the bound keys and
+ * writes a PNG per subject - which is the whole of what they need. The purchases go in through
+ * `ShopService`, which is the same door a bot and a test use; nothing writes an inventory slot
+ * directly.
+ *
+ * ## The shopping changes the fight, and that is stated rather than hidden
+ *
+ * The champion is handed [SHOP_GOLD] and two items at [SHOP_TICK], so the match this harness
+ * photographs is no longer the one it photographed before #166: a champion carrying
+ * `item/warhammer` and `item/aegis` swings harder and dies later. `melee`, `hud` and `spin` are
+ * still the same claims, and `result` is still a decided match - it is decided later, which is
+ * what [DEADLINE_TICKS] was raised for. Run with the purchases removed, this harness reproduces
+ * the pre-#166 trajectory tick for tick, which is how that was established rather than assumed.
  *
  * `melee.png` and `hud.png` are two moments of one claim rather than the same file twice: the HUD
  * is drawn at `RenderPhase.UI`, which is *before* the capture point on purpose, so every frame
@@ -61,11 +84,34 @@ public object MatchShot {
     /** The tick the melee is photographed on. Far enough in that the lines have met. */
     public const val MELEE_TICK: Long = 420L
 
+    /**
+     * The tick the champion goes shopping on.
+     *
+     * Early, and for a reason: `ShopSystem` refuses an order from a champion outside its own
+     * fountain, and the champion has not been knocked anywhere yet at tick 20. Late enough that
+     * `ChampionSystem`, `InventoryGrantSystem` and `RespawnSystem` have all granted what a shopper
+     * needs - the same warm-up `ShopHarness` waits out, with room to spare.
+     */
+    public const val SHOP_TICK: Long = 20L
+
+    /** How much gold the champion is given, so no picture here is about affordability. */
+    public const val SHOP_GOLD: Int = 20_000
+
     /** The tick the HUD is photographed on. Later, so a cooldown is running in a slot. */
     public const val HUD_TICK: Long = 560L
 
-    /** Give up after this many ticks. Long enough for a match to resolve on the default layout. */
-    public const val DEADLINE_TICKS: Long = 2_400L
+    /**
+     * Give up after this many ticks.
+     *
+     * Above `MatchRules.MATCH_LIMIT_TICKS`, so a match this harness photographs is decided *by the
+     * clock* if it is not decided by a wipeout first, and `result` can never be missed for want of
+     * one side being finished off in time. It was 2,400 - below the match limit - which held only
+     * for as long as the default layout happened to resolve inside it. Issue #166 gave the
+     * champion two items at [SHOP_TICK], the fight took longer than 2,400 ticks, and `result` was
+     * simply never captured: a deadline below the game's own limit is a picture that goes missing
+     * whenever a balance change makes a match last longer.
+     */
+    public const val DEADLINE_TICKS: Long = 5_700L
 
     private class Shot(
         val name: String,
@@ -88,8 +134,12 @@ public object MatchShot {
             MobaEntry.follow(rendering, player)
             val match = host.ctx[MatchService.KEY]
             val netIds = host.ctx[CoreModule.NET_IDS]
+            val shop = host.ctx[ShopService.KEY]
             var spinAskedAt = -1L
             var resultAsked = false
+            var shopped = false
+            var itemBarAsked = false
+            var itemFiredAt = -1L
             MobaEntry.Attachment(
                 frame = { delta ->
                     host.frame(delta)
@@ -107,6 +157,37 @@ public object MatchShot {
                             rendering.presentation().capture(afterTick = HUD_TICK),
                             "the HUD with a cooldown running",
                         )
+                    }
+                    // Issue #166. Buy two items with actives, photograph the bar they land on, then
+                    // fire the first with the key bound to it and photograph what that costs.
+                    if (!shopped && now >= SHOP_TICK) {
+                        shopped = true
+                        grantGold(host, netIds, player, SHOP_GOLD)
+                        shop.buy(player, AssetId(WARHAMMER))
+                        shop.buy(player, AssetId(AEGIS))
+                    }
+                    if (shopped && !itemBarAsked && itemActives(host, netIds, player) == 2) {
+                        itemBarAsked = true
+                        pending += Shot(
+                            "item_bar",
+                            rendering.presentation().capture(afterTick = now + 2),
+                            "two item actives on the bar, granted at tick " + now,
+                        )
+                    }
+                    // Fired only once the bar has been photographed empty of cooldowns, so the two
+                    // pictures are the same bar before and after rather than two arbitrary frames.
+                    if (itemFiredAt < 0 && "item_bar" in written) {
+                        if (itemCooldown(host, netIds, player) > 0) {
+                            itemFiredAt = now
+                            pending += Shot(
+                                "item_fired",
+                                rendering.presentation().capture(afterTick = now + 2),
+                                "the item bar cooling down, fired from " + MobaControls.ITEM_1 +
+                                    " at tick " + now,
+                            )
+                        } else {
+                            injected.tap(MobaControls.ITEM_1_ACTION)
+                        }
                     }
                     // The spin: press Q, then photograph the tick after the activation lands. The
                     // press is repeated until the slot reports itself active, because the ability
@@ -167,8 +248,56 @@ public object MatchShot {
         }
     }
 
-    /** The four subjects. */
-    private val SUBJECTS = listOf("melee", "hud", "spin", "result")
+    /** Every subject this harness photographs. */
+    private val SUBJECTS = listOf("melee", "hud", "spin", "result", "item_bar", "item_fired")
+
+    /** `item/warhammer`, which grants `ability/orc_elite_spin` as an active. */
+    private const val WARHAMMER = "item/warhammer"
+
+    /** `item/aegis`, which grants `ability/priest_heal`. Bought second, so it takes the second slot. */
+    private const val AEGIS = "item/aegis"
+
+    /**
+     * Fills the champion's purse.
+     *
+     * The one thing this harness writes directly, and the same licence `ShopHarness` takes for the
+     * same reason: gold is earned from last hits, and a capture that first had to farm a wave
+     * would be a photograph of `BountySystem`. The purchase itself still goes through
+     * [ShopService] and is still refused if the champion is dead or out of its fountain.
+     */
+    private fun grantGold(host: GameHost, netIds: NetIdIndex, player: NetId, gold: Int) {
+        val entity = netIds.resolveOrNull(player) ?: return
+        with(host.world) { entity.getOrNull(Wallet)?.gold = gold }
+    }
+
+    /** How many item slots hold a granted active right now. */
+    private fun itemActives(host: GameHost, netIds: NetIdIndex, player: NetId): Int {
+        val entity = netIds.resolveOrNull(player) ?: return 0
+        return with(host.world) {
+            val abilities = entity.getOrNull(Abilities) ?: return@with 0
+            var granted = 0
+            for (slot in UnitBlueprint.ITEM_SLOT_FIRST until UnitBlueprint.ABILITY_SLOTS) {
+                if (slot < abilities.slotCount && abilities.instanceAt(slot).isGranted) granted++
+            }
+            granted
+        }
+    }
+
+    /** Ticks left on the shared item cooldown, or `0`. */
+    private fun itemCooldown(host: GameHost, netIds: NetIdIndex, player: NetId): Int {
+        val entity = netIds.resolveOrNull(player) ?: return 0
+        val gas = host.ctx[GasServices.KEY]
+        return with(host.world) {
+            val abilities = entity.getOrNull(Abilities) ?: return@with 0
+            val effects = entity.getOrNull(GameplayEffects) ?: return@with 0
+            gas.activation.cooldownRemaining(
+                abilities,
+                effects,
+                UnitBlueprint.ITEM_SLOT_FIRST,
+                host.ctx.clock.tick,
+            )
+        }
+    }
 
     /** Living units, by the definition the match counts them with. */
     private fun alive(host: GameHost): Int =

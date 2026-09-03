@@ -137,6 +137,19 @@ class MobaFieldTest {
         assertEquals(listOf(Input.Keys.SPACE), attack.keys.toList(), "attack is Space")
         val second = bindings.binding(MobaControls.ATTACK_2_ACTION)
         assertEquals(listOf(Input.Keys.Q), second.keys.toList(), "attack_2 is Q")
+        // The item bar, added by issue #166. A slot with no key bound to it is an active a human
+        // cannot cast, which from the player's side of the window is the same as an active that
+        // was never granted.
+        assertEquals(
+            listOf(Input.Keys.E),
+            bindings.binding(MobaControls.ITEM_1_ACTION).keys.toList(),
+            "item_1 is E",
+        )
+        assertEquals(
+            listOf(Input.Keys.R),
+            bindings.binding(MobaControls.ITEM_2_ACTION).keys.toList(),
+            "item_2 is R",
+        )
         val move = bindings.binding(MobaControls.MOVE_AXIS)
         assertEquals(Input.Keys.A, move.negativeX, "move_left")
         assertEquals(Input.Keys.D, move.positiveX, "move_right")

@@ -44,11 +44,24 @@ val KeyW = 51
 val KeyA = 29
 val KeyS = 47
 val KeyD = 32
+val KeyE = 33
+val KeyR = 46
 val KeySpace = 62
 
 control(name = "attack")
 
 control(name = "attack_2")
+
+// The item bar. Issue #166 grants an item's active into an ability slot above a kind's own two,
+// and a slot with no key bound to it is an active a human cannot cast - which is the state
+// `attack_2` sat in until `PlayerControlSystem` was given a second slot to point it at, and the
+// reason that KDoc says a bound control nothing reads is indistinguishable from an unbound key.
+//
+// E and R, next to WASD, and not 1 and 2: the digits are what a MOBA binds the *shop* to, and
+// this game will want them.
+control(name = "item_1")
+
+control(name = "item_2")
 
 axis2D(name = "move")
 
@@ -62,6 +75,18 @@ binding(
     name = "attack_2_binding",
     control = reference("control/attack_2"),
     input = key(KeyQ),
+)
+
+binding(
+    name = "item_1_binding",
+    control = reference("control/item_1"),
+    input = key(KeyE),
+)
+
+binding(
+    name = "item_2_binding",
+    control = reference("control/item_2"),
+    input = key(KeyR),
 )
 
 axis2DBinding(

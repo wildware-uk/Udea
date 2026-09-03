@@ -22,8 +22,10 @@ import dev.wildware.udea.gas.value
  * - **`blockedBy` actually blocks.** The corpus notes that the original wrote
  *   `blockedBy = { Debuffs.Stunned }` - an expression statement in a list builder, so the list was
  *   empty and no ability was ever blocked by a stun. Every ability here is blocked by
- *   [MobaTags.STUNNED], and `AbilityActivation.tick` cancels one already running when the tag
- *   appears, which is the behaviour those assets always meant.
+ *   [MobaTags.STUNNED] and by [MobaTags.DEAD], and `AbilityActivation.tick` cancels one already
+ *   running when either tag appears, which is the behaviour those assets always meant. The
+ *   `Debuffs.Dead` half arrived with issue #166 and is described at the `blockedWhileHelpless`
+ *   declaration below.
  */
 public class MobaAbilities private constructor(
     /** Every definition. */
@@ -74,7 +76,15 @@ public class MobaAbilities private constructor(
             execs: AbilityExecRegistry,
             rules: CombatRules,
         ): MobaAbilities {
-            val blockedByStun = tags.table.setOf(tags.stunned)
+            // Stunned **and** dead. The `Debuffs.Dead` half is what closes the hole issue #166's
+            // "blocked while dead" criterion names: a corpse keeps its `Abilities`, `Attributes`
+            // and `GameplayEffects`, which is `AbilitySystem`'s whole family, so before this a key
+            // press or an `activateAbility` packet fired an ability out of a body on the floor.
+            // Every ability rather than only the item actives, because an item's active *is* one
+            // of these definitions - `item/aegis` grants `ability/priest_heal` - so there is no
+            // way to block one and not the other from here, and blocking both is the behaviour a
+            // player expects anyway.
+            val blockedWhileHelpless = tags.table.setOf(listOf(tags.stunned, tags.dead))
             val table = AbilityTable.of(
                 listOf(
                     AbilityDef(
@@ -84,7 +94,7 @@ public class MobaAbilities private constructor(
                         cooldownEffectIndex = effects.cooldown,
                         cooldownTag = tags.dataCooldown,
                         tags = tags.table.setOf(listOf(tags.hintDamage, tags.hintMelee)),
-                        blockedBy = blockedByStun,
+                        blockedBy = blockedWhileHelpless,
                     ),
                     AbilityDef(
                         name = ORC_SPIN,
@@ -93,7 +103,7 @@ public class MobaAbilities private constructor(
                         cooldownEffectIndex = effects.cooldown,
                         cooldownTag = tags.dataCooldown,
                         tags = tags.table.setOf(listOf(tags.hintAoe, tags.hintDamage, tags.hintMelee)),
-                        blockedBy = blockedByStun,
+                        blockedBy = blockedWhileHelpless,
                     ),
                     AbilityDef(
                         name = PRIEST_HEAL,
@@ -110,7 +120,7 @@ public class MobaAbilities private constructor(
                             ),
                         ),
                         tags = tags.table.setOf(listOf(tags.hintAoe, tags.hintHeal)),
-                        blockedBy = blockedByStun,
+                        blockedBy = blockedWhileHelpless,
                     ),
                     AbilityDef(
                         name = FIRE_ARROW,
@@ -119,7 +129,7 @@ public class MobaAbilities private constructor(
                         cooldownEffectIndex = effects.cooldown,
                         cooldownTag = tags.dataCooldown,
                         tags = tags.table.setOf(listOf(tags.hintRanged, tags.hintDamage)),
-                        blockedBy = blockedByStun,
+                        blockedBy = blockedWhileHelpless,
                     ),
                 ),
             )

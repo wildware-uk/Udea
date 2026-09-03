@@ -314,7 +314,7 @@ tasks.register<JavaExec>("runShot") {
 // hand-assembled `java -cp` so that the classpath it runs on is the one Gradle resolved.
 tasks.register<JavaExec>("runMatchShot") {
     group = ApplicationPlugin.APPLICATION_GROUP
-    description = "moba.matchshot: captures the melee, the HUD, the spin and the match result."
+    description = "moba.matchshot: captures the melee, the HUD, the spin, the item bar and the result."
     mainClass.set("dev.wildware.moba.MatchShot")
     classpath = sourceSets.test.get().runtimeClasspath
     systemProperty("udea.render.mode", "Offscreen")

@@ -1,6 +1,7 @@
 package dev.wildware.moba
 
 import dev.wildware.moba.ability.MobaAbilities
+import dev.wildware.moba.ability.UnitBlueprint
 import dev.wildware.moba.entry.MobaEntry
 import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.udea.core.host.GameHost
@@ -52,14 +53,45 @@ class MobaHudTest {
         )
     }
 
-    /** Both slots are named, so a player can see what they have before pressing anything. */
+    /**
+     * The kind's slots are named, so a player can see what they have before pressing anything,
+     * and the item bar is drawn empty rather than not drawn.
+     *
+     * Issue #166 put `UnitBlueprint.ITEM_SLOTS` above the two a kind fills. A champion carrying
+     * nothing has them empty, and an empty box with its key on it is how a player finds out the
+     * bar is there at all - which is the same argument the whole HUD rests on.
+     */
     @Test
-    fun `the hud names both of the player's ability slots`() {
+    fun `the hud names the player's kind slots and draws the item bar empty`() {
         val state = Fixture().sample()
 
-        assertEquals(2, state.slotCount)
+        assertEquals(UnitBlueprint.ABILITY_SLOTS, state.slotCount)
         assertEquals(MobaAbilities.MELEE, state.nameAt(PlayerControlSystem.SLOT_PRIMARY))
         assertEquals(MobaAbilities.ORC_SPIN, state.nameAt(PlayerControlSystem.SLOT_SECONDARY))
+        for (slot in UnitBlueprint.ITEM_SLOT_FIRST until UnitBlueprint.ABILITY_SLOTS) {
+            assertEquals("", state.nameAt(slot), "item slot $slot holds nothing until one is bought")
+        }
+    }
+
+    /**
+     * Every slot the HUD draws has a key printed on it.
+     *
+     * `MobaHudScreen` indexes `keyLabels` by slot, so a bar with more slots than
+     * `MobaControls.SLOT_ACTIONS` has actions is an `ArrayIndexOutOfBoundsException` in `draw` -
+     * on the frame a player first carries an item, and only in a mode that has a GL context.
+     */
+    @Test
+    fun `every ability slot has a key bound to it`() {
+        assertEquals(
+            UnitBlueprint.ABILITY_SLOTS,
+            MobaControls.SLOT_ACTIONS.size,
+            "a slot with no action is a box a player presses nothing to fire",
+        )
+        assertEquals(
+            UnitBlueprint.ABILITY_SLOTS,
+            MobaHudSystem.keyLabels().size,
+            "and the HUD prints one label per slot",
+        )
     }
 
     /**

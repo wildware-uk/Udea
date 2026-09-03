@@ -51,6 +51,18 @@ public object MobaControls {
     public const val ATTACK_2: String = "moba/attack_2"
 
     /**
+     * The first item active. E, and it fires `UnitBlueprint.ITEM_SLOT_FIRST`.
+     *
+     * An item's active is granted into a slot on the same ability bar a champion's own two sit on
+     * (issue #166), so casting one is a key press through the same `IntentSource` seam as
+     * [ATTACK] - not a second input path, and not a shop click.
+     */
+    public const val ITEM_1: String = "moba/item_1"
+
+    /** The second item active. R, and it fires the slot above [ITEM_1]. */
+    public const val ITEM_2: String = "moba/item_2"
+
+    /**
      * The bindings, read out of the packed graph once.
      *
      * An `object`'s `val` and not a function, because the [dev.wildware.udea.render.input.InputCatalog]
@@ -73,4 +85,23 @@ public object MobaControls {
     /** [ATTACK_2]'s id. */
     public val ATTACK_2_ACTION: dev.wildware.udea.render.input.ActionId =
         BINDINGS.catalog.action(ATTACK_2)
+
+    /** [ITEM_1]'s id. */
+    public val ITEM_1_ACTION: dev.wildware.udea.render.input.ActionId =
+        BINDINGS.catalog.action(ITEM_1)
+
+    /** [ITEM_2]'s id. */
+    public val ITEM_2_ACTION: dev.wildware.udea.render.input.ActionId =
+        BINDINGS.catalog.action(ITEM_2)
+
+    /**
+     * The action that fires ability [slot], in slot order.
+     *
+     * A list and not a `when`, because the HUD wants the same mapping to label a box and
+     * `PlayerControlSystem` wants it to read a press. Its length is
+     * `UnitBlueprint.ABILITY_SLOTS`, and `MobaHudTest` is what says so - a slot with no action
+     * would be a box a player presses nothing to fire.
+     */
+    public val SLOT_ACTIONS: List<dev.wildware.udea.render.input.ActionId> =
+        listOf(ATTACK_ACTION, ATTACK_2_ACTION, ITEM_1_ACTION, ITEM_2_ACTION)
 }

@@ -89,3 +89,13 @@ gameplayEffect(
     effectDuration = infinite(),
     period = 1.0F,
 )
+
+// Carried by a corpse and by nothing else. It modifies no attribute: its whole content is the
+// `Debuffs.Dead` tag, which every ability in this game names in `blockedBy`, so a dead champion
+// cannot cast through a key press, through the autopilot or through the `activateAbility` RPC.
+// `DeathTagSystem` applies it and takes it away; see `MobaTags.DEAD` for what it fixes.
+gameplayEffect(
+    name = "dead",
+    effectDuration = infinite(),
+    tags = listOf("Debuffs.Dead"),
+)

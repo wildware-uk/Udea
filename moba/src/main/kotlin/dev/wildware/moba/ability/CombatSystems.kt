@@ -366,6 +366,105 @@ public class DeathSystem(
 }
 
 /**
+ * Carries "this unit is dead" into GAS, so an ability can be blocked by it.
+ *
+ * ## The hole it closes
+ *
+ * [DeathSystem] retires a unit by taking its [Combatant] away, which drops it out of
+ * [CombatIndex], out of [AbilityAutopilotSystem] and out of every targeting family. It does not
+ * drop out of `AbilitySystem`'s, whose family is `Abilities`, `Attributes` and `GameplayEffects` -
+ * all three of which a corpse keeps. So a dead champion could still cast: `PlayerControlSystem`
+ * on a key press, and `MobaHostSession` on an `activateAbility` packet, both reach
+ * `AbilityActivation.activate` with no question asked about whether the caster is alive.
+ *
+ * A tag and not a `Corpse in entity` check at those two call sites, because there are three ways
+ * into `activate` in this game and a check written at one of them is a check the other two do not
+ * make. Every ability in [MobaAbilities] names [MobaTags.DEAD] in `blockedBy`, so the refusal is
+ * `ActivationResult.BlockedByTag` on every path at once - and `AbilityActivation.tick` cancels a
+ * cast that was already in flight when the caster fell, rather than letting it land out of a body
+ * on the floor.
+ *
+ * ## Why it reconciles rather than applying at the moment of death
+ *
+ * Applying in [DeathSystem] and removing in `RespawnSystem.revive` would be two writers of one
+ * fact in two phases of two modules, and a corpse cleared by the third path
+ * ([DeathSystem.clearOldBodies]) is a third. This asks the question the other way round - does
+ * this entity's tag agree with whether it has a [Corpse] - so it is idempotent, it has one place
+ * to be wrong, and a `time.rewind` needs nothing from it: the restored world's next tick
+ * reconciles whatever the restore left behind.
+ *
+ * `SimPhase.Cleanup`, after [DeathSystem] has retired this tick's dead, so a unit that fell on
+ * this tick is tagged on this tick rather than on the next - a one-tick window in which a key
+ * press still cast out of a corpse.
+ */
+public class DeathTagSystem(
+    /** The effect table index of `ability/dead`. See [MobaEffects.dead]. */
+    private val deadEffect: Int,
+    /** Applies it, and releases the handle when it is removed. */
+    private val applier: EffectApplier,
+) : SimSystem() {
+
+    private val bodies: Family = world.family { all(Corpse, Attributes, GameplayEffects) }
+
+    /** Disjoint from [bodies] by construction: retiring a unit removes its [Combatant]. */
+    private val living: Family = world.family { all(Combatant, Attributes, GameplayEffects) }
+
+    /** Corpses tagged since this world was built. A signal for a test, not state. */
+    public var tagged: Long = 0L
+        private set
+
+    /** Tags taken off a unit that stood back up. */
+    public var cleared: Long = 0L
+        private set
+
+    override fun onTick() {
+        val now = tick
+        var index = 0
+        val dead = bodies.entities
+        while (index < dead.size) {
+            val entity: Entity = dead[index]
+            val effects = entity[GameplayEffects]
+            if (slotOf(effects) < 0) {
+                applier.begin(deadEffect).applyTo(effects, entity[Attributes], now)
+                tagged++
+            }
+            index++
+        }
+        index = 0
+        val alive = living.entities
+        while (index < alive.size) {
+            val effects = alive[index][GameplayEffects]
+            val slot = slotOf(effects)
+            if (slot >= 0) {
+                applier.remove(effects, effects.handleAt(slot))
+                cleared++
+            }
+            index++
+        }
+    }
+
+    /**
+     * Which slot of [effects] holds the dead tag, or `-1`.
+     *
+     * A scan rather than a stored handle, and the handle is exactly what could not be stored:
+     * putting one on a component would be a field no snapshot carries, so a rewind would restore
+     * a corpse whose tag this system could no longer find and could never remove. The scan is
+     * over `GameplayEffects.count`, which is at most
+     * [dev.wildware.udea.gas.GameplayEffects.DEFAULT_CAPACITY] entries, and it allocates nothing.
+     */
+    private fun slotOf(effects: GameplayEffects): Int {
+        var slot = 0
+        while (slot < effects.count) {
+            if (effects.defIndexAt(slot) == deadEffect) return slot
+            slot++
+        }
+        return -1
+    }
+
+    override fun toString(): String = "DeathTagSystem(tagged=$tagged, cleared=$cleared)"
+}
+
+/**
  * Drives every AI unit's decision for the tick: run, heal, shoot, or swing.
  *
  * ## What changed

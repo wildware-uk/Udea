@@ -4,6 +4,7 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import com.github.quillraven.fleks.Family
 import dev.wildware.moba.ability.AbilityRpcChannel
+import dev.wildware.moba.ability.UnitBlueprint
 import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.MobaBlueprints
 import dev.wildware.udea.annotations.Net
@@ -265,6 +266,20 @@ public class PlayerControlSystem(
     public var specialsRefused: Long = 0L
         private set
 
+    /**
+     * Item actives started from the item bar. What separates "E is wired" from "a key was pressed".
+     *
+     * The same distinction [specialsRequested] draws, one slot group along: an item active is
+     * granted by `ItemActiveSystem` into a slot above a kind's own, so a press that reaches an
+     * empty item bar is a refusal rather than nothing happening.
+     */
+    public var itemActivesRequested: Long = 0L
+        private set
+
+    /** Item-bar presses that fired nothing: nothing carried, still cooling down, or dead. */
+    public var itemActivesRefused: Long = 0L
+        private set
+
     override fun onTick() {
         val router = intents
         // Read once when there is one pair of hands, so the single-player path allocates and
@@ -285,8 +300,6 @@ public class PlayerControlSystem(
             }
             val x = intent.axisX(MobaControls.MOVE_AXIS)
             val y = intent.axisY(MobaControls.MOVE_AXIS)
-            val primary = intent.isJustPressed(MobaControls.ATTACK_ACTION)
-            val secondary = intent.isJustPressed(MobaControls.ATTACK_2_ACTION)
             player.moveX = x
             player.moveY = y
             // Only on a real deflection: see `Player.facing`.
@@ -295,29 +308,34 @@ public class PlayerControlSystem(
             // from whoever this unit is targeting. A character that turns to face an enemy while
             // you walk the other way reads as the controls being ignored.
             entity.getOrNull(CharacterView)?.flipX = player.facing < 0f
-            if (!primary && !secondary) return@forEach
             val abilities = entity.getOrNull(Abilities) ?: return@forEach
             val attributes = entity.getOrNull(Attributes) ?: return@forEach
             val effects = entity.getOrNull(GameplayEffects) ?: return@forEach
-            // Both keys are read on the same tick when both went down on it. A player who mashes
+            // Every key is read on the same tick when several went down on it. A player who mashes
             // Space and Q together means both, and a rule that dropped one would be a rule they
             // have to learn by losing a fight.
-            if (primary) {
-                if (fire(self, abilities, attributes, effects, SLOT_PRIMARY, now)) {
-                    attacksRequested++
-                } else {
-                    attacksRefused++
+            //
+            // A loop over `SLOT_ACTIONS` rather than one `if` per key: the item bar added two more
+            // slots, and four copies of the same six lines differing only in a slot number is the
+            // shape a reviewer rejects - and the shape in which one copy silently keeps the wrong
+            // counter.
+            var slot = 0
+            while (slot < MobaControls.SLOT_ACTIONS.size) {
+                if (intent.isJustPressed(MobaControls.SLOT_ACTIONS[slot])) {
+                    count(slot, fire(self, abilities, attributes, effects, slot, now))
                 }
+                slot++
             }
-            if (secondary) {
-                if (fire(self, abilities, attributes, effects, SLOT_SECONDARY, now)) {
-                    attacksRequested++
-                    specialsRequested++
-                } else {
-                    attacksRefused++
-                    specialsRefused++
-                }
-            }
+        }
+    }
+
+    /** Books one press against the totals its slot belongs to. */
+    private fun count(slot: Int, fired: Boolean) {
+        if (fired) attacksRequested++ else attacksRefused++
+        when {
+            slot == SLOT_SECONDARY -> if (fired) specialsRequested++ else specialsRefused++
+            UnitBlueprint.isItemSlot(slot) ->
+                if (fired) itemActivesRequested++ else itemActivesRefused++
         }
     }
 

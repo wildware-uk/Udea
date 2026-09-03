@@ -545,6 +545,13 @@ private class HudActor(
                 else -> BACKGROUND
             }
             batch.draw(pixel, left, MARGIN, SLOT_SIZE, SLOT_SIZE)
+            // The key goes on an empty box too, and that is a change issue #166 made after
+            // looking at a capture: the item bar starts empty, so a box with nothing in it and no
+            // letter on it is a slot a player has no way to discover. Dimmed, because an empty
+            // slot is not something to press yet.
+            font.color = if (name.isEmpty()) EMPTY_TEXT else if (ready) Color.WHITE else COOLING_TEXT
+            font.draw(batch, keyLabels[slot], left + PADDING, MARGIN + SLOT_SIZE - PADDING)
+            batch.color = Color.WHITE
             if (name.isEmpty()) continue
             // The sweep: a shutter over the fraction of the cooldown still to run, shrinking
             // downward. A box that is nearly clear is a box nearly ready, which is the reading a
@@ -555,9 +562,6 @@ private class HudActor(
                 batch.color = SWEEP_COLOUR
                 batch.draw(pixel, left, MARGIN, SLOT_SIZE, SLOT_SIZE * filled)
             }
-            batch.color = Color.WHITE
-            font.color = if (ready) Color.WHITE else COOLING_TEXT
-            font.draw(batch, keyLabels[slot], left + PADDING, MARGIN + SLOT_SIZE - PADDING)
             if (!ready) {
                 text.setLength(0)
                 appendSeconds(remaining, state.tickRate)
@@ -707,6 +711,9 @@ private class HudActor(
         val EMPTY_COLOUR: Color = Color(0.10f, 0.10f, 0.10f, 0.55f)
         val SWEEP_COLOUR: Color = Color(0.02f, 0.02f, 0.04f, 0.72f)
         val COOLING_TEXT: Color = Color(0.62f, 0.62f, 0.66f, 1f)
+
+        /** The key on a slot holding nothing: legible, and clearly not something to press. */
+        val EMPTY_TEXT: Color = Color(0.45f, 0.45f, 0.48f, 1f)
         val DEATH_BACKGROUND: Color = Color(0.30f, 0.02f, 0.02f, 0.72f)
         val DEATH_COLOUR: Color = Color(1f, 0.86f, 0.86f, 1f)
         val RESULT_BACKGROUND: Color = Color(0.06f, 0.10f, 0.18f, 0.80f)
@@ -792,10 +799,8 @@ public class MobaHudSystem(
          * An action with no key bound prints `-`: a control the graph declares and binds nothing
          * to is legitimately present and unpressable, which is exactly what an empty box says.
          */
-        public fun keyLabels(): Array<String> = arrayOf(
-            labelFor(MobaControls.ATTACK_ACTION),
-            labelFor(MobaControls.ATTACK_2_ACTION),
-        )
+        public fun keyLabels(): Array<String> =
+            Array(UnitBlueprint.ABILITY_SLOTS) { labelFor(MobaControls.SLOT_ACTIONS[it]) }
 
         private fun labelFor(action: dev.wildware.udea.render.input.ActionId): String {
             val keys = MobaControls.BINDINGS.binding(action).keys

@@ -37,19 +37,18 @@ import dev.wildware.udea.gas.GasModule
  * | `Movement` | [CombatMotionSystem] | Knockbacks and arrows actually move. |
  * | `PostPhysics` | [ProjectileSystem] | Arrows hit what they have reached. |
  * | `Gameplay` | [DeathSystem] | Publishes health to `Position.hp`; removes the dead. |
+ * | `Cleanup` | [DeathTagSystem] | Puts `Debuffs.Dead` on a corpse, so an ability can be blocked by it. |
  * | `Cleanup` | `GasCueForwardSystem` | Drains GAS cues into `GameContext.cues`. |
  *
  * ## Stated plainly
  *
  * - Nothing renders a unit, plays a cue or draws a healthbar. Cues are emitted and forwarded; the
  *   presentation half of this wave is somebody else's file.
- * - `ability/passive_health_regen` is defined and **applied by nothing**. A periodic effect has to
- *   be applied at a known tick, and `Blueprint.configure` has no tick - applying it at `Tick.ZERO`
- *   would make the first recompute fire one period per elapsed second at once. It wants a
- *   spawn-time effect hook, which is a `udea-gas`/`udea-core` change rather than a game one.
- * - `armour` and `magicResist` are declared, spawned and read by no damage formula. The old game
- *   did not have one either: `UnitMeleeAttack` applied `-strength` with a `Damage.Physical` tag
- *   and nothing consumed the tag.
+ * - `magicResist` is declared, spawned and read by no damage formula, and no item raises it. The
+ *   old game did not have one either: `UnitMeleeAttack` applied `-strength` with a
+ *   `Damage.Physical` tag and nothing consumed the tag. `armour` is in the same position as a
+ *   *formula*, but it is no longer inert as a number: `moba.item.ItemPassiveSystem` moves it, so a
+ *   champion who buys `item/bulwark` can watch it change.
  */
 public class MobaAbilityModule(
     /**
@@ -119,6 +118,12 @@ public class MobaAbilityModule(
         abilities = abilities.table,
         execs = execs,
         authority = authority,
+        // The item bar cools down as one, independently of a champion's own two slots. Declared
+        // here rather than in the item module because the slot layout is a property of the
+        // ability bar this module dresses every unit with, and `GasModule` - which owns the one
+        // `AbilityActivation` in the world - is constructed here. A definition assembled without
+        // the item module still gets it, and it then applies to two slots nothing grants into.
+        sharing = UnitBlueprint.ITEM_COOLDOWN_SHARING,
     )
 
     /**
@@ -175,6 +180,10 @@ public class MobaAbilityModule(
         registry.add(SimPhase.Gameplay, { ctx ->
             DeathSystem(rules = rules, cues = gas.cues, netIds = ctx[CoreModule.NET_IDS])
         })
+        // `Cleanup`, which is after `Gameplay` absolutely rather than by a declared edge, so the
+        // unit `DeathSystem` retired on this tick carries `Debuffs.Dead` on this tick. A phase
+        // later would be a one-tick window in which a key press still cast out of a corpse.
+        registry.add(SimPhase.Cleanup, { DeathTagSystem(effects.dead, gas.applier) })
     }
 
     override fun toString(): String = "MobaAbilityModule(${units.size} unit kinds, autopilot=$autopilot)"

@@ -28,6 +28,16 @@ public class MobaTags private constructor(
     /** Blocks every ability that names it in `blockedBy`, and cancels one already running. */
     public val stunned: GameplayTag = table.tagOf(STUNNED)
 
+    /**
+     * Carried by a unit that is lying dead. See [DEAD].
+     *
+     * A tag rather than a `Corpse in entity` check at each activation site, because there are
+     * three ways into `AbilityActivation.activate` in this game - a key press, the autopilot and
+     * the `activateAbility` RPC - and a check written at one of them is a check the other two do
+     * not make.
+     */
+    public val dead: GameplayTag = table.tagOf(DEAD)
+
     /** Damage schools. Carried on an application so a resistance can read it. */
     public val physical: GameplayTag = table.tagOf(PHYSICAL)
     public val magic: GameplayTag = table.tagOf(MAGIC)
@@ -37,6 +47,16 @@ public class MobaTags private constructor(
     public val dataHeal: GameplayTag = table.tagOf(DATA_HEAL)
     public val dataDuration: GameplayTag = table.tagOf(DATA_DURATION)
     public val dataCooldown: GameplayTag = table.tagOf(DATA_COOLDOWN)
+
+    /**
+     * The magnitude `ItemPassiveSystem` stages onto an `item/stat_*` application.
+     *
+     * One tag for every one of those effects: an application carries its own magnitudes, so the
+     * strength total and the armour total staged under the same key on two different applications
+     * do not see each other. A tag per attribute would be five tags that can never be confused
+     * because they are never on one application in the first place.
+     */
+    public val dataItemStat: GameplayTag = table.tagOf(DATA_ITEM_STAT)
     public val costMana: GameplayTag = table.tagOf(COST_MANA)
 
     /** What the AI reads to decide what an ability is *for*. */
@@ -49,6 +69,18 @@ public class MobaTags private constructor(
     public companion object {
 
         public const val STUNNED: String = "Debuffs.Stunned"
+
+        /**
+         * Held by a corpse, and by nothing else.
+         *
+         * `DeathTagSystem` puts it on and takes it off, and every ability in this game names it in
+         * `blockedBy`. Before it existed a dead champion could go on casting: `DeathSystem` takes
+         * a unit's `Combatant` away, which removes it from every targeting family and from
+         * `AbilityAutopilotSystem`'s, but `AbilitySystem`'s family is `Abilities`, `Attributes`
+         * and `GameplayEffects` - all three of which a corpse keeps - so a key press or an
+         * `activateAbility` packet still fired.
+         */
+        public const val DEAD: String = "Debuffs.Dead"
         public const val PHYSICAL: String = "Damage.Physical"
         public const val MAGIC: String = "Damage.Magic"
         public const val TRUE_DAMAGE: String = "Damage.True"
@@ -58,6 +90,9 @@ public class MobaTags private constructor(
         public const val DATA_DURATION: String = "Data.Duration"
         public const val DATA_HEAL: String = "Data.Heal"
         public const val DATA_COOLDOWN: String = "Data.Cooldown"
+
+        /** @see MobaTags.dataItemStat */
+        public const val DATA_ITEM_STAT: String = "Data.ItemStat"
 
         public const val COST_MANA: String = "Cost.Mana"
         public const val COST_HEALTH: String = "Cost.Health"
@@ -79,9 +114,9 @@ public class MobaTags private constructor(
          * is a boot failure the moment that corpus is wired up.
          */
         public val NAMES: List<String> = listOf(
-            STUNNED,
+            STUNNED, DEAD,
             PHYSICAL, MAGIC, TRUE_DAMAGE,
-            DATA_DAMAGE, DATA_KNOCKBACK, DATA_DURATION, DATA_HEAL, DATA_COOLDOWN,
+            DATA_DAMAGE, DATA_KNOCKBACK, DATA_DURATION, DATA_HEAL, DATA_COOLDOWN, DATA_ITEM_STAT,
             COST_MANA, COST_HEALTH,
             HINT_HEAL, HINT_DAMAGE, HINT_AOE, HINT_MELEE, HINT_RANGED,
             HINT_TARGET_ENEMY, HINT_TARGET_FRIENDLY, FEARLESS,

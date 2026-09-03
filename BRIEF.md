@@ -1,789 +1,556 @@
-063c792
+# BRIEF-160 — the overlay's allocation-free claim, measured
 
-# BRIEF-172 — the determinism gate replays the game, not a world written not to drift
+ac4dbac
 
-`063c792` is the change: every file in this ticket's diff except this one. This brief is the commit
-on top of it and touches nothing else — `git log --oneline -2` and `git show --stat HEAD` show
-that, so the branch tip and `063c792` are the same code. (A SHA cannot name its own commit, which
-is why the top line is the code's rather than `HEAD`'s; `BRIEF-170.md` and `BRIEF-171.md` do the
-same.)
+`ac4dbac` is the change: every file in this ticket's diff except this one. This brief is the commit
+on top of it and touches nothing else, so the branch tip and `ac4dbac` are the same code. (A SHA
+cannot name its own commit, which is why the top line is the code's rather than `HEAD`'s;
+`BRIEF-170.md`, `BRIEF-171.md` and the brief this file replaced all do the same.)
 
-Branch `issue-172-replay-gate-at-moba`, off `origin/example` at `db477f4`.
-
-### Which Actions run is on which commit
-
-| run | commit | event | what it is evidence of |
-|---|---|---|---|
-| [33441678513](https://github.com/wildware-uk/Udea/actions/runs/33441678513) | `8bf85ad` | push | the **cold-cache** leg times of section 5, and nothing else |
-| [33443701286](https://github.com/wildware-uk/Udea/actions/runs/33443701286) | `933dfff` | push | criterion 1, and the warm leg times |
-| [33444043104](https://github.com/wildware-uk/Udea/actions/runs/33444043104) | `933dfff` | dispatch | criteria 1 and the nightly |
-| [33444524021](https://github.com/wildware-uk/Udea/actions/runs/33444524021) | `933dfff` | dispatch, `replay_plant_ulp_at: 1200` | criterion 2 |
-
-**Every run the acceptance criteria rest on is on `933dfff`** — the first row of the table is the
-cold-cache measurement and nothing else. The head of this branch is `063c792` plus this file, and
-the difference is two commits, neither of which can change what a leg does:
-
-- `4c86fba` is **test-only** — it adds `MobaReplayEqualityTest > the digest task tells its entry
-  point which directory the workspace is` and the comment stripper its build-script fences read
-  through.
-- `063c792` is **comment-only** — it replaces five counts ("twenty-seven AI units", "six green
-  legs", a KDoc counting a job's own lines) with the property behind them. It touches `ci.yml`,
-  `moba/build.gradle.kts`, `determinism-audit.md` and two `moba` test sources, and in every one of
-  them the change is inside a `#` or a KDoc: **no executable line moved.**
-
-So after `933dfff`: no `src/main`, no Gradle task body, no `ci.yml` step and no checked-in fixture,
-and the legs run the identical command over the identical bytes. `git diff 933dfff 063c792 --stat`
-and `git log -p 933dfff..063c792` are the check — read the second, because the first will show
-`ci.yml` and `moba/build.gradle.kts` and only the patch shows that what moved in them is prose.
-
-Run [33445413997](https://github.com/wildware-uk/Udea/actions/runs/33445413997) is on `9afecf5`,
-which is `063c792` plus an earlier draft of this file, and its three `replay-equality` legs and
-`join` are green over `moba-3600.udearep`. So criterion 1 holds on a commit whose *code* is
-identical to HEAD's, and the only thing that has moved since is the paragraph you are reading.
+Branch `issue-160-overlay-allocation-free`, off `origin/example` at `60a9471`.
+Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a5b65b93c1b5ec78c`.
 
 ---
 
 ## 1. The evidence command
 
 ```
-JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew :moba:udeaReplayEqualityProof
+JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew \
+  :udea-agent-host:test --tests 'dev.wildware.udea.agent.host.overlay.OverlayAllocationTest'
 ```
 
-Five processes. Two honest legs replay `moba-3600.udearep` in separate JVMs and their digests are
-compared cell for cell; a third leg replays the same recording with one ulp added to the champion's
-`Position.x` at t1200, and the join has to catch it and name it. The task fails unless **both**
-halves hold.
+Leaves `udea-agent-host/build/test-results/test/TEST-dev.wildware.udea.agent.host.overlay.OverlayAllocationTest.xml`.
+On `ac4dbac`: `tests=3 failures=0 skipped=0`.
 
-### It does not exist on `origin/example`
+**It goes red when an allocation is introduced on the frame path.** Section 4 has the six
+mutations, each with its literal `git diff` and the failing-test names from that run. The short
+version: the canonical red-proof is mutation **B**, which deletes `AgentOverlayModel`'s change
+gate so the panel re-formats every frame. All three tests go red under it, deterministically, in
+every ordering.
 
-```
-$ git show origin/example:moba/build.gradle.kts | grep -c "udeaReplayEqualityProof"
-0
-(0 matches means the task does not exist there)
-```
-
-So it asserts nothing about the branch point; it is entirely new surface.
-
-### It goes red when the feature is reverted
-
-Neutralising the plant — `position.x = Math.nextUp(position.x)` becomes `position.x = position.x`,
-the literal diff is M7 in section 7 below — and running the command:
-
-```
-* What went wrong:
-Execution failed for task ':moba:udeaReplayEqualityProof'.
-> a leg with a deliberately planted one-ulp divergence was NOT caught (exit 0). A gate that cannot fail proves nothing.
-  replay-equality over 2 leg(s) of 'moba-3600.udearep', 3600 tick(s) from t1
-    proof/leg-a  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-    proof/leg-planted  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-
-  replay equality holds: 3600 tick(s) of 'moba-3600.udearep' are cell-for-cell identical
-```
-
-*(spliced from `mutations/M7-evidence-command-plant-neutralised.log`, lines 206-217, one
-consecutive run)*
-
-### What it prints when it passes
-
-```
-=== a third leg carrying a planted one-ulp divergence ===
-replay-equality over 2 leg(s) of 'moba-3600.udearep', 3600 tick(s) from t1
-  proof/leg-a  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-  proof/leg-planted  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-
-replay equality FAILED at t1200 (1199 tick(s) matched first)
-  fixture moba-3600.udearep
-  A = 'proof/leg-a'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-  B = 'proof/leg-planted'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20]
-  world hash: -7461869609382314053 against 367776917239456302
-  1 differing cell(s):
-    NetId(#0@0) dev.wildware.moba.Position.x
-      A = 303.3437 (0x4397abfe)
-      B = 303.34372 (0x4397abff)
-      the preceding 5 tick(s) of this cell:
-        t1195  agreed  A = 300.34366 (0x43962bfd), B = 300.34366 (0x43962bfd)
-        t1196  agreed  A = 300.94366 (0x439678ca), B = 300.94366 (0x439678ca)
-        t1197  agreed  A = 301.54367 (0x4396c597), B = 301.54367 (0x4396c597)
-        t1198  agreed  A = 302.14368 (0x43971264), B = 302.14368 (0x43971264)
-        t1199  agreed  A = 302.74368 (0x43975f31), B = 302.74368 (0x43975f31)
-...
-moba replay-equality proof PASSED: two honest legs agree (exit 0); the planted leg fails (exit 1) naming Position.x at t1200, with five ticks of history.
-```
-
-*(elided at the marked `...` — the omitted block is the `--- reproducing this locally ---` guide,
-reproduced under criterion 2 in section 6)*
-
-`dev.wildware.moba.Position.x` is the champion's world x. That is the whole point of the ticket:
-the gate now names something in the game.
+`skipped=0` is not by itself proof the probe ran — `AllocationProbe.isSupported` returning false
+makes each test `return` early, which records as a **pass**, not a skip. The mutations are what
+prove the probe measured: a test that returns early cannot report `38400 bytes`.
 
 ---
 
 ## 2. Summary
 
-### What was wrong
+### The outcome, stated plainly
 
-#152 and #169 built a working cross-OS `replay-equality` gate — three legs, two operating systems,
-two JVM vendors, a field-level divergence report, and a `join` that produces a verdict. It replayed
-`DriftWorld`: a few hundred lines of purpose-built drifters that route their trigonometry through
-`StrictMath` because their author knew exactly which call was the trap. That world is **written to
-be deterministic**. Six green legs (three on the gate, three on the nightly) reported the health of
-their own fixture.
+**The overlay was already allocation-free. No production code changed.** The diff is two new
+test files. Issue #160's first five acceptance criteria were implemented and tested on
+`origin/example` before I started; the sixth — *"allocation-free per frame in steady state"* —
+was asserted in three shipped KDocs and measured by nothing. My deliverable is that measurement,
+plus the verification that the other five tests can actually fail.
 
-### What I did
+`git diff --stat origin/example -- udea-agent-host/src/main udea-agent/src/main` is empty.
 
-Both jobs now replay `moba`. `replay-equality` replays `moba-3600.udearep` on every push;
-`replay-equality-nightly` replays `moba-36000.udearep`. Each is a real match with the champion
-piloted by a fixed-seed `java.util.Random`, and everything else — the AI units, the lane, the
-creeps, the towers, the projectiles, the abilities, the shop, the match loop — reproduced from the
-seed. The recording carries one peer's input, which is the design `MobaReplay` already had.
+### What was claimed but unmeasured
 
-`DriftWorld` stays checked in as the gate's **self-test**. It is the only place a divergence of
-exactly one ulp on exactly one field at exactly one tick can be arranged over a world whose
-`BuildIdentity` is a function of one source file, and it is what
-`:udea-replay:udeaReplayEqualityProof` and `CrossPlatformDivergenceTest` use.
+- `AgentOverlayModel` KDoc: a frame on which nothing changed *"did no string work at all, which
+  is the property `OverlayAllocationTest` asserts"* — naming a file that **did not exist**.
+- `AgentOverlayView.drawPanel` KDoc: *"Allocation-free."*
+- `OverlayCanvas` KDoc justifies a packed `Int` colour over a colour object because an object per
+  draw *"would be presentation-thread garbage sixty times a second"*.
 
-### The shape of the change
+The nearest existing test, `AgentOverlayViewTest`'s *"a frame on which nothing changed re-formats
+nothing"*, asserts `AgentOverlayModel.refreshes` does not move. That is a real assertion and it is
+a different one: a refresh counter says the *rows* were not rebuilt and says nothing about the
+marker pass, the panel measure loop, the colour arithmetic, or the boxing of a session id — all
+of which run every frame whether the model refreshed or not.
 
-- **`ReplayDigestCli`** (new, `udea-replay/src/main`) is the whole of a leg's command line: the
-  options, the `--workspace` resolution issue #169 is about, the identity refusal, and the
-  post-condition that a stream really got written. `MobaDigestMain` and `DriftDigestMain` are each
-  about six lines naming their own fixtures, world, registry and plant. Copying the parser into
-  `moba` would have been "copy-pasted logic that differs only in a constant" (§8) and, worse, two
-  parsers that could disagree about what `--out` means — #169 with a second place to go wrong.
-- **`moba/src/test/kotlin/dev/wildware/moba/replay/`** gains `MobaFixture` (the constants and the
-  `MobaFixtureKind` set), `MobaFixtureRecorder` (the LCG pilot, the identity, the reconcile set),
-  `MobaDigestMain` (the leg entry point and `PlantedMobaWorld`), and two test classes.
-- **`moba/build.gradle.kts`** gains `udeaReplayDigest`, `udeaWriteReplayFixture` and the
-  five-process `udeaReplayEqualityProof`, modelled on `udea-replay`'s and sharing its entry points.
-- **`ci.yml`**: the three `replay-equality` legs and the three `replay-equality-nightly` legs run
-  `:moba:udeaReplayDigest`. The two `join` jobs still run `:udea-replay:udeaReplayEquals`, which
-  reads nothing but the files.
+### What I built
 
-### Decisions, and what I rejected
+`OverlayAllocationTest` (3 tests) and a module-local `AllocationProbe`, copied from the ones
+`udea-core`, `udea-agent`, `udea-gas` and `udea-render` each hold in their own `test` source set.
+I used the existing house pattern rather than inventing one; `udea-render`'s
+`RenderAllocationTest` is the direct precedent and I followed its structure, its `warmups = 200`,
+and its practice of stating the technique's blind spot.
 
-Each is also a comment on issue #172 so it is reviewable there.
+Two guards run beside every measurement, as assertions rather than comments, because "zero bytes"
+is trivially achievable by measuring frames that do nothing:
 
-1. **3600 and 36000 ticks, unchanged from the drift fixtures.**
-   ([comment](https://github.com/wildware-uk/Udea/issues/172#issuecomment-5485133081)) The issue
-   asks for a shorter tick count if `moba` blows the 240s budget. It does not: 27s, 38s and 54s
-   against `DriftWorld`'s 32s, 38s and 49s. Section 5 has the numbers, including the 302s I nearly
-   reported as a finding and why it was a cold cache rather than a cost. Rejected: halving the
-   fixture, which would have bought back a second in a leg where a second is not the problem.
-2. **I changed `ReplayBisectGuide`, which the issue's "Out of scope" bullet 2 forbids.**
-   ([comment](https://github.com/wildware-uk/Udea/issues/172#issuecomment-5485134323)) It printed
-   `./gradlew :udea-replay:udeaReplayDigest -Pudea.replay.fixture=moba-3600.udearep`, which exits
-   non-zero with `no fixture is called 'moba-3600.udearep'`. My change is what broke it, so fixing
-   it is in scope by any reading; the change is the smallest one that makes the sentence true
-   rather than a better sentence. `.udeaeq` format version 1 → 2; no such file is checked in.
-3. **The plant moved to `moba`; `DriftWorld` keeps everything else.**
-   ([comment](https://github.com/wildware-uk/Udea/issues/172#issuecomment-5485134568)) Scope says
-   `drift-3600` "is what `replay_plant_ulp_at` plants into"; acceptance criterion 2 says the plant
-   must name a **`moba`** component. Both cannot be true, and I took the criterion as authoritative.
-4. **The plant is a decorator, not a constructor parameter.** `PlantedMobaWorld` wraps
-   `MobaReplayWorld` in the test source set, so `moba/src/main` has no branch whose only purpose is
-   to corrupt a simulation. It refuses loudly when there is no champion at the plant tick, because
-   a match restart has a window with no `Player` in it and a plant that silently wrote nothing
-   would make the planted leg agree with every honest one.
-5. **The fixture machinery lives in `moba/src/test`, not `src/main` or a new `testFixtures`
-   variant.** `MatchShot`, `LaneShot` and `VfxShot` are already `JavaExec` entry points in
-   `src/test`; `ReleaseRules.CLASSPATH_RULE` is about `runtimeClasspath`, so this keeps CI
-   machinery out of the shipped jar the way this project already does it. Rejected: a
-   `java-test-fixtures` variant on `moba` for four files.
-6. **`HANDOFF.md` edited.** Its item 3 said "the gate covers the engine's world, not `moba`'s" and
-   its next-step item 2 asked for exactly this ticket. Both are false once this merges. It is the
-   lead's file, so flagging it here: two paragraphs, no other agent's subject.
+- **the measured frames drew** — `CountingCanvas` counts primitives, and the expected total is
+  *draws-per-frame × frames-actually-run*, warmups included (`AllocationProbe.invocations`).
+- **the measured frames were steady** — `AgentMarkers.refreshes` and `AgentOverlayModel.refreshes`
+  must not move across the measured region.
 
-### One thing worth knowing that is not a defect
+Three states measured, not one: busy (8 markers, 7-row panel), empty (no calls at all), and
+post-expiry (markers collected and walked, every one taking the aged-out branch). An empty fixture
+satisfies invariants a populated one does not, so it is measured rather than assumed covered.
 
-The **first** CI run on any new branch will emit the leg's `::warning::`, because a cold Gradle
-cache costs a leg ~250s where a warm one costs ~40s. That is true of every job in this workflow;
-this ticket only makes it visible, because `replay-equality` is the job that prints its own wall
-time. Section 5 has both samples. I considered raising the budget or slicing `moba`'s test source
-set out of the leg's classpath, and did neither, because with a warm cache there is nothing to fix.
+### Decisions I made
+
+**`dtSeconds = 0f` in the measured block.** The probe runs its block 220 times × 100 frames =
+22,000 frames. At a plausible 1/60s that is over an hour of overlay wall time, every marker would
+be long dead of its 4-second TTL, and the measurement would be of an empty marker pass reporting
+zero *for the wrong reason*. `0f` avoids that rather than merely detecting it. The code path is
+identical — `ages[index] += dtSeconds` and `1f - age / ttlSeconds` are the same instructions
+whatever the value — and the expired state is measured by its own test. Rejected: a shorter frame
+count (would not have fixed it, only delayed it), and re-arming markers inside the block (makes
+the block non-steady, which is the thing being measured).
+
+**Warmup count: 200 blocks**, i.e. 20,000 render calls before the first byte is counted. Not a
+number I chose — it is `RenderAllocationTest`'s, and inventing a second number for the same JVM
+and the same technique would be exactly the parallel convention I was told not to build.
+First-frame lazy work (the initial marker collect, the initial row format) happens on the
+fixture's own priming frame, *before* the probe is called, and would in any case be absorbed by
+the warmups and then by the minimum-of-20.
+
+**A frozen `AgentClock` for the narration.** `AgentNarration.version` bumps on caption expiry,
+which would re-format the panel inside the measured region. Injecting a frozen clock removes a
+wall-clock dependency from a measurement rather than leaving it to be caught by a guard as a
+confusing failure about refresh counts.
+
+**Second set of test fakes.** `OverlayFakes.kt`'s `RecordingCanvas` allocates a `Draw` per
+primitive into a growing `ArrayList` and `MapLocator` boxes a `Pair` into a `HashMap` per lookup.
+A measurement through either would be measuring the test's own garbage and attributing it to the
+overlay. `RenderAllocationTest` needed the same second set for the same reason.
+
+### The assertion I deleted, and why
+
+I wrote a fourth test comparing bytes for one marker against bytes for eight, reasoning that a
+per-marker allocation shows up as a difference. **I deleted it.** It ran late in the class,
+measured 0 against 0, and **passed under two of the three mutations the surviving assertions
+caught** — including mutation A, which is a real per-marker allocation. It was reading `0 == 0`
+as coverage. For an escaping allocation it added nothing the eight-marker zero does not already
+catch; for a non-escaping one it reported a false pass. It is a paragraph in the test's KDoc now.
+
+### The blind spot, measured rather than assumed
+
+`AllocationProbe` counts heap bytes, so an allocation C2 proves does not escape its frame is
+scalar-replaced and invisible. The honest scope is ***the overlay's frame path allocates nothing
+the JIT cannot eliminate*** — which is what matters operationally, because a scalar-replaced
+object costs no GC, and which is narrower than "no object is written anywhere on this path".
+
+That boundary was measured. Mutation A (per-marker `FloatArray(2)` pair, undoing the two reused
+scratch fields):
+
+| how it was run | result |
+|---|---|
+| `a hundred steady-state frames…` as the only test in the class | **RED**, 38400 bytes |
+| the same, with 1 marker instead of 8 | **RED**, 4800 bytes |
+| the deleted 1-vs-8 test, with the class ahead of it in the same JVM | **zero**, passed |
+
+38400 = 8 markers × 2 arrays × 24 bytes × 100 frames. 4800 = 1 × 2 × 24 × 100. 24 bytes is a
+`FloatArray(2)` under compressed oops (12-byte header + 4-byte length + 8 bytes of data). The
+arithmetic matches the effect exactly, which is what makes it a measurement rather than a story.
+
+**Ordering, and what pins it.** The observed order in Gradle's result XML — stable across every
+run I made — is: *after every marker has expired*, *a hundred steady-state frames*, *no markers
+and no calls*. JUnit 5 applies no `MethodOrderer` by default; its order is deterministic for a
+given set of methods but unspecified, and it changes when a method is added or renamed.
+**Nothing pins it, and I did not try to pin it.** That is the design point rather than a gap: all
+three surviving assertions are *absolute zeros*, and an absolute zero is order-independent for an
+escaping allocation. A comparison between two measurements is not, which is precisely how the
+deleted test failed. Pinning the order with `@TestMethodOrder` would have preserved a fragile
+assertion instead of removing it.
+
+`udea-render`'s `RenderAllocationTest` documents the same blindness, reached the same way. This is
+a property of the technique across this repository, not something specific to the overlay.
 
 ---
 
-## 3. `sh gradlew build`
+## 3. Build output
 
-Two runs. **The first failed**, on two tasks, and the box was carrying `melon-merge`'s suite at the
-time (`pgrep -f "[m]elon-merge"` returned 18 processes; load average 10-13).
+### `sh gradlew build`
 
-```
-2 tests completed, 2 failed
-
-> Task :udea-assets-compiler:udeaDaemonBudget FAILED
-
-DaemonLatencyBudgetTest > a warm validate of one edited script is under 300ms() STANDARD_OUT
-    warm validate of one script: median 405ms over 4 samples [19, 554, 405, 317]
-
-DaemonLatencyBudgetTest > a warm validate of one edited script is under 300ms() FAILED
-    org.opentest4j.AssertionFailedError at DaemonLatencyBudgetTest.kt:60
-...
-BUILD FAILED in 1m 11s
-215 actionable tasks: 81 executed, 34 from cache, 100 up-to-date
-```
-
-*(spliced from `full-build.log`; the `...` elides the second failure's block,
-`:udea-core:udeaBenchCharacterMover`, and Gradle's deprecation notice)*
-
-Both are wall-clock budgets. **Re-run alone, both pass**, which is what the brief asks for:
+No exclusions.
 
 ```
-$ JAVA_HOME=... sh gradlew :udea-assets-compiler:udeaDaemonBudget :udea-core:udeaBenchCharacterMover
-CharacterMoverBudgetTest > 200 movers replayed 60 times fit in the per-frame budget() STANDARD_OUT
-    [CharacterMoverBudgetTest] 200 movers x 60 replays (12000 move calls) median 2.049ms, budget 4.0ms
-DaemonLatencyBudgetTest > a warm reload of one script decides inside the edit-to-observe budget() STANDARD_OUT
-    warm reload decision: median 162ms over 4 samples [162, 178, 160, 137]
-    warm validate of one script: median 109ms over 4 samples [9, 106, 116, 109]
-BUILD SUCCESSFUL in 7s
+JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --console=plain
 ```
 
-162ms and 109ms against the same budgets that measured 832ms and 405ms under load; 2.049ms against
-a 4.0ms budget. That is the box, not the branch.
-
-**Second full run, on the quieter box:**
+Tail (`scratchpad/build.log`):
 
 ```
-> Task :udeaVerifyMigration
-> Task :check
-> Task :build
+> Task :moba:test
+> Task :moba:check
+> Task :moba:build
+> Task :udea-assets-compiler:check
+> Task :udea-assets-compiler:build
 
-BUILD SUCCESSFUL in 8s
-206 actionable tasks: 4 executed, 202 up-to-date
-Configuration cache entry reused.
+BUILD SUCCESSFUL in 1m 32s
+209 actionable tasks: 123 executed, 45 from cache, 41 up-to-date
 ```
 
-Across every module's JUnit XML in the tree: **2549 tests, 0 failures, 0 errors, 34 skipped**
-(the 34 are the GL tests, which skip without a `DISPLAY` — see below, where they are run for real).
+Aggregated out of every `*/build/test-results/*/*.xml` after that run:
+**2272 tests, 0 failures, 34 skipped** (`udea-core` 435, `udea-net` 255, `udea-codegen` 244,
+`moba` 216, `udea-render` 204, `udea-assets-compiler` 191, `udea-agent-host` 165, and the rest).
+The one compile warning is a pre-existing reified-type-argument warning in
+`moba/.../Box2DPhysicsWorldTest.kt:263`, untouched by this branch.
 
-### GL, run for real under xvfb
+**25 of those 34 skips are the GL tests**, which is exactly the trap and is why the run below is
+separate. That is not an inference — I watched it happen: my first xvfb run left
+`udeaAgentGlTest` at `tests=8 skipped=0`, then this `build` re-ran the same task with no `DISPLAY`
+and **overwrote the result XML with `tests=8 skipped=8`**. A green `build` says nothing whatever
+about GL here. The xvfb XMLs are therefore preserved outside the build directory, at
+`scratchpad/gl-xml/`, where the next `build` cannot overwrite them.
 
-This ticket does not touch `udea-render`, but the reviewer is told to treat an omission as a
-finding, so:
+### The xvfb GL run
+
+The ticket touches the render half of `udea-agent-host`, so the GL tests were run for real rather
+than left to skip on an empty `$DISPLAY`.
 
 ```
-JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem xvfb-run -a -s "-screen 0 1280x720x24" \
+xvfb-run -a -s "-screen 0 1280x720x24" \
   env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
-  sh gradlew udeaGlTest --rerun udeaAgentGlTest --rerun -Pudea.render.requireGl=true
+  JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem \
+  sh gradlew udeaGlTest udeaAgentGlTest -Pudea.render.requireGl=true --console=plain
 ```
 
-`--rerun` on both is load-bearing. Without it the first attempt reported
-`> Task :udea-render:udeaGlTest FROM-CACHE`, and the cached entry was from a run with **no**
-`DISPLAY`, i.e. a skip. A cached green is the same trap as a skipped green.
+Run with `--rerun-tasks` so nothing came from the cache. Tail (`scratchpad/gl.log`):
 
 ```
 > Task :udea-agent-host:udeaAgentGlTest
-> Task :udea-render:udeaGlTest
 
-BUILD SUCCESSFUL in 6s
-41 actionable tasks: 2 executed, 39 up-to-date
+BUILD SUCCESSFUL in 26s
+34 actionable tasks: 34 executed
 ```
 
-Read out of the results rather than out of the console:
+Counted out of the result XMLs rather than from the word SUCCESSFUL, because **a skip is also
+success** — that is the whole trap. Per suite, from `scratchpad/gl-xml/`:
 
 ```
-udea-render/build/test-results/udeaGlTest: 18 tests, 0 failures, 0 skipped, 4 classes
-    dev.wildware.udea.render.gl.GlCaptureDeterminismTest
-    dev.wildware.udea.render.gl.GlCaptureTest
-    dev.wildware.udea.render.gl.GlOverlayIsolationTest
-    dev.wildware.udea.render.gl.OffscreenBackendTest
-udea-agent-host/build/test-results/udeaAgentGlTest: 8 tests, 0 failures, 0 skipped, 2 classes
-    dev.wildware.udea.agent.host.gl.OffscreenRenderToolsTest
-    dev.wildware.udea.agent.host.gl.OverlayCaptureIsolationTest
+dev.wildware.udea.render.gl.GlCaptureTest               tests=5 skipped=0 failures=0
+dev.wildware.udea.render.gl.OffscreenBackendTest        tests=8 skipped=0 failures=0
+dev.wildware.udea.render.gl.GlCaptureDeterminismTest    tests=4 skipped=0 failures=0
+dev.wildware.udea.render.gl.GlOverlayIsolationTest      tests=1 skipped=0 failures=0
+dev.wildware.udea.agent.host.gl.OffscreenRenderToolsTest tests=7 skipped=0 failures=0
+dev.wildware.udea.agent.host.gl.OverlayCaptureIsolationTest tests=1 skipped=0 failures=0
+```
+
+**26 GL tests, 0 skipped, 0 failures**, on a real LWJGL3 context under llvmpipe — including
+`OverlayCaptureIsolationTest > every declared capture route is identical with the overlay on and
+off, and the window is not`, which is criterion 1.
+
+The known `OffscreenBackendTest > closing the backend stops the render thread()` flake (#178, this
+same wave, another developer) did **not** occur: that suite is 8 tests, 0 failures, in both of my
+xvfb runs.
+
+---
+
+## 4. The mutation table
+
+Every diff below is the literal `git diff` from the run that produced the named result, saved at
+the time to `scratchpad/mutations/<id>.diff` and pasted from there. Failing-test names come from
+that run's result XML. Mutations A–C are against my new test; D–F verify the five criteria that
+already existed. All were reverted; `git diff origin/example -- udea-agent-host/src/main` is empty
+on `ac4dbac`.
+
+### A — undo the marker scratch arrays (the JIT finding)
+
+Real shape: exactly what `WorldProjector.project`'s KDoc says keeps the pass allocation-free
+(*"Taking the array rather than returning a pair is what keeps the per-frame marker pass
+allocation-free"*).
+
+```diff
+@@ -178,6 +178,8 @@ public class AgentMarkers(
+             val age = ages[index]
+             if (age >= ttlSeconds) continue
+             val kind = kinds[index] ?: continue
++            val scratchWorld = FloatArray(2)
++            val scratchScreen = FloatArray(2)
+             val worldX: Float
+             val worldY: Float
+             when (kind) {
+```
+
+`a hundred steady-state frames allocate nothing at all` **FAILED**:
+
+```
+100 steady-state frames allocated 38400 bytes. ... ==> expected: <0> but was: <38400>
+```
+
+Run alone, `a frame allocates no more for eight markers than for one` (since deleted) **FAILED**
+`expected: <4800> but was: <38400>`; run after the rest of the class it **passed** with
+`one=0 eight=0`. This is the escape-analysis result in section 2.
+
+### B — remove the panel's change gate (the canonical red-proof)
+
+Real shape: the regression `AgentOverlayModel`'s entire KDoc exists to prevent — *"formatting six
+of them sixty times a second is three hundred and sixty short-lived strings a second"*. The
+strings escape into the `rowText` array, so C2 cannot eliminate them and the result is
+order-independent.
+
+```diff
+@@ -92,12 +92,6 @@ public class AgentOverlayModel(
+     public fun refreshIfStale(verbosity: OverlayVerbosity): Boolean {
+         val activityVersion = activity.version
+         val narrationVersion = narration.version
+-        if (verbosity == seenVerbosity &&
+-            activityVersion == seenActivityVersion &&
+-            narrationVersion == seenNarrationVersion
+-        ) {
+-            return false
+-        }
+         seenVerbosity = verbosity
+         seenActivityVersion = activityVersion
+         seenNarrationVersion = narrationVersion
+```
+
+**All three FAILED:**
+
+```
+a frame after every marker has expired allocates nothing()
+    walking 8 expired markers allocated 139200 bytes over 100 frames ==> expected: <0> but was: <139200>
+a hundred steady-state frames allocate nothing at all()
+    the panel was re-formatted inside the measurement, so it was not steady state ==> expected: <2> but was: <22002>
+a frame with no markers and no calls allocates nothing()
+    an idle overlay allocated 2400 bytes over 100 frames ==> expected: <0> but was: <2400>
+```
+
+Two numbers worth checking against the effect. `22002` = 22,000 frames (220 blocks × 100) + the 2
+refreshes before the measurement, which confirms `AllocationProbe.invocations` accounting is
+right and that the steady-state guard fires on the real quantity. `2400` over 100 frames is 24
+bytes/frame — the capturing lambda `rebuild` passes to `activity.forEachRecent`, which is a
+2-field object: 16-byte header + 2 × 4-byte refs.
+
+### C — an `ArrayList` on the marker draw path
+
+The shape the ticket brief specifically names as the thing a loose threshold would hide. The
+threshold here is 0, so it does not hide.
+
+```diff
+@@ -174,7 +174,9 @@ public class AgentMarkers(
+      * @param locator where an anchored entity is now. A stale generation draws nothing.
+      */
+     public fun draw(canvas: OverlayCanvas, projector: WorldProjector, locator: EntityLocator) {
+-        for (index in 0 until count) {
++        val live = ArrayList<Int>()
++        for (index in 0 until count) if (ages[index] < ttlSeconds) live.add(index)
++        for (index in live) {
+             val age = ages[index]
+             if (age >= ttlSeconds) continue
+             val kind = kinds[index] ?: continue
+```
+
+`a hundred steady-state frames allocate nothing at all` **FAILED**, `expected: <0> but was:
+<11200>`. The other two passed *in this ordering*: an `ArrayList` that does not escape is
+scalar-replaceable too, which is the section-2 finding again and the reason the steady-state
+assertion is the one to trust.
+
+> Reported honestly rather than tidied: against the earlier four-test version of the file the same
+> mutation took all three of those tests red (5600 / 11200 / 5600). Removing one test changed the
+> JIT ordering and with it which of them C2 could eliminate. The steady-state assertion went red
+> both times.
+
+### D — cache the anchor position instead of tracking (criteria 2 and 3)
+
+```diff
+@@ -184,9 +184,8 @@ public class AgentMarkers(
+                 AnchorKind.ENTITY -> {
+                     // The stale-generation case: nothing is drawn at all, rather than a ring
+                     // around whatever recycled the slot.
+-                    if (!locator.locate(netIds[index], scratchWorld)) continue
+-                    worldX = scratchWorld[0]
+-                    worldY = scratchWorld[1]
++                    worldX = xs[index]
++                    worldY = ys[index]
+                 }
+ 
+                 AnchorKind.POINT -> {
+```
+
+```
+FAILED an entity anchor draws a ring that tracks the entity as it moves()
+    expected: <100.0> but was: <0.0>
+FAILED a stale generation draws nothing rather than ringing whatever recycled the slot()
+    a marker was drawn for an entity that no longer exists: 1 ring(s)
+FAILED a write marker is drawn differently from a read marker()
+    Collection contains more than one matching element.
+```
+
+### E — clamp an off-screen marker to the edge instead of dropping it (criterion 4)
+
+```diff
+@@ -196,7 +196,10 @@ public class AgentMarkers(
+ 
+                 AnchorKind.NONE -> continue
+             }
+-            if (!projector.project(worldX, worldY, scratchScreen)) continue
++            if (!projector.project(worldX, worldY, scratchScreen)) {
++                scratchScreen[0] = 0f
++                scratchScreen[1] = 0f
++            }
+ 
+             val write = writes[index]
+             val base = OverlayPalette.forSession(AgentSessionId(sessions[index]))
+```
+
+```
+FAILED a marker off screen draws nothing rather than clamping to the window edge()
+    Expected value to be true.
+```
+
+### F — draw reads and writes identically (criterion 5)
+
+```diff
+@@ -203,11 +203,8 @@ public class AgentMarkers(
+             // Two channels at once: the fade says how long ago, and the read/write dimming says
+             // whether it changed anything. A read at full age is faint on purpose.
+             val fade = 1f - age / ttlSeconds
+-            val colour = OverlayPalette.withAlpha(
+-                base,
+-                fade * if (write) 1f else OverlayPalette.READ_ALPHA,
+-            )
+-            val thickness = if (write) WRITE_THICKNESS else READ_THICKNESS
++            val colour = OverlayPalette.withAlpha(base, fade)
++            val thickness = WRITE_THICKNESS
+             if (kind == AnchorKind.ENTITY) {
+                 canvas.ring(scratchScreen[0], scratchScreen[1], ENTITY_RADIUS, thickness, colour)
+             } else {
+```
+
+```
+FAILED a write marker is drawn differently from a read marker()
+    a write and a read are drawn with the same stroke
 ```
 
 ---
 
-## 4. The gate driven for real, over the agent tool surface
+## 5. Images
 
-Compiling is not evidence, so the running game was asked to verify the checked-in fixture itself.
-A `moba` instance under xvfb on port 7841, `/health` reporting `Offscreen`; the fixture copied into
-`moba/build/udea/recordings/`; `replay.load` and `replay.verify` called over the debug surface and
-the results read back out of `/state`:
+**This ticket produces no image, and I did not manufacture one.** An allocation count is a number.
 
-```json
-{
-  "id": 4, "ok": true,
-  "result": {
-    "loaded": "moba-3600",
-    "recording": {
-      "gameId": "moba", "gameVersion": "0.1.0", "firstTick": 1, "endTick": 3601,
-      "tickCount": 3600, "peerCount": 1, "tickRateHz": 60, "durationSeconds": 60,
-      "rootSeed": 0, "protoHash": 7151, "inputSchemaHash": 2229103034793186487,
-      "assetGraphHash": "76a6569c7001840665cf3414a01762af22e234f3ce832796993608031accef55",
-      "axes": ["moba/move"], "actions": ["moba/attack", "moba/attack_2"]
-    },
-    "position": {"tick": 1, "rebuilds": 0, "ticksRun": 0, "firstDivergentTick": -1}
-  }
-}
-{
-  "id": 3, "ok": true,
-  "result": {
-    "bitExact": true, "ticksCompared": 3600, "matchingTicks": 3600, "firstDivergentTick": -1,
-    "summary": "bit-exact: 3600 tick(s) from t1 replayed to the recorded hash stream, every tick"
-  }
-}
-```
+The one thing here that *is* visual — the markers themselves — is structurally unphotographable
+from the agent side by design: the overlay draws only in `Windowed` and only onto `ScreenTarget`,
+which `FrameCapture` never reads, so a `render.screenshot` correctly shows no markers. That
+exclusion is #162's guarantee and `OverlayCaptureIsolationTest` is what asserts it; driving a
+bridge session to photograph an overlay that is defined not to appear in a capture would produce a
+picture that proves the opposite of what it appeared to. Nothing was copied to
+`/srv/ssd1/workspace/Udea/build/debug-screenshots/`.
 
-*(the two results are shown newest-last for reading; `/state` returns them in id order, and `id: 3`
-is the `replay.verify` that ran before the `replay.info` at `id: 4`. Neither block is elided.)*
-
-So the shipped agent surface can load and verify the exact bytes the CI legs replay. The `replay`
-toolset this instance publishes is `replay.info`, `replay.load`, `replay.rewind`, `replay.seek`,
-`replay.step`, `replay.verify` — read off the instance with `list_toolsets` rather than assumed,
-because `/tools` is generated and has moved before.
-
-**What the tool surface cannot do, stated rather than worked around:** it cannot *render* the
-replay. `MobaReplayHost.worlds` builds a fresh headless world for the replay session, so
-`render.screenshot` captures the live host and not the replayed one. The images in section 8 are
-the live game stepped tick by tick, not a rendering of the fixture, and they are labelled that way.
-
----
-
-## 5. The 240s budget, measured — and the finding I retracted
-
-The issue asks for the leg wall time in the job summary against #152's 240s budget. The step that
-prints it is unchanged, so it is there on every run, green or red.
-
-**The first run on this branch said the windows leg took 302s and I nearly reported that as a
-finding.** It was the first run on a *new* branch, so `gradle/actions/setup-gradle` had no cache
-entry for the ref and every leg rebuilt the world from nothing. The next push says 54s.
-
-| leg | drift, [33438832167](https://github.com/wildware-uk/Udea/actions/runs/33438832167) | moba, [33441678513](https://github.com/wildware-uk/Udea/actions/runs/33441678513) (**cold**) | moba, [33443701286](https://github.com/wildware-uk/Udea/actions/runs/33443701286) (warm) |
-|---|---|---|---|
-| ubuntu-latest / temurin | 32s | 212s | **27s** |
-| ubuntu-latest / corretto | 38s | 195s | **38s** |
-| windows-latest / temurin | 49s | 302s | **54s** |
-| *replay itself, ubuntu/temurin* | *394ms* | *1964ms* | *2038ms* |
-| *replay itself, windows* | *449ms* | *2462ms* | *2644ms* |
-| *digest bytes, ubuntu/temurin* | *1,626,969* | *2,326,517* | *2,326,517* |
-
-Run 33438832167 is `example` at the branch point, replaying `drift-3600.udearep`; both others are
-this branch replaying `moba-3600.udearep`. Nothing but the cache differs between the two `moba`
-columns — same fixture, same tick count, same matrix.
-
-**So replaying the game costs about what replaying the fixture world cost**: 27/38/54 against
-32/38/49. The replay itself is genuinely ~1.5s slower per leg and that disappears into a leg whose
-wall time is checkout, JDK setup and a Gradle build. **The 240s budget is not threatened.**
-
-What *is* true, and narrower than what I first wrote: **the first CI run on any new branch will
-emit the `::warning::`**, because a cold cache costs ~250s a leg. A reader who sees it should look
-at the second run before acting on it. I have withdrawn the three mitigations I proposed on the
-issue for a problem that turned out not to exist; the correction and both wrong versions are left
-visible [there](https://github.com/wildware-uk/Udea/issues/172#issuecomment-5485133081).
-
-### `--workspace` resolves to the repository root, executed rather than asserted
-
-Issue #169's defect, for the third `udeaReplayDigest` in this tree. The workflow's exact `--out`
-string, run by hand from the worktree root:
-
-```
-$ sh gradlew :moba:udeaReplayDigest -Pudea.replay.label=ubuntu-latest/temurin-17 \
-    -Pudea.replay.out=digests/ubuntu-latest-temurin.udeaeq
-ubuntu-latest/temurin-17: replayed 3600 tick(s) in 1717ms into ubuntu-latest-temurin.udeaeq
-  2326516 bytes at /srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8b9947d3dbda0c54/digests/ubuntu-latest-temurin.udeaeq
-
-$ ls -la digests/
--rw-rw-r--  1 shaun users 2326516 Aug 31 21:58 ubuntu-latest-temurin.udeaeq
-$ git rev-parse --show-toplevel
-/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8b9947d3dbda0c54
-$ ls moba/digests
-ls: cannot access 'moba/digests': No such file or directory
-```
-
-The repository root, which is what `actions/checkout` makes `$GITHUB_WORKSPACE` and what
-`actions/upload-artifact` globs — **not** `moba/digests/`, which is where a `JavaExec` with no
-`--workspace` would have put it. `MobaReplayEqualityTest > the digest task tells its entry point
-which directory the workspace is` is the fence, and mutations M9 and M10 are it going red.
+The executed transcripts in sections 3 and 4 stand in their place, and every one is spliced from a
+file still on disk under
+`/tmp/claude-1000/-srv-ssd1-workspace-Udea/184f8e9c-009e-46cb-9cba-389394ecf6fb/scratchpad/`
+(`gl.log`, `mutations/*.diff`, `mutations/*.log`) or from a Gradle result XML in the worktree.
 
 ---
 
 ## 6. The issue, criterion by criterion
 
-### ☑ 1. A real Actions run shows all three `replay-equality` legs and the `join` green, replaying a `moba` fixture
-
-**Run [33443701286](https://github.com/wildware-uk/Udea/actions/runs/33443701286)** (push,
-`4c86fba`'s parent `933dfff`) and **run
-[33444043104](https://github.com/wildware-uk/Udea/actions/runs/33444043104)** (dispatch, same code)
-both show it. From the second's `replay-equality (join)` log:
-
-```
-replay equality holds: 3600 tick(s) of 'moba-3600.udearep' are cell-for-cell identical
-  A = 'ubuntu-latest/corretto-17'  [Linux amd64; Amazon.com Inc. OpenJDK 64-Bit Server VM 17.0.20.1]
-  B = 'ubuntu-latest/temurin-17'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20.1]
-  B = 'windows-latest/temurin-17'  [Windows Server 2025 amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20.1]
-```
-
-*(the three `A =`/`B =` lines are the distinct leg identities the join printed across its two
-pairwise comparisons, collected with `sort -u`; they are not four consecutive lines of the log. The
-`holds:` line is verbatim.)*
-
-Three legs green, two operating systems, two JVM vendors, and the fixture named in the verdict is
-`moba-3600.udearep`.
-
-### ☑ 2. `replay_plant_ulp_at` on the `moba` fixture makes the join report a divergence naming a real `moba` component and field
-
-**Run [33444524021](https://github.com/wildware-uk/Udea/actions/runs/33444524021)**, a
-`workflow_dispatch` with `replay_plant_ulp_at: 1200`. `replay-equality (join)` is **red**, and the
-three legs are green — which is the shape it has to have: a leg that fails to produce a digest is a
-different failure from two legs that disagree. From that job's log, one consecutive block:
-
-```
-replay equality FAILED at t1200 (1199 tick(s) matched first)
-  fixture moba-3600.udearep
-  A = 'ubuntu-latest/corretto-17'  [Linux amd64; Amazon.com Inc. OpenJDK 64-Bit Server VM 17.0.20.1]
-  B = 'windows-latest/temurin-17'  [Windows Server 2025 amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20.1]
-  world hash: 367776917239456302 against -7461869609382314053
-  1 differing cell(s):
-    NetId(#0@0) dev.wildware.moba.Position.x
-      A = 303.34372 (0x4397abff)
-      B = 303.3437 (0x4397abfe)
-      the preceding 5 tick(s) of this cell:
-        t1195  agreed  A = 300.34366 (0x43962bfd), B = 300.34366 (0x43962bfd)
-        t1196  agreed  A = 300.94366 (0x439678ca), B = 300.94366 (0x439678ca)
-        t1197  agreed  A = 301.54367 (0x4396c597), B = 301.54367 (0x4396c597)
-        t1198  agreed  A = 302.14368 (0x43971264), B = 302.14368 (0x43971264)
-        t1199  agreed  A = 302.74368 (0x43975f31), B = 302.74368 (0x43975f31)
-```
-
-`dev.wildware.moba.Position.x` — a real `moba` component and a real field, at the tick the input
-named, with the five preceding ticks agreeing.
-
-Two things in that block are worth reading rather than skimming. `A` is `ubuntu-latest/corretto`,
-which is the one leg the matrix marks `plant: true`; the join printed the *same* divergence against
-the ubuntu-temurin leg as against the windows one, so the two honest legs agreed with each other on
-Windows and Linux (`0x4397abfe` both) while the planted one is one ulp away (`0x4397abff`). And the
-report says `1 differing cell(s)` — one ulp on one field of one entity showed up as exactly one
-cell, on the tick it was planted.
-
-Locally, the same claim through `:moba:udeaReplayEqualityProof` (section 1) and through
-`MobaReplayEqualityTest > a planted one-ulp divergence is caught and names a real moba component
-and field`, which asserts `componentName == "dev.wildware.moba.Position"`, `fieldName == "x"`,
-`result.tick == MobaFixture.PLANT_TICK`, exactly one differing cell, and five agreeing history
-entries. Mutation M2 in section 7 is it going red.
-
-The reproduce block the join prints under a red gate, from the local proof's `planted.txt`:
-
-```
---- reproducing this locally ---
-Both halves of the gate, in five processes on one machine:
-  ./gradlew :moba:udeaReplayEqualityProof
-This leg on its own, against the same recording:
-  ./gradlew :moba:udeaReplayDigest -Pudea.replay.fixture=moba-3600.udearep -Pudea.replay.label=mine
-The divergence is at t1200, so walk into it. There is no single bisect tool: the surface is the 5 calls below, and issue #149 is where the loop is described.
-  replay.load    {"name": "moba-3600.udearep"}
-  replay.verify  {}
-  replay.seek    {"tick": 1199}
-  replay.step    {"ticks": 1}
-  replay.rewind  {"ticks": 1}
-Read the world between the last two with `world.*`; they are a loop, and the recording is bit-exact in both directions.
-```
-
-It says `:moba:` because of decision 2. Before that change it said `:udea-replay:`, and that command
-exits non-zero.
-
-### ☑ 3. The measured wall time of the `moba` leg is in the job summary, against the 240s budget
-
-The `Report this leg's wall time` step is unchanged: it appends `| <os> / <dist>-17 | <n>s |` to
-`$GITHUB_STEP_SUMMARY` on every run, green or red, and emits `::warning::` past 240s. Section 5 has
-the numbers and the finding.
-
-### ☑ 4. The regeneration command is documented where the next person will look
-
-Four places, in the order somebody meets them:
-
-1. **The failure message.** `ReplayFixtures.requireCurrent` prints
-   `./gradlew :moba:test -Dupdate.replay.fixtures=true` when a fixture goes stale, and
-   `MobaReplayFixturesCurrentTest` is what fires it. Mutation M4 in section 7 is that message
-   arriving.
-2. **`determinism-audit.md` §0**, new: what each job replays, where the bytes are, all three
-   regeneration commands, and why review of the diff is possible at all (the LCG).
-   `determinism-audit.md` is the document whose §1 already says the cross-OS job is the *only*
-   thing that catches float differences across JVMs, so it is where a reader is already going.
-3. **`HANDOFF.md` item 3**, rewritten, with the two commands.
-4. **The KDoc** on `MobaFixtureRecorder`, `MobaFixturesMain` and `:moba:udeaWriteReplayFixture`.
-
-### ☑ Scope: `drift-3600` stays beside the `moba` fixtures, not replaced
-
-`udea-replay/src/testFixtures/resources/fixtures/drift-3600.udearep` and `drift-36000.udearep` are
-untouched, and `:udea-replay:udeaReplayDigest`, `:udea-replay:udeaWriteReplayFixture` and
-`:udea-replay:udeaReplayEqualityProof` all still exist and still replay them.
-`CrossPlatformDivergenceTest` is untouched.
-
-### ☑ Scope: the digest folds `moba`'s components
-
-`ReplayDigestRecorder` takes the registry as an argument and `MobaDigestMain` hands it
-`MobaReplay.REGISTRY` — the same registry *object* `MobaReplayWorld`'s `SnapshotService` was built
-over, which matters because `WorldFieldStore.diffInto` compares registries by identity. No registry
-work was needed: `MobaReplay.REGISTRY` already existed for `MobaReplayProofTest`. The divergence
-report in section 1 naming `dev.wildware.moba.Position.x` is the folding working.
-
-### ☑ Scope correction: the nightly is pointed at `moba` too
-
-`replay-equality-nightly` runs `:moba:udeaReplayDigest -Pudea.replay.fixture=moba-36000.udearep`.
-It did **not** turn out too large or too slow to check in: the recording is 586,987 bytes and the
-digest 19,533,419, against 665,794 and 16,466,747 for `drift-36000`. Numbers and the artefact
-arithmetic are in section 5 and in `ci.yml`'s own comment.
-
-**Run [33444043104](https://github.com/wildware-uk/Udea/actions/runs/33444043104)** shows all
-three nightly legs and `replay-equality-nightly (join)` green over the long fixture:
-
-```
-replay equality holds: 36000 tick(s) of 'moba-36000.udearep' are cell-for-cell identical
-  A = 'nightly/ubuntu-latest/corretto-17'  [Linux amd64; Amazon.com Inc. OpenJDK 64-Bit Server VM 17.0.20.1]
-  B = 'nightly/ubuntu-latest/temurin-17'  [Linux amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20.1]
-  B = 'nightly/windows-latest/temurin-17'  [Windows Server 2025 amd64; Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.20.1]
-```
-
-*(same collection caveat as criterion 1: the `holds:` line is verbatim and the three leg identities
-are `sort -u` over the join's two comparisons.)*
-
-**That is the result this ticket exists to make possible**, and as far as I can tell it is the first
-time this repository has established it: ten minutes of a real `moba` match — every replicated
-field of every unit, plus the RNG state and the id allocator, on each of 36,000 ticks — is bit-exact
-across Windows Server 2025 and Linux, and across Amazon Corretto and Eclipse Adoptium. Nightly leg
-wall times were 90s (windows), 156s and 166s (ubuntu), and the replay itself 13.7-15.4s.
-
-### ☑ Scope: the fixture is regenerable by a documented command, not by hand
-
-`MobaReplayEqualityTest > the checked-in gate fixture is regenerable, input for input` rebuilds the
-3600-tick recording from `MobaFixtureRecorder` and compares the input stream sample for sample
-against the checked-in file, and asserts that more than a quarter of the ticks carry input at all
-so that a recording of an idle champion could not pass. Mutation M3 is it going red.
-
----
-
-## 7. Mutations: every fence, watched failing
-
-Each row is the literal `git diff` of the mutation and the test names that went red, taken from the
-run rather than retyped. Failing names are parsed out of the JUnit XML rather than by grepping for
-`FAILED`, which also matches `BUILD FAILED`. Full diffs and logs are under
-`mutations/` in the scratch directory named in section 9.
-
-| # | mutation | what went red |
-|---|---|---|
-| M1 | `ci.yml`: `- ./gradlew :moba:udeaReplayDigest` / `+ ./gradlew :udea-replay:udeaReplayDigest` on the gate leg | `ReplayEqualityProofTest > the legs run the game's digest task and not this module's` — *the 'replay-equality' job no longer replays the game* |
-| M2 | `MobaDigestMain.kt`: `- position.x = Math.nextUp(position.x)` / `+ position.x = position.x` | `MobaReplayEqualityTest > a planted one-ulp divergence is caught and names a real moba component and field` — *a planted one-ulp divergence was not caught at all* |
-| M3 | `MobaFixture.kt`: `- PILOT_SEED: Long = 0x0BA_5EED_172L` / `+ 0x0BA_5EED_173L` | `MobaReplayEqualityTest > the checked-in gate fixture is regenerable, input for input` — *the pilot diverges at t1: the file holds InputSample(moba/move=(1.0, -1.0)) and a rebuild produces InputSample(moba/move=(-1.0, -1.0))* |
-| M4 | `MobaFixture.kt`: `- NIGHTLY_TICKS: Int = 36_000` / `+ 30_000` | `MobaReplayEqualityTest > the gate replays the short recording and the nightly the long one` (*expected: 30000 but was: 36000*) **and** `MobaReplayFixturesCurrentTest > every checked-in moba replay fixture can be replayed by this build` (*1 replay fixture(s) cannot be replayed by this build*) |
-| M5 | `ReplayBisectGuide.kt`: `- append(gradleProject).append(":udeaReplayDigest")` / `+ append(":udea-replay:udeaReplayDigest")`, both lines | `ReplayBisectGuideTest > the reproduction command names the project that owns the fixture` |
-| M6 | `ci.yml`: `- -Pudea.replay.fixture=moba-36000.udearep` / `+ drift-36000.udearep` on the nightly | `MobaReplayEqualityTest > every fixture the workflow names is one this game has` — *no fixture is called 'drift-36000.udearep'; this world has moba-3600.udearep, moba-36000.udearep* |
-| M7 | M2's diff, against the **evidence command** rather than the test suite | `:moba:udeaReplayEqualityProof` fails — transcript in section 1 |
-| M8 | `moba/build.gradle.kts`: `- val replayPlantTick = "1200"` / `+ "1500"` | `MobaReplayEqualityTest > the proof task plants at the tick this game declares` |
-| M9 | `moba/build.gradle.kts`: the two lines `- add("--workspace")` / `- add(workspace)` deleted from `udeaReplayDigest` | `MobaReplayEqualityTest > the digest task tells its entry point which directory the workspace is` — *it must pass --workspace exactly once; the build script has 0 ==> expected: <1> but was: <0>* |
-| M10 | the same two lines **commented out** rather than deleted (`+ // add("--workspace")`) | the same test, the same message — which is the point: the fence reads a comment-stripped copy, so a switched-off line does not count as a live one |
-
-M9 and M10 are a pair on purpose. M9 proves the assertion fires; M10 proves the *helper under it*
-does, on the real file — Kotlin block comments nest, and one stray slash-star in a KDoc has already
-switched off every task registered below it in `udea-replay/build.gradle.kts` once, silently.
-
-M4 is worth reading twice: moving the *pilot seed* (M3) does **not** fail
-`MobaReplayFixturesCurrentTest`, because a `BuildIdentity` does not cover the pilot — only the
-length and the four identity fields. The two fences cover different things, and each has a mutation
-that only it catches.
-
-### Controls run, not assumed
-
-- **`MobaReplayEqualityTest > a comment naming a fixture is not a job running one`** — the fence
-  over `ci.yml` reads a comment-stripped copy, because the workflow's *prose* names
-  `moba-36000.udearep` while explaining the nightly. The test runs the known negative (a
-  commented-out `-Pudea.replay.fixture=not-a-fixture-at-all.udearep`) and checks it does not count,
-  and asserts the real file really does carry that prose line — so the stripper is being exercised
-  rather than agreed with by accident.
-- **`MobaReplayEqualityTest > two honest legs of the gate fixture agree cell for cell`** — the
-  control for the planted test. A comparison that reported a divergence between two identical runs
-  would make the planted one prove nothing.
-- **`ReplayBisectGuideTest > the reproduction command names the project that owns the fixture`**
-  asserts both directions (`:moba` for a `moba` fixture, `:udea-replay` for a drift one), so it is
-  not a fence that only knows one answer.
-- **`MobaReplayEqualityTest > the build script fence reads what the compiler reads, not what is
-  switched off`** — the control for the comment stripper the two build-script fences read through,
-  in both directions and against the **real** file: it asserts that a KDoc line survives a raw read
-  of `moba/build.gradle.kts` and does not survive the strip, so the fences cannot be passing
-  because they are reading prose. M10 is the same claim from the failing side.
-- **`ReplayEqualityPathsTest > a stream with bytes in it passes and reports its size`** (existing)
-  is the positive case for the post-condition.
-- **The evidence command's task graph** was checked against `origin/example` (section 1): it does
-  not exist there, so it cannot be passing for an uninteresting reason.
-
----
-
-## 8. Images
-
-All in `/srv/ssd1/workspace/Udea/build/debug-screenshots/`.
-
-These are the **live** game driven over the agent tool surface — paused, rewound into the window
-`moba-3600.udearep` covers, and stepped 120 ticks between captures. Each tile's tick is read out of
-that capture's own result rather than computed, because `render.screenshot`'s description says a
-time tool sent in the same batch runs after the capture. They are **not** a rendering of the replay:
-see section 4 for why that is not possible with today's tool surface.
-
-- **`issue172-fixture-window-t1281-t1881.png`** — six frames from t1281 to t1881, the window the
-  gate's fixture covers. The champion (ORC_ELITE) wades into a stack of soldiers and its health
-  falls 200 → 150 → 120 → 50 → 10, and the last tile is `SOLDIER WINS` / `YOU DIED`. It shows that
-  the recording covers a whole match rather than a slice of idle time, which is what makes the
-  fixture worth replaying.
-- **`issue172-plant-tick-1281-champion-in-the-melee.png`** — t1281 on its own, the neighbourhood of
-  the plant tick. `MATCH 1`, `ORC 1 SOLDIER 11 UNDEAD 0`, the champion at 200/500 mid-swing against
-  five soldiers. This is the world state whose `Position.x` the planted leg moves by one ulp.
-- **`issue172-match-ends-inside-the-fixture-t1881.png`** — t1881, the match resolving inside the
-  3600-tick window. Proof the fixture is not a minute of standing still.
-
----
-
-## 9. Regenerated files, and where the working artefacts are
-
-**`net-protocol.lock` and `expected-generated-hashes.txt`: neither, and no id moved.** No
-`@Replicated` component was added or removed. `MobaFixtureRecorder`'s identity reports
-`protoHash: 7151` (section 4), and `git diff origin/example -- udea-codegen/net-protocol.lock
-udea-codegen/src/test/resources/expected-generated-hashes.txt` is empty. `udeaCheckProtocolLock`
-runs on `check` and the build is green.
-
-**`.udeaeq` format version 1 → 2.** Not a checked-in file: a digest stream is written by a leg,
-downloaded by the join and deleted after seven days. No migration, and a stale stream now refuses
-itself by name.
-
-**New checked-in binaries**, both regenerable with `./gradlew :moba:udeaWriteReplayFixture`:
-
-```
-moba/src/test/resources/fixtures/moba-3600.udearep    59,140 bytes
-moba/src/test/resources/fixtures/moba-36000.udearep  586,987 bytes
-```
-
-**Working artefacts** (logs, mutation diffs, the CI logs I spliced from) are under
-`/tmp/claude-1000/-srv-ssd1-workspace-Udea/01ec1be7-305f-4987-ab53-69f61b72d43e/scratchpad/`:
-`full-build.log`, `full-build-2.log`, `solo-budgets.log`, `gl-tests-rerun.log`, `mutations/`,
-`legs/`, `failcauses/`.
-
----
-
-## 10. The five CI checks that are red, and why four of them are not mine
-
-`origin/example` is **not green in CI** at the branch point. Verified by comparing failing Gradle
-tasks between run 33441678513 (mine) and run 33438832167 (`example` at `db477f4`):
-
-| job | fails on `example` at `db477f4` | fails on this branch | same task? |
+| # | Criterion | Proved by | Verified how |
 |---|---|---|---|
-| `build (ubuntu-latest)` | `:udea-agent-host:udeaPhase2Exit`, `:udea-assets-compiler:udeaDaemonBudget` | `:udea-agent-host:udeaPhase2Exit` | yes |
-| `build (windows-latest)` | `:udea-agent-host:udeaPhase2Exit`, `:udea-assets-compiler:test` | `:udea-assets-compiler:test`, `:udea-assets-compiler:udeaDaemonBudget` | yes |
-| `build with the K2 plugin disabled` | `:udea-agent-host:udeaPhase2Exit`, `:udea-assets-compiler:udeaDaemonBudget` | `:udea-agent-host:udeaPhase2Exit` | yes |
-| `determinism (windows-latest, temurin/corretto)` | `:test` — `AgentsMdTest > a row for a module that has been deleted fails`, `CompilerPluginSwitchTest > the checkers-fire probe is not written into a tree build-logic compiles a second time`, `CompilerPluginSwitchTest > the checkers-fire probe is in a module the K2 plugin is actually applied to` | `:test` — the same three | yes |
-| `clean build under budget` | **passes** (81,418ms) | **fails** (97,716ms, budget 90,000ms) | — |
+| 1 | `OverlayExclusionTest` still passes with markers active and anchored | `OverlayCaptureIsolationTest > every declared capture route is identical with the overlay on and off, and the window is not` | Run for real under xvfb with `-Pudea.render.requireGl=true`: 8 tests in `udeaAgentGlTest`, 0 skipped, 0 failures (§3). Pre-existing; #162 owns it |
+| 2 | A marker anchored to a moving entity tracks it across frames | `AgentOverlayViewTest > an entity anchor draws a ring that tracks the entity as it moves` | Pre-existing. **Mutation D** → `expected: <100.0> but was: <0.0>` |
+| 3 | A stale `NetId` draws nothing, asserted directly | `AgentOverlayViewTest > a stale generation draws nothing rather than ringing whatever recycled the slot` | Pre-existing. **Mutation D** → `a marker was drawn for an entity that no longer exists: 1 ring(s)` |
+| 4 | An off-screen anchor does not throw and does not draw outside the viewport | `AgentOverlayViewTest > a marker off screen draws nothing rather than clamping to the window edge` | Pre-existing. **Mutation E** → red |
+| 5 | Read-calls and write-calls are visually distinct | `AgentOverlayViewTest > a write marker is drawn differently from a read marker` (asserts both stroke and alpha) | Pre-existing. **Mutation F** → `a write and a read are drawn with the same stroke` |
+| 6 | **Allocation-free per frame in steady state** | `OverlayAllocationTest` (3 tests) — **new** | **Mutations A, B, C** all take `a hundred steady-state frames allocate nothing at all` red; B takes all three red deterministically |
 
-### One more, seen once in four runs, in code this branch does not touch
-
-`gl tests (xvfb)` failed on run 33444043104 and passed on 33441678513, 33443701286 and 33444524021
-— four runs of near-identical code, one red:
-
-```
-OffscreenBackendTest > closing the backend stops the render thread() FAILED
-    org.opentest4j.AssertionFailedError at OffscreenBackendTest.kt:206
-        Caused by: dev.wildware.udea.render.backend.GlContextException at OffscreenBackendTest.kt:206
-            Caused by: java.util.concurrent.CancellationException at OffscreenBackendTest.kt:206
-```
-
-A shutdown race on the GL thread in `udea-render`, a module this branch does not modify. All 18
-`udeaGlTest` tests pass locally under xvfb with `--rerun` (section 3). Flagging it because one
-sample in four is exactly the rate at which a flake gets attributed to whoever is unlucky, and
-because I would rather it be written down before somebody else meets it.
-
-The windows `:udea-assets-compiler:test` and the `determinism` `AgentsMdTest` /
-`CompilerPluginSwitchTest` failures are issue **#176**, which dev-176 is fixing on its own branch —
-CRLF in checked-in golden files under a `core.autocrlf=true` checkout. `udeaPhase2Exit` and
-`udeaDaemonBudget` are the wall-clock latency budgets, red under CI runner load exactly as they are
-under `melon-merge` load here (section 3).
-
-**`clean build under budget` failed on run 33441678513 and passed on run 33443701286**, the same
-cold-cache-then-warm pair as the leg times in section 5:
-
-The red one, from `mine-clean-budget.log` (the saved `--log-failed` output of job 99651148467):
-
-```
-##[error]clean build took 97716 ms, over the 90000 ms budget (spec 6, Phase 0 exit)
-```
-
-The other three, from `cleanbudget-history.txt` (the saved output of the script that fetched them).
-Its own first line is truncated at `ove` by an Actions line break, which is why the red one is
-quoted above from its own log rather than from here:
-
-```
-run 33441678513 job 99651148467: clean build took 97716 ms, ove
-run 33443701286 job 99657686646: clean build took 66890 ms, within the 90000 ms budget
-run 33438832167 job 99641769151: clean build took 81418 ms, within the 90000 ms budget
-run 33437939749 job 99638839477: clean build took 66671 ms, within the 90000 ms budget
-```
-
-The last two are `example`: consecutive runs of a tree this branch had not touched, differing by
-22%.
-
-66,890ms against `example`'s 66,671ms is as close as two samples of this measurement get. That is
-the whole answer: my change adds one new file to `udeaAssemble` (`ReplayDigestCli.kt`, ~230 lines
-in `udea-replay/src/main`) and nothing in `moba/src/test` is in `udeaAssemble` at all.
+A note on criterion 3, because I went looking for a problem there and did not find one. Its test
+asserts only that *nothing* was drawn, which is the shape that can pass by construction — a marker
+that was never drawn for any reason would satisfy it. It is not vacuous: mutation D removes the
+generation guard and the test reports `1 ring(s)`, and the paired positive control is in the same
+file (`an entity anchor draws a ring that tracks the entity as it moves`, same `entityRule()`,
+same call shape, which does draw a ring). Same for criterion 4, whose positive control is `a point
+anchor draws a cross, not a ring`.
 
 ---
 
-## 11. My own pass over the diff, against the reviewer's closed list
+## 7. Regenerated files
 
-**Engineering standards §8**
+**None.** No replicated component was added or removed, so `udea-codegen/net-protocol.lock` and
+`udea-codegen/src/test/resources/expected-generated-hashes.txt` are untouched and no id moved. No
+file in `docs/contracts/` was changed and `docs/contracts.lock` is untouched. `AGENTS.md`'s module
+table is unaffected — no module moved.
 
-- *Any §1 smell reproduced in new code* — the one candidate was duplicating `DriftDigestMain`'s
-  parser into `moba`; `ReplayDigestCli` exists so that it is not duplicated. The remaining
-  near-duplicate is `moba/build.gradle.kts`'s `udeaReplayEqualityProof` block against
-  `udea-replay`'s: two Gradle task graphs over two different projects' classpaths and main classes,
-  which Kotlin DSL cannot share without a convention plugin. I judged a convention plugin for two
-  callers worse than the repetition, and the shared half — the entry points both drive — is shared.
-- *A `public` declaration nobody outside the module uses* — everything new in `moba/src/test` is
-  scoped to that compilation, which exports nothing. In `udea-replay/src/main`, `ReplayDigestCli`
-  and `ReplayFixtureRef` are consumed by `moba`; `ReplayDigestHeader.gradleProject` is read by
-  `ReplayEqualsMain`.
-- *A test that cannot fail* — eight mutations in section 7, plus five controls.
-- *Generated code by string concatenation* — none; nothing here generates code.
-- *A new field on `GameContext`* — none.
-- *Wall clock or unseeded randomness inside simulation code* — the pilot is `java.util.Random` with
-  a fixed seed and **never enters a world**: it writes into an `InputSample` before the tick, which
-  is the `IntentSource` seam a keyboard sits behind. `ReplayDigestRecorder`'s `System.nanoTime` is
-  a build measurement outside `Simulation.step()`, and it is pre-existing.
-- *A `TODO()`, a stubbed return, or a swallowed exception on a reachable path* — none. The one new
-  refusal (`PlantedMobaWorld.plant`) throws with the reason rather than returning.
-- *Copy-pasted logic differing only in a constant* — covered above.
+`gradlew` shows as `M` in `git status` (the `chmod +x` this box needs) and is deliberately **not**
+staged; `git show --stat ac4dbac` lists only the two new test files.
 
-**`AGENTS.md` "Do not"** — no `by net(...)`; no second snapshot codec (the digest is written from
-`WorldSnapshot`, and `ReplayDigestWriter` refolds its own cells into the world hash and refuses a
-tick that does not reproduce it); no setter instrumentation; no wall clock or unseeded randomness in
-`step()`; nothing new depends on `common`; no reflection on a per-tick path; no bare
-`Int`/`Long`/`String` for a domain concept — `plantAt` is a `Tick`, `PLANT_TICK` is a `Tick`, and
-the two tick *counts* are counts rather than durations, with the KDoc saying why they are not
-seconds; no GL outside `udea-render`; no presentation system as a Fleks system;
-`udeaVerifyModuleGraph` and `udeaVerifyNoLegacyDependencies` pass.
+### One thing this file overwrote, flagged rather than silently done
 
-**And the four this repository's own documents make blocking**
+`BRIEF.md` was not a new file. On `origin/example` it held **BRIEF-172** (789 lines, last touched
+by `231f5f3`), and writing this brief replaced it — which my instructions require ("write
+`BRIEF.md` in the root of your worktree") and which is how every brief in this repository has been
+produced. Nothing is lost: it is recoverable in full with
 
-- *A `docs/contracts/` file changed* — no. `git diff --stat origin/example -- docs/contracts/` is
-  empty. The `.udeaeq` digest format is not in `docs/contracts/`; the three files there are
-  `agent-tools.md`, `asset-index.md` and `replicator.md`.
-- *The `fieldNames[i]` == FieldMask bit *i* == FieldStore index *i* alignment* — untouched. Nothing
-  here writes a replicator or a field store; the digest reads `ReplayDigestIo.componentsOf(registry)`
-  exactly as before.
-- *A duration expressed in seconds or milliseconds rather than a `Tick`* — see above.
-- *`AGENTS.md`'s module table left stale* — no module moved; `udeaVerifyAgentsMd` passes.
+```
+git show 231f5f3:BRIEF.md
+```
 
-**What I did not exercise**
+But it is worth a ruling, because #172 looks like the odd one out. Every other completed ticket has
+been archived under its own number — `BRIEF-154`, `165`, `167`, `168`, `169`, `170`, `171`, `173`,
+`174`, `175`, `176`, `180`, `182` are all present as files — and there is **no `BRIEF-172.md`**.
+So #172's brief existed only as `BRIEF.md`, and the next ticket to write a brief was always going
+to overwrite it; I happen to be that ticket. **I have not created `BRIEF-172.md`**, because
+inventing a file outside this ticket is exactly the unreviewed change I was told not to add. Naming
+it is the job; ruling on whether it should be restored is not.
 
-- **A red gate on a real cross-OS run.** The planted dispatch proves the join fails on a *planted*
-  divergence. Nobody has yet seen `moba` diverge for a real reason across two operating systems,
-  which is the thing this gate exists to find, and the honest position is that it may never — or
-  may on the first nightly.
-- **A `BuildIdentity` move in anger.** `MobaReplayFixturesCurrentTest` is proven by M4's tick-count
-  mutation, not by adding a `@Replicated` component and watching `protoHash` shift. That path is
-  `ReplayFixtureUpdateTest`'s in `udea-replay`, over a synthetic fixture.
-- **The `--update-replay-fixtures` flag reaching the test JVM for `moba`.** `udea-replay` has a
-  build-script fence for that forwarding (`ReplayEqualityProofTest > the test task forwards the
-  regeneration flag to the JVM that reads it`); `moba` has the same `systemProperty` line but no
-  fence over it. I ran the flag by hand and it regenerated (that is how the checked-in bytes were
-  made), so it works today; nothing would catch it being deleted. The stripper and `buildScript`
-  are now in `MobaReplayEqualityTest`, so adding that fence is three lines for whoever wants it.
-- **A second peer.** The recording carries one peer, as `MobaReplay` was already designed. A
-  two-peer recording is a different ticket.
-- **The `36000`-tick fixture end to end locally.** I replayed it once to measure (section 5) but
-  `:moba:udeaReplayEqualityProof` uses the 3600 one, and nothing local compares two 36000-tick
-  digests. The nightly does.
+---
+
+## 8. Out of scope — reported, not fixed
+
+The defect that started this ticket has a class: **a KDoc citing a test class by name that does not
+exist.** `AgentOverlayModel` named `OverlayAllocationTest` as the thing that asserted its central
+property, and that file had never been written. Having found one instance I swept for the class
+rather than stopping — every `*Test` identifier named in `udea-agent/src/main` and
+`udea-agent-host/src/main`, resolved against every `*Test.kt` in the repository. **Five more, and
+that is the complete list for those two modules:**
+
+| Named test | Cited in |
+|---|---|
+| `AssetToolSurfaceTest` | `udea-agent/.../assets/AssetToolModule.kt:22` |
+| `CommandResultRingTest` | `udea-agent/.../AgentBridge.kt:341` |
+| `DigestAllocationTest` | `udea-agent/.../state/DigestBudgets.kt:47`, `udea-agent/.../Json.kt:213` |
+| `OverlayHotkeyIsHardwareTest` | `udea-agent-host/.../overlay/AgentOverlaySystem.kt:187`, `.../overlay/OverlayVerbosity.kt:65` |
+| `SayToolsetTest` | `udea-agent/.../tools/SayToolset.kt:123` |
+
+**I have not touched any of them**, and they are not in this diff. One distinction the lead should
+have when ruling on whether these clear the filing bar: `OverlayHotkeyIsHardwareTest` is a *stale
+name over a property that is genuinely tested elsewhere* — `AgentOverlayViewTest > nothing an
+agent can reach moves the level` does exactly what that KDoc describes. That is a different and
+much smaller thing than a name over a test that was never written, which is what
+`OverlayAllocationTest` was. I did not check the other four to that depth; naming them is the job,
+ruling on them is not.
+
+The sweep covered `udea-agent` and `udea-agent-host` only — the two modules this ticket owns. I
+did not scan the rest of the tree.
+
+---
+
+## 9. My own pass over the diff
+
+Against `docs/engineering-standards.md` §8 and `AGENTS.md`'s do-not list:
+
+- **No production code changed at all**, so no §1 smell, no `TODO()`, no stubbed return, no
+  swallowed exception, no copy-pasted logic differing by a constant can have been introduced on a
+  reachable path.
+- **No `public` declaration added.** `AllocationProbe` is `internal`; every class inside
+  `OverlayAllocationTest` is `private`.
+- **A test that cannot fail** — the item this ticket lived closest to. Three assertions, six
+  mutations, and the one assertion that could not fail reliably was **deleted rather than kept**
+  (§2). Every surviving test has been watched go red.
+- No generated code, no string concatenation producing code, no new `GameContext` field.
+- **No wall clock and no unseeded randomness.** The test injects a *frozen* `AgentClock` to remove
+  the one wall-clock dependency the fixture had. Nothing here is inside `Simulation.step()` — the
+  overlay is presentation and takes `dtSeconds`, never a `Tick`. The `WallClockBudgetCensusTest`
+  scan is unaffected: this file reads no clock, so it is not a census candidate and needs no row.
+- No `by net(...)`, no snapshot codec, no setter instrumentation, no `common` dependency, no
+  reflection on a per-tick path, no bare `Int`/`Long`/`String` for a domain concept.
+- **No GL outside `udea-render`.** The new test names no `com.badlogic.gdx` type (`grep badlogic`
+  over both new files returns nothing); it drives the `OverlayCanvas` port. Stated precisely, so
+  it is not read as more than it is: `udea-agent-host` is **not** in
+  `ModuleGraphRules.HEADLESS_PROJECTS` — it was taken out deliberately, as its `build.gradle.kts`
+  explains — so `udeaVerifyHeadless` does not gate this module and did not check this. The rule
+  holds here because no GL was added, not because a verifier confirmed it.
+- **No presentation system implemented as a Fleks system**, no module arrow moved, no frozen
+  contract changed, no `fieldNames`/`FieldMask`/`FieldStore` alignment touched.
+
+### What I did not exercise
+
+- **A marker expiring on the frame being measured.** The measured blocks run at `dtSeconds = 0f`,
+  so no marker crosses its TTL *inside* a measurement. The state either side is measured (live in
+  the steady-state test, expired in its own test); the transition frame is not. It is one
+  `continue` and allocates nothing either side of it, but I did not measure it and am not claiming
+  it.
+- **The overflow case.** `AgentMarkers.capacity` is 8 and my busy fixture records exactly 8
+  anchored calls, so the `if (count >= capacity) return@forEachRecent` path in `collect()` is not
+  taken. `collect()` is off the steady-state frame path, so this is not a gap in the criterion.
+- **Verbosity changes during a measurement.** Measured at `VERBOSE` throughout, which is the most
+  work per frame. `OFF` and `CAPTION` draw strictly less; `AgentOverlayViewTest` covers what they
+  draw, not what they allocate.
+- **A non-HotSpot JVM.** Every test returns early without `com.sun.management.ThreadMXBean`, so on
+  such a JVM criterion 6 is unproved rather than falsely proved. Stated, not hidden.

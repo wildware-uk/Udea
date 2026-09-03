@@ -2,6 +2,7 @@ package dev.wildware.moba.item
 
 import dev.wildware.moba.ability.MobaAbilities
 import dev.wildware.moba.ability.MobaTags
+import dev.wildware.moba.MobaControls
 import dev.wildware.moba.ability.UnitBlueprint
 import dev.wildware.udea.gas.ActivationResult
 import kotlin.test.Test
@@ -14,8 +15,9 @@ import kotlin.test.assertTrue
  *
  * ## What issue #166 asks this file to say
  *
- * - **An item active is castable.** Buying `item/warhammer` puts `ability/orc_elite_spin` into a
- *   slot above the champion's own two, and activating that slot fires it.
+ * - **An item active is castable, from the ability bar.** Buying `item/warhammer` puts
+ *   `ability/orc_elite_spin` into a slot above the champion's own two, and pressing `moba/item_1`
+ *   fires it.
  * - **Its cooldown is independent of a champion's ability cooldowns.** Firing the item does not
  *   put slot 0 or slot 1 on cooldown, and firing slot 0 does not put the item on one.
  * - **It is blocked while dead.** A corpse keeps its `Abilities`, its `Attributes` and its
@@ -30,7 +32,10 @@ import kotlin.test.assertTrue
  *
  * [ShopHarness.activate] calls the `AbilityActivation` off the built context - the same object
  * `PlayerControlSystem` calls on a key press, `UnitBrain` calls for an AI unit and
- * `MobaHostSession` calls for an `activateAbility` packet. There is no second door.
+ * `MobaHostSession` calls for an `activateAbility` packet. [ShopHarness.tap] goes one step further
+ * out and presses the key, through the `IntentState` a keyboard writes. The direct call is used
+ * where the assertion is about the *rule* - a cooldown, a refusal - because it says what happened
+ * in one `ActivationResult` instead of leaving a test to infer it from a counter.
  */
 class ItemActiveTest {
 
@@ -59,6 +64,36 @@ class ItemActiveTest {
             "the item slot is granted and off cooldown, so it should have fired",
         )
         assertTrue(shop.cooldown(FIRST) > 0, "firing it should have started its cooldown")
+    }
+
+    /**
+     * **The key fires it.** `moba/item_1` is E, and pressing it casts what the first item granted.
+     *
+     * The scope bullet is "castable from the ability bar", and a slot that only an
+     * `AbilityActivation` call can reach is not on any bar a player can see. This goes through
+     * `PlayerControlSystem` from an `InjectedIntent`, which is the same `IntentState` a keyboard
+     * writes and the same one `input.tap` drives over HTTP - so nothing in the control path can
+     * tell this press from a human's.
+     */
+    @Test
+    fun `the item key casts the active it was granted`() {
+        val shop = carrying(Items.WARHAMMER)
+        assertEquals(0, shop.cooldown(FIRST), "the item bar is ready before anything is pressed")
+
+        shop.tap(MobaControls.ITEM_1_ACTION)
+
+        assertEquals(
+            1L,
+            shop.control().itemActivesRequested,
+            "pressing ${MobaControls.ITEM_1} started nothing; refusals so far: " +
+                "${shop.control().itemActivesRefused}",
+        )
+        assertTrue(shop.cooldown(FIRST) > 0, "the key fired it, so the item bar is cooling down")
+        assertEquals(
+            0,
+            shop.cooldown(PRIMARY),
+            "and the champion's own basic attack is untouched by the item key",
+        )
     }
 
     /**

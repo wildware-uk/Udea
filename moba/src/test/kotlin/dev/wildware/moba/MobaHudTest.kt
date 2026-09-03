@@ -138,6 +138,39 @@ class MobaHudTest {
     }
 
     /**
+     * **E reaches the item bar**, even with nothing in it.
+     *
+     * The same gap `moba/attack_2` sat in until it was given a slot to point at: a control can be
+     * declared, packed and resolved into an `ActionId` and read by no system at all, and from the
+     * player's side of the window that is indistinguishable from a key that is not bound. What
+     * separates the two is a counter moving.
+     *
+     * A refusal rather than an activation, because the champion the level seeds is carrying
+     * nothing - which is the honest state of the item bar at the start of a match, and the reason
+     * this asserts on `itemActivesRefused`. `ItemActiveTest` is where a press that actually fires
+     * something is proved, over a champion that has been to the shop.
+     */
+    @Test
+    fun `pressing the item key reaches the item bar and is counted`() {
+        val fixture = Fixture()
+        assertEquals(0L, fixture.control().itemActivesRefused, "nothing has been pressed yet")
+
+        fixture.tap(MobaControls.ITEM_1_ACTION)
+
+        assertEquals(
+            1L,
+            fixture.control().itemActivesRefused,
+            "pressing ${MobaControls.ITEM_1} reached no system: the item bar is empty, so the " +
+                "press must be a counted refusal rather than nothing at all",
+        )
+        assertEquals(
+            0L,
+            fixture.control().specialsRefused,
+            "the item key must not be booked against the champion's own second slot",
+        )
+    }
+
+    /**
      * Space is the sword and only the sword.
      *
      * The regression that made `Q` unreachable was not a missing binding: it was that the one

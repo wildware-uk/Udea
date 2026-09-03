@@ -65,6 +65,7 @@ class MigratedCorpusCompilesTest {
                 "effects/effects.udea.kts",
                 "item/components.udea.kts",
                 "item/finished.udea.kts",
+                "item/stats.udea.kts",
                 "item/trinkets.udea.kts",
                 "level/test_level.udea.kts",
                 "sounds/sounds.udea.kts",

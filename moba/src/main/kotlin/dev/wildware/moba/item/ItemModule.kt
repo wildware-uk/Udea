@@ -64,6 +64,16 @@ public class ItemModule(
      */
     public val service: ShopService = ShopService()
 
+    /**
+     * Every item's strings resolved into table positions, once, at module construction.
+     *
+     * Built here rather than inside each system so the two share one, and so an item naming a stat
+     * or a passive this game cannot apply fails while a definition is being assembled - which is
+     * before a world exists, let alone a player who paid for the bonus. See [ItemBonusTable].
+     */
+    public val bonuses: ItemBonusTable =
+        ItemBonusTable.of(catalog, combat.effects, combat.abilities.table)
+
     override fun context(builder: GameContextBuilder) {
         builder.service(ShopService.KEY, service)
     }
@@ -82,7 +92,7 @@ public class ItemModule(
             SimPhase.Gameplay,
             { ctx ->
                 ItemPassiveSystem(
-                    catalog = catalog,
+                    bonuses = bonuses,
                     effects = combat.effects,
                     applier = ctx[GasServices.KEY].applier,
                     magnitudeTag = combat.tags.dataItemStat,
@@ -91,10 +101,7 @@ public class ItemModule(
         ) { after(ShopSystem::class) }
         registry.add(
             SimPhase.Gameplay,
-            { ctx ->
-                val gas = ctx[GasServices.KEY]
-                ItemActiveSystem(catalog, gas.activation, gas.abilities)
-            },
+            { ctx -> ItemActiveSystem(bonuses, ctx[GasServices.KEY].activation) },
         ) { after(ShopSystem::class) }
     }
 

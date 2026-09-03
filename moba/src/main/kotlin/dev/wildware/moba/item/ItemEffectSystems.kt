@@ -14,6 +14,141 @@ import dev.wildware.udea.gas.GameplayEffects
 import dev.wildware.udea.gas.GameplayTag
 
 /**
+ * Everything the two systems below need to know about an item, resolved once and read by index.
+ *
+ * ## Why it exists at all
+ *
+ * An item asset names its stats, its passive, its unique group and its granted ability as
+ * **strings** - `"strength"`, `"item/passive_fortified"`, `"unique/fortified"`,
+ * `"ability/orc_elite_spin"`. Turning those into a table position is a lookup, and both systems do
+ * it for every carried item on every champion on every tick. Standards section 1 is unambiguous
+ * about that shape: *"If a lookup is on a per-tick path, it is indexed."* `ItemCatalog`'s own KDoc
+ * makes the same argument one level down, about comparing an id string per slot per component per
+ * purchase.
+ *
+ * So every string is resolved here, at world-build time, into an `Int`, and everything on the tick
+ * path is an array read.
+ *
+ * ## Indexed by [dev.wildware.udea.assets.AssetIndex], because that is what an inventory holds
+ *
+ * An [Inventory] slot stores an asset index as a raw `Int`, so a slot resolves to a row here with
+ * no unwrapping and no map. The arrays are as long as the packed graph with a null at every slot
+ * that is not an item - the same trade [ItemCatalog] makes and states: a few hundred null
+ * references bought in exchange for there being no second numbering that a hot reload could move
+ * out from under a snapshot.
+ */
+public class ItemBonusTable internal constructor(
+    private val statPositions: Array<IntArray?>,
+    private val statAmounts: Array<FloatArray?>,
+    private val passivePositions: IntArray,
+    private val uniqueGroups: IntArray,
+    private val grantedAbilities: IntArray,
+    /** How many distinct `unique` groups the item tree declares. */
+    public val uniqueGroupCount: Int,
+) {
+
+    /** Which entries of [MobaEffects.ITEM_STATS] the item at [raw] moves, or `null` for none. */
+    internal fun statPositionsAt(raw: Int): IntArray? =
+        if (raw in statPositions.indices) statPositions[raw] else null
+
+    /** The amounts matching [statPositionsAt], position for position. */
+    internal fun statAmountsAt(raw: Int): FloatArray? =
+        if (raw in statAmounts.indices) statAmounts[raw] else null
+
+    /** Which entry of [MobaEffects.ITEM_PASSIVES] the item at [raw] grants, or [NONE]. */
+    internal fun passiveAt(raw: Int): Int =
+        if (raw in passivePositions.indices) passivePositions[raw] else NONE
+
+    /** The dense id of the item's `unique` group, or [NONE] when it declares none. */
+    internal fun uniqueGroupAt(raw: Int): Int =
+        if (raw in uniqueGroups.indices) uniqueGroups[raw] else NONE
+
+    /** The `AbilityTable` index of the item's active, or [NONE]. */
+    internal fun grantedAbilityAt(raw: Int): Int =
+        if (raw in grantedAbilities.indices) grantedAbilities[raw] else NONE
+
+    override fun toString(): String = "ItemBonusTable($uniqueGroupCount unique groups)"
+
+    public companion object {
+
+        /** What every accessor answers for a slot that holds nothing, or holds no such bonus. */
+        public const val NONE: Int = -1
+
+        /**
+         * Resolves every item in [catalog] against this game's tables.
+         *
+         * Every failure is loud and names the item, because each of them is a bonus a player pays
+         * for and never receives - found by a player rather than by a build. Adding a stat is a
+         * row in [MobaEffects.ITEM_STATS] plus a `gameplayEffect(...)`; adding a passive is a row
+         * in [MobaEffects.ITEM_PASSIVES] plus the same.
+         *
+         * Unique groups are numbered from `catalog.entries`, which walks `registry.ids` in slot
+         * order, so two builds of the same tree number them identically. Nothing outside this
+         * class ever sees the number, so it is an implementation detail rather than an identity a
+         * snapshot could hold.
+         */
+        public fun of(
+            catalog: ItemCatalog,
+            effects: MobaEffects,
+            abilities: AbilityTable,
+        ): ItemBonusTable {
+            val size = catalog.entries.maxOfOrNull { it.index.value + 1 } ?: 0
+            val statPositions = arrayOfNulls<IntArray>(size)
+            val statAmounts = arrayOfNulls<FloatArray>(size)
+            val passivePositions = IntArray(size) { NONE }
+            val uniqueGroups = IntArray(size) { NONE }
+            val grantedAbilities = IntArray(size) { NONE }
+            val groupIds = LinkedHashMap<String, Int>()
+            for (entry in catalog.entries) {
+                val raw = entry.index.value
+                val item = entry.item
+                val positions = IntArray(item.stats.size)
+                val amounts = FloatArray(item.stats.size)
+                var next = 0
+                for ((name, amount) in item.stats) {
+                    val position = MobaEffects.ITEM_STATS.indexOfFirst { it.stat == name }
+                    require(position >= 0) {
+                        "item '${item.id}' grants '$name', which is not one of the stats this " +
+                            "game can apply: ${MobaEffects.ITEM_STATS.map { it.stat }}"
+                    }
+                    positions[next] = position
+                    amounts[next] = amount
+                    next++
+                }
+                if (next > 0) {
+                    statPositions[raw] = positions
+                    statAmounts[raw] = amounts
+                }
+                item.passive?.id?.value?.let { passive ->
+                    val position = MobaEffects.ITEM_PASSIVES.indexOfFirst { it.effect == passive }
+                    require(position >= 0) {
+                        "item '${item.id}' names passive '$passive', which is not one of " +
+                            "${MobaEffects.ITEM_PASSIVES.map { it.effect }}. ItemPassiveSystem " +
+                            "removes what it does not want, so it owns only those - an effect " +
+                            "some other system applies must not be on this list."
+                    }
+                    passivePositions[raw] = position
+                }
+                item.unique?.value?.let { unique ->
+                    uniqueGroups[raw] = groupIds.getOrPut(unique) { groupIds.size }
+                }
+                item.grantedAbility?.id?.value?.let { ability ->
+                    grantedAbilities[raw] = abilities.indexOf(ability)
+                }
+            }
+            return ItemBonusTable(
+                statPositions = statPositions,
+                statAmounts = statAmounts,
+                passivePositions = passivePositions,
+                uniqueGroups = uniqueGroups,
+                grantedAbilities = grantedAbilities,
+                uniqueGroupCount = groupIds.size,
+            )
+        }
+    }
+}
+
+/**
  * What carrying an item does to a champion's stats, and what carrying two of one unique does not.
  *
  * ## The two kinds of bonus, and why they behave differently
@@ -62,8 +197,8 @@ import dev.wildware.udea.gas.GameplayTag
  * folds these modifiers into `current` sees this tick's set.
  */
 public class ItemPassiveSystem(
-    /** Every item this build ships. Read once at load; see [ItemCatalog]. */
-    private val catalog: ItemCatalog,
+    /** Every item this build ships, with its strings already resolved. See [ItemBonusTable]. */
+    private val bonuses: ItemBonusTable,
     /** This game's effect table indices: which effect carries which stat, and what each is worth. */
     private val effects: MobaEffects,
     /** Applies an effect, and releases the handle when one is removed. */
@@ -95,21 +230,14 @@ public class ItemPassiveSystem(
     /** How many applications each entry of [passiveEffects] should have. Scratch, as above. */
     private val passiveWanted = IntArray(MobaEffects.ITEM_PASSIVES.size)
 
-    init {
-        // Loud at world-build time rather than per tick: an item whose `passive` names an effect
-        // outside `ITEM_PASSIVES` is a bonus a player pays for and never gets, and it would be
-        // found by a player rather than by a build. Adding one is a row in `ITEM_PASSIVES` and a
-        // `gameplayEffect(...)` in `assets/item/stats.udea.kts`.
-        for (entry in catalog.entries) {
-            val passive = entry.item.passive?.id?.value ?: continue
-            require(MobaEffects.ITEM_PASSIVES.any { it.effect == passive }) {
-                "item '${entry.item.id}' names passive '$passive', which is not one of " +
-                    "${MobaEffects.ITEM_PASSIVES.map { it.effect }}. ItemPassiveSystem owns only " +
-                    "those, because it removes what it does not want and must not remove an " +
-                    "application some other system made."
-            }
-        }
-    }
+    /**
+     * Which unique groups a lower inventory slot has already granted, this champion, this tick.
+     *
+     * A bitmap over the dense group ids [ItemBonusTable] hands out, so "has this group been seen
+     * below me" is an array read rather than a walk back down the inventory comparing group
+     * strings. Scratch: cleared at the top of every [readInventory].
+     */
+    private val groupSeen = BooleanArray(bonuses.uniqueGroupCount)
 
     /** Stat and passive applications this system has made. A signal for a test, not state. */
     public var applied: Long = 0L
@@ -148,52 +276,48 @@ public class ItemPassiveSystem(
     private fun readInventory(inventory: Inventory) {
         java.util.Arrays.fill(statTotals, 0f)
         java.util.Arrays.fill(passiveWanted, 0)
+        java.util.Arrays.fill(groupSeen, false)
         var slot = 0
         while (slot < Inventory.CAPACITY) {
-            val entry = catalog.at(inventory, slot)
-            if (entry != null) {
-                addStats(entry)
-                addPassive(entry, inventory, slot)
+            val raw = inventory.rawAt(slot)
+            if (raw != Inventory.EMPTY) {
+                addStats(raw)
+                addPassive(raw)
             }
             slot++
         }
     }
 
-    private fun addStats(entry: ItemEntry) {
-        for ((name, amount) in entry.item.stats) {
-            val position = MobaEffects.ITEM_STATS.indexOfFirst { it.stat == name }
-            // Loud rather than dropped, for `init`'s reason. Here rather than in `init` because
-            // `stats` is a map and its keys are what an author gets wrong; a catalogue-wide sweep
-            // would say the same thing, and this says it naming the champion that is carrying it.
-            require(position >= 0) {
-                "item '${entry.item.id}' grants '$name', which is not one of the stats this game " +
-                    "can apply: ${MobaEffects.ITEM_STATS.map { it.stat }}"
-            }
-            statTotals[position] += amount
+    /** Adds the item at [raw]'s flat bonuses to the running totals. */
+    private fun addStats(raw: Int) {
+        val positions = bonuses.statPositionsAt(raw) ?: return
+        val amounts = checkNotNull(bonuses.statAmountsAt(raw)) {
+            "ItemBonusTable holds stat positions for asset $raw and no amounts to go with them"
+        }
+        var index = 0
+        while (index < positions.size) {
+            statTotals[positions[index]] += amounts[index]
+            index++
         }
     }
 
-    /** Records [entry]'s passive unless a lower slot already holds its unique group. */
-    private fun addPassive(entry: ItemEntry, inventory: Inventory, slot: Int) {
-        val passive = entry.item.passive?.id?.value ?: return
-        val unique = entry.item.unique?.value
-        if (unique != null && groupHeldBelow(inventory, slot, unique)) return
-        val position = MobaEffects.ITEM_PASSIVES.indexOfFirst { it.effect == passive }
-        // `init` has already refused a catalogue that could reach this, so a miss here would be a
-        // disagreement between the two - a defect in this file rather than a state a player can
-        // get into, and it fails loudly rather than granting nothing.
-        check(position >= 0) { "no ITEM_PASSIVES row for '$passive' after the catalogue check" }
+    /**
+     * Records the item at [raw]'s passive unless a lower slot already granted its unique group.
+     *
+     * The dedup is [groupSeen], which is why this is called in ascending slot order: the **lowest**
+     * slot holding an item of a group is the one that contributes. A rule is needed because two
+     * items in one group may name different passives, and "whichever the iteration reached first"
+     * would make a champion's stats depend on the order a shop happened to fill its slots.
+     */
+    private fun addPassive(raw: Int) {
+        val position = bonuses.passiveAt(raw)
+        if (position == ItemBonusTable.NONE) return
+        val group = bonuses.uniqueGroupAt(raw)
+        if (group != ItemBonusTable.NONE) {
+            if (groupSeen[group]) return
+            groupSeen[group] = true
+        }
         passiveWanted[position]++
-    }
-
-    /** Whether any slot below [slot] holds an item whose unique group is [unique]. */
-    private fun groupHeldBelow(inventory: Inventory, slot: Int, unique: String): Boolean {
-        var earlier = 0
-        while (earlier < slot) {
-            if (catalog.at(inventory, earlier)?.item?.unique?.value == unique) return true
-            earlier++
-        }
-        return false
     }
 
     /**
@@ -319,12 +443,10 @@ public class ItemPassiveSystem(
  * died.
  */
 public class ItemActiveSystem(
-    /** Every item this build ships. */
-    private val catalog: ItemCatalog,
+    /** Every item this build ships, with its `grantedAbility` already an index. */
+    private val bonuses: ItemBonusTable,
     /** Grants, and gates activation. The same object every activation path in this game uses. */
     private val activation: AbilityActivation,
-    /** Every ability definition, for turning an item's `grantedAbility` id into an index. */
-    private val abilityTable: AbilityTable,
 ) : SimSystem() {
 
     private val champions: Family = world.family { all(Inventory, Abilities, GameplayEffects) }
@@ -363,14 +485,17 @@ public class ItemActiveSystem(
 
     /** Fills [wanted] with the actives of the first carried items that declare one. */
     private fun readInventory(inventory: Inventory) {
-        java.util.Arrays.fill(wanted, -1)
+        java.util.Arrays.fill(wanted, ItemBonusTable.NONE)
         var found = 0
         var slot = 0
         while (slot < Inventory.CAPACITY && found < wanted.size) {
-            val ability = catalog.at(inventory, slot)?.item?.grantedAbility
-            if (ability != null) {
-                wanted[found] = abilityTable.indexOf(ability.id.value)
-                found++
+            val raw = inventory.rawAt(slot)
+            if (raw != Inventory.EMPTY) {
+                val ability = bonuses.grantedAbilityAt(raw)
+                if (ability != ItemBonusTable.NONE) {
+                    wanted[found] = ability
+                    found++
+                }
             }
             slot++
         }
@@ -379,13 +504,13 @@ public class ItemActiveSystem(
     /** Grants, revokes or leaves [slot] alone, so that it holds [abilityIndex]. */
     private fun apply(abilities: Abilities, effects: GameplayEffects, slot: Int, abilityIndex: Int) {
         val instance = abilities.instanceAt(slot)
-        val held = if (instance.isGranted) instance.abilityIndex else -1
+        val held = if (instance.isGranted) instance.abilityIndex else ItemBonusTable.NONE
         if (held == abilityIndex) return
         // An activation in flight is left to finish. Taking the ability out from under a running
         // `onTick` would leave `AbilityActivation` advancing an instance whose definition had
         // changed underneath it, which is a cast that lands as somebody else's ability.
         if (instance.isActive) return
-        if (abilityIndex < 0) {
+        if (abilityIndex == ItemBonusTable.NONE) {
             abilities.revoke(slot)
             revocations++
             return

@@ -8,7 +8,9 @@ import dev.wildware.moba.ability.CharacterAttributes
 import dev.wildware.moba.ability.Corpse
 import dev.wildware.moba.ability.MobaEffects
 import dev.wildware.moba.ability.MobaTags
+import dev.wildware.moba.MobaControls
 import dev.wildware.moba.Player
+import dev.wildware.moba.PlayerControlSystem
 import dev.wildware.udea.gas.Abilities
 import dev.wildware.udea.gas.ActivationResult
 import dev.wildware.udea.gas.AttributeId
@@ -23,6 +25,9 @@ import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.CoreModule
+import dev.wildware.udea.render.input.ActionId
+import dev.wildware.udea.render.input.InjectedIntent
+import dev.wildware.udea.render.input.IntentState
 
 /**
  * A booted headless `moba`, with the champion standing in its own fountain.
@@ -59,6 +64,11 @@ internal class ShopHarness private constructor(
 
     /** The one activation path, the applier and the tables, off the built context. */
     val gas: GasServices = host.ctx[GasServices.KEY]
+
+    /** Where [tap] writes. Installed as this host's intent source; see [tap]. */
+    private val injected = InjectedIntent(MobaControls.BINDINGS.catalog).also {
+        host.ctx[IntentState.KEY].source = it
+    }
 
     /** Where orders go in and outcomes come out. Off the definition's own module. */
     val shop: ShopService = host.ctx[ShopService.KEY]
@@ -124,6 +134,23 @@ internal class ShopHarness private constructor(
     /** Activates [slot] through the one activation path this game has, and says what happened. */
     fun activate(slot: Int): ActivationResult =
         gas.activation.activate(championId(), abilities(), attributes(), effects(), slot, host.tick)
+
+    /**
+     * Presses [action] and runs the tick that samples it.
+     *
+     * [InjectedIntent] is what `input.tap` drives over HTTP and it is the *same* `IntentState` a
+     * keyboard writes, so `PlayerControlSystem` cannot tell one from the other. A press here is a
+     * press - which is what makes an assertion about it evidence that the **key** fires an item
+     * active, rather than evidence that an ability can be activated by calling the activation
+     * object directly.
+     */
+    fun tap(action: ActionId) {
+        injected.tap(action)
+        host.run(1)
+    }
+
+    /** The one `PlayerControlSystem` this host runs, for its counters. */
+    fun control(): PlayerControlSystem = host.world.system<PlayerControlSystem>()
 
     /**
      * Kills the champion where it stands and runs the tick that retires it.

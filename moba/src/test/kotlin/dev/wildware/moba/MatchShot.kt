@@ -53,8 +53,17 @@ import kotlin.system.exitProcess
  * The last two are issue #166's, and they are here rather than in a harness of their own because
  * this one already boots the shipped game with a GL context, drives it through the bound keys and
  * writes a PNG per subject - which is the whole of what they need. The purchases go in through
- * [ShopService], which is the same door a bot and a test use; nothing writes an [Inventory] slot
+ * `ShopService`, which is the same door a bot and a test use; nothing writes an inventory slot
  * directly.
+ *
+ * ## The shopping changes the fight, and that is stated rather than hidden
+ *
+ * The champion is handed [SHOP_GOLD] and two items at [SHOP_TICK], so the match this harness
+ * photographs is no longer the one it photographed before #166: a champion carrying
+ * `item/warhammer` and `item/aegis` swings harder and dies later. `melee`, `hud` and `spin` are
+ * still the same claims, and `result` is still a decided match - it is decided later, which is
+ * what [DEADLINE_TICKS] was raised for. Run with the purchases removed, this harness reproduces
+ * the pre-#166 trajectory tick for tick, which is how that was established rather than assumed.
  *
  * `melee.png` and `hud.png` are two moments of one claim rather than the same file twice: the HUD
  * is drawn at `RenderPhase.UI`, which is *before* the capture point on purpose, so every frame
@@ -91,8 +100,18 @@ public object MatchShot {
     /** The tick the HUD is photographed on. Later, so a cooldown is running in a slot. */
     public const val HUD_TICK: Long = 560L
 
-    /** Give up after this many ticks. Long enough for a match to resolve on the default layout. */
-    public const val DEADLINE_TICKS: Long = 2_400L
+    /**
+     * Give up after this many ticks.
+     *
+     * Above `MatchRules.MATCH_LIMIT_TICKS`, so a match this harness photographs is decided *by the
+     * clock* if it is not decided by a wipeout first, and `result` can never be missed for want of
+     * one side being finished off in time. It was 2,400 - below the match limit - which held only
+     * for as long as the default layout happened to resolve inside it. Issue #166 gave the
+     * champion two items at [SHOP_TICK], the fight took longer than 2,400 ticks, and `result` was
+     * simply never captured: a deadline below the game's own limit is a picture that goes missing
+     * whenever a balance change makes a match last longer.
+     */
+    public const val DEADLINE_TICKS: Long = 5_700L
 
     private class Shot(
         val name: String,

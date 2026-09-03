@@ -534,6 +534,14 @@ private class HudActor(
      */
     private fun drawSlots(batch: Batch, state: HudState) {
         val namesLeft = MARGIN + UnitBlueprint.ABILITY_SLOTS * (SLOT_SIZE + GAP) + GAP * 2f
+        // The names run *downward* from here, one per slot, so the anchor has to leave room for
+        // every slot below the first or the last name is drawn off the bottom of the window. It
+        // used to be `MARGIN + SLOT_SIZE - PADDING`, which fitted while there were two slots and
+        // put the fourth name's baseline at y=20 the moment issue #166 added the item bar - hard
+        // against the edge, with its descenders cut. Anchored off `ABILITY_SLOTS` rather than off
+        // `state.slotCount`, so the column does not jump up the screen when a unit happens to
+        // have been granted fewer.
+        val namesTop = MARGIN + LINE_HEIGHT * UnitBlueprint.ABILITY_SLOTS
         for (slot in 0 until state.slotCount) {
             val left = MARGIN + slot * (SLOT_SIZE + GAP)
             val name = state.nameAt(slot)
@@ -567,12 +575,7 @@ private class HudActor(
                 appendSeconds(remaining, state.tickRate)
                 font.draw(batch, text, left + PADDING, MARGIN + LINE_HEIGHT + PADDING)
             }
-            font.draw(
-                batch,
-                shortNameOf(slot, name),
-                namesLeft,
-                MARGIN + SLOT_SIZE - PADDING - slot * LINE_HEIGHT,
-            )
+            font.draw(batch, shortNameOf(slot, name), namesLeft, namesTop - slot * LINE_HEIGHT)
         }
         font.color = Color.WHITE
     }

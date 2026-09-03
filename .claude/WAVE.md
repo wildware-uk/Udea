@@ -1,141 +1,122 @@
-# Wave handoff — 2026-09-01, waves 4–6
+# Wave handoff — 2026-09-03, wave 7
 
-**Six tickets dispatched, six merged, every one at review round 1 with zero findings.**
+**Three tickets dispatched, three merged, every one at review round 1 with zero findings.**
 
-`example` went `db477f4 → 32eab56 → d1526f9 → e7159c1 → cada9ed → 293649b → c3c3c41 → 784f614`,
-all pushed. `master` untouched at `ce7db67`, as `HANDOFF.md` reserves.
+`example` went `60a9471 → fd10c87 → 4f075c4 → e3a341f → 81727f8`, all pushed. `master` untouched
+at `ce7db67`, as `HANDOFF.md` reserves.
 
-| Wave | Issue | What merged | Commit |
-|---|---|---|---|
-| 4 | #172 | The determinism gate replays the game, not a world written not to drift | `32eab56` |
-| 4 | #176 | A Windows checkout stops defeating the gates that read their own subject | `d1526f9` |
-| 5 | #174 | `docs/contracts/` frozen by a lock the build reads | `cada9ed` |
-| 5 | #175 | The latency budgets measure latency, not the build contending with them | `293649b` |
-| 6 | #180 | `build-logic` tests declare the files they read, and a guard finds the sixth | `c3c3c41` |
-| 6 | #182 | The wall-clock census, and the five gates still inside the build | `784f614` |
+| Issue | What merged | Commit |
+|---|---|---|
+| #160 | The overlay's allocation-free claim is measured, and its blind spot with it | `fd10c87` |
+| — | Archive every brief under its own number (lead, see below) | `4f075c4` |
+| #178 | A stopped render loop says so, without waiting for its thread object to die | `e3a341f` |
+| #166 | Item actives on a shared bar, and unique passives that do not stack | `81727f8` |
 
-**CI on `example` at `784f614` (run `33462366896`): 24 jobs, 24 green, 0 red.** The first fully
-green run in this sequence. Wave 3 opened at 10 red.
+Worktrees left on disk under `.claude/worktrees/`, none removed:
+`agent-a5b65b93c1b5ec78c` (#160), `agent-a10b02ebe1b965e3b` (#178), `agent-a5e39bad901aec41f` (#166).
 
-Worktrees left on disk under `.claude/worktrees/`, none removed: `agent-a8b9947d3dbda0c54` (#172),
-`agent-a6181135d60b20d17` (#176), `agent-a3feddd0686493e0b` (#174), `agent-a5773b1d0f90f1f83` (#175),
-`agent-a9ffff83bda14fb94` (#180), `agent-a937a08ec67e02f7e` (#182).
+**This wave was a deliberate pivot to features.** Waves 4–6 were six consecutive infrastructure
+tickets. #166 is game content; #160 closed the last unproved criterion on the agent overlay epic;
+#178 was the one bug worth taking, because it sat on the only job that makes the GL surface
+pass-or-fail.
 
 ---
 
-## The three waves in one sentence
+## The one sentence
 
-**Every gate in this repository was asked the same question — *does it run, and can it fail?* — and
-five of them answered no.**
+**Three tickets, three different ways a claim can be true in prose and unmeasured in fact — and in
+all three the developer found it against its own work before any reviewer did.**
 
-| Found green having measured nothing | How |
+| The claim | What was actually under it |
 |---|---|
-| The cross-OS `replay-equality` matrix | Replayed `DriftWorld`, written to be deterministic (#172) |
-| `AgentsMdTest` on Windows | Failed on CRLF, so it reported the same red whether `AGENTS.md` was stale or not (#176) |
-| `docs/contracts/` | Declared frozen; nothing read the files (#174) |
-| The `latency budgets` CI job, first green run | Both runners served all six gates `FROM-CACHE` (#175) |
-| `build-logic`'s own tests | Undeclared inputs, so `UP-TO-DATE` after an edit to the file they police (#180) |
-| `udeaPhysicsRebuildBudget` | Worst sample **over** its budget in both full runs, inside a green build (#182) |
-
-Three of those were caught by the developer against its own work, before any reviewer saw it.
-
----
-
-## What is now enforced by code rather than declared
-
-- **`docs/contracts/`** — `docs/contracts.lock` (SHA-256 per file), `udeaVerifyContracts` on `check`,
-  rules `UDEA-FRZ-001/002/003` covering edit, add, delete, rename, directory deleted, lock deleted.
-  Route out is a **named task**, `udeaWriteContractLock`, deliberately not a `-P` flag: a `-P` flag
-  can be passed to a whole `build` and re-baseline the freeze as a side effect, which is the act the
-  gate refuses.
-- **Wall-clock budgets** — eleven, all on `udeaLatencyBudgets`, measured by their own CI job on both
-  runner images with `--no-parallel --max-workers=1`, never cacheable, never up-to-date-able.
-  `WallClockBudgetCensusTest` reads every test source and requires each clock reading to be a member
-  of the aggregate or a census row saying what it is instead. `LatencyBudget.measuredBy` refuses a
-  budget measured by any task but its own. **Four enumerations were needed before the census existed;
-  it is what makes a fifth unnecessary.**
-- **`build-logic` test inputs** — the five files declared, plus `OuterBuildInputsTest`, which compares
-  reads found in test sources against *the collection Gradle actually resolved*, handed over as a
-  manifest rather than regexed out of the build script.
-- **Phase 7** — the gate replays `moba` on every push (`moba-3600`) and nightly (`moba-36000`), and
-  **has been watched failing on it**: run `33444524021`, planted ulp, join red, naming
-  `dev.wildware.moba.Position.x` at t1200.
+| "The overlay is allocation-free" | Three KDocs asserting it; `AgentOverlayModel` even named `OverlayAllocationTest`, a file never written (#160) |
+| "`OffscreenBackendTest` is flaky under load" | Not a slow shutdown at all — a **wrong exception type**, which no timeout could have fixed (#178) |
+| "Put the cooldown group on the `AbilityDef`" | Would have cooled the priest's own heal down with `item/aegis`, silently passing nothing (#166) |
 
 ---
 
 ## Read this before you dispatch anything
 
-### The developer contract changed twice and the old advice is now wrong
+### The GL evidence clobber, measured twice this wave
 
-- **The latency budgets are NOT on `check`.** A green `sh gradlew build` does not cover them. Run
-  `sh gradlew udeaLatencyBudgets --no-parallel --max-workers=1`. **The old "they fail under load,
-  re-run them alone" advice is obsolete** — if one fails inside a `build` now, something was wired
-  back onto `check` and that is a real finding.
-- **`udeaVerifyContracts` IS on `check`.** Do not edit `docs/contracts/`; if a ticket needs a
-  contract's content changed, it stops and says so.
-- **`:build-logic:test` does not run in the root `build`** — `grep -c 'build-logic:test'` over a full
-  build log is 0. CI runs it as its own `-p build-logic` steps. A green `build` never covered it.
+**A plain `sh gradlew build` re-runs `udeaGlTest`/`udeaAgentGlTest` with no DISPLAY and OVERWRITES
+the xvfb result XMLs with skipped ones.** `dev-160` measured `udeaAgentGlTest` going from
+`tests=8 skipped=0` to `tests=8 skipped=8` in the same file; with no `DISPLAY`, 26 of 27 GL tests
+come back skipped.
 
-### Two pre-existing failures on this box that are not yours
+So on any GL-touching ticket, tell the developer **and the reviewer**:
 
-- **`KotlinPinCheckTest` x2** — no JDK 17 installed here and `GradleFixture` writes a
-  `settings.gradle.kts` with no foojay resolver. Fails identically on a clean `example`; confirmed
-  three times this run. It lives in `build-logic`, so it looks like your fault if you are working
-  there.
-- **`:moba:runUdpProof`** under 5% loss. `HANDOFF.md` documents it.
+- Sequence the plain build FIRST and the xvfb run LAST, or copy the XMLs out at capture time.
+- `--rerun-tasks` is not optional. `dev-166`'s first xvfb attempt came back `FROM-CACHE`, and it
+  said plainly that is not evidence.
+- A reviewer that runs the build and then finds skips will wrongly conclude the developer never ran
+  the GL tests. Warn it explicitly.
 
-### `example/`'s corpus is NOT committed with CRLF, whatever #176's body says
+### An allocation probe has a blind spot, and it is JIT-state dependent
 
-Measured, not reasoned: every **text** blob under `example/` is LF in the repository. The 1914 CR
-bytes that exist there are **all inside `.png` and `.ogg` files** — binary payload. Option 3
-(`* text=auto eol=lf`) remains the trap, for a better reason than the one recorded: it would put 80
-binary blobs on git's `text=auto` heuristic. Corrected on #176.
+Measured on #160, and it applies to any allocation gate anyone writes here. Sensitivity to a
+**non-escaping** allocation is test-ORDER dependent within one class: the same mutation reads
+**4800 bytes for 1 marker and 38400 for 8 run alone**, and **zero** run after the rest of the class,
+once C2 has inlined enough to scalar-replace. `udea-render`'s `RenderAllocationTest` documents the
+same blindness independently.
 
-### The estimator question has been settled twice, in opposite directions, both times by measurement
+**Absolute-zero assertions are order-independent for an escaping allocation. Comparative ones
+("1 marker vs 8, same bytes") are not** — one was passing as `0 == 0` and was deleted rather than
+pinned to a method order.
 
-`udeaBenchCharacterMover` moved from median-of-9 to **best-of-25** (#175): one-sided error, and the
-tail was over the line on a run where the code was fine. `udeaWarmEditBudget` **keeps
-`samples.max()`** (#182): 19.6% spread against the daemon gate's 37%, and a per-edit deadline makes
-the tail the subject. **Measure before choosing; do not reason by analogy from either.**
+### Evidence under `build/` is not safe
+
+`dev-166` lost its evidence directory to `git clean` mid-run because it sat under `build/`.
+`dev-178` put its 90 artefacts in the **main checkout** at `build/issue178-evidence/`, where they
+outlive the worktree. Tell developers to do the latter.
+
+### Rename detection will eat a brief if you let it
+
+When merging, watch `BRIEF-*.md`. Git detected `BRIEF.md → BRIEF-172.md` from `4f075c4` as a rename
+and **cleanly applied #178's brief onto `BRIEF-172.md`** — a merge with no conflict that silently
+destroyed the wrong file. Caught in the trial worktree. The root `BRIEF.md` is now **removed**, so
+this cannot recur, and every merged ticket has a `BRIEF-<N>.md`. A developer still writes
+`BRIEF.md` in its own worktree; archive it under its number at merge time.
 
 ---
 
-## Left for the owner
+## What is now true that was not
+
+- **The agent activity overlay epic (#155) has no unproved criterion left.** `OverlayAllocationTest`
+  measures three absolute zeros over busy, empty and post-expiry frames, guarded so a zero cannot be
+  reported for an overlay that quietly stopped drawing (the reviewer proved that guard itself:
+  expected 352032, was 800).
+- **`gl tests (xvfb)` is deterministic.** `isRunning` reads the loop's own monotone exit signal
+  (`finished.count > 0L`) rather than `thread.isAlive`. Reverted to pre-fix code, the new
+  `GlThreadShutdownTest` is red **4/4** where the old assertion was red **0/4**.
+- **`moba` has item actives and unique passives**, on a cooldown group that is a property of the
+  **slot**, not the `AbilityDef`. `udea-gas` gained `CooldownGroup`/`CooldownSharing` and **no
+  replicated component**, so neither lock file moved.
+- **Blocked-while-dead is a GAS tag**, so a corpse can no longer cast through a key press or an RPC.
+  Wider than #166 asked; reviewed as a correct implementation because no existing test's
+  expectations were rewritten to accept it. **One line to revert** if the owner disagrees.
+
+---
+
+## Still open, and not this wave's to answer
 
 - **#179 — the Phase 7 checkpoint. One word: continue, stop, or re-plan**, plus the entry in
-  `docs/decisions/phase-log.md` in the same change that closes it. All three spec section 6 exit
-  criteria are ticked with evidence on the issue; the decision was deliberately left blank, because
-  spec section 7's mitigation for the top risk is that *a person* says it out loud, and an agent
-  writing "continue" into an append-only log empties it of the only thing it does. **That file still
-  has no entries through seven phases.** Note the issue also records that Phase 7 landed while
-  Phases 3–6 still carry open work, so answering it in isolation could imply more than is true.
+  `docs/decisions/phase-log.md`. Still deliberately blank; spec section 7's mitigation is that *a
+  person* says it out loud. **That file still has no entries through seven phases.**
 - **Mark `replay-equality`, `latency budgets` and `the FIR checkers fail a real build` as required
-  status checks.** Branch protection; no agent can set it. All three now produce a verdict and all
-  three have been seen to fail for the right reason.
+  status checks.** Branch protection; no agent can set it.
 - **Run `sh gradlew :udea-assets-compiler:udeaPackGate --rerun` once locally.** Carried from wave 2.
-  #168's contract derives frame size from the images and asserts every frame is 100x100; a real
-  corpus that is not uniform will newly fail on your machine only. Relax the uniformity assertion,
-  not the corpus.
-- **Whether `example` merges into `master`.** Still yours, still untouched.
+- **Whether `example` merges into `master`.** Still the owner's, still untouched.
 
----
+## Backlog notes
 
-## Pick up next
+`#147`–`#151` are still open and still describe work that shipped at `8035374`. `#160` was open and
+five of its six criteria had shipped — the triage comment on it is the model: grep the tree, find
+what is really missing, redirect the developer to that and say so in the dispatch.
 
-1. **#178** — the `gl tests (xvfb)` `OffscreenBackendTest` shutdown flake. Passed in the final run,
-   but it is a flake with four recorded occurrences and it is the only job making the GL surface
-   pass-or-fail. `dev-172` recorded the newest detail: a `CancellationException` at
-   `OffscreenBackendTest.kt:206`, on a branch touching no GL code.
-2. **#183** — two more tests reading repo files their build script does not declare
-   (`udea-annotations`, `udea-codegen`), neither script declaring any inputs at all. Same class as
-   #180, one module out. Includes the question of whether #180's guard should generalise.
-3. **#181** — `clean build under budget` flips red and green on identical work. Now has **seven**
-   data points and a recorded swing of **21 806 ms** (#182's runs), wider than the 13 558 ms the
-   issue records. It already runs in isolation, so it needs a better-conditioned measurement.
-4. **#184** — `udeaWarmEditBudget`'s 3000 ms line measures ~180 ms now it runs alone. One constant
-   doing two jobs badly: a product contract and a regression threshold.
-5. **#166** — item actives and unique passives. Untouched for three waves.
-
-**Roster note:** #183 and #184 are disjoint (different modules) and either pairs safely with #178.
-Memory is the ceiling on this box, not cores — it is shared with `melon-merge`'s dev team, and
-~3.5G per developer against what `free -g` reports available is the budget that held all three waves.
+**The dashboard MCP is configured now.** All three developers and all three reviewers this wave
+reported `mcp__agent-dashboard__*` absent, so nothing reached the owner's wall for the whole run.
+`~/.claude-second/.claude.json` now carries both servers, token verified against the live server on
+`127.0.0.1:8010`. **It needs a session restart to take effect** — MCP servers connect at startup.
+Tell agents to use `post_update` and `heartbeat`; `request_input`/`await_request` block on a human
+and nobody is watching.

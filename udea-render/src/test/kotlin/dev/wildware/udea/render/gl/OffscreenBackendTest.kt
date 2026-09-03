@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
@@ -201,7 +202,16 @@ class OffscreenBackendTest {
         val backend = startBackend(RenderRegistry())
         backend.close()
 
-        // If the loop were still running, this would block for the full shutdown timeout.
+        // `close` does not return until the loop has signalled that it exited or its shutdown
+        // budget has run out, so this asks about something that has already happened either
+        // way. There is no deadline in this test to lose a race against -- which is the whole
+        // of issue #178: the assertion below used to be the only one here, and it was reading
+        // `Thread.isAlive` through `GlThread.submit`, so on a loaded runner it saw a live
+        // thread running a loop that was over and got a `GlContextException` instead.
+        assertFalse(backend.renderLoopRunning, "the render loop was still running after close()")
+
+        // And having exited it stays exited: `awaitExit` returns instead of parking, and a
+        // `create` is refused for the stated reason rather than by whatever the queue does next.
         backend.awaitExit()
         assertFailsWith<IllegalStateException> { backend.create(definition().build()) }
     }

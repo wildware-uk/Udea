@@ -76,8 +76,28 @@ internal class GlThread(private val window: WindowConfig, visible: Boolean) {
 
     private val thread = Thread({ run() }, "udea-gl").apply { isDaemon = true }
 
-    /** True between a successful [start] and the GL thread exiting. */
-    val isRunning: Boolean get() = thread.isAlive && failure.get() == null
+    /**
+     * True between a successful [start] and the render loop exiting.
+     *
+     * The loop's exit is read from [finished] and not from `Thread.isAlive`, and the difference
+     * between those two is the whole of issue #178. [run]'s `finally` counts [finished] down
+     * and *then* fails the queued tasks and runs the shutdown hook, so between the loop ending
+     * and the OS thread terminating there is a window whose width is however long the scheduler
+     * takes to get back to that thread — nothing bounds it, and on a loaded runner it is wide.
+     * A caller that reached [submit] inside it passed `check(isRunning)`, queued a task onto a
+     * queue nobody would drain again, and was answered with a [GlContextException] where the
+     * contract says `IllegalStateException`.
+     *
+     * Reading the latch makes the answer a consequence of the loop's own exit signal instead:
+     * [stop] does not return until it has observed [finished] or given up on it, so once a
+     * caller has seen [stop] return normally every later [submit] is refused, with no
+     * dependence on when the thread object happens to die.
+     *
+     * `thread.isAlive` stays in the conjunction because it is what answers *before* [start],
+     * where the latch is still armed and the loop has yet to begin.
+     */
+    val isRunning: Boolean get() =
+        thread.isAlive && finished.count > 0L && failure.get() == null
 
     /**
      * Boots the context and returns once it is current and usable.
@@ -124,7 +144,10 @@ internal class GlThread(private val window: WindowConfig, visible: Boolean) {
                 throw GlContextException("the GL thread stopped before running a task", cancelled)
             }
             val cause = failure.get()
-            if (cause != null || !thread.isAlive) {
+            // `finished` and not `thread.isAlive`, for the same reason [isRunning] reads it:
+            // nothing is drained after the loop signals its exit, so waiting for the thread
+            // object to die is waiting past the moment the answer became known.
+            if (cause != null || finished.count == 0L) {
                 throw GlContextException("the GL thread stopped before running a task", cause)
             }
             if (waitedMillis >= TASK_TIMEOUT_MILLIS) {
@@ -157,18 +180,25 @@ internal class GlThread(private val window: WindowConfig, visible: Boolean) {
         shutdown.set(hook)
     }
 
-    /**
-     * Asks the loop to exit and waits for the thread to finish.
-     *
-     * Idempotent: a host's shutdown path and a test's `finally` both call it.
-     */
     /** Blocks until the render loop has exited. */
     fun awaitExit() {
         finished.await()
     }
 
+    /**
+     * Asks the loop to exit and waits for it to say it has.
+     *
+     * Idempotent: a host's shutdown path and a test's `finally` both call it. When it returns
+     * having observed the exit, [isRunning] is false and every later [submit] is refused —
+     * which is the property `OffscreenBackendTest` and `GlThreadShutdownTest` hold it to.
+     * It can also return on [SHUTDOWN_TIMEOUT_SECONDS] with the loop still running; that is a
+     * loop which did not stop, and [isRunning] still says so.
+     */
     fun stop() {
-        if (thread.isAlive) {
+        // Both conjuncts are load-bearing. `thread.isAlive` keeps a `GlThread` that was never
+        // started from posting an exit to whichever *other* backend owns the `Gdx.app` static;
+        // `finished` keeps a loop that has already ended from being asked again.
+        if (thread.isAlive && finished.count > 0L) {
             // `postRunnable` rather than `submit`: the block ends the loop that would have
             // completed a `submit`'s future, so waiting for it to return is waiting forever.
             runCatching { Gdx.app?.postRunnable { Gdx.app.exit() } }

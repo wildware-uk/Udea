@@ -1,10 +1,10 @@
-759fb4c
+6f9f531
 
 # Issue #166 — Item actives and unique passives on the shared item cooldown slot
 
 Branch `issue-166-item-actives-unique-passives`, off `origin/example` at `60a9471`.
 
-The SHA above is `759fb4c`, the **last commit of the change** — the convention `c26afe4` set for
+The SHA above is `6f9f531`, the **last commit of the change** — the convention `c26afe4` set for
 `BRIEF-182`. The commit that adds this file sits on top of it and contains nothing but this file.
 
 > **On the filename.** The contract I was given says `BRIEF.md` in the worktree root. `4f075c4`
@@ -257,7 +257,7 @@ JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew clean build
 ```
 
 ```
-BUILD SUCCESSFUL in 26s
+BUILD SUCCESSFUL in 23s
 223 actionable tasks: 144 executed, 72 from cache, 7 up-to-date
 Configuration cache entry reused.
 ```
@@ -265,11 +265,11 @@ Configuration cache entry reused.
 No `-x`. Test totals read out of every `*/build/test-results/*/TEST-*.xml` that run produced:
 
 ```
-sh gradlew clean build: 2567 tests, 0 failures, 0 errors, 34 skipped
+sh gradlew clean build: 2574 tests, 0 failures, 0 errors, 34 skipped
   moba: 233          udea-agent: 281        udea-agent-host: 162
   udea-annotations: 11   udea-assets: 76    udea-assets-compiler: 191
   udea-audio: 15     udea-codegen: 244      udea-compiler-plugin: 127
-  udea-core: 435     udea-diagnostics: 87   udea-gas: 98
+  udea-core: 435     udea-diagnostics: 87   udea-gas: 105
   udea-gradle: 49    udea-net: 255          udea-render: 204
   udea-replay: 99
 ```
@@ -327,7 +327,7 @@ result.
 | `moba/ability` | `Debuffs.Dead` + `ability/dead` + `DeathTagSystem`; `ITEM_STATS`/`ITEM_PASSIVES`; four ability slots and the item-slot layout |
 | `moba` controls/HUD | `moba/item_1` (E) and `moba/item_2` (R); four slot boxes; key on an empty slot; the names column anchored so four fit |
 | `moba/assets/item` | `stats.udea.kts` (five stat effects, four named passives); `maxHealth`/`maxMana`; a `passive` on every `unique` |
-| tests | `UniquePassiveTest`, `ItemActiveTest`, two additions to `MobaHudTest`, `MobaFieldTest`'s bindings, the corpus script list |
+| tests | `UniquePassiveTest`, `ItemActiveTest`, `CooldownGroupTest`, two additions to `MobaHudTest`, `MobaFieldTest`'s bindings, the corpus script list |
 | fixtures | both `.udearep` files regenerated — §7 |
 
 ---
@@ -393,6 +393,33 @@ and `item/phoenix_charm` (`ability/priest_heal`), `item/scouting_totem`
 left them pointing at no passive; this branch authored the four passive effects they name, which is
 what makes the groups mean anything.
 
+### The engine half, tested in its own module
+
+`udea-gas/src/test/kotlin/dev/wildware/udea/gas/CooldownGroupTest.kt`, 7 tests, all green. The
+`moba` tests above prove the *acceptance criteria* through the real game, which is where they
+belong. What they cannot state is **why the group is a property of the slot rather than of the
+`AbilityDef`** — that argument needs one definition granted into three slots, two of them grouped,
+and an assertion that firing one of the pair leaves the third ready. Under a
+group-on-the-definition design that assertion is unsatisfiable, and `slots granted the same
+definition inside and outside a group do not share` is what says so.
+
+It also carries the **control** for the adoption test: `Abilities.grant` does *not* adopt a live
+group cooldown and `AbilityActivation.grant` does, and both halves are asserted — so if the plain
+grant ever started adopting, the adoption test would go on passing and stop meaning anything.
+
+Neutralising the propagation in `AbilityActivation.activate`:
+
+```diff
+-            if (peer != slot && sharing.groupOf(peer) == group) {
++            if (false && peer != slot && sharing.groupOf(peer) == group) {
+```
+
+```
+CooldownGroupTest > slots granted the same definition inside and outside a group do not share() FAILED
+CooldownGroupTest > firing one slot in a group cools down every slot in it() FAILED
+7 tests completed, 2 failed
+```
+
 > **Out of scope:** the asset kind, `Inventory` and the shop (`#132`, merged and untouched here);
 > bots buying items (`#133`); consumables with charges, wards and vision items — none added.
 
@@ -450,10 +477,16 @@ Working artefacts are under
 `evidence-green-counts.txt`, `replay-fixture-refusal.txt`, and `mutation-m{1..6}-*.{diff,log,result}`.
 
 They are **outside** the repository's `build/` on purpose: they were there first, and
-`sh gradlew clean build` deleted them. Everything quoted above was regenerated afterwards from the
-tree at `759fb4c`, so every block in this brief can be reproduced by re-running the command beside
-it. The scratchpad is session-scoped; the images in
-`/srv/ssd1/workspace/Udea/build/debug-screenshots/` and this file are the durable record.
+`sh gradlew clean build` deleted them. Everything quoted above was regenerated afterwards, so every
+block in this brief can be reproduced by re-running the command beside it. The scratchpad is
+session-scoped; the images in `/srv/ssd1/workspace/Udea/build/debug-screenshots/` and this file are
+the durable record.
+
+**Which tree produced which block, precisely.** The six mutation runs and their diffs are from
+`759fb4c`; the `clean build` totals, the GL run and the green evidence run are from `6f9f531`. The
+one commit between them adds `CooldownGroupTest` and a defaulted parameter on `GasFixture` and
+touches no `moba` source at all — `git diff 759fb4c 6f9f531 -- moba/` is empty — so every mutation
+above applies verbatim to `6f9f531`.
 
 ---
 

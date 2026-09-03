@@ -6,7 +6,6 @@ import dev.wildware.moba.MobaGame
 import dev.wildware.moba.MobaModule
 import dev.wildware.moba.ability.CharacterAttributes
 import dev.wildware.moba.ability.Corpse
-import dev.wildware.moba.ability.MobaEffects
 import dev.wildware.moba.ability.MobaTags
 import dev.wildware.moba.MobaControls
 import dev.wildware.moba.Player
@@ -56,8 +55,6 @@ internal class ShopHarness private constructor(
      * five call sites to prevent, and the one `LaneProofTest` takes the same precaution against.
      */
     val combat: CharacterAttributes,
-    /** This world's effect table indices, off the same [MobaEffects] its units were built with. */
-    val effectNames: MobaEffects,
     /** This world's tag vocabulary, for an assertion about *which* tag blocked an activation. */
     val tags: MobaTags,
 ) {
@@ -242,7 +239,7 @@ internal class ShopHarness private constructor(
             val host = GameHost(RenderMode.Headless, definition, null)
             MobaEntry.seed(host)
             host.run(WARMUP_TICKS)
-            val harness = ShopHarness(host, catalog, combat.attributes, combat.effects, combat.tags)
+            val harness = ShopHarness(host, catalog, combat.attributes, combat.tags)
             with(host.world) {
                 val champion = harness.champion()
                 checkNotNull(champion.getOrNull(Wallet)) { "no wallet after $WARMUP_TICKS ticks" }

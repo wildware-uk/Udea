@@ -82,26 +82,21 @@ public class MobaEffects private constructor(
     public val itemStatByName: Map<String, Int> =
         ITEM_STATS.associate { it.stat to table.indexOf(it.effect) }
 
-    /**
-     * The magnitude each item passive is worth, by its effect name.
-     *
-     * The number is here and not in the asset because `EffectMagnitude` has no constant case -
-     * `assets/item/stats.udea.kts` says so at length and names what closing it would take. It is
-     * staged onto the application under [MobaTags.DATA_ITEM_STAT] exactly as an ability's
-     * cooldown ticks are staged onto `ability/cooldown`.
-     *
-     * Iterated only through [ITEM_PASSIVES]; the map is a lookup.
-     */
-    public val itemPassiveMagnitude: Map<String, Float> =
-        ITEM_PASSIVES.associate { it.effect to it.amount }
-
     /** One named item passive: the effect an item's `unique` group grants once. */
     public class ItemPassive internal constructor(
         /** The [GameplayEffectDef] name, which is also the asset id an item's `passive` points at. */
         public val effect: String,
         /** Which attribute it moves. */
         public val attribute: (CharacterAttributes) -> AttributeId,
-        /** How much of it. See [itemPassiveMagnitude] for why the number is here. */
+        /**
+         * How much of it.
+         *
+         * The number is here and not in the asset because `EffectMagnitude` has no constant
+         * case - `assets/item/stats.udea.kts` says so at length and names what closing it would
+         * take. `ItemPassiveSystem` stages it onto the application under
+         * [MobaTags.DATA_ITEM_STAT], exactly as an ability's cooldown ticks are staged onto
+         * `ability/cooldown` rather than authored on it.
+         */
         public val amount: Float,
     ) {
         override fun toString(): String = "ItemPassive($effect, $amount)"

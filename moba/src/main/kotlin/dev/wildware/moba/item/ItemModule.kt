@@ -71,7 +71,7 @@ public class ItemModule(
      * or a passive this game cannot apply fails while a definition is being assembled - which is
      * before a world exists, let alone a player who paid for the bonus. See [ItemBonusTable].
      */
-    public val bonuses: ItemBonusTable =
+    private val bonuses: ItemBonusTable =
         ItemBonusTable.of(catalog, combat.effects, combat.abilities.table)
 
     override fun context(builder: GameContextBuilder) {

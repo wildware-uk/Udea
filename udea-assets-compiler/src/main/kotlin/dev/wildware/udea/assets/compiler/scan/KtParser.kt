@@ -1,13 +1,18 @@
 package dev.wildware.udea.assets.compiler.scan
 
+import org.jetbrains.kotlin.CoreEnvironmentDeprecation
+import org.jetbrains.kotlin.cli.extensionsStorage
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.com.intellij.psi.PsiFileFactory
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
+import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.MessageCollectorAccess
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.KtFile
 
@@ -41,10 +46,42 @@ public class KtParser @JvmOverloads constructor(
 
     private val disposable: Disposable = Disposer.newDisposable("udea-assets-compiler-psi")
 
+    /**
+     * Three opt-ins, and all three are the compiler asking for acknowledgement rather than
+     * offering an alternative (Kotlin 2.4, issue #186):
+     *
+     * - `CompilerConfiguration.Internals` guards the constructor. There is no public builder
+     *   for an empty configuration, and an empty configuration is exactly the point of this
+     *   class -- no classpath, no JDK roots, no resolution.
+     * - `MessageCollectorAccess` guards `MESSAGE_COLLECTOR_KEY`. The suggested replacement,
+     *   `CompilerConfiguration.report`, *sends* a message; this needs to install the collector
+     *   that swallows them, because a PSI-only parse has nothing to report and
+     *   `createForProduction` requires the key to be present.
+     * - `CoreEnvironmentDeprecation` guards `KotlinCoreEnvironment` itself, which the compiler
+     *   says is "planned to be reworked". Nothing replaces it yet: the whole point here is a
+     *   `PsiFileFactory` with no analysis behind it, and the K2 front end offers no smaller
+     *   entry point. When it does, this is the one place that changes.
+     */
+    @OptIn(
+        ExperimentalCompilerApi::class,
+        CompilerConfiguration.Internals::class,
+        MessageCollectorAccess::class,
+        CoreEnvironmentDeprecation::class,
+    )
     private val factory: PsiFileFactory = run {
         val configuration = CompilerConfiguration().apply {
             put(CommonConfigurationKeys.MODULE_NAME, "udea-asset-scan")
             put(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
+
+            // An EMPTY extension storage, and it has to be present (Kotlin 2.4, issue #186).
+            // `KotlinCoreEnvironment.configureProjectEnvironment` now asks the configuration
+            // for the compiler plugins it should install, and an absent storage is an
+            // `IllegalStateException("Extensions storage is not registered")` at construction
+            // rather than a default of "no plugins". Empty is the correct content: this parser
+            // runs no plugin, no checker and no analysis -- it is a PsiFileFactory and nothing
+            // else. Nothing caught this at compile time, because the change is a new runtime
+            // precondition on an unchanged signature; `KtParserTest` is what caught it.
+            extensionsStorage = CompilerPluginRegistrar.ExtensionStorage()
         }
         val environment = KotlinCoreEnvironment.createForProduction(
             disposable,

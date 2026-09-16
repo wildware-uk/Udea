@@ -10,7 +10,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalCompilerApi::class)
+/*
+ * `CompilerConfiguration()`'s constructor is annotated `@CompilerConfiguration.Internals` from
+ * Kotlin 2.4: the compiler asks its callers to go through a builder it does not expose. A test
+ * of a `CommandLineProcessor` has to hand `processOption` a real configuration and read back
+ * what landed in it, and there is no public route to an empty one, so the opt-in is the honest
+ * answer rather than a way around a check. It is scoped to the test source set; nothing in
+ * `src/main` opts in.
+ */
+@OptIn(ExperimentalCompilerApi::class, CompilerConfiguration.Internals::class)
 class UdeaCommandLineProcessorTest {
 
     private val processor = UdeaCommandLineProcessor()

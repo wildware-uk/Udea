@@ -54,7 +54,10 @@ class AbilitySystem : IntervalSystem() {
             context(world) {
                 val remoteSource = world.getNetworkEntityOrNull(it.entity)
                     ?: return@processAndRemoveEach
-                val spec = remoteSource[Abilities].findAbilityById(abilityId)
+                // `with(world)`: Kotlin 2.4 will not choose between the system's own
+                // `EntityComponentContext` and the `context(world)` above it, and for a Fleks
+                // system those are the same `World` object (issue #186).
+                val spec = with(world) { remoteSource[Abilities] }.findAbilityById(abilityId)
                 doAbility(remoteSource, spec)
                 println(
                     "${if (gameScreen.isServer) "SERVER" else "CLIENT"} " +
@@ -74,7 +77,9 @@ class AbilitySystem : IntervalSystem() {
 
     context(world: World)
     fun activateAbilityByTag(entity: Entity, tag: GameplayTag) {
-        val abilities = entity[Abilities]
+        // `with(world)` for the same reason as above: one of the two candidates has to be named,
+        // and here the context parameter and the system's own context are the same World.
+        val abilities = with(world) { entity[Abilities] }
         val ability = abilities.findAbilityByTag(tag)
 
         if (ability != null) activateAbility(entity, ability)

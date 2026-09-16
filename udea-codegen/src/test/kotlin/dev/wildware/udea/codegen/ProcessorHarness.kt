@@ -20,8 +20,40 @@ import java.io.File
  */
 internal object ProcessorHarness {
 
-    /** The project's Kotlin version, minus the patch: `udea-codegen` is pinned to it (spec 7). */
-    private const val KOTLIN_LANGUAGE_VERSION = "2.2"
+    /**
+     * The Kotlin language version and JVM target to run KSP2 at, handed over by
+     * `udea-codegen/build.gradle.kts` from `UdeaVersions` (issue #186).
+     *
+     * Read rather than written down. Both used to be literals with a comment claiming they were
+     * the project's, and both would have stayed at 2.2 and 17 through the 2.4.20/JDK 21 move
+     * while every assertion in `ProcessorLoggingTest` and `ProcessorFailureTest` went on passing
+     * -- about a language and a bytecode level the project no longer uses. There is deliberately
+     * no default: an absent property fails here, loudly, rather than quietly restoring the
+     * defect.
+     */
+    private fun required(property: String): String =
+        checkNotNull(System.getProperty(property)) {
+            "-D$property did not reach this JVM. `udea-codegen/build.gradle.kts` sets it from " +
+                "UdeaVersions so the harness runs KSP at the version the project compiles at; " +
+                "without it this harness would silently test some other version."
+        }
+
+    private val kotlinLanguageVersion: String get() = required("udea.kotlinLanguageVersion")
+
+    private val harnessJvmTarget: String get() = required("udea.jvmTarget")
+
+    /**
+     * KSP 2.3's own notice about a processor that has not taken the "upcoming features" opt-in.
+     *
+     * It is emitted by `KotlinSymbolProcessing` at `info` **about** the processor, not by the
+     * processor, and there is nothing `UdeaSymbolProcessor` can do about it: nothing in
+     * `symbol-processing-api` 2.3.12 exposes the opt-in, and `KSPConfig.Builder`'s only booleans
+     * are `incremental`, `incrementalLog`, `allWarningsAsErrors`, `mapAnnotationArgumentsInJava`
+     * and `experimentalPsiResolution`. So [Run.processorInfos] filters it out, and
+     * `ProcessorLoggingTest` asserts it is still there -- an exclusion nobody re-checks is how
+     * the next real info message gets waved through.
+     */
+    const val UPCOMING_FEATURES_NOTICE: String = "has not opted in for upcoming features"
 
     /**
      * @param sources file name to Kotlin source text.
@@ -68,10 +100,10 @@ internal object ProcessorHarness {
             resourceOutputDir = File(outputBase, "resources")
             javaOutputDir = File(outputBase, "java")
             processorOptions = options
-            jvmTarget = "17"
+            jvmTarget = harnessJvmTarget
             jdkHome = File(System.getProperty("java.home"))
-            languageVersion = KOTLIN_LANGUAGE_VERSION
-            apiVersion = KOTLIN_LANGUAGE_VERSION
+            languageVersion = kotlinLanguageVersion
+            apiVersion = kotlinLanguageVersion
             // The test runtime classpath already carries udea-annotations and the stdlib, which
             // is everything a fixture source can reference.
             libraries = System.getProperty("java.class.path")
@@ -118,6 +150,16 @@ internal object ProcessorHarness {
         val errors: List<String> get() = logger.errors.map { it.message }
         val warnings: List<String> get() = logger.warnings.map { it.message }
         val infos: List<String> get() = logger.infos.map { it.message }
+
+        /**
+         * [infos] without KSP's own notice about the processor - see [UPCOMING_FEATURES_NOTICE].
+         *
+         * This is what "the processor was silent" can mean now that KSP itself says something at
+         * `info` on every run. Asserting on [infos] instead would be asserting that KSP is quiet,
+         * which is not this module's claim and not something it can make true.
+         */
+        val processorInfos: List<String>
+            get() = infos.filterNot { UPCOMING_FEATURES_NOTICE in it }
 
         /**
          * The errors with the source position each was reported at.

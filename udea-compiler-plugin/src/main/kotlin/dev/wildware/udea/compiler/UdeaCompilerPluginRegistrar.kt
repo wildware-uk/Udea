@@ -8,7 +8,6 @@ import org.jetbrains.kotlin.cli.jvm.config.jvmClasspathRoots
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.diagnostics.rendering.RootDiagnosticRendererFactory
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 
 /**
@@ -28,15 +27,27 @@ public class UdeaCompilerPluginRegistrar : CompilerPluginRegistrar() {
 
     override val supportsK2: Boolean = true
 
+    /**
+     * Abstract on `CompilerPluginRegistrar` since Kotlin 2.4, and it is the same id the CLI
+     * processor and the `gradle-plugins` descriptor already use, so it is read from the one
+     * place that declares it rather than typed a fourth time.
+     */
+    override val pluginId: String = UdeaCompilerPlugin.PLUGIN_ID
+
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
         val options = configuration.toUdeaPluginOptions()
         if (!options.enabled) return
 
-        if (options.checkers) {
-            // Registering the renderer map is what makes the diagnostic printable at all;
-            // an unregistered factory renders as a bare "null" message.
-            RootDiagnosticRendererFactory.registerFactory(UdeaDiagnostics.Renderers)
-        }
+        // No renderer registration here any more, and nothing was lost with it. Up to Kotlin
+        // 2.2 a diagnostic factory carried no renderer, so this class called
+        // `RootDiagnosticRendererFactory.registerFactory(UdeaDiagnostics.Renderers)` into a
+        // process-wide registry or the message rendered as a bare "null". From 2.4
+        // `AbstractKtDiagnosticFactory` holds its own `rendererFactory`, taken from the
+        // `KtDiagnosticsContainer` the `error1`/`warning0` delegate was declared on -- see
+        // `UdeaDiagnostics` -- so a factory cannot exist without a renderer to print it.
+        // `UdeaRuleParityTest.the rendered message carries the id, so a developer sees it`
+        // compiles real source and reads the text the compiler printed, so it is that test and
+        // not this comment that says the renderer still reaches a developer.
 
         // Built here, once per compilation, and shared by every FIR session the compilation
         // creates. The `lazy` inside it means the classpath is not walked at all unless a

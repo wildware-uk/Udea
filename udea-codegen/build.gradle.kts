@@ -1,4 +1,5 @@
 import dev.wildware.udea.build.UdeaNetComponents
+import dev.wildware.udea.build.UdeaVersions
 import dev.wildware.udea.build.registerNetProtocolLock
 
 plugins {
@@ -127,4 +128,17 @@ tasks.test {
         "udea.updateGeneratedHashes",
         providers.gradleProperty("udea.updateGeneratedHashes").getOrElse("false"),
     )
+
+    // The Kotlin language version and JVM target `ProcessorHarness` runs KSP2's standalone
+    // runner at (issue #186).
+    //
+    // They were literals -- "2.2" and "17" -- with a comment claiming they were the project's.
+    // The claim was true when it was written and silently stopped being true when the catalog
+    // moved: the harness would have gone on driving the processor at language version 2.2 under
+    // a 2.4 compiler, and every `ProcessorFailureTest` and `ProcessorLoggingTest` assertion
+    // would have kept passing about a language the project no longer uses. Handed over at the
+    // one moment the real numbers are known instead, and `ProcessorHarness` fails loudly rather
+    // than defaulting if either is absent.
+    systemProperty("udea.kotlinLanguageVersion", UdeaVersions.KOTLIN.substringBeforeLast('.'))
+    systemProperty("udea.jvmTarget", UdeaVersions.JVM_TOOLCHAIN.toString())
 }

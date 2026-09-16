@@ -3,7 +3,7 @@
 # UDEA
 
 [![shield](https://img.shields.io/badge/Ko--fi-Donate%20-hotpink?logo=kofi&logoColor=white)](https://ko-fi.com/shaunwild)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-purple.svg)](http://kotlinlang.org/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.4.20-purple.svg)](http://kotlinlang.org/)
 [![Discord](https://img.shields.io/discord/1442524958432563292)](https://discord.gg/jzmH5VQDqj)
 [![Trello](https://img.shields.io/badge/check_progress-trello-blue)](https://trello.com/b/3JqieuNR/udea)
     

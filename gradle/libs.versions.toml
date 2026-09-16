@@ -7,7 +7,7 @@ libgdx = "1.13.1"
 # plugins
 changelog = "2.2.1"
 intelliJPlatform = "2.5.0"
-kotlin = "2.2.10"
+kotlin = "2.4.20"
 kover = "0.9.1"
 qodana = "2024.3.4"
 junitJupiter = "5.8.1"
@@ -21,16 +21,39 @@ junitJupiter = "5.8.1"
 # the `udea.kotlin-build-tool` convention - the jars loaded inside the compiler - pin the
 # resolved stdlib back to `kotlin` and prove it with `udeaVerifyKotlinPin`. Everything
 # else deliberately takes the higher stdlib, which is the supported direction.
-ksp = "2.2.10-2.0.2"
+#
+# KSP has left the `<kotlin>-<ksp>` versioning scheme, so this entry's *shape* changed with the
+# 2.4.20 move and not just its number. `2.2.21-2.0.5` was the last release on the old scheme;
+# from `2.3.0` onwards KSP publishes a single version of its own and no longer names a compiler
+# in it. That is deliberate on KSP's side: KSP2 talks to the Kotlin Analysis API rather than to
+# the compiler frontend, so it is no longer built once per Kotlin release.
+#
+# The consequence for this repository is that `UdeaVersions.KOTLIN` can no longer be checked
+# against this string, and `UdeaVersionsTest` no longer pretends it can - see `KspVersionRule`
+# for what is still checkable and where the executable proof lives instead.
+ksp = "2.3.12"
 kotlinpoet = "2.3.0"
 fleks = "2.14"
-gdx = "1.13.5"
+# libGDX. Moved 1.13.5 -> 1.14.2 with the ComposeGL move (issue #186), and not for its own
+# sake: `composegl-gdx:0.5.0` depends on `com.badlogicgames.gdx:gdx:1.14.2`, so Gradle upgraded
+# `gdx` to 1.14.2 on `udea-render` and `moba` while `gdx-backend-lwjgl3` and the
+# `gdx-platform`/`gdx-box2d-platform` **native** loaders stayed on 1.13.5 from this entry. A gdx
+# core at one version and its desktop natives at another is the skew that fails inside
+# `Lwjgl3Application`'s own constructor, and it would have been invisible: `:udea-render:dependencies`
+# printed `gdx:1.13.5 -> 1.14.2` while this file still said 1.13.5. One version here keeps core,
+# backend, natives and box2d on the same release and leaves `composegl-gdx` with nothing to upgrade.
+gdx = "1.14.2"
 junit5 = "5.13.4"
 # ASM is a build/test-time class-file reader: udea-render's udeaVerifyHeadless scans the
 # compiled bytecode of the headless modules for GL references, and udeaVerifyDeterminism
 # (Phase 7) will share the same visitor. Never a runtime dependency of a shipped module.
 asm = "9.6"
 junitPlatform = "1.13.4"
+# ComposeGL: the Compose-based UI toolkit that replaces scene2d (issues #185-#189). Every
+# published release declares `kotlin-stdlib:2.4.20` and its jars carry `@Metadata(mv = [2, 4, 0])`,
+# which is why `kotlin` above had to move to 2.4.20 before any of this could be on the classpath
+# at all. `composegl-gdx` is a GL backend, so it is `udea-render`-only by UDEA-MG-002.
+composegl = "0.5.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -67,6 +90,12 @@ gdx-platform = { module = "com.badlogicgames.gdx:gdx-platform", version.ref = "g
 gdx-box2d = { module = "com.badlogicgames.gdx:gdx-box2d", version.ref = "gdx" }
 gdx-box2d-platform = { module = "com.badlogicgames.gdx:gdx-box2d-platform", version.ref = "gdx" }
 asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
+# The toolkit: nodes, modifiers, layout, widgets, input, and `HeadlessBackend`/`uiTest`, which is
+# how a composable is composed and asserted on with no window (see ComposeGlLinkTest).
+composegl-ui = { module = "dev.wildware.composegl:composegl-ui", version.ref = "composegl" }
+# The libGDX backend: it draws a ComposeGL tree through a gdx `Batch`, so it names GL types and
+# may only ever be a dependency of `udea-render`.
+composegl-gdx = { module = "dev.wildware.composegl:composegl-gdx", version.ref = "composegl" }
 junit5-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }
 
@@ -74,5 +103,9 @@ junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launche
 changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }
 intelliJPlatform = { id = "org.jetbrains.intellij.platform", version.ref = "intelliJPlatform" }
 kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+# The Compose compiler plugin. `version.ref = "kotlin"` is not a convenience: since Kotlin 2.0
+# this plugin ships out of the Kotlin repository and is released in lockstep with the compiler,
+# so any other version is a version that cannot load. Applied to `udea-render` only.
+composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 qodana = { id = "org.jetbrains.qodana", version.ref = "qodana" }

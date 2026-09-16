@@ -86,8 +86,14 @@ class NetworkServerSystem(
 
             defaultCharacter.value.newInstance(world).apply {
                 println("Setting networkable to $id")
-                this.configure {
-                    it += Networkable(id)
+                // `with(world)`, and `this@apply` because that `with` moves the innermost
+                // receiver. Kotlin 2.4 will not choose between the system's own
+                // `EntityComponentContext` and the `context(world)` around `onTick`, and for a
+                // Fleks system both are the same `World` object (issue #186).
+                with(world) {
+                    this@apply.configure {
+                        it += Networkable(id)
+                    }
                 }
             }
 

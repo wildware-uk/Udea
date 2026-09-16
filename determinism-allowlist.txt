@@ -32,7 +32,7 @@
 # affected rows and moves the pin. That is the whole mechanism issue #151 asks for.
 
 @version fleks 2.14
-@version gdx 1.13.5
+@version gdx 1.14.2
 
 #
 # THE ENTRIES

@@ -7,7 +7,7 @@ plugins {
     // Not applied: the root project has no sources of its own. It is declared so that the
     // Kotlin Gradle plugin is on this script's classpath, which is what makes the
     // `KotlinCompile` type below resolvable for the `allprojects` jvmTarget rule.
-    kotlin("jvm") version "2.2.10" apply false
+    kotlin("jvm") version "2.4.20" apply false
 
     // Phase 0 build gates from the `build-logic` included build. Applied to the rewrite
     // subprojects below, never to the root or to the old tree.
@@ -51,13 +51,13 @@ allprojects {
     }
 
     java {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     tasks.withType<KotlinCompile>().configureEach {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
+            jvmTarget.set(JvmTarget.JVM_21)
         }
     }
 }

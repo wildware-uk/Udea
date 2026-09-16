@@ -35,55 +35,65 @@ class UnitAISystem : IteratingSystem(
     }
 
     override fun onTickEntity(entity: Entity): Unit = context(world) {
-        val team = entity[Team]
-        val abilities = entity[Abilities]
-        val attributes = entity[Attributes]
-        val controller = entity[CharacterController]
-        val gameUnit = entity[GameUnit]
+        // `with(world)` wraps this whole body (issue #186). Kotlin 2.4 will not choose between
+        // the system's own `EntityComponentContext` and the `context(world)` this body already
+        // declares, and reports every `entity[...]`, `in` and `configure` call as ambiguous. For a
+        // Fleks system those two candidates are the same `World` object, so naming one changes
+        // nothing; `with` is the spelling the compiler itself suggests. The `context(world)` stays
+        // because some calls in here -- `Entity.position`, `applyGameplayEffectToSelf` -- want
+        // `World` as a context *parameter*, which an implicit receiver does not supply.
+        // Diffing this file with whitespace ignored shows only these added lines.
+        with(world) {
+                val team = entity[Team]
+                val abilities = entity[Abilities]
+                val attributes = entity[Attributes]
+                val controller = entity[CharacterController]
+                val gameUnit = entity[GameUnit]
 
-        if (gameUnit.isDead) return@context
+                if (gameUnit.isDead) return@context
 
-        val attributeSet = attributes.getAttributes<CharacterAttributeSet>()
+                val attributeSet = attributes.getAttributes<CharacterAttributeSet>()
 
-        controller.movement.setZero()
+                controller.movement.setZero()
 
-        if (attributeSet.health.currentValue < attributeSet.maxHealth.currentValue / 2F) {
-            val healingAbility = abilities.findAvailableAbilityWithTags(AIHint.Heal)
+                if (attributeSet.health.currentValue < attributeSet.maxHealth.currentValue / 2F) {
+                    val healingAbility = abilities.findAvailableAbilityWithTags(AIHint.Heal)
 
-            if (healingAbility != null) {
-                world.system<AbilitySystem>().activateAbility(entity, healingAbility)
-            }
-        }
+                    if (healingAbility != null) {
+                        world.system<AbilitySystem>().activateAbility(entity, healingAbility)
+                    }
+                }
 
-        val nearestEnemy = gameUnitsFamily
-            .filter { it[Team].teamId != team.teamId && !it[GameUnit].isDead && it.position.dst(entity.position) < 10F }
-            .map { it }
-            .minByOrNull { it.position.dst(entity.position) } ?: return
+                val nearestEnemy = gameUnitsFamily
+                    .filter { it[Team].teamId != team.teamId && !it[GameUnit].isDead && it.position.dst(entity.position) < 10F }
+                    .map { it }
+                    .minByOrNull { it.position.dst(entity.position) } ?: return
 
-        val heading = nearestEnemy.position.cpy().sub(entity.position)
-        val distance = heading.len()
+                val heading = nearestEnemy.position.cpy().sub(entity.position)
+                val distance = heading.len()
 
-        if(AITag.Fearless !in gameUnit.aiTags && attributeSet.health.currentValue <= 10) {
-            controller.movement.set(heading.nor().scl(-1F))
-            return@context
-        }
+                if(AITag.Fearless !in gameUnit.aiTags && attributeSet.health.currentValue <= 10) {
+                    controller.movement.set(heading.nor().scl(-1F))
+                    return@context
+                }
 
-        if (distance > .5F) {
-            val rangedAbility = abilities.findAvailableAbilityWithTags(AIHint.Damage, AIHint.Ranged)
+                if (distance > .5F) {
+                    val rangedAbility = abilities.findAvailableAbilityWithTags(AIHint.Damage, AIHint.Ranged)
 
-            if (rangedAbility != null) {
-                world.system<AbilitySystem>().activateAbility(entity, rangedAbility)
-            } else {
-                controller.movement.set(heading.nor())
-            }
-        } else {
-            val meleeAbility = abilities.findAvailableAbilityWithTags(AIHint.Damage, AIHint.Melee)
+                    if (rangedAbility != null) {
+                        world.system<AbilitySystem>().activateAbility(entity, rangedAbility)
+                    } else {
+                        controller.movement.set(heading.nor())
+                    }
+                } else {
+                    val meleeAbility = abilities.findAvailableAbilityWithTags(AIHint.Damage, AIHint.Melee)
 
-            if (meleeAbility != null) {
-                world.system<AbilitySystem>().activateAbility(entity, meleeAbility)
-            } else {
-                controller.movement.set(heading.nor().scl(-1F))
-            }
+                    if (meleeAbility != null) {
+                        world.system<AbilitySystem>().activateAbility(entity, meleeAbility)
+                    } else {
+                        controller.movement.set(heading.nor().scl(-1F))
+                    }
+                }
         }
     }
 }

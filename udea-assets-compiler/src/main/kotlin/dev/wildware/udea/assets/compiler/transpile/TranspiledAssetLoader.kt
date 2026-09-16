@@ -1,5 +1,6 @@
 package dev.wildware.udea.assets.compiler.transpile
 
+import dev.wildware.udea.assets.compiler.EMBEDDED_JVM_TARGET
 import dev.wildware.udea.assets.compiler.AssetCompileResult
 import dev.wildware.udea.assets.compiler.AssetCompilerRules
 import dev.wildware.udea.assets.compiler.AssetGraph
@@ -85,7 +86,7 @@ public class TranspiledAssetLoader(
             classpath = compileClasspath.joinToString(java.io.File.pathSeparator) { it.absolutePathString() }
             noStdlib = true
             noReflect = true
-            jvmTarget = "17"
+            jvmTarget = EMBEDDED_JVM_TARGET
         }
         val exit = K2JVMCompiler().exec(collector(collected), Services.EMPTY, arguments)
         if (exit != ExitCode.OK && collected.none { it.severity == Severity.Error }) {

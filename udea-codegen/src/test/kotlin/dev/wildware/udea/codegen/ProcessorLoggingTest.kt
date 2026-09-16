@@ -22,7 +22,22 @@ class ProcessorLoggingTest {
 
         assertEquals(emptyList(), run.warnings, "the processor must not warn on a successful run")
         assertEquals(emptyList(), run.errors, "the processor must not error on a valid component")
-        assertEquals(emptyList(), run.infos, "the processor must not chatter at info either")
+        assertEquals(
+            emptyList(),
+            run.processorInfos,
+            "the processor must not chatter at info either",
+        )
+
+        // The other half of that assertion, and what keeps it honest (issue #186). KSP 2.3 says
+        // one thing at `info` on every run - that the processor has not taken the "upcoming
+        // features" opt-in, which nothing in `symbol-processing-api` 2.3.12 exposes - so
+        // `processorInfos` excludes it. If KSP ever stops saying it, or renames it, this goes red
+        // and the exclusion should be deleted rather than widened.
+        assertEquals(
+            1,
+            run.infos.count { ProcessorHarness.UPCOMING_FEATURES_NOTICE in it },
+            "expected exactly KSP's own opt-in notice at info, got ${run.infos}",
+        )
         assertTrue(run.succeeded, "expected a clean run, got ${run.exitCode}")
         assertEquals(
             listOf("PowerCellReplicator.kt"),

@@ -41,8 +41,18 @@ class GameUnitSystem : IteratingSystem(
     }
 
     override fun onAddEntity(entity: Entity): Unit = context(world) {
-        val healthRegen = GameplayEffectSpec(reference("ability/passive_health_regen"))
-        entity[Abilities].applyGameplayEffectToSelf(entity, healthRegen)
+        // `with(world)` wraps this whole body (issue #186). Kotlin 2.4 will not choose between
+        // the system's own `EntityComponentContext` and the `context(world)` this body already
+        // declares, and reports every `entity[...]`, `in` and `configure` call as ambiguous. For a
+        // Fleks system those two candidates are the same `World` object, so naming one changes
+        // nothing; `with` is the spelling the compiler itself suggests. The `context(world)` stays
+        // because some calls in here -- `Entity.position`, `applyGameplayEffectToSelf` -- want
+        // `World` as a context *parameter*, which an implicit receiver does not supply.
+        // Diffing this file with whitespace ignored shows only these added lines.
+        with(world) {
+                val healthRegen = GameplayEffectSpec(reference("ability/passive_health_regen"))
+                entity[Abilities].applyGameplayEffectToSelf(entity, healthRegen)
+        }
     }
 
     private fun checkDead(

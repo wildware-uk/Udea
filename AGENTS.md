@@ -1,7 +1,16 @@
 # Udea — agent brief
 
 A Kotlin/LibGDX/Fleks engine built so agents can do most of the work of making a game with it.
-Package root `dev.wildware.udea`. Kotlin 2.2.10, KSP 2.2.10-2.0.2, Gradle 8.13, JDK 17.
+Package root `dev.wildware.udea`. Kotlin 2.4.20, KSP 2.3.12, Gradle 8.13, JDK 21.
+
+Three of those four moved in issue #186, and two of the moves change a shape rather than a
+number. KSP has left the `<kotlin>-<ksp>` scheme — from 2.3.0 it publishes one version of its
+own and names no compiler — so a KSP version can no longer be read off the Kotlin version. And
+the JDK went 17 to 21 because every published ComposeGL artifact is Java 21 bytecode
+(`org.gradle.jvm.version = 21` on `composegl-gdx`, class-file major 65 throughout), which is a
+resolution failure long before it is a compile failure. `gradle/libs.versions.toml` is the
+authoritative source for all of it; `UdeaVersions` mirrors the two that build logic needs as
+constants and `UdeaVersionsTest` is what stops the mirror drifting.
 
 Three documents, in order of authority:
 

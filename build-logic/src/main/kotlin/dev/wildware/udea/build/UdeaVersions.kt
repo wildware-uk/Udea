@@ -15,8 +15,8 @@ public object UdeaVersions {
      * version exactly — a K2 plugin built against a different compiler than the one
      * loading it fails at class-load time, not at compile time.
      */
-    public const val KOTLIN: String = "2.2.10"
+    public const val KOTLIN: String = "2.4.20"
 
     /** JDK release every module targets. */
-    public const val JVM_TOOLCHAIN: Int = 17
+    public const val JVM_TOOLCHAIN: Int = 21
 }

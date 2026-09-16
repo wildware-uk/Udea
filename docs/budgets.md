@@ -14,7 +14,7 @@ and notes drift.
 | **Budget** | 90 000 ms (spec §6, Phase 0 exit: "clean build <90s") |
 | **Gate** | `clean-build-budget` job in `.github/workflows/ci.yml` |
 | **Command** | `./gradlew clean udeaAssemble --no-build-cache` |
-| **Runner** | `ubuntu-latest`, Temurin JDK 17, daemon warmed with `./gradlew help` first |
+| **Runner** | `ubuntu-latest`, Temurin JDK 21, daemon warmed with `./gradlew help` first |
 | **Threshold source** | `UDEA_CLEAN_BUILD_BUDGET_MS`, defaulting to `90000` |
 | **Measured** | 26 248 ms – 31 705 ms |
 | **Measured on** | developer workstation, Windows 11, 32 logical cores, Corretto 17.0.8, Gradle 8.13 |
@@ -136,7 +136,7 @@ issue and is not what this is.
 ### The measured numbers
 
 Solo, serialised, on the development box: 24 processors, load average 4.8–13.3, Temurin 21.0.11
-launcher, JDK 17 toolchain, Gradle 8.13, another project's GL suite running alongside.
+launcher, JDK 21 toolchain, Gradle 8.13, another project's GL suite running alongside.
 
 | Gate | Task | Budget | Measured (median) | Headroom |
 |---|---|---|---|---|

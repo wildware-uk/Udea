@@ -14,8 +14,11 @@ class AttributeSystem : IteratingSystem(
     family = family { all(Attributes, Abilities) }
 ) {
     override fun onTickEntity(entity: Entity): Unit = context(world) {
-        val attributes = entity[Attributes]
-        val abilities = entity[Abilities]
+        // `with(world)`: Kotlin 2.4 will not choose between the system's own
+        // `EntityComponentContext` and the `context(world)` this body is wrapped in, and for a
+        // Fleks system both are the same `World` object (issue #186).
+        val attributes = with(world) { entity[Attributes] }
+        val abilities = with(world) { entity[Abilities] }
 
         attributes.attributeSet.resetCurrentValues()
 

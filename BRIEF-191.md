@@ -1,11 +1,38 @@
-131bca8
+757a7f2
 # BRIEF-191: save and load levels as binary Fleks snapshots with kotlinx CBOR
 
 Branch `issue-191-level-save-load`, rebased onto `origin/example` at `5e37c99`.
 Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a2f9401b541e763b3`.
 
-`131bca8` is the last commit of the change. The commit after it adds only this file.
+`757a7f2` is the last commit of the change (the review round 1 fix, section 0). The commit after it changes
+only this file. Sections 1 to 8 were produced at `131bca8`, the round-1 SHA, and name it where they quote a run.
 Every artefact named below is under `/srv/ssd1/workspace/Udea/build/issue191-evidence/` (called `EV/`).
+
+---
+
+## 0. Review round 1
+
+Finding: public declarations nothing outside `udea-core` reads. `git grep` over every module found no reader
+outside `udea-core` for any of them. `udea-core`'s own tests use `LevelComponentModule.discover`, which
+`internal` still allows. Now `internal`:
+- `LevelComponent.type`, `LevelComponent.serializer`, `LevelComponent.serialName`. The constructor stays
+  public for generated code in other modules.
+- `LevelComponentModule.discover`.
+- `Level.entityCount`.
+
+Nothing else changed. `sh gradlew build` at `757a7f2`, no exclusions (`EV/build-full-r2.log`):
+
+```
+BUILD SUCCESSFUL in 1m 10s
+211 actionable tasks: 56 executed, 155 up-to-date
+exit=0
+```
+
+Tests summed from the JUnit XML afterwards (`EV/test-count-r2.txt`):
+
+```
+tests 2549 skipped 0 failures 0 errors 0
+```
 
 ---
 

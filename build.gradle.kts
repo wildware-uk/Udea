@@ -31,6 +31,10 @@ plugins {
     // implement could move in any commit and the build stayed green. The question is about the
     // repository rather than about a module, so the gate belongs where the other two do.
     id("udea.contract-freeze")
+
+    // Root for the same reason again (issue #181): the clean-build-budget CI job asks whether a
+    // commit made `udeaAssemble` as a whole slower, and this is where it asks for the verdict.
+    id("udea.clean-build-budget")
 }
 
 group = "dev.wildware.udea"

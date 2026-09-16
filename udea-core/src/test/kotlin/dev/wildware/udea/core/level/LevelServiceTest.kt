@@ -18,6 +18,7 @@ import dev.wildware.udea.core.physics.BodyHandle
 import dev.wildware.udea.core.physics.BodyPose
 import dev.wildware.udea.core.physics.Box
 import dev.wildware.udea.core.physics.PhysicsBody
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -41,11 +42,11 @@ import kotlin.test.assertTrue
  */
 class LevelServiceTest {
 
-    private fun host(): GameHost = GameHost(RenderMode.Headless, UdeaGameDef(emptyList()))
+    private fun host(): GameHost = GameHost(RenderMode.Headless, UdeaGameDef(CoreUdeaRegistry, emptyList()))
 
     private fun levels(host: GameHost, hooks: LevelHooks = LevelHooks(), vararg extra: LevelComponent<*>): LevelService =
         LevelService(host.world, host.ctx, host.ctx[CoreModule.NET_IDS], hooks) {
-            LevelComponentModule.discover() + TestComponents(extra.toList())
+            LevelComponentModule.of(CoreUdeaRegistry) + TestComponents(extra.toList())
         }
 
     private class TestComponents(override val components: List<LevelComponent<*>>) : LevelComponentModule {
@@ -248,7 +249,7 @@ class LevelServiceTest {
         val original = host()
         val saved = populated(original)
         val bytes = save(original, levels(original, extra = arrayOf(linkComponent)))
-        val format = LevelFormat(LevelComponentModule.discover() + TestComponents(listOf(linkComponent)), LevelHooks())
+        val format = LevelFormat(LevelComponentModule.of(CoreUdeaRegistry) + TestComponents(listOf(linkComponent)), LevelHooks())
         val document = format.decode(bytes)
         assertTrue(document.handles.freeIndices.isNotEmpty(), "the fixture has no freed id to contradict")
 

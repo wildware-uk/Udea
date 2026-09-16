@@ -104,7 +104,7 @@ internal object ToolManifest {
      *
      * A fragment and not the whole `GET /tools` document, because no single KSP round sees
      * every module - merging them is the agent host's job, and it is the reason each module
-     * publishes a `ToolModule` through `ServiceLoader` rather than writing into a shared file.
+     * lists its tools on its own generated registry rather than writing into a shared file.
      */
     fun render(moduleName: String, tools: List<ToolModel>): String {
         val toolsets = tools

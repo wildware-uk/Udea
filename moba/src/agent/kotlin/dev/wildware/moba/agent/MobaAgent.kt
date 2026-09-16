@@ -59,6 +59,7 @@ import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.loop.barrier
 import dev.wildware.udea.core.module.CoreModule
+import dev.wildware.udea.generated.MobaUdeaRegistry
 import dev.wildware.udea.render.OverlayResources
 import dev.wildware.udea.render.OverlaySystem
 import dev.wildware.udea.render.input.InjectedIntent
@@ -292,7 +293,10 @@ public object MobaAgent {
         )
         val tools = EngineToolModules
             .wireAll(
-                ToolIndex.builder(),
+                // Every generated `ToolModule` facet on this game's registry (issue #202). None of
+                // `moba`'s modules sets `udea.toolModuleService` today, so this adds no tool; it is
+                // the wiring a game's own `@AgentTool` would arrive through.
+                ToolIndex.builder().registry(MobaUdeaRegistry),
                 worldTools,
                 TimeToolset(host.time, host.ctx.clock, bridge),
                 // The artifact store, not `TextSpill.NONE`: an event message too long for the

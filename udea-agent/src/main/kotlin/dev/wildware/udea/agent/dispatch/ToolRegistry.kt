@@ -9,12 +9,11 @@ import dev.wildware.udea.agent.AgentToolArg
  *
  * ## Why the dispatcher takes an interface it does not implement
  *
- * The real implementation is **generated**: `udea-codegen` emits one `ToolModule` per module
- * from the `@AgentTool` functions it sees, and a runtime index merges them through
- * `ServiceLoader`. The dispatcher must not know that, for the reason spec 5 gives for
- * ServiceLoader discovery in the first place - no magic package, no classpath scan - and
- * because a dispatcher that could only be exercised by running a KSP round would have no
- * unit tests worth the name. A hand-written registry in a test drives every path here.
+ * The real implementation is **generated**: `udea-codegen` lists each module's `@AgentTool`
+ * functions on its generated registry, and a runtime index merges the registries a launcher
+ * names. The dispatcher must not know that, for the reason spec 5 gives for generated discovery
+ * in the first place - no magic package, no classpath scan - and because a dispatcher that could
+ * only be exercised by running a KSP round would have no unit tests worth the name. A hand-written registry in a test drives every path here.
  *
  * ## What an implementation owes
  *

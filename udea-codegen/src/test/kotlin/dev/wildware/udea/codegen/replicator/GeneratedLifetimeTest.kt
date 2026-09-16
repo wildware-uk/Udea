@@ -123,6 +123,7 @@ class GeneratedLifetimeTest {
             ),
             mapOf(
                 "udea.moduleName" to "Fixtures",
+                "udea.registryModules" to "Fixtures",
                 "udea.projectComponents" to "fixtures.Spawned",
             ),
         )
@@ -142,6 +143,7 @@ class GeneratedLifetimeTest {
             ),
             mapOf(
                 "udea.moduleName" to "Fixtures",
+                "udea.registryModules" to "Fixtures",
                 "udea.projectComponents" to "fixtures.Spawned",
             ),
         )

@@ -31,7 +31,7 @@ public value class GameplayTag(public val id: Int) : Comparable<GameplayTag> {
  * Names to [GameplayTag] ids for one game, assigned deterministically.
  *
  * Built once at start-up from every tag any module declares. Ids are assigned by ascending
- * name, so declaration order — and therefore `ServiceLoader` discovery order — cannot change
+ * name, so declaration order — and therefore the order modules are listed in — cannot change
  * them. That is the same rule the attribute table follows, and for the same reason: an id that
  * depends on load order is an id two machines disagree about.
  */

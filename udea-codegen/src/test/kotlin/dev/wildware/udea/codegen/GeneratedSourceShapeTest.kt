@@ -42,13 +42,12 @@ class GeneratedSourceShapeTest {
                 // toolset-qualified name, and an AgentContext parameter (a ContextualToolDef).
                 "dev/wildware/udea/codegen/fixtures/TimelineAdvanceTool.kt",
                 "dev/wildware/udea/codegen/fixtures/TimelineDescribeTool.kt",
-                // The module-level outputs. There is exactly one aggregating group per module:
-                // the `ServiceLoader` index this module contributes, and the protocol constant
-                // a packet header carries.
-                "dev/wildware/udea/generated/CodegenFixturesNetModule.kt",
+                // The module-level outputs, one aggregating group per module: the module's
+                // registry, the protocol constant a packet header carries, and the launcher
+                // registry naming every module registry on this module's test classpath.
+                "dev/wildware/udea/generated/CodegenFixturesModuleRegistry.kt",
                 "dev/wildware/udea/generated/CodegenFixturesNetProtocol.kt",
-                "dev/wildware/udea/generated/CodegenFixturesStateModule.kt",
-                "dev/wildware/udea/generated/CodegenFixturesToolModule.kt",
+                "dev/wildware/udea/generated/CodegenFixturesUdeaRegistry.kt",
             ),
             GeneratedSources.relativePaths(),
         )

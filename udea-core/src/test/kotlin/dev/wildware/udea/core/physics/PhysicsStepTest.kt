@@ -5,6 +5,7 @@ import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,7 +23,7 @@ import kotlin.test.assertTrue
 class PhysicsStepTest {
 
     private fun host(physics: PhysicsWorld): GameHost =
-        GameHost(RenderMode.Headless, UdeaGameDef(listOf(PhysicsOverrideModule(physics))))
+        GameHost(RenderMode.Headless, UdeaGameDef(CoreUdeaRegistry, listOf(PhysicsOverrideModule(physics))))
 
     @Test
     fun `randomised frame deltas produce exactly one physics step per simulation tick`() {

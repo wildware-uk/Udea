@@ -9,6 +9,7 @@ import dev.wildware.udea.core.gameContext
 import dev.wildware.udea.core.loop.GameLoop
 import dev.wildware.udea.core.loop.WorldSimulation
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.interp.InterpSnapshotSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -71,7 +72,7 @@ class PureSimulationTest {
         // `systems { add(...) }` takes nothing else. It could not fail, which is what §8 calls
         // a test that cannot fail. The property worth checking is that the *shipped*
         // configuration contributes nothing that draws, and that is what runs here.
-        val game = UdeaGameDef(modules = listOf(RenderModule())).build()
+        val game = UdeaGameDef(registry = CoreUdeaRegistry, modules = listOf(RenderModule())).build()
 
         assertTrue(
             game.world.systems.isNotEmpty(),

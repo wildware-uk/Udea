@@ -1,14 +1,14 @@
 package dev.wildware.udea.net
 
+import dev.wildware.udea.core.registry.UdeaRegistry
 import dev.wildware.udea.core.replication.Replicator
-import java.util.ServiceLoader
 
 /**
- * Discovers every [NetModule] on the classpath and flattens them into one protocol.
+ * Picks every [NetModule] out of a game's generated registry and flattens them into one protocol.
  *
- * This is the *consumer* half of the generated index. Without it the generated
- * `META-INF/services` line is a file nothing reads, and cross-module discovery is emitted
- * but never exercised — which is exactly how the mechanism it replaces rotted.
+ * This is the *consumer* half of the generated `NetModule` facet. Without it the facet is a list
+ * nothing reads, and cross-module replication is emitted but never exercised — which is exactly
+ * how the mechanism before it rotted.
  *
  * ## Why the id collision check lives here
  *
@@ -24,17 +24,14 @@ import java.util.ServiceLoader
 public object NetRegistry {
 
     /**
-     * Every [NetModule] on [classLoader], in ascending [NetModule.moduleName] order.
+     * Every [NetModule] in [registry], in ascending [NetModule.moduleName] order.
      *
-     * Sorted rather than in discovery order: `ServiceLoader` walks the classpath, and the
-     * classpath order of two jars is a property of how Gradle assembled the run, not of the
-     * protocol. A server and a client that disagreed about it would build different worlds
-     * from the same modules.
+     * Sorted rather than in registry order: the protocol is a property of the modules, not of
+     * how a launcher's list was assembled, and a server and a client that disagreed about the
+     * order would build different worlds from the same modules.
      */
-    public fun load(classLoader: ClassLoader = NetRegistry::class.java.classLoader): List<NetModule> =
-        ServiceLoader.load(NetModule::class.java, classLoader)
-            .toList()
-            .sortedBy(NetModule::moduleName)
+    public fun modules(registry: UdeaRegistry): List<NetModule> =
+        registry.modules.filterIsInstance<NetModule>().sortedBy(NetModule::moduleName)
 
     /**
      * Every module's replicators in one list, in ascending component type id order.
@@ -43,7 +40,7 @@ public object NetRegistry {
      *   modules and both replicators — a bare "id 3 collides" sends the reader to grep two
      *   jars, and this does not.
      */
-    public fun replicators(modules: List<NetModule> = load()): List<Replicator<*>> {
+    public fun replicators(modules: List<NetModule>): List<Replicator<*>> {
         val owners = HashMap<Int, String>()
         val all = ArrayList<Replicator<*>>()
         for (module in modules) {

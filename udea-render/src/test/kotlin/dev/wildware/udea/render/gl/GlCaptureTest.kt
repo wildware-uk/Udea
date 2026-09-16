@@ -9,6 +9,7 @@ import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.capture.CaptureRegion
 import dev.wildware.udea.render.capture.CaptureRequest
@@ -153,7 +154,7 @@ class GlCaptureTest {
             registry,
         )
         try {
-            val host = GameHost(RenderMode.Offscreen, UdeaGameDef(modules = emptyList()), backend)
+            val host = GameHost(RenderMode.Offscreen, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()), backend)
             backend.drive(host)
             block(backend, host)
         } finally {

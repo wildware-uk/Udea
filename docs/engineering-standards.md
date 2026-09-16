@@ -22,7 +22,7 @@ is a reaction to. If you find yourself reproducing one of these, stop.
 | Stringly-typed domain | `Assets["character/orc"]`, string attribute lookup | Domain primitives are value classes: `Tick`, `NetId`, `AssetId`, `AttributeId`. Never a bare `Int`, `Long` or `String` for a domain concept. |
 | Code built by string concatenation | `NetworkGenerator.kt` builds Kotlin source with `appendLine` and no escaping | Generated code is emitted with KotlinPoet. Never string concatenation. |
 | Silent failure | `NetworkGenerator` swallows per-symbol exceptions in a `try/catch` that only logs; `logger.warn` for normal operation | Failures are loud and located. Report through `UdeaDiagnostic` with a stable rule id and a `SourceSpan`. Never log-and-continue past a real error. |
-| Reflection on hot paths | `UdeaReflections`, classpath scanning for serializers | No reflection in simulation, replication or rendering. Discovery happens at build time via codegen and `ServiceLoader`. |
+| Reflection on hot paths | `UdeaReflections`, classpath scanning for serializers | No reflection in simulation, replication or rendering. Discovery happens at build time via codegen: a generated registry per module and per launcher. |
 | Linear scans as lookups | `utils.kt:35-36` scans the family per inbound packet | Identity resolution is O(1). If a lookup is on a per-tick path, it is indexed. |
 | Unbounded/fixed-magic buffers | `ByteBuffer.allocate(2048)`, then writing all 2048 regardless | No magic numbers. Sizes are named constants with a stated reason, or computed. |
 | `TODO()` in a live path | `NetworkClientSystem.kt:75`, `// TODO validate the sender!` | No `TODO()` on a reachable path. Unimplemented means the type does not exist yet, or the call fails loudly with a typed error. |
@@ -66,7 +66,7 @@ share a vocabulary.
 |---|---|---|
 | Strategy | `Transport` (loopback / simulated / UDP), `PhysicsWorld` | Swappable behaviour is the whole point; it is what makes socket-free tests possible. |
 | Command | `SimBarrier` queue, agent tool dispatch | Mutations become data: queueable, orderable, replayable, testable. |
-| Registry + ServiceLoader | `ComponentType`, `NetModule`, `ToolModule` | Cross-module discovery without reflection or a magic package name. |
+| Generated registry | `ModuleRegistry` with its `NetModule`, `ToolModule`, `StateModule` and `LevelComponentModule` facets; `UdeaRegistry` | Cross-module discovery without reflection, a magic package name or a run-time classpath lookup. |
 | Value class | `Tick`, `NetId`, `AssetId`, field masks | Type safety at zero runtime cost. |
 | Sealed hierarchy | packet kinds, `RenderMode`, diagnostics severity, tool results | Exhaustive `when` — the compiler catches the case you forgot. |
 | Object pool | bit buffers, `FieldStore` scratch | Only on measured allocation hot paths. A pool anywhere else is premature and a smell. |

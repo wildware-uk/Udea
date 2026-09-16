@@ -13,26 +13,32 @@ package dev.wildware.udea.codegen
  * @param moduleName the module's name in `UpperCamelCase`. Present means "emit this module's
  *   index declarations"; absent means the module is being processed for its per-component
  *   replicators alone, which is what `udea-codegen`'s own harness runs do.
- * @param netModuleService the fully-qualified name of the `NetModule` service interface, when
+ * @param netModuleService the fully-qualified name of the `NetModule` facet interface, when
  *   this module's runtime classpath has it. Generated code may only implement an interface
- *   that exists, so the emission is gated on the module actually depending on `udea-net`
- *   rather than on the processor assuming it does.
+ *   that exists, so the module registry implements it only when the module actually depends on
+ *   `udea-net` rather than on the processor assuming it does. The option names predate the
+ *   registry, when each facet was a `java.util` service; they are kept so no build script moves.
  * @param projectComponents **the whole project's** `@Replicated` component names, which is
  *   the id space every module assigns from (spec 5: "one generator, sorted FQNs"). It is
  *   required of any module that also sets [moduleName], because that module emits a lock, a
- *   `protoHash` and a `ServiceLoader` index — it is a participant in the project's wire
+ *   `protoHash` and a module registry — it is a participant in the project's wire
  *   contract, and a participant numbered from its own symbols collides with every other one.
  *   `null` is legal only for a module that emits no protocol identity at all, where the ids
  *   never leave the module; the processor refuses the combination rather than falling back.
  *   The build reads the list from the reviewed `net-components.lock` in the repository root.
- * @param toolModuleService the fully-qualified name of the `ToolModule` service interface,
+ * @param toolModuleService the fully-qualified name of the `ToolModule` facet interface,
  *   when this module's runtime classpath has it. Gated for the same reason as
  *   [netModuleService]: generated code may only implement an interface that exists, and a
  *   module contributing `@AgentTool` functions to a game that does not ship the agent surface
  *   at all is a normal configuration, not an error.
- * @param stateModuleService the fully-qualified name of the `StateModule` service interface,
+ * @param stateModuleService the fully-qualified name of the `StateModule` facet interface,
  *   on the same terms. Separate from [toolModuleService] because a module may publish match
  *   state without declaring a single tool, and the reverse.
+ * @param registryModules every module whose registry this module's `<Module>UdeaRegistry` names:
+ *   this module and each Udea module on its runtime classpath, computed by `build-logic`'s
+ *   `udeaModule` from the resolved graph (issue #202). Required whenever [moduleName] is set,
+ *   because a module that set its name by hand publishes no module attribute and no launcher
+ *   would ever list it.
  */
 internal data class CodegenOptions(
     val moduleName: String?,
@@ -40,12 +46,14 @@ internal data class CodegenOptions(
     val projectComponents: List<String>?,
     val toolModuleService: String?,
     val stateModuleService: String?,
+    val registryModules: List<String>? = null,
 ) {
     companion object {
         const val MODULE_NAME: String = "udea.moduleName"
         const val NET_MODULE_SERVICE: String = "udea.netModuleService"
         const val TOOL_MODULE_SERVICE: String = "udea.toolModuleService"
         const val STATE_MODULE_SERVICE: String = "udea.stateModuleService"
+        const val REGISTRY_MODULES: String = "udea.registryModules"
 
         /**
          * The whole-project component list, comma separated.
@@ -82,6 +90,10 @@ internal data class CodegenOptions(
                 ?.takeIf(List<String>::isNotEmpty),
             toolModuleService = options[TOOL_MODULE_SERVICE]?.takeIf(String::isNotBlank),
             stateModuleService = options[STATE_MODULE_SERVICE]?.takeIf(String::isNotBlank),
+            registryModules = options[REGISTRY_MODULES]
+                ?.split(LIST_SEPARATOR)
+                ?.map(String::trim)
+                ?.filter(String::isNotEmpty),
         )
     }
 }

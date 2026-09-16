@@ -6,6 +6,7 @@ import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.loop.SimBarrier
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -28,7 +29,7 @@ class SceneSwapTest {
     private val jungle = SceneId("jungle")
 
     private fun host(swapAtTick: Long? = null, sceneA: MarkerScene, sceneB: MarkerScene? = null): GameHost {
-        val def = UdeaGameDef(listOf(SceneProbeModule(swapAtTick ?: -1L, sceneB?.id)))
+        val def = UdeaGameDef(CoreUdeaRegistry, listOf(SceneProbeModule(swapAtTick ?: -1L, sceneB?.id)))
         def.core.scenes.register(sceneA)
         sceneB?.let(def.core.scenes::register)
         val host = GameHost(RenderMode.Headless, def)
@@ -103,7 +104,7 @@ class SceneSwapTest {
     fun `a scene reloaded in the same process mints the same id indices`() {
         val a = MarkerScene(arena, seed = 7L, entityCount = 6)
         val b = MarkerScene(jungle, seed = 8L, entityCount = 3)
-        val def = UdeaGameDef(emptyList())
+        val def = UdeaGameDef(CoreUdeaRegistry, emptyList())
         def.core.scenes.register(a)
         def.core.scenes.register(b)
         val host = GameHost(RenderMode.Headless, def)
@@ -166,7 +167,7 @@ class SceneSwapTest {
     fun `a scene whose populate throws leaves no scene at all, not half of one`() {
         val a = MarkerScene(arena, seed = 11L, entityCount = 5, withBodies = true)
         val boom = ExplodingScene(jungle, spawnedBeforeFailure = 3)
-        val def = UdeaGameDef(listOf(SceneProbeModule(-1L, null)))
+        val def = UdeaGameDef(CoreUdeaRegistry, listOf(SceneProbeModule(-1L, null)))
         def.core.scenes.register(a)
         def.core.scenes.register(boom)
         val host = GameHost(RenderMode.Headless, def)
@@ -210,7 +211,7 @@ class SceneSwapTest {
         // that both lies about what it holds and reports no failure. Only populate was wrapped.
         val a = MarkerScene(arena, seed = 11L, entityCount = 5, withBodies = true)
         val b = MarkerScene(jungle, seed = 12L, entityCount = 4)
-        val def = UdeaGameDef(listOf(SceneProbeModule(-1L, null)))
+        val def = UdeaGameDef(CoreUdeaRegistry, listOf(SceneProbeModule(-1L, null)))
         def.core.scenes.register(a)
         def.core.scenes.register(b)
         val host = GameHost(RenderMode.Headless, def)
@@ -267,7 +268,7 @@ class SceneSwapTest {
     fun `the loop keeps ticking over the empty world and the next scene loads normally`() {
         val a = MarkerScene(arena, seed = 11L, entityCount = 5, withBodies = true)
         val boom = ExplodingScene(jungle, spawnedBeforeFailure = 3)
-        val def = UdeaGameDef(listOf(SceneProbeModule(-1L, null)))
+        val def = UdeaGameDef(CoreUdeaRegistry, listOf(SceneProbeModule(-1L, null)))
         def.core.scenes.register(a)
         def.core.scenes.register(boom)
         val host = GameHost(RenderMode.Headless, def)

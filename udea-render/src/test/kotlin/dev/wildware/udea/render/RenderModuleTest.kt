@@ -3,6 +3,7 @@ package dev.wildware.udea.render
 import dev.wildware.udea.core.module.SimPhase
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.physics.TeleportSystem
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.interp.InterpSnapshotSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,7 +16,7 @@ class RenderModuleTest {
 
     @Test
     fun `the pose snapshot runs before the teleport that would erase its evidence`() {
-        val game = UdeaGameDef(modules = listOf(RenderModule())).build()
+        val game = UdeaGameDef(registry = CoreUdeaRegistry, modules = listOf(RenderModule())).build()
 
         val order = game.manifest.entries.map { it.name }
         val snapshot = order.indexOf(InterpSnapshotSystem::class.java.name)
@@ -32,7 +33,7 @@ class RenderModuleTest {
 
     @Test
     fun `the pose snapshot runs in PreSimulation`() {
-        val game = UdeaGameDef(modules = listOf(RenderModule())).build()
+        val game = UdeaGameDef(registry = CoreUdeaRegistry, modules = listOf(RenderModule())).build()
 
         val entry = game.manifest.entries.single { it.name == InterpSnapshotSystem::class.java.name }
 
@@ -41,7 +42,7 @@ class RenderModuleTest {
 
     @Test
     fun `a game that leaves the module out gets no presentation system at all`() {
-        val game = UdeaGameDef(modules = emptyList()).build()
+        val game = UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()).build()
 
         assertTrue(
             game.manifest.entries.none { it.name == InterpSnapshotSystem::class.java.name },

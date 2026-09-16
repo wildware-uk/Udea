@@ -5,8 +5,8 @@ package dev.wildware.udea.annotations
  *
  * Consumed by the **`udea-codegen` KSP2 processor**, which emits one `Replicator<T>`
  * per annotated class (network delta write, network full write, snapshot capture,
- * snapshot restore, agent field read/write - spec 3.1) plus the `NetModule`
- * ServiceLoader registry entry that makes the replicator discoverable across modules.
+ * snapshot restore, agent field read/write - spec 3.1) and lists it on the module registry's
+ * `NetModule` facet, which is how the replicator reaches a game built from several modules.
  * The **`udea-compiler-plugin` K2 FIR checkers** also key off this marker: a [Net] or
  * [Sim] property on a class that is not `@Replicated` is a diagnostic.
  *

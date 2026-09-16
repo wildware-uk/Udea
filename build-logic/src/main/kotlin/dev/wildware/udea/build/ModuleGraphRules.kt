@@ -224,7 +224,7 @@ public object ModuleGraphRules {
         rationale = "common pulls in five kotlin-scripting-* artifacts and org.reflections:" +
             "reflections today, which is both a startup cost and the mechanism behind the " +
             "reflection-on-hot-paths smell the rewrite exists to kill. Asset scripts are compiled " +
-            "at build time; discovery is codegen and ServiceLoader, not classpath scanning.",
+            "at build time; discovery is a generated registry, not classpath scanning.",
         specSection = "6 (Phase 2 exit), 3.6",
         projects = setOf(":moba"),
         configurations = setOf("runtimeClasspath"),

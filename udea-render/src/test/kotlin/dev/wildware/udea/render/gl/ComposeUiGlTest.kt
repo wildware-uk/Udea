@@ -28,6 +28,7 @@ import dev.wildware.composegl.ui.widget.Text
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.FrameTime
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderPhase
@@ -223,7 +224,7 @@ class ComposeUiGlTest {
             registry,
         )
         try {
-            val host = GameHost(RenderMode.Offscreen, UdeaGameDef(modules = emptyList()), backend)
+            val host = GameHost(RenderMode.Offscreen, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()), backend)
             backend.drive(host)
             block(backend, checkNotNull(layer) { "the UI layer was never built" }, screen)
         } finally {

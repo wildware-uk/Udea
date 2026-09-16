@@ -4,8 +4,12 @@ import dev.wildware.udea.core.EngineConfig
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.level.LevelFormatException
 import dev.wildware.udea.core.level.LevelOutcome
+import dev.wildware.udea.core.level.LevelSaveException
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.module.UdeaGame
+import dev.wildware.udea.core.registry.UdeaRegistry
+import dev.wildware.udea.generated.CoreUdeaRegistry
+import dev.wildware.udea.generated.GasUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertContentEquals
@@ -25,7 +29,7 @@ import kotlin.test.assertTrue
  */
 class GasLevelTest {
 
-    private class Game(attributes: AttributeTable? = null) {
+    private class Game(attributes: AttributeTable? = null, registry: UdeaRegistry = GasUdeaRegistry) {
         val fixture = GasFixture()
         val module = GasModule(
             attributes = attributes ?: fixture.attributeTable,
@@ -33,7 +37,7 @@ class GasLevelTest {
             abilities = fixture.abilityTable,
             execs = fixture.execs,
         )
-        val def = UdeaGameDef(modules = listOf(module), config = EngineConfig(seed = 20_260_916L))
+        val def = UdeaGameDef(registry = registry, modules = listOf(module), config = EngineConfig(seed = 20_260_916L))
         val game: UdeaGame = def.build()
 
         fun step(ticks: Int) = repeat(ticks) { game.simulation.step() }
@@ -95,6 +99,24 @@ class GasLevelTest {
         )
         assertTrue(game.abilities(ids[1]).instanceAt(0).isActive, "the channel ended before the save")
         return ids
+    }
+
+    @Test
+    fun `what a level can hold is decided by the registry the game was started with, not the classpath`() {
+        // `udea-gas` is on this test's classpath either way. Started with the kernel's registry, the
+        // same game cannot save a GAS component, and says which one; that is the registry being
+        // read, where run-time service discovery would have found the module and saved it anyway.
+        val kernelOnly = Game(registry = CoreUdeaRegistry)
+        busy(kernelOnly)
+
+        val action = kernelOnly.game.levels.save(kernelOnly.game.simulation.barrier)
+        kernelOnly.game.simulation.barrier.drain(kernelOnly.game.world, kernelOnly.game.ctx)
+
+        val failure = assertIs<LevelOutcome.Failed>(action.outcome, "save: ${action.outcome}").cause
+        assertIs<LevelSaveException>(failure)
+        assertContains(failure.message.orEmpty(), "dev.wildware.udea.gas.")
+        // And the same world under this module's own registry saves.
+        Game().apply { busy(this) }.save()
     }
 
     @Test

@@ -126,7 +126,7 @@ breaks several modules at once.
 |---|---|
 | **Serialization** | One `Replicator<T>`, two masks (`@Net`/`@Sim`), frozen in Phase 0 behind golden tests. `docs/contracts/replicator.md` |
 | **Dirty determination** | Capture-and-diff, never setter instrumentation |
-| **Id assignment** | One generator, sorted FQNs, checked-in `net-protocol.lock`, `u16 protoHash` in packet byte 0, `ServiceLoader` discovery |
+| **Id assignment** | One generator, sorted FQNs, checked-in `net-protocol.lock`, `u16 protoHash` in packet byte 0, generated-registry discovery: KSP emits one `<Module>ModuleRegistry` per module and one `<Module>UdeaRegistry` per launcher in sorted-FQN order, passed to `UdeaGameDef` (issue #202, no `ServiceLoader` at run time) |
 | **Between-tick mutation** | One `SimBarrier`, drained at the top of `step()` |
 | **Entity identity** | `NetId` (dense `u16` + `u8` generation), never a Fleks `Entity`, across snapshots, packets and tool calls. `IntArray` for O(1) resolution |
 | **Time** | `Tick` is universal. `SimClock.time` is derived, never accumulated |

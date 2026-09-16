@@ -40,6 +40,7 @@ import dev.wildware.udea.gas.Attributes
 import dev.wildware.udea.gas.AttributesReplicator
 import dev.wildware.udea.gas.GameplayEffects
 import dev.wildware.udea.gas.GameplayEffectsReplicator
+import dev.wildware.udea.generated.MobaUdeaRegistry
 import dev.wildware.udea.render.RenderModule
 import dev.wildware.udea.render.input.InputModule
 
@@ -87,6 +88,11 @@ public object MobaGame {
         val combat = MobaAbilityModule()
         val module = MobaModule(combat)
         val definition = UdeaGameDef(
+            // Generated from this module's resolved runtime classpath (issue #202), so a level
+            // saved from any mode can hold every component the game's modules declare, and a
+            // module the build lists without a generated registry fails the compile rather than
+            // a save.
+            registry = MobaUdeaRegistry,
             // `RenderModule` is in the list for **every** mode, including the headless server.
             // It contributes one simulation system, `InterpSnapshotSystem`, and leaving it out of
             // the headless build would make "all three modes run the identical Simulation" false

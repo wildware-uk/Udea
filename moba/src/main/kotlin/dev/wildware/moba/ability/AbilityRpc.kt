@@ -76,9 +76,9 @@ public object AbilityRpc {
     /**
      * Every RPC this game speaks.
      *
-     * Listed here rather than discovered through `ServiceLoader`, and that is a stated gap
-     * rather than a design: `NetModule` discovery exists for replicators and nothing analogous
-     * has been built for RPCs yet, so a second module adding an `@Rpc` would have to be added
+     * Listed here rather than read off the generated registry, and that is a stated gap
+     * rather than a design: the registry has a `NetModule` facet for replicators and nothing
+     * analogous has been built for RPCs yet, so a second module adding an `@Rpc` would have to be added
      * to this list by hand. `RpcRegistry` sorts by name, so the wire index is still a pure
      * function of the set and not of the order written here.
      */

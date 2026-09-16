@@ -140,9 +140,9 @@ internal object ProcessorHarness {
         val generatedFiles: List<File>,
         /**
          * Generated resources by path relative to the resource output root, e.g.
-         * `META-INF/services/dev.wildware.udea.net.NetModule`. Kept as text because the path
-         * *is* the assertion for a `ServiceLoader` file: put it one directory out and nothing
-         * loads, with no error anywhere.
+         * `udea/Moba-net-protocol.lock`. Kept as text because the path is half of what a
+         * resource assertion is about: put it one directory out and nothing reads it, with no
+         * error anywhere.
          */
         val generatedResources: Map<String, String>,
         private val logger: RecordingLogger,

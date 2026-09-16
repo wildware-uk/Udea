@@ -2,6 +2,7 @@ package dev.wildware.udea.render.gl
 
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Graphics
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import org.lwjgl.glfw.GLFW
 import dev.wildware.udea.core.host.CaptureOutcome
 import dev.wildware.udea.core.host.GameHost
@@ -245,7 +246,7 @@ class OffscreenBackendTest {
         registry,
     )
 
-    private fun definition() = UdeaGameDef(modules = emptyList())
+    private fun definition() = UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList())
 
     private fun awaitAtLeast(counter: AtomicInteger, target: Int) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)

@@ -111,7 +111,7 @@ class ToolManifestBridgeParserTest {
             .map { TestJson.obj(it)["name"] }
 
         // Grouped by toolset and then by name, which is why the `sim.*` pair is contiguous
-        // here and interleaved in the ServiceLoader index: the manifest is what a model reads,
+        // here and interleaved in the registry's tool list: the manifest is what a model reads,
         // and a model reads a toolset at a time.
         assertEquals(
             listOf(

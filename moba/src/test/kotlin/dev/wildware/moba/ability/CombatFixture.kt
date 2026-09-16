@@ -25,6 +25,7 @@ import dev.wildware.udea.gas.Attributes
 import dev.wildware.udea.gas.GameplayEffects
 import dev.wildware.udea.gas.GasCueForwardSystem
 import dev.wildware.udea.gas.GasCueQueue
+import dev.wildware.udea.generated.MobaUdeaRegistry
 
 /**
  * A real game with nothing in it but combat, driven a tick at a time.
@@ -43,6 +44,7 @@ internal class CombatFixture(autopilot: Boolean = true) {
 
     private val definition: UdeaGameDef =
         UdeaGameDef(
+            registry = MobaUdeaRegistry,
             modules = listOf(
                 module,
                 // The game's physics, because `ProjectileSystem` now asks `PhysicsWorld.overlap`

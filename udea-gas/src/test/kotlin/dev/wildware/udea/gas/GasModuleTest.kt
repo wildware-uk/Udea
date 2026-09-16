@@ -8,6 +8,7 @@ import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.SimPhase
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.module.systemManifest
+import dev.wildware.udea.generated.GasUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -36,7 +37,7 @@ class GasModuleTest {
             execs = fixture.execs,
         )
 
-        val def = UdeaGameDef(modules = listOf(module), config = EngineConfig(seed = 20_260_823L))
+        val def = UdeaGameDef(registry = GasUdeaRegistry, modules = listOf(module), config = EngineConfig(seed = 20_260_823L))
 
         val game = def.build()
 

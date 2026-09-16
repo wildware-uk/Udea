@@ -1,3 +1,6 @@
+import dev.wildware.udea.build.UdeaModuleRegistry
+import dev.wildware.udea.build.udeaModule
+
 plugins {
     id("udea.kotlin-library")
     // The engine's own toolsets go through the same `@AgentTool` KSP pass every game's do.
@@ -66,15 +69,15 @@ dependencies {
 
 // --- the agent surface's own codegen ---------------------------------------------------------
 //
-// `udea.moduleName` is the only option set, and the omissions are the design:
+// The module's name and launcher list are the only options set, and the omissions are the design:
 //
-// - **no `udea.toolModuleService`**, so no `META-INF/services` entry is emitted for the engine's
-//   toolsets. `ToolIndex.Builder.discover()` would then find them in *every* process with
-//   `udea-agent` on the classpath, and `build()` refuses a tool whose toolset instance was never
-//   registered - so a host that wires two toolsets, and `udea-codegen`'s own fixture tests which
-//   wire a `Playground` and nothing else, would fail at start-up. `EngineToolModules` assembles
-//   the modules from the generated objects by hand instead, which is what lets a host take four
-//   of the five.
+// - **no `udea.toolModuleService`**, so `UdeaAgentModuleRegistry` does not implement `ToolModule`
+//   for the engine's toolsets. `ToolIndex.Builder.registry()` would then pick them up in *every*
+//   game whose registry lists this module, and `build()` refuses a tool whose toolset instance was
+//   never registered - so a host that wires two toolsets, and `udea-codegen`'s own fixture tests
+//   which wire a `Playground` and nothing else, would fail at start-up. `EngineToolModules`
+//   assembles the modules from the generated objects by hand instead, which is what lets a host
+//   take four of the five.
 // - **no `udea.stateModuleService`**, because this module declares no `@AgentState`.
 // - **no `udea.projectComponents`**, because it declares no `@Replicated` component either, so
 //   it mints no component type id and is not a participant in the wire contract. The processor
@@ -83,8 +86,10 @@ dependencies {
 // The tool manifest fragment IS emitted - `udea/UdeaAgent-agent-tools.json` - and
 // `EngineToolSurfaceTest` reads it, so a reworded engine tool description is a reviewable diff
 // exactly as it is for a game's own tools.
+val udeaRegistry = udeaModule("UdeaAgent")
 ksp {
-    arg("udea.moduleName", "UdeaAgent")
+    arg(UdeaModuleRegistry.MODULE_NAME_OPTION, udeaRegistry.name)
+    arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
 }
 
 // --- Phase 1 budget gate (spec 6, Phase 1 exit) ----------------------------------------------

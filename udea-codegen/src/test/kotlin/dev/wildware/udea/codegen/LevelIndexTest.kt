@@ -12,13 +12,16 @@ import org.junit.jupiter.api.io.TempDir
  * A level refuses to save a world holding a component no generated list names, so what this list
  * leaves out is what a user finds out about at the moment they press save. These run the real
  * processor over throwaway sources, as [ModuleIndexTest] does and for its reason: the claim is
- * about what the processor emits for a module - a class and a resource path - not about a fixture.
+ * about what the processor emits for a module - the `LevelComponentModule` facet of its registry -
+ * not about a fixture.
  */
 class LevelIndexTest {
 
-    private val service = "dev.wildware.udea.core.level.LevelComponentModule"
-
-    private val options = mapOf(CodegenOptions.MODULE_NAME to "Moba", CodegenOptions.PROJECT_COMPONENTS to "")
+    private val options = mapOf(
+        CodegenOptions.MODULE_NAME to "Moba",
+        CodegenOptions.REGISTRY_MODULES to "Moba",
+        CodegenOptions.PROJECT_COMPONENTS to "",
+    )
 
     private fun source(body: String): Map<String, String> = mapOf(
         "Components.kt" to (
@@ -57,18 +60,13 @@ class LevelIndexTest {
         )
 
         assertEquals(emptyList(), run.errors)
-        val index = run.generatedSource("MobaLevelComponents.kt")
-        assertTrue("public class MobaLevelComponents : LevelComponentModule" in index, index)
+        val index = run.generatedSource("MobaModuleRegistry.kt")
+        assertTrue("public object MobaModuleRegistry : ModuleRegistry, LevelComponentModule" in index, index)
         assertTrue("moduleName: String = \"Moba\"" in index, index)
         assertTrue(
             "listOf(LevelComponent(Aardvark::class, Aardvark.serializer()), " +
                 "LevelComponent(Zebra::class, Zebra.serializer()))" in index,
             "the list must name exactly the serializable components, statically, by name:\n$index",
-        )
-        assertEquals(
-            "dev.wildware.udea.generated.MobaLevelComponents\n",
-            run.generatedResources["META-INF/services/$service"],
-            "generated resources were ${run.generatedResources.keys}",
         )
     }
 
@@ -77,8 +75,8 @@ class LevelIndexTest {
         val run = ProcessorHarness.run(workDir, source(component("Unsaved", annotations = "")), options)
 
         assertEquals(emptyList(), run.errors)
-        assertTrue(run.generatedFiles.none { it.name == "MobaLevelComponents.kt" }, "${run.generatedFiles}")
-        assertTrue("META-INF/services/$service" !in run.generatedResources, "${run.generatedResources.keys}")
+        val registry = run.generatedSource("MobaModuleRegistry.kt")
+        assertTrue("LevelComponentModule" !in registry && "LevelComponent(" !in registry, registry)
     }
 
     @Test

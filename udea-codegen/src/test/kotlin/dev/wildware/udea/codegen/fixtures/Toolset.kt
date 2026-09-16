@@ -78,8 +78,8 @@ public class Playground {
      * A game's debug toolset is normally not part of its published API, and the generated
      * dispatcher has to match that visibility or it does not compile — a `public object` whose
      * `invoke` calls an internal function is not a warning, it is an error in a file nobody
-     * wrote. It is still listed in this module's public `ToolModule` index, which is what
-     * `GeneratedAgentIndexServiceTest` loads through a real `ServiceLoader`.
+     * wrote. It is still listed in this module's public `ToolModule` facet, which is what
+     * `GeneratedAgentRegistryTest` reaches through the generated launcher registry.
      *
      * The `List<Boolean>` is the other half: a scalar `Boolean` argument accepts `1` and `0`,
      * and until an element of a boolean list did too, a call written the way the schema

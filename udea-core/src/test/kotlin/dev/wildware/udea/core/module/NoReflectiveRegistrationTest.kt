@@ -2,6 +2,7 @@ package dev.wildware.udea.core.module
 
 import dev.wildware.udea.core.KotlinSource
 import dev.wildware.udea.core.ModuleFiles
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -70,7 +71,7 @@ class NoReflectiveRegistrationTest {
         // `KClass.qualifiedName` is one of the members that can need the reflect artifact.
         // The manifest is built from `java.name`, which never does — asserted here rather than
         // trusted, because the two read identically at a call site.
-        val manifest = UdeaGameDef(emptyList()).build().manifest
+        val manifest = UdeaGameDef(CoreUdeaRegistry, emptyList()).build().manifest
         assertTrue(manifest.size > 0, "CoreModule registers systems")
         for (entry in manifest.entries) {
             assertEquals(

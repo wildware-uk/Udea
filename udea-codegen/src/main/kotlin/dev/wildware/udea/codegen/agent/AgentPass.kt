@@ -18,7 +18,7 @@ import dev.wildware.udea.diagnostics.UdeaRules
  * Separated from `UdeaSymbolProcessor` because it shares nothing with the replication half but
  * the round it runs in. Every cross-cutting check that *can* be made inside one module lives
  * here — a tool name declared twice, a digest key published twice — while the checks that
- * need the whole classpath belong to the runtime index the `ServiceLoader` entry feeds, since
+ * need the whole classpath belong to the runtime index the generated registry feeds, since
  * no KSP round ever sees more than one module.
  */
 internal class AgentPass(private val logger: KSPLogger) {

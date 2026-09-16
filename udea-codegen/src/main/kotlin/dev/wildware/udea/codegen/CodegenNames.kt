@@ -82,8 +82,16 @@ internal object CoreNames {
     /** One saveable component class and its serializer (issue #191). */
     val LEVEL_COMPONENT: ClassName = ClassName(LEVEL, "LevelComponent")
 
-    /** The service a module's generated saveable-component list is found through. */
+    /** The facet a module registry implements to list its saveable components. */
     val LEVEL_COMPONENT_MODULE: ClassName = ClassName(LEVEL, "LevelComponentModule")
+
+    private const val REGISTRY = "dev.wildware.udea.core.registry"
+
+    /** What every generated `<Module>ModuleRegistry` implements (issue #202). */
+    val MODULE_REGISTRY: ClassName = ClassName(REGISTRY, "ModuleRegistry")
+
+    /** What every generated `<Module>UdeaRegistry` implements (issue #202). */
+    val UDEA_REGISTRY: ClassName = ClassName(REGISTRY, "UdeaRegistry")
 }
 
 /**
@@ -156,15 +164,9 @@ internal object GeneratedNames {
     /** `Moba` becomes `MobaNetProtocol`. */
     fun netProtocol(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}NetProtocol")
 
-    /** `Moba` becomes `MobaNetModule`. */
-    fun netModule(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}NetModule")
+    /** `Moba` becomes `MobaModuleRegistry`: everything this module contributes (issue #202). */
+    fun moduleRegistry(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}ModuleRegistry")
 
-    /** `Moba` becomes `MobaToolModule`: this module's `@AgentTool` index. */
-    fun toolModule(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}ToolModule")
-
-    /** `Moba` becomes `MobaStateModule`: this module's `@AgentState` index. */
-    fun stateModule(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}StateModule")
-
-    /** `Moba` becomes `MobaLevelComponents`: this module's saveable-component index. */
-    fun levelComponents(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}LevelComponents")
+    /** `Moba` becomes `MobaUdeaRegistry`: every module registry on this module's runtime classpath. */
+    fun udeaRegistry(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}UdeaRegistry")
 }

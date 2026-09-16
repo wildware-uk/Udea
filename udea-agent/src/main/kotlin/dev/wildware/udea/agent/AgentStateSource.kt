@@ -33,7 +33,7 @@ public interface AgentStateSource<in T> {
     public fun write(source: T, out: GameStateSink)
 }
 
-/** One Gradle module's contribution to the digest's `game` block, found through `ServiceLoader`. */
+/** One Gradle module's contribution to the digest's `game` block: a generated module registry's facet. */
 public interface StateModule {
 
     /** The Gradle module this index was generated for, in `UpperCamelCase`. */

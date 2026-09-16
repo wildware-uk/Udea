@@ -78,9 +78,16 @@ class IncrementalProcessingTest {
         // a module-level output depends on, and the one that is wrong costs a full reprocess
         // on every keystroke without changing a byte of output.
         assertTrue("aggregating = true" in functionBody("aggregating"), processorSource)
-        for (writer in listOf("writeModuleFiles", "writeAgentModuleFiles")) {
+        val registries = functionBody("writeRegistries")
+        assertTrue("aggregating(sourceFiles)" in registries, "writeRegistries does not use the one helper: $registries")
+        // The other two module-level writers are handed the helper's result by `process`, so the
+        // module's protocol, manifest and registries share one declaration of what they depend on.
+        for (writer in listOf("writeProtocolFiles", "writeManifest")) {
             val body = functionBody(writer)
-            assertTrue("aggregating(sourceFiles)" in body, "$writer does not use the one helper: $body")
+            assertTrue("dependencies: Dependencies" in body, "$writer does not take the helper's result: $body")
+        }
+        for (writer in listOf("writeRegistries", "writeProtocolFiles", "writeManifest")) {
+            val body = functionBody(writer)
             assertTrue(
                 "aggregating = false" !in body,
                 "$writer genuinely depends on every source in the module; it must not claim otherwise",
@@ -120,6 +127,7 @@ class IncrementalProcessingTest {
         )
         val options = mapOf(
             CodegenOptions.MODULE_NAME to "Moba",
+            CodegenOptions.REGISTRY_MODULES to "Moba",
             // As the build supplies it: a module emitting a protocol is numbered from the
             // project's id space, never from the symbols in front of the processor.
             CodegenOptions.PROJECT_COMPONENTS to "fixtures.Alpha,fixtures.Beta",
@@ -130,7 +138,13 @@ class IncrementalProcessingTest {
 
         assertEquals(emptyList(), a.errors)
         assertEquals(
-            listOf("AlphaReplicator.kt", "BetaReplicator.kt", "MobaNetProtocol.kt"),
+            listOf(
+                "AlphaReplicator.kt",
+                "BetaReplicator.kt",
+                "MobaModuleRegistry.kt",
+                "MobaNetProtocol.kt",
+                "MobaUdeaRegistry.kt",
+            ),
             a.generatedFiles.map { it.name }.sorted(),
         )
         assertEquals(
@@ -161,6 +175,7 @@ class IncrementalProcessingTest {
             ),
             mapOf(
                 CodegenOptions.MODULE_NAME to "Moba",
+                CodegenOptions.REGISTRY_MODULES to "Moba",
                 CodegenOptions.PROJECT_COMPONENTS to "fixtures.One",
             ),
         )

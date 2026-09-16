@@ -23,6 +23,7 @@ import dev.wildware.udea.agent.host.ToolManifest
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -174,7 +175,7 @@ class NetSessionEndToEndTest {
     @Test
     fun `a test drives the net tools through the same dispatch path an agent does`() {
         val bridge = AgentBridge()
-        val host = GameHost(RenderMode.Headless, UdeaGameDef(modules = emptyList()))
+        val host = GameHost(RenderMode.Headless, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()))
         val toolset = NetToolset()
         val tools = ToolIndex.builder().module(NetToolModule).toolset(toolset).build()
         val harness = SimHarness(host, bridge, tools) { }
@@ -207,7 +208,7 @@ class NetSessionEndToEndTest {
     @Test
     fun `a tool called before a session exists says which call to make instead`() {
         val bridge = AgentBridge()
-        val host = GameHost(RenderMode.Headless, UdeaGameDef(modules = emptyList()))
+        val host = GameHost(RenderMode.Headless, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()))
         val tools = ToolIndex.builder().module(NetToolModule).toolset(NetToolset()).build()
         val harness = SimHarness(host, bridge, tools) { }
 
@@ -222,7 +223,7 @@ class NetSessionEndToEndTest {
     @Test
     fun `a client the session does not have is refused rather than defaulted`() {
         val bridge = AgentBridge()
-        val host = GameHost(RenderMode.Headless, UdeaGameDef(modules = emptyList()))
+        val host = GameHost(RenderMode.Headless, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()))
         val tools = ToolIndex.builder().module(NetToolModule).toolset(NetToolset()).build()
         val harness = SimHarness(host, bridge, tools) { }
 
@@ -294,7 +295,7 @@ private class NetLiveInstance : AutoCloseable {
 
     private val bridge = AgentBridge()
 
-    private val host = GameHost(RenderMode.Headless, UdeaGameDef(modules = emptyList()))
+    private val host = GameHost(RenderMode.Headless, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()))
 
     private val toolset = NetToolset()
 

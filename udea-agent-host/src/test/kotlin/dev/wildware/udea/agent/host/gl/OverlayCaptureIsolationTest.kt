@@ -32,6 +32,7 @@ import dev.wildware.udea.agent.state.StateDigest
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.OverlaySystem
 import dev.wildware.udea.render.RenderPhase
@@ -212,7 +213,7 @@ class OverlayCaptureIsolationTest {
             registry,
         )
         try {
-            val host = GameHost(RenderMode.Windowed, UdeaGameDef(modules = emptyList()), backend)
+            val host = GameHost(RenderMode.Windowed, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()), backend)
             val pipeline = checkNotNull(backend.pipeline) { "the backend built no pipeline" }
 
             val artifacts = AgentArtifacts(artifactRoot.resolve(if (overlay) "with" else "without"))

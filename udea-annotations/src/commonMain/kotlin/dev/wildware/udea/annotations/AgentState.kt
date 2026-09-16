@@ -4,9 +4,9 @@ package dev.wildware.udea.annotations
  * Publishes one scalar property into the `game` block of the agent's `/state` digest.
  *
  * Consumed by the **`udea-codegen` KSP2 processor**, which emits one `AgentStateSource`
- * per declaring class plus the `StateModule` ServiceLoader entry that lets a module
- * contribute match state without `udea-agent` knowing that module exists (spec 5,
- * "Id assignment": ServiceLoader discovery, no magic package).
+ * per declaring class and lists it on the module registry's `StateModule` facet, which lets a
+ * module contribute match state without `udea-agent` knowing that module exists (spec 5,
+ * "Id assignment": a generated registry, no magic package).
  *
  * ### This is not a replication annotation
  *

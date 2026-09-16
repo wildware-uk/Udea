@@ -9,19 +9,18 @@ import dev.wildware.udea.agent.OwnerBinding
 import dev.wildware.udea.agent.ToolModule
 import dev.wildware.udea.agent.tools.ArgumentCheck
 import dev.wildware.udea.agent.tools.ContextualToolDef
+import dev.wildware.udea.core.registry.UdeaRegistry
 import dev.wildware.udea.diagnostics.UdeaRules
-import java.util.ServiceLoader
 
 /**
- * The [ToolRegistry] over every generated tool on the classpath.
+ * The [ToolRegistry] over every generated tool a game's registry lists.
  *
  * ## The seam this closes
  *
- * `udea-codegen` emits `object <Owner><Fn>Tool : AgentToolDef<Owner>` and a
- * `<Module>ToolModule` service entry per Gradle module; [AgentDispatcher] takes a
- * [ToolRegistry]. Until this class existed the two halves were generated and consumed with
- * nothing in between: the tools compiled, `ServiceLoader` could find them, and no shipped code
- * could call one. This is the join, and it is the only place in the tree that casts an
+ * `udea-codegen` emits `object <Owner><Fn>Tool : AgentToolDef<Owner>` and lists them on each
+ * Gradle module's registry as its `ToolModule` facet; [AgentDispatcher] takes a [ToolRegistry].
+ * Until this class existed the two halves were generated and consumed with nothing in between:
+ * the tools compiled, an index listed them, and no shipped code could call one. This is the join, and it is the only place in the tree that casts an
  * `AgentToolDef<*>` in order to call it.
  *
  * ## What it checks, and when
@@ -186,18 +185,17 @@ public class ToolIndex private constructor(
         private val modules = ArrayList<ToolModule>()
         private val instances = ArrayList<Any>()
 
-        /** Adds one module's tools. Usually [discover] instead; explicit for tests and hosts. */
+        /** Adds one module's tools. Usually [registry] instead; explicit for tests and hosts. */
         public fun module(module: ToolModule): Builder = apply { modules.add(module) }
 
         /**
-         * Adds every [ToolModule] on [loader], as its `META-INF/services` entry declares it.
+         * Adds every [ToolModule] facet in [registry], in the registry's order.
          *
-         * Order is `ServiceLoader`'s, which is classpath order, and deliberately not sorted:
-         * the index refuses a duplicate name rather than letting an order decide a winner, so
-         * nothing here depends on that order being stable.
+         * Deliberately not re-sorted: the index refuses a duplicate name rather than letting an
+         * order decide a winner, so nothing here depends on the order.
          */
-        public fun discover(loader: ClassLoader = ToolIndex::class.java.classLoader): Builder =
-            apply { ServiceLoader.load(ToolModule::class.java, loader).forEach(modules::add) }
+        public fun registry(registry: UdeaRegistry): Builder =
+            apply { registry.modules.filterIsInstanceTo<ToolModule, _>(modules) }
 
         /**
          * Registers the object whose `@AgentTool` functions are being served.

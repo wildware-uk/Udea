@@ -3,11 +3,12 @@
 **Status:** active (Phase 1 wave 1)
 **Producer:** `udea-codegen`, package `dev.wildware.udea.codegen.agent`
 **Consumer:** `udea-agent` (issues #65, #67, #68), then `udea-agent-host`
-**Spec:** §3.2 (`@AgentTool` manifests + JSON Schema are KSP2's job), §5 (ServiceLoader
-discovery, no magic package), §6 Phase 1 exit
+**Spec:** §3.2 (`@AgentTool` manifests + JSON Schema are KSP2's job), §5 (generated discovery,
+no magic package), §6 Phase 1 exit. Discovery amended by issue #202 (Kool/KMP port spec, D7):
+`ServiceLoader` was replaced by a generated registry, owner-approved.
 
-`udea-codegen` emits four things from `@AgentTool` and `@AgentState`, all of them written
-against types `udea-agent` owns. This page is the shape neither module may change alone: the
+`udea-codegen` emits the outputs below from `@AgentTool` and `@AgentState`, the agent-facing
+ones written against types `udea-agent` owns. This page is the shape neither module may change alone: the
 generator only ever *names* these types (`AgentNames`), so nothing but this document and the
 golden files in `udea-codegen` connect the two sides.
 
@@ -19,14 +20,25 @@ golden files in `udea-codegen` connect the two sides.
 |---|---|---|
 | `object <Owner><Fn>Tool : AgentToolDef<Owner>` | `@AgentTool` function | isolating |
 | `object <Owner>AgentState : AgentStateSource<Owner>` | class declaring `@AgentState` | isolating |
-| `class <Module>ToolModule : ToolModule` + its `META-INF/services` line | module | aggregating |
-| `class <Module>StateModule : StateModule` + its `META-INF/services` line | module | aggregating |
+| `object <Module>ModuleRegistry : ModuleRegistry`, implementing `ToolModule` and `StateModule` as facets | module | aggregating |
+| `object <Module>UdeaRegistry : UdeaRegistry`, naming every module registry on the module's runtime classpath | module | aggregating |
 | `udea/<Module>-agent-tools.json` | module | aggregating |
 
-Both indexes are gated on a KSP option — `udea.toolModuleService` and
-`udea.stateModuleService` — exactly as the `NetModule` index is gated on
+`ModuleRegistry` and `UdeaRegistry` are declared in `udea-core`
+(`dev.wildware.udea.core.registry`); the generated objects live in `dev.wildware.udea.generated`.
+No `META-INF/services` resource is written, and nothing reads one at run time.
+
+The `ToolModule` and `StateModule` facets are gated on a KSP option — `udea.toolModuleService`
+and `udea.stateModuleService` — exactly as the `NetModule` facet is gated on
 `udea.netModuleService`. Generated code may only implement an interface that exists, and a
 module contributing tools to a game that does not ship the agent surface must still compile.
+(The option names predate the registry and are kept.)
+
+The launcher registry's list reaches the processor as `udea.registryModules`, which
+`build-logic`'s `udeaModule` computes from the module's resolved runtime classpath. The
+processor refuses a listed module whose `<Module>ModuleRegistry` is not on the classpath, and
+refuses `udea.moduleName` without the list - so a module the build says a game contains and
+whose registry does not exist is a compile error, never a module silently absent at run time.
 
 The manifest fragment is **not** gated. It is data, and the CI diff against its checked-in
 golden is the only thing that makes a reworded tool description a reviewable change.
@@ -46,8 +58,8 @@ Already real, in `udea-agent`, and used directly by generated code:
   scalar so publishing costs no boxing.
 
 Declared in `udea-agent`'s `src/main` (`AgentToolDef.kt`, `AgentStateSource.kt`), and on
-`udea-codegen`'s **test** classpath so generated code is compiled, `ServiceLoader`-loaded and
-dispatched through the real runtime indexes:
+`udea-codegen`'s **test** classpath so generated code is compiled, reached through the generated
+registry and dispatched through the real runtime indexes:
 
 ```kotlin
 package dev.wildware.udea.agent
@@ -103,13 +115,14 @@ and nothing else`.
 
 ### The runtime indexes (`udea-agent`)
 
-| Type | Discovers | Serves | Refuses, at build time |
+| Type | Reads | Serves | Refuses, at build time |
 |---|---|---|---|
-| `dispatch.ToolIndex` | `ToolModule` via `ServiceLoader` | `ToolRegistry`, so `AgentDispatcher` calls generated tools | two modules publishing one tool name; a tool whose toolset was never registered; two registered instances fitting one tool |
-| `state.AgentStateIndex` | `StateModule` via `ServiceLoader` | `GameStateSource`, so `StateDigest`'s `game` block carries `@AgentState` | two modules publishing one digest key; the same two binding failures |
+| `dispatch.ToolIndex` | the `ToolModule` facets of a `UdeaRegistry`, via `Builder.registry` | `ToolRegistry`, so `AgentDispatcher` calls generated tools | two modules publishing one tool name; a tool whose toolset was never registered; two registered instances fitting one tool |
+| `state.AgentStateIndex` | the `StateModule` facets of a `UdeaRegistry`, via `Builder.registry` | `GameStateSource`, so `StateDigest`'s `game` block carries `@AgentState` | two modules publishing one digest key; the same two binding failures |
 
 Both cross-module checks are ones a KSP round structurally cannot make — a round sees one
-module — so the runtime index is the first place the whole classpath is visible at once.
+module — so the runtime index is the first place every module a game contains is visible at
+once.
 
 A tool's return value is rendered by `ToolIndex` from a closed set: `AgentResult` (passed
 through), `String`, `Int`, `Long`, `Float`, `Boolean`, and `Unit`/`null` as `{}`. Anything else

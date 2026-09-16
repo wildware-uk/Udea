@@ -40,7 +40,13 @@ class DeterminismLayoutTest {
     @Test
     fun `a multiplatform module is read from the bytecode of its JVM and Android targets only`() {
         // The stale JVM-layout output a converted module leaves behind until a clean.
-        dirs("udea-core/src/commonMain/kotlin", "udea-core/src/jvmMain/kotlin", "udea-core/build/classes/kotlin/main")
+        dirs(
+            "udea-core/src/commonMain/kotlin",
+            "udea-core/src/jvmAndAndroidMain/kotlin",
+            "udea-core/src/wasmJsMain/kotlin",
+            "udea-core/src/jvmTest/kotlin",
+            "udea-core/build/classes/kotlin/main",
+        )
 
         val input = DeterminismLayout.scopeInput(repo, scope)
 
@@ -51,11 +57,13 @@ class DeterminismLayoutTest {
             ),
             relative(input.classRoots),
         )
+        // Sources are only ever looked up, never scanned, so a source set whose output is a klib
+        // costs nothing here - and the test source set is not a `main` one.
         assertEquals(
             listOf(
                 "udea-core/src/commonMain/kotlin",
-                "udea-core/src/jvmMain/kotlin",
-                "udea-core/src/androidMain/kotlin",
+                "udea-core/src/jvmAndAndroidMain/kotlin",
+                "udea-core/src/wasmJsMain/kotlin",
             ),
             relative(input.sourceRoots),
         )

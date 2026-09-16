@@ -332,9 +332,9 @@ class WallClockBudgetCensusTest {
                 "printed, not asserted: the go/no-go figures for issue #87",
             "udea-assets-compiler/src/test/kotlin/dev/wildware/udea/assets/compiler/worker/WorkerTest.kt" to
                 "printed, not asserted: the cost of forking the worker, for the log",
-            "udea-core/src/test/kotlin/dev/wildware/udea/core/host/HeadlessHostTest.kt" to
+            "udea-core/src/jvmTest/kotlin/dev/wildware/udea/core/host/HeadlessHostTest.kt" to
                 "a deadline: how long to wait for the host loop to reach a tick",
-            "udea-core/src/test/kotlin/dev/wildware/udea/core/identity/NetIdIndexTest.kt" to
+            "udea-core/src/jvmTest/kotlin/dev/wildware/udea/core/identity/NetIdIndexTest.kt" to
                 "a ratio: resolution at 64 000 ids over resolution at 64, which is an O(1) claim",
             "udea-net/src/test/kotlin/dev/wildware/udea/net/proof/UdpProofClient.kt" to
                 "a deadline: the socket read timeout in the UDP proof client",

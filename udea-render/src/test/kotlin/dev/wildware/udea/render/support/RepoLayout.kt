@@ -102,6 +102,8 @@ internal object RepoLayout {
             "src/commonMain/kotlin",
             "src/jvmMain/kotlin",
             "src/androidMain/kotlin",
+            // Both targets' shared source set, where a module keeps one (issue #203).
+            "src/jvmAndAndroidMain/kotlin",
         )
         return roots.asSequence()
             .map { root -> moduleDir(module).resolve("$root/$packagePath/$sourceFileName") }

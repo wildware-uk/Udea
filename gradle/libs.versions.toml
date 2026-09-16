@@ -71,6 +71,11 @@ agp = "8.13.2"
 # forces; raise it here, once, when a dependency does.
 androidCompileSdk = "36"
 androidMinSdk = "24"
+# atomicfu: the multiplatform lock `udea-core` guards the one queue other threads write to, the
+# `SimBarrier` inbox (issue #203, spec section 6: "`java.util.concurrent` is replaced by coroutines,
+# and by `atomicfu` where state is genuinely shared"). Only its `locks` API is used, which is an
+# ordinary class on every target, so no atomicfu compiler plugin is applied.
+atomicfu = "0.33.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -120,6 +125,7 @@ composegl-ui = { module = "dev.wildware.composegl:composegl-ui", version.ref = "
 # may only ever be a dependency of `udea-render`.
 composegl-gdx = { module = "dev.wildware.composegl:composegl-gdx", version.ref = "composegl" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerialization" }
+kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "atomicfu" }
 kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinxSerialization" }
 junit5-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }

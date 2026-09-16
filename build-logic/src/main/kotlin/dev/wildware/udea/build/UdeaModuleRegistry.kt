@@ -113,7 +113,10 @@ public class UdeaModuleOptions(
  * second copy here would be a version the catalog does not govern.
  *
  * The launcher list is read from `runtimeClasspath`, which is the classpath a program started
- * from this module's main sources actually has.
+ * from this module's main sources actually has. A multiplatform module has one per target and
+ * generates its registry once, into common code, so it reads `jvmRuntimeClasspath`: the JVM is
+ * the authoritative target (spec D3), and every target of a Udea runtime module declares the same
+ * common dependencies (issue #203).
  */
 public fun Project.udeaModule(name: String): UdeaModuleOptions {
     configurations.configureEach {
@@ -121,8 +124,12 @@ public fun Project.udeaModule(name: String): UdeaModuleOptions {
             attributes.attribute(UdeaModuleRegistry.MODULE_ATTRIBUTE, name)
         }
     }
-    return UdeaModuleOptions(name, udeaRegistryModules(name, "runtimeClasspath"))
+    val classpath = if (plugins.hasPlugin(MULTIPLATFORM_PLUGIN_ID)) "jvmRuntimeClasspath" else "runtimeClasspath"
+    return UdeaModuleOptions(name, udeaRegistryModules(name, classpath))
 }
+
+/** The Kotlin multiplatform plugin's id, which [udeaModule] reads a module's layout from. */
+private const val MULTIPLATFORM_PLUGIN_ID: String = "org.jetbrains.kotlin.multiplatform"
 
 /**
  * The launcher list for a KSP run over [classpath], without declaring this project a module.

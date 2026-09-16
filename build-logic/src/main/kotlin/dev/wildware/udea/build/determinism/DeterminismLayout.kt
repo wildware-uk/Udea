@@ -24,18 +24,18 @@ internal object DeterminismLayout {
      */
     private val BYTECODE_TARGETS: List<String> = listOf("jvm", "android")
 
-    /** The source sets a multiplatform module's bytecode targets are compiled from. */
-    private val BYTECODE_SOURCE_SETS: List<String> = listOf("common") + BYTECODE_TARGETS
-
     /** The scan input for [scope], resolved against [repoRoot]. */
     fun scopeInput(repoRoot: File, scope: SimScope): DeterminismScan.ScopeInput {
-        val module = moduleDir(repoRoot, scope)
-        val sourceSetSuffix = scope.sourceSet.replaceFirstChar { it.uppercase() }
+        val module = repoRoot.resolve(scope.project.removePrefix(":").replace(':', '/'))
+        val suffix = scope.sourceSet.replaceFirstChar { it.uppercase() }
         return if (isMultiplatform(module)) {
             DeterminismScan.ScopeInput(
                 scope = scope,
                 classRoots = BYTECODE_TARGETS.map { module.resolve("build/classes/kotlin/$it/${scope.sourceSet}") },
-                sourceRoots = BYTECODE_SOURCE_SETS.map { module.resolve("src/$it$sourceSetSuffix/kotlin") },
+                // Every `<name>Main` source set on disk rather than a fixed list: a shared one such
+                // as `jvmAndAndroidMain` feeds the bytecode too. A span is looked up by file name,
+                // and each platform's `actual` file has a name of its own.
+                sourceRoots = multiplatformSourceSets(module, suffix).map { it.resolve("kotlin") },
             )
         } else {
             DeterminismScan.ScopeInput(
@@ -50,10 +50,11 @@ internal object DeterminismLayout {
      * True when [module] keeps its sources in multiplatform source sets (`src/commonMain`, ...)
      * rather than in `src/main`.
      */
-    private fun isMultiplatform(module: File): Boolean =
-        module.resolve("src").listFiles().orEmpty()
-            .any { it.isDirectory && it.name != "main" && it.name.endsWith("Main") }
+    private fun isMultiplatform(module: File): Boolean = multiplatformSourceSets(module, "Main").isNotEmpty()
 
-    private fun moduleDir(repoRoot: File, scope: SimScope): File =
-        repoRoot.resolve(scope.project.removePrefix(":").replace(':', '/'))
+    /** `src/<target><suffix>` directories of [module] by name, which the JVM layout's `src/main` is not. */
+    private fun multiplatformSourceSets(module: File, suffix: String): List<File> =
+        module.resolve("src").listFiles().orEmpty()
+            .filter { it.isDirectory && it.name.endsWith(suffix) && it.name.length > suffix.length }
+            .sortedBy { it.name }
 }

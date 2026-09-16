@@ -216,7 +216,9 @@ jobs:
     #
     # `macos-latest` is an Apple Silicon runner, the architecture `iosSimulatorArm64` targets.
     # The tasks name the multiplatform modules one by one, so a module converted later has to be
-    # added to both steps below in the change that converts it.
+    # added to both steps below in the change that converts it. `udea-core` is multiplatform and
+    # absent on purpose: it has no iOS target until Fleks publishes one (issue #215), and joins
+    # both steps when the iOS switch in its build script flips.
     #
     # The step after the tests is the same defence the `build` job's atlas step makes, for the
     # same reason: a skipped test task is reported as a pass. It fails unless each module wrote an
@@ -362,7 +364,7 @@ jobs:
         shell: bash
         run: >-
           ./gradlew
-          :udea-core:testClasses
+          :udea-core:jvmTestClasses
           :udea-assets-compiler:testClasses
           :udea-agent:testClasses
           :udea-agent-host:testClasses
@@ -1004,7 +1006,7 @@ jobs:
           PLANT: ${{ github.event.inputs.clean_build_plant_functions }}
         run: |
           set -euo pipefail
-          planted=udea-core/src/main/kotlin/dev/wildware/udea/core/PlantedBuildRegression.kt
+          planted=udea-core/src/commonMain/kotlin/dev/wildware/udea/core/PlantedBuildRegression.kt
           echo "package dev.wildware.udea.core" > "$planted"
           for n in $(seq 1 "$PLANT"); do
             echo "internal fun planted$n(x: Int): Int = (x * 31 + $n) xor (x shr 3) + listOf(x, $n).sum()" >> "$planted"

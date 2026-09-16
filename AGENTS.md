@@ -95,6 +95,9 @@ rationale: `docs/module-graph.md`.
 **Multiplatform (the Kool/KMP port, issue #201).** A runtime module moves to KMP by applying
 `udea.kotlin-multiplatform` (`jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64`);
 `udea-render` will apply `udea.kotlin-multiplatform-render`, the same set without iOS.
+`udea-core` is multiplatform on `udea.kotlin-multiplatform-no-ios` - `jvm`, `android`, `wasmJs` -
+because Fleks publishes no iOS artifact (issue #215); its build script carries the one-line switch
+back.
 Build-time modules stay on `udea.kotlin-library`. The module-graph gates govern each target's
 classpath as the JVM classpath it stands for. `sh gradlew :<module>:allTests` skips iOS off
 macOS; the `ios-tests` CI job runs it. The Android SDK comes from `ANDROID_HOME` or an

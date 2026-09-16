@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
  * Some of what issues #95, #98 and #100 ask for is a shape a compiler is perfectly happy with: a
  * Fleks `Entity` on a snapshot-captured field compiles, and so does a `kotlin.time.Duration` in a
  * simulation type. The Gradle gate `udeaVerifyGasTime` covers the time half at build time; this
- * covers the rest, and covers the time half again from inside `test` so a developer running tests
+ * covers the rest, and covers the time half again from inside `jvmTest` so a developer running tests
  * sees it before CI does.
  */
 class GasArchitectureTest {

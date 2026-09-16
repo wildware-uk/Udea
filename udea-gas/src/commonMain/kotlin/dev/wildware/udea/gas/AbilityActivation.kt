@@ -435,6 +435,7 @@ public class AbilityActivation(
  * `Math.round(Float)` is `floor(value + 1/2)` evaluated exactly, saturating at the `Int` range, and
  * `NaN` is `0`. Widening to `Double` first keeps the addition exact wherever the rounding can go
  * either way, and `Double.toInt()` saturates and maps `NaN` to `0` the same way.
- * `RoundHalfUpTest` holds it to `Math.round` on the JVM.
+ * `RoundHalfUpTest` holds it to `Math.round` on the JVM, and `RoundHalfUpEdgesTest` pins its ties and
+ * edges on every target.
  */
 internal fun roundHalfUp(value: Float): Int = floor(value.toDouble() + 0.5).toInt()

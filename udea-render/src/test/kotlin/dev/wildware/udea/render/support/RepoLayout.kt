@@ -39,9 +39,14 @@ internal object RepoLayout {
 
     /**
      * Every `.class` file [module] compiled for [sourceSet], across every language directory
-     * (`build/classes/kotlin/main`, `build/classes/java/main`, ...) and, for a multiplatform
-     * module, every target that compiles to bytecode (`build/classes/kotlin/jvm/main`,
+     * (`build/classes/kotlin/main`, `build/classes/java/main`, ...) - or, for a multiplatform
+     * module, across every target that compiles to bytecode (`build/classes/kotlin/jvm/main`,
      * `build/classes/kotlin/android/main`).
+     *
+     * One layout or the other, chosen from the module's sources rather than from what happens to
+     * be under `build/`: a module converted to multiplatform keeps its old
+     * `build/classes/kotlin/main` until somebody cleans, and reading both would scan stale
+     * bytecode beside the real bytecode - and pass on the stale copy if the real one went missing.
      *
      * Deliberately not filtered to Kotlin: a `.java` file added to a headless module would be
      * exactly as able to name a GL type, and a gate that only looked at Kotlin output would
@@ -50,14 +55,27 @@ internal object RepoLayout {
     fun classFiles(module: String, sourceSet: String = "main"): List<File> {
         val classesRoot = moduleDir(module).resolve("build/classes")
         val languageDirs = classesRoot.listFiles()?.filter { it.isDirectory }.orEmpty()
+        val multiplatform = isMultiplatform(module)
         return languageDirs
             .flatMap { language ->
-                listOf(language.resolve(sourceSet)) + BYTECODE_TARGETS.map { language.resolve("$it/$sourceSet") }
+                if (multiplatform) {
+                    BYTECODE_TARGETS.map { language.resolve("$it/$sourceSet") }
+                } else {
+                    listOf(language.resolve(sourceSet))
+                }
             }
             .filter { it.isDirectory }
             .flatMap { root -> root.walkTopDown().filter { it.isFile && it.extension == "class" } }
             .sortedBy { it.invariantSeparatorsPath }
     }
+
+    /**
+     * True when [module] keeps its sources in multiplatform source sets (`src/commonMain`,
+     * `src/jvmMain`, ...) rather than in `src/main`.
+     */
+    private fun isMultiplatform(module: String): Boolean =
+        moduleDir(module).resolve("src").listFiles().orEmpty()
+            .any { it.isDirectory && it.name != "main" && it.name.endsWith("Main") }
 
     /** Path relative to the repository root, `/`-separated, for readable failures and spans. */
     fun relativePath(file: File): String = file.relativeTo(repoRoot).invariantSeparatorsPath

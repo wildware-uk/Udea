@@ -21,9 +21,9 @@ import dev.wildware.udea.render.RenderSystem
  * ## It is not the engine's UI layer any more, and it is on its way out
  *
  * [dev.wildware.udea.render.ui.UiLayer] is, and it drives a ComposeGL composition (issue #187).
- * This class is the scene2d one it replaced, kept under a name that says so for exactly one
- * reason: `MobaHud` is still written against a scene2d `Actor` tree, and porting the HUD in the
- * same change as the engine seam would be two rewrites a reviewer had to read at once. Issue #188
+ * This class is the scene2d one it replaced, kept under a name that says so because `MobaHud` is
+ * still written against a scene2d `Actor` tree, and porting the HUD in the same change as the
+ * engine seam would be two rewrites a reviewer had to read at once. Issue #188
  * ports it and takes the last caller away; issue #189 then bans scene2d and deletes this file and
  * [Scene2dUiScreen] with it.
  *
@@ -38,10 +38,12 @@ import dev.wildware.udea.render.RenderSystem
  *
  * ## What it replaces
  *
- * `GameScreen` owned the `ScreenViewport`, the `Stage` and the skin
- * (`common/UdeaGameManager.kt:93-125`) alongside the Box2D world, the ECS world, the network
- * systems and level loading. `stage.act`/`stage.draw` were two lines buried in the middle of
- * `GameScreen.render` (`UdeaGameManager.kt:228`), between the world tick and the debug keys.
+ * `GameScreen` in `common/UdeaGameManager.kt` owned the viewport, the `Stage` and the skin
+ * alongside the Box2D world, the ECS world, the network systems and level loading, and its
+ * `stage.act`/`stage.draw` pair sat in the middle of `GameScreen.render` among the frame's other
+ * bookkeeping. Cited by file and symbol rather than by line: `common` is old tree, it is still
+ * being edited, and a line number in this KDoc would be wrong within a few commits. (It was:
+ * the number this comment carried forward pointed nine lines short of the `stage.act` call.)
  *
  * ## The act delta is clamped, and not to the same figure as everything else
  *
@@ -104,7 +106,7 @@ public class Scene2dUiLayer(
         // were already true.
         resources.own(this)
 
-        // Carried forward from GameScreen's init (`UdeaGameManager.kt:184`), because it is a
+        // Carried forward from `GameScreen`'s init in `common/UdeaGameManager.kt`, because it is a
         // real fix rather than incidental: without it, a text field keeps keyboard focus after
         // the player clicks away from it, and every subsequent key press is swallowed by an
         // invisible widget instead of reaching the game.
@@ -152,8 +154,8 @@ public class Scene2dUiLayer(
      * Disposes the stage and whatever screen is mounted.
      *
      * Registered through [RenderResources.own] in this class's `init`, so the pipeline's
-     * reverse-order disposal covers it and no caller has to remember. The old tree disposed a
-     * stage in three different places and none of them in a `finally`.
+     * reverse-order disposal covers it and no caller has to remember. That registration is what
+     * `Scene2dUiLayerTest`'s "disposed by the pipeline rather than by whoever remembered" pins.
      *
      * Idempotent: [Stage.dispose] is safe to call twice, and a double shutdown path is likelier
      * than a defect.

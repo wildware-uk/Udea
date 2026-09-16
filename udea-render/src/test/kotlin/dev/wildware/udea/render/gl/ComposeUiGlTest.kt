@@ -51,16 +51,18 @@ import kotlin.test.assertTrue
  * A ComposeGL interface drawn by a real driver, into the framebuffer a capture reads: issue
  * #187's third acceptance criterion.
  *
- * ## Why none of the other tests can stand in for this one
+ * ## Why `UiLayerTest` cannot stand in for this one
  *
  * `UiLayerTest` drives the same [UiLayer] against ComposeGL's `HeadlessBackend`, so it proves
  * the composition, the clamp, the lifecycle and the layout. What it cannot prove is that any of
  * it reaches a pixel, and #186 said so explicitly rather than pretending otherwise: drawing a
  * ComposeGL tree needs a `GdxCanvas` with a live `Batch`, a `GdxFonts` with a registered
  * typeface, and therefore the gdx-freetype **natives** that `composegl-gdx`'s POM does not
- * bring. All three are wired now, and this is the test that goes red if any one of them comes
- * unwired -- an `UnsatisfiedLinkError` out of `FreeType.initFreeType`, a canvas with no batch,
- * or a frame drawn into the window instead of into the offscreen target.
+ * bring. All three are wired now, and this is the test that reads a pixel rather than a promise.
+ * Two of the three unwirings were checked by mutation while this was written: removing the
+ * freetype natives gives an `UnsatisfiedLinkError` out of `FreeType.initFreeType`, and replacing
+ * the draw with a settle-only call gives a frame with nothing in it. Both are in `BRIEF-187.md`
+ * as M7 and M2.
  *
  * ## What it asserts, and why not "the panel is #1E2836"
  *

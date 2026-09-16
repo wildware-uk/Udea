@@ -56,10 +56,16 @@ junitPlatform = "1.13.4"
 #
 # TEMPORARY: A SNAPSHOT, AND ONE OF THE TWO PLACES THAT SAY SO.
 # 0.6.0 is what `UiLayer` is written against (issue #187) and it is not on Maven Central yet, so
-# it resolves from the Sonatype snapshot repository declared in the root `build.gradle.kts`
-# `allprojects { repositories { ... } }` block -- the only other place this snapshot is mentioned.
+# it resolves from `https://central.sonatype.com/repository/maven-snapshots`, declared in the root
+# `build.gradle.kts` `allprojects { repositories { ... } }` block -- the other of the two places.
+#
 # When 0.6.0 releases on Central, the whole move is: change this line to `composegl = "0.6.0"`
-# and delete that repository line. Nothing else in the build refers to a snapshot.
+# and delete that one `maven(...)` line. This is the only `-SNAPSHOT` version in this catalogue,
+# so `grep -n SNAPSHOT gradle/libs.versions.toml` is the check that the swap is complete.
+#
+# Read the next sentence before deleting anything else. The `allprojects` block also declares two
+# `oss.sonatype.org/content/repositories/snapshots` repositories. They are **not** part of this,
+# they predate it by a long way (they are in `19403f3`, the initial commit), and they must stay.
 composegl = "0.6.0-SNAPSHOT"
 
 [libraries]

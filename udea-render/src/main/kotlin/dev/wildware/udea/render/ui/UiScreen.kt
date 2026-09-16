@@ -8,7 +8,9 @@ import androidx.compose.runtime.Composable
  * ## Why it is not a `Screen`, and why it has no `render`
  *
  * `UIScreen` in the old tree was a `KtxScreen` — it had its own `render(delta)`, read
- * `Gdx.graphics.deltaTime` for itself (`screen/UIScreen.kt:18`) and drew its own stage. That
+ * `Gdx.graphics.deltaTime` for itself in `common/screen/UIScreen.kt`'s `render` and drew its own
+ * stage. (File and symbol, not a line number: `common` is still being edited, and the number this
+ * sentence used to carry was already three lines out.) That
  * made it a second game loop running beside the real one: two things deciding when a frame
  * happens, two readings of wall time per frame, and a menu that kept animating while the game
  * was paused because nobody had told it.

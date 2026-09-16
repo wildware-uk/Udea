@@ -218,7 +218,8 @@ jobs:
     # The tasks name the multiplatform modules one by one, so a module converted later has to be
     # added to both steps below in the change that converts it. `udea-core` is multiplatform and
     # absent on purpose: it has no iOS target until Fleks publishes one (issue #215), and joins
-    # both steps when the iOS switch in its build script flips.
+    # both steps when the iOS switch in its build script flips. `udea-replay` (issue #206) is absent
+    # for the same reason and flips with it.
     #
     # The step after the tests is the same defence the `build` job's atlas step makes, for the
     # same reason: a skipped test task is reported as a pass. It fails unless each module wrote an

@@ -1,5 +1,7 @@
 package dev.wildware.udea.core
 
+import kotlinx.serialization.Serializable
+
 /**
  * The universal unit of simulation time (spec 5, "Time").
  *
@@ -10,7 +12,11 @@ package dev.wildware.udea.core
  *
  * A [Tick] is a `Long` count from the start of the simulation, so it never wraps in any
  * plausible session: a 60Hz simulation would need billions of years to overflow.
+ *
+ * `@Serializable` for level files (issue #191), where it is written as its bare `Long`: a saved
+ * component holding a deadline keeps it as a [Tick] rather than being widened to a number.
  */
+@Serializable
 @JvmInline
 public value class Tick(public val value: Long) : Comparable<Tick> {
 

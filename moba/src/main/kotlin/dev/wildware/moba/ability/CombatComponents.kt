@@ -5,6 +5,7 @@ import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.annotations.Lifetime
 import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
+import kotlinx.serialization.Serializable
 import dev.wildware.udea.annotations.Sim
 import dev.wildware.udea.core.identity.NetId
 
@@ -19,6 +20,7 @@ import dev.wildware.udea.core.identity.NetId
  * and a spectator team, a neutral camp or a per-match team count are all ordinary numbers. The
  * three the old game had are on [Teams].
  */
+@Serializable
 @Replicated
 public class Combatant(
     /**
@@ -77,6 +79,7 @@ public object Teams {
  * "the solver decides authoritative movement" arrangement spec 3.4 forbids. `PhysicsWorld` is a
  * no-op in this engine today, so a projectile that needed to move had nothing to move it.
  */
+@Serializable
 @Replicated
 public class Motion(
     /**
@@ -130,6 +133,7 @@ public class Motion(
  * effects that list ever held were damage, stun and knockback, so they are three fields, and the
  * hit path allocates nothing.
  */
+@Serializable
 @Replicated
 public class Projectile(
     /** Who fired it. Never hit; credited as the damage source. */

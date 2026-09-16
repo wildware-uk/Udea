@@ -76,6 +76,28 @@ internal object CoreNames {
     /** Fully-qualified names of the value types that get their own `FieldStore` accessor. */
     const val NET_ID_FQN: String = "$IDENTITY.NetId"
     const val TICK_FQN: String = "$CORE.Tick"
+
+    private const val LEVEL = "dev.wildware.udea.core.level"
+
+    /** One saveable component class and its serializer (issue #191). */
+    val LEVEL_COMPONENT: ClassName = ClassName(LEVEL, "LevelComponent")
+
+    /** The service a module's generated saveable-component list is found through. */
+    val LEVEL_COMPONENT_MODULE: ClassName = ClassName(LEVEL, "LevelComponentModule")
+}
+
+/**
+ * Names outside the Udea tree that the level-component pass keys on (issue #191).
+ *
+ * Strings for the reason [AnnotationNames] holds strings: they are matched against what `Resolver`
+ * reports, and nothing here should load the classes they name.
+ */
+internal object LevelNames {
+    /** kotlinx's `@Serializable`: only a component carrying it has a serializer to list. */
+    const val SERIALIZABLE: String = "kotlinx.serialization.Serializable"
+
+    /** Fleks' component interface: what makes a class something a world snapshot can hold. */
+    const val FLEKS_COMPONENT: String = "com.github.quillraven.fleks.Component"
 }
 
 /**
@@ -142,4 +164,7 @@ internal object GeneratedNames {
 
     /** `Moba` becomes `MobaStateModule`: this module's `@AgentState` index. */
     fun stateModule(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}StateModule")
+
+    /** `Moba` becomes `MobaLevelComponents`: this module's saveable-component index. */
+    fun levelComponents(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}LevelComponents")
 }

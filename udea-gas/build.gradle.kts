@@ -1,9 +1,19 @@
 plugins {
     id("udea.kotlin-library")
+    // Level files (issue #191): `Attributes`, `Abilities` and `GameplayEffects` are saved, so
+    // they need serializers, and `udea-codegen` lists them in the generated `GasLevelComponents`.
+    alias(libs.plugins.kotlinSerialization)
+    id("com.google.devtools.ksp") version libs.versions.ksp.get()
+}
+
+ksp {
+    arg("udea.moduleName", "Gas")
 }
 
 dependencies {
     api(project(":udea-core"))
+
+    ksp(project(":udea-codegen"))
 
     // The Replicator contract's executable specification: ArrayFieldStore and ArrayBitIo. The
     // attribute replication tests measure a real payload through them rather than asserting on a

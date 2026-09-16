@@ -6,6 +6,7 @@ import dev.wildware.moba.level.Team
 import dev.wildware.udea.annotations.Lifetime
 import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
+import kotlinx.serialization.Serializable
 import dev.wildware.udea.annotations.Sim
 import dev.wildware.udea.core.identity.NetId
 
@@ -51,6 +52,7 @@ import dev.wildware.udea.core.identity.NetId
  * would break the invariant `MobaIntegrationTest` pins, and a unit that walks toward one enemy
  * and swings at another is a worse bug than a foreign one-line edit.
  */
+@Serializable
 @Replicated
 public class LaneCreep(
     /**
@@ -121,6 +123,7 @@ public class LaneCreep(
  * so [LastHitSystem] records a tower kill as a tower kill and the champion standing next to it
  * gets nothing. A tower stealing your last hit is a real thing that happens in this game.
  */
+@Serializable
 @Replicated
 public class Tower(
     /**
@@ -169,6 +172,7 @@ public class Tower(
  * attribution, which is a server-side reading of a cue queue that is not replicated - so this is
  * a case where the wire is the only way the number can be right on both ends.
  */
+@Serializable
 @Replicated
 public class Wallet(
     /** Gold. Earned on last hits and on nothing else in this wave: no passive income yet. */
@@ -214,6 +218,7 @@ public class Wallet(
  * right way round for a currency. `LaneEconomyTest` asserts the queue is not dropping over a real
  * wave rather than assuming it.
  */
+@Serializable
 @Replicated
 public class LastHit(
     /** The attacker, as a raw [NetId], or [NetId.NONE]. See `Tower.targetRaw` on the raw form. */
@@ -251,6 +256,7 @@ public class LastHit(
  * last creep in it. [LaneSystem] mints it over a populated world and a scene swap destroys it,
  * so a match restart re-opens the lane from wave zero without a reset path of its own.
  */
+@Serializable
 @Replicated
 public class LaneState(
     /** Creeps currently walking, both sides. Rewritten every tick. */

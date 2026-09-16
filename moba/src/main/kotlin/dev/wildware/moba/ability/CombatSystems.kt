@@ -8,6 +8,7 @@ import dev.wildware.moba.Player
 import dev.wildware.moba.Position
 import dev.wildware.moba.ai.UnitBrain
 import dev.wildware.udea.annotations.Replicated
+import kotlinx.serialization.Serializable
 import dev.wildware.udea.annotations.Sim
 import dev.wildware.udea.core.SimSystem
 import dev.wildware.udea.core.identity.NetId
@@ -179,6 +180,7 @@ public class ProjectileSystem(
  * `@Sim` and not `@Net`: a client is told a unit is dead by its `CharacterView.state`, and the
  * tick it died on is what the linger is measured against here and nowhere else.
  */
+@Serializable
 @Replicated
 public class Corpse(
     /** The tick this unit's health reached zero. */

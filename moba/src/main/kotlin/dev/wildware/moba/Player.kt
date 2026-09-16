@@ -9,6 +9,7 @@ import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.MobaBlueprints
 import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
+import kotlinx.serialization.Serializable
 import dev.wildware.udea.annotations.Sim
 import dev.wildware.udea.core.SimSystem
 import dev.wildware.udea.core.Tick
@@ -50,6 +51,7 @@ import dev.wildware.udea.render.input.IntentState
  * components, minus the second component - the family that named `AIUnit` was the only reader it
  * ever had.
  */
+@Serializable
 @Replicated
 public class Player(
     /**

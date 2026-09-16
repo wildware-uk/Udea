@@ -4,6 +4,7 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
+import kotlinx.serialization.Serializable
 import dev.wildware.udea.annotations.Sim
 import dev.wildware.udea.core.identity.NetId
 
@@ -39,6 +40,7 @@ import dev.wildware.udea.core.identity.NetId
  * what is behind it. Closing that means an `Attributes` replicator, which is a `udea-codegen`
  * change and not a level's.
  */
+@Serializable
 @Replicated
 public class GameUnit(
     /**

@@ -4,6 +4,7 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
+import kotlinx.serialization.Serializable
 import dev.wildware.udea.annotations.Sim
 
 /**
@@ -15,6 +16,7 @@ import dev.wildware.udea.annotations.Sim
  * design for a MOBA; it is the smallest component that makes the engine's own claims checkable
  * from a running game rather than from a test.
  */
+@Serializable
 @Replicated
 public class Position(
     /** World x. Agent-writable. */

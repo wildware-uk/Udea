@@ -4,6 +4,7 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
+import kotlinx.serialization.Serializable
 import dev.wildware.udea.annotations.Sim
 
 /**
@@ -40,6 +41,7 @@ import dev.wildware.udea.annotations.Sim
  * [startTick] is a tick and not a wall-clock instant, which is what makes the drawn frame and the
  * notify schedule pure functions of the simulation - see [CharacterAnimator].
  */
+@Serializable
 @Replicated
 public class CharacterView(
     /**

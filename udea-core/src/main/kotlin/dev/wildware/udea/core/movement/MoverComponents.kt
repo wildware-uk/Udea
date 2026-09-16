@@ -2,6 +2,7 @@ package dev.wildware.udea.core.movement
 
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
+import kotlinx.serialization.Serializable
 
 /**
  * What a controller - a player, a bot, or a replayed input buffer - is asking for this tick.
@@ -15,6 +16,7 @@ import com.github.quillraven.fleks.ComponentType
  * how fast it goes, and the server would have nothing to check it against. [MoverConfig.maxSpeed]
  * turns the axis into a speed, and the config is the server's.
  */
+@Serializable
 public class MoveIntent(
     /** Horizontal axis, clamped to `-1..1` on read. Negative is left. */
     public var move: Float = 0f,
@@ -45,6 +47,7 @@ public class MoveIntent(
  * [dev.wildware.udea.core.physics.Capsule], deliberately, so a game does not describe its
  * character twice.
  */
+@Serializable
 public class MoverConfig(
     /** Capsule radius in world units. Also bounds the substep length, so it must be positive. */
     public var radius: Float = 0.4f,
@@ -94,6 +97,7 @@ public class MoverConfig(
  * That also makes [sameAs] meaningful, and it is the comparison the parity and replay tests make:
  * field by field on the raw bits, so `-0f` and `0f` are the divergence they actually are.
  */
+@Serializable
 public class MoverState(
     /** Capsule centre x. */
     public var x: Float = 0f,

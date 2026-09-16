@@ -16,6 +16,10 @@ plugins {
     // by construction.
     id("com.google.devtools.ksp") version libs.versions.ksp.get()
 
+    // Level files (issue #191): every component a match holds is `@Serializable`, and the same
+    // KSP run above lists them in the generated `MobaLevelComponents`.
+    alias(libs.plugins.kotlinSerialization)
+
     // The plugin that was unreachable until now: it had a class and no id, no project applied it,
     // and there was no `gamebridge.json`, so `launch_instance` had nothing to launch and the only
     // bootable thing in the tree was a task in `udea-agent-host`'s TEST sources. Applying it here
@@ -341,6 +345,34 @@ tasks.register<JavaExec>("runLaneShot") {
     )
 }
 
+// Issue #191's pictures. `LevelShot` saves a real match to a level file in one JVM and loads it
+// into a fresh game in a second, photographing both from the same camera; the second run fails
+// unless the two pictures are pixel-identical. Two tasks because the two halves must not share a
+// process. Needs a GL driver, so run by name, for the reason `runMatchShot` gives.
+val levelShotDir: String = providers.gradleProperty("udea.levelshot.dir").orNull
+    ?: layout.buildDirectory.dir("reports/udea/level").get().asFile.absolutePath
+
+val runLevelShotSave = tasks.register<JavaExec>("runLevelShotSave") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.levelshot, first half: plays the real level, saves it mid-fight, photographs it."
+    mainClass.set("dev.wildware.moba.level.LevelShot")
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty("udea.levelshot.phase", "save")
+    systemProperty("udea.levelshot.dir", levelShotDir)
+}
+
+tasks.register<JavaExec>("runLevelShot") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.levelshot: loads the saved match into a fresh process and checks the picture matches."
+    dependsOn(runLevelShotSave)
+    mainClass.set("dev.wildware.moba.level.LevelShot")
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty("udea.levelshot.phase", "load")
+    systemProperty("udea.levelshot.dir", levelShotDir)
+}
+
 /**
  * `moba.netproof`: one server, two clients, the real 27-unit level, and three hashes that must
  * agree. Run by name rather than wired into `check`, because it prints a transcript that is the
@@ -596,6 +628,13 @@ tasks.register<Test>("runUdpProof") {
 tasks.test {
     // See `runUdpProof`: wall-clock timing across three forked JVMs, which `check` cannot give it.
     filter { excludeTestsMatching("dev.wildware.moba.net.MobaUdpTwoProcessTest") }
+}
+
+tasks.test {
+    // Issue #191: where `LevelSaveLoadProofTest` keeps the `.udealevel` it saved and the transcript
+    // of what it measured. A Gradle property rather than `-D`, because `Test` forks and a `-D` on
+    // the command line stops at the daemon; unset, the test writes nothing and still asserts.
+    providers.gradleProperty("udea.levelEvidenceDir").orNull?.let { systemProperty("udea.levelEvidenceDir", it) }
 }
 
 tasks.test {

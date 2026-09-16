@@ -4,10 +4,27 @@ plugins {
     // ArrayFieldStore. udea-codegen's golden tests consume them, so they have to be a
     // published variant rather than this module's private test source (issue #28 scope).
     `java-test-fixtures`
+    // Level files (issue #191). The serialization plugin gives this module's components their
+    // serializers, and KSP runs `udea-codegen` over them to generate `CoreLevelComponents`, the
+    // list a level file's polymorphic component section is built from.
+    alias(libs.plugins.kotlinSerialization)
+    id("com.google.devtools.ksp") version libs.versions.ksp.get()
+}
+
+ksp {
+    arg("udea.moduleName", "Core")
 }
 
 dependencies {
     api(project(":udea-annotations"))
+
+    ksp(project(":udea-codegen"))
+
+    // `api`: `LevelComponent` names a `KSerializer`, and every module that declares a saved
+    // component compiles `@Serializable` against it. CBOR is the level encoding and nothing
+    // outside `dev.wildware.udea.core.level` names it, so it stays `implementation`.
+    api(libs.kotlinx.serialization.core)
+    implementation(libs.kotlinx.serialization.cbor)
 
     // `api`, not `implementation`: SimSystem extends Fleks' IntervalSystem and NetIdIndex
     // resolves to a Fleks Entity, so both are part of udea-core's public surface. Fleks is

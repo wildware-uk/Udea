@@ -1,12 +1,26 @@
 import dev.wildware.udea.build.UdeaModuleRegistry
 import dev.wildware.udea.build.udeaModule
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
-    id("udea.kotlin-library")
+    // THE iOS SWITCH (issue #215). Multiplatform on jvm, android and wasmJs, and not iOS, because
+    // Fleks - an `api` dependency below, used throughout common code - publishes no iOS variant in
+    // any version, and Kotlin compiles iOS klibs on Linux too, so an iOS target fails dependency
+    // resolution on every machine. When Fleks has iOS, this line becomes
+    // `id("udea.kotlin-multiplatform")`, and udea-core joins the `ios-tests` job in `ci.yml`.
+    id("udea.kotlin-multiplatform-no-ios")
     // The Replicator contract ships an executable specification: TransformReplicator and
     // ArrayFieldStore. udea-codegen's golden tests consume them, so they have to be a
     // published variant rather than this module's private test source (issue #28 scope).
-    `java-test-fixtures`
+    // `udea.jvm-test-fixtures` rather than Gradle's `java-test-fixtures`, which cannot be applied
+    // beside the multiplatform plugin; every consumer's `testFixtures(project(":udea-core"))` is
+    // unchanged (issue #203).
+    id("udea.jvm-test-fixtures")
     // Level files (issue #191). The serialization plugin gives this module's components their
     // serializers, and KSP runs `udea-codegen` over them to generate `CoreModuleRegistry`, whose
     // level-component list a level file's polymorphic component section is built from.
@@ -22,40 +36,88 @@ ksp {
     arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
 }
 
+kotlin {
+    // Two shared source sets beside the default hierarchy, for the few `expect` declarations whose
+    // `actual`s split along the JVM line rather than per target: `jvmAndAndroidMain` reaches
+    // `java.lang`, and `nonJvmMain` (Wasm and, once issue #215 lets iOS back in, native) has only
+    // Kotlin's own reflection.
+    @OptIn(ExperimentalKotlinGradlePluginApi::class)
+    applyDefaultHierarchyTemplate {
+        common {
+            group("jvmAndAndroid") {
+                // By platform type rather than `withJvm()` and `withAndroidTarget()`: AGP's
+                // multiplatform library target is not the `androidTarget()` the latter matches.
+                withCompilations {
+                    it.target.platformType == KotlinPlatformType.jvm || it.target.platformType == KotlinPlatformType.androidJvm
+                }
+            }
+            group("nonJvm") {
+                withWasmJs()
+                withNative()
+            }
+        }
+    }
+
+    sourceSets {
+        commonMain {
+            dependencies {
+                api(project(":udea-annotations"))
+
+                // `api`: `LevelComponent` names a `KSerializer`, and every module that declares a
+                // saved component compiles `@Serializable` against it. CBOR is the level encoding
+                // and nothing outside `dev.wildware.udea.core.level` names it, so it stays
+                // `implementation`.
+                api(libs.kotlinx.serialization.core)
+                implementation(libs.kotlinx.serialization.cbor)
+
+                // `api`, not `implementation`: SimSystem extends Fleks' IntervalSystem and
+                // NetIdIndex resolves to a Fleks Entity, so both are part of udea-core's public
+                // surface. Fleks is headless - this does not put GL on anyone's classpath (spec 4).
+                api(libs.fleks)
+
+                // The lock around `SimBarrier`'s inbox, the one queue another thread writes to.
+                implementation(libs.kotlinx.atomicfu)
+            }
+            // The registry KSP generates from the common source set (issue #202), compiled into
+            // every target from there. See the `kspCommonMainMetadata` wiring below.
+            kotlin.srcDir(layout.buildDirectory.dir("generated/ksp/metadata/commonMain/kotlin"))
+        }
+    }
+}
+
 dependencies {
-    api(project(":udea-annotations"))
+    // In this block by their `jvmTest` bucket names rather than inside `kotlin.sourceSets`, so each
+    // test-only edge is visibly one on its own line - which is what `NoReflectiveRegistrationTest`
+    // reads this file for.
 
-    ksp(project(":udea-codegen"))
-
-    // `api`: `LevelComponent` names a `KSerializer`, and every module that declares a saved
-    // component compiles `@Serializable` against it. CBOR is the level encoding and nothing
-    // outside `dev.wildware.udea.core.level` names it, so it stays `implementation`.
-    api(libs.kotlinx.serialization.core)
-    implementation(libs.kotlinx.serialization.cbor)
-
-    // `api`, not `implementation`: SimSystem extends Fleks' IntervalSystem and NetIdIndex
-    // resolves to a Fleks Entity, so both are part of udea-core's public surface. Fleks is
-    // headless — this does not put GL on anyone's classpath (spec 4).
-    api(libs.fleks)
-
-    // ReplicatorApiShapeTest asserts the frozen signature exposes FieldMask and never a raw
-    // Long. JVM erasure hides a value class, so the check has to run on Kotlin's reflection.
-    testImplementation(kotlin("reflect"))
+    // ReplicatorApiShapeTest asserts the frozen signature exposes FieldMask and never a raw Long.
+    // JVM erasure hides a value class, so the check has to run on Kotlin's reflection.
+    "jvmTestImplementation"(kotlin("reflect"))
 
     // `LatencyBudget`: the contention note every budget test in `budgetTestClasses` below ends its
     // failure message with, and the `measuredBy` guard each one opens with, which refuses to let a
     // budget be measured by any task but its own (issues #175 and #182). A test-scope edge to the
-    // zero-dependency leaf: it adds the
-    // fixture and nothing else, and it puts no GL, no gdx and no new runtime dependency anywhere
-    // near the headless kernel.
-    testImplementation(testFixtures(project(":udea-diagnostics")))
+    // zero-dependency leaf: it adds the fixture and nothing else, and it puts no GL, no gdx and no
+    // new runtime dependency anywhere near the headless kernel.
+    "jvmTestImplementation"(testFixtures(project(":udea-diagnostics")))
+
+    // KSP over the common source set, once, rather than once per target: the registry it writes
+    // names only common declarations, and one copy compiled everywhere cannot disagree between
+    // targets about which components a level file lists.
+    add("kspCommonMainMetadata", project(":udea-codegen"))
 }
+
+// Every compilation reads the generated registry, and so does each per-target KSP run the plugin
+// registers beside the common one, so none of them may start before it has been written.
+val kspCommonMain = "kspCommonMainKotlinMetadata"
+tasks.withType<KotlinCompilationTask<*>>().configureEach { dependsOn(kspCommonMain) }
+tasks.matching { it.name.startsWith("ksp") && it.name != kspCommonMain }.configureEach { dependsOn(kspCommonMain) }
 
 // --- Phase 0 budget gates (spec 6 exit criteria, spec 7 risk row) -----------------------------
 //
 // These are hard CI gates, not aspirations: one structure carries time travel, replication
 // baselines and rollback, so a capture that allocates degrades three features at once. Each is
-// excluded from `test` so a normal test run does not pay for it twice.
+// excluded from `jvmTest` so a normal test run does not pay for it twice.
 //
 // They hang off the root's `udeaLatencyBudgets` and no longer off `check` (issue #175). Every
 // number here is a wall-clock duration, and a wall-clock duration measured while the other
@@ -71,7 +133,7 @@ dependencies {
 
 /**
  * The `CoreModule` system-order golden pins which systems run and in what order, so it has to
- * be regenerable on purpose and never by accident. `./gradlew :udea-core:test
+ * be regenerable on purpose and never by accident. `./gradlew :udea-core:jvmTest
  * -Dupdate.goldens=true` rewrites it; without the flag an order change is a failing diff.
  *
  * Gradle has no `--update-goldens` option for a plain `Test` task, so the flag is a system
@@ -111,10 +173,28 @@ val fieldMaskScanSources: ConfigurableFileTree = fileTree(rootProject.layout.pro
     include("moba/src/*TestFixtures/**/*.kt")
 }
 
-tasks.named<Test>("test") {
+tasks.named<Test>("jvmTest") {
     inputs.files(fieldMaskScanSources)
         .withPropertyName("fieldMaskScanSources")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+/** The JVM target's test compilation: where the budget tests below are compiled. */
+val jvmTestCompilation: KotlinCompilation<*> =
+    (the<KotlinMultiplatformExtension>().targets.getByName("jvm") as KotlinJvmTarget).compilations.getByName("test")
+
+/**
+ * Points a budget task at [jvmTestCompilation]'s classes, on the runner `jvmTest` uses.
+ *
+ * `useJUnitPlatform()` is not decoration. The multiplatform convention sets it on `jvmTest` alone,
+ * and a `Test` task left on Gradle's default runner finds no JUnit 5 test and fails with "No tests
+ * found for given includes" - which is what all four of these did after issue #203 first moved
+ * this module, while `build` stayed green because none of them is on `check`.
+ */
+fun Test.runsJvmTestClasses() {
+    testClassesDirs = jvmTestCompilation.output.classesDirs
+    classpath = files(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
+    useJUnitPlatform()
 }
 
 val budgetTestClasses = listOf(
@@ -127,7 +207,7 @@ val budgetTestClasses = listOf(
     "dev.wildware.udea.core.physics.PhysicsRebuildBudgetTest",
 )
 
-tasks.named<Test>("test") {
+tasks.named<Test>("jvmTest") {
     budgetTestClasses.forEach { filter.excludeTestsMatching(it) }
 }
 
@@ -135,8 +215,7 @@ tasks.named<Test>("test") {
 tasks.register<Test>("udeaSnapshotBudget") {
     group = "verification"
     description = "Gates snapshot capture at 1000 entities: <1ms median, zero allocation, <64MB ring."
-    testClassesDirs = sourceSets.test.get().output.classesDirs
-    classpath = sourceSets.test.get().runtimeClasspath
+    runsJvmTestClasses()
     filter.includeTestsMatching("dev.wildware.udea.core.snapshot.SnapshotBudgetTest")
     // The measured numbers are the point of the task, so they go to the build log rather than
     // into a report nobody opens.
@@ -149,8 +228,7 @@ tasks.register<Test>("udeaBenchTickLoop") {
     description =
         "Gates the assembled tick loop at 200 entities and 600 ticks: <50ms median, zero " +
         "steady-state allocation, identical hash stream across a snapshot restore."
-    testClassesDirs = sourceSets.test.get().output.classesDirs
-    classpath = sourceSets.test.get().runtimeClasspath
+    runsJvmTestClasses()
     filter.includeTestsMatching("dev.wildware.udea.core.snapshot.TickLoopBudgetTest")
     testLogging.showStandardStreams = true
     // Published by the Phase 0 CI job as the gate's artifact.
@@ -169,8 +247,7 @@ tasks.register<Test>("udeaBenchCharacterMover") {
     group = "verification"
     description =
         "Gates CharacterMover at 200 movers x 60 replay steps: under a quarter of a 60Hz frame."
-    testClassesDirs = sourceSets.test.get().output.classesDirs
-    classpath = sourceSets.test.get().runtimeClasspath
+    runsJvmTestClasses()
     filter.includeTestsMatching("dev.wildware.udea.core.movement.CharacterMoverBudgetTest")
     testLogging.showStandardStreams = true
 }
@@ -186,8 +263,7 @@ tasks.register<Test>("udeaBenchCharacterMover") {
 tasks.register<Test>("udeaPhysicsRebuildBudget") {
     group = "verification"
     description = "Gates the physics rebuild at 500 bodies: under 2ms median."
-    testClassesDirs = sourceSets.test.get().output.classesDirs
-    classpath = sourceSets.test.get().runtimeClasspath
+    runsJvmTestClasses()
     filter.includeTestsMatching("dev.wildware.udea.core.physics.PhysicsRebuildBudgetTest")
     testLogging.showStandardStreams = true
 }

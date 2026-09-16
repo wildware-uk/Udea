@@ -43,6 +43,8 @@ import dev.wildware.udea.core.snapshot.ComponentSchema
 import dev.wildware.udea.core.snapshot.FieldKind
 import dev.wildware.udea.core.snapshot.fleksComponentType
 import dev.wildware.udea.core.snapshot.ComponentRegistry
+import dev.wildware.udea.core.snapshot.SnapshotService
+import dev.wildware.udea.core.snapshot.WorldHasher
 import dev.wildware.udea.core.snapshot.snapshotTimeTravel
 import dev.wildware.udea.generated.UdeaAgentUdeaRegistry
 import kotlin.test.assertIs
@@ -65,10 +67,13 @@ internal class ToolsetHarness(
 
     private val module = ToolsetModule()
 
+    /** One registry object for the ring and for [worldHash], so both read the same component types. */
+    private val componentRegistry: ComponentRegistry = registry()
+
     private val definition = UdeaGameDef(
         registry = UdeaAgentUdeaRegistry,
         modules = listOf(module),
-        timeTravel = if (withSnapshotRing) snapshotTimeTravel(registry()) else null,
+        timeTravel = if (withSnapshotRing) snapshotTimeTravel(componentRegistry) else null,
     )
 
     val netIds: NetIdIndex = definition.core.netIds
@@ -173,6 +178,13 @@ internal class ToolsetHarness(
         val result = call(name, *args)
         return assertIs<AgentResult.Failed>(result, "$name unexpectedly succeeded: $result").error
     }
+
+    /**
+     * `WorldHasher.hash` over a fresh capture of the whole world: fields, tick, random streams and
+     * the id allocator. The number `.udearep` recordings store per tick.
+     */
+    fun worldHash(): Long =
+        WorldHasher.hash(SnapshotService(componentRegistry, world, host.ctx, netIds).capture())
 
     /** Creates an entity directly, bypassing the tools, so a read can be tested against a known world. */
     fun place(x: Float = 0f, y: Float = 0f, health: Float = 100f, team: Int = 1): NetId {

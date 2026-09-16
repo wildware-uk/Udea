@@ -80,7 +80,7 @@ public abstract class UdeaVerifyDeterminismTask : DefaultTask() {
         val repoRoot = File(repoRootPath.get())
         val allowlistText = allowlistFile.get().asFile.readText()
         val result = DeterminismScan.run(
-            inputs = DeterminismRules.SIMULATION_SCOPES.map { scopeInput(repoRoot, it) },
+            inputs = DeterminismRules.SIMULATION_SCOPES.map { DeterminismLayout.scopeInput(repoRoot, it) },
             allowlist = Allowlist.parse(allowlistText),
             repoRoot = repoRoot,
             resolvedVersions = resolvedVersions.get(),
@@ -93,22 +93,7 @@ public abstract class UdeaVerifyDeterminismTask : DefaultTask() {
         logger.lifecycle(text)
     }
 
-    /** Where a scope's classes and sources live, by the layout every module in this build uses. */
-    private fun scopeInput(repoRoot: File, scope: SimScope): DeterminismScan.ScopeInput {
-        val module = repoRoot.resolve(scope.project.removePrefix(":").replace(':', '/'))
-        return DeterminismScan.ScopeInput(
-            scope = scope,
-            classRoots = LANGUAGES.map {
-                module.resolve("build/classes/$it/${scope.sourceSet}")
-            },
-            sourceRoots = LANGUAGES.map { module.resolve("src/${scope.sourceSet}/$it") },
-        )
-    }
-
     public companion object {
-        /** The language directories Gradle's JVM layout uses, in the order sources are looked up. */
-        public val LANGUAGES: List<String> = listOf("kotlin", "java")
-
         /** Task name. Referenced by name from `udea-render`'s docs and from `ci.yml`. */
         public const val TASK_NAME: String = "udeaVerifyDeterminism"
 

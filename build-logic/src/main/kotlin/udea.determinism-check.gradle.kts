@@ -1,3 +1,5 @@
+import dev.wildware.udea.build.ModuleGraphRules
+import dev.wildware.udea.build.determinism.DeterminismLayout
 import dev.wildware.udea.build.determinism.DeterminismRules
 import dev.wildware.udea.build.determinism.UdeaVerifyDeterminismTask
 import dev.wildware.udea.build.udeaCatalog
@@ -35,14 +37,15 @@ val simulationModules: List<String> =
  * `compileTestKotlin` output without depending on it is a Gradle error, and a determinism rule
  * about test code would be wrong anyway - a test is allowed to plant a clock read, and one of
  * this gate's own tests does exactly that.
+ *
+ * The directories come from [DeterminismLayout], the same place the task reads them from, so a
+ * multiplatform module's `build/classes/kotlin/jvm/main` is both what is declared here and what is
+ * scanned (issue #203).
  */
 val simulationClassDirs = files(
     DeterminismRules.SIMULATION_SCOPES.flatMap { scope ->
-        val module = scope.project.removePrefix(":").replace(':', '/')
-        UdeaVerifyDeterminismTask.LANGUAGES.map { language ->
-            fileTree(rootDir.resolve("$module/build/classes/$language/${scope.sourceSet}")) {
-                include("**/*.class")
-            }
+        DeterminismLayout.scopeInput(rootDir, scope).classRoots.map { root ->
+            fileTree(root) { include("**/*.class") }
         }
     },
 )
@@ -85,7 +88,8 @@ val udeaVerifyDeterminism =
         // The bytecode has to exist before it can be scanned, and a gate that reads whatever
         // stale `build/classes` happened to be lying around is the defect `udeaVerifyHeadless`
         // had before `HEADLESS_PROJECTS` was derived rather than written twice.
-        dependsOn(simulationModules.map { "$it:classes" })
+        // `udeaMainBytecode` rather than `classes`, which a multiplatform module does not have.
+        dependsOn(simulationModules.map { "$it:${ModuleGraphRules.MAIN_BYTECODE_TASK}" })
     }
 
 tasks.named("check") {

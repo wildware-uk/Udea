@@ -13,7 +13,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 
 - #202 generated registry: merged `f45bbeb`, round 1 PASS. Per-module `<Module>ModuleRegistry` + `<Module>UdeaRegistry`;
   `UdeaGameDef` requires the registry; modules declare themselves with `udeaModule("Name")` in build scripts.
-  ServiceLoader left only in build-time code.
+  ServiceLoader left only in build-time code. Worktree kept: `.claude/worktrees/agent-af8703c835b0fca84`.
 - #207 held: udea-audio `api`-depends on udea-core and udea-assets (still JVM-only), so four-target build needs
   #203 and #205 first. Decision commented on #207.
 

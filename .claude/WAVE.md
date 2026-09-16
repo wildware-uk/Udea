@@ -2,12 +2,28 @@
 
 ## kmp baseline
 
-SHA `a634450` (kmp after #203 merge), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `4ca994d` (kmp after #204 merge; before: `a634450` after #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
 
+**Plus, outside root `build`:** `sh gradlew -p build-logic check` is RED on `07eddef` (CI runs it):
+`OuterBuildInputsTest > every repository file a build-logic test names is a declared input` - #203 left
+udea-core KMP paths undeclared. Baseline failure, not any wave-4 branch's. Filed #216, dispatch in wave 5.
+Reviewers and trial merges: run `-p build-logic check` too; that one test failing is baseline.
+
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
+
+## Wave 4 (2026-09-16): in flight
+
+- Dispatched: #204 gas (dev-204), #205 assets (dev-205), #206 replay (dev-206), #209 net (dev-209). Disjoint modules.
+- Wave 5 candidates: #216 (build-logic inputs, found wave 4), #217 (determinism scanner misses TimeSource, found by dev-204).
+- #204 gas: merged `4ca994d` (+ BRIEF-204.md `c58cb75`), round 1 PASS. Trial + merged build green; build-logic check only #216. udea-core `KClass.runtimeName` now public; `roundHalfUp` replaces Math.round (roundToInt differs on Wasm). Worktree kept: `.claude/worktrees/agent-a8b2f894959c4489d`.
+- Ruling: developers leave BRIEF.md uncommitted in worktree root; lead commits it as BRIEF-<N>.md after the merge.
+- #205 touched shared build-logic: K2 plugin classpath transitive on Kotlin/Native compilations (iOS crash fix); UDEA-MG-006 allows kotlinx-io.
+- Held to wave 5: #208 (udea-agent `implementation`-depends on udea-assets, needs #205; commented), #207 (needs #205).
+- #206 ruling: udea-agent stays JVM until #208, so replay keeps agent-tool code in a JVM source set (commented).
+- #205 (assets) does not depend on udea-core, so it takes full `udea.kotlin-multiplatform` including iOS.
 
 ## Wave 3 (2026-09-16): done
 

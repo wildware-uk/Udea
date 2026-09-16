@@ -2,14 +2,14 @@
 
 ## kmp baseline
 
-SHA `6097ae7` (origin/kmp), taken 2026-09-16 on a detached checkout with
+SHA `d97517b` (kmp after #200 merge), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.** (220 actionable tasks.) Refresh after every merge.
 
 ## Wave 1 in flight
 
-- #200 Kool Offscreen spike: `dev-200`, branch `issue-200-kool-offscreen-spike`, standalone build at `spikes/kool-offscreen/`.
+- #200 Kool Offscreen spike: **merged** `d97517b`, round 1 PASS. Answer yes: Kool 0.19.0, GL on llvmpipe under xvfb. Needs X11 GLFW init workaround (see #200 comments).
 - #201 KMP convention plugin: `dev-201`, branch `issue-201-kmp-convention-plugin`.
 
 ## What happened

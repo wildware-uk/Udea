@@ -9,6 +9,12 @@ SHA `90b26fc` (kmp after #201 merge), refreshed 2026-09-16; first taken at `6097
 
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
 
+## Wave 2 (2026-09-16): in flight
+
+- #202 generated registry: `dev-202` dispatched, branch `issue-202-generated-registry`. Only ticket this wave.
+- #207 held: udea-audio `api`-depends on udea-core and udea-assets (still JVM-only), so four-target build needs
+  #203 and #205 first. Decision commented on #207.
+
 ## Wave 1 (2026-09-16): done
 
 - #200 Kool Offscreen spike: merged `d97517b`, round 1 PASS. Yes: Kool 0.19.0, GL on llvmpipe under xvfb.

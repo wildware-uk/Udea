@@ -97,6 +97,7 @@ class ComposeUiGlTest {
         withHost { backend, layer, _ ->
             val slot = checkNotNull(backend.pipeline?.capture) { "the pipeline has no capture slot" }
 
+            settle(slot)
             val mounted = decode(slot.capture(CaptureRequest()).bytes)
             val panel = backend.onRenderThread { layer.host.root.find(ComposeUiScreen.PANEL).boundsInRoot }
             val title = backend.onRenderThread { layer.host.root.find(ComposeUiScreen.TITLE).boundsInRoot }
@@ -104,6 +105,7 @@ class ComposeUiGlTest {
             // The same frame with the interface taken away, so the comparison is about the
             // interface and not about the driver, the clear colour or the world quad.
             backend.onRenderThread { layer.hide() }
+            settle(slot)
             val bare = decode(slot.capture(CaptureRequest()).bytes)
 
             write("issue187-composegl-ui-gl-frame.png", mounted)
@@ -153,6 +155,7 @@ class ComposeUiGlTest {
         withHost { backend, layer, screen ->
             val slot = checkNotNull(backend.pipeline?.capture) { "the pipeline has no capture slot" }
 
+            settle(slot)
             val before = decode(slot.capture(CaptureRequest()).bytes)
             val count = backend.onRenderThread { layer.host.root.find(ComposeUiScreen.COUNT).boundsInRoot }
 
@@ -163,6 +166,7 @@ class ComposeUiGlTest {
                 layer.input.touchDown(button.centre.x.toInt(), button.centre.y.toInt(), 0, Input.Buttons.LEFT)
                 layer.input.touchUp(button.centre.x.toInt(), button.centre.y.toInt(), 0, Input.Buttons.LEFT)
             }
+            settle(slot)
             val after = decode(slot.capture(CaptureRequest()).bytes)
 
             write("issue187-composegl-ui-gl-clicked.png", after)
@@ -223,6 +227,20 @@ class ComposeUiGlTest {
         } finally {
             backend.close()
         }
+    }
+
+    /**
+     * Draws and throws away [FRAMES] frames, so the next capture is of a settled surface.
+     *
+     * Not caution. ComposeGL uploads a glyph atlas page the first time text is drawn on it, and
+     * the toolkit's own first frames are where a layout and a focus refresh land -- so the first
+     * captured frame after a mount genuinely differs from the second, by thousands of pixels
+     * inside the panel. Without this, "the mounted frame differs from the unmounted one inside
+     * the panel" was satisfied by *two consecutive frames of the same screen*: the mutation that
+     * stops `hide` unmounting anything left the assertion green, which is how this was found.
+     */
+    private fun settle(slot: dev.wildware.udea.render.capture.FrameCaptureSlot) {
+        repeat(FRAMES) { slot.capture(CaptureRequest()) }
     }
 
     private fun decode(png: ByteArray): BufferedImage = ImageIO.read(ByteArrayInputStream(png))
@@ -352,6 +370,14 @@ class ComposeUiGlTest {
 
         /** How big a corner of untouched surface the control assertion reads. */
         const val CORNER = 64
+
+        /**
+         * Frames drawn and discarded before a capture that is going to be compared.
+         *
+         * Three rather than one: a mount takes a frame to recompose, a frame to lay out and a
+         * frame to upload whatever glyph pages the new text needs.
+         */
+        const val FRAMES = 3
 
         const val REPORT_DIR = "build/reports/udea/compose-ui"
 

@@ -1,4 +1,4 @@
-0d04db0
+a363c36
 
 # Issue #187 — `UiLayer` and `UiScreen` on ComposeGL
 
@@ -10,25 +10,38 @@ Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-ad50cbdd4b0807eec`.
 > `example` from #154 onwards is `BRIEF-<N>.md`. So this is `BRIEF-187.md`, the same decision
 > `BRIEF-186.md` made and for the same reason. If the lead wants the other name, `git mv`.
 
-Four commits, and the SHA above is the last of them. The commit that adds this file sits on top
-of it and contains nothing but this file, which is the convention `BRIEF-186.md` and `BRIEF-166.md`
-both followed:
+**This is the second handover.** The first (tip `3c51bb4`) was built against a ComposeGL snapshot.
+ComposeGL 0.6.0 was then released on Central, the lead stopped the review before it produced a
+verdict, and `a363c36` swaps the pin to the release. Everything below is re-run on `a363c36`
+unless it says otherwise; section 2 has the version story.
+
+**On the SHA.** The runs were made on `dd5a131`. I then amended that commit's *message* only,
+because it said 0.6.0 was released "while this branch was in review", and the release (11:44 UTC)
+predates the first handover. `git rev-parse dd5a131^{tree}` and `git rev-parse a363c36^{tree}`
+both print `6e2c80c4b4887db17031b09a9ffe410dc43a23d8` in this worktree (`dd5a131` is reachable
+only through its reflog now), so every run below is a run of `a363c36`'s tree, and that is what
+this brief calls it.
+
+The SHA above is the last commit of the change. The commit that updates this file sits on top of
+it and contains nothing but this file, the convention `BRIEF-186.md` and `BRIEF-166.md` followed:
 
 ```
+a363c36 ComposeGL 0.6.0 from Maven Central, and the snapshot repository goes
+3c51bb4 BRIEF-187: the ComposeGL seam, and the four wrong comments my own pass found
 0d04db0 Four comments that were true-sounding and wrong, found by my own review
 c2369c0 The GL test compared two unsettled frames, so its main assertion passed on nothing
 865e6b7 Two tests that could not fail, and the reason both could not
 13ed255 UiLayer and UiScreen drive a ComposeGL composition, not a scene2d Stage
 ```
 
-Every run quoted below was made on `0d04db0`'s content unless the text says otherwise. `0d04db0`
-changes no behaviour -- it is comments only, and section 8 is where it came from -- but the full
-build and the evidence command were both re-run on it rather than assumed, and those are the runs
-quoted. The only other thing in `git status` is ` M gradlew`, the executable bit this box needs on
-the wrapper, deliberately not committed.
+The only other thing in `git status` is ` M gradlew`, the executable bit this box needs on the
+wrapper, deliberately not committed.
 
 Evidence files referenced below live in `/srv/ssd1/workspace/Udea/build/issue187-evidence/` — the
-main checkout, not this worktree's `build/`, so they survive a `clean`.
+main checkout, not this worktree's `build/`, so they survive a `clean`. Files numbered 30 and up
+are runs on `a363c36` against 0.6.0. Files 19, 24, 25, 26 and 26b are fetches and listings of the
+published ComposeGL artifacts, not runs of this tree. Every other lower-numbered file is the first
+handover's, against the snapshot, and is cited only where the text says so.
 
 ---
 
@@ -46,19 +59,20 @@ xvfb-run -a -s "-screen 0 1280x720x24" \
 `-Pudea.render.requireGl=true` because without it the GL half **skips** and stays green, which is
 the trap this whole ticket lives in.
 
-### It is green on this branch
+### It is green on `a363c36`, against 0.6.0
 
-On `0d04db0`. Spliced from `23-evidence-green-final.txt`, last four lines:
+Run after everything else in this handover, including the `moba` re-shoot, so nothing ran after it
+to overwrite its XMLs or PNGs. `48-evidence-green-0.6.0-last.txt`, last four lines:
 
 ```
-BUILD SUCCESSFUL in 48s
-46 actionable tasks: 46 executed
-Configuration cache entry stored.
+BUILD SUCCESSFUL in 14s
+37 actionable tasks: 37 executed
+Configuration cache entry reused.
 EXIT=0
 ```
 
-Counted off that run's XMLs, before any later run touched them, and saved as
-`23-evidence-green-xml-totals.txt`:
+Its XMLs were copied out the moment it finished, to `evidence-xml-0.6.0-last/`, and counted from there
+(`48-evidence-xml-totals-0.6.0.txt`):
 
 ```
 test: tests=198 failures+errors=0 skipped=0
@@ -67,20 +81,15 @@ udeaGlTest: tests=21 failures+errors=0 skipped=0
 
 `skipped=0` on `udeaGlTest` is the load-bearing half: it says the GL tests *ran*.
 
-The same command on `c2369c0`, before the comment commit, is `16-evidence-green-final.txt`:
-`BUILD SUCCESSFUL in 34s`, `EXIT=0`, and the same two counts. The three PNGs it wrote are
-byte-identical to `0d04db0`'s, which is a small bonus fact: the composed GL frame is reproducible
-run to run on this box, so a pixel diff against the gallery copies is a real check rather than a
-coin toss.
+### It goes red when the feature is reverted — proven against 0.6.0, not carried over
 
-### It goes red when the feature is reverted
-
-The one line that makes `UiLayer` draw, replaced by the same call that only settles and lays out
-— the mutation a reviewer would reach for, because it still compiles, still composes, still
-advances the clock, and draws nothing. Literal diff, taken from that run
-(`15-evidence-red.diff`):
+The one line that makes `UiLayer` draw, replaced by the call that only settles and lays out: it
+still compiles, still composes, still advances the clock, and draws nothing. Literal diff, from
+that run (`45-evidence-red-0.6.0.diff`):
 
 ```diff
+diff --git a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
+index 82fdb9d..9598a79 100644
 --- a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 +++ b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 @@ -15,6 +15,7 @@ import dev.wildware.composegl.ui.focus.FocusManager
@@ -98,55 +107,49 @@ advances the clock, and draws nothing. Literal diff, taken from that run
 -        renderer.render(viewport, clockNanos)
 +        host.settle(viewport, focus, clockNanos)
      }
+ 
+     /**
 ```
 
-Spliced from `15-evidence-red.txt`. Two segments, each a consecutive in-order run of that file's
-lines, with the one elision marked. The first segment is lines 95–101:
+The exact command above, run on `a363c36` with that diff applied. `45-evidence-red-0.6.0.txt`,
+lines 101–118, one contiguous run:
 
 ```
 > Task :udea-render:udeaGlTest
 
 ComposeUiGlTest > a composed ComposeGL screen is drawn over the world into the captured frame() FAILED
-    org.opentest4j.AssertionFailedError at ComposeUiGlTest.kt:122
+    org.opentest4j.AssertionFailedError at ComposeUiGlTest.kt:124
 
 ComposeUiGlTest > a click on the composed button recomposes the frame a capture reads() FAILED
-    org.opentest4j.AssertionFailedError at ComposeUiGlTest.kt:175
-```
+    org.opentest4j.AssertionFailedError at ComposeUiGlTest.kt:177
 
-**[... lines 102–112 elided: two blank lines and nine `> Task` lines for `:udea-agent` and
-`:udea-replay`, which Gradle interleaved because it was still building them while the test task
-ran ...]**
-
-Then lines 113–126, unbroken:
-
-```
-> Task :udea-render:udeaGlTest
-
-21 tests completed, 2 failed
-
-> Task :udea-render:udeaGlTest FAILED
-
-> Task :udea-render:test
+> Task :udea-render:test FAILED
 
 UiLayerTest > the composed tree is drawn into the backend's canvas every frame() FAILED
     org.opentest4j.AssertionFailedError at UiLayerTest.kt:187
 
 198 tests completed, 1 failed
 
-> Task :udea-render:test FAILED
+> Task :udea-render:udeaGlTest FAILED
+
+21 tests completed, 2 failed
 ```
 
-and, after Gradle's two `* What went wrong` blocks, the tail:
+and lines 144–147, the end of the file:
 
 ```
-BUILD FAILED in 38s
+BUILD FAILED in 15s
 37 actionable tasks: 37 executed
 Configuration cache entry reused.
 EXIT=1
 ```
 
-Reverted with `git checkout --`, and the green run in the section above was taken **after** the
-revert, so the tree the reviewer gets is the green one.
+(The first handover proved the same command red against the snapshot, with the GL failures at
+lines 122/175 of the test. They are at 124/177 now because `0d04db0` added two KDoc lines to that
+file. Nothing else about the failure moved.)
+
+Reverted with `git checkout --`; `git status --short` was ` M gradlew` only afterwards, and the
+green run above was taken after that, last.
 
 ---
 
@@ -206,152 +209,157 @@ Two things were missing and both are one line each:
 `GdxCanvas`'s other requirement — a live `Batch` — is satisfied by `RenderResources.batch`, the
 one the pipeline already owns, so there is no second batch and no second glyph atlas.
 
-### The snapshot, and where it is mentioned
+### The ComposeGL version: `0.6.0` from Maven Central
 
-Two places, and that is a grep rather than a promise. Run on `0d04db0`:
-
-```
-$ git grep -n "0\.6\.0-SNAPSHOT\|maven-snapshots" -- . ':!BRIEF-187.md'
-build.gradle.kts:56:        maven("https://central.sonatype.com/repository/maven-snapshots")
-gradle/libs.versions.toml:59:# it resolves from `https://central.sonatype.com/repository/maven-snapshots`, declared in the root
-gradle/libs.versions.toml:69:composegl = "0.6.0-SNAPSHOT"
-```
-
-Three hits for two places: the middle one is the version comment naming the repository, which is
-what makes the comment usable without the issue open.
-
-**And here is what that grep does not say, because I got this wrong first time and the comments I
-wrote said it wrongly too.** `build.gradle.kts` declares *three* snapshot repositories, not one:
+**Resolved: `dev.wildware.composegl:*:0.6.0`, a release, from Central proper.** No snapshot and no
+snapshot repository. The sha1s are `sha1sum` over the jars in the Gradle cache the build resolved
+into, shown here by filename rather than by their full cache paths, and they match what the lead
+checked independently on repo1.maven.org:
 
 ```
-$ git grep -n "snapshots" -- build.gradle.kts settings.gradle.kts
-build.gradle.kts:56:        maven("https://central.sonatype.com/repository/maven-snapshots")
-build.gradle.kts:57:        maven("https://oss.sonatype.org/content/repositories/snapshots/")
-build.gradle.kts:58:        maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+6139735e44bb17f76b2a8e8178af537f67557213  composegl-gdx-0.6.0.jar
+cb63a8df4e46f11f28c4a972e0aee46e467122e8  composegl-render-jvm-0.6.0.jar
+278489f5fa09f6e9f2d9fa0ca2dfa16bd4b51a94  composegl-ui-jvm-0.6.0.jar
 ```
 
-Lines 57 and 58 have been there since `19403f3`, the initial commit -- that is
-`git log -1 -S "oss.sonatype.org/content/repositories/snapshots" -- build.gradle.kts` -- they
-serve other dependencies, and they must stay. My original comments said "nothing else in the
-build refers to a snapshot", which a reader doing the 0.6.0 swap from the comment alone (the exact
-use the constraint asked me to support) would have acted on by deleting all three. `0d04db0` fixes
-both comments to name the one line to delete and to say what to leave. Section 8 has the rest of
-that audit.
+Release date from Central's own metadata (`19-composegl-central-metadata.xml`):
+`<lastUpdated>20260916115441</lastUpdated>`, and the jar's `last-modified: Wed, 16 Sep 2026
+11:44:49 GMT`. That is today, while the first handover was being written; its later runs (files
+22 and 23) postdate the release, but they resolved the snapshot because that is what the pin
+named.
 
-`composegl = "0.6.0-SNAPSHOT"` is also the only `-SNAPSHOT` version in the catalogue, so
-`grep -n SNAPSHOT gradle/libs.versions.toml` is the completeness check on the swap, and the
-comment now says so.
+The pin is one line. The whole diff of the two build files that carried the snapshot, against
+`origin/example`, saved as `49-pin-diff-0.6.0.txt` and pasted here entire:
 
-The full diff of both places, as committed, so the swap can be read off the comments:
-
+```
+$ git diff origin/example..HEAD -- gradle/libs.versions.toml build.gradle.kts
+```
 ```diff
 diff --git a/gradle/libs.versions.toml b/gradle/libs.versions.toml
+index 44d87f0..653184e 100644
 --- a/gradle/libs.versions.toml
 +++ b/gradle/libs.versions.toml
-@@ -53,7 +53,20 @@ junitPlatform = "1.13.4"
+@@ -53,7 +53,7 @@ junitPlatform = "1.13.4"
  # published release declares `kotlin-stdlib:2.4.20` and its jars carry `@Metadata(mv = [2, 4, 0])`,
  # which is why `kotlin` above had to move to 2.4.20 before any of this could be on the classpath
  # at all. `composegl-gdx` is a GL backend, so it is `udea-render`-only by UDEA-MG-002.
 -composegl = "0.5.0"
-+#
-+# TEMPORARY: A SNAPSHOT, AND ONE OF THE TWO PLACES THAT SAY SO.
-+# 0.6.0 is what `UiLayer` is written against (issue #187) and it is not on Maven Central yet, so
-+# it resolves from `https://central.sonatype.com/repository/maven-snapshots`, declared in the root
-+# `build.gradle.kts` `allprojects { repositories { ... } }` block -- the other of the two places.
-+#
-+# When 0.6.0 releases on Central, the whole move is: change this line to `composegl = "0.6.0"`
-+# and delete that one `maven(...)` line. This is the only `-SNAPSHOT` version in this catalogue,
-+# so `grep -n SNAPSHOT gradle/libs.versions.toml` is the check that the swap is complete.
-+#
-+# Read the next sentence before deleting anything else. The `allprojects` block also declares two
-+# `oss.sonatype.org/content/repositories/snapshots` repositories. They are **not** part of this,
-+# they predate it by a long way (they are in `19403f3`, the initial commit), and they must stay.
-+composegl = "0.6.0-SNAPSHOT"
-
++composegl = "0.6.0"
+ 
  [libraries]
  junit = { group = "junit", name = "junit", version.ref = "junit" }
-diff --git a/build.gradle.kts b/build.gradle.kts
---- a/build.gradle.kts
-+++ b/build.gradle.kts
-@@ -44,6 +44,16 @@ allprojects {
-         mavenLocal()
-         gradlePluginPortal()
-         google()
-+        // TEMPORARY: A SNAPSHOT REPOSITORY, AND ONE OF THE TWO PLACES THAT SAY SO.
-+        // ComposeGL 0.6.0 is not on Maven Central yet (issue #187), and Central's snapshot
-+        // service is a separate host from Central proper. The other place is the `composegl`
-+        // version in `gradle/libs.versions.toml`. When 0.6.0 releases, that entry becomes
-+        // `"0.6.0"` and this one line goes.
-+        //
-+        // Only this line. The two `oss.sonatype.org` snapshot repositories immediately below
-+        // are older than this change -- they are in `19403f3`, the initial commit -- serve
-+        // other dependencies, and are nothing to do with ComposeGL.
-+        maven("https://central.sonatype.com/repository/maven-snapshots")
-         maven("https://oss.sonatype.org/content/repositories/snapshots/")
-         maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
-         maven("https://s01.oss.sonatype.org")
+@@ -83,6 +83,11 @@ gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", vers
+ # UDEA-MG-002 bans `com.badlogicgames.gdx:*-platform` from every headless module for exactly
+ # that reason.
+ gdx-platform = { module = "com.badlogicgames.gdx:gdx-platform", version.ref = "gdx" }
++# FreeType's desktop natives. `composegl-gdx` brings the Java binding (`gdx-freetype`)
++# transitively and not this, so a game that registers a `.ttf` through `GdxFonts` needs it
++# selected here; `udea-render/build.gradle.kts` says why at the call site. A `*-platform`
++# artifact, so UDEA-MG-002 keeps it out of every headless module.
++gdx-freetype-platform = { module = "com.badlogicgames.gdx:gdx-freetype-platform", version.ref = "gdx" }
+ # Box2D. `gdx-box2d` is the Java binding and is headless in the sense UDEA-MG-002 cares about -
+ # it names no GL type - but it is useless without `gdx-box2d-platform`, which is a
+ # `*-platform` native loader and therefore banned from every designated headless module. Both are
 ```
 
-Both hunks spliced from `git diff origin/example..HEAD -- gradle/libs.versions.toml
-build.gradle.kts`, with only the `index` lines dropped.
+The first hunk is the version. The second is the `gdx-freetype-platform` catalogue entry, unchanged
+from the first handover. `build.gradle.kts` does not appear at all: the root build script is
+byte-identical to `origin/example`, so the two `oss.sonatype.org` snapshot repositories that have
+been there since `19403f3` are exactly as they were.
 
-**No `changing = true`, no `cacheChangingModulesFor`, no `--refresh-dependencies` anywhere in the
-build.** I did not hit a stale-artifact problem, so I did not add a cache setting for one. The
-snapshot resolved once, on 2026-09-16, and every run in this brief used that same cached jar.
+**`UiLayer` needed no change.** `:udea-render:compileKotlin` and `:udea-render:compileTestKotlin`
+executed against 0.6.0 and passed (`30-compile-against-0.6.0.txt`; `:moba:compileKotlin` was
+`UP-TO-DATE` in that run, since `moba` cannot see ComposeGL through `udea-render`'s
+`implementation` edge, and it executed and passed in the cold build, `41-clean-build-0.6.0.txt`).
+Worth saying how I know, because the obvious shortcut failed: I first checked each ComposeGL import this branch uses
+against the release jar listings, and it reported nine "missing" — `Box`, `Column`, `Button`,
+`Panel`, `Text` and the four `Provide*`. Run against the snapshot this branch already compiled
+against, the same probe reported the same nine (`26-imports-vs-0.6.0-release.txt`, and the
+control `26b-imports-probe-CONTROL-vs-snapshot.txt`). Those are Compose composables — capitalised *functions* living in
+`*Kt.class` files — and my probe classified them as classes. A listing cannot answer the question;
+only compiling did. None of 0.6.0's new widgets is used here; they are #188's.
 
-**The exact build resolved: `0.6.0-20260915.202706-1`** for all three artifacts. Spliced from
-`17-composegl-ui-snapshot-metadata.xml`, which I fetched from the snapshot repository:
+#### What 0.6.0 newly brings: `gdx-controllers-core:2.2.3`
 
-```xml
-    <lastUpdated>20260915202706</lastUpdated>
-    <snapshot>
-      <timestamp>20260915.202706</timestamp>
-      <buildNumber>1</buildNumber>
-    </snapshot>
-```
-
-### The surprise, and it matters for #188 rather than for this ticket
-
-**`0.6.0-20260915.202706-1` is byte-identical to `0.5.0`** for all three artifacts this build
-uses:
-
-```
-6fd0d8a9cebd7f00f895db53467f2ebd239a7c4b  composegl-render-jvm   (0.5.0 and 0.6.0-SNAPSHOT)
-7b0d81a634b81cc4e1e83dd28106e21af1dedb77  composegl-gdx          (0.5.0 and 0.6.0-SNAPSHOT)
-94444e319603c237f6bf1e64b48343b754d7fb6f  composegl-ui-jvm       (0.5.0 and 0.6.0-SNAPSHOT)
-```
-
-The hash is the whole argument, and it does not depend on what anything is called. For what it
-is worth as a cross-check, the full `unzip -Z1` listing of
-`composegl-ui-jvm-0.6.0-20260915.202706-1.jar` is saved as
-`18-composegl-ui-jar-listing.txt` — 854 entries — and a case-insensitive grep over it for
-`inventory|dialog|skilltree|chat|subtitle|hitmarker|dock|objective|damagedirection` returns **0**.
-The control for that grep, so it is not a search that finds nothing by construction, is that the
-same listing does yield the `ui/game/` composables, and they are 0.5.0's set:
+From `:udea-render:dependencies --configuration testRuntimeClasspath`
+(`31-render-testRuntime-deps-0.6.0.txt`), filtered with
+`grep -E "composegl|gdx-freetype|gdx-controllers|com.badlogicgames.gdx:gdx:" | sort -u`:
 
 ```
-dev/wildware/composegl/ui/game/BarKt.class
-dev/wildware/composegl/ui/game/DamageNumbersKt.class
-dev/wildware/composegl/ui/game/HotbarKt.class
-dev/wildware/composegl/ui/game/MinimapKt.class
-dev/wildware/composegl/ui/game/NotificationsKt.class
-dev/wildware/composegl/ui/game/ParticlesKt.class
-dev/wildware/composegl/ui/game/RadialCooldownKt.class
-dev/wildware/composegl/ui/game/ReticleKt.class
+|    +--- com.badlogicgames.gdx-controllers:gdx-controllers-core:2.2.3
++--- com.badlogicgames.gdx:gdx:1.14.2
+|    +--- com.badlogicgames.gdx:gdx:1.14.2 (*)
+|    |    \--- com.badlogicgames.gdx:gdx:1.14.2 (*)
+|    |    \--- com.badlogicgames.gdx:gdx:1.9.11 -> 1.14.2 (*)
+|    +--- com.badlogicgames.gdx:gdx-freetype:1.14.2
++--- com.badlogicgames.gdx:gdx-freetype-platform:1.14.2
++--- dev.wildware.composegl:composegl-gdx:0.6.0
+|    +--- dev.wildware.composegl:composegl-render:0.6.0
+|    |    \--- dev.wildware.composegl:composegl-render-jvm:0.6.0
++--- dev.wildware.composegl:composegl-ui:0.6.0
+|    +--- dev.wildware.composegl:composegl-ui:0.6.0 (*)
+|    |         +--- dev.wildware.composegl:composegl-ui:0.6.0 (*)
+|    \--- dev.wildware.composegl:composegl-ui-jvm:0.6.0
 ```
 
-Note what that grep does **not** say: it is a search for the names #188 would want, not proof
-that no such widget exists under some other name. The byte-identical hash is what settles it.
+Two things in that. `gdx-controllers-core` asks for `gdx:1.9.11` and Gradle takes it to `1.14.2`,
+so there is still one gdx core on the classpath and no skew against the natives. And `gdx` itself
+is still `1.14.2`, so the catalogue version `determinism-allowlist.txt` pins is unchanged.
 
-So "0.6.0 has loads of awesome features" is true of some build that is not this one. **This
-changes nothing about #187** — the seam this ticket ports needs `UiHost`, `UiRenderer`,
-`GdxBackend`, `PointerRouter` and `KeyRouter`, all of which 0.5.0 already had, which is why
-everything here works. **It changes #188**, which is the ticket that wants the widget set. Posted
-on the issue: <https://github.com/wildware-uk/Udea/issues/187#issuecomment-5696259422>.
+**Against the module graph.** `UDEA-MG-002`'s banned patterns are `com.badlogicgames.gdx:gdx-backend-lwjgl3`,
+`org.lwjgl:*` and `com.badlogicgames.gdx:*-platform`. `gdx-controllers-core`'s group is
+`com.badlogicgames.gdx-controllers`, which **none of them matches** — so `udeaVerifyModuleGraph`
+being green is not evidence about this dependency at all, and I did not use it as such. Instead I
+resolved the dependency tree of every designated headless project plus `udea-render` and `moba`
+(`32-all-deps-0.6.0.txt`) and parsed it per project and configuration (`33-gdx-controllers-census.txt`):
 
-I kept the snapshot pin anyway, because the owner's instruction was explicit and because it is
-the reversible choice: when a newer snapshot is published, the next `--refresh-dependencies`
-picks it up with no code change, whereas pinning back to 0.5.0 would have to be undone by hand.
+```
+projects parsed: :moba, :udea-agent, :udea-annotations, :udea-assets, :udea-assets-compiler, :udea-audio, :udea-codegen, :udea-compiler-plugin, :udea-core, :udea-diagnostics, :udea-gas, :udea-gradle, :udea-net, :udea-render, :udea-replay
+projects whose dependency trees name gdx-controllers:
+  :moba  in: agentRuntimeClasspath, runtimeClasspath, testRuntimeClasspath
+  :udea-render  in: compileClasspath, runtimeClasspath, testCompileClasspath, testRuntimeClasspath
+```
+
+The thirteen `HEADLESS_PROJECTS` are all parsed and none of them names it. The census is not
+passing by construction: it finds the two projects that do have it, and a raw
+`grep -c gdx-controllers-core` over the same file gives 7, which is those 4 + 3 configurations.
+`udea-render`'s `compileClasspath` carries it because `composegl-gdx` exposes it at compile scope;
+`moba` gets it at runtime only, through `udea-render`. Neither is a headless module.
+
+**Against the determinism allowlist.** `udeaVerifyDeterminism`'s `ALLOW005` stamps the versions of
+the catalogue aliases listed in `PINNED_ALIASES` against `determinism-allowlist.txt`, whose pins
+are `@version fleks 2.14` and `@version gdx 1.14.2`. Neither moved, so `ALLOW005` has nothing to
+say, and the cold build ran the gate rather than taking it from cache (`> Task
+:udeaVerifyDeterminism`, no `UP-TO-DATE`, in `41-clean-build-0.6.0.txt`). `gdx-controllers-core` is
+not a catalogue alias and not pinned, so that gate does not examine it — and correctly: the gate
+scans the declared simulation scopes' own bytecode, `:udea-render` is deliberately not one of them,
+and `git grep -ln controllers` over `udea-core`, `udea-gas`, `udea-net`, `moba`, `udea-assets` and
+`udea-agent` sources returns nothing. No game code reads a controller.
+
+**The `gdx-freetype` natives line is still needed on 0.6.0.** The lead's guess was yes; I ran M7
+against 0.6.0 rather than take the guess. The release POM brings `gdx-freetype:1.14.2`, the Java
+binding (visible in the tree above), and still not the `natives-desktop` classifier. With the line
+removed, `ComposeUiGlTest` fails both tests with
+`SharedLibraryLoadRuntimeException: Couldn't load shared library 'libgdx-freetype64.so' for target:
+Linux, x86, 64-bit` — section 7, M7.
+
+#### How this ticket got here: the snapshot, briefly
+
+The first handover of this branch (tip `3c51bb4`, SHA of the change `0d04db0`) was built against
+`0.6.0-SNAPSHOT`, resolved as `0.6.0-20260915.202706-1` from
+`https://central.sonatype.com/repository/maven-snapshots`, because 0.6.0 was not yet on Central.
+That snapshot turned out byte-identical to 0.5.0 (`94444e31…`, `7b0d81a6…`, `6fd0d8a9…` for
+`ui-jvm`, `gdx`, `render-jvm`), so it had none of the features the owner asked for 0.6.0 for.
+0.6.0 itself was released at 11:44 UTC, a little before that handover went out; I noticed it only
+afterwards, when the dashboard showed the owner pushing the ComposeGL release. The lead stopped the
+review, which had produced no verdict, and had me swap to the release: `a363c36`. Against the snapshot the
+`ui-jvm` listing gains 115 entries and loses 96 (`25-composegl-0.6.0-listing-diff.txt`); among the
+additions are `DebugOverlay`, `KeyShortcut`, `BarMenu`, `ContextMenu`, `CellWindow`,
+`CollapsingHeader`, `ColourPicker` and `DividerDrag`, which is #188's business. The correction is on
+the issue: <https://github.com/wildware-uk/Udea/issues/187#issuecomment-5697156157>.
+
+No stale-artifact problem was ever hit, so no `changing = true` or cache setting was ever added,
+and with a release pin there is nothing left that could need one.
 
 ### Decisions I had to make, and what to change if the owner disagrees
 
@@ -383,38 +391,26 @@ value rather than a delta. The class KDoc says so at the field.
 
 ## 3. `sh gradlew build`, and the xvfb GL run
 
-### The cold full build, no exclusions
+### The cold full build on `a363c36`, against 0.6.0, no exclusions
 
-`clean build --no-build-cache --console=plain --no-daemon`, transcript `10-full-build.txt`,
-its last five lines:
+`clean build --no-build-cache --no-daemon --console=plain`. `41-clean-build-0.6.0.txt`, its last
+five lines:
 
 ```
-BUILD SUCCESSFUL in 2m 3s
-225 actionable tasks: 218 executed, 7 up-to-date
-Configuration cache entry reused.
+BUILD SUCCESSFUL in 2m 8s
+234 actionable tasks: 217 executed, 17 up-to-date
+Configuration cache entry stored.
 EXIT=0
-loadavg at end: 14.56 12.74 8.69 2/1526 1860937
+loadavg at end: 15.43 10.07 6.61 2/1610 2009747
 ```
 
-Confirmed warm on `c2369c0`, transcript `20-full-build-final.txt`:
+I ran it cold on purpose. The warm `sh gradlew build` just before it (`40-full-build-0.6.0.txt`,
+`BUILD SUCCESSFUL in 1m 5s`, `213 actionable tasks: 11 executed, 202 up-to-date`, `EXIT=0`)
+executed 11 tasks. After a dependency version moves, that is too little to be evidence about the
+suite.
 
-```
-BUILD SUCCESSFUL in 21s
-213 actionable tasks: 7 executed, 206 up-to-date
-Configuration cache entry stored.
-```
-
-And again on `0d04db0`, after the comment commit -- `22-full-build-after-kdoc-fixes.txt`, with
-`EXIT=0` reported by the shell:
-
-```
-BUILD SUCCESSFUL in 1m 25s
-213 actionable tasks: 17 executed, 196 up-to-date
-Configuration cache entry stored.
-```
-
-Summed over every `TEST-*.xml` in the tree after that build — saved as
-`21-full-build-xml-totals.txt` so the number can be grepped rather than taken on trust:
+Summed over every `TEST-*.xml` in the tree straight after the cold build
+(`42-clean-build-0.6.0-xml-totals.txt`):
 
 ```
 files=390 tests=2597 failures+errors=0 skipped=37
@@ -431,87 +427,83 @@ files=390 tests=2597 failures+errors=0 skipped=37
 ```
 
 **Read that skip list, because it is the trap stated as a measurement.** `$DISPLAY` is empty on
-this box, so every class in `dev.wildware.udea.render.gl` and
-`dev.wildware.udea.agent.host.gl` skipped — `ComposeUiGlTest` among them, both of its tests —
-and the build was green anyway. A green `sh gradlew build` says nothing at all about the GL half
-of this ticket. That is why section 1's evidence command is the xvfb one and not this. (The other
-two skipped classes, `RealArtAtlasPackerTest` and `RealArtReproducibilityTest`, are unrelated to
-this ticket and skip on `origin/example` too.)
+this box, so every class in `dev.wildware.udea.render.gl` and `dev.wildware.udea.agent.host.gl`
+skipped — `ComposeUiGlTest` among them, both of its tests — and the build was green anyway. A green
+`sh gradlew build` says nothing at all about the GL half of this ticket, which is why section 1's
+evidence command is the xvfb one. The two real-art classes are unrelated to this ticket and skip on
+`origin/example` too.
 
-### The xvfb GL run, `requireGl=true`
+The gates that matter here executed in that build rather than coming from cache — none of these
+lines carries `UP-TO-DATE`. `grep -nE` over `41-clean-build-0.6.0.txt` for each task name:
+
+```
+77:> Task :udeaVerifyContracts
+78:> Task :udeaVerifyAgentsMd
+137:> Task :udeaLegacyReport
+186:> Task :udeaVerifyModuleGraph
+189:> Task :udeaVerifyNoLegacyDependencies
+281:> Task :udeaVerifyMigration
+575:> Task :udea-codegen:udeaCheckProtocolLock
+595:> Task :udea-render:udeaVerifyHeadless
+625:> Task :udea-assets-compiler:udeaPackGate
+645:> Task :udeaVerifyDeterminism
+```
+
+`udeaVerifyContracts` executing and the build passing is the mechanical statement that no
+`docs/contracts/` file moved; `udeaCheckProtocolLock` the same for `net-protocol.lock`. Section 2
+explains why `udeaVerifyModuleGraph` passing is *not* evidence about `gdx-controllers-core`, and
+what is.
+
+### The xvfb GL run on `a363c36`, `requireGl=true`
 
 ```
 xvfb-run -a -s "-screen 0 1280x720x24" \
   env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
-  sh gradlew udeaGlTest udeaAgentGlTest -Pudea.render.requireGl=true --rerun-tasks
+  JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem \
+  sh gradlew udeaGlTest udeaAgentGlTest -Pudea.render.requireGl=true --rerun-tasks --console=plain
 ```
 
-Transcript `13-gl-xvfb.txt`, last four lines:
+`43-gl-xvfb-0.6.0.txt`, last four lines:
 
 ```
-BUILD SUCCESSFUL in 1m 5s
+BUILD SUCCESSFUL in 24s
 45 actionable tasks: 45 executed
 Configuration cache entry stored.
 EXIT=0
 ```
 
-The XMLs from that run were copied out **at capture time**, to
-`issue187-evidence/gl-xml-final/`, precisely because a later plain `build` overwrites them with
-skipped ones — which is exactly what the warm build above then did. Summary
-(`13-gl-xml-summary.txt`):
+Its XMLs were copied to `gl-xml-0.6.0/` in the same shell command that ran it, before anything
+else could overwrite them. Summary (`43-gl-xml-summary-0.6.0.txt`):
 
 ```
-dev.wildware.udea.agent.host.gl.OffscreenRenderToolsTest: tests=7 failures=0 errors=0 skipped=0 time=2.057
-dev.wildware.udea.agent.host.gl.OverlayCaptureIsolationTest: tests=1 failures=0 errors=0 skipped=0 time=0.513
-dev.wildware.udea.render.gl.ComposeUiGlTest: tests=2 failures=0 errors=0 skipped=0 time=1.609
-dev.wildware.udea.render.gl.GlCaptureDeterminismTest: tests=4 failures=0 errors=0 skipped=0 time=0.963
-dev.wildware.udea.render.gl.GlCaptureTest: tests=5 failures=0 errors=0 skipped=0 time=1.281
-dev.wildware.udea.render.gl.GlOverlayIsolationTest: tests=1 failures=0 errors=0 skipped=0 time=0.322
-dev.wildware.udea.render.gl.GlThreadShutdownTest: tests=1 failures=0 errors=0 skipped=0 time=0.123
-dev.wildware.udea.render.gl.OffscreenBackendTest: tests=8 failures=0 errors=0 skipped=0 time=1.908
+dev.wildware.udea.agent.host.gl.OffscreenRenderToolsTest: tests=7 failures=0 errors=0 skipped=0 time=1.822
+dev.wildware.udea.agent.host.gl.OverlayCaptureIsolationTest: tests=1 failures=0 errors=0 skipped=0 time=0.51
+dev.wildware.udea.render.gl.ComposeUiGlTest: tests=2 failures=0 errors=0 skipped=0 time=1.386
+dev.wildware.udea.render.gl.GlCaptureDeterminismTest: tests=4 failures=0 errors=0 skipped=0 time=0.929
+dev.wildware.udea.render.gl.GlCaptureTest: tests=5 failures=0 errors=0 skipped=0 time=1.205
+dev.wildware.udea.render.gl.GlOverlayIsolationTest: tests=1 failures=0 errors=0 skipped=0 time=0.292
+dev.wildware.udea.render.gl.GlThreadShutdownTest: tests=1 failures=0 errors=0 skipped=0 time=0.11
+dev.wildware.udea.render.gl.OffscreenBackendTest: tests=8 failures=0 errors=0 skipped=0 time=1.62
 TOTAL tests=29 failures+errors=0 skipped=0
 ```
 
-### The three gates outside `check`
+### `moba`, re-shot on 0.6.0
 
-`udeaVerifyModuleGraph udeaVerifyNoLegacyDependencies udeaVerifyAgentsMd udeaVerifyContracts
-udeaVerifyMigration udeaLegacyReport udeaVerifyDeterminism` — transcript `11-gates.txt`.
+`moba`'s runtime classpath changed — it gains `gdx-controllers-core` through `udea-render` — so I
+did not carry the first handover's shots over. `:moba:runMatchShot :moba:runShot` under xvfb,
+`47-moba-shots-0.6.0.txt`: `BUILD SUCCESSFUL in 1m 35s`, `EXIT=0`, no `UDEA0032`. The match shots
+land on the same ticks with the same scores as the snapshot-era run, for example
+`hud.png 1280x720 at tick 561 - the HUD with a cooldown running | alive=24 score orc=2 soldier=8
+undead=8`. I looked at `match/hud.png`: score bar, health bar, ability bar with live cooldowns,
+event log, selection ring and sprites all present. That is the scene2d HUD, so it proves the
+rename and the dependency move did not break the game, not anything about ComposeGL.
 
-Its last two lines, contiguous:
-
-```
-BUILD SUCCESSFUL in 12s
-EXIT=0
-```
-
-The individual verdicts are **not** a contiguous block — Gradle interleaves a per-project task for
-every module, so this is that file reduced by
-`grep -E '^> Task :udea(Verify|Legacy)' 11-gates.txt` to the root-level aggregates:
-
-```
-> Task :udeaVerifyModuleGraph UP-TO-DATE
-> Task :udeaVerifyNoLegacyDependencies UP-TO-DATE
-> Task :udeaVerifyContracts UP-TO-DATE
-> Task :udeaLegacyReport UP-TO-DATE
-> Task :udeaVerifyMigration UP-TO-DATE
-> Task :udeaVerifyDeterminism UP-TO-DATE
-> Task :udeaVerifyAgentsMd UP-TO-DATE
-```
-
-`udeaVerifyContracts` green is the mechanical statement that **no `docs/contracts/` file moved**;
-the diffstat in section 5 is the other half of it.
-
-`:moba:runMatchShot :moba:runShot` under xvfb — `12-moba-shots.txt`, `BUILD SUCCESSFUL in 2m 36s`,
-`EXIT=0`. I ran those to check `MobaHud` is unregressed by the rename, and I **looked at**
-`match/hud.png`: score bar, health bar, ability bar with live cooldowns, event log, selection
-ring, sprites all resolving, no `UDEA0032`.
-
-`:moba:runUdpProof` I did not run. It is red on `origin/example` and nothing in this ticket
-touches replication.
+`:moba:runUdpProof` I did not run. It is red on `origin/example` and nothing here touches
+replication.
 
 ### `udeaDaemonBudget`
 
-**It did not run, and the reason is that it is not on `check` in this tree.**
+**It did not run, because it is not on `check` in this tree.**
 `udea-assets-compiler/build.gradle.kts` registers it as a standalone `Test` task and wires only
 `udeaPackGate` to `check`:
 
@@ -523,18 +515,15 @@ tasks.named("check") {
 }
 ```
 
-Consistent with the build log: the only `udea-assets-compiler` verification tasks in
-`10-full-build.txt` are `test`, `udeaPackGate` and the verifiers. `udeaPackGate` passed. So the
-latency-budget flakiness I was warned about could not have affected this build, and there is
-nothing to re-run solo.
+`udeaPackGate` executed and passed (line 625 above). So the latency-budget flakiness I was warned
+about could not have affected these builds, and there is nothing to re-run solo.
 
-### One incident worth recording
+### Incidents worth recording
 
-The **first** attempt at the cold full build was **killed, not failed**:
+In the first handover, the first attempt at the cold build was **killed, not failed** —
 `Gradle build daemon has been stopped: stop command received`, at loadavg 24, while `melon-merge`
-was running its fifteen-minute scenario suite on this shared box. I did not report that as a test
-failure. I sampled `pgrep` every few seconds until the box was quiet and re-ran, which gave the
-`BUILD SUCCESSFUL in 2m 3s` above. Nothing about it was specific to this branch.
+ran its scenario suite on this shared box. Re-run once the box was quiet, it passed. Nothing about
+it was specific to this branch, and nothing like it happened on `a363c36`.
 
 ---
 
@@ -551,8 +540,11 @@ believed:
 88d407da05d00b701a4794a571af00a1  issue187-composegl-ui-gl-frame-unmounted.png
 ```
 
-The same three md5s come out of `udea-render/build/reports/udea/compose-ui/` after the evidence
-command, and out of the run before it on `c2369c0`.
+Those are the md5s of the copies in the gallery, and the same three come out of
+`udea-render/build/reports/udea/compose-ui/` after the final evidence run on `a363c36` against
+0.6.0. They are also the md5s the first handover's runs against the snapshot produced: ComposeGL
+0.6.0 draws this screen to the identical pixel. I looked at the 0.6.0 frames anyway, and the
+collage was rebuilt from them.
 
 | File | What it shows | What it proves |
 |---|---|---|
@@ -560,7 +552,7 @@ command, and out of the run before it on `c2369c0`.
 | `issue187-composegl-ui-gl-frame.png` | The same frame with a ComposeGL panel over it: a title, a label reading "clicked 0 times", and a focused button | AC-3. A real LWJGL3 context, a real FreeType-rasterised glyph, drawn into the offscreen target a `FrameCapture` reads. The world shows through around the panel, so the layer composited rather than cleared |
 | `issue187-composegl-ui-gl-clicked.png` | The label now reads "clicked 1 times" | A pointer event went through `layer.input`, reached the button's `onClick`, recomposed, and reached a pixel |
 | `issue187-composegl-ui-sequence.png` | The three above tiled and labelled | The sequence read as one picture: no interface, interface, interface responding |
-| `issue187-moba-hud-live-agent-screenshot.png` | `moba`'s scene2d HUD, captured over the bridge from a live game at tick 2203 | `MobaHud` is unregressed by the `Scene2dUiLayer` rename — decision 4 honoured. This is the *old* layer still working, not the new one |
+| `issue187-moba-hud-live-agent-screenshot.png` | `moba`'s scene2d HUD, captured over the bridge from a live game at tick 2203 | `MobaHud` is unregressed by the `Scene2dUiLayer` rename — decision 4 honoured. This is the *old* layer still working, not the new one. **Taken in the first handover, against the snapshot, and not re-taken.** The re-check on 0.6.0 is `47-moba-shots-0.6.0.txt` and `match/hud.png` in section 3 |
 
 I looked at every one of them rather than only measuring them, and that caught a defect no
 assertion would have. An earlier version put the panel's `.padding(20f)` on `Panel` itself, and
@@ -578,8 +570,7 @@ green throughout**, which is the point: no number I had was going to find this, 
 `git diff origin/example..HEAD --stat -- . ':!BRIEF-187.md'`:
 
 ```
- build.gradle.kts                                   |  10 +
- gradle/libs.versions.toml                          |  20 +-
+ gradle/libs.versions.toml                          |   7 +-
  moba/src/main/kotlin/dev/wildware/moba/MobaHud.kt  |  14 +-
  udea-render/build.gradle.kts                       |   8 +
  .../kotlin/dev/wildware/udea/render/ui/UiLayer.kt  | 357 ++++++++++++++-----
@@ -593,26 +584,18 @@ green throughout**, which is the point: no number I had was going to find this, 
  .../udea/render/ui/scene2d/Scene2dUiLayerTest.kt   | 216 +++++++++++
  .../test/resources/fonts/DejaVuSans-LICENSE.txt    |  78 ++++
  .../src/test/resources/fonts/DejaVuSans.ttf        | Bin 0 -> 759720 bytes
- 15 files changed, 1703 insertions(+), 186 deletions(-)
+ 14 files changed, 1680 insertions(+), 186 deletions(-)
 ```
 
-`0d04db0` is the comment commit and changed no behaviour in any file. Its own stat, which is
-where some of the added lines in the two build files and four Kotlin files above come from:
-
-```
- build.gradle.kts                                   |  6 +++++-
- gradle/libs.versions.toml                          | 12 +++++++++---
- .../kotlin/dev/wildware/udea/render/ui/UiScreen.kt |  4 +++-
- .../udea/render/ui/scene2d/Scene2dUiLayer.kt       | 22 ++++++++++++----------
- .../udea/render/ui/scene2d/Scene2dUiScreen.kt      |  4 +++-
- .../dev/wildware/udea/render/gl/ComposeUiGlTest.kt | 10 ++++++----
- 6 files changed, 38 insertions(+), 20 deletions(-)
-```
+`build.gradle.kts` is gone from that list: the root build script is now byte-identical to
+`origin/example`. `gradle/libs.versions.toml` is the version line and the `gdx-freetype-platform`
+entry, and nothing else.
 
 **`net-protocol.lock`: not touched. `expected-generated-hashes.txt`: not touched. Ids moved by
 zero.** This ticket adds no replicated component and no `@Net` field — it is presentation only,
 and presentation has no wire representation. Both files are absent from the diffstat above, and
-`udeaCheckProtocolLock` runs on `check`, which was green in the full build.
+`udeaCheckProtocolLock` executed in the cold build on `a363c36` (line 575 of
+`41-clean-build-0.6.0.txt`) and passed.
 
 `docs/contracts/`: not touched, and no contract needed to change. `docs/contracts.lock`: not
 touched. `udeaVerifyContracts` green.
@@ -708,6 +691,10 @@ the second is what M2 breaks.
 
 ### Also delivered against the standing instruction to drive the real game
 
+*This live session was in the first handover, against the snapshot, and was not repeated on
+0.6.0.* It exercised the agent tool surface and the scene2d HUD, neither of which this swap
+touches; the 0.6.0 check on the running game is the `moba` re-shoot in section 3.
+
 `mcp__game-bridge__launch_instance` fails on this box with the documented one-line `25.0.2` —
 the bridge's generated `gamebridge.json` runs `./gradlew`, which picks up the box's default JDK
 25, which Gradle 8.13 rejects. So I started the game myself with `JAVA_HOME` set and talked to
@@ -730,20 +717,32 @@ is a `udea-gradle` change with no relationship to this ticket.
 
 ## 7. The mutation table
 
-Each row is the literal `git diff` of the mutation, from the run that produced the failure beside
-it. Outputs, diffs and XMLs are all under `issue187-evidence/mutations/`. `unit` means
+Each row is the literal `git diff` of the mutation, pasted whole from the saved file
+`mutations/M<n>.diff` that the run wrote before it ran — `index` lines and context included.
+(The first handover printed these with the context and `index` lines trimmed and no elision
+marker; that is corrected here, not merely noted.) All ten were run against the snapshot in the
+first handover. **M2 and M7 were re-run against 0.6.0 on `a363c36`**, because they are the two
+that stand behind the evidence command and the AC-3 blocker, and a mutation proven red against
+one library version is not proven red against another. Outputs, diffs and XMLs are all under `issue187-evidence/mutations/`. `unit` means
 `:udea-render:test --tests 'dev.wildware.udea.render.ui.*'` (24 tests); `gl` means
 `:udea-render:udeaGlTest --tests '...ComposeUiGlTest'` under xvfb with `requireGl=true`.
 
 ### M1 — the clamp
 
 ```diff
+diff --git a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
+index 82fdb9d..05169df 100644
 --- a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 +++ b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 @@ -293,7 +293,7 @@ public class UiLayer internal constructor(
+      * is the second, tighter one. See the class KDoc for why there are two.
+      */
      private fun clampedFrameNanos(): Long =
 -        (frameTime.frameSeconds.coerceAtMost(MAX_UI_SECONDS) * NANOS_PER_SECOND).toLong()
 +        (frameTime.frameSeconds * NANOS_PER_SECOND).toLong()
+ 
+     /**
+      * Sizes the UI viewport to the surface being drawn into.
 ```
 
 `unit`: `24 tests completed, 2 failed`
@@ -780,11 +779,27 @@ pipeline.render(0f)
 ### M2 — the draw
 
 ```diff
+diff --git a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
+index 82fdb9d..9598a79 100644
 --- a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 +++ b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
+@@ -15,6 +15,7 @@ import dev.wildware.composegl.ui.focus.FocusManager
+ import dev.wildware.composegl.ui.geometry.Size
+ import dev.wildware.composegl.ui.host.UiHost
+ import dev.wildware.composegl.ui.host.UiRenderer
++import dev.wildware.composegl.ui.host.settle
+ import dev.wildware.composegl.ui.input.KeyRouter
+ import dev.wildware.composegl.ui.input.PointerRouter
+ import dev.wildware.composegl.ui.layout.Viewport
 @@ -229,7 +230,7 @@ public class UiLayer internal constructor(
+         // the canvas's frame, draw and close it. The canvas draws into whatever framebuffer is
+         // bound, which inside a `RenderPipeline` frame is the offscreen target every capture is
+         // read from, and it clears nothing -- the world is already there.
 -        renderer.render(viewport, clockNanos)
 +        host.settle(viewport, focus, clockNanos)
+     }
+ 
+     /**
 ```
 
 `unit`: `24 tests completed, 1 failed` — `the composed tree is drawn into the backend's canvas
@@ -794,11 +809,16 @@ expected: <3> but was: <0>`.
 and the unmounted frame; the interface did not draw`, and `the label counting the clicks reads the
 same in both frames, so the recomposition never reached a pixel`.
 
-This is the mutation section 1 uses as the evidence-command proof.
+**Re-run against 0.6.0 on `a363c36`.** The mutation, saved scoped to the one file as
+`mutations/M2-060-scoped.diff`, is byte-identical to the diff above. `unit` (`M2-060.out`): `24 tests completed, 1 failed`, the
+same test. `gl` (`M2gl-060.out`): `2 tests completed, 2 failed`, the same two, with the same two
+messages. Section 1 then runs the *named* evidence command red with it, against 0.6.0.
 
 ### M3 — the unmount
 
 ```diff
+diff --git a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
+index 82fdb9d..0b052b6 100644
 --- a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 +++ b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 @@ -268,7 +268,6 @@ public class UiLayer internal constructor(
@@ -808,6 +828,7 @@ This is the mutation section 1 uses as the evidence-command proof.
 -        host.setContent {}
          current.dispose()
      }
+ 
 ```
 
 `unit`: 1 failed — `showing a screen composes its content and hiding removes and disposes it`,
@@ -835,11 +856,19 @@ interface. The fix is three discarded frames before every compared capture:
 ### M4 — the input order
 
 ```diff
+diff --git a/udea-render/src/main/kotlin/dev/wildware/udea/render/input/GdxKeyboard.kt b/udea-render/src/main/kotlin/dev/wildware/udea/render/input/GdxKeyboard.kt
+index ae8f167..0d7732a 100644
 --- a/udea-render/src/main/kotlin/dev/wildware/udea/render/input/GdxKeyboard.kt
 +++ b/udea-render/src/main/kotlin/dev/wildware/udea/render/input/GdxKeyboard.kt
 @@ -120,7 +120,7 @@ public class GdxKeyboard : KeyboardState, InputProcessor {
+                 "there is no Gdx.input to install an input chain on; call this on the render " +
+                     "thread once the backend has started"
+             }
 -            val multiplexer = InputMultiplexer(*processors)
 +            val multiplexer = InputMultiplexer(*processors.reversedArray())
+             input.inputProcessor = multiplexer
+             return multiplexer
+         }
 ```
 
 `unit`: 1 failed — `a key the composition consumes never reaches the keyboard`,
@@ -848,11 +877,18 @@ interface. The fix is three discarded frames before every compared capture:
 ### M5 — the disposal
 
 ```diff
+diff --git a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
+index 82fdb9d..dcf9c4a 100644
 --- a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 +++ b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 @@ -215,7 +215,6 @@ public class UiLayer internal constructor(
+         // rather than left to the caller because a composition nobody disposes is a Recomposer
+         // whose coroutine outlives the window, and a `GdxBackend` nobody disposes is a glyph
+         // atlas and a set of GL programs leaked per pipeline.
 -        resources.own(this)
          (backend as? Disposable)?.let(resources::own)
+     }
+ 
 ```
 
 `unit`: 1 failed — `the layer is disposed by the pipeline rather than by whoever remembered`,
@@ -861,12 +897,18 @@ interface. The fix is three discarded frames before every compared capture:
 ### M6 — the viewport is never sized
 
 ```diff
+diff --git a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
+index 82fdb9d..7585580 100644
 --- a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 +++ b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 @@ -308,7 +308,6 @@ public class UiLayer internal constructor(
+         val width = target.width.toFloat()
+         val height = target.height.toFloat()
          if (viewport.physical.width == width && viewport.physical.height == height) return
 -        viewport = Viewport.oneToOne(Size(width, height))
      }
+ 
+     internal companion object {
 ```
 
 `unit`: 1 failed — `the layer lays the tree out against the surface it is drawing into`,
@@ -877,11 +919,19 @@ expected: <1> but was: <0>` (a 1x1 layout puts the button nowhere the pointer la
 ### M7 — the FreeType natives, in the build file
 
 ```diff
+diff --git a/udea-render/build.gradle.kts b/udea-render/build.gradle.kts
+index 3243038..59800d8 100644
 --- a/udea-render/build.gradle.kts
 +++ b/udea-render/build.gradle.kts
 @@ -41,7 +41,7 @@ dependencies {
+     // `FreeType.initFreeType` with an UnsatisfiedLinkError the first time a game asks for a glyph.
+     // #186 could not draw a ComposeGL frame at all for exactly this reason; this line is half of
+     // what fixed it. Runtime-only because nothing compiles against the natives.
 -    runtimeOnly(variantOf(libs.gdx.freetype.platform) { classifier("natives-desktop") })
 +    // M7: the freetype natives removed.
+ 
+     // Test-only, deliberately. `udeaVerifyHeadless` reports through the one UdeaDiagnostic
+     // (spec 5) so its output has the same rule ids, spans and cap as every other producer;
 ```
 
 `gl`: `2 tests completed, 2 failed`
@@ -894,14 +944,43 @@ SharedLibraryLoadRuntimeException: Unable to read file for extraction: libgdx-fr
 This is the row that makes the AC-3 claim concrete: the blocker #186 hit is real, the one-line fix
 is load-bearing, and removing it fails loudly rather than drawing blank text.
 
+**Re-run against 0.6.0 on `a363c36`**, which is what settles whether the line is still needed now
+that `composegl-gdx:0.6.0`'s POM brings `gdx-freetype` itself. The mutation (`mutations/M7-060-scoped.diff`)
+is byte-identical to the diff above. `gl` (`M7-060.out`, XML `M7-060-ComposeUiGlTest.xml`): `2 tests completed, 2 failed`, with
+
+```
+SharedLibraryLoadRuntimeException: Couldn't load shared library 'libgdx-freetype64.so' for target: Linux, x86, 64-bit
+SharedLibraryLoadRuntimeException: Unable to read file for extraction: libgdx-freetype64.so
+```
+
+So yes: the release brings the Java binding and not the `natives-desktop` classifier, and the line
+stays.
+
 ### M8 — the glyphs
 
 ```diff
+diff --git a/udea-render/src/test/kotlin/dev/wildware/udea/render/gl/ComposeUiGlTest.kt b/udea-render/src/test/kotlin/dev/wildware/udea/render/gl/ComposeUiGlTest.kt
+index d0d70c0..817e3d5 100644
 --- a/udea-render/src/test/kotlin/dev/wildware/udea/render/gl/ComposeUiGlTest.kt
 +++ b/udea-render/src/test/kotlin/dev/wildware/udea/render/gl/ComposeUiGlTest.kt
+@@ -21,6 +21,8 @@ import dev.wildware.composegl.ui.modifier.Modifier
+ import dev.wildware.composegl.ui.modifier.fillMaxSize
+ import dev.wildware.composegl.ui.modifier.padding
+ import dev.wildware.composegl.ui.modifier.testTag
++import dev.wildware.composegl.ui.modifier.background
++import dev.wildware.composegl.ui.modifier.height
+ import dev.wildware.composegl.ui.modifier.width
+ import dev.wildware.composegl.ui.widget.Button
+ import dev.wildware.composegl.ui.widget.Panel
 @@ -318,7 +320,7 @@ class ComposeUiGlTest {
+                         verticalArrangement = Arrangement.spacedBy(12f),
+                         horizontalAlignment = HorizontalAlignment.Centre,
+                     ) {
 -                        Text("UDEA ON COMPOSEGL", Modifier.testTag(TITLE))
 +                        Box(Modifier.width(220f).height(18f).background(dev.wildware.composegl.ui.graphics.Colour.rgb(0x8899AA)).testTag(TITLE))
+                         Text("issue 187 - clicked $clicks times", Modifier.testTag(COUNT))
+                         Button("CLICK ME", { clicks++ }, Modifier.testTag(BUTTON))
+                     }
 ```
 
 `gl`: 1 failed — `the title's box holds only 2 distinct colours, which is a flat rectangle rather
@@ -914,11 +993,19 @@ same size, which is what a blank-glyph failure would look like.
 ### M9 — the layer rescales the whole surface
 
 ```diff
+diff --git a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
+index 82fdb9d..82ebefe 100644
 --- a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 +++ b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 @@ -308,7 +308,7 @@ public class UiLayer internal constructor(
+         val width = target.width.toFloat()
+         val height = target.height.toFloat()
+         if (viewport.physical.width == width && viewport.physical.height == height) return
 -        viewport = Viewport.oneToOne(Size(width, height))
 +        viewport = Viewport.oneToOne(Size(width / 2f, height / 2f)).copy(physical = Size(width, height))
+     }
+ 
+     internal companion object {
 ```
 
 `gl`: 1 failed — `3641 pixels changed in a 64x64 corner the interface does not cover, so the layer
@@ -927,15 +1014,21 @@ is clearing or rescaling the whole surface ==> expected: <0> but was: <3641>`.
 ### M10 — the control
 
 ```diff
+diff --git a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
+index 82fdb9d..e56c18b 100644
 --- a/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 +++ b/udea-render/src/main/kotlin/dev/wildware/udea/render/ui/UiLayer.kt
 @@ -292,6 +292,10 @@ public class UiLayer internal constructor(
+      * The pipeline has already clamped [FrameTime.frameSeconds] to its own, looser figure; this
+      * is the second, tighter one. See the class KDoc for why there are two.
+      */
 +    // M10, the control: prose that says the opposite of the code, and changes nothing.
 +    // `(frameTime.frameSeconds * NANOS_PER_SECOND).toLong()` -- no coerceAtMost, no clamp, and
 +    // `resources.own(this)` is not called either. Everything here must stay green: a check that
 +    // failed on a comment would be a check about text rather than about behaviour.
      private fun clampedFrameNanos(): Long =
          (frameTime.frameSeconds.coerceAtMost(MAX_UI_SECONDS) * NANOS_PER_SECOND).toLong()
+ 
 ```
 
 `unit`: `BUILD SUCCESSFUL in 19s`. `gl`: `BUILD SUCCESSFUL in 15s`.
@@ -1005,7 +1098,9 @@ None of them would have failed a test, which is exactly why they were still ther
 build refers to a snapshot"; `build.gradle.kts` has declared two `oss.sonatype.org` snapshot
 repositories since the initial commit. The constraint I was given was that somebody who never
 read this ticket must be able to do the 0.6.0 swap from the comment alone, and following my
-comment they would have deleted three repositories instead of one. Section 2 has the greps.
+comment they would have deleted three repositories instead of one. `0d04db0` fixed the comments;
+`a363c36` then removed them, and the repository line they described, because 0.6.0 is a release
+and there is no snapshot left to describe. The two `oss.sonatype.org` lines are untouched.
 
 **2. A carried-forward count that was wrong.** `Scene2dUiLayer`'s disposal KDoc said "the old
 tree disposed a stage in three different places and none of them in a `finally`". It came with
@@ -1027,19 +1122,51 @@ construction; all three now cite file and symbol.
 Then I grepped for the class rather than stopping at the instances I had been looking at:
 
 ```
-$ grep -rnE "\.kt:[0-9]+" udea-render/src/main/kotlin/dev/wildware/udea/render/ui/ \
+grep -rnE "\.kt:[0-9]+" udea-render/src/main/kotlin/dev/wildware/udea/render/ui/ \
     udea-render/src/test/kotlin/dev/wildware/udea/render/ui/ \
     udea-render/src/test/kotlin/dev/wildware/udea/render/gl/ComposeUiGlTest.kt
-(none left)
 ```
+
+It prints no lines and exits with status 1, which is grep's "no match". (The first handover showed
+this with an output line reading `(none left)`. grep prints no such line; that was my shell's
+`|| echo`, typed into the block as though it were output. Corrected here.)
 
 **4. Two exhaustiveness claims the text under them did not support.** "kept under a name that
 says so for exactly one reason", sitting above two reasons; and a heading, "Why none of the
 other tests can stand in for this one", over a body that argues only about `UiLayerTest`. Both
 now say what they actually argue.
 
-And I re-ran both the full build and the evidence command on `0d04db0` rather than reasoning
-that comments cannot break anything. Sections 1 and 3 quote those runs.
+I re-ran both the full build and the evidence command on `0d04db0` rather than reasoning that
+comments cannot break anything. Those runs are files 20–23; sections 1 and 3 now quote the
+later runs on `a363c36`.
+
+### The second pass, on `a363c36`, found more of the same
+
+Re-reading for the swap turned up these. Every one is the same species as the four above, and
+two of them had already shipped in the first handover.
+
+- **The mutation diffs in section 7 were not literal.** The first handover printed them with the
+  `index` lines and the diff context trimmed, and no elision marker, even though the whole point
+  of the table is that a row can be reproduced from its diff. All ten are now pasted whole from
+  `mutations/M<n>.diff`.
+- **A block of grep "output" that grep never printed**: the `(none left)` line above.
+- **A probe that answered wrong, caught by its control before I relied on it.** Checking this
+  branch's ComposeGL imports against the 0.6.0 jar listings reported nine missing. Run against the
+  snapshot this branch already compiled against, it reported the same nine: Compose composables
+  are capitalised functions, and the probe treated them as classes. I used the compile as the
+  evidence instead (section 2).
+- **A saved artefact that mislabelled its own subject.** That probe's control output was first
+  saved with the header "0.6.0 release" although it ran against the snapshot, because the label
+  was hard-coded. Regenerated with the listing named, and each listing checked to be what its label
+  says (`ContextMenuKt` present in the release listing only).
+- **Two claims in my draft of this brief that the transcripts did not support**, both caught before
+  publishing: that the compile run "executed both compile tasks" (`:moba:compileKotlin` was
+  `UP-TO-DATE` in it), and a load average attributed to the cold build that was measured before
+  the warm one.
+
+Every quoted block in sections 1 and 3, and the two parsed blocks in section 2, were then checked
+mechanically against their source files, as exact line sequences, by a script with an off-by-one
+control that must fail and does.
 
 ### What I did not exercise
 
@@ -1052,5 +1179,8 @@ that comments cannot break anything. Sections 1 and 3 quote those runs.
   it is `RenderMode`'s existing contract.
 - **A `UiScreen` whose `content()` throws.** No behaviour is defined for it and I did not invent
   one; it propagates out of `render`, like any other render-thread exception.
-- **The widget set.** Not this ticket (decision 2), and section 2 explains why #188 will want to
-  read the snapshot finding before it starts.
+- **The widget set.** Not this ticket (decision 2). 0.6.0's new widgets are listed in section 2
+  and on the issue for #188; none of them is used here.
+- **`gdx-controllers-core` at runtime.** It is on the classpath and nothing in this branch calls
+  it. I checked where it resolves and that no game code references it; I did not exercise a
+  controller.

@@ -22,12 +22,12 @@ import kotlinx.serialization.modules.PolymorphicModuleBuilder
  */
 public class LevelComponent<T : Component<T>>(
     /** The concrete component class. */
-    public val type: KClass<T>,
+    internal val type: KClass<T>,
     /** Its plugin-generated serializer. */
-    public val serializer: KSerializer<T>,
+    internal val serializer: KSerializer<T>,
 ) {
     /** The name the class is written under in a level file, and read back by. */
-    public val serialName: String get() = serializer.descriptor.serialName
+    internal val serialName: String get() = serializer.descriptor.serialName
 
     internal fun registerInto(builder: PolymorphicModuleBuilder<Component<*>>) {
         builder.subclass(type, serializer)
@@ -59,7 +59,7 @@ public interface LevelComponentModule {
          * Every [LevelComponentModule] on [loader]'s classpath, in ascending module-name order so
          * the result does not depend on classpath order.
          */
-        public fun discover(
+        internal fun discover(
             loader: ClassLoader = LevelComponentModule::class.java.classLoader,
         ): List<LevelComponentModule> =
             ServiceLoader.load(LevelComponentModule::class.java, loader)

@@ -257,7 +257,7 @@ public class Level internal constructor(
     public val tick: Tick get() = document.tick
 
     /** How many entities loading it creates. */
-    public val entityCount: Int get() = document.world.size
+    internal val entityCount: Int get() = document.world.size
 
     override fun toString(): String = "Level(tick=$tick, entities=$entityCount)"
 }

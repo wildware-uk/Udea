@@ -22,10 +22,17 @@ when the lead tells you the branch merged.
 3. **`HANDOFF.md`** — where the tree actually stands, including what is red.
 4. `docs/contracts/` for anything your ticket touches. **Frozen means frozen.**
 
-## The branch is `example`, not `master`
+## The branch is `kmp`
 
-Branch from `origin/example`. `master` sits at `ce7db67` and is deliberately behind; whether
-`example` merges into it is the owner's outstanding decision and nothing you do touches it.
+Branch from `origin/kmp`, the integration branch for the port of Udea to Kool rendering and Kotlin
+Multiplatform (epic #199). The `example` branch is retired; `master` receives `kmp` once, when it is
+fully green (#214). Read the spec first: `docs/superpowers/specs/2026-09-16-kool-kmp-port-design.md`. Its decisions D1-D12 are settled.
+
+`kmp` may be red mid-port. Before your first change, run `sh gradlew build --continue` and save the
+failing tasks: that is your baseline. Your ticket turns its named tasks green and turns no
+baseline-green task red; `BRIEF-<N>.md` lists both. iOS cannot build on this Linux box - never claim
+it was tested here. The Android SDK is `/home/shaun/Android/Sdk` (`ANDROID_HOME` is unset; never
+commit `local.properties`).
 
 ## Nobody is at the keyboard
 
@@ -72,9 +79,8 @@ One command, no exclusions:
 
     JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build
 
-`CLAUDE.md` says it in as many words: no `-x`. The whole repository is green on `example`; if it is
-not, that is your change. The last recorded clean run at `8035374` was BUILD SUCCESSFUL, 2447 tests,
-0 failures — a **recorded** result, not one re-run for you. Run it yourself before believing it.
+`CLAUDE.md` says it in as many words: no `-x`. On `kmp` add `--continue` and compare failing tasks
+with your baseline: a task red on your branch and green on the baseline is your change.
 
 **Two things about that command line are not decoration, and both were measured on this box.**
 
@@ -180,7 +186,7 @@ run the two tasks again in the merged tree and compare.
 ## Your evidence command
 
 **Name exactly one in `BRIEF.md`**, complete and ready to paste, and **prove it can fail** — revert
-the feature, run it, watch it go red, put it back. A command that passes on `origin/example` asserts
+the feature, run it, watch it go red, put it back. A command that passes on `origin/kmp` asserts
 nothing about your branch, and it is the one piece of evidence nobody downstream can check for you.
 
 You are not asked to build a harness. Pick from what already exists:
@@ -292,7 +298,7 @@ of the same fact is a hostage to whether anyone can still produce it.
 reported "18 behind master, merges clean" in six consecutive status reports while working on a branch
 it had never fetched. Every one of those statements was **true**. This is worse than a check that
 runs against the wrong subject, because nothing errors: it is a check that runs and returns a true
-answer to a question nobody asked. `git fetch` first, and compare against `origin/example`, which is
+answer to a question nobody asked. `git fetch` first, and compare against `origin/kmp`, which is
 the ref this project actually integrates on.
 
 **Keep the artefact, not the command's verdict.** Reporting *what a command said* leaves nothing
@@ -699,7 +705,7 @@ exclusions**; the GL tests run for real under xvfb if the ticket touches GL; an 
 goes red when the feature is reverted; the feature driven for real where there is something to drive;
 images copied to the gallery; every acceptance criterion proved; your own pass over the diff and the
 brief done; `BRIEF.md` written with its SHA and its evidence command; and the work committed on your
-branch off `origin/example`.
+branch off `origin/kmp`.
 
 Report the actual output. If something is broken, say so — never report done on a red build.
 

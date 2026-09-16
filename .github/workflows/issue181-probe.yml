@@ -1,8 +1,10 @@
-# TEMPORARY - issue #181 measurement probe. Deleted before the branch is handed over.
-# Runs only on pushes to the issue branch. Measures, per runner:
-#   - what the current gate measures (first clean build, cold configuration cache)
-#   - repeated clean builds in the same job (is the noise within-job or between-runners?)
-#   - alternating clean builds of two checkouts of the same commit (does a same-job ratio hold?)
+# TEMPORARY - issue #181 measurement probe, round 2. Deleted before the branch is handed over.
+#
+# Round 1 (run 35110741713) showed the first clean build is ~75% warm-up and that runners come
+# in two CPU types. This round measures the candidate protocol: two checkouts in one job, warmed,
+# then ABBA-ordered clean builds with the configuration cache entry removed before each sample.
+# `plant` is the number of generated functions added to udea-core in the HEAD copy only: 0 is
+# identical work (the noise), anything else is a genuine extra compile (the signal).
 name: issue181-probe
 
 on:
@@ -11,12 +13,21 @@ on:
 
 jobs:
   probe:
-    name: probe ${{ matrix.leg }}
+    name: probe leg ${{ matrix.leg }} plant ${{ matrix.plant }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        leg: [1, 2, 3, 4]
+        include:
+          - { leg: 1, plant: 0 }
+          - { leg: 2, plant: 0 }
+          - { leg: 3, plant: 0 }
+          - { leg: 4, plant: 0 }
+          - { leg: 5, plant: 0 }
+          - { leg: 6, plant: 1500 }
+          - { leg: 7, plant: 1500 }
+          - { leg: 8, plant: 6000 }
+          - { leg: 9, plant: 6000 }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -29,29 +40,38 @@ jobs:
       - name: Machine
         shell: bash
         run: |
-          nproc; free -m; grep -m1 "model name" /proc/cpuinfo; lscpu | head -20
+          nproc; grep -m1 "model name" /proc/cpuinfo
       - name: Measure
         shell: bash
+        env:
+          PLANT: ${{ matrix.plant }}
         run: |
           set -euo pipefail
           chmod +x ./gradlew
           cp -r . ../base
+          if [ "$PLANT" -gt 0 ]; then
+            f=udea-core/src/main/kotlin/dev/wildware/udea/core/Planted181.kt
+            echo "package dev.wildware.udea.core" > $f
+            for n in $(seq 1 "$PLANT"); do
+              echo "fun planted$n(x: Int): Int = (x * 31 + $n) xor (x shr 3) + listOf(x, $n).sum()" >> $f
+            done
+          fi
           measure() { # label dir
-            read -r _ u n s i w q sq st _ < /proc/stat
+            rm -rf "$2/.gradle/configuration-cache"
             start=$(date +%s%3N)
             (cd "$2" && ./gradlew clean udeaAssemble --no-build-cache > /tmp/g.log 2>&1) || { tail -60 /tmp/g.log; exit 1; }
             end=$(date +%s%3N)
-            read -r _ u2 n2 s2 i2 w2 q2 sq2 st2 _ < /proc/stat
-            echo "SAMPLE $1 wall_ms=$((end-start)) busy_jiffies=$(( (u2+n2+s2+q2+sq2)-(u+n+s+q+sq) )) idle_jiffies=$(( (i2+w2)-(i+w) )) steal_jiffies=$((st2-st))"
+            echo "SAMPLE $1 $((end-start))"
           }
           ./gradlew help -q > /dev/null
-          measure current-gate .
-          measure head-warm-1 .
-          measure head-warm-2 .
-          measure head-warm-3 .
           (cd ../base && ./gradlew help -q > /dev/null)
-          measure base-warmup ../base
-          for i in 1 2 3; do
-            measure base-$i ../base
-            measure head-$i .
+          measure warm-head .
+          measure warm-base ../base
+          measure warm-head .
+          measure warm-base ../base
+          for round in 1 2 3; do
+            measure base ../base
+            measure head .
+            measure head .
+            measure base ../base
           done

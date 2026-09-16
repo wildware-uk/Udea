@@ -9,10 +9,24 @@ SHA `90b26fc` (kmp after #201 merge), refreshed 2026-09-16; first taken at `6097
 
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
 
-## Wave 1 in flight
+## Wave 1 (2026-09-16): done
 
-- #200 Kool Offscreen spike: **merged** `d97517b`, round 1 PASS. Answer yes: Kool 0.19.0, GL on llvmpipe under xvfb. Needs X11 GLFW init workaround (see #200 comments).
-- #201 KMP convention plugin: **merged** `90b26fc`, round 1 PASS. Plugins `udea.kotlin-multiplatform` and `udea.kotlin-multiplatform-render`; macOS CI job `ios-tests` lists converted modules by hand, so each port ticket adds its module there. `udeaVerifyDeterminism` layout needs the KMP fix in #203.
+- #200 Kool Offscreen spike: merged `d97517b`, round 1 PASS. Yes: Kool 0.19.0, GL on llvmpipe under xvfb.
+  Needs an X11 GLFW-init workaround and a per-backend row flip; noted on #211. Code in `spikes/kool-offscreen/`.
+- #201 KMP convention plugin: merged `90b26fc`, round 1 PASS. Plugins `udea.kotlin-multiplatform`,
+  `udea.kotlin-multiplatform-render`, `udea.kotlin-base`, `udea.jvm-test-fixtures`.
+- Cards filed: none. Notes carried as comments on #211 (Kool workarounds) and #203 (`udeaVerifyDeterminism`
+  layout; add module to CI `ios-tests`).
+
+## Standing rulings and traps
+
+- **Every build command needs `ANDROID_HOME=$HOME/Android/Sdk`** since #201 (put it in developer, reviewer
+  and trial-merge commands). Without it: `SDK location not found`. Environment, not a red build.
+- CI's `ios-tests` job lists converted modules by hand: each port ticket adds its module there.
+- A standalone spike build not included in root settings may use Kool/GLFW outside `udea-render` (#200 ruling).
+- `build-logic` is not a `udea-*` module; reject item 2 (unused public) does not apply there (#201 ruling).
+- Developer agents sometimes stop while a Gradle build is still running and say "I'll pick up when
+  notified"; they are not re-notified. Check the worktree and nudge with SendMessage.
 
 ## What happened
 
@@ -28,9 +42,9 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 
 ## Next
 
-1. Take the baseline above.
-2. Wave 1: **#200** (Kool Offscreen spike) and **#201** (KMP convention plugin). Disjoint; nothing else
-   is ready until they merge.
-3. Then #202, then #203–#210 in parallel where modules are disjoint (see spec section 9).
-
-`composegl-kool` (#210) is built in `wildware-uk/composegl`, not this repository.
+1. Wave 2: **#202** (generated registry, the one contract change allowed) and **#207** (udea-audio, needs
+   only #201) if `grep -r ServiceLoader udea-audio` is empty, so they are disjoint. #203 (udea-core) overlaps
+   #202's discovery sites, so it waits for wave 3 unless #202's diff proves otherwise.
+2. Then #203; then #204, #205, #206, #209 in parallel (all need #203); #208 needs #202 and #203.
+3. #210 lives in `wildware-uk/composegl`; a separate `composegl-ef` session is active there. Check its state
+   before dispatching.

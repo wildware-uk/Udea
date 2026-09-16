@@ -16,24 +16,26 @@ import org.gradle.api.tasks.TaskAction
  * A task rather than arithmetic in `ci.yml`, so the rule that decides the verdict is the one
  * `CleanBuildComparisonTest` executes. The job does the timing, because a Gradle task cannot time
  * a clean build of the build it is running in; this does the judging.
+ *
+ * `internal`: registered by `udea.clean-build-budget` in this module, and named by no build script.
  */
-public abstract class UdeaCleanBuildVerdictTask : DefaultTask() {
+internal abstract class UdeaCleanBuildVerdictTask : DefaultTask() {
 
     /** One `<base|head> <milliseconds>` row per timed build, as the job writes them. */
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
-    public abstract val samples: RegularFileProperty
+    abstract val samples: RegularFileProperty
 
     /**
      * The markdown table the job appends to its step summary. Written before the verdict is
      * enforced, so a red run shows the numbers that made it red.
      */
     @get:OutputFile
-    public abstract val summary: RegularFileProperty
+    abstract val summary: RegularFileProperty
 
     /** Judges the samples, writes [summary], and fails the build on a regression. */
     @TaskAction
-    public fun judge() {
+    fun judge() {
         val verdict = CleanBuildComparison.judge(CleanBuildComparison.parse(samples.get().asFile.readText()))
         val table = CleanBuildComparison.summary(verdict)
         summary.get().asFile.apply {

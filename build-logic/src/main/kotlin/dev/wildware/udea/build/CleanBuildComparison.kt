@@ -34,14 +34,16 @@ import kotlin.time.Duration.Companion.milliseconds
  * fastest of several samples is the one nearest the true cost. A median still moves when most of a
  * handful draw badly, and a mean moves with any one of them. `udeaBenchCharacterMover` made the same change for the same
  * reason in issue #175.
+ *
+ * `internal`: only [UdeaCleanBuildVerdictTask] and this module's tests read it.
  */
-public object CleanBuildComparison {
+internal object CleanBuildComparison {
 
     /**
      * How much slower than its base a head's clean build may be before the gate fails, as a
      * ratio of the two fastest samples.
      */
-    public const val TOLERANCE: Double = 1.10
+    const val TOLERANCE: Double = 1.10
 
     /**
      * The fewest samples of each side [judge] will read.
@@ -49,10 +51,10 @@ public object CleanBuildComparison {
      * One sample is a single draw from the runner's noise - the measurement issue #181 replaced -
      * and the fastest of two still lets one bad draw decide half the pair.
      */
-    public const val MIN_SAMPLES_PER_SIDE: Int = 3
+    const val MIN_SAMPLES_PER_SIDE: Int = 3
 
     /** Which checkout a sample timed. */
-    public enum class Side(public val label: String) {
+    enum class Side(val label: String) {
         /** The commit this one is compared against, built in a second checkout. */
         Base("base"),
 
@@ -61,27 +63,27 @@ public object CleanBuildComparison {
     }
 
     /** One timed `./gradlew clean udeaAssemble --no-build-cache` of one checkout. */
-    public data class Sample(val side: Side, val elapsed: Duration)
+    data class Sample(val side: Side, val elapsed: Duration)
 
     /** The outcome of comparing the two sides' fastest samples. */
-    public sealed interface Verdict {
+    sealed interface Verdict {
         /** The fastest base sample. */
-        public val baseEstimate: Duration
+        val baseEstimate: Duration
 
         /** The fastest head sample. */
-        public val headEstimate: Duration
+        val headEstimate: Duration
 
         /** [headEstimate] over [baseEstimate]; above 1 means the head is slower. */
-        public val ratio: Double get() = headEstimate / baseEstimate
+        val ratio: Double get() = headEstimate / baseEstimate
 
         /** The head is no more than [TOLERANCE] times slower than its base. */
-        public data class Within(
+        data class Within(
             override val baseEstimate: Duration,
             override val headEstimate: Duration,
         ) : Verdict
 
         /** The head is more than [TOLERANCE] times slower than its base. */
-        public data class Regressed(
+        data class Regressed(
             override val baseEstimate: Duration,
             override val headEstimate: Duration,
         ) : Verdict
@@ -94,7 +96,7 @@ public object CleanBuildComparison {
      * A row that is not exactly that fails, naming the row. A parser that skipped what it could
      * not read would let a broken timing loop hand the gate fewer samples than it thinks it has.
      */
-    public fun parse(text: String): List<Sample> = text.lines()
+    fun parse(text: String): List<Sample> = text.lines()
         .filter { it.isNotBlank() }
         .map { row ->
             val match = requireNotNull(ROW.matchEntire(row.trim())) {
@@ -105,14 +107,14 @@ public object CleanBuildComparison {
         }
 
     /** Compares the fastest head sample against the fastest base sample. */
-    public fun judge(samples: List<Sample>): Verdict {
+    fun judge(samples: List<Sample>): Verdict {
         val base = fastest(samples, Side.Base)
         val head = fastest(samples, Side.Head)
         return if (head / base <= TOLERANCE) Verdict.Within(base, head) else Verdict.Regressed(base, head)
     }
 
     /** The markdown the job appends to its step summary, pass or fail. */
-    public fun summary(verdict: Verdict): String {
+    fun summary(verdict: Verdict): String {
         val outcome = when (verdict) {
             is Verdict.Within -> "within tolerance"
             is Verdict.Regressed -> "**regressed**"

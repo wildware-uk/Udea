@@ -38,7 +38,7 @@ import kotlin.test.assertTrue
  * or one left out of the generated list - so the proof runs the real level until the fight is in
  * the state where the most kinds of component are alive at once.
  *
- * ## Three comparisons, because each one is blind where another sees
+ * ## Several comparisons, because each one is blind where another sees
  *
  * - **`WorldHasher.hash` of a full capture**: every registered component field, the entity roster,
  *   the clock, every random stream and the `NetId` allocator. This is the criterion as the issue
@@ -46,9 +46,14 @@ import kotlin.test.assertTrue
  * - **component sets per entity, read off Fleks**: the hash only sees the snapshot registry, and
  *   `SpriteView` is outside it (`SnapshotRestoreProofTest.UNCOVERED`). A level that dropped every
  *   hit flash would hash identical; it would not census identical.
- * - **the level saved again from the loaded world, byte for byte**: fields no `Replicator` lowers -
- *   `GameUnit.movingTick`, `SpriteView.animation` - reach neither of the above. A second save that
- *   reproduces the first file exactly means every saved field of every saved component came back.
+ * - **the level saved again from the loaded world, byte for byte**: a field the serializer writes
+ *   but the load did not put back shows up as a different second file.
+ * - **every JVM field of every component, compared object to object** ([FieldByField]): the one
+ *   comparison that reads a component without going through a description of it - a `Replicator`
+ *   or a serializer. A field the serializer
+ *   never writes is missing from both files alike, so the byte comparison agrees about a world
+ *   that lost it; measured with `@Transient` on `GameUnit.movingTick`, which left the other
+ *   comparisons green and this one red.
  *
  * Set the Gradle property `udea.levelEvidenceDir` to keep the saved `.udealevel` and a transcript
  * of the measured values.
@@ -79,6 +84,21 @@ class LevelSaveLoadProofTest {
                 .sorted()
         }
         return out
+    }
+
+    /** Every live entity's components, keyed by `NetId` and sorted by class, as objects. */
+    private fun components(host: GameHost): Map<Int, List<Component<*>>> {
+        val out = sortedMapOf<Int, List<Component<*>>>()
+        host.ctx[CoreModule.NET_IDS].forEachLive { netId: NetId, entity: Entity ->
+            out[netId.raw] = host.world.snapshotOf(entity).components.sortedBy { it::class.java.name }
+        }
+        return out
+    }
+
+    /** What [FieldByField] finds between two worlds' components, entity by entity. */
+    private fun fieldDifferences(saved: Map<Int, List<Component<*>>>, loaded: GameHost): List<String> {
+        val comparison = FieldByField(liveLength = mapOf("GameplayEffects" to "count"))
+        return comparison.differences("world", saved.values.toList(), components(loaded).values.toList())
     }
 
     /**
@@ -139,6 +159,7 @@ class LevelSaveLoadProofTest {
         val bytes = saveFrom(original)
         val savedHash = fullHash(original)
         val savedCensus = census(original)
+        val savedComponents = components(original)
 
         val fresh = MobaGame.host(RenderMode.Headless)
         val freshHash = fullHash(fresh)
@@ -147,6 +168,7 @@ class LevelSaveLoadProofTest {
         val loadedHash = fullHash(fresh)
         val loadedCensus = census(fresh)
         val resaved = saveFrom(fresh)
+        val differences = fieldDifferences(savedComponents, fresh)
         evidence(
             "level.udealevel" to bytes,
             "transcript.txt" to buildString {
@@ -159,6 +181,7 @@ class LevelSaveLoadProofTest {
                 appendLine("components    saved=${savedCensus.values.sumOf { it.size }} loaded=${loadedCensus.values.sumOf { it.size }}")
                 appendLine("census equal  ${savedCensus == loadedCensus}")
                 appendLine("resave equal  ${bytes.contentEquals(resaved)}")
+                appendLine("field by field differences  ${differences.size}")
                 appendLine("component kinds saved:")
                 for (name in savedCensus.values.flatten().toSortedSet()) appendLine("  $name")
             }.toByteArray(),
@@ -168,6 +191,11 @@ class LevelSaveLoadProofTest {
         assertEquals(savedHash, loadedHash, "WorldHasher.hash after loading the level saved at $moment")
         assertEquals(savedCensus, loadedCensus, "component sets per entity after loading the level saved at $moment")
         assertContentEquals(bytes, resaved, "saving the loaded world again did not reproduce the level file")
+        assertEquals(
+            emptyList(),
+            differences.take(40),
+            "fields that differ between the saved world's components and the loaded world's",
+        )
     }
 
     /**

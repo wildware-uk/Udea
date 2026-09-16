@@ -148,11 +148,69 @@ launcher, JDK 21 toolchain, Gradle 8.13, another project's GL suite running alon
 | Warm reload decision | `:udea-assets-compiler:udeaDaemonBudget` | 500 ms | 228 ms | 2.2x |
 | Graph deserialisation, 2 000 assets | `:udea-assets-compiler:udeaGraphBudget` | 15 ms | 4.79 ms | 3.1x |
 | Warm pass-1 scan of the example tree | `:udea-assets-compiler:udeaScanBudget` | 200 ms | 58.08 ms | 3.4x |
-| Warm edit of moba's real corpus, edit to observe | `:udea-assets-compiler:udeaWarmEditBudget` | 3 000 ms | 167 ms (max of 5) | 18x |
+| Warm edit of moba's real corpus, edit to observe | `:udea-assets-compiler:udeaWarmEditBudget` | 1 500 ms (deadline 3 000 ms, see below) | 167 ms (max of 5) | 9.0x |
 | Tier-0 digest build, 500 entities | `:udea-agent:udeaDigestBudget` | 300 000 ns | 7 810 ns | 38x |
 | Entity query, 500 entities returning 20 | `:udea-agent:udeaQueryBudget` | 1 000 000 ns | 21 060 ns | 47x |
 | Agent patch to running world, over HTTP | `:udea-agent-host:udeaPhase2Exit` | 1 000 ms | 445 ms | 2.2x |
 | Typo'd reference rejected | `:udea-agent-host:udeaPhase2Exit` | 300 ms | 16 ms | 18.8x |
+
+### The warm edit has a deadline and a threshold (issue #184)
+
+`udeaWarmEditBudget` used to fail at **3 000 ms**. It now fails at **1 500 ms**. The 3 000 ms
+number did not move and is not this repository's to move: it is spec §6's Phase 2 exit criterion,
+*asset edit-to-observe <3s*, a promise to the person editing. What changed is that the gate stopped
+using the promise as its tripwire.
+
+**Why.** One constant was doing two jobs. As a product deadline 3 000 ms is right. As a regression
+detector it could not fail: the slowest warm edit on this box is a few hundred milliseconds, so the
+code had to get more than ten times slower before the gate noticed. That was checked with a real
+regression rather than argued. Two changes, together the shape of a daemon that has lost what makes
+its warm path warm: `AssetDaemon.reload` recompiles every script in the corpus rather than the one
+that changed, and `AssetCompiler` has no compiled-script jar cache. Against the 3 000 ms line that
+regression measured a slowest sample of 2 649, 2 948 and 2 976 ms in three solo runs, at one-minute
+load averages of 6.55–7.13 on 24 processors. **All three were green.** Against 1 500 ms the same
+regression was red in every run made against it, with slowest samples of 3 080, 2 980, 2 926 and
+5 389 ms at load 4.40–5.41.
+
+**Why 1 500 ms.** It has to sit above the slowest honest edit on every machine the gate runs on,
+and below the fastest sample of that regression. The first was read from the `latency-budgets`
+job's own logs for every completed CI run on `example` since #182 put this gate there: 8 runs on
+`ubuntu-latest` and 6 on `windows-latest`. (Two more Windows runs stopped at an earlier failing
+budget before reaching this one.)
+
+| Runner | Slowest sample per run, oldest run first (ms) | Worst |
+|---|---|---|
+| `ubuntu-latest` | 258, 263, 265, 236, 219, 273, 270, 330 | 330 |
+| `windows-latest` | 485, 455, 428, 326, 674, 277 | 674 |
+
+The fastest sample of the regression, across every run of it, was 2 035 ms. 1 500 ms is 2.2x the
+worst CI run and 1.36x below the regression on this box. The regression has not been measured on a
+CI runner.
+
+**Under load, unmutated, on this box**, six solo runs of the gate: slowest samples of 172, 233 and
+199 ms at load 6.05–6.64, and 247, 248 and 186 ms at load 9.99–10.32 with other builds running. All
+green, and the worst is about a sixth of the threshold. Four more runs beside a full parallel
+`build` of this repository, which is not where the gate is meant to run, at load 12.73–25.06: 239,
+274, 627 and 230 ms. Still green, with the worst 2.4x inside the threshold.
+
+**It stays `samples.max()`.** Issue #182's reasons still hold: the counted samples spread by tens of
+percent rather than multiples, and a deadline is a claim about every edit, not a typical one.
+
+**There is no second assertion at 3 000 ms.** 1 500 ms is below it, so a run that passes the
+threshold has met the deadline, and an assertion that can only fail after the one before it has
+already failed is an assertion that cannot fail. The failure message says whether a red run also
+missed the deadline.
+
+**What a stopwatch here cannot see.** The reload recompiling the whole corpus *with* the jar cache
+still working measured a slowest sample of 266 ms in one run, against 322 ms for the unmutated gate
+a few minutes earlier: no slower. A warm jar cache answers every unchanged script, so at this corpus
+size losing incrementality on its own does not show on a stopwatch, and no threshold on this gate
+would catch it. That property needs a count rather than a time.
+
+**If the owner disagrees.** Both numbers are constants in `MobaWarmEditBudgetTest`: `CONTRACT_MS`
+is the deadline, `REGRESSION_MS` the threshold. Moving the threshold is a one-line diff, and it must
+stay below the deadline for the reasoning above to hold. To make 3 000 ms the only line again, set
+`REGRESSION_MS` to `CONTRACT_MS`, and accept the tenfold regression above going green.
 
 ### Two wall-clock assertions issue #182 dropped rather than moved
 
@@ -218,7 +276,7 @@ measured number here, and adds the job to `.github/workflows/ci.yml`.
 
 | Budget | Target | Spec | Gate | Measured |
 |---|---|---|---|---|
-| Asset edit-to-observe | < 3 s | §6 (Phase 3 exit) | *(assets epic)* | *(not yet measured)* |
+| Asset edit-to-observe | < 3 s | §6 (Phase 2 exit) | `:udea-assets-compiler:udeaWarmEditBudget`, at 1 500 ms | see the warm edit section above |
 | Agent edit-to-observe | < 12 s | §6 (Phase 5 exit) | *(agent epic)* | *(not yet measured)* |
 | Snapshot capture, 1 000 entities | < 1 ms | §6 (Phase 7 exit) | `:udea-core:udeaSnapshotBudget` | 84 272 ns — see the latency section above |
 | Snapshot digest, 500 entities | < 0.3 ms | §6 (Phase 7 exit) | *(determinism epic)* | *(not yet measured)* |

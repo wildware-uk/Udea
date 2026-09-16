@@ -155,7 +155,7 @@ tasks.register<Test>("udeaDaemonBudget") {
 
 tasks.register<Test>("udeaWarmEditBudget") {
     group = "verification"
-    description = "Gates spec 6 Phase 2: an edit of moba's real corpus is observed under 3s."
+    description = "Gates an edit of moba's real corpus at 1.5s, inside spec 6 Phase 2's 3s deadline."
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     filter.includeTestsMatching("dev.wildware.udea.assets.compiler.daemon.MobaWarmEditBudgetTest")

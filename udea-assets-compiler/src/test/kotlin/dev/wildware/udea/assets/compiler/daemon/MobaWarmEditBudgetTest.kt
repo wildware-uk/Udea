@@ -40,7 +40,7 @@ import kotlin.test.assertTrue
  *
  * Six edits are made, the first is discarded as the warm-up (it pays for classloading the
  * scripting host - about two seconds on this machine, which is start-up and not the editing loop),
- * and the **maximum** of the rest is what the budget is asserted against.
+ * and the **maximum** of the rest is what the threshold is asserted against.
  *
  * Issue #182 asked whether that should become a median, because #175 made exactly that change to
  * `DaemonLatencyBudgetTest`'s reload gate - where the maximum of five was "the worst scheduling
@@ -58,18 +58,41 @@ import kotlin.test.assertTrue
  * A median would also have made the gate strictly easier to pass, and this repository does not buy
  * that without a demonstration that it still catches the regression it is for.
  *
+ * ## Two numbers, one assertion (issue #184)
+ *
+ * [CONTRACT_MS] is spec 6's promise to a person editing assets, and it is not this file's to move.
+ * [REGRESSION_MS] is what the gate fails at. They were one constant until #184, and the constant
+ * did the second job badly: measured alone, a warm edit's slowest sample is a few hundred
+ * milliseconds, so three seconds let through a regression of more than tenfold.
+ *
+ * That is not hypothetical. Making every reload recompile the whole corpus with the compiled-script
+ * jar cache switched off - a daemon that has lost both of the things that make the warm path warm -
+ * measured a slowest sample of 2 649, 2 948 and 2 976ms in three solo runs on this repository's
+ * 24-processor box at one-minute load averages of 6.55 to 7.13, and all three were green against
+ * three seconds.
+ *
+ * There is deliberately no second assertion at [CONTRACT_MS]. [REGRESSION_MS] is below it, so any
+ * run that passes the threshold has passed the deadline, and an assertion that can only fail when
+ * the one before it already has is an assertion that cannot fail. The failure message says which
+ * of the two a red run missed. That reasoning holds only while the threshold is the lower number,
+ * which is why the remedy below rules out raising it to the deadline or past it.
+ *
+ * The threshold is 1 500ms because it has to sit between two measurements, both in
+ * `docs/budgets.md`: the slowest warm edit CI has recorded on either runner image, and the fastest
+ * sample of the regression above on this repository's own box.
+ *
  * ## Where it is measured
  *
  * On `udeaLatencyBudgets`, through `:udea-assets-compiler:udeaWarmEditBudget`, and no longer inside
  * `check` (issue #182). [LatencyBudget.measuredBy] refuses to let it run anywhere else.
  *
  * If it fails, the remedy is the daemon's incremental scope - re-walk less of the graph - never a
- * wider budget.
+ * wider threshold, and never a threshold at or above the deadline.
  */
 class MobaWarmEditBudgetTest {
 
     @Test
-    fun `a warm edit of the real moba corpus is observed in under three seconds`() {
+    fun `a warm edit of the real moba corpus is observed well inside the three-second deadline`() {
         LatencyBudget.measuredBy(TASK)
 
         val harness = MobaWarmEdit("moba-warm-edit")
@@ -85,16 +108,21 @@ class MobaWarmEditBudgetTest {
             if (iteration > 0) samples += elapsedMs
         }
 
+        val slowest = samples.max()
         println(
-            "moba warm edit -> observed: max ${samples.max()}ms, " +
+            "moba warm edit -> observed: max ${slowest}ms, " +
                 "median ${samples.sorted()[samples.size / 2]}ms, min ${samples.min()}ms over " +
                 "${samples.size} samples $samples " +
-                "(budget ${BUDGET_MS}ms, corpus ${harness.assetCount} assets)",
+                "(threshold ${REGRESSION_MS}ms, deadline ${CONTRACT_MS}ms, " +
+                "corpus ${harness.assetCount} assets)",
         )
         assertTrue(
-            samples.max() <= BUDGET_MS,
-            "spec 6 Phase 2 gates an asset edit at ${BUDGET_MS}ms; the slowest of $samples " +
-                "missed it. " + LatencyBudget.contentionNote(TASK),
+            slowest <= REGRESSION_MS,
+            "a warm edit of moba's corpus is gated at ${REGRESSION_MS}ms to catch a regression " +
+                "long before it reaches spec 6's ${CONTRACT_MS}ms deadline; the slowest of " +
+                "$samples missed it" +
+                (if (slowest > CONTRACT_MS) ", and missed the deadline too. " else ". ") +
+                LatencyBudget.contentionNote(TASK),
         )
     }
 
@@ -103,8 +131,14 @@ class MobaWarmEditBudgetTest {
         /** The task that measures this, and the one to re-run alone before believing a red. */
         const val TASK = ":udea-assets-compiler:udeaWarmEditBudget"
 
-        /** Spec 6 Phase 2: an asset edit is observed in under three seconds. */
-        const val BUDGET_MS = 3_000L
+        /** Spec 6 Phase 2: an asset edit is observed in under three seconds. A product promise. */
+        const val CONTRACT_MS = 3_000L
+
+        /**
+         * What this gate fails at: a regression threshold inside [CONTRACT_MS] (issue #184).
+         * The class KDoc says where the number comes from.
+         */
+        const val REGRESSION_MS = 1_500L
 
         /** Six edits, five counted. */
         const val ITERATIONS = 6

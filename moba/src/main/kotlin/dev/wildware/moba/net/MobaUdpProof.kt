@@ -12,8 +12,7 @@ import dev.wildware.udea.net.transport.SimulatedTransport
 import dev.wildware.udea.net.transport.ManualClock
 import dev.wildware.udea.net.transport.Transport
 import dev.wildware.udea.net.transport.UdpConfig
-import java.net.InetAddress
-import java.net.InetSocketAddress
+import io.ktor.network.sockets.InetSocketAddress
 
 /**
  * What the `moba` UDP proof processes agree on without talking to each other first.
@@ -62,7 +61,7 @@ public object MobaUdpProof {
     )
 
     public fun loopback(port: Int): InetSocketAddress =
-        InetSocketAddress(InetAddress.getLoopbackAddress(), port)
+        InetSocketAddress("127.0.0.1", port)
 
     /**
      * Conditions named on the command line: `perfect`, or `lossy` for 150ms and 5% loss.

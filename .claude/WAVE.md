@@ -2,12 +2,15 @@
 
 ## kmp baseline
 
-**Not taken yet.** The first lead of the port runs, on a detached `origin/kmp` checkout:
+SHA `6097ae7` (origin/kmp), taken 2026-09-16 on a detached checkout with
+`JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
-    JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue
+**BUILD SUCCESSFUL. Failing tasks: none.** (220 actionable tasks.) Refresh after every merge.
 
-and writes here the SHA and every failing task (expected: none, since `kmp` == `master` == old
-`example` plus docs). Refresh after every merge. The list only shrinks.
+## Wave 1 in flight
+
+- #200 Kool Offscreen spike: `dev-200`, branch `issue-200-kool-offscreen-spike`, standalone build at `spikes/kool-offscreen/`.
+- #201 KMP convention plugin: `dev-201`, branch `issue-201-kmp-convention-plugin`.
 
 ## What happened
 

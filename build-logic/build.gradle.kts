@@ -51,6 +51,10 @@ gradlePlugin {
 dependencies {
     implementation(libs.kotlin.gradle.plugin)
 
+    // `udea.kotlin-multiplatform` gives every runtime module an Android target through AGP's
+    // multiplatform library plugin (issue #201). Build-logic only, like the Kotlin plugin above.
+    implementation(libs.android.gradle.plugin)
+
     // The bytecode reader behind `udeaVerifyDeterminism` (issue #150). `implementation`, not
     // `testImplementation`: the scan runs inside a Gradle task, not inside a test JVM, which
     // is the difference from `udea-render`'s `udeaVerifyHeadless` - that one is a Test task,
@@ -144,6 +148,11 @@ val outerBuildInputs: FileCollection = files(
     // `udea-render` declaring one `org.gradle.jvm.version` and compiling to another, which
     // surfaces as a resolution failure against ComposeGL somewhere else entirely.
     rootDir.resolve("../build.gradle.kts"),
+
+    // `GradleFixture.withAndroidSdk` falls back to the outer build's untracked `local.properties`
+    // for the SDK location the multiplatform fixtures need (issue #201). Absent on a machine that
+    // sets `ANDROID_HOME` instead, which leaves nothing to track.
+    rootDir.resolve("../local.properties"),
 
     // `TrelloMapTest` reads the spec and the map and asserts they account for each other, so
     // either one moving on its own is the whole point of it. Both were undeclared, which made

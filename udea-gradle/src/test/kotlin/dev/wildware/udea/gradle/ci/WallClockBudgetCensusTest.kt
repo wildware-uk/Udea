@@ -222,7 +222,9 @@ class WallClockBudgetCensusTest {
         .filterValues { declaredTaskPaths(it).isNotEmpty() }
 
     /**
-     * Every Kotlin file under a `src/test` or `src/testFixtures` directory in the repository.
+     * Every Kotlin file under a test or test-fixtures source set in the repository: `src/test` and
+     * `src/testFixtures`, and a multiplatform module's `src/<name>Test` and
+     * `src/<name>TestFixtures` - `commonTest`, `jvmTest`, `jvmTestFixtures` (issue #201).
      *
      * A whole-tree walk with the generated and version-control directories pruned, rather than a
      * list of module names: a fence over an enumeration of modules is a fence that stops covering
@@ -234,7 +236,7 @@ class WallClockBudgetCensusTest {
             .onEnter { it.name !in PRUNED }
             .filter { it.isFile && it.extension == "kt" }
             .map { it.relativeTo(root).path.replace(File.separatorChar, '/') to it }
-            .filter { (path, _) -> "/src/test/" in path || "/src/testFixtures/" in path }
+            .filter { (path, _) -> TEST_SOURCE_SET.containsMatchIn(path) }
             .associate { (path, file) -> path to KotlinSource(file.readText()) }
         check(sources.isNotEmpty()) {
             "no Kotlin test source found under ${root.absolutePath}; the fence would pass over " +
@@ -272,6 +274,9 @@ class WallClockBudgetCensusTest {
         /** The two calls that make a test declare itself a latency budget. */
         val CALLS = listOf("LatencyBudget.measuredBy(", "LatencyBudget.contentionNote(")
 
+        /** A path segment naming a test or test-fixtures source set; see [testSources]. */
+        val TEST_SOURCE_SET = Regex("/src/(?:test|testFixtures|[A-Za-z0-9]+Test|[A-Za-z0-9]+TestFixtures)/")
+
         /** Directories a source walk must not descend into. */
         val PRUNED = setOf(".git", ".gradle", ".claude", "build", "node_modules")
 
@@ -287,7 +292,7 @@ class WallClockBudgetCensusTest {
          * so `the scan actually found sources to scan` checks that each entry still exists.
          */
         val DECLARES_THE_CONVENTION = setOf(
-            "udea-diagnostics/src/test/kotlin/dev/wildware/udea/diagnostics/bench/LatencyBudgetTest.kt",
+            "udea-diagnostics/src/jvmTest/kotlin/dev/wildware/udea/diagnostics/bench/LatencyBudgetTest.kt",
             "udea-gradle/src/test/kotlin/dev/wildware/udea/gradle/ci/WallClockBudgetCensusTest.kt",
         )
 

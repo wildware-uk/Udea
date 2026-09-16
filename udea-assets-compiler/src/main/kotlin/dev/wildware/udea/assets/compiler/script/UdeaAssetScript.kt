@@ -63,10 +63,15 @@ public object UdeaAssetScriptConfiguration : ScriptCompilationConfiguration({
         jvmTarget(EMBEDDED_JVM_TARGET)
         // Named artefacts, never `wholeClasspath = true`. This list is what an IDE resolves
         // against; a build resolves against the classpath AssetCompiler passes in.
+        //
+        // `udea-diagnostics-jvm`, not `udea-diagnostics`: the module became multiplatform in
+        // issue #201 and its JVM jar is now `udea-diagnostics-jvm-<version>.jar`. With the old
+        // name this object failed to initialise in the forked pipeline, and every `.udea.kts`
+        // in `moba` reported UDEA0022 with `ExceptionInInitializerError`.
         dependenciesFromClassContext(
             UdeaAssetScript::class,
             "udea-assets-compiler",
-            "udea-diagnostics",
+            "udea-diagnostics-jvm",
             "kotlin-stdlib",
         )
     }

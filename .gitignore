@@ -10,6 +10,10 @@ build/
 allure-results/
 .attach_pid*
 
+# The Android SDK location for this machine (issue #201). AGP reads `sdk.dir` from it when
+# `ANDROID_HOME` is unset; it is a path on one developer's disk and never belongs in a commit.
+local.properties
+
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml

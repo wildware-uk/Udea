@@ -124,6 +124,30 @@ class GradleFixture(private val root: File) {
 
     private var versionCatalog = false
 
+    /**
+     * Points the fixture at an Android SDK, which the multiplatform conventions need because
+     * they apply the Android Gradle Plugin's multiplatform library support.
+     *
+     * Found the way AGP itself finds one - `ANDROID_HOME`, then `ANDROID_SDK_ROOT` - and failing
+     * that, from the outer build's untracked `local.properties`. No SDK is a failure rather than a
+     * skip: a skipped test reads as a pass, and CI runners all carry an SDK.
+     */
+    fun withAndroidSdk(): GradleFixture = apply { androidSdk = true }
+
+    private var androidSdk = false
+
+    private fun androidSdkDir(): String {
+        val fromEnvironment = listOf("ANDROID_HOME", "ANDROID_SDK_ROOT")
+            .firstNotNullOfOrNull { System.getenv(it)?.takeIf(String::isNotBlank) }
+        val fromOuterBuild = File("../local.properties").takeIf { it.isFile }
+            ?.readLines()
+            ?.firstOrNull { it.startsWith("sdk.dir=") }
+            ?.removePrefix("sdk.dir=")
+        return checkNotNull(fromEnvironment ?: fromOuterBuild) {
+            "no Android SDK: set ANDROID_HOME, or put sdk.dir= in the repository's untracked local.properties"
+        }
+    }
+
     /** Materialises `settings.gradle.kts` and the root build script, then runs Gradle. */
     private fun write(rootBuildScript: String) {
         val catalog = File("../gradle/libs.versions.toml").canonicalFile
@@ -143,6 +167,9 @@ class GradleFixture(private val root: File) {
         )
         File(root, "build.gradle.kts").writeText(rootBuildScript.trimIndent() + "\n")
         File(root, "gradle.properties").writeText("org.gradle.configuration-cache=true\n")
+        if (androidSdk) {
+            File(root, "local.properties").writeText("sdk.dir=${File(androidSdkDir()).invariantSeparatorsPath}\n")
+        }
     }
 
     private fun runner(rootBuildScript: String, arguments: List<String>): GradleRunner {

@@ -37,7 +37,8 @@ object PluginOptionalRule {
     /**
      * Every production source file that must not reference the plugin.
      *
-     * "Production" is `src/main` of every `udea-*` module and of `moba`. Test sources are
+     * "Production" is `src/main` of every `udea-*` module and of `moba`, and every
+     * `src/<name>Main` of a multiplatform one - `commonMain`, `jvmMain` (issue #201). Test sources are
      * excluded deliberately: this module's own suite compiles against the plugin, and so may a
      * future module's, without making anything load-bearing - a test is not on the path a
      * plugin-disabled build has to walk.
@@ -46,8 +47,8 @@ object PluginOptionalRule {
         repoRoot.listFiles().orEmpty()
             .filter { it.isDirectory && (it.name.startsWith("udea-") || it.name == "moba") }
             .filter { it.name != OWNING_MODULE }
-            .map { File(it, "src/main") }
-            .filter { it.isDirectory }
+            .flatMap { File(it, "src").listFiles().orEmpty().toList() }
+            .filter { it.isDirectory && (it.name == "main" || it.name.endsWith("Main")) }
             .flatMap { root -> root.walkTopDown().filter { it.isFile && it.extension == "kt" } }
             .sortedBy { it.invariantSeparatorsPath }
 

@@ -113,6 +113,18 @@ public object ModuleGraphRules {
     public const val HEADLESS_MODULES_PROPERTY: String = "udea.headless.modules"
 
     /**
+     * The task every module on a Udea Kotlin convention registers to compile the bytecode its
+     * main code ships as, whichever plugin compiles it (issue #201).
+     *
+     * `udeaVerifyHeadless` scans that bytecode in each of [HEADLESS_PROJECTS], so it has to make
+     * the bytecode exist first. A JVM module's is `classes`; a multiplatform module has no
+     * `classes` task at all, and ships bytecode from two compilations, `jvm` and `android`. One
+     * name for both is what lets the gate depend on every headless module without knowing which
+     * plugin each is on.
+     */
+    public const val MAIN_BYTECODE_TASK: String = "udeaMainBytecode"
+
+    /**
      * `udea-annotations` is on the compile classpath of the engine, the game, the KSP
      * processor and the K2 compiler plugin simultaneously, so anything it drags in is
      * dragged everywhere at once — including into the compiler's own classloader.
@@ -130,6 +142,9 @@ public object ModuleGraphRules {
         allowOnly = listOf(
             CoordinatePattern("org.jetbrains.kotlin:kotlin-stdlib"),
             CoordinatePattern("org.jetbrains:annotations"),
+            // The same stdlib, as Wasm resolves it (issue #201): `kotlin-stdlib`'s Wasm variant
+            // is published as this module and reached only through `kotlin-stdlib` itself.
+            CoordinatePattern("org.jetbrains.kotlin:kotlin-stdlib-wasm-js"),
         ),
     )
 

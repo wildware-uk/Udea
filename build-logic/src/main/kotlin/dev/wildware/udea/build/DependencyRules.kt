@@ -148,14 +148,19 @@ public object DependencyRules {
      *
      * Sorted by rule id then coordinate so that a failure message is stable across runs —
      * an unstable message is one nobody can diff.
+     *
+     * @param appliesAs the configuration name the rules are matched against. A multiplatform
+     *   target's classpath is governed as the JVM classpath it stands for (issue #201) while the
+     *   violation still names the classpath it was found on.
      */
     public fun violations(
         projectPath: String,
         configuration: String,
         graph: ResolvedGraph,
         rules: List<DependencyRule>,
+        appliesAs: String = configuration,
     ): List<DependencyViolation> =
-        rules.filter { it.appliesTo(projectPath, configuration) }
+        rules.filter { it.appliesTo(projectPath, appliesAs) }
             .flatMap { rule ->
                 graph.components()
                     .filter { rule.isViolatedBy(it, graph.root) }
@@ -188,14 +193,17 @@ public object DependencyRules {
      *
      * [ResolvedGraph.components] always contains the root project itself, so "resolved
      * nothing" is a component set of exactly the root.
+     *
+     * @param appliesAs as for [violations].
      */
     public fun vacuity(
         projectPath: String,
         configuration: String,
         graph: ResolvedGraph,
         rules: List<DependencyRule>,
+        appliesAs: String = configuration,
     ): String? {
-        val budgets = rules.filter { it.appliesTo(projectPath, configuration) && it.allowOnly != null }
+        val budgets = rules.filter { it.appliesTo(projectPath, appliesAs) && it.allowOnly != null }
         if (budgets.isEmpty()) return null
         if (graph.components().any { it != graph.root }) return null
         return "$projectPath resolved nothing on $configuration, so " +

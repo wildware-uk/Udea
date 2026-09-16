@@ -87,6 +87,10 @@ tasks.test {
         root.asFileTree.matching {
             include("*/src/test/**/*.kt", "*/src/testFixtures/**/*.kt")
             include("*/*/src/test/**/*.kt", "*/*/src/testFixtures/**/*.kt")
+            // A multiplatform module's test source sets (issue #201): `commonTest`, `jvmTest`,
+            // `jvmTestFixtures`, matching `WallClockBudgetCensusTest.TEST_SOURCE_SET`.
+            include("*/src/*Test/**/*.kt", "*/src/*TestFixtures/**/*.kt")
+            include("*/*/src/*Test/**/*.kt", "*/*/src/*TestFixtures/**/*.kt")
             exclude("**/build/**")
         },
     ).withPropertyName("repositoryTestSources").withPathSensitivity(PathSensitivity.RELATIVE)

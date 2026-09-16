@@ -96,6 +96,12 @@ val fieldMaskScanSources: ConfigurableFileTree = fileTree(rootProject.layout.pro
     include("udea-*/src/testFixtures/**/*.kt")
     include("moba/src/main/**/*.kt")
     include("moba/src/testFixtures/**/*.kt")
+    // A multiplatform module's shipped source sets (issue #201): `commonMain`, `jvmMain`,
+    // `jvmTestFixtures` and the like.
+    include("udea-*/src/*Main/**/*.kt")
+    include("udea-*/src/*TestFixtures/**/*.kt")
+    include("moba/src/*Main/**/*.kt")
+    include("moba/src/*TestFixtures/**/*.kt")
 }
 
 tasks.named<Test>("test") {

@@ -29,8 +29,19 @@ internal object RepoLayout {
     }
 
     /**
+     * The Kotlin multiplatform targets whose output is JVM bytecode, which a multiplatform module
+     * compiles to `build/classes/<language>/<target>/<sourceSet>` (issue #201).
+     *
+     * Wasm and iOS output is a klib rather than class files, so there is nothing there for a
+     * bytecode scan to read.
+     */
+    private val BYTECODE_TARGETS = listOf("jvm", "android")
+
+    /**
      * Every `.class` file [module] compiled for [sourceSet], across every language directory
-     * (`build/classes/kotlin/main`, `build/classes/java/main`, ...).
+     * (`build/classes/kotlin/main`, `build/classes/java/main`, ...) and, for a multiplatform
+     * module, every target that compiles to bytecode (`build/classes/kotlin/jvm/main`,
+     * `build/classes/kotlin/android/main`).
      *
      * Deliberately not filtered to Kotlin: a `.java` file added to a headless module would be
      * exactly as able to name a GL type, and a gate that only looked at Kotlin output would
@@ -40,7 +51,9 @@ internal object RepoLayout {
         val classesRoot = moduleDir(module).resolve("build/classes")
         val languageDirs = classesRoot.listFiles()?.filter { it.isDirectory }.orEmpty()
         return languageDirs
-            .map { it.resolve(sourceSet) }
+            .flatMap { language ->
+                listOf(language.resolve(sourceSet)) + BYTECODE_TARGETS.map { language.resolve("$it/$sourceSet") }
+            }
             .filter { it.isDirectory }
             .flatMap { root -> root.walkTopDown().filter { it.isFile && it.extension == "class" } }
             .sortedBy { it.invariantSeparatorsPath }
@@ -67,6 +80,10 @@ internal object RepoLayout {
             "src/main/java",
             "src/test/kotlin",
             "src/testFixtures/kotlin",
+            // A multiplatform module's JVM and Android bytecode is compiled from these (issue #201).
+            "src/commonMain/kotlin",
+            "src/jvmMain/kotlin",
+            "src/androidMain/kotlin",
         )
         return roots.asSequence()
             .map { root -> moduleDir(module).resolve("$root/$packagePath/$sourceFileName") }

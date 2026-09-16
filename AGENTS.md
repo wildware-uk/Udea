@@ -92,6 +92,14 @@ Three rules that are cheap to break and expensive to find:
 Enforced by `./gradlew udeaVerifyModuleGraph udeaVerifyNoLegacyDependencies`. Rule ids and
 rationale: `docs/module-graph.md`.
 
+**Multiplatform (the Kool/KMP port, issue #201).** A runtime module moves to KMP by applying
+`udea.kotlin-multiplatform` (`jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64`);
+`udea-render` will apply `udea.kotlin-multiplatform-render`, the same set without iOS.
+Build-time modules stay on `udea.kotlin-library`. The module-graph gates govern each target's
+classpath as the JVM classpath it stands for. `sh gradlew :<module>:allTests` skips iOS off
+macOS; the `ios-tests` CI job runs it. The Android SDK comes from `ANDROID_HOME` or an
+untracked `local.properties` (`sdk.dir=...`), which is never committed.
+
 ---
 
 ## The tick model

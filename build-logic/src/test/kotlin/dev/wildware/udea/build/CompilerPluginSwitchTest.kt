@@ -30,8 +30,12 @@ class CompilerPluginSwitchTest {
 
     private val repoRoot = File("..").canonicalFile
 
+    /**
+     * The convention every Kotlin module is on: `udea.kotlin-library` and both multiplatform
+     * conventions apply it (issue #201), so it is where the wiring has to live.
+     */
     private val convention =
-        repoRoot.resolve("build-logic/src/main/kotlin/udea.kotlin-library.gradle.kts")
+        repoRoot.resolve("build-logic/src/main/kotlin/udea.kotlin-base.gradle.kts")
 
     private val ci = repoRoot.resolve(".github/workflows/ci.yml")
 
@@ -73,7 +77,7 @@ class CompilerPluginSwitchTest {
         assertTrue(convention.isFile, "not found: $convention")
         assertTrue(
             "apply<UdeaCompilerPluginSupport>()" in convention.readText(),
-            "udea.kotlin-library no longer applies UdeaCompilerPluginSupport, so whichever " +
+            "udea.kotlin-base no longer applies UdeaCompilerPluginSupport, so whichever " +
                 "modules still compile with the K2 plugin do so by accident",
         )
     }

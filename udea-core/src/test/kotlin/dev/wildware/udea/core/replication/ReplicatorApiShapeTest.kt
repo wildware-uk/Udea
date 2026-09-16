@@ -119,7 +119,8 @@ class ReplicatorApiShapeTest {
         // every module. The four reflection tests above carry the load-bearing half of the
         // spec-7 mitigation; this is a belt over those braces.
         //
-        // Scope: shipped source only — `src/main` and `src/testFixtures`, the code a
+        // Scope: shipped source only — `src/main` and `src/testFixtures`, and a multiplatform
+        // module's `src/<name>Main` and `src/<name>TestFixtures` (issue #201) - the code a
         // widening would have to keep compiling without a source change. Test sources are
         // deliberately excluded: a test names a `FieldMask` local to make an assertion
         // readable, which is passing the mask through the API, not storing it, and it is
@@ -135,10 +136,11 @@ class ReplicatorApiShapeTest {
         assertTrue(moduleRoots.isNotEmpty(), "expected sibling udea-* modules beside udea-core")
 
         val offenders = moduleRoots.flatMap { module ->
-            listOf("src/main", "src/testFixtures").flatMap { sourceSet ->
-                ModuleFiles.kotlinFilesIn(module.resolve(sourceSet))
-                    .flatMap { file -> fieldMaskProperties(file) }
-            }
+            module.resolve("src").listFiles().orEmpty()
+                .filter { it.isDirectory && SHIPPED_SOURCE_SET.matches(it.name) }
+                .flatMap { sourceSet ->
+                    ModuleFiles.kotlinFilesIn(sourceSet).flatMap { file -> fieldMaskProperties(file) }
+                }
         }
 
         assertEquals(
@@ -310,6 +312,9 @@ class ReplicatorApiShapeTest {
     private fun typeName(type: KType): String? = (type.classifier as? kotlin.reflect.KClass<*>)?.qualifiedName
 
     private companion object {
+        /** `main`, `testFixtures`, and a multiplatform `<name>Main` or `<name>TestFixtures`. */
+        val SHIPPED_SOURCE_SET = Regex("main|testFixtures|[A-Za-z0-9]+Main|[A-Za-z0-9]+TestFixtures")
+
         /** A `val`/`var` declaration with an explicit type, matched up to and including its `:`. */
         val PROPERTY_DECLARATION = Regex("""\b(?:val|var)\s+\w+\s*:""")
 

@@ -209,6 +209,87 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  ios-tests:
+    # Issue #201, spec section 7. Kotlin/Native links and runs iOS test binaries only on macOS;
+    # off macOS `iosSimulatorArm64Test` is SKIPPED and `allTests` runs every target but iOS.
+    # This job is where the iOS tests of a multiplatform module actually run.
+    #
+    # `macos-latest` is an Apple Silicon runner, the architecture `iosSimulatorArm64` targets.
+    # The tasks name the multiplatform modules one by one, so a module converted later has to be
+    # added to both steps below in the change that converts it.
+    #
+    # The step after the tests is the same defence the `build` job's atlas step makes, for the
+    # same reason: a skipped test task is reported as a pass. It fails unless each module wrote an
+    # iOS test report with tests in it and none skipped.
+    name: iOS simulator tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: Run the iOS simulator tests
+        shell: bash
+        run: >-
+          ./gradlew
+          :udea-annotations:iosSimulatorArm64Test
+          :udea-diagnostics:iosSimulatorArm64Test
+          --stacktrace
+
+      - name: Assert the iOS tests ran and none skipped
+        shell: bash
+        run: |
+          set -euo pipefail
+          for module in udea-annotations udea-diagnostics; do
+            results="$module/build/test-results/iosSimulatorArm64Test"
+            reports=("$results"/TEST-*.xml)
+            if [ ! -s "${reports[0]}" ]; then
+              echo "::error::$module wrote no iOS test report - iosSimulatorArm64Test did not run"
+              exit 1
+            fi
+            ran=0
+            skipped=0
+            for report in "${reports[@]}"; do
+              counts=$(sed -n 's/.*<testsuite [^>]*tests="\([0-9][0-9]*\)"[^>]*skipped="\([0-9][0-9]*\)".*/\1 \2/p' "$report" | head -1)
+              if [ -z "$counts" ]; then
+                echo "::error::$report has no <testsuite> counts - it is not a JUnit report"
+                exit 1
+              fi
+              ran=$((ran + ${counts% *}))
+              skipped=$((skipped + ${counts#* }))
+            done
+            if [ "$ran" -eq 0 ]; then
+              echo "::error::$module ran 0 iOS tests"
+              exit 1
+            fi
+            if [ "$skipped" -ne 0 ]; then
+              echo "::error::$module skipped $skipped of $ran iOS tests"
+              exit 1
+            fi
+            echo "$module: $ran iOS tests ran, $skipped skipped"
+          done
+
+      - name: Upload iOS test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-reports
+          path: |
+            */build/reports/tests/iosSimulatorArm64Test/**
+            */build/test-results/iosSimulatorArm64Test/**
+          retention-days: 7
+
   latency-budgets:
     # Issue #175: **a wall-clock latency measurement taken beside a parallel build measures the
     # build**, so every gate that asserts a number of milliseconds gets a runner to itself. The

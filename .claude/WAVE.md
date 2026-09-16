@@ -2,16 +2,18 @@
 
 ## kmp baseline
 
-SHA `90b26fc` (kmp after #201 merge), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `f45bbeb` (kmp after #202 merge), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
 
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
 
-## Wave 2 (2026-09-16): in flight
+## Wave 2 (2026-09-16): done
 
-- #202 generated registry: `dev-202` dispatched, branch `issue-202-generated-registry`. Only ticket this wave.
+- #202 generated registry: merged `f45bbeb`, round 1 PASS. Per-module `<Module>ModuleRegistry` + `<Module>UdeaRegistry`;
+  `UdeaGameDef` requires the registry; modules declare themselves with `udeaModule("Name")` in build scripts.
+  ServiceLoader left only in build-time code.
 - #207 held: udea-audio `api`-depends on udea-core and udea-assets (still JVM-only), so four-target build needs
   #203 and #205 first. Decision commented on #207.
 
@@ -25,6 +27,9 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   layout; add module to CI `ios-tests`).
 
 ## Standing rulings and traps
+
+- New runtime module must call `udeaModule("Name")` in its build script, or codegen errors (#202 ruling).
+- #207 (audio) needs #203 and #205 too, not only #201: it `api`-depends on core and uses assets.
 
 - **Every build command needs `ANDROID_HOME=$HOME/Android/Sdk`** since #201 (put it in developer, reviewer
   and trial-merge commands). Without it: `SDK location not found`. Environment, not a red build.
@@ -48,9 +53,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 
 ## Next
 
-1. Wave 2: **#202** (generated registry, the one contract change allowed) and **#207** (udea-audio, needs
-   only #201) if `grep -r ServiceLoader udea-audio` is empty, so they are disjoint. #203 (udea-core) overlaps
-   #202's discovery sites, so it waits for wave 3 unless #202's diff proves otherwise.
-2. Then #203; then #204, #205, #206, #209 in parallel (all need #203); #208 needs #202 and #203.
+1. Wave 3: **#203** (udea-core) alone - everything else needs it.
+2. Then #203 done: then #204, #205, #206, #209 in parallel (all need #203); #208 needs #202 and #203.
 3. #210 lives in `wildware-uk/composegl`; a separate `composegl-ef` session is active there. Check its state
    before dispatching.

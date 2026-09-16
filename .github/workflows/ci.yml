@@ -35,12 +35,13 @@ on:
     - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
-      clean_build_budget_ms:
+      clean_build_plant_functions:
         description: >-
-          Clean-build budget in milliseconds. Set it to 1 to prove the gate still fails;
-          leave it alone for the real 90s budget from the Phase 0 exit criteria.
+          Plant this many extra functions in the head's udea-core before the clean-build
+          comparison, to prove that gate still fails on a genuinely slower build. Leave it empty
+          for an honest run.
         required: false
-        default: "90000"
+        default: ""
       ksp_cold_budget_ms:
         description: >-
           Cold codegen-pass threshold in milliseconds for the `ksp-incremental-budget` job.
@@ -853,12 +854,31 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   clean-build-budget:
-    # ubuntu-latest only. The budget is a trend line, and a trend line measured on two
-    # differently sized runners is two trend lines pretending to be one.
+    # Issue #181. This job used to time ONE clean build against an absolute 90 000 ms, and its
+    # verdict was a function of the runner rather than of the commit: identical work went red and
+    # green. Two things were wrong, and the probe runs recorded on the issue measured both:
+    #
+    #   - the first clean build in a fresh job is mostly warm-up. The same command, repeated in the
+    #     same job on warm daemons, took about a third of the time or less. The old number
+    #     measured a cold daemon more than it measured the code.
+    #   - `ubuntu-latest` is several kinds of machine, and they differ by about a third even warm.
+    #     No estimator over one job's samples can divide that out.
+    #
+    # So the job builds the commit's BASE in a second checkout on the same runner, warms both, and
+    # times them interleaved. `udeaCleanBuildVerdict` compares the fastest sample of each side;
+    # `CleanBuildComparison` in build-logic, and its test, hold the rule. The machine divides out,
+    # and what is left is whether this commit made a clean build slower. `docs/budgets.md` records
+    # why the absolute 90 000 ms is now reported rather than gated, which is not widening it.
+    #
+    # ubuntu-latest only: both sides of the comparison share a runner by construction, so a second
+    # OS would buy a second copy of the same answer.
     name: clean build under budget
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The base is found by walking history, which a depth-1 clone does not have.
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -873,51 +893,107 @@ jobs:
         shell: bash
         run: chmod +x ./gradlew
 
-      # The budget is about compiling this project, not about starting a JVM. Warming the
-      # daemon first is what stops the number being dominated by Gradle's own startup.
-      - name: Warm the daemon
+      # The base is where this commit leaves `example`: the merge base for a branch or a pull
+      # request, and the first parent for a commit that is already on `example` (a push to it, or a
+      # scheduled run of a ref behind it), where the merge base is the commit itself.
+      - name: Check out the base beside the head
         shell: bash
-        run: ./gradlew help
-
-      - name: Time a clean build of the rewrite tree
-        shell: bash
-        env:
-          # `udeaAssemble`, never `assemble`: the old modules would dominate the number -
-          # `idea-plugin` alone resolves an entire IntelliJ distribution - and a budget the
-          # rewrite cannot move is a budget nobody acts on.
-          #
-          # The configuration cache stays ON (it is on in `gradle.properties`). A fresh runner
-          # has no cache entry, so this is a genuine cold build; disabling it would measure a
-          # configuration the project never actually runs.
-          UDEA_CLEAN_BUILD_BUDGET_MS: ${{ github.event.inputs.clean_build_budget_ms || '90000' }}
         run: |
           set -euo pipefail
-          budget="${UDEA_CLEAN_BUILD_BUDGET_MS}"
-          start=$(date +%s%3N)
-          ./gradlew clean udeaAssemble --no-build-cache --stacktrace
-          end=$(date +%s%3N)
-          elapsed=$((end - start))
-
-          {
-            echo "### Clean build budget"
-            echo
-            echo "| Measure | Value |"
-            echo "| --- | --- |"
-            echo "| Command | \`./gradlew clean udeaAssemble --no-build-cache\` |"
-            echo "| Runner | \`${RUNNER_OS}\` / \`ubuntu-latest\` |"
-            echo "| Measured | **${elapsed} ms** |"
-            echo "| Budget | ${budget} ms |"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "$elapsed" -gt "$budget" ]; then
-            echo "::error::clean build took ${elapsed} ms, over the ${budget} ms budget (spec 6, Phase 0 exit)"
-            exit 1
+          git fetch --no-tags origin example
+          head=$(git rev-parse HEAD)
+          base=$(git merge-base HEAD origin/example)
+          if [ "$base" = "$head" ]; then
+            base=$(git rev-parse HEAD^1)
           fi
-          echo "clean build took ${elapsed} ms, within the ${budget} ms budget"
+          git worktree add --detach "$RUNNER_TEMP/base" "$base"
+          chmod +x "$RUNNER_TEMP/base/gradlew"
+          echo "UDEA_CLEAN_BUILD_BASE=$RUNNER_TEMP/base" >> "$GITHUB_ENV"
+          echo "UDEA_CLEAN_BUILD_BASE_SHA=$base" >> "$GITHUB_ENV"
+          echo "head $head, base $base"
+
+      # Proves the gate still fails, on a workflow dispatch only: plants extra top-level functions
+      # into the HEAD checkout's udea-core, so the head genuinely compiles more than its base. It
+      # never runs on an ordinary push. It replaces `clean_build_budget_ms=1`, which proved only
+      # that a comparison against a constant can be made to fail.
+      - name: Plant a build-time regression in the head
+        if: github.event.inputs.clean_build_plant_functions != ''
+        shell: bash
+        env:
+          PLANT: ${{ github.event.inputs.clean_build_plant_functions }}
+        run: |
+          set -euo pipefail
+          planted=udea-core/src/main/kotlin/dev/wildware/udea/core/PlantedBuildRegression.kt
+          echo "package dev.wildware.udea.core" > "$planted"
+          for n in $(seq 1 "$PLANT"); do
+            echo "internal fun planted$n(x: Int): Int = (x * 31 + $n) xor (x shr 3) + listOf(x, $n).sum()" >> "$planted"
+          done
+          echo "planted $PLANT functions in $planted"
+
+      # Every sample is `clean udeaAssemble --no-build-cache` with the configuration-cache entry
+      # deleted first, so each one configures and compiles from nothing - a clean build - on daemons
+      # that are already warm. The first clean build of each side is not a sample, because it is
+      # mostly warm-up. The head's is still reported: it is the number the Phase 0 exit criterion
+      # was written about.
+      #
+      # Samples go base, head, head, base, repeated, so drift across the job - the JIT still
+      # settling, the page cache filling - lands on both sides equally rather than on whichever
+      # checkout happened to go second.
+      - name: Time clean builds of the base and the head, interleaved
+        shell: bash
+        run: |
+          set -euo pipefail
+          samples="$RUNNER_TEMP/clean-build-samples.txt"
+          : > "$samples"
+          clean_build() { # dir -> milliseconds on stdout
+            rm -rf "$1/.gradle/configuration-cache"
+            local start end
+            start=$(date +%s%3N)
+            (cd "$1" && ./gradlew clean udeaAssemble --no-build-cache --stacktrace > "$RUNNER_TEMP/last-build.log" 2>&1) \
+              || { tail -80 "$RUNNER_TEMP/last-build.log" >&2; echo "::error::a clean build of $1 failed" >&2; exit 1; }
+            end=$(date +%s%3N)
+            echo $((end - start))
+          }
+          head="$GITHUB_WORKSPACE"
+          base="$UDEA_CLEAN_BUILD_BASE"
+
+          (cd "$head" && ./gradlew help -q)
+          (cd "$base" && ./gradlew help -q)
+          cold=$(clean_build "$head")
+          clean_build "$base" > /dev/null
+          echo "first clean build of the head, daemons cold: ${cold} ms"
+          echo "UDEA_CLEAN_BUILD_COLD_MS=$cold" >> "$GITHUB_ENV"
+
+          for round in 1 2 3; do
+            echo "base $(clean_build "$base")" >> "$samples"
+            echo "head $(clean_build "$head")" >> "$samples"
+            echo "head $(clean_build "$head")" >> "$samples"
+            echo "base $(clean_build "$base")" >> "$samples"
+          done
+          cat "$samples"
+
+      - name: Judge the head against its base
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=0
+          ./gradlew udeaCleanBuildVerdict -Pudea.cleanBuild.samples="$RUNNER_TEMP/clean-build-samples.txt" --stacktrace \
+            || status=$?
+          {
+            echo "### Clean build: head against base, same runner"
+            echo
+            echo "Base \`${UDEA_CLEAN_BUILD_BASE_SHA}\`, head \`${GITHUB_SHA}\`, on \`$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs)\`."
+            echo
+            cat build/reports/udea/clean-build-verdict.md 2>/dev/null || echo "No verdict was written; see the step log."
+            echo
+            echo "First clean build of the head, daemons cold: **${UDEA_CLEAN_BUILD_COLD_MS} ms**."
+            echo "Reported, not gated - see \`docs/budgets.md\`, *Clean build*."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
   ksp-incremental-budget:
     # The codegen epic's half of the build budget (issue #35). It owns `ksp.incremental` and a
-    # per-task regression threshold; the <90s clean-build gate above is a different measurement
+    # per-task regression threshold; the clean-build comparison above is a different measurement
     # and stays where it is.
     #
     # ubuntu-latest only, for the same reason `clean-build-budget` is: a threshold measured on

@@ -7,17 +7,19 @@ file** rather than creating a second one, and add their gate as a job or a matri
 A budget here is a CI gate, not an aspiration. A number nobody fails a build over is a note,
 and notes drift.
 
-## Clean build — enforced
+## Clean build — enforced as a comparison against the base
 
 | | |
 |---|---|
-| **Budget** | 90 000 ms (spec §6, Phase 0 exit: "clean build <90s") |
+| **Spec target** | 90 000 ms (spec §6, Phase 0 exit: "clean build <90s") — **reported, not gated**; see *Why the absolute number is not the gate* |
 | **Gate** | `clean-build-budget` job in `.github/workflows/ci.yml` |
-| **Command** | `./gradlew clean udeaAssemble --no-build-cache` |
-| **Runner** | `ubuntu-latest`, Temurin JDK 21, daemon warmed with `./gradlew help` first |
-| **Threshold source** | `UDEA_CLEAN_BUILD_BUDGET_MS`, defaulting to `90000` |
-| **Measured** | 26 248 ms – 31 705 ms |
-| **Measured on** | developer workstation, Windows 11, 32 logical cores, Corretto 17.0.8, Gradle 8.13 |
+| **Command timed** | `./gradlew clean udeaAssemble --no-build-cache`, configuration-cache entry deleted first |
+| **Compared against** | the same command on the commit's base, in a second checkout on the same runner: the merge base with `example`, or the first parent for a commit already on it |
+| **Samples** | 6 per side, in base/head/head/base order, after one untimed clean build of each |
+| **Rule** | the head's fastest sample may be at most `CleanBuildComparison.TOLERANCE` (1.10) times the base's fastest — `build-logic`, tested by `CleanBuildComparisonTest` |
+| **Verdict task** | `./gradlew udeaCleanBuildVerdict -Pudea.cleanBuild.samples=<file>` |
+| **Wiring gate** | `:udea-gradle:CleanBuildBudgetJobTest`, which reads the workflow |
+| **Runner** | `ubuntu-latest`, Temurin JDK 21 |
 
 ### What is measured, and what is not
 
@@ -27,15 +29,47 @@ measure `common` and `example` resolving KryoNet, Box2D natives and five `kotlin
 artifacts; that number is real but it is not a number the rewrite can move — it belongs to code
 on its way out — and a budget nobody can act on is a budget nobody looks at.
 
-The configuration cache stays **on**. It is on in `gradle.properties`, so it is the
-configuration this project actually runs; turning it off for the measurement would produce a
-faithful number about a build nobody performs. A fresh CI runner has no cache entry, so the
-gated run is a genuine cold build, whereas the workstation figures above are with an entry
-already stored — expect the first CI number to be the higher one, and treat the two as
-different measurements rather than a regression.
+`--no-build-cache` is there because the build cache would let the gate pass by not compiling
+anything, which is exactly the thing the gate is supposed to notice. The configuration cache
+stays **on**, as it is in `gradle.properties`, but its entry is deleted before every sample, so
+each sample configures and compiles from nothing on daemons that are already warm.
 
-`--no-build-cache` is there for the opposite reason: the build cache would let the gate pass
-by not compiling anything, which is exactly the thing the gate is supposed to notice.
+### Why the absolute number is not the gate (issue #181)
+
+Until #181 the job timed one clean build in a fresh job and failed it over 90 000 ms. Its
+verdict was about the runner rather than the commit: runs of it measured from 60 405 to
+102 453 ms, and five runs on work that did not differ went three red and two green. Three
+probe runs on the issue branch measured why. Their logs are listed in the issue's decision
+comment.
+
+- **The first clean build in a job is mostly warm-up.** On one runner, the first build measured
+  83 843–97 368 ms and the same command repeated in the same job fell to 18 303–26 006 ms. The
+  old number was mostly a cold Gradle daemon, a cold Kotlin daemon and JIT compilation.
+- **`ubuntu-latest` is not one machine.** Under the one label the probes drew AMD EPYC 9V74,
+  7763 and 9V45 and Intel Xeon Platinum 8573C and 6973P-C, and the fastest warm clean build
+  differed by about 1.5x between them (17 017 ms against 25 623 ms). No estimator over one
+  job's samples divides that out.
+
+So this is not a wider budget, which is the remedy this document refuses everywhere else. It is a
+different measurement. The base is built on the same runner in the same job, so the machine
+cancels out, and the verdict is the question a reader of CI can act on: did this commit make a
+clean build slower? On identical work, five probe legs on four CPU models measured head/base
+ratios between 0.971 and 1.029.
+
+**What it does not catch, stated rather than implied.** A regression under the tolerance passes:
+1 500 planted functions measured 1.053 and would be green, while 6 000 measured 1.118. Because
+each commit is compared with its own base, small regressions can also add up across commits
+without any single one failing. The 90 000 ms target has not been dropped. Every run writes the
+head's first build (cold daemons, the old measurement) to the step summary, so the absolute
+trend stays readable. Gating it again needs a runner whose hardware is fixed, not a different
+number.
+
+### Why the fastest sample
+
+Everything that disturbs a wall-clock build time adds time: a neighbour on the host, a GC pause,
+a cold page cache. Nothing makes a build faster than the work it does, so the fastest sample is
+the closest to the build's real cost. `udeaBenchCharacterMover` moved to the fastest of its
+samples for the same reason in issue #175.
 
 ### Known drag
 
@@ -47,7 +81,7 @@ below is the gate that keeps it honest.
 
 | | |
 |---|---|
-| **Owner** | codegen epic (issue #35). Owns `ksp.incremental`, the isolating/aggregating split and this threshold — not the 90s gate above. |
+| **Owner** | codegen epic (issue #35). Owns `ksp.incremental`, the isolating/aggregating split and this threshold — not the clean-build gate above. |
 | **Gate** | `ksp-incremental-budget` job in `.github/workflows/ci.yml` |
 | **Hard gate** | a second identical `./gradlew :udea-codegen:testClasses` must execute **no** `:udea-codegen:` task |
 | **Threshold** | `UDEA_KSP_COLD_BUDGET_MS` = 90 000, `UDEA_KSP_EDIT_BUDGET_MS` = 40 000 — holding values, ~2.6x and ~3.7x the workstation baselines below, **not** baseline + 20% (see *Why the thresholds are not baseline + 20%*) |
@@ -227,10 +261,16 @@ measured number here, and adds the job to `.github/workflows/ci.yml`.
 
 ```bash
 ./gradlew help                                   # warm the daemon; the budget is about compiling, not about JVM startup
-./gradlew clean udeaAssemble --no-build-cache    # time this
+./gradlew clean udeaAssemble --no-build-cache    # once untimed, to warm the Kotlin daemon and the JIT
+rm -rf .gradle/configuration-cache && ./gradlew clean udeaAssemble --no-build-cache   # time this, several times
 ```
 
-On CI the same two commands run in the `clean-build-budget` job, which writes the measured
-milliseconds to the job summary on every run — pass or fail — so the trend is readable without
-opening a log. To prove the gate can still fail, dispatch the workflow manually with
-`clean_build_budget_ms` set to `1`.
+A number from one machine is only comparable with another number from the same machine. Take
+base and head from the same box, interleaved, and compare the fastest of each.
+
+On CI the `clean-build-budget` job does exactly that and writes both fastest samples, their ratio
+and the head's cold first build to the job summary on every run, pass or fail. To prove the gate
+can still fail, dispatch the workflow manually with `clean_build_plant_functions` set: it plants
+that many extra functions in the head's `udea-core`, so the head really does compile more than its
+base. 6 000 measured a ratio of 1.118 in probe round 3, just over the tolerance. Use more than
+that to see a clear red.

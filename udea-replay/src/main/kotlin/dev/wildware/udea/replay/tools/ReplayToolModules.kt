@@ -7,12 +7,12 @@ import dev.wildware.udea.agent.dispatch.ToolIndex
 /**
  * `replay.*` as a [ToolModule] a host registers by hand.
  *
- * ## Why this is not a `META-INF/services` entry
+ * ## Why this is not on the generated registry's `ToolModule` facet
  *
  * For the reason `EngineToolModules` gives about the engine's own toolsets, and one more.
  * `ToolIndex.Builder.build` refuses a tool whose toolset instance was never registered - so a
- * `ServiceLoader` entry would turn *every* process with this module on its classpath into a
- * start-up failure unless it had wired a [ReplayToolset]. And a [ReplayToolset] needs a
+ * generated facet would turn *every* game whose registry lists this module into a start-up
+ * failure unless it had wired a [ReplayToolset]. And a [ReplayToolset] needs a
  * [ReplayHost], which knows how to build a world of a specific game: nothing but the host can
  * supply one, and no amount of discovery can invent it.
  *

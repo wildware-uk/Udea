@@ -37,6 +37,7 @@ import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.snapshot.snapshotTimeTravel
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.backend.Lwjgl3Backend
@@ -298,6 +299,7 @@ class OffscreenRenderToolsTest {
     private fun withHost(block: (Fixture) -> Unit) {
         val module = DemoBodyModule()
         val definition = UdeaGameDef(
+            registry = CoreUdeaRegistry,
             modules = listOf(module),
             timeTravel = snapshotTimeTravel(demoRegistry()),
         )

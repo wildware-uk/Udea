@@ -1,5 +1,6 @@
 package dev.wildware.udea.core.module
 
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,7 +20,7 @@ class CoreModuleManifestGoldenTest {
 
     @Test
     fun `the CoreModule manifest matches the golden file`() {
-        val rendered = UdeaGameDef(emptyList()).build().manifest.render()
+        val rendered = UdeaGameDef(CoreUdeaRegistry, emptyList()).build().manifest.render()
         val golden = goldenFile()
 
         if (System.getProperty("update.goldens") == "true") {

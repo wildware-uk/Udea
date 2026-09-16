@@ -1,5 +1,6 @@
 package dev.wildware.udea.core.module
 
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,6 +18,7 @@ class SystemCycleTest {
 
     private fun defWith(configure: SimRegistry.() -> Unit): UdeaGameDef =
         UdeaGameDef(
+            CoreUdeaRegistry,
             listOf(
                 object : UdeaModule {
                     override fun simulation(registry: SimRegistry) = registry.configure()
@@ -122,7 +124,7 @@ class SystemCycleTest {
     @Test
     fun `CoreModule may not be listed twice`() {
         val failure = assertFailsWith<IllegalArgumentException> {
-            UdeaGameDef(listOf(CoreModule()))
+            UdeaGameDef(CoreUdeaRegistry, listOf(CoreModule()))
         }
         assertTrue("CoreModule" in failure.message.orEmpty(), "${failure.message}")
     }

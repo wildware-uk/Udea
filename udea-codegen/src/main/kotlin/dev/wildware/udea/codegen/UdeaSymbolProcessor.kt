@@ -21,7 +21,7 @@ import dev.wildware.udea.codegen.protocol.LockedComponent
 import dev.wildware.udea.codegen.protocol.LockedField
 import dev.wildware.udea.codegen.protocol.NetProtocolEmitter
 import dev.wildware.udea.codegen.protocol.ProtocolLock
-import dev.wildware.udea.codegen.registry.ServiceIndexEmitter
+import dev.wildware.udea.codegen.registry.RegistryEmitter
 import dev.wildware.udea.codegen.replicator.ComponentModelBuilder
 import dev.wildware.udea.codegen.replicator.ReplicatedComponent
 import dev.wildware.udea.codegen.replicator.ReplicatorEmitter
@@ -41,7 +41,7 @@ import java.nio.charset.StandardCharsets
  * | output | one per | dependency |
  * |---|---|---|
  * | `…Replicator` | `@Replicated` component | **isolating** — the component's own file |
- * | `…NetProtocol`, `…NetModule`, `<Module>-net-protocol.lock` | module | **aggregating** — every source |
+ * | `…NetProtocol`, `…ModuleRegistry`, `…UdeaRegistry`, `<Module>-net-protocol.lock` | module | **aggregating** — every source |
  *
  * An isolating output is invalidated only by an edit to the one file it came from, so editing
  * one component reprocesses one component. The generator this replaces marked *every* file
@@ -77,8 +77,6 @@ internal class UdeaSymbolProcessor(
      */
     private var emittedModuleFiles = false
 
-    private var emittedLevelIndex = false
-
     /** So a malformed `udea.moduleName` is reported once and not once per KSP round. */
     private var reportedModuleName = false
 
@@ -106,9 +104,13 @@ internal class UdeaSymbolProcessor(
         // `udea-gas` do exactly that - and an early return keyed on the other three would
         // generate no list for them, so their levels would refuse to save.
         val saveable = levelComponents.find(resolver)
-        if (components.isEmpty() && agentIsEmpty && rpcFunctions.isEmpty() && saveable.isEmpty()) return emptyList()
+        // A named module with nothing in it still gets its registry, once: a launcher whose
+        // classpath holds the module names that registry, and a reference to a class nobody
+        // wrote is a compile error that is only meant to happen when the module is absent.
+        val nothingToDo = components.isEmpty() && agentIsEmpty && rpcFunctions.isEmpty() && saveable.isEmpty()
+        if (nothingToDo && (options.moduleName == null || emittedModuleFiles)) return emptyList()
         // Validated once, here, and not at each writer. `udea.moduleName` gates the lock, the
-        // protoHash, both ServiceLoader indexes and the tool manifest, and a module whose name
+        // protoHash, both registries and the tool manifest, and a module whose name
         // is malformed can produce none of them - so a check inside one writer and a bare
         // `return` inside another had the two paths disagreeing about whether the same
         // misconfiguration was a failure at all. Tools-only modules took the silent path:
@@ -119,12 +121,15 @@ internal class UdeaSymbolProcessor(
         // `RpcRegistry` builds, so a module can emit its guards even while its component list
         // is being argued about.
         writeRpcFiles(rpcFunctions)
-        writeLevelIndex(saveable)
+        if (!checkLevelModuleName(saveable)) return emptyList()
         if (components.isEmpty()) {
             if (emittedModuleFiles) return emptyList()
             val agentResult = agent.run(resolver)
             writeAgentFiles(agentResult)
-            writeAgentModuleFiles(agentResult, agentSourceFiles(agentResult))
+            val moduleName = options.moduleName ?: return emptyList()
+            val sources = agentSourceFiles(agentResult) + saveable.map(LevelComponentScanner.Found::containingFile)
+            writeManifest(moduleName, agentResult, aggregating(sources))
+            writeRegistries(resolver, moduleName, agentFacets(agentResult) + levelFacets(saveable), sources)
             emittedModuleFiles = true
             return emptyList()
         }
@@ -141,7 +146,7 @@ internal class UdeaSymbolProcessor(
         //
         // Absent, the id space is the module's own components — and that is legal in exactly
         // one configuration: a module that emits no protocol identity. `udea.moduleName` is
-        // what turns the lock, the protoHash and the `ServiceLoader` index on, so a module
+        // what turns the lock, the protoHash and the module registry on, so a module
         // that sets it is a participant in the project's wire contract and must be numbered
         // from the project's id space. Silently falling back there is the defect itself: the
         // module's lock would be internally consistent, its protoHash would agree with a peer
@@ -212,11 +217,38 @@ internal class UdeaSymbolProcessor(
 
         val moduleName = options.moduleName
         if (moduleName != null && !emittedModuleFiles) {
-            writeModuleFiles(moduleName, emitted, sourceFiles)
-            writeAgentModuleFiles(agentResult, sourceFiles)
+            sourceFiles += saveable.map(LevelComponentScanner.Found::containingFile)
+            val dependencies = aggregating(sourceFiles)
+            writeProtocolFiles(moduleName, emitted, dependencies)
+            writeManifest(moduleName, agentResult, dependencies)
+            writeRegistries(
+                resolver,
+                moduleName,
+                netFacets(emitted) + agentFacets(agentResult) + levelFacets(saveable),
+                sourceFiles,
+            )
             emittedModuleFiles = true
         }
         return emptyList()
+    }
+
+    /**
+     * False, having reported it, when this round has saveable components and no module name.
+     *
+     * Their list lives on the module registry, which is named after the module, so there is
+     * nowhere to put it. That is an error rather than a skip: the cost of skipping is a level
+     * that refuses to save at run time, naming a component whose module simply never said what
+     * it was called.
+     */
+    private fun checkLevelModuleName(found: List<LevelComponentScanner.Found>): Boolean {
+        if (found.isEmpty() || options.moduleName != null) return true
+        logger.error(
+            "this module declares ${found.size} @Serializable Fleks component(s) but the build " +
+                "did not set ${CodegenOptions.MODULE_NAME}, so no level component list can be " +
+                "generated for them and a level holding one would refuse to save. Set it in " +
+                "this module's ksp { } block.",
+        )
+        return false
     }
 
     /**
@@ -225,38 +257,6 @@ internal class UdeaSymbolProcessor(
      * Sorted for the reason the component list is: the set of emitted files and their contents
      * must depend on the sources alone and not on the order KSP happened to hand them over.
      */
-    /**
-     * `<Module>LevelComponents` and its `META-INF/services` line: the list a level file's
-     * polymorphic component section is registered from (issue #191).
-     *
-     * Needs `udea.moduleName`, because the index is named after the module and two unnamed
-     * modules would write the same class. Without it this is an error rather than a skip: the
-     * cost of skipping is a level that refuses to save at run time, naming a component whose
-     * module simply never said what it was called.
-     */
-    private fun writeLevelIndex(found: List<LevelComponentScanner.Found>) {
-        if (found.isEmpty() || emittedLevelIndex) return
-        val moduleName = options.moduleName
-        if (moduleName == null) {
-            logger.error(
-                "this module declares ${found.size} @Serializable Fleks component(s) but the build " +
-                    "did not set ${CodegenOptions.MODULE_NAME}, so no level component list can be " +
-                    "generated for them and a level holding one would refuse to save. Set it in " +
-                    "this module's ksp { } block.",
-            )
-            return
-        }
-        emittedLevelIndex = true
-        writeServiceIndexElements(
-            service = CoreNames.LEVEL_COMPONENT_MODULE,
-            index = GeneratedNames.levelComponents(moduleName),
-            moduleName = moduleName,
-            property = ServiceIndexEmitter.LEVEL_COMPONENTS,
-            members = found.map { ServiceIndexEmitter.levelComponent(it.className) },
-            dependencies = aggregating(found.map(LevelComponentScanner.Found::containingFile)),
-        )
-    }
-
     private fun rpcFunctions(resolver: Resolver): List<KSFunctionDeclaration> =
         resolver.getSymbolsWithAnnotation(AnnotationNames.RPC)
             .filterIsInstance<KSFunctionDeclaration>()
@@ -329,20 +329,18 @@ internal class UdeaSymbolProcessor(
     }
 
     /**
-     * The module-level outputs: the protocol constant, the lock file and — when the module has
-     * `udea-net` on its classpath — the `ServiceLoader` index.
+     * The module's wire identity: the protocol constant and the lock file.
      *
-     * These are the **only** aggregating outputs. They genuinely depend on every component in
+     * Aggregating, like every module-level output. They genuinely depend on every component in
      * the module (adding one shifts every later id), so marking them isolating would be a
-     * correctness bug rather than an optimisation; keeping them to one file per module is what
+     * correctness bug rather than an optimisation; keeping them to one group per module is what
      * stops that dependency from costing a full rebuild per edited component.
      */
-    private fun writeModuleFiles(
+    private fun writeProtocolFiles(
         moduleName: String,
         emitted: List<Pair<ReplicatedComponent, Int>>,
-        sourceFiles: List<KSFile>,
+        dependencies: Dependencies,
     ) {
-        val dependencies = aggregating(sourceFiles)
         val lock = ProtocolLock.build(emitted.map { (component, id) -> locked(component, id) })
 
         writeAggregating(NetProtocolEmitter.emit(moduleName, lock), dependencies)
@@ -353,31 +351,102 @@ internal class UdeaSymbolProcessor(
         ).use { stream ->
             stream.write(ProtocolLock.render(lock).toByteArray(StandardCharsets.UTF_8))
         }
+    }
 
-        val service = options.netModuleService ?: return
-        val serviceName = ClassName.bestGuess(service)
-        val index = GeneratedNames.netModule(moduleName)
-        writeAggregating(
-            ServiceIndexEmitter.emit(
-                service = serviceName,
-                index = index,
-                moduleName = moduleName,
-                property = ServiceIndexEmitter.REPLICATORS,
-                // Ascending type id, which is ascending name: the same order NetRegistry
-                // indexes the array it builds by.
-                members = emitted.sortedBy { it.second }.map { (component, _) ->
-                    ClassName(component.className.packageName, component.replicatorName)
+    /**
+     * The `NetModule` facet, when the build says `udea-net` is on this module's classpath.
+     *
+     * Members in ascending type id, which is ascending name: the same order `NetRegistry`
+     * indexes the array it builds by.
+     */
+    private fun netFacets(emitted: List<Pair<ReplicatedComponent, Int>>): List<RegistryEmitter.Facet> {
+        val service = options.netModuleService ?: return emptyList()
+        return listOf(
+            RegistryEmitter.Facet(
+                service = ClassName.bestGuess(service),
+                member = RegistryEmitter.REPLICATORS,
+                elements = emitted.sortedBy { it.second }.map { (component, _) ->
+                    CodeBlock.of("%T", ClassName(component.className.packageName, component.replicatorName))
                 },
             ),
-            dependencies,
         )
-        codeGenerator.createNewFileByPath(
-            dependencies = dependencies,
-            path = ServiceIndexEmitter.resourcePath(serviceName),
-            extensionName = "",
-        ).use { stream ->
-            stream.write(ServiceIndexEmitter.resourceContent(index).toByteArray(StandardCharsets.UTF_8))
+    }
+
+    /** The `LevelComponentModule` facet, when the module declares a saveable component. */
+    private fun levelFacets(found: List<LevelComponentScanner.Found>): List<RegistryEmitter.Facet> {
+        if (found.isEmpty()) return emptyList()
+        return listOf(
+            RegistryEmitter.Facet(
+                service = CoreNames.LEVEL_COMPONENT_MODULE,
+                member = RegistryEmitter.LEVEL_COMPONENTS,
+                elements = found.map { RegistryEmitter.levelComponent(it.className) },
+            ),
+        )
+    }
+
+    /**
+     * `<Module>ModuleRegistry`, and `<Module>UdeaRegistry` over the modules the build listed.
+     *
+     * The launcher registry names every listed module's registry as a static reference, so a
+     * module the build says is on the classpath and whose registry is not would fail the
+     * compile anyway. It is checked here first, by exact name, so the failure names the module
+     * and the option rather than surfacing as an unresolved reference in a generated file.
+     */
+    private fun writeRegistries(
+        resolver: Resolver,
+        moduleName: String,
+        facets: List<RegistryEmitter.Facet>,
+        sourceFiles: List<KSFile>,
+    ) {
+        val self = GeneratedNames.moduleRegistry(moduleName)
+        writeAggregating(RegistryEmitter.module(self, moduleName, facets), aggregating(sourceFiles))
+
+        val listed = options.registryModules
+        if (listed == null) {
+            logger.error(
+                "${CodegenOptions.MODULE_NAME} is '$moduleName' but the build did not set " +
+                    "${CodegenOptions.REGISTRY_MODULES}, so no launcher registry can be generated " +
+                    "for this module - and no launcher would list it either, because the module " +
+                    "attribute a launcher's list is read from is only published by build-logic's " +
+                    "udeaModule(\"$moduleName\"). Declare the module through udeaModule rather than " +
+                    "setting ${CodegenOptions.MODULE_NAME} by hand.",
+            )
+            return
         }
+        if (moduleName !in listed) {
+            logger.error(
+                "${CodegenOptions.REGISTRY_MODULES} is '${listed.joinToString(",")}', which leaves " +
+                    "out this module, '$moduleName'. The list is every module on this module's " +
+                    "runtime classpath and the module itself; a launcher registry without its own " +
+                    "module would drop everything the module contributes.",
+            )
+            return
+        }
+        val others = listed.filter { it != moduleName }.distinct()
+        val missing = others.filter { name ->
+            !CodegenOptions.MODULE_NAME_FORMAT.matches(name) ||
+                resolver.getClassDeclarationByName(
+                    resolver.getKSNameFromString(GeneratedNames.moduleRegistry(name).canonicalName),
+                ) == null
+        }
+        for (name in missing) {
+            logger.error(
+                "${CodegenOptions.REGISTRY_MODULES} lists module '$name', but " +
+                    "${GeneratedNames.moduleRegistry(name).canonicalName} is not on this module's " +
+                    "classpath. The build lists every module on the runtime classpath that declared " +
+                    "itself with udeaModule, so that module did not generate its registry: check that " +
+                    "it applies the KSP plugin with udea-codegen and passes both of udeaModule's options.",
+            )
+        }
+        if (missing.isNotEmpty()) return
+        writeAggregating(
+            RegistryEmitter.launcher(
+                GeneratedNames.udeaRegistry(moduleName),
+                moduleName,
+                (others + moduleName).map(GeneratedNames::moduleRegistry),
+            ),
+            aggregating(sourceFiles),
+        )
     }
 
     /**
@@ -419,102 +488,59 @@ internal class UdeaSymbolProcessor(
     }
 
     /**
-     * The module-level agent outputs: the two `ServiceLoader` indexes and the manifest fragment.
+     * The tool manifest fragment, `udea/<Module>-agent-tools.json`.
      *
-     * Each index is gated on the build telling the processor its service interface is on the
-     * module's classpath, exactly as the `NetModule` index is: generated code may only
-     * implement an interface that exists, and a module that declares tools for a game which
-     * does not ship the agent surface must still compile.
-     *
-     * The manifest fragment is **not** gated. It is data, not code — the CI diff against the
-     * checked-in golden is the only thing that turns a reworded description into a reviewable
-     * change, and gating it on a runtime dependency would silence that for every module that
-     * has not yet grown one.
+     * **Not** gated on the build naming the `ToolModule` interface, unlike the facet. It is
+     * data, not code - the CI diff against the checked-in golden is the only thing that turns a
+     * reworded description into a reviewable change, and gating it on a runtime dependency
+     * would silence that for every module that has not yet grown one.
      */
-    private fun writeAgentModuleFiles(result: AgentPass.Result, sourceFiles: List<KSFile>) {
-        // The name's shape was checked once, before anything was written; reaching here with a
-        // malformed one is impossible rather than tolerated.
-        val moduleName = options.moduleName ?: return
-        if (result.isEmpty) return
-        val dependencies = aggregating(sourceFiles)
-
-        if (result.tools.isNotEmpty()) {
-            codeGenerator.createNewFileByPath(
-                dependencies = dependencies,
-                path = ToolManifest.resourcePath(moduleName),
-                extensionName = "",
-            ).use { stream ->
-                stream.write(
-                    ToolManifest.render(moduleName, result.tools.map(AgentPass.Emitted<ToolModel>::model))
-                        .toByteArray(StandardCharsets.UTF_8),
-                )
-            }
-        }
-
-        writeServiceIndex(
-            service = options.toolModuleService.takeIf { result.tools.isNotEmpty() },
-            index = GeneratedNames.toolModule(moduleName),
-            moduleName = moduleName,
-            property = ServiceIndexEmitter.TOOLS,
-            // Ascending tool name: the order the merged manifest and the dispatch table are
-            // both built in, so no consumer has to sort.
-            members = result.tools
-                .map(AgentPass.Emitted<ToolModel>::model)
-                .sortedBy(ToolModel::name)
-                .map { ClassName(it.owner.packageName, it.objectName) },
-            dependencies = dependencies,
-        )
-        writeServiceIndex(
-            service = options.stateModuleService.takeIf { result.states.isNotEmpty() },
-            index = GeneratedNames.stateModule(moduleName),
-            moduleName = moduleName,
-            property = ServiceIndexEmitter.STATES,
-            members = result.states
-                .map(AgentPass.Emitted<AgentStateModel>::model)
-                .sortedBy { it.owner.canonicalName }
-                .map { ClassName(it.owner.packageName, it.objectName) },
-            dependencies = dependencies,
-        )
-    }
-
-    private fun writeServiceIndex(
-        service: String?,
-        index: ClassName,
-        moduleName: String,
-        property: ServiceIndexEmitter.Member,
-        members: List<ClassName>,
-        dependencies: Dependencies,
-    ) {
-        writeServiceIndexElements(
-            service = ClassName.bestGuess(service ?: return),
-            index = index,
-            moduleName = moduleName,
-            property = property,
-            members = members.map { CodeBlock.of("%T", it) },
-            dependencies = dependencies,
-        )
-    }
-
-    private fun writeServiceIndexElements(
-        service: ClassName,
-        index: ClassName,
-        moduleName: String,
-        property: ServiceIndexEmitter.Member,
-        members: List<CodeBlock>,
-        dependencies: Dependencies,
-    ) {
-        writeAggregating(
-            ServiceIndexEmitter.emitElements(service, index, moduleName, property, members),
-            dependencies,
-        )
+    private fun writeManifest(moduleName: String, result: AgentPass.Result, dependencies: Dependencies) {
+        if (result.tools.isEmpty()) return
         codeGenerator.createNewFileByPath(
             dependencies = dependencies,
-            path = ServiceIndexEmitter.resourcePath(service),
+            path = ToolManifest.resourcePath(moduleName),
             extensionName = "",
         ).use { stream ->
-            stream.write(ServiceIndexEmitter.resourceContent(index).toByteArray(StandardCharsets.UTF_8))
+            stream.write(
+                ToolManifest.render(moduleName, result.tools.map(AgentPass.Emitted<ToolModel>::model))
+                    .toByteArray(StandardCharsets.UTF_8),
+            )
         }
     }
+
+    /**
+     * The `ToolModule` and `StateModule` facets.
+     *
+     * Each is gated on the build telling the processor its interface is on the module's
+     * classpath, exactly as the `NetModule` facet is: generated code may only implement an
+     * interface that exists, and a module that declares tools for a game which does not ship
+     * the agent surface must still compile.
+     */
+    private fun agentFacets(result: AgentPass.Result): List<RegistryEmitter.Facet> = listOfNotNull(
+        options.toolModuleService?.takeIf { result.tools.isNotEmpty() }?.let { service ->
+            RegistryEmitter.Facet(
+                service = ClassName.bestGuess(service),
+                member = RegistryEmitter.TOOLS,
+                // Ascending tool name: the order the merged manifest and the dispatch table are
+                // both built in, so no consumer has to sort.
+                elements = result.tools
+                    .map(AgentPass.Emitted<ToolModel>::model)
+                    .sortedBy(ToolModel::name)
+                    .map { CodeBlock.of("%T", ClassName(it.owner.packageName, it.objectName)) },
+            )
+        },
+        options.stateModuleService?.takeIf { result.states.isNotEmpty() }?.let { service ->
+            RegistryEmitter.Facet(
+                service = ClassName.bestGuess(service),
+                member = RegistryEmitter.STATES,
+                elements = result.states
+                    .map(AgentPass.Emitted<AgentStateModel>::model)
+                    .sortedBy { it.owner.canonicalName }
+                    .map { CodeBlock.of("%T", ClassName(it.owner.packageName, it.objectName)) },
+            )
+        },
+    )
 
     private fun locked(component: ReplicatedComponent, typeId: Int): LockedComponent =
         LockedComponent(

@@ -2,6 +2,7 @@ package dev.wildware.udea.core.module
 
 import dev.wildware.udea.core.EngineConfig
 import dev.wildware.udea.core.physics.PhysicsStepSystem
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -40,7 +41,7 @@ class SystemOrderTest {
             }
         }
 
-        val game = UdeaGameDef(listOf(module)).build()
+        val game = UdeaGameDef(CoreUdeaRegistry, listOf(module)).build()
 
         val contextOnly = game.world.system<ContextOnlySystem>()
         val scoring = game.world.system<ScoringSystem>()
@@ -67,7 +68,7 @@ class SystemOrderTest {
             }
         }
 
-        val manifest = UdeaGameDef(listOf(EngineModule(), gameModule)).build().manifest
+        val manifest = UdeaGameDef(CoreUdeaRegistry, listOf(EngineModule(), gameModule)).build().manifest
         val order = manifest.entries.map { it.name }
 
         val ability = order.indexOf(EngineAbilitySystem::class.java.name)
@@ -94,7 +95,7 @@ class SystemOrderTest {
                     for (index in order) declare[index](registry)
                 }
             }
-            return UdeaGameDef(listOf(module)).build().manifest.render()
+            return UdeaGameDef(CoreUdeaRegistry, listOf(module)).build().manifest.render()
         }
 
         val forwards = manifestFor(listOf(0, 1, 2))
@@ -119,7 +120,7 @@ class SystemOrderTest {
             }
         }
 
-        val order = UdeaGameDef(listOf(module)).build().manifest.entries.map { it.name }
+        val order = UdeaGameDef(CoreUdeaRegistry, listOf(module)).build().manifest.entries.map { it.name }
         assertEquals(
             listOf(SecondSystem::class.java.name, FirstSystem::class.java.name),
             order.filter { it.endsWith("SecondSystem") || it.endsWith("FirstSystem") },
@@ -137,13 +138,13 @@ class SystemOrderTest {
             }
         }
 
-        val phases = UdeaGameDef(listOf(module)).build().manifest.entries.map { it.phase }
+        val phases = UdeaGameDef(CoreUdeaRegistry, listOf(module)).build().manifest.entries.map { it.phase }
         assertEquals(phases.sortedBy { it.ordinal }, phases, "phases run in ordinal order: $phases")
     }
 
     @Test
     fun `the manifest is readable back off the built world`() {
-        val game = UdeaGameDef(listOf(EngineModule()), config = EngineConfig(seed = 7L)).build()
+        val game = UdeaGameDef(CoreUdeaRegistry, listOf(EngineModule()), config = EngineConfig(seed = 7L)).build()
 
         assertEquals(
             game.manifest.render(),
@@ -170,7 +171,7 @@ class SystemOrderTest {
 
     @Test
     fun `the module list is a value, not a classpath scan`() {
-        val def = UdeaGameDef(listOf(EngineModule()))
+        val def = UdeaGameDef(CoreUdeaRegistry, listOf(EngineModule()))
 
         assertEquals(
             listOf("core", "EngineModule"),

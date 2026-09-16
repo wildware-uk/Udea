@@ -8,6 +8,7 @@ import com.badlogic.gdx.math.Matrix4
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
@@ -173,7 +174,7 @@ class GlCaptureDeterminismTest {
             registry,
         )
         try {
-            val host = GameHost(RenderMode.Offscreen, UdeaGameDef(modules = emptyList()), backend)
+            val host = GameHost(RenderMode.Offscreen, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()), backend)
             host.loop.paused = true
             backend.drive(host)
             block(backend, host, checkNotNull(scene) { "the scene was never constructed" })

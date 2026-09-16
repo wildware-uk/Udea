@@ -3,15 +3,15 @@ package dev.wildware.udea.agent.state
 import dev.wildware.udea.agent.AgentStateSource
 import dev.wildware.udea.agent.OwnerBinding
 import dev.wildware.udea.agent.StateModule
-import java.util.ServiceLoader
+import dev.wildware.udea.core.registry.UdeaRegistry
 
 /**
- * The [GameStateSource] over every generated `@AgentState` writer on the classpath.
+ * The [GameStateSource] over every generated `@AgentState` writer a game's registry lists.
  *
  * ## The seam this closes
  *
- * `udea-codegen` emits `object <Owner>AgentState : AgentStateSource<Owner>` and a
- * `<Module>StateModule` service entry; [StateDigest] takes a [GameStateSource]. The two were
+ * `udea-codegen` emits `object <Owner>AgentState : AgentStateSource<Owner>` and lists them on
+ * the module registry's `StateModule` facet; [StateDigest] takes a [GameStateSource]. The two were
  * generated and consumed with nothing in between, so `@AgentState` produced code that compiled,
  * loaded and never reached a digest. This is the join.
  *
@@ -59,12 +59,17 @@ public class AgentStateIndex private constructor(
         private val modules = ArrayList<StateModule>()
         private val instances = ArrayList<Any>()
 
-        /** Adds one module's state sources. Usually [discover] instead. */
+        /** Adds one module's state sources. Usually [registry] instead. */
         public fun module(module: StateModule): Builder = apply { modules.add(module) }
 
-        /** Adds every [StateModule] on [loader], as its `META-INF/services` entry declares it. */
-        public fun discover(loader: ClassLoader = AgentStateIndex::class.java.classLoader): Builder =
-            apply { ServiceLoader.load(StateModule::class.java, loader).forEach(modules::add) }
+        /**
+         * Adds every [StateModule] facet in [registry], in the registry's order.
+         *
+         * Order does not decide anything: [build] refuses a key two modules publish rather than
+         * letting one of them win.
+         */
+        public fun registry(registry: UdeaRegistry): Builder =
+            apply { registry.modules.filterIsInstanceTo<StateModule, _>(modules) }
 
         /** Registers the object whose `@AgentState` properties are being published. */
         public fun source(instance: Any): Builder = apply { instances.add(instance) }

@@ -8,8 +8,8 @@ import dev.wildware.udea.agent.Json
  *
  * ## Rendered once, at start-up
  *
- * The manifest is immutable for the life of a process — the tools come from `ServiceLoader` at
- * boot and nothing adds one later — so it is built once and the handler writes a `String`. That
+ * The manifest is immutable for the life of a process — the tools come from the index the host
+ * builds at boot and nothing adds one later — so it is built once and the handler writes a `String`. That
  * keeps the HTTP thread's work to a socket write, which matters because `/tools` is fetched on
  * every bridge reconnect and after every restart detection.
  *

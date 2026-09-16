@@ -250,7 +250,7 @@ This passes trivially while `moba` is empty, which is the point: it is a ratchet
 *before* Phase 2 has a reason to reach for `kotlin-scripting-jvm-host`. `common` pulls in five
 `kotlin-scripting-*` artifacts and `org.reflections:reflections` today, which is both a
 startup cost and the mechanism behind the reflection-on-hot-paths smell the rewrite exists to
-kill. Asset scripts are compiled at build time; discovery is codegen and `ServiceLoader`.
+kill. Asset scripts are compiled at build time; discovery is a generated registry.
 
 ## `UDEA-MG-006` — the runtime asset model is a leaf
 

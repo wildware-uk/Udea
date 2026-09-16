@@ -60,6 +60,7 @@ import dev.wildware.udea.core.snapshot.ComponentSchema
 import dev.wildware.udea.core.snapshot.FieldKind
 import dev.wildware.udea.core.snapshot.fleksComponentType
 import dev.wildware.udea.core.snapshot.snapshotTimeTravel
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.Path
@@ -155,6 +156,7 @@ public object Phase2Demo {
         val bridge = AgentBridge(resultSpill = artifacts.textSpill())
         val module = AssetProbeModule(registry)
         val definition = UdeaGameDef(
+            registry = CoreUdeaRegistry,
             modules = listOf(module),
             timeTravel = snapshotTimeTravel(registry()),
         )

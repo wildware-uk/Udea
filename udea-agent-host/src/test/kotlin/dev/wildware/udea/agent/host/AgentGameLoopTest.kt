@@ -13,6 +13,7 @@ import dev.wildware.udea.agent.tools.TimeToolset
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -37,7 +38,7 @@ class AgentGameLoopTest {
 
     private val bridge = AgentBridge()
 
-    private val host = GameHost(RenderMode.Headless, UdeaGameDef(modules = emptyList()))
+    private val host = GameHost(RenderMode.Headless, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()))
 
     private val digest = StateDigest(
         bridge = bridge,

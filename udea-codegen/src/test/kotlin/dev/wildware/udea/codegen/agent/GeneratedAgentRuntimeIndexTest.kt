@@ -10,6 +10,7 @@ import dev.wildware.udea.codegen.fixtures.MatchClock
 import dev.wildware.udea.codegen.fixtures.MatchPhase
 import dev.wildware.udea.codegen.fixtures.Playground
 import dev.wildware.udea.codegen.fixtures.Timeline
+import dev.wildware.udea.generated.CodegenFixturesUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -18,13 +19,13 @@ import kotlin.test.assertTrue
 /**
  * The whole agent seam, end to end, with nothing hand-written in the middle.
  *
- * `GeneratedAgentIndexServiceTest` proves `ServiceLoader` finds the generated indexes;
+ * `GeneratedAgentRegistryTest` proves the generated launcher registry lists the generated facets;
  * `GeneratedToolDispatchTest` proves a generated dispatcher converts its arguments. Neither
  * proves the two halves *join*: until `udea-agent` shipped `ToolIndex` and `AgentStateIndex`,
  * generated tools compiled, loaded, and could not be called by any shipped code, and generated
  * `@AgentState` writers could not reach a digest.
  *
- * So this test does what a host does and nothing else: discover through `ServiceLoader`, register
+ * So this test does what a host does and nothing else: take the generated registry, register
  * the instances, build, and call. Every type in the path is either generated here or declared in
  * `udea-agent`'s `src/main`.
  */
@@ -33,9 +34,13 @@ class GeneratedAgentRuntimeIndexTest {
     @Test
     fun `a discovered tool module dispatches to the toolset a host registered`() {
         val playground = Playground()
-        // Two toolsets, because that is the shape a host is actually in: one `ServiceLoader`
-        // index naming tools from several declaring classes, and a receiver resolved per tool.
-        val index = ToolIndex.builder().discover().toolset(playground).toolset(Timeline()).build()
+        // Two toolsets, because that is the shape a host is actually in: one module's `ToolModule`
+        // facet naming tools from several declaring classes, and a receiver resolved per tool.
+        val index = ToolIndex.builder()
+            .registry(CodegenFixturesUdeaRegistry)
+            .toolset(playground)
+            .toolset(Timeline())
+            .build()
 
         assertEquals(listOf("CodegenFixtures"), index.moduleNames)
         assertEquals(
@@ -61,7 +66,7 @@ class GeneratedAgentRuntimeIndexTest {
         // `AgentToolDef<*>` and still find the right receiver, and an emitter that wrote the
         // wrong class here would fail only at a call, with a ClassCastException.
         val tools = ToolIndex.builder()
-            .discover()
+            .registry(CodegenFixturesUdeaRegistry)
             .toolset(Playground())
             .toolset(Timeline())
             .build()
@@ -83,7 +88,7 @@ class GeneratedAgentRuntimeIndexTest {
         val clock = MatchClock()
         clock.phase = MatchPhase.Running
         clock.elapsedTicks = 91
-        val index = AgentStateIndex.builder().discover().source(health).source(clock).build()
+        val index = AgentStateIndex.builder().registry(CodegenFixturesUdeaRegistry).source(health).source(clock).build()
 
         val sink = RecordingSink()
         index.publish(sink)
@@ -99,7 +104,7 @@ class GeneratedAgentRuntimeIndexTest {
     @Test
     fun `the digest keys the index reports are the ones the generated sources declare`() {
         val index = AgentStateIndex.builder()
-            .discover()
+            .registry(CodegenFixturesUdeaRegistry)
             .source(Health())
             .source(MatchClock())
             .build()

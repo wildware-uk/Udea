@@ -10,28 +10,32 @@ import dev.wildware.udea.codegen.fixtures.PlaygroundSpawnBlueprintTool
 import dev.wildware.udea.codegen.fixtures.PlaygroundTagEntityTool
 import dev.wildware.udea.codegen.fixtures.TimelineAdvanceTool
 import dev.wildware.udea.codegen.fixtures.TimelineDescribeTool
-import java.util.ServiceLoader
+import dev.wildware.udea.diagnostics.UdeaRules
+import dev.wildware.udea.generated.CodegenFixturesUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
- * The two generated indexes, loaded through a **real** `ServiceLoader` off a real classpath.
+ * The two agent facets, reached through the **generated** launcher registry (issue #202).
  *
- * Nothing less proves this mechanism. An index that is substring-matched in a generated file
- * can name a service that does not exist, or be emitted as a Kotlin `object` whose constructor
- * `ServiceLoader` cannot call — both compile, and both fail on first use at run time with a
- * green build. That exact mistake was found in the `NetModule` half only when a test loaded it;
- * so the agent half is loaded here on day one rather than after it has shipped.
+ * Nothing less proves this mechanism. A facet that is substring-matched in a generated file can
+ * name an interface that does not exist, or a member that does not implement it - both are
+ * caught only by compiling the registry and reading it back, which is what this does.
+ *
+ * `udea-agent` is on this module's test classpath too, and its own registry deliberately has no
+ * `ToolModule` facet (see `EngineToolModules`), so the fixtures are the only tool module here.
  */
-class GeneratedAgentIndexServiceTest {
+class GeneratedAgentRegistryTest {
+
+    private val toolModules: List<ToolModule> = CodegenFixturesUdeaRegistry.modules.filterIsInstance<ToolModule>()
+
+    private val stateModules: List<StateModule> = CodegenFixturesUdeaRegistry.modules.filterIsInstance<StateModule>()
 
     @Test
-    fun `ServiceLoader finds this module's ToolModule and it names every tool statically`() {
-        val modules = ServiceLoader.load(ToolModule::class.java).toList()
-
-        assertEquals(listOf("CodegenFixtures"), modules.map { it.moduleName })
+    fun `the registry lists this module's ToolModule and it names every tool statically`() {
+        assertEquals(listOf("CodegenFixtures"), toolModules.map { it.moduleName })
         // Ascending name, which is the order the merged manifest and the dispatch map are both
         // built in, so no consumer has to sort.
         assertEquals(
@@ -46,40 +50,38 @@ class GeneratedAgentIndexServiceTest {
                 PlaygroundSpawnBlueprintTool,
                 PlaygroundTagEntityTool,
             ),
-            modules.single().tools,
+            toolModules.single().tools,
         )
         assertEquals(
             listOf(
                 "set_overlays", "set_stance", "sim.advance", "sim.describe",
                 "spawn_blueprint", "tag_entity",
             ),
-            modules.single().tools.map { it.name },
+            toolModules.single().tools.map { it.name },
         )
     }
 
     @Test
-    fun `ServiceLoader finds this module's StateModule and it names every digest source`() {
-        val modules = ServiceLoader.load(StateModule::class.java).toList()
-
-        assertEquals(listOf("CodegenFixtures"), modules.map { it.moduleName })
-        assertEquals(listOf(HealthAgentState, MatchClockAgentState), modules.single().states)
+    fun `the registry lists this module's StateModule and it names every digest source`() {
+        assertEquals(listOf("CodegenFixtures"), stateModules.map { it.moduleName })
+        assertEquals(listOf(HealthAgentState, MatchClockAgentState), stateModules.single().states)
     }
 
     @Test
-    fun `the index hands back the same singletons the generated objects are`() {
+    fun `the facet hands back the same singletons the generated objects are`() {
         // Static naming, not construction: R8 keeps these because they are genuinely referenced,
         // and resolution costs a class-load rather than a reflective lookup.
-        val tools = ServiceLoader.load(ToolModule::class.java).single().tools
+        val tools = toolModules.single().tools
         assertSame(PlaygroundSpawnBlueprintTool, tools.single { it.name == "spawn_blueprint" })
     }
 
     @Test
-    fun `every tool the index publishes has a description a model can act on`() {
+    fun `every tool the facet publishes has a description a model can act on`() {
         // The description gate is a build error, so this cannot fail while the gate works - and
         // that is the point: it fails the moment somebody weakens the gate.
-        for (tool in ServiceLoader.load(ToolModule::class.java).single().tools) {
+        for (tool in toolModules.single().tools) {
             assertTrue(
-                tool.description.length >= dev.wildware.udea.diagnostics.UdeaRules.MIN_TOOL_DESCRIPTION,
+                tool.description.length >= UdeaRules.MIN_TOOL_DESCRIPTION,
                 "${tool.name} is described in ${tool.description.length} characters",
             )
         }
@@ -87,7 +89,7 @@ class GeneratedAgentIndexServiceTest {
 
     @Test
     fun `no digest key is published twice across the module's state sources`() {
-        val names = ServiceLoader.load(StateModule::class.java).single().states.flatMap { it.names }
+        val names = stateModules.single().states.flatMap { it.names }
 
         assertEquals(names.size, names.toSet().size, "duplicate digest keys in $names")
     }

@@ -1,8 +1,10 @@
 import dev.wildware.udea.build.ReleaseRules
+import dev.wildware.udea.build.UdeaModuleRegistry
 import dev.wildware.udea.build.UdeaNetComponents
 import dev.wildware.udea.build.UdeaVerifyReleaseTask
 import dev.wildware.udea.build.registerCharacterArtStaging
 import dev.wildware.udea.build.registerNetProtocolLock
+import dev.wildware.udea.build.udeaModule
 import dev.wildware.udea.gradle.UdeaAgentPlugin
 
 plugins {
@@ -17,7 +19,7 @@ plugins {
     id("com.google.devtools.ksp") version libs.versions.ksp.get()
 
     // Level files (issue #191): every component a match holds is `@Serializable`, and the same
-    // KSP run above lists them in the generated `MobaLevelComponents`.
+    // KSP run above lists them on the generated `MobaModuleRegistry`.
     alias(libs.plugins.kotlinSerialization)
 
     // The plugin that was unreachable until now: it had a class and no id, no project applied it,
@@ -220,8 +222,16 @@ val projectComponents: Provider<String> =
             }
         }
 
+/**
+ * This game's launcher registry (issue #202): `MobaUdeaRegistry` names the registry of this module
+ * and of every Udea module on its runtime classpath, read off the resolved graph rather than
+ * written down a second time.
+ */
+val udeaRegistry = udeaModule("Moba")
+
 ksp {
-    arg("udea.moduleName", "Moba")
+    arg(UdeaModuleRegistry.MODULE_NAME_OPTION, udeaRegistry.name)
+    arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
     arg(UdeaNetComponents.KSP_OPTION, projectComponents.get())
 }
 

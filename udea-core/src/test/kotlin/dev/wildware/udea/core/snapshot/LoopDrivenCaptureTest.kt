@@ -15,6 +15,7 @@ import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.module.UdeaModule
 import dev.wildware.udea.core.scene.Scene
 import dev.wildware.udea.core.scene.SceneScope
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -232,6 +233,7 @@ class LoopDrivenCaptureTest {
         config: EngineConfig = EngineConfig(seed = SEED),
     ): UdeaGameDef {
         val definition = UdeaGameDef(
+            registry = CoreUdeaRegistry,
             modules = listOf(ArenaModule()),
             config = config,
             timeTravel = if (travel) {

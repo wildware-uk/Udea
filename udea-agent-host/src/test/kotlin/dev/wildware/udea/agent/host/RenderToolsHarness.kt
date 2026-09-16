@@ -13,6 +13,7 @@ import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Future
 import kotlin.test.assertEquals
@@ -43,7 +44,7 @@ internal class RenderToolsHarness(
 
     val bridge = AgentBridge()
 
-    val host = GameHost(mode, UdeaGameDef(modules = emptyList()))
+    val host = GameHost(mode, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()))
 
     val toolset = RenderToolset(mode, control, artifacts)
 

@@ -1,6 +1,8 @@
+import dev.wildware.udea.build.UdeaModuleRegistry
 import dev.wildware.udea.build.UdeaNetComponents
 import dev.wildware.udea.build.UdeaVersions
 import dev.wildware.udea.build.registerNetProtocolLock
+import dev.wildware.udea.build.udeaRegistryModules
 
 plugins {
     id("udea.kotlin-build-tool")
@@ -46,8 +48,8 @@ dependencies {
     // written against udea-agent's own `AgentToolDef`, `ToolModule`, `AgentCommand`,
     // `BadArgumentException`, `AgentStateSource`, `StateModule` and `GameStateSink` - all of
     // them real declarations in udea-agent's src/main, none of them stand-ins this module
-    // invented. That is what lets GeneratedAgentIndexServiceTest load the generated indexes
-    // through a real ServiceLoader and drive them through the real `ToolIndex` and
+    // invented. That is what lets GeneratedAgentRegistryTest reach the generated facets through
+    // the generated launcher registry and drive them through the real `ToolIndex` and
     // `AgentStateIndex`, which is the only form of proof this mechanism accepts.
     // Nothing in src/main depends on udea-agent, so this adds no edge to the module graph.
     testImplementation(project(":udea-agent"))
@@ -60,17 +62,18 @@ dependencies {
 }
 
 // The module-level outputs — the `…NetProtocol` constant, `<Module>-net-protocol.lock` and the
-// `ServiceLoader` index — are gated on these options, so a module that is only having its
-// Replicators generated emits none of them. Setting them here is what makes the fixture source
-// set exercise the aggregating path for real: the generated protocol object *and the generated
-// index* are compiled by `compileTestKotlin` like any other output, under `-Werror`.
+// two registries — are gated on these options, so a module that is only having its Replicators
+// generated emits none of them. Setting them here is what makes the fixture source set exercise
+// the aggregating path for real: the generated protocol object *and the generated registries* are
+// compiled by `compileTestKotlin` like any other output, under `-Werror`.
 //
 // `udea.netModuleService` used to be deliberately unset, and that was the hole: the emitted
 // index was only ever substring-matched, so it went unnoticed that the service it named was an
 // internal `object` and every generated index would have failed to compile. udea-net is already
 // on this module's test compile *and* runtime classpath, so pointing the option at the real
-// interface makes `GeneratedNetModuleServiceTest` load the index through `ServiceLoader` and
-// get the replicators back — which is the only form of proof this mechanism accepts.
+// interface makes `GeneratedModuleRegistryTest` reach the `NetModule` facet through the generated
+// launcher registry and get the replicators back — which is the only form of proof this
+// mechanism accepts.
 //
 // `udea.projectComponents` is the third and it is not optional: a module that emits protocol
 // identity must be numbered from the *project's* id space, or its `ComponentTypeId(0)` is also
@@ -87,12 +90,15 @@ val projectComponents: Provider<String> =
         }
 
 ksp {
-    arg("udea.moduleName", MODULE_NAME)
+    arg(UdeaModuleRegistry.MODULE_NAME_OPTION, MODULE_NAME)
+    // The launcher list for the fixtures, read off the test runtime classpath the fixture tests
+    // run on. Not `udeaModule`: that would stamp `CodegenFixtures` on the processor jar's own
+    // variants, and put a module whose registry lives in test output into other launchers' lists.
+    arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistryModules(MODULE_NAME, "testRuntimeClasspath"))
     arg("udea.netModuleService", "dev.wildware.udea.net.NetModule")
-    // The agent surface's two ServiceLoader services, declared by udea-agent and on this
-    // module's test compile *and* runtime classpath. Naming them here is what makes the
-    // generated indexes compile and load through a real ServiceLoader, which is the only form
-    // of proof this mechanism accepts.
+    // The agent surface's two facet interfaces, declared by udea-agent and on this module's test
+    // compile *and* runtime classpath. Naming them here is what makes the generated registry
+    // implement them and compile, which is the only form of proof this mechanism accepts.
     arg("udea.toolModuleService", "dev.wildware.udea.agent.ToolModule")
     arg("udea.stateModuleService", "dev.wildware.udea.agent.StateModule")
     arg(UdeaNetComponents.KSP_OPTION, projectComponents.get())

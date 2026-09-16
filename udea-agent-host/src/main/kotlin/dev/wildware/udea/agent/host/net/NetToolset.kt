@@ -613,10 +613,10 @@ public object NetCloseSessionTool : AgentToolDef<NetToolset> {
 /**
  * The `net.*` toolset as a [ToolModule] a host registers.
  *
- * Assembled by hand rather than discovered through `ServiceLoader`, for the reason
+ * Assembled by hand rather than listed on a generated registry, for the reason
  * `EngineToolModules` gives: `ToolIndex.Builder.build` refuses a tool whose toolset was never
- * registered, so a service entry would turn every process with this module on its classpath into
- * a start-up failure unless it wired a [NetToolset]. A host that wants the session tools adds
+ * registered, so a generated `ToolModule` facet would turn every game whose registry lists this
+ * module into a start-up failure unless it wired a [NetToolset]. A host that wants the session tools adds
  * this module and registers the instance; one that does not gets neither, and its manifest then
  * advertises no capability it cannot serve.
  */

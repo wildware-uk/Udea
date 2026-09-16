@@ -70,6 +70,7 @@ class ProjectIdSpaceTest {
         mapOf(source),
         buildMap {
             put(CodegenOptions.MODULE_NAME, moduleName)
+            put(CodegenOptions.REGISTRY_MODULES, moduleName)
             if (project != null) {
                 put(CodegenOptions.PROJECT_COMPONENTS, project.joinToString(","))
             }
@@ -131,7 +132,7 @@ class ProjectIdSpaceTest {
     ) {
         // The one configuration where module-local ids are legal, and the reason the refusal
         // above is keyed on `udea.moduleName` rather than on there being components at all:
-        // with no module name there is no lock, no protoHash and no ServiceLoader index, so
+        // with no module name there is no lock, no protoHash and no registry, so
         // the module contributes nothing to any protocol and its ids reach no wire.
         val run = ProcessorHarness.run(workDir, mapOf(gas))
 

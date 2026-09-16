@@ -21,6 +21,7 @@ import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.replication.FieldStore
 import dev.wildware.udea.core.replication.MaskOps
 import dev.wildware.udea.core.replication.Replicator
+import dev.wildware.udea.generated.CodegenFixturesUdeaRegistry
 import dev.wildware.udea.net.NetRegistry
 import dev.wildware.udea.net.bits.BitBufferReader
 import dev.wildware.udea.net.bits.BitBufferWriter
@@ -99,8 +100,8 @@ class GeneratedReplicatorNetRoundTripTest {
 
     @Test
     fun `every generated replicator round-trips through the real bit stream`() {
-        // Driven from a list, and the list is audited against the generated `ServiceLoader`
-        // index below, so a seventh fixture component cannot be added without appearing here.
+        // Driven from a list, and the list is audited against the generated registry's
+        // `NetModule` facet below, so a seventh fixture component cannot be added without appearing here.
         // This used to name Health, Movement and AiBlackboard while claiming "every": the
         // three components with no composite, no NetId and no quantised field — that is,
         // exactly the three whose encoding is least likely to be wrong.
@@ -115,7 +116,7 @@ class GeneratedReplicatorNetRoundTripTest {
         // generated from the fixture source set, so it is the one list that cannot fall behind
         // the components.
         assertEquals(
-            NetRegistry.replicators().map { it.typeId.raw },
+            NetRegistry.replicators(NetRegistry.modules(CodegenFixturesUdeaRegistry)).map { it.typeId.raw },
             subjects.map { it.replicator.typeId.raw }.sorted(),
             "a fixture component is generated but never driven through the bit stream",
         )
@@ -300,7 +301,7 @@ class GeneratedReplicatorNetRoundTripTest {
     /**
      * Every fixture component, with a source value chosen to exercise its own field kinds.
      *
-     * The list is audited against the generated `ServiceLoader` index, so it is a coverage
+     * The list is audited against the generated registry's `NetModule` facet, so it is a coverage
      * claim the build can check rather than one a test name asserts.
      */
     private val subjects: List<Subject<*>> by lazy {

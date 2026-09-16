@@ -9,23 +9,21 @@ import kotlin.test.assertTrue
 import org.junit.jupiter.api.io.TempDir
 
 /**
- * Cross-module discovery: one generated index object per module, plus the `META-INF/services`
- * line that lets `ServiceLoader` find it.
+ * A module's protocol identity: the protocol constant, the lock, and names that never vary.
  *
  * **What this replaces.** The old generator listed a module's serializers by writing them as a
  * semicolon-joined string into an annotation on a class in the magic package
  * `dev.wildware._serializer_`, under a name containing `System.currentTimeMillis()`; read them
  * back with `Resolver.getDeclarationsFromPackage`; and, at run time, fell back to an
  * `org.reflections` classpath scan. None of that survives R8, none of it is deterministic, and
- * the timestamped name is why KSP incremental processing was off repository-wide.
+ * the timestamped name is why KSP incremental processing was off repository-wide. What lists a
+ * module's contributions now is its generated registry, and [ModuleRegistryTest] covers it.
  *
  * These tests run the real processor over throwaway sources, because the thing under test is
- * what the processor *emits* for a module — a file set and a resource path — and the fixture
+ * what the processor *emits* for a module - a file set and a resource path - and the fixture
  * source set can only show the configuration it is itself built with.
  */
 class ModuleIndexTest {
-
-    private val service = "dev.wildware.udea.net.NetModule"
 
     private fun sources(): Map<String, String> = mapOf(
         "Components.kt" to """
@@ -46,7 +44,8 @@ class ModuleIndexTest {
      * @param components the project's id space, which the build reads from the reviewed
      *   `net-components.lock` and which the processor requires of any module emitting a
      *   protocol. Supplied here whenever `udea.moduleName` is, exactly as the build does, so
-     *   these tests run the configuration a real module runs in and not a fallback.
+     *   these tests run the configuration a real module runs in and not a fallback. So is the
+     *   launcher list, which `udeaModule` always sets beside the name - here, the module alone.
      */
     private fun run(
         workDir: File,
@@ -57,56 +56,16 @@ class ModuleIndexTest {
         workDir,
         sources,
         if (CodegenOptions.MODULE_NAME in options) {
-            options + (CodegenOptions.PROJECT_COMPONENTS to components.joinToString(","))
+            options + mapOf(
+                CodegenOptions.PROJECT_COMPONENTS to components.joinToString(","),
+                CodegenOptions.REGISTRY_MODULES to options.getValue(CodegenOptions.MODULE_NAME),
+            )
         } else {
             options
         },
     )
 
-    // --- the index and its service file ------------------------------------------------------
-
-    @Test
-    fun `a module emits one index class naming its replicators statically`(@TempDir workDir: File) {
-        val run = run(
-            workDir,
-            mapOf(
-                CodegenOptions.MODULE_NAME to "Moba",
-                CodegenOptions.NET_MODULE_SERVICE to service,
-            ),
-        )
-
-        assertEquals(emptyList(), run.errors)
-        val index = run.generatedSource("MobaNetModule.kt")
-        // A class, not an object: ServiceLoader constructs a classpath provider through its
-        // public no-arg constructor, which a Kotlin object does not have.
-        // `GeneratedNetModuleServiceTest` is the leg that actually loads one.
-        assertTrue("public class MobaNetModule : NetModule" in index, index)
-        assertTrue("moduleName: String = \"Moba\"" in index, index)
-        // Ascending type id, which is ascending name: Aardvark is 0 and Zebra is 1.
-        assertTrue(
-            "listOf(AardvarkReplicator, ZebraReplicator)" in index,
-            "the index must name its members statically, in id order:\n$index",
-        )
-    }
-
-    @Test
-    fun `the service resource is at the path ServiceLoader actually reads`(@TempDir workDir: File) {
-        // The one assertion that catches the mistake with no symptom: a services file written
-        // one directory out loads nothing, silently, with a green build.
-        val run = run(
-            workDir,
-            mapOf(
-                CodegenOptions.MODULE_NAME to "Moba",
-                CodegenOptions.NET_MODULE_SERVICE to service,
-            ),
-        )
-
-        assertEquals(
-            "dev.wildware.udea.generated.MobaNetModule\n",
-            run.generatedResources["META-INF/services/$service"],
-            "generated resources were ${run.generatedResources.keys}",
-        )
-    }
+    // --- names ------------------------------------------------------------------------------
 
     @Test
     fun `no generated name or resource path carries a timestamp or any other varying part`(
@@ -115,7 +74,7 @@ class ModuleIndexTest {
     ) {
         val options = mapOf(
             CodegenOptions.MODULE_NAME to "Moba",
-            CodegenOptions.NET_MODULE_SERVICE to service,
+            CodegenOptions.NET_MODULE_SERVICE to "dev.wildware.udea.net.NetModule",
         )
         val a = run(first, options)
         val b = run(second, options)
@@ -287,23 +246,6 @@ class ModuleIndexTest {
     }
 
     @Test
-    fun `the index is emitted only when the module actually has the service on its classpath`(
-        @TempDir workDir: File,
-    ) {
-        // Generated code may only implement an interface that exists. Emitting the index
-        // unconditionally would make every module that contributes a component fail to compile
-        // unless it depended on udea-net.
-        val run = run(workDir, mapOf(CodegenOptions.MODULE_NAME to "Moba"))
-
-        assertEquals(emptyList(), run.errors)
-        assertFalse(
-            run.generatedFiles.any { it.name == "MobaNetModule.kt" },
-            "the index must not be emitted without ${CodegenOptions.NET_MODULE_SERVICE}",
-        )
-        assertTrue(run.generatedResources.keys.none { it.startsWith("META-INF/") })
-    }
-
-    @Test
     fun `a module name that cannot be part of an object name fails the build, naming the rule`(
         @TempDir workDir: File,
     ) {
@@ -323,8 +265,7 @@ class ModuleIndexTest {
     ) {
         // The path with no `@Replicated` components did no name validation of its own and
         // answered a malformed name with a bare `return`: the tool dispatchers were generated,
-        // the ToolModule index, the META-INF/services line and the manifest were not, and no
-        // diagnostic said so anywhere. That is a tool that compiles and that nothing can
+        // the module's tool index and the manifest were not, and no diagnostic said so anywhere. That is a tool that compiles and that nothing can
         // discover - the exact state the agent surface exists to make impossible.
         val run = ProcessorHarness.run(
             workDir,

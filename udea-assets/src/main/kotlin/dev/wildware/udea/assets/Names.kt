@@ -7,8 +7,8 @@ package dev.wildware.udea.assets
  * Authored data names code, and this is the only way it is allowed to. The old tree resolved such
  * names with `Class.forName(className).kotlin` (`common/.../classes.kt`), which is reflection on a
  * load path and a `ClassNotFoundException` for a renamed class. Here the name is data, and turning
- * it into something callable is the loader's job, through generated registries and `ServiceLoader`
- * (standards section 1: discovery happens at build time).
+ * it into something callable is the loader's job, through generated registries (standards
+ * section 1: discovery happens at build time).
  */
 @JvmInline
 public value class TypeName(public val value: String) {

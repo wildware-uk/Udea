@@ -153,6 +153,7 @@ class GeneratedVisibilityTest {
             ),
             mapOf(
                 "udea.moduleName" to "Fixtures",
+                "udea.registryModules" to "Fixtures",
                 "udea.projectComponents" to "fixtures.Spawned",
             ),
         )
@@ -172,6 +173,7 @@ class GeneratedVisibilityTest {
             ),
             mapOf(
                 "udea.moduleName" to "Fixtures",
+                "udea.registryModules" to "Fixtures",
                 "udea.projectComponents" to "fixtures.Spawned",
             ),
         )
@@ -207,6 +209,7 @@ class GeneratedVisibilityTest {
             ),
             mapOf(
                 "udea.moduleName" to "Fixtures",
+                "udea.registryModules" to "Fixtures",
                 "udea.projectComponents" to "fixtures.Spawned",
             ),
         )

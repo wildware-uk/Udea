@@ -475,13 +475,13 @@ public class RenderToolset(
  * The tools this module publishes, as a [ToolModule].
  *
  * Hand-written rather than emitted by KSP, for the reason [CompareArtifactsTool] gives. It is
- * **not** a `ServiceLoader` entry: a host registers it explicitly, because the toolsets it names
+ * **not** on a generated registry: a host registers it explicitly, because the toolsets it names
  * need constructor arguments the host owns - the artifact store, the render mode, the renderer -
- * and a service entry cannot be handed any of them.
+ * and a generated list cannot be handed any of them.
  *
  * ```
  * val index = ToolIndex.builder()
- *     .discover()                                    // the generated modules
+ *     .registry(MobaUdeaRegistry)                    // the generated modules
  *     .module(AgentHostTools)                        // this one
  *     .toolset(ArtifactToolset(artifacts))
  *     .toolset(RenderToolset(mode, control, artifacts))

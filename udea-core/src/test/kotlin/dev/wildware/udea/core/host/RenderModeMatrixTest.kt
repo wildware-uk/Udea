@@ -7,6 +7,7 @@ import dev.wildware.udea.core.module.UdeaGame
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.scene.Marker
 import dev.wildware.udea.core.scene.MarkerScene
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -47,7 +48,7 @@ class RenderModeMatrixTest {
 
     private fun host(mode: RenderMode, factory: PresentationFactory?): GameHost {
         val scene = MarkerScene(SceneId("arena"), seed = 909L, entityCount = 25)
-        val def = UdeaGameDef(emptyList())
+        val def = UdeaGameDef(CoreUdeaRegistry, emptyList())
         def.core.scenes.register(scene)
         val host = GameHost(mode, def, factory)
         host.ctx.scenes.requestScene(scene.id)

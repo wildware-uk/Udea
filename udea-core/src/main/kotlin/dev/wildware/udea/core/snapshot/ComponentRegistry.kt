@@ -165,8 +165,8 @@ public inline fun <reified T> fleksComponentType(
  * Canonical order is **ascending [ComponentTypeId]**, and the registry sorts rather than
  * trusts its input. That is the same reason spec 5 assigns ids from sorted FQNs in one
  * generator: two independently built processes — a server and a client, or two CI machines —
- * must lay out and hash a world identically no matter what order their `ServiceLoader`
- * happened to discover modules in. [WorldHasher] walks this order, so an unstable registry
+ * must lay out and hash a world identically no matter what order their launchers happened to
+ * list modules in. [WorldHasher] walks this order, so an unstable registry
  * would present as a determinism failure with no cause anywhere near it.
  *
  * The dense [indexOf] mapping exists because a `ComponentTypeId` is sparse — ids come from a

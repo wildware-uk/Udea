@@ -15,6 +15,7 @@ import dev.wildware.udea.agent.tools.LifecycleToolset
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -44,7 +45,7 @@ internal class LiveInstance(
 
     val bridge: AgentBridge = AgentBridge()
 
-    private val host: GameHost = GameHost(RenderMode.Headless, UdeaGameDef(modules = emptyList()))
+    private val host: GameHost = GameHost(RenderMode.Headless, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()))
 
     val shutdown: HostShutdown = HostShutdown()
 

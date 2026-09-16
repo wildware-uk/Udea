@@ -49,11 +49,11 @@ public class LevelService internal constructor(
     private val ctx: GameContext,
     private val netIds: NetIdIndex,
     private val hooks: LevelHooks,
-    modules: () -> List<LevelComponentModule> = { LevelComponentModule.discover() },
+    modules: () -> List<LevelComponentModule>,
 ) {
 
-    // Lazy, so building a game - which every test does, many times - never pays for a classpath
-    // service lookup and a serializers module it will not use.
+    // Lazy, so building a game - which every test does, many times - never pays for a
+    // serializers module it will not use.
     private val format: LevelFormat by lazy { LevelFormat(modules(), hooks) }
 
     private val streams: CapturableRng

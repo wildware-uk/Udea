@@ -35,9 +35,9 @@ import kotlin.test.assertTrue
  * If the emitter's shape moves - a keyword added, a default rendered differently - this fails
  * here, naming the tool, instead of this module publishing last year's dialect for ever.
  *
- * They are named one by one rather than found through `ServiceLoader`, because `udea-agent`
- * publishes no `ToolModule` service of its own - a host registers its generated tools explicitly -
- * so a loader-driven version of this test would find nothing and pass. [GENERATED] is chosen to
+ * They are named one by one rather than read off a generated registry, because `udea-agent`'s
+ * registry has no `ToolModule` facet - a host registers its generated tools explicitly - so a
+ * registry-driven version of this test would find nothing and pass. [GENERATED] is chosen to
  * cover every shape the builder has to reproduce: no arguments at all, required arguments,
  * an optional with a default, and an optional without one.
  */

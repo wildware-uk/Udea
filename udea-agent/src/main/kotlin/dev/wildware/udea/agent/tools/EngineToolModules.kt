@@ -26,20 +26,20 @@ import dev.wildware.udea.agent.dispatch.ToolIndex
  * at all: they must run outside the barrier drain they were called in, and the only way to do
  * that and still answer is `AgentContext.answerLater`.
  *
- * ## Why these are still not `META-INF/services` entries
+ * ## Why these are still not on the generated registry's `ToolModule` facet
  *
- * The generated `ToolModule` index is emitted only when the build sets
- * `udea.toolModuleService`, and `udea-agent`'s own build deliberately does not. Every *other*
- * generated `ToolModule` is discovered through `ServiceLoader` because a generated tool's
- * declaring class is a game type the host constructs anyway. These four are the opposite: a
- * [WorldToolset] needs the `World`, the component index and the `NetIdIndex`; a [TimeToolset]
- * needs the `TimeControl`. Only the host can build one.
+ * A module registry implements `ToolModule` only when the build sets `udea.toolModuleService`,
+ * and `udea-agent`'s own build deliberately does not. Every *other* generated `ToolModule` is
+ * reached through the launcher's `UdeaRegistry` because a generated tool's declaring class is a
+ * game type the host constructs anyway. These four are the opposite: a [WorldToolset] needs the
+ * `World`, the component index and the `NetIdIndex`; a [TimeToolset] needs the `TimeControl`.
+ * Only the host can build one.
  *
  * `ToolIndex.Builder.build` refuses a tool whose toolset was never registered - deliberately, so
  * a misconfigured host fails at start-up instead of answering `no_such_tool` weeks later. A
- * service entry for these would therefore turn *every* process with `udea-agent` on its
- * classpath into a start-up failure unless it wired all four, including `udea-codegen`'s own
- * `ServiceLoader` fixture tests, which register a `Playground` and nothing else. So the modules
+ * facet for these would therefore turn *every* game whose registry lists `udea-agent` into a
+ * start-up failure unless it wired all four, including `udea-codegen`'s own fixture tests, which
+ * register a `Playground` and nothing else. So the modules
  * are assembled here by hand, one per toolset, and a host that wires only two gets exactly
  * those two.
  *
@@ -152,8 +152,8 @@ public object EngineToolModules {
                 is LifecycleToolset -> Lifecycle
                 else -> throw IllegalArgumentException(
                     "${toolset::class.qualifiedName} is not an engine toolset; register a " +
-                        "generated module's toolset with ToolIndex.Builder.toolset and let " +
-                        "ServiceLoader find its ToolModule",
+                        "generated module's toolset with ToolIndex.Builder.toolset and add " +
+                        "its ToolModule with ToolIndex.Builder.registry",
                 )
             }
             builder.module(module)

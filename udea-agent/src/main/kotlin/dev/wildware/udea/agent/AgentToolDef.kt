@@ -66,12 +66,13 @@ public interface AgentToolDef<in T> {
 }
 
 /**
- * One Gradle module's contribution to the agent's tool surface, found through `ServiceLoader`.
+ * One Gradle module's contribution to the agent's tool surface: the facet a generated module
+ * registry implements to list its tools (issue #202).
  *
  * The same mechanism `NetModule` uses and for the same reason: tools live in engine modules, a
- * shared module and the game at once, and no single KSP round sees them all. ServiceLoader
- * discovery is what lets `moba` declare a toolset without `udea-agent` knowing the game exists,
- * with no magic package and no classpath scan.
+ * shared module and the game at once, and no single KSP round sees them all. The launcher's
+ * generated `UdeaRegistry` is what lets `moba` declare a toolset without `udea-agent` knowing the
+ * game exists, with no magic package and no classpath scan.
  */
 public interface ToolModule {
 

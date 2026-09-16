@@ -12,9 +12,9 @@ import com.squareup.kotlinpoet.ClassName
  * ## The shape this pins
  *
  * Generated code can only implement an interface that already exists on the module's own
- * compile classpath, so emission of each index is gated on the build telling the processor
- * that the service is there — `udea.toolModuleService` and `udea.stateModuleService`, exactly
- * as `udea.netModuleService` gates the `NetModule` index. The remaining names below are not
+ * compile classpath, so each facet of the module registry is gated on the build telling the
+ * processor that the interface is there — `udea.toolModuleService` and `udea.stateModuleService`,
+ * exactly as `udea.netModuleService` gates the `NetModule` facet. The remaining names below are not
  * gated, because they are members of the same one contract that ships with the service: a
  * module that has `ToolModule` has `AgentToolDef` and `AgentToolArg` too.
  *
@@ -23,8 +23,8 @@ import com.squareup.kotlinpoet.ClassName
  * depend on it in either direction: `udea-codegen` runs inside the Kotlin compiler and anything
  * it declared would land on every consumer's annotation-processor classpath, so the names stay
  * `ClassName`s. `udea-agent` is on this module's *test* classpath, which is what lets the
- * generated code here be compiled, `ServiceLoader`-loaded and dispatched through the real
- * `ToolIndex` rather than through a stand-in.
+ * generated code here be compiled, reached through the generated registry and dispatched through
+ * the real `ToolIndex` rather than through a stand-in.
  */
 internal object AgentNames {
     const val PACKAGE: String = "dev.wildware.udea.agent"

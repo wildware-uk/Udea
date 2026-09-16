@@ -19,6 +19,7 @@ import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.module.UdeaModule
 import dev.wildware.udea.core.scene.Scene
 import dev.wildware.udea.core.scene.SceneScope
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -271,7 +272,7 @@ class BlueprintSpawnerTest {
     ) {
         private val module = SpawnModule(spawnFromSystemAtTick)
 
-        private val definition = UdeaGameDef(modules = listOf(module))
+        private val definition = UdeaGameDef(registry = CoreUdeaRegistry, modules = listOf(module))
 
         val barrier = definition.core.barrier
         val netIds: NetIdIndex = definition.core.netIds

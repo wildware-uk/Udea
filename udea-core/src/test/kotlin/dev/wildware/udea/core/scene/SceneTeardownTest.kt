@@ -14,6 +14,7 @@ import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.snapshot.RingConfig
 import dev.wildware.udea.core.snapshot.SnapshotRing
 import dev.wildware.udea.core.snapshot.TestComponents
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -44,7 +45,7 @@ class SceneTeardownTest {
     }
 
     private class Setup(vararg scenes: MarkerScene) {
-        val def = UdeaGameDef(emptyList())
+        val def = UdeaGameDef(CoreUdeaRegistry, emptyList())
         val host: GameHost
 
         init {

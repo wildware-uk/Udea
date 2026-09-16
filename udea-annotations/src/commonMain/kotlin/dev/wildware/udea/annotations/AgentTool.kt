@@ -4,8 +4,8 @@ package dev.wildware.udea.annotations
  * Marks a function as one tool on the agent's MCP surface.
  *
  * Consumed by the **`udea-codegen` KSP2 processor**, which emits the tool manifest and
- * its JSON Schema from the function signature, plus the `ToolModule` ServiceLoader entry
- * that `udea-agent` discovers without a magic package (spec 3.2, spec 5 "Id assignment").
+ * its JSON Schema from the function signature, and lists the tool on the module registry's
+ * `ToolModule` facet, with no magic package (spec 3.2, spec 5 "Id assignment").
  * The generated dispatcher calls the function directly, so the tool surface survives R8.
  *
  * @param name the tool's MCP name. Empty means "derive it from the function name".

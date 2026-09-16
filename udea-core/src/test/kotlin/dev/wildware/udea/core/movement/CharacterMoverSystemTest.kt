@@ -5,6 +5,7 @@ import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.SimPhase
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.physics.PhysicsStepSystem
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,7 +25,7 @@ class CharacterMoverSystemTest {
      * A definition with no game modules. `CoreModule` is implicit and is reachable as
      * [UdeaGameDef.core], which is where the scene's geometry is set from.
      */
-    private fun definition(): UdeaGameDef = UdeaGameDef(emptyList())
+    private fun definition(): UdeaGameDef = UdeaGameDef(CoreUdeaRegistry, emptyList())
 
     private fun host(def: UdeaGameDef): GameHost = GameHost(RenderMode.Headless, def)
 

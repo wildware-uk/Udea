@@ -1,13 +1,19 @@
+import dev.wildware.udea.build.UdeaModuleRegistry
+import dev.wildware.udea.build.udeaModule
+
 plugins {
     id("udea.kotlin-library")
     // Level files (issue #191): `Attributes`, `Abilities` and `GameplayEffects` are saved, so
-    // they need serializers, and `udea-codegen` lists them in the generated `GasLevelComponents`.
+    // they need serializers, and `udea-codegen` lists them in the generated `GasModuleRegistry`.
     alias(libs.plugins.kotlinSerialization)
     id("com.google.devtools.ksp") version libs.versions.ksp.get()
 }
 
+// Declares this module to every launcher that has it on its runtime classpath (issue #202).
+val udeaRegistry = udeaModule("Gas")
 ksp {
-    arg("udea.moduleName", "Gas")
+    arg(UdeaModuleRegistry.MODULE_NAME_OPTION, udeaRegistry.name)
+    arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
 }
 
 dependencies {

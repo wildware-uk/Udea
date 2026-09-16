@@ -6,10 +6,12 @@ import dev.wildware.udea.core.EngineConfig
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.NetRole
 import dev.wildware.udea.core.gameContext
+import dev.wildware.udea.core.level.LevelComponentModule
 import dev.wildware.udea.core.level.LevelHooks
 import dev.wildware.udea.core.level.LevelService
 import dev.wildware.udea.core.loop.TimeTravelFactory
 import dev.wildware.udea.core.loop.WorldSimulation
+import dev.wildware.udea.core.registry.UdeaRegistry
 
 /**
  * What a game *is*, as a value: its modules, its knobs and its authority role.
@@ -23,6 +25,16 @@ import dev.wildware.udea.core.loop.WorldSimulation
  * value anywhere describing what the game contained.
  */
 public class UdeaGameDef(
+    /**
+     * Every generated module registry this game's program contains - its launcher's
+     * `<Module>UdeaRegistry` (issue #202).
+     *
+     * Required rather than defaulted. A default would be the one way left to build a game whose
+     * level files silently lack a module's components, which is the failure the generated
+     * registry exists to turn into a compile error. A world built from the kernel alone passes
+     * `udea-core`'s own `CoreUdeaRegistry`, and says so where it is built.
+     */
+    public val registry: UdeaRegistry,
     /** Game and engine-extension modules, in declaration order. [CoreModule] is implicit. */
     public val modules: List<UdeaModule>,
     public val config: EngineConfig = EngineConfig(),
@@ -116,7 +128,9 @@ public class UdeaGameDef(
 
         val levelHooks = LevelHooks()
         for (module in allModules) module.level(levelHooks)
-        val levels = LevelService(world, ctx, core.netIds, levelHooks)
+        val levels = LevelService(world, ctx, core.netIds, levelHooks) {
+            LevelComponentModule.of(this@UdeaGameDef.registry)
+        }
 
         return UdeaGame(ctx, world, WorldSimulation(ctx, world, travel = travel), manifest, levels)
     }

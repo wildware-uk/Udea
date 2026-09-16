@@ -130,7 +130,7 @@ only by re-executing. So the gate asserts task states, not milliseconds.
 The other half is the isolating/aggregating split. `udea-codegen` writes one **isolating**
 file per `@Replicated` component (invalidated only by an edit to that component's own source)
 and exactly one **aggregating** group per module — the `…NetProtocol` constant, the
-`ServiceLoader` index and `net-protocol.lock`, which genuinely do depend on every component,
+generated registries and `net-protocol.lock`, which genuinely do depend on every component,
 because adding one renumbers the ids of all its successors. One aggregating output per module
 is fine; one per component would make every keystroke a full module reprocess.
 `IncrementalProcessingTest` audits both halves, because nothing else in the repository would

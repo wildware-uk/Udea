@@ -1,7 +1,7 @@
 package dev.wildware.udea.core.level
 
 import com.github.quillraven.fleks.Component
-import java.util.ServiceLoader
+import dev.wildware.udea.core.registry.UdeaRegistry
 import kotlin.reflect.KClass
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.PolymorphicModuleBuilder
@@ -37,13 +37,12 @@ public class LevelComponent<T : Component<T>>(
 }
 
 /**
- * Every saveable component one Gradle module declares, found through `ServiceLoader`.
+ * The facet a generated module registry implements to list the saveable components its module
+ * declares.
  *
- * Generated: `udea-codegen` writes `<Module>LevelComponents` and its
- * `META-INF/services` entry for every module that runs KSP with `udea.moduleName` set and
- * declares at least one `@Serializable` Fleks component. A class rather than a Kotlin `object`
- * for the reason every other generated index is one - `ServiceLoader` needs a public no-arg
- * constructor.
+ * Generated: `udea-codegen` makes `<Module>ModuleRegistry` implement this for every module that
+ * runs KSP with `udea.moduleName` set and declares at least one `@Serializable` Fleks component.
+ * A game's levels are built from the facets of the [UdeaRegistry] it was started with.
  */
 public interface LevelComponentModule {
 
@@ -56,13 +55,10 @@ public interface LevelComponentModule {
     public companion object {
 
         /**
-         * Every [LevelComponentModule] on [loader]'s classpath, in ascending module-name order so
-         * the result does not depend on classpath order.
+         * Every [LevelComponentModule] in [registry], in ascending module-name order so the
+         * result does not depend on the order the registry lists them in.
          */
-        internal fun discover(
-            loader: ClassLoader = LevelComponentModule::class.java.classLoader,
-        ): List<LevelComponentModule> =
-            ServiceLoader.load(LevelComponentModule::class.java, loader)
-                .sortedBy { it.moduleName }
+        internal fun of(registry: UdeaRegistry): List<LevelComponentModule> =
+            registry.modules.filterIsInstance<LevelComponentModule>().sortedBy { it.moduleName }
     }
 }

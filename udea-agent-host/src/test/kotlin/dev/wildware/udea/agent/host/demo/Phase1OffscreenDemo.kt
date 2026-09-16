@@ -33,6 +33,7 @@ import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.snapshot.snapshotTimeTravel
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.backend.Lwjgl3Backend
@@ -92,6 +93,7 @@ public object Phase1OffscreenDemo {
         val bridge = AgentBridge()
         val module = DemoBodyModule()
         val definition = UdeaGameDef(
+            registry = CoreUdeaRegistry,
             modules = listOf(module),
             timeTravel = snapshotTimeTravel(demoRegistry()),
         )

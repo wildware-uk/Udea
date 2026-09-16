@@ -14,6 +14,7 @@ import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.module.UdeaModule
 import dev.wildware.udea.core.physics.PhysicsBody
 import dev.wildware.udea.core.scene.MarkerScene
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import java.lang.reflect.Modifier
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -131,7 +132,7 @@ class HeadlessHostTest {
     @Test
     fun `a 200-entity scene runs 10000 ticks with no window and no GL context`() {
         val scene = MarkerScene(SceneId("arena"), seed = 31_337L, entityCount = 200, withBodies = true)
-        val def = UdeaGameDef(listOf(DriftModule()))
+        val def = UdeaGameDef(CoreUdeaRegistry, listOf(DriftModule()))
         def.core.scenes.register(scene)
         val host = GameHost(RenderMode.Headless, def)
         host.ctx.scenes.requestScene(scene.id)
@@ -153,7 +154,7 @@ class HeadlessHostTest {
     @Test
     fun `stop() ends an unpaced headless run from inside a system`() {
         val scene = MarkerScene(SceneId("arena"), seed = 5L, entityCount = 3)
-        val def = UdeaGameDef(emptyList())
+        val def = UdeaGameDef(CoreUdeaRegistry, emptyList())
         def.core.scenes.register(scene)
         val host = GameHost(RenderMode.Headless, def)
         host.ctx.scenes.requestScene(scene.id)
@@ -192,7 +193,7 @@ class HeadlessHostTest {
 
         val ticked = CountDownLatch(TICKS_BEFORE_STOP)
         val scene = MarkerScene(SceneId("arena"), seed = 5L, entityCount = 3)
-        val def = UdeaGameDef(listOf(TickLatchModule(ticked)))
+        val def = UdeaGameDef(CoreUdeaRegistry, listOf(TickLatchModule(ticked)))
         def.core.scenes.register(scene)
         val host = GameHost(RenderMode.Headless, def)
         host.ctx.scenes.requestScene(scene.id)
@@ -236,7 +237,7 @@ class HeadlessHostTest {
 
         val ticked = CountDownLatch(TICKS_BEFORE_STOP)
         val scene = MarkerScene(SceneId("arena"), seed = 5L, entityCount = 3)
-        val def = UdeaGameDef(listOf(TickLatchModule(ticked)))
+        val def = UdeaGameDef(CoreUdeaRegistry, listOf(TickLatchModule(ticked)))
         def.core.scenes.register(scene)
         val host = GameHost(RenderMode.Headless, def)
         host.ctx.scenes.requestScene(scene.id)
@@ -305,7 +306,7 @@ class HeadlessHostTest {
         val entered = CountDownLatch(1)
         val module = SlowTickModule(entered)
         val scene = MarkerScene(SceneId("arena"), seed = 5L, entityCount = 3)
-        val def = UdeaGameDef(listOf(module))
+        val def = UdeaGameDef(CoreUdeaRegistry, listOf(module))
         def.core.scenes.register(scene)
         val host = GameHost(RenderMode.Headless, def)
         host.ctx.scenes.requestScene(scene.id)
@@ -336,7 +337,7 @@ class HeadlessHostTest {
     fun `two headless hosts in one JVM do not see each other`() {
         fun build(seed: Long): GameHost {
             val scene = MarkerScene(SceneId("arena"), seed = seed, entityCount = 4)
-            val def = UdeaGameDef(emptyList())
+            val def = UdeaGameDef(CoreUdeaRegistry, emptyList())
             def.core.scenes.register(scene)
             return GameHost(RenderMode.Headless, def).also { it.ctx.scenes.requestScene(scene.id) }
         }

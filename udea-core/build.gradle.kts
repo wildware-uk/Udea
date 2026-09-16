@@ -1,3 +1,6 @@
+import dev.wildware.udea.build.UdeaModuleRegistry
+import dev.wildware.udea.build.udeaModule
+
 plugins {
     id("udea.kotlin-library")
     // The Replicator contract ships an executable specification: TransformReplicator and
@@ -5,14 +8,18 @@ plugins {
     // published variant rather than this module's private test source (issue #28 scope).
     `java-test-fixtures`
     // Level files (issue #191). The serialization plugin gives this module's components their
-    // serializers, and KSP runs `udea-codegen` over them to generate `CoreLevelComponents`, the
-    // list a level file's polymorphic component section is built from.
+    // serializers, and KSP runs `udea-codegen` over them to generate `CoreModuleRegistry`, whose
+    // level-component list a level file's polymorphic component section is built from.
     alias(libs.plugins.kotlinSerialization)
     id("com.google.devtools.ksp") version libs.versions.ksp.get()
 }
 
+// Declares this module to every launcher that has it on its runtime classpath (issue #202), and
+// hands the processor the list its own `CoreUdeaRegistry` names - the kernel alone.
+val udeaRegistry = udeaModule("Core")
 ksp {
-    arg("udea.moduleName", "Core")
+    arg(UdeaModuleRegistry.MODULE_NAME_OPTION, udeaRegistry.name)
+    arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
 }
 
 dependencies {

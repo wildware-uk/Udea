@@ -26,6 +26,7 @@ import dev.wildware.udea.core.snapshot.SnapshotRing
 import dev.wildware.udea.core.snapshot.SnapshotService
 import dev.wildware.udea.core.snapshot.WorldSnapshot
 import dev.wildware.udea.core.snapshot.fleksComponentType
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.net.input.MoveInput
 
 /**
@@ -198,6 +199,9 @@ public class NetArena(
 ) {
 
     private val definition = UdeaGameDef(
+        // The kernel's own registry, because this world is built from the kernel alone: `modules`
+        // is empty, and the avatar's codec is written by hand in this class.
+        registry = CoreUdeaRegistry,
         modules = emptyList(),
         config = EngineConfig(seed = seed),
         entityCapacity = ENTITY_CAPACITY,

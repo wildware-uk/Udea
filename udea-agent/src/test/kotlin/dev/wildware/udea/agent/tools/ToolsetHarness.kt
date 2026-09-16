@@ -44,6 +44,7 @@ import dev.wildware.udea.core.snapshot.FieldKind
 import dev.wildware.udea.core.snapshot.fleksComponentType
 import dev.wildware.udea.core.snapshot.ComponentRegistry
 import dev.wildware.udea.core.snapshot.snapshotTimeTravel
+import dev.wildware.udea.generated.UdeaAgentUdeaRegistry
 import kotlin.test.assertIs
 
 /**
@@ -65,6 +66,7 @@ internal class ToolsetHarness(
     private val module = ToolsetModule()
 
     private val definition = UdeaGameDef(
+        registry = UdeaAgentUdeaRegistry,
         modules = listOf(module),
         timeTravel = if (withSnapshotRing) snapshotTimeTravel(registry()) else null,
     )

@@ -1,3 +1,6 @@
+import dev.wildware.udea.build.UdeaModuleRegistry
+import dev.wildware.udea.build.udeaModule
+
 plugins {
     id("udea.kotlin-library")
     // The replay toolset goes through the same `@AgentTool` KSP pass every other toolset does.
@@ -56,10 +59,12 @@ dependencies {
 
 // The manifest fragment is named per module, or two modules emit `udea/-agent-tools.json` and
 // the second overwrites the first. No `udea.toolModuleService`: `ReplayToolset` needs a
-// `ReplaySession` that only a host can build, and a `ServiceLoader` entry would make every
-// process with this module on its classpath fail `ToolIndex.Builder.build`.
+// `ReplaySession` that only a host can build, and a `ToolModule` facet on this module's registry
+// would make every game whose registry lists it fail `ToolIndex.Builder.build`.
+val udeaRegistry = udeaModule("UdeaReplay")
 ksp {
-    arg("udea.moduleName", "UdeaReplay")
+    arg(UdeaModuleRegistry.MODULE_NAME_OPTION, udeaRegistry.name)
+    arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
 }
 
 /**

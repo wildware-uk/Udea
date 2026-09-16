@@ -74,10 +74,9 @@ public class AttributeDecl(
 /**
  * A module's contribution to the attribute table.
  *
- * Discovered through `ServiceLoader` by the host, exactly as `ComponentType` and `NetModule`
- * are, so a game module declares its own attributes without an engine-side edit (Trello #35).
- * The merge is order-independent because [AttributeTableBuilder] sorts, so it does not matter
- * which order the loader hands modules back in.
+ * Supplied by the host, so a game module declares its own attributes without an engine-side
+ * edit (Trello #35). The merge is order-independent because [AttributeTableBuilder] sorts, so it
+ * does not matter which order modules are handed over in.
  */
 public interface AttributeModule {
     /** Short name, for the lock file and for diagnostics. */

@@ -16,7 +16,11 @@ copy reviewed.
 
 | Plugin | For | What it gives you |
 |---|---|---|
-| `udea.kotlin-library` | every runtime module and `moba` | Kotlin JVM, JDK 21 toolchain, `explicitApi()`, kotlin.test on JUnit 5. **No GL.** |
+| `udea.kotlin-base` | applied by the Kotlin conventions below, never on its own | JDK 21 toolchain, `explicitApi()`, the `kotlin-stdlib` pin with `udeaVerifyKotlinPin`, the K2 compiler plugin with `udeaVerifyCompilerPlugin` |
+| `udea.kotlin-library` | every JVM runtime module and `moba` | Kotlin JVM plus `udea.kotlin-base`, kotlin.test on JUnit 5. **No GL.** |
+| `udea.kotlin-multiplatform` | runtime modules ported to KMP (issue #201) | Kotlin Multiplatform on `jvm`, `android` (AGP's KMP library plugin), `wasmJs` (Node), `iosArm64`, `iosSimulatorArm64`, plus `udea.kotlin-base`; kotlin.test in `commonTest`, JUnit 5 on `jvmTest` |
+| `udea.kotlin-multiplatform-render` | `udea-render`, once it is on Kool (spec D2) | `udea.kotlin-multiplatform` without the iOS targets |
+| `udea.jvm-test-fixtures` | a KMP module with JVM test fixtures | a `jvmTestFixtures` source set published under the `-test-fixtures` capability, so `testFixtures(project(...))` works from a JVM consumer |
 | `udea.kotlin-library-gl` | `udea-render` only | `udea.kotlin-library` plus gdx and the LWJGL3 backend, as `implementation` so GL cannot leak downstream |
 | `udea.kotlin-build-tool` | `udea-codegen`, `udea-compiler-plugin`, `udea-assets-compiler` | `udea.kotlin-library` plus the exact-Kotlin-version pin (spec §7), checked at configuration time |
 | `udea.gradle-plugin` | `udea-gradle` | `udea.kotlin-library` plus `compileOnly(gradleApi())` and TestKit for tests |
@@ -28,8 +32,8 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 
 | Module | Convention | Purpose | Replaces | Depends on | Depended on by |
 |---|---|---|---|---|---|
-| `udea-annotations` | `udea.kotlin-library` | Zero-dependency leaf: `@Net`, `@Sim`, `@Q`, `@Replicated`, `@AgentTool`, `@Arg` | Two conflicting `UdeaNetworked` declarations on one classpath | *(Kotlin stdlib only)* | `udea-codegen`, `udea-compiler-plugin`, `udea-core`, `udea-assets` |
-| `udea-diagnostics` | `udea.kotlin-library` | Zero-dependency leaf: the one `UdeaDiagnostic` — severity, stable rule id, `SourceSpan`, `assetId`, optional `Fix` (spec §5) | new — the shared vocabulary the K2 checkers and the asset validator both emit | *(Kotlin stdlib only)* | `udea-compiler-plugin`, `udea-assets`, `udea-assets-compiler`, `udea-gradle`; and, on `testImplementation(testFixtures(...))` only, `udea-core`, `udea-agent` and `udea-agent-host` for `LatencyBudget` (issue #175) |
+| `udea-annotations` | `udea.kotlin-multiplatform` | Zero-dependency leaf: `@Net`, `@Sim`, `@Q`, `@Replicated`, `@AgentTool`, `@Arg` | Two conflicting `UdeaNetworked` declarations on one classpath | *(Kotlin stdlib only)* | `udea-codegen`, `udea-compiler-plugin`, `udea-core`, `udea-assets` |
+| `udea-diagnostics` | `udea.kotlin-multiplatform` | Zero-dependency leaf: the one `UdeaDiagnostic` — severity, stable rule id, `SourceSpan`, `assetId`, optional `Fix` (spec §5) | new — the shared vocabulary the K2 checkers and the asset validator both emit | *(Kotlin stdlib only)* | `udea-compiler-plugin`, `udea-assets`, `udea-assets-compiler`, `udea-gradle`; and, on `testImplementation(testFixtures(...))` only, `udea-core`, `udea-agent` and `udea-agent-host` for `LatencyBudget` (issue #175) |
 | `udea-codegen` | `udea.kotlin-build-tool` | KSP2 processor + KotlinPoet emitters; owns id assignment and `net-protocol.lock` | `NetworkGenerator`, `UdeaDslProcessor`, `@CreateDsl` | `udea-annotations`, `symbol-processing-api`, KotlinPoet | build-time only (`ksp(...)` from consumers) |
 | `udea-compiler-plugin` | `udea.kotlin-build-tool` | K2 FIR/IR plugin: checkers, KDoc propagation, gated declaration synthesis | new (D8) | `udea-annotations`, `udea-diagnostics`, `kotlin-compiler-embeddable` (`compileOnly`) | build-time only |
 | `udea-core` | `udea.kotlin-library` | Headless kernel: `Simulation`, `SimBarrier`, `NetId`, `Tick`, snapshot ring, `Replicator`. **No GL on the compile classpath** | `UdeaGameManager`/`GameScreen`, the globals, `common/.../properties.kt`, `reflection.kt` | `udea-annotations` (api), Fleks, kotlinx-serialization-core (api) and -cbor for level files (issue #191) | `udea-gas`, `udea-net`, `udea-render`, `udea-agent`, `moba` |
@@ -137,7 +141,13 @@ failure cannot mean either "you brought back the old tree" or "you put GL on the
 ## `UDEA-MG-001` — `udea-annotations` resolves the Kotlin stdlib and nothing else
 
 **Spec §4.** Allowed on `runtimeClasspath`: `org.jetbrains.kotlin:kotlin-stdlib`,
-`org.jetbrains:annotations`. Everything else fails.
+`org.jetbrains:annotations`, and `org.jetbrains.kotlin:kotlin-stdlib-wasm-js`, which is the
+stdlib itself as the Wasm target resolves it. Everything else fails.
+
+Since issue #201 the module is multiplatform, and "`runtimeClasspath`" means every target's
+copy of it: `jvmRuntimeClasspath`, `androidRuntimeClasspath`, `wasmJsRuntimeClasspath`. Each
+rule on this page governs a target's classpath as the JVM classpath it stands for, and a
+failure names the target's classpath it was found on.
 
 The annotation vocabulary is on the compile classpath of the engine, the game, the KSP
 processor and the K2 plugin at once, so a dependency added here is added to all four — and

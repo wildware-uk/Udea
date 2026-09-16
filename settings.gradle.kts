@@ -5,6 +5,9 @@ pluginManagement {
     repositories {
         mavenCentral()
         gradlePluginPortal()
+        // The Android Gradle Plugin, which `build-logic`'s multiplatform conventions put on the
+        // build classpath (issue #201), is published only here.
+        google()
     }
 }
 

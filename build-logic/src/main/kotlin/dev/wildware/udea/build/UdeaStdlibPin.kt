@@ -229,6 +229,46 @@ public object UdeaStdlibPin {
                 "project's stdlib onto the tool that builds the project - the same mistake the " +
                 "`kotlin*` entry below this one exists to avoid.",
         ),
+        // --- a multiplatform module's tooling (issue #201) ---
+        ToolClasspath(
+            "*NpmAggregated",
+            "the Kotlin plugin's aggregation of a Wasm target's npm dependencies for the " +
+                "JavaScript package manager. The Kotlin libraries the target compiles and runs " +
+                "against are on its compile and runtime classpaths, which the pin covers.",
+        ),
+        ToolClasspath(
+            "*CInterop",
+            "the inputs of Kotlin/Native's cinterop tool for a target. The code itself compiles " +
+                "against the target's `CompileKlibraries`, which the pin covers.",
+        ),
+        ToolClasspath(
+            "resolvable*CompilationApi",
+            "the Kotlin plugin's own view of a Kotlin/Native compilation's API dependencies; the " +
+                "compilation compiles against the target's `CompileKlibraries`, which the pin covers.",
+        ),
+        ToolClasspath(
+            "swiftPMDependenciesMetadataClasspath",
+            "the Kotlin plugin's Swift Package Manager integration for Apple targets. Swift " +
+                "packages, not a Kotlin classpath.",
+        ),
+        ToolClasspath(
+            "androidJdkImage",
+            "AGP's JDK image for compiling against the Android platform: a JDK, not a Kotlin " +
+                "classpath.",
+        ),
+        ToolClasspath(
+            "lint*",
+            "AGP's Android Lint check jars, run by lint rather than compiled against or shipped.",
+        ),
+        ToolClasspath(
+            "androidTestUtil",
+            "AGP's on-device test utilities, installed on a device rather than compiled against.",
+        ),
+        ToolClasspath(
+            "coreLibraryDesugaring",
+            "AGP's core-library desugaring library, consumed by the dexer when a module enables " +
+                "desugaring; not a classpath the code compiles against.",
+        ),
         ToolClasspath(
             "*DependenciesMetadata",
             "the Kotlin plugin's multiplatform metadata views of the dependency declarations. " +
@@ -250,6 +290,20 @@ public object UdeaStdlibPin {
     }
 
     /**
+     * True when the pin applies to [configurationName] of [projectPath]: it is one of
+     * [pinnedConfigurationsFor], or it is a multiplatform target's copy of one (issue #201).
+     *
+     * `jvmRuntimeClasspath`, `wasmJsTestCompileClasspath` and `iosArm64CompileKlibraries` are the
+     * classpaths a multiplatform module's code compiles and runs against on each platform, so the
+     * stdlib on them is exactly what the pin is for; an exemption of the JVM name excuses every
+     * target's copy of it.
+     */
+    public fun isPinned(projectPath: String, configurationName: String): Boolean {
+        val pinned = pinnedConfigurationsFor(projectPath)
+        return configurationName in pinned || UdeaMultiplatform.jvmRole(configurationName) in pinned
+    }
+
+    /**
      * The resolvable configurations in [resolvableNames] that nothing has classified.
      *
      * A classified configuration is one of: in [PINNED_CONFIGURATIONS] (pinned, or exempt
@@ -262,7 +316,7 @@ public object UdeaStdlibPin {
      */
     public fun unclassified(resolvableNames: Collection<String>): List<String> =
         resolvableNames
-            .filterNot { it in PINNED_CONFIGURATIONS }
+            .filterNot { it in PINNED_CONFIGURATIONS || UdeaMultiplatform.jvmRole(it) in PINNED_CONFIGURATIONS }
             .filterNot { name -> TOOL_CONFIGURATIONS.any { it.matches(name) } }
             .distinct()
             .sorted()

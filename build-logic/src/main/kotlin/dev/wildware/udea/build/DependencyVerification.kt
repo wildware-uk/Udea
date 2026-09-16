@@ -19,7 +19,9 @@ import org.gradle.api.tasks.TaskProvider
  * @param description shown by `gradlew tasks`.
  * @param configurationNames the classpaths to scan; anything absent from the project is
  *   skipped rather than being an error, since `testFixturesRuntimeClasspath` only exists
- *   where `java-test-fixtures` is applied.
+ *   where `java-test-fixtures` is applied. On a multiplatform module each target's copy of one
+ *   of these is scanned in its place and governed as the classpath it stands for
+ *   ([UdeaMultiplatform.jvmRole], issue #201).
  * @param rules evaluated against every scanned classpath.
  * @param reportFileName written under `build/reports/udea/`, so a passing run still leaves
  *   behind what it actually looked at.
@@ -34,7 +36,7 @@ public fun Project.registerDependencyVerification(
     val graphs: MapProperty<String, ResolvedGraph> =
         objects.mapProperty(String::class.java, ResolvedGraph::class.java)
 
-    configurations.matching { it.name in configurationNames && it.isCanBeResolved }.all {
+    configurations.matching { roleOf(it.name) in configurationNames && it.isCanBeResolved }.all {
         graphs.put(name, ResolutionScan.graphOf(this))
     }
 
@@ -60,12 +62,12 @@ public fun Project.registerDependencyVerification(
             }
             val vacuous = scanned.entries.sortedBy { it.key }
                 .firstNotNullOfOrNull { (configuration, graph) ->
-                    DependencyRules.vacuity(projectPath, configuration, graph, rules)
+                    DependencyRules.vacuity(projectPath, configuration, graph, rules, roleOf(configuration))
                 }
             if (vacuous != null) throw GradleException(vacuous)
             val violations = scanned.entries.sortedBy { it.key }
                 .flatMap { (configuration, graph) ->
-                    DependencyRules.violations(projectPath, configuration, graph, rules)
+                    DependencyRules.violations(projectPath, configuration, graph, rules, roleOf(configuration))
                 }
             report.get().asFile.apply {
                 parentFile.mkdirs()
@@ -82,3 +84,7 @@ public fun Project.registerDependencyVerification(
     tasks.named("check") { dependsOn(task) }
     return task
 }
+
+/** The JVM classpath name [configurationName] is governed as: itself, or a target's JVM role. */
+private fun roleOf(configurationName: String): String =
+    UdeaMultiplatform.jvmRole(configurationName) ?: configurationName

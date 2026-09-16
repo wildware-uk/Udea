@@ -60,6 +60,17 @@ composegl = "0.6.0"
 # here would be upgraded to it by resolution anyway and the catalog would say something untrue.
 # Runtime snapshots - rewind, replication, desync reports - stay on `Replicator<T>`; AGENTS.md.
 kotlinxSerialization = "1.11.0"
+# The Android Gradle Plugin, for its Kotlin Multiplatform library support
+# (`com.android.kotlin.multiplatform.library`), which is how a runtime module gets its Android
+# target (issue #201, spec section 3). 8.13.x is the newest line Gradle 8.13 runs: AGP 9 needs
+# Gradle 9. Build-logic only - it is on `build-logic`'s classpath and no module's.
+agp = "8.13.2"
+# The Android API levels every multiplatform runtime module compiles against and runs on.
+# `androidCompileSdk` is the newest platform installed in the development box's SDK.
+# `androidMinSdk` 24 (Android 7.0) is a floor chosen in issue #201 rather than one a dependency
+# forces; raise it here, once, when a dependency does.
+androidCompileSdk = "36"
+androidMinSdk = "24"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -68,6 +79,7 @@ junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.r
 
 # --- udea-* rewrite ---
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
 # The scripting host, pinned to `kotlin` for the same reason the compiler is: the host loads

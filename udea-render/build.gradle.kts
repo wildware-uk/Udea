@@ -104,7 +104,11 @@ val headlessModulesProperty: String = ModuleGraphRules.HEADLESS_MODULES_PROPERTY
  */
 val headlessModuleClasses = files(
     headlessModules.map { module ->
-        fileTree(rootDir.resolve("$module/build/classes")) { include("*/main/**") }
+        // `*/jvm/main` and `*/android/main` are where a multiplatform module compiles the same
+        // bytecode (issue #201); `RepoLayout.classFiles` reads the same three.
+        fileTree(rootDir.resolve("$module/build/classes")) {
+            include("*/main/**", "*/jvm/main/**", "*/android/main/**")
+        }
     },
 )
 
@@ -133,7 +137,7 @@ val udeaVerifyHeadless = tasks.register<Test>("udeaVerifyHeadless") {
     filter { includeTestsMatching(gateTestClass) }
     systemProperty(headlessModulesProperty, headlessModules.joinToString(","))
 
-    dependsOn(headlessModules.map { ":$it:classes" })
+    dependsOn(headlessModules.map { ":$it:${ModuleGraphRules.MAIN_BYTECODE_TASK}" })
     inputs.files(headlessModuleClasses)
         .withPropertyName("headlessModuleClasses")
         .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -156,7 +160,7 @@ tasks.test {
 
     // HeadlessScanTest and RenderModuleGraphTest read the compiled output and the build
     // scripts of modules this one does not depend on.
-    dependsOn(headlessModules.map { ":$it:classes" })
+    dependsOn(headlessModules.map { ":$it:${ModuleGraphRules.MAIN_BYTECODE_TASK}" })
     inputs.files(headlessModuleClasses)
         .withPropertyName("headlessModuleClasses")
         .withPathSensitivity(PathSensitivity.RELATIVE)

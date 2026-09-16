@@ -1,5 +1,7 @@
 plugins {
-    id("udea.kotlin-library")
+    // Multiplatform (issue #201). A JVM consumer - KSP, the K2 plugin, every JVM module - still
+    // resolves the `jvm` variant without asking for it.
+    id("udea.kotlin-multiplatform")
 }
 
 /**
@@ -7,7 +9,7 @@ plugins {
  *
  * This module's zero-dependency budget — the Kotlin stdlib and the `org.jetbrains:annotations`
  * artifact it drags in, and nothing else (spec 4) — is `UDEA-MG-001` in
- * `ModuleGraphRules.ANNOTATIONS_ARE_A_LEAF`, enforced on `runtimeClasspath` by
+ * `ModuleGraphRules.ANNOTATIONS_ARE_A_LEAF`, enforced on the runtime classpaths by
  * `udeaVerifyModuleGraph` from `check` like every other arrow in the graph.
  *
  * It used to be enforced *twice*: by that rule, and by a `udeaVerifyAnnotationsLeaf` task

@@ -41,8 +41,6 @@ group = "dev.wildware.udea"
 version = "1.0-SNAPSHOT"
 
 allprojects {
-    apply(plugin = "java")
-
     repositories {
         mavenCentral()
         mavenLocal()
@@ -54,9 +52,15 @@ allprojects {
         maven("https://jitpack.io")
     }
 
-    java {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+    // Configured wherever a module has the `java` plugin, and no longer applied to every project
+    // to get there (issue #201). The Kotlin multiplatform plugin refuses to share a project with
+    // `java`, and every JVM module gets `java` from `kotlin("jvm")` already; the one project that
+    // had it from here alone is `example:assets`, which has no build script and no sources.
+    plugins.withType<JavaPlugin> {
+        extensions.configure<JavaPluginExtension> {
+            sourceCompatibility = JavaVersion.VERSION_21
+            targetCompatibility = JavaVersion.VERSION_21
+        }
     }
 
     tasks.withType<KotlinCompile>().configureEach {

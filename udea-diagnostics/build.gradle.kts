@@ -1,5 +1,7 @@
 plugins {
-    id("udea.kotlin-library")
+    // Multiplatform (issue #201). Every JVM consumer - the K2 plugin, the KSP processor, the
+    // asset compiler - still resolves the `jvm` variant without asking for it.
+    id("udea.kotlin-multiplatform")
 
     /*
      * `LatencyBudget` (issue #175), and why the shared home is this module.
@@ -17,6 +19,11 @@ plugins {
      * and `udea-annotations` is a compile-time vocabulary the codegen reads rather than a place
      * for a runtime helper. It is `testFixtures` and not `main` because none of this ships: a
      * contention note has no business in the jar a game loads.
+     *
+     * `udea.jvm-test-fixtures` rather than Gradle's `java-test-fixtures`, which cannot be applied
+     * beside the multiplatform plugin. It publishes the same capability, so the consumers'
+     * `testFixtures(project(":udea-diagnostics"))` is unchanged, and it is JVM-only: the helper
+     * reads the JVM's management beans for the machine's load.
      */
-    `java-test-fixtures`
+    id("udea.jvm-test-fixtures")
 }

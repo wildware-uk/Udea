@@ -861,7 +861,7 @@ jobs:
     #   - the first clean build in a fresh job is mostly warm-up. The same command, repeated in the
     #     same job on warm daemons, took about a third of the time or less. The old number
     #     measured a cold daemon more than it measured the code.
-    #   - `ubuntu-latest` is several kinds of machine, and they differ by about a third even warm.
+    #   - `ubuntu-latest` is several kinds of machine, about 1.5x apart fastest to slowest even warm.
     #     No estimator over one job's samples can divide that out.
     #
     # So the job builds the commit's BASE in a second checkout on the same runner, warms both, and

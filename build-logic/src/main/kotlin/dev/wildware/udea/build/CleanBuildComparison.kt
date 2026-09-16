@@ -10,17 +10,18 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * ## Why a comparison and not an absolute number (issue #181)
  *
- * The job used to time one `./gradlew clean udeaAssemble` against 90 000 ms. Fifty recorded runs of
- * it measured 60 405 to 102 453 ms, and five of them on work that did not differ went three red and
- * two green. Two probe runs on the issue branch found why, and neither cause is something an
- * estimator over a single job's samples can remove:
+ * The job used to time one `./gradlew clean udeaAssemble` against 90 000 ms. Its recorded runs
+ * measured from 60 405 to 102 453 ms, and five of them on work that did not differ went three red
+ * and two green. Probe runs on the issue branch found two causes, and only the first is something a
+ * better estimator over one job's samples could remove:
  *
  * - **Most of the number was not compiling.** The first clean build in a fresh job measured 84 to
- *   97 s; the same command repeated in the same job measured 18 to 26 s. Three quarters of the
- *   old measurement was a cold Gradle daemon, a cold Kotlin daemon and JIT warm-up.
- * - **`ubuntu-latest` is two machines.** The same label handed out AMD EPYC 9V74 and EPYC 7763
- *   runners, and the 7763 was about a third slower even warm. A number compared against a
- *   constant is a number about which of the two the job drew.
+ *   97 s; the same command repeated in the same job fell to 18 to 26 s. Most of the old
+ *   measurement was a cold Gradle daemon, a cold Kotlin daemon and JIT warm-up.
+ * - **`ubuntu-latest` is several machines.** The same label handed out AMD EPYC and Intel Xeon
+ *   runners of different generations, and their fastest warm builds of identical work were about
+ *   1.5x apart. A number compared against a constant is partly a number about which one the job
+ *   drew.
  *
  * A base build in the same job draws the same machine, so the machine divides out. What is left
  * is the thing a reader of CI can act on: this commit made a clean build slower, or it did not.

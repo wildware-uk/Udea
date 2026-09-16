@@ -71,7 +71,7 @@ public class WebSocketServerTransport private constructor(
     private var closed = false
 
     /** Every refusal, by why. Live, like [TransportStats]. */
-    public val counters: WebSocketCounters = WebSocketCounters()
+    internal val counters: WebSocketCounters = WebSocketCounters()
 
     override val localPeer: PeerId get() = PeerId.SERVER
 
@@ -81,7 +81,7 @@ public class WebSocketServerTransport private constructor(
     }
 
     /** The TCP port the server is listening on, including an ephemeral one. */
-    public val port: Int
+    internal val port: Int
 
     /** The URL a client on this machine connects to. */
     public val url: String get() = "ws://$host:$port$path"
@@ -92,7 +92,7 @@ public class WebSocketServerTransport private constructor(
     }
 
     /** Every admitted connection, ascending by peer id. */
-    public fun connections(): List<PeerId> = byPeer.mapNotNull { it?.peer }
+    internal fun connections(): List<PeerId> = byPeer.mapNotNull { it?.peer }
 
     override fun send(peer: PeerId, bytes: ByteArray, offset: Int, length: Int) {
         check(!closed) { "server transport is closed" }

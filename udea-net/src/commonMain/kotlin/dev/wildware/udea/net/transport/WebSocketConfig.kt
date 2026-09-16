@@ -55,23 +55,19 @@ public data class WebSocketConfig(
 }
 
 /** What a WebSocket end refused or dropped, by why. Live, like [TransportStats]. */
-public class WebSocketCounters internal constructor() {
+internal class WebSocketCounters {
 
     /** Messages this build could not make sense of. */
-    public var malformed: Long = 0L
-        internal set
+    var malformed: Long = 0L
 
     /** Sends addressed to a peer with no live connection. */
-    public var sendsToUnknownPeer: Long = 0L
-        internal set
+    var sendsToUnknownPeer: Long = 0L
 
     /** Handshakes that reached a live connection. */
-    public var handshakesCompleted: Long = 0L
-        internal set
+    var handshakesCompleted: Long = 0L
 
     /** Handshakes refused outright, with a reason sent back. */
-    public var handshakesDenied: Long = 0L
-        internal set
+    var handshakesDenied: Long = 0L
 
     override fun toString(): String =
         "WebSocketCounters(malformed=$malformed, sendsToUnknownPeer=$sendsToUnknownPeer, " +

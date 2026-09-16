@@ -71,7 +71,7 @@ public class WebSocketTransport private constructor(
     private var closed = false
 
     /** Every refusal, by why. Live, like [TransportStats]. */
-    public val counters: WebSocketCounters = WebSocketCounters()
+    internal val counters: WebSocketCounters = WebSocketCounters()
 
     /** The peer id the server assigned, or an unassigned id before it has. */
     override var localPeer: PeerId = PeerId(UNASSIGNED_RAW)
@@ -89,7 +89,7 @@ public class WebSocketTransport private constructor(
      * the broken read. Null otherwise. Kept for the person reading [failure], who needs to know
      * whether "unreachable" was a wrong port or a certificate.
      */
-    public var failureCause: Throwable? = null
+    internal var failureCause: Throwable? = null
         private set
 
     init {

@@ -1,6 +1,11 @@
 package dev.wildware.udea.net.transport
 
 import dev.wildware.udea.net.replication.ReplicationClient
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.plugins.websocket.webSocket
+import io.ktor.websocket.Frame
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -9,6 +14,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
@@ -29,7 +35,7 @@ import kotlin.time.Duration.Companion.seconds
 class WebSocketTransportTest {
 
     @Test
-    fun `snapshots stream from the server to a client and its acknowledgements flow back`() = runBlocking {
+    fun `snapshots stream from the server to a client and its acknowledgements flow back`() = runBlocking<Unit> {
         WebSocketSnapshotServer().use { server ->
             val socket = WebSocketTransport.client(server.url, server.protocol.protoHash)
             socket.use {
@@ -56,7 +62,7 @@ class WebSocketTransportTest {
     }
 
     @Test
-    fun `payload bytes arrive whole and in order in both directions`() = runBlocking {
+    fun `payload bytes arrive whole and in order in both directions`() = runBlocking<Unit> {
         WebSocketServerTransport.start(protoHash = TEST_PROTO_HASH).use { server ->
             WebSocketTransport.client(server.url, TEST_PROTO_HASH).use { client ->
                 val serverSink = RecordingSink()
@@ -81,7 +87,7 @@ class WebSocketTransportTest {
     }
 
     @Test
-    fun `a client built against a different protocol is denied by name`() = runBlocking {
+    fun `a client built against a different protocol is denied by name`() = runBlocking<Unit> {
         val serverEvents = RecordingListener()
         val clientEvents = RecordingListener()
         WebSocketServerTransport.start(protoHash = TEST_PROTO_HASH, listener = serverEvents).use { server ->
@@ -93,12 +99,14 @@ class WebSocketTransportTest {
                 assertEquals(emptyList(), serverEvents.connected)
                 assertEquals(emptyList(), server.connections())
                 assertTrue(!client.isConnected)
+                assertEquals(1L, server.counters.handshakesDenied)
+                assertEquals(0L, server.counters.handshakesCompleted)
             }
         }
     }
 
     @Test
-    fun `a full server denies the next client and keeps the first`() = runBlocking {
+    fun `a full server denies the next client and keeps the first`() = runBlocking<Unit> {
         WebSocketServerTransport.start(protoHash = TEST_PROTO_HASH, config = WebSocketConfig(maxClients = 1)).use { server ->
             WebSocketTransport.client(server.url, TEST_PROTO_HASH).use { first ->
                 pump({ server.poll(RecordingSink()); first.poll(RecordingSink()) }) { first.isConnected }
@@ -110,13 +118,15 @@ class WebSocketTransportTest {
                     assertEquals(DisconnectReason.ServerFull, second.failure)
                     assertTrue(first.isConnected)
                     assertEquals(listOf(PeerId.client(1)), server.connections())
+                    assertEquals(1L, server.counters.handshakesCompleted)
+                    assertEquals(1L, server.counters.handshakesDenied)
                 }
             }
         }
     }
 
     @Test
-    fun `a client that leaves frees its slot for the next one`() = runBlocking {
+    fun `a client that leaves frees its slot for the next one`() = runBlocking<Unit> {
         val serverEvents = RecordingListener()
         WebSocketServerTransport.start(protoHash = TEST_PROTO_HASH, listener = serverEvents).use { server ->
             val first = WebSocketTransport.client(server.url, TEST_PROTO_HASH)
@@ -135,7 +145,7 @@ class WebSocketTransportTest {
     }
 
     @Test
-    fun `a server that goes away disconnects its client`() = runBlocking {
+    fun `a server that goes away disconnects its client`() = runBlocking<Unit> {
         val clientEvents = RecordingListener()
         val server = WebSocketServerTransport.start(protoHash = TEST_PROTO_HASH)
         WebSocketTransport.client(server.url, TEST_PROTO_HASH, listener = clientEvents).use { client ->
@@ -148,16 +158,17 @@ class WebSocketTransportTest {
     }
 
     @Test
-    fun `a client with no server to reach fails as unreachable`() = runBlocking {
+    fun `a client with no server to reach fails as unreachable`() = runBlocking<Unit> {
         val closedPort = ServerSocket(0).use { it.localPort }
         WebSocketTransport.client("ws://${WebSocketServerTransport.LOOPBACK}:$closedPort/udea", TEST_PROTO_HASH).use { client ->
             pump({ client.poll(RecordingSink()) }) { client.failure != null }
             assertEquals(DisconnectReason.Unreachable, client.failure)
+            assertNotNull(client.failureCause, "an unreachable server keeps the refused connect as its cause")
         }
     }
 
     @Test
-    fun `a message over the configured limit is refused at the sender`() = runBlocking {
+    fun `a message over the configured limit is refused at the sender`() = runBlocking<Unit> {
         val config = WebSocketConfig(maxMessageBytes = 256)
         WebSocketServerTransport.start(protoHash = TEST_PROTO_HASH, config = config).use { server ->
             WebSocketTransport.client(server.url, TEST_PROTO_HASH, config).use { client ->
@@ -172,11 +183,30 @@ class WebSocketTransportTest {
     }
 
     @Test
-    fun `a send to a peer with no connection is counted rather than thrown`() = runBlocking {
+    fun `a send to a peer with no connection is counted rather than thrown`() = runBlocking<Unit> {
         WebSocketServerTransport.start(protoHash = TEST_PROTO_HASH).use { server ->
             val bytes = byteArrayOf(1, 2, 3)
             server.send(PeerId.client(7), bytes, 0, bytes.size)
             assertEquals(1L, server.counters.sendsToUnknownPeer)
+        }
+    }
+
+    @Test
+    fun `a connection that opens with anything but a hello is counted and dropped`() = runBlocking<Unit> {
+        val serverEvents = RecordingListener()
+        WebSocketServerTransport.start(protoHash = TEST_PROTO_HASH, listener = serverEvents).use { server ->
+            HttpClient(CIO) { install(WebSockets) }.use { http ->
+                http.webSocket(server.url) {
+                    send(Frame.Binary(true, WebSocketLayout.payload(byteArrayOf(1, 2, 3), 0, 3)))
+                    pump({ server.poll(RecordingSink()) }) { server.counters.malformed == 1L }
+                    // The server closes a connection it cannot make sense of rather than holding it.
+                    val ending = withTimeoutOrNull(PUMP_DEADLINE) { incoming.receiveCatching() }
+                    assertTrue(ending?.isClosed == true, "the server left the connection open: $ending")
+                }
+            }
+            assertEquals(emptyList(), serverEvents.connected)
+            assertEquals(emptyList(), server.connections())
+            assertEquals(0L, server.counters.handshakesCompleted)
         }
     }
 

@@ -5,6 +5,7 @@ import dev.wildware.udea.core.blueprint.Blueprint
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
 import dev.wildware.udea.core.blueprint.blueprintSpawner
 import dev.wildware.udea.core.blueprint.blueprints
+import dev.wildware.udea.core.level.LevelHooks
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.SimPhase
 import dev.wildware.udea.core.module.SimRegistry
@@ -20,7 +21,7 @@ import dev.wildware.udea.gas.GasModule
  *
  * ## One module, not two
  *
- * It owns a [GasModule] and forwards [context] and [simulation] to it, so a game adds combat by
+ * It owns a [GasModule] and forwards [context], [simulation] and [level] to it, so a game adds combat by
  * adding **this** to its module list and gets the engine half wired correctly by construction.
  * The alternative - asking every game to list `GasModule(tables...)` and a content module beside
  * it, in that order, with the same tables passed to both - is four chances to build a game whose
@@ -138,6 +139,12 @@ public class MobaAbilityModule(
     override fun context(builder: GameContextBuilder) {
         gas.context(builder)
         spawner?.let { builder.blueprintSpawner(it) }
+    }
+
+    // Forwarded for the reason the other two hooks are: `gas` is not in the game's module list, so
+    // a hook it does not receive from here it does not receive at all.
+    override fun level(hooks: LevelHooks) {
+        gas.level(hooks)
     }
 
     override fun simulation(registry: SimRegistry) {

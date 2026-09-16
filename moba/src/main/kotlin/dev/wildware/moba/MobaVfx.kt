@@ -31,6 +31,13 @@ import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.camera.CameraRig
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /**
  * Everything in this game that is drawn and is **not** a character: the arrow, and the flashes.
@@ -74,6 +81,7 @@ import dev.wildware.udea.render.camera.CameraRig
  *   that the simulation never knows about - is the better long-term shape and needs a cue
  *   *reader* on the presentation side, which is `udea-render` work rather than a game's.
  */
+@Serializable
 public class SpriteView(
     /**
      * The authored `spriteAnimation` this draws, by id.
@@ -88,7 +96,10 @@ public class SpriteView(
      * view at all, nothing drew it, nothing expired it, and six hundred ticks of a fight left a
      * hundred and seventy-six of them in the world. A required parameter is the only version of
      * this field that cannot be got wrong.
+     *
+     * Saved in a level file as its id string by [AssetIdLevelSerializer] (issue #191).
      */
+    @Serializable(with = AssetIdLevelSerializer::class)
     public var animation: AssetId,
     /** The tick the animation started on. The playhead is `clock.tick - startTick`. */
     public var startTick: Long = 0L,
@@ -122,6 +133,25 @@ public class SpriteView(
         /** An [expiryTick] no clock reaches: the entity is removed by something else, or never. */
         public const val FOREVER: Long = Long.MAX_VALUE
     }
+}
+
+/**
+ * An [AssetId] in a level file: its id string, read back through [AssetId]'s own checks.
+ *
+ * Here rather than on [AssetId] itself because `udea-assets` does not use kotlinx.serialization and
+ * [SpriteView] is the only saved component holding one; the day a second module needs it, this
+ * moves beside the type.
+ */
+internal object AssetIdLevelSerializer : KSerializer<AssetId> {
+
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("dev.wildware.udea.assets.AssetId", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: AssetId) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: Decoder): AssetId = AssetId(decoder.decodeString())
 }
 
 /**

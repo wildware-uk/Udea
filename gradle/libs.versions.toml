@@ -54,6 +54,12 @@ junitPlatform = "1.13.4"
 # which is why `kotlin` above had to move to 2.4.20 before any of this could be on the classpath
 # at all. `composegl-gdx` is a GL backend, so it is `udea-render`-only by UDEA-MG-002.
 composegl = "0.6.0"
+# kotlinx.serialization, for level files (issue #191): a saved level is Fleks' own
+# `world.snapshot()` encoded as CBOR. 1.11.0 is not a free choice: it is the version Fleks 2.14
+# itself requires (its `Snapshot` and `Entity` are `@Serializable` against it), so a lower entry
+# here would be upgraded to it by resolution anyway and the catalog would say something untrue.
+# Runtime snapshots - rewind, replication, desync reports - stay on `Replicator<T>`; AGENTS.md.
+kotlinxSerialization = "1.11.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -101,6 +107,8 @@ composegl-ui = { module = "dev.wildware.composegl:composegl-ui", version.ref = "
 # The libGDX backend: it draws a ComposeGL tree through a gdx `Batch`, so it names GL types and
 # may only ever be a dependency of `udea-render`.
 composegl-gdx = { module = "dev.wildware.composegl:composegl-gdx", version.ref = "composegl" }
+kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerialization" }
+kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinxSerialization" }
 junit5-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }
 
@@ -112,5 +120,9 @@ kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 # this plugin ships out of the Kotlin repository and is released in lockstep with the compiler,
 # so any other version is a version that cannot load. Applied to `udea-render` only.
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+# The kotlinx.serialization compiler plugin. Like `composeCompiler` it ships out of the Kotlin
+# repository in lockstep with the compiler, so `version.ref = "kotlin"` is the only version that
+# loads. Applied to the modules whose components a level file saves: udea-core, udea-gas, moba.
+kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 qodana = { id = "org.jetbrains.qodana", version.ref = "qodana" }

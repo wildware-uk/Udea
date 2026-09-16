@@ -6,6 +6,8 @@ import dev.wildware.udea.core.EngineConfig
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.NetRole
 import dev.wildware.udea.core.gameContext
+import dev.wildware.udea.core.level.LevelHooks
+import dev.wildware.udea.core.level.LevelService
 import dev.wildware.udea.core.loop.TimeTravelFactory
 import dev.wildware.udea.core.loop.WorldSimulation
 
@@ -112,7 +114,11 @@ public class UdeaGameDef(
         // for its whole life and there is no window in which a game is half wired for history.
         val travel = timeTravel?.create(ctx, world)
 
-        return UdeaGame(ctx, world, WorldSimulation(ctx, world, travel = travel), manifest)
+        val levelHooks = LevelHooks()
+        for (module in allModules) module.level(levelHooks)
+        val levels = LevelService(world, ctx, core.netIds, levelHooks)
+
+        return UdeaGame(ctx, world, WorldSimulation(ctx, world, travel = travel), manifest, levels)
     }
 
     override fun toString(): String =
@@ -125,11 +131,12 @@ public class UdeaGameDef(
 }
 
 /**
- * A built simulation: the context, the world, the thing that steps it, and the resolved order.
+ * A built simulation: the context, the world, the thing that steps it, the resolved order, and
+ * the level files that save and load its world.
  *
- * Deliberately not a god object — it holds four references and no behaviour of its own. It
- * exists so `build()` can hand back everything a host needs without a caller having to
- * reconstruct which world went with which context, which is exactly the mistake two worlds in
+ * Deliberately not a god object — it holds references and no behaviour of its own. It exists
+ * so `build()` can hand back everything a host needs without a caller having to reconstruct
+ * which world went with which context, which is exactly the mistake two worlds in
  * one JVM makes easy.
  */
 public class UdeaGame internal constructor(
@@ -138,6 +145,12 @@ public class UdeaGame internal constructor(
     public val simulation: WorldSimulation,
     /** Also reachable as `world.systemManifest()`; here so a host need not go through Fleks. */
     public val manifest: SystemManifest,
+    /**
+     * Saves this world to a level file and loads one into it (issue #191). A property of the
+     * built game rather than a `GameContext` service, because it needs the world, which is built
+     * after the context, and because no system has any business saving a level mid-tick.
+     */
+    public val levels: LevelService,
 ) {
     override fun toString(): String = "UdeaGame(${manifest.size} systems, ${world.numEntities} entities)"
 }

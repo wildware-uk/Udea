@@ -1,5 +1,13 @@
 package dev.wildware.udea.core.identity
 
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+
 /**
  * The identity of a simulated entity everywhere outside the Fleks world (spec 5,
  * "Entity identity").
@@ -36,7 +44,13 @@ package dev.wildware.udea.core.identity
  * bits, so a single index must be recycled 256 times before a stale id can alias again; the
  * FIFO free list in [NetIdIndex] is what makes reaching that in practice unlikely, because
  * a freed index goes to the back of the queue rather than being handed straight back out.
+ *
+ * ## In a level file
+ *
+ * Written as its raw word by [NetIdSerializer], and read back through [ofRaw], so a level file
+ * with a reserved bit set is refused at load rather than producing an id no allocator issued.
  */
+@Serializable(with = NetIdSerializer::class)
 @JvmInline
 public value class NetId private constructor(public val raw: Int) : Comparable<NetId> {
 
@@ -111,4 +125,23 @@ public value class NetId private constructor(public val raw: Int) : Comparable<N
             return NetId(raw)
         }
     }
+}
+
+/**
+ * A [NetId] in a level file: the raw 32-bit word, read back through [NetId.ofRaw].
+ *
+ * Hand-written so that every id read from a file goes through [NetId.ofRaw]'s reserved-bit check
+ * rather than being built from whatever word the file holds. Public because the serializer the plugin generates for a saved component in another
+ * module - `moba`'s `Projectile.owner` - references it by name.
+ */
+public object NetIdSerializer : KSerializer<NetId> {
+
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("dev.wildware.udea.core.identity.NetId", PrimitiveKind.INT)
+
+    override fun serialize(encoder: Encoder, value: NetId) {
+        encoder.encodeInt(value.raw)
+    }
+
+    override fun deserialize(decoder: Decoder): NetId = NetId.ofRaw(decoder.decodeInt())
 }

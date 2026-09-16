@@ -1,5 +1,7 @@
 package dev.wildware.udea.gas
 
+import kotlinx.serialization.Serializable
+
 /**
  * Identifies one *applied* effect on one entity, for the life of that application.
  *
@@ -11,6 +13,7 @@ package dev.wildware.udea.gas
  * without rolling the counter back — so an ability's `cooldownHandle` pointed at a handle the
  * restored world had never allocated, and the ability came off cooldown early.
  */
+@Serializable
 @JvmInline
 public value class EffectHandle(public val raw: Int) : Comparable<EffectHandle> {
 

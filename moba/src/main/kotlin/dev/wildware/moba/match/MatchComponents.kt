@@ -5,6 +5,7 @@ import com.github.quillraven.fleks.ComponentType
 import dev.wildware.moba.level.Team
 import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
+import kotlinx.serialization.Serializable
 import dev.wildware.udea.annotations.Sim
 
 /**
@@ -76,6 +77,7 @@ public enum class MatchPhase {
  * `Tick`. Durations are compared against them in ticks (see [MatchRules]), so a match resolves
  * on the same tick on a 30Hz server and a 144Hz client.
  */
+@Serializable
 @Replicated
 public class MatchState(
     /** Which match of this session this is. One-based; the first is 1. */
@@ -159,6 +161,7 @@ public class MatchState(
  *   means walking `GameplayEffects` and returning handles to the allocator, which belongs to the
  *   effect system and not here.
  */
+@Serializable
 @Replicated
 public class Respawn(
     /** How many times this unit has died. Reset with the match, because the entity is. */

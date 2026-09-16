@@ -4,6 +4,7 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.identity.NetId
+import kotlinx.serialization.Serializable
 
 /** Where an activation has got to. Serializable, because it is a number on an instance. */
 public enum class AbilityPhase {
@@ -55,7 +56,11 @@ public enum class AbilityTargetKind {
  * Everything here is a primitive or a [NetId], so a `Replicator` lowers it and a restore rebuilds
  * it exactly. Instances are preallocated per slot and reused, so granting and activating allocate
  * nothing.
+ *
+ * `@Serializable` for level files (issue #191): every field is written by name, including the
+ * scratch arrays an in-flight exec keeps between ticks.
  */
+@Serializable
 public class AbilityInstance internal constructor(
     /** Which slot of the owning component this is. Fixed for the component's life. */
     public val slot: Int,
@@ -200,16 +205,27 @@ public class AbilityInstance internal constructor(
  * index. Slots are preallocated, so granting allocates nothing and an ungranted slot is simply an
  * instance with `abilityIndex == -1`.
  */
-public class Abilities(
-    /** How many ability slots this entity has. */
-    slotCount: Int = DEFAULT_SLOTS,
+@Serializable
+public class Abilities private constructor(
+    /**
+     * One instance per slot, in slot order. The primary constructor takes the array rather than a
+     * count so a level file can hand back the saved instances (issue #191); game code builds one
+     * with the slot-count constructor below.
+     */
+    private val instances: Array<AbilityInstance>,
 ) : Component<Abilities> {
 
-    init {
-        require(slotCount > 0) { "slotCount must be positive, was $slotCount" }
-    }
+    /** An entity with [slotCount] empty ability slots. */
+    public constructor(slotCount: Int = DEFAULT_SLOTS) : this(emptySlots(slotCount))
 
-    private val instances: Array<AbilityInstance> = Array(slotCount) { AbilityInstance(it) }
+    init {
+        // Can only fail for instances decoded from a level file, which carry their own slot numbers.
+        for (index in instances.indices) {
+            require(instances[index].slot == index) {
+                "ability slot $index holds the instance for slot ${instances[index].slot}"
+            }
+        }
+    }
 
     /** Increments per activation across every slot, giving each activation a distinct id. */
     private var nextInstanceId: Int = 1
@@ -267,6 +283,11 @@ public class Abilities(
     public companion object : ComponentType<Abilities>() {
         /** Slots a champion gets: four abilities plus two item actives. */
         public const val DEFAULT_SLOTS: Int = 6
+
+        private fun emptySlots(slotCount: Int): Array<AbilityInstance> {
+            require(slotCount > 0) { "slotCount must be positive, was $slotCount" }
+            return Array(slotCount) { AbilityInstance(it) }
+        }
     }
 }
 

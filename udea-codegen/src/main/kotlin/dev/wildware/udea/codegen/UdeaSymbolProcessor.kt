@@ -6,6 +6,7 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
@@ -15,6 +16,7 @@ import dev.wildware.udea.codegen.agent.AgentPass
 import dev.wildware.udea.codegen.agent.AgentStateModel
 import dev.wildware.udea.codegen.agent.ToolManifest
 import dev.wildware.udea.codegen.agent.ToolModel
+import dev.wildware.udea.codegen.level.LevelComponentScanner
 import dev.wildware.udea.codegen.protocol.LockedComponent
 import dev.wildware.udea.codegen.protocol.LockedField
 import dev.wildware.udea.codegen.protocol.NetProtocolEmitter
@@ -66,6 +68,7 @@ internal class UdeaSymbolProcessor(
     private val models = ComponentModelBuilder(logger)
     private val agent = AgentPass(logger)
     private val rpcs = RpcModelBuilder(logger)
+    private val levelComponents = LevelComponentScanner(logger)
 
     /**
      * KSP calls `process` once per round. Nothing here defers a symbol, so the module-level
@@ -73,6 +76,8 @@ internal class UdeaSymbolProcessor(
      * from rewriting them as an empty index.
      */
     private var emittedModuleFiles = false
+
+    private var emittedLevelIndex = false
 
     /** So a malformed `udea.moduleName` is reported once and not once per KSP round. */
     private var reportedModuleName = false
@@ -96,7 +101,12 @@ internal class UdeaSymbolProcessor(
         // whose only networking is RPCs, which is the failure mode the agent pass already
         // taught this method once.
         val rpcFunctions = rpcFunctions(resolver)
-        if (components.isEmpty() && agentIsEmpty && rpcFunctions.isEmpty()) return emptyList()
+        // The level pass shares the round and nothing else, for the reason the RPC pass does: a
+        // module may declare saveable components and nothing else at all - `udea-core` and
+        // `udea-gas` do exactly that - and an early return keyed on the other three would
+        // generate no list for them, so their levels would refuse to save.
+        val saveable = levelComponents.find(resolver)
+        if (components.isEmpty() && agentIsEmpty && rpcFunctions.isEmpty() && saveable.isEmpty()) return emptyList()
         // Validated once, here, and not at each writer. `udea.moduleName` gates the lock, the
         // protoHash, both ServiceLoader indexes and the tool manifest, and a module whose name
         // is malformed can produce none of them - so a check inside one writer and a bare
@@ -109,6 +119,7 @@ internal class UdeaSymbolProcessor(
         // `RpcRegistry` builds, so a module can emit its guards even while its component list
         // is being argued about.
         writeRpcFiles(rpcFunctions)
+        writeLevelIndex(saveable)
         if (components.isEmpty()) {
             if (emittedModuleFiles) return emptyList()
             val agentResult = agent.run(resolver)
@@ -214,6 +225,38 @@ internal class UdeaSymbolProcessor(
      * Sorted for the reason the component list is: the set of emitted files and their contents
      * must depend on the sources alone and not on the order KSP happened to hand them over.
      */
+    /**
+     * `<Module>LevelComponents` and its `META-INF/services` line: the list a level file's
+     * polymorphic component section is registered from (issue #191).
+     *
+     * Needs `udea.moduleName`, because the index is named after the module and two unnamed
+     * modules would write the same class. Without it this is an error rather than a skip: the
+     * cost of skipping is a level that refuses to save at run time, naming a component whose
+     * module simply never said what it was called.
+     */
+    private fun writeLevelIndex(found: List<LevelComponentScanner.Found>) {
+        if (found.isEmpty() || emittedLevelIndex) return
+        val moduleName = options.moduleName
+        if (moduleName == null) {
+            logger.error(
+                "this module declares ${found.size} @Serializable Fleks component(s) but the build " +
+                    "did not set ${CodegenOptions.MODULE_NAME}, so no level component list can be " +
+                    "generated for them and a level holding one would refuse to save. Set it in " +
+                    "this module's ksp { } block.",
+            )
+            return
+        }
+        emittedLevelIndex = true
+        writeServiceIndexElements(
+            service = CoreNames.LEVEL_COMPONENT_MODULE,
+            index = GeneratedNames.levelComponents(moduleName),
+            moduleName = moduleName,
+            property = ServiceIndexEmitter.LEVEL_COMPONENTS,
+            members = found.map { ServiceIndexEmitter.levelComponent(it.className) },
+            dependencies = aggregating(found.map(LevelComponentScanner.Found::containingFile)),
+        )
+    }
+
     private fun rpcFunctions(resolver: Resolver): List<KSFunctionDeclaration> =
         resolver.getSymbolsWithAnnotation(AnnotationNames.RPC)
             .filterIsInstance<KSFunctionDeclaration>()
@@ -442,14 +485,31 @@ internal class UdeaSymbolProcessor(
         members: List<ClassName>,
         dependencies: Dependencies,
     ) {
-        val serviceName = ClassName.bestGuess(service ?: return)
+        writeServiceIndexElements(
+            service = ClassName.bestGuess(service ?: return),
+            index = index,
+            moduleName = moduleName,
+            property = property,
+            members = members.map { CodeBlock.of("%T", it) },
+            dependencies = dependencies,
+        )
+    }
+
+    private fun writeServiceIndexElements(
+        service: ClassName,
+        index: ClassName,
+        moduleName: String,
+        property: ServiceIndexEmitter.Member,
+        members: List<CodeBlock>,
+        dependencies: Dependencies,
+    ) {
         writeAggregating(
-            ServiceIndexEmitter.emit(serviceName, index, moduleName, property, members),
+            ServiceIndexEmitter.emitElements(service, index, moduleName, property, members),
             dependencies,
         )
         codeGenerator.createNewFileByPath(
             dependencies = dependencies,
-            path = ServiceIndexEmitter.resourcePath(serviceName),
+            path = ServiceIndexEmitter.resourcePath(service),
             extensionName = "",
         ).use { stream ->
             stream.write(ServiceIndexEmitter.resourceContent(index).toByteArray(StandardCharsets.UTF_8))

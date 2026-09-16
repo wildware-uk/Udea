@@ -1,6 +1,7 @@
 package dev.wildware.udea.core.module
 
 import dev.wildware.udea.core.GameContextBuilder
+import dev.wildware.udea.core.level.LevelHooks
 
 /**
  * A unit of engine or game content, registered explicitly.
@@ -50,4 +51,10 @@ public interface UdeaModule {
 
     /** Declares this module's simulation systems, their phases and their ordering. */
     public fun simulation(registry: SimRegistry) {}
+
+    /**
+     * Contributes to level files: serializers for live objects a saved component refers to, and
+     * state to rebuild once a level has loaded. Most modules have neither. See [LevelHooks].
+     */
+    public fun level(hooks: LevelHooks) {}
 }

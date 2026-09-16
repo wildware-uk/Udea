@@ -3,6 +3,13 @@ package dev.wildware.udea.core.physics
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.core.identity.NetId
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /**
  * The authoritative description of a body. **The components are the truth; the solver is
@@ -16,6 +23,7 @@ import dev.wildware.udea.core.identity.NetId
  * `x`/`y`/`angle` rather than a `Vector2`: `udea-core` has no gdx-math, and a component whose
  * field type came from LibGDX would put LibGDX on the classpath of every module that reads it.
  */
+@Serializable
 public class PhysicsBody(
     public var kind: BodyKind = BodyKind.Dynamic,
     public var x: Float = 0f,
@@ -50,7 +58,12 @@ public class PhysicsBody(
      * `rebuildFrom` reassigns it — handing out handles to bodies that no longer exist, or, on a
      * backend that recycles indices, to somebody else's. `NoBox2DInCoreTest` fails if an
      * annotation appears on a `BodyHandle` property anywhere in this module.
+     *
+     * `@Transient` for the same reason in a level file (issue #191): a load rebuilds every body
+     * from the components with [PhysicsWorld.rebuildFrom], so the handle is reassigned there and
+     * a saved one could only ever be stale.
      */
+    @Transient
     public var handle: BodyHandle = BodyHandle.NONE
 
     override fun type(): ComponentType<PhysicsBody> = PhysicsBody
@@ -78,6 +91,7 @@ public sealed interface ShapeComponent {
 }
 
 /** An axis-aligned box, by half-extents. */
+@Serializable
 public class Box(
     public var halfWidth: Float = 0.5f,
     public var halfHeight: Float = 0.5f,
@@ -95,6 +109,7 @@ public class Box(
 }
 
 /** A circle centred on the body origin. */
+@Serializable
 public class Circle(public var radius: Float = 0.5f) : Component<Circle>, ShapeComponent {
 
     override val shapeOrder: Int get() = ORDER
@@ -109,6 +124,7 @@ public class Circle(public var radius: Float = 0.5f) : Component<Circle>, ShapeC
 }
 
 /** A vertical capsule: a box of `2 * halfHeight` capped by two circles of [radius]. */
+@Serializable
 public class Capsule(
     public var radius: Float = 0.5f,
     public var halfHeight: Float = 0.5f,
@@ -131,7 +147,12 @@ public class Capsule(
  * [vertices] is `x0, y0, x1, y1, ...` — a flat array rather than a list of points because it
  * is level data, sized once and read many times, and a `List<Vector2>` would be one allocation
  * per vertex plus a LibGDX type in a kernel signature.
+ *
+ * Saved in a level through [ChainSerializer], because its constructor parameter is not the
+ * property: the property is a `var` behind a checking setter, which the plugin cannot generate
+ * a serializer for directly.
  */
+@Serializable(with = ChainSerializer::class)
 public class Chain(vertices: FloatArray = FloatArray(0)) : Component<Chain>, ShapeComponent {
 
     /**
@@ -173,6 +194,24 @@ public class Chain(vertices: FloatArray = FloatArray(0)) : Component<Chain>, Sha
     }
 }
 
+/** [Chain] in a level file: the same one field, read back through the constructor's check. */
+@Serializable
+@SerialName("dev.wildware.udea.core.physics.Chain")
+private class ChainSurrogate(val vertices: FloatArray)
+
+/** Writes a [Chain] as its vertices, and reads it back through the even-pairs check. */
+internal object ChainSerializer : KSerializer<Chain> {
+
+    override val descriptor: SerialDescriptor = ChainSurrogate.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: Chain) {
+        encoder.encodeSerializableValue(ChainSurrogate.serializer(), ChainSurrogate(value.vertices))
+    }
+
+    override fun deserialize(decoder: Decoder): Chain =
+        Chain(decoder.decodeSerializableValue(ChainSurrogate.serializer()).vertices)
+}
+
 /**
  * A request to move a body discontinuously, consumed once at
  * [dev.wildware.udea.core.module.SimPhase.PreSimulation].
@@ -185,6 +224,7 @@ public class Chain(vertices: FloatArray = FloatArray(0)) : Component<Chain>, Sha
  *
  * Removed by `TeleportSystem` after it applies, so it cannot re-fire on the next tick.
  */
+@Serializable
 public class Teleport(
     public var x: Float = 0f,
     public var y: Float = 0f,

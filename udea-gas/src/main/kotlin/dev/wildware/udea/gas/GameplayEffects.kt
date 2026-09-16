@@ -4,6 +4,13 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.identity.NetId
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /**
  * The effects currently applied to one entity, as parallel primitive arrays.
@@ -28,7 +35,14 @@ import dev.wildware.udea.core.identity.NetId
  * `_gameplayEffectSpecs.find { it.handle == handle }` at `Abilities.kt:88`, and it is why the
  * recompute's sort is stable in the only sense that matters — the input order is already a
  * total order.
+ *
+ * ## In a level file
+ *
+ * Written by [LevelSerializer] as the applied slots only, one named array per column (issue #191).
+ * Not the plugin's own serializer, because the constructor takes a capacity rather than the
+ * columns, and because the spare capacity beyond [count] is not state.
  */
+@Serializable(with = GameplayEffects.LevelSerializer::class)
 public class GameplayEffects(
     initialCapacity: Int = DEFAULT_CAPACITY,
 ) : Component<GameplayEffects> {
@@ -287,6 +301,78 @@ public class GameplayEffects(
     }
 
     override fun toString(): String = "GameplayEffects($count/$capacity)"
+
+    /** The applied slots, column by column, trimmed to [count]. */
+    @Serializable
+    @SerialName("dev.wildware.udea.gas.GameplayEffects")
+    private class Saved(
+        val handles: IntArray,
+        val defIndices: IntArray,
+        val appliedTicks: LongArray,
+        val durations: LongArray,
+        val nextPeriodTicks: LongArray,
+        val periodTicks: IntArray,
+        val stacks: IntArray,
+        val sources: IntArray,
+        val setByCallerTags: IntArray,
+        val setByCallerValues: FloatArray,
+    )
+
+    /** How a [GameplayEffects] is written into a level file. See the class KDoc. */
+    internal object LevelSerializer : KSerializer<GameplayEffects> {
+
+        override val descriptor: SerialDescriptor = Saved.serializer().descriptor
+
+        override fun serialize(encoder: Encoder, value: GameplayEffects) {
+            val count = value.count
+            val saved = Saved(
+                handles = value.handles.copyOf(count),
+                defIndices = value.defIndices.copyOf(count),
+                appliedTicks = value.appliedTicks.copyOf(count),
+                durations = value.durations.copyOf(count),
+                nextPeriodTicks = value.nextPeriodTicks.copyOf(count),
+                periodTicks = value.periodTicks.copyOf(count),
+                stacks = value.stacks.copyOf(count),
+                sources = value.sources.copyOf(count),
+                setByCallerTags = value.setByCallerTags.copyOf(count * SET_BY_CALLER_SLOTS),
+                setByCallerValues = value.setByCallerValues.copyOf(count * SET_BY_CALLER_SLOTS),
+            )
+            encoder.encodeSerializableValue(Saved.serializer(), saved)
+        }
+
+        override fun deserialize(decoder: Decoder): GameplayEffects {
+            val saved = decoder.decodeSerializableValue(Saved.serializer())
+            val count = saved.handles.size
+            val columns = listOf(
+                saved.defIndices.size, saved.appliedTicks.size, saved.durations.size,
+                saved.nextPeriodTicks.size, saved.periodTicks.size, saved.stacks.size, saved.sources.size,
+            )
+            val magnitudes = count * SET_BY_CALLER_SLOTS
+            if (columns.any { it != count } ||
+                saved.setByCallerTags.size != magnitudes ||
+                saved.setByCallerValues.size != magnitudes
+            ) {
+                throw SerializationException(
+                    "a saved effect list's columns disagree about how many effects it holds: " +
+                        "$count handles, $columns, ${saved.setByCallerTags.size} and " +
+                        "${saved.setByCallerValues.size} magnitudes",
+                )
+            }
+            val effects = GameplayEffects(maxOf(count, DEFAULT_CAPACITY))
+            saved.handles.copyInto(effects.handles)
+            saved.defIndices.copyInto(effects.defIndices)
+            saved.appliedTicks.copyInto(effects.appliedTicks)
+            saved.durations.copyInto(effects.durations)
+            saved.nextPeriodTicks.copyInto(effects.nextPeriodTicks)
+            saved.periodTicks.copyInto(effects.periodTicks)
+            saved.stacks.copyInto(effects.stacks)
+            saved.sources.copyInto(effects.sources)
+            saved.setByCallerTags.copyInto(effects.setByCallerTags)
+            saved.setByCallerValues.copyInto(effects.setByCallerValues)
+            effects.count = count
+            return effects
+        }
+    }
 
     public companion object : ComponentType<GameplayEffects>() {
 

@@ -33,6 +33,12 @@ the build when one of them moves — see "Frozen contracts" below for the delibe
 - **No separate snapshot codec.** One `Replicator<T>` per component serves delta replication,
   snapshot capture, snapshot restore and the agent's field access. Four things that cannot
   disagree about what an entity is.
+  **Level files are not snapshots.** Runtime snapshots - rewind, replication, desync reports -
+  stay on `Replicator<T>`. A level file (`.udealevel`, issue #191) is saved content: it is Fleks'
+  own `world.snapshot()` encoded with kotlinx CBOR through `UdeaGame.levels`, over the
+  `@Serializable` components `udea-codegen` lists per module, plus the `NetId` bindings, clock,
+  random streams and each module's `LevelSection`. It stores field names so it survives a
+  component changing, and it never feeds rewind or the wire.
 - **No setter instrumentation for dirty tracking.** In-place `Vector2` mutation defeats setters.
   Capture-and-diff, always.
 - **No wall clock in simulation.** `System.currentTimeMillis`, `nanoTime`, `Instant.now` are

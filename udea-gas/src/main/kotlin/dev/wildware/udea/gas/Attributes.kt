@@ -3,6 +3,8 @@ package dev.wildware.udea.gas
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.core.snapshot.StableHash
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.Serializable
 
 /**
  * One entity's attribute values: authoritative [base], derived [current].
@@ -24,9 +26,13 @@ import dev.wildware.udea.core.snapshot.StableHash
  * rollback incapable of leaving a corrupted stat behind. So the snapshot carries `base` and the
  * effect list, and `current` reappears on the first tick after a restore.
  */
+@Serializable
 public class Attributes(
-    /** The table these values are indexed by. Shared, never per entity. */
-    public val table: AttributeTable,
+    /**
+     * The table these values are indexed by. Shared, never per entity - and so, in a level file,
+     * referenced by its attribute names rather than written out (issue #191).
+     */
+    @Contextual public val table: AttributeTable,
 ) : Component<Attributes> {
 
     /** Authoritative values. Written by instant and periodic effects, and replicated. */
@@ -40,6 +46,15 @@ public class Attributes(
      * writer is `AttributeSystem`.
      */
     public val current: FloatArray = base.copyOf()
+
+    init {
+        // Can only fail for a component decoded from a level file: the constructor sizes both from the
+        // table, and a level decodes them from bytes that could have been written for another.
+        require(base.size == table.count && current.size == table.count) {
+            "attribute arrays hold ${base.size} base and ${current.size} current values for a table " +
+                "of ${table.count}"
+        }
+    }
 
     override fun type(): ComponentType<Attributes> = Attributes
 

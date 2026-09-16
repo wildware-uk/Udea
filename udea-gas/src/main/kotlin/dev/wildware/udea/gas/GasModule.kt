@@ -2,6 +2,7 @@ package dev.wildware.udea.gas
 
 import dev.wildware.udea.core.GameContextBuilder
 import dev.wildware.udea.core.ServiceKey
+import dev.wildware.udea.core.level.LevelHooks
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.SimPhase
 import dev.wildware.udea.core.module.SimRegistry
@@ -139,5 +140,15 @@ public class GasModule(
         registry.add(SimPhase.Ability, { ctx -> AbilitySystem(activation, ctx[CoreModule.NET_IDS]) })
         registry.add(SimPhase.Attribute, { AttributeSystem(recompute) })
         registry.add(SimPhase.Cleanup, { GasCueForwardSystem(cues) })
+    }
+
+    /**
+     * A saved `Attributes` references this module's [attributes] table rather than carrying a
+     * copy of it, and the effect-handle counter travels with the level so handles issued after a
+     * load are the ones the saved match would have issued (issue #191).
+     */
+    override fun level(hooks: LevelHooks) {
+        hooks.reference(AttributeTable::class, AttributeTableReference(attributes))
+        hooks.section(EffectHandleSection(handles))
     }
 }

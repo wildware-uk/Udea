@@ -4,6 +4,7 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
+import kotlinx.serialization.Serializable
 import dev.wildware.udea.annotations.Visibility
 import dev.wildware.udea.assets.AssetIndex
 
@@ -49,6 +50,7 @@ import dev.wildware.udea.assets.AssetIndex
  * rather than a partial one, and `InventoryVisibilityTest` is what says so against two live
  * clients rather than against a mask.
  */
+@Serializable
 @Replicated
 public class Inventory(
     /**

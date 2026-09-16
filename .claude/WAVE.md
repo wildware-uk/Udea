@@ -2,15 +2,17 @@
 
 ## kmp baseline
 
-SHA `d97517b` (kmp after #200 merge), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `90b26fc` (kmp after #201 merge), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
-**BUILD SUCCESSFUL. Failing tasks: none.** (220 actionable tasks.) Refresh after every merge.
+**BUILD SUCCESSFUL. Failing tasks: none.**
+
+Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
 
 ## Wave 1 in flight
 
 - #200 Kool Offscreen spike: **merged** `d97517b`, round 1 PASS. Answer yes: Kool 0.19.0, GL on llvmpipe under xvfb. Needs X11 GLFW init workaround (see #200 comments).
-- #201 KMP convention plugin: `dev-201`, branch `issue-201-kmp-convention-plugin`.
+- #201 KMP convention plugin: **merged** `90b26fc`, round 1 PASS. Plugins `udea.kotlin-multiplatform` and `udea.kotlin-multiplatform-render`; macOS CI job `ios-tests` lists converted modules by hand, so each port ticket adds its module there. `udeaVerifyDeterminism` layout needs the KMP fix in #203.
 
 ## What happened
 

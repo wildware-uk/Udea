@@ -260,7 +260,12 @@ class Box2DPhysicsWorldTest {
                 body(kind = BodyKind.Static),
                 shapes = arrayOf(Chain(floatArrayOf(0f, 0f, 50f, 0f, 50f, 50f))),
             )
-            val both = physics.add(body(), shapes = arrayOf(Box(), Circle(), Capsule()))
+            // Explicit `<ShapeComponent>`: Kotlin 2.4 makes reifying an inferred *intersection*
+            // type an error, and with three different shapes the argument types intersect to
+            // `Component<*> & ShapeComponent` before the `vararg shapes: ShapeComponent`
+            // parameter gets a say. The two calls above take one shape each and so never
+            // intersect anything.
+            val both = physics.add(body(), shapes = arrayOf<ShapeComponent>(Box(), Circle(), Capsule()))
 
             assertEquals(3, physics.fixtureCountOf(capsule), "a capsule is a box and two caps")
             assertEquals(1, physics.fixtureCountOf(chain))

@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.KtDiagnosticFactory0
 import org.jetbrains.kotlin.diagnostics.KtDiagnosticFactory1
 import org.jetbrains.kotlin.diagnostics.KtDiagnosticFactoryToRendererMap
+import org.jetbrains.kotlin.diagnostics.KtDiagnosticsContainer
 import org.jetbrains.kotlin.diagnostics.SourceElementPositioningStrategies
 import org.jetbrains.kotlin.diagnostics.error1
 import org.jetbrains.kotlin.diagnostics.rendering.BaseDiagnosticRendererFactory
@@ -39,7 +40,7 @@ import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
  * 64-field ceiling - a test of the renderer rather than of the checker. One `String`
  * parameter keeps every message in the checker that decides to raise it.
  */
-internal object UdeaDiagnostics {
+internal object UdeaDiagnostics : KtDiagnosticsContainer() {
 
     /**
      * Fires on a class named [dev.wildware.udea.compiler.UdeaCompilerPlugin.PROBE_CLASS_NAME]
@@ -129,20 +130,39 @@ internal object UdeaDiagnostics {
     }
 
     /**
-     * Renderer map, registered by the plugin registrar when checkers are on.
+     * How the compiler finds [Renderers] since Kotlin 2.4.
      *
+     * Each `error1`/`warning0` delegate above reads this off the container it was declared on
+     * and stores it in the factory itself, so a factory now cannot exist without a renderer.
+     * Before 2.4 the link went the other way -- the registrar pushed [Renderers] into a
+     * process-wide `RootDiagnosticRendererFactory`, and a factory whose map had not been
+     * registered rendered as the literal text `null`.
+     */
+    override fun getRendererFactory(): BaseDiagnosticRendererFactory = Renderers
+
+    /**
      * Every rule renders as `{0}` - the whole message is the parameter - so the text a
      * developer reads is byte-for-byte the text the checker built.
      */
     object Renderers : BaseDiagnosticRendererFactory() {
-        override val MAP: KtDiagnosticFactoryToRendererMap =
-            KtDiagnosticFactoryToRendererMap("Udea").apply {
-                put(
+        /**
+         * `by`, not `=`, and that is load-bearing rather than style.
+         *
+         * `KtDiagnosticFactoryToRendererMap`'s constructor became `internal` in Kotlin 2.4; the
+         * top-level function of the same name is the replacement and it returns a `Lazy`. The
+         * laziness is what breaks the initialisation cycle this pair has: [Renderers] reads
+         * `UdeaDiagnostics.factories`, and `UdeaDiagnostics`'s own delegates read
+         * [getRendererFactory], which is [Renderers]. Eager, whichever of the two the JVM
+         * touched first would see the other half-built.
+         */
+        override val MAP: KtDiagnosticFactoryToRendererMap by
+            KtDiagnosticFactoryToRendererMap("Udea") { map ->
+                map.put(
                     UDEA_PLUGIN_LOADED,
                     "The Udea K2 compiler plugin is loaded and its FIR checkers are running.",
                 )
-                for (factory in UdeaDiagnostics.factories.values) {
-                    put(factory, "{0}", CommonRenderers.STRING)
+                for (factory in factories.values) {
+                    map.put(factory, "{0}", CommonRenderers.STRING)
                 }
             }
     }

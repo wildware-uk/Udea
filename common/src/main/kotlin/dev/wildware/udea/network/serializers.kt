@@ -12,5 +12,10 @@ object InPlaceSerializers {
         return (serializers[this] ?: error("No inplace serializer found for $this")) as InPlaceSerializer<T>
     }
 
-    inline fun <reified T> T.inPlaceSerializer() = this::class.inPlaceSerializer()
+    // `T : Any`, not `T`, since Kotlin 2.4 rejects a class literal on a nullable expression
+    // (issue #186). It is the true constraint rather than a `!!`: `this::class` on a null
+    // receiver throws, so no caller ever passed one. Nothing in this module calls this
+    // overload -- every use site goes through the `KClass<in T>` one above -- so the tighter
+    // bound breaks nothing.
+    inline fun <reified T : Any> T.inPlaceSerializer() = this::class.inPlaceSerializer()
 }

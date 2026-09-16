@@ -10,6 +10,7 @@ import kotlin.script.experimental.api.ide
 import kotlin.script.experimental.api.implicitReceivers
 import kotlin.script.experimental.jvm.dependenciesFromClassContext
 import kotlin.script.experimental.jvm.jvm
+import dev.wildware.udea.assets.compiler.EMBEDDED_JVM_TARGET
 import kotlin.script.experimental.jvm.jvmTarget
 
 /**
@@ -59,7 +60,7 @@ public object UdeaAssetScriptConfiguration : ScriptCompilationConfiguration({
     }
 
     jvm {
-        jvmTarget("17")
+        jvmTarget(EMBEDDED_JVM_TARGET)
         // Named artefacts, never `wholeClasspath = true`. This list is what an IDE resolves
         // against; a build resolves against the classpath AssetCompiler passes in.
         dependenciesFromClassContext(

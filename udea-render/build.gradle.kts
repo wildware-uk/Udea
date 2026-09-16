@@ -2,11 +2,30 @@ import dev.wildware.udea.build.ModuleGraphRules
 
 plugins {
     id("udea.kotlin-library-gl")
+
+    // ComposeGL is a Compose library, so consuming it needs the Compose compiler plugin: it is
+    // what rewrites a `@Composable` into a function taking a `Composer` and what makes
+    // `remember`/`mutableStateOf` anything other than an intrinsic that throws. Applied here and
+    // nowhere else -- `udea-render` is the only module the graph lets see a renderer at all, and
+    // the plugin has nothing to do in a module with no composables.
+    //
+    // Not in `udea.kotlin-library-gl`, even though `udea-render` is that convention's only user
+    // today. The convention's stated job is "this module is allowed GL"; Compose is a separate
+    // permission, and rolling the two together would mean the next GL-allowed module silently
+    // acquired a compiler plugin it never asked for.
+    alias(libs.plugins.composeCompiler)
 }
 
 dependencies {
     api(project(":udea-core"))
     implementation(project(":udea-assets"))
+
+    // ComposeGL (issue #186; #187 puts `UiLayer` on it). `udea-render` only: `composegl-gdx` is a
+    // GL backend, so UDEA-MG-002 bans it from every headless module, and this is the one module
+    // the graph allows GL in. `implementation` rather than `api` for the same reason gdx is:
+    // nothing consuming this module should be able to see the renderer's toolkit.
+    implementation(libs.composegl.ui)
+    implementation(libs.composegl.gdx)
 
     // The gdx desktop natives. Runtime-only because nothing compiles against them: the
     // LWJGL3 backend loads `gdx64.dll`/`libgdx64.so` through `SharedLibraryLoader` at

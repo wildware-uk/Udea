@@ -38,7 +38,14 @@ internal object UdeaReplicatedPropertyChecker : FirPropertyChecker(MppCheckerKin
         // on top would name the wrong defect and send the author looking in the wrong place.
         if (UdeaFieldTypes.isUnresolved(type)) return
 
-        val name = declaration.symbol.callableId.asSingleFqName().asString()
+        // `callableId` became nullable in Kotlin 2.4: a *local* property is a `FirProperty` with
+        // no callable id, because there is no class or file-level scope to qualify it against.
+        // It is used for the message text and nothing else, so the fallback is the simple name
+        // rather than an early return -- `@Net` on a local val is exactly the silent-failure
+        // case this checker's KDoc refuses to narrow away, and skipping it because the compiler
+        // cannot spell its full name would be narrowing it away by accident.
+        val name = declaration.symbol.callableId?.asSingleFqName()?.asString()
+            ?: declaration.name.asString()
         val source = declaration.source
 
         // Only a *directly stored* val is the defect: a composite `@Net val position: Vector2`

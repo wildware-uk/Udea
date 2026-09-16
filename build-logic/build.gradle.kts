@@ -137,6 +137,14 @@ val outerBuildInputs: FileCollection = files(
     // is exactly the edit those want to run on, and exactly the edit that left them cached.
     rootDir.resolve("../gradle/libs.versions.toml"),
 
+    // The root build script, for the other half of the same pin (issue #186). The root's
+    // `allprojects` block sets `jvmTarget`/`sourceCompatibility` for the whole tree - including
+    // the old tree, which is not on the `udea.kotlin-library` convention and so never sees
+    // `UdeaVersions.JVM_TOOLCHAIN`. Those two numbers disagreeing is not a compile error: it is
+    // `udea-render` declaring one `org.gradle.jvm.version` and compiling to another, which
+    // surfaces as a resolution failure against ComposeGL somewhere else entirely.
+    rootDir.resolve("../build.gradle.kts"),
+
     // `TrelloMapTest` reads the spec and the map and asserts they account for each other, so
     // either one moving on its own is the whole point of it. Both were undeclared, which made
     // it a comparison of two files nothing re-read.

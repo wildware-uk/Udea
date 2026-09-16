@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.compiler.plugin.AbstractCliOption
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.extensions.ProjectExtensionDescriptor
+import org.jetbrains.kotlin.extensions.ExtensionPointDescriptor
 import org.jetbrains.kotlin.fir.analysis.extensions.FirAdditionalCheckersExtension
 import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
 import org.jetbrains.kotlin.fir.extensions.FirExtension
@@ -20,13 +20,22 @@ import kotlin.test.assertTrue
  *
  * `ExtensionStorage` is the compiler's own collector, so "registered zero extensions" is
  * asserted against the real structure the compiler goes on to read, not a stand-in.
+ *
+ * `CompilerConfiguration.Internals` is opted into for the same reason as in
+ * `UdeaCommandLineProcessorTest`: from Kotlin 2.4 the constructor is marked internal to the
+ * compiler and there is no public route to an empty configuration, which is what
+ * `registerExtensions` takes.
  */
-@OptIn(ExperimentalCompilerApi::class)
+@OptIn(ExperimentalCompilerApi::class, CompilerConfiguration.Internals::class)
 class UdeaCompilerPluginRegistrarTest {
 
     private fun register(
         vararg options: Pair<String, String>,
-    ): Map<ProjectExtensionDescriptor<*>, List<Any>> {
+    // `ExtensionStorage.registeredExtensions` is keyed on `ExtensionPointDescriptor` from
+    // Kotlin 2.4, where it used to be keyed on the `ProjectExtensionDescriptor` subtype. The
+    // assertion below is unchanged in substance -- `FirExtensionRegistrarAdapter.Companion` is
+    // still the one key -- but that companion's supertype moved up with it.
+    ): Map<ExtensionPointDescriptor<*>, List<Any>> {
         val configuration = CompilerConfiguration()
         val processor = UdeaCommandLineProcessor()
         for ((name, value) in options) {
@@ -62,7 +71,7 @@ class UdeaCompilerPluginRegistrarTest {
         val registered = register()
 
         assertEquals(
-            listOf<ProjectExtensionDescriptor<*>>(FirExtensionRegistrarAdapter.Companion),
+            listOf<ExtensionPointDescriptor<*>>(FirExtensionRegistrarAdapter.Companion),
             registered.keys.toList(),
             "the plugin contributes FIR extensions and nothing else - no IR, ever (spec 3.2)",
         )

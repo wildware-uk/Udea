@@ -2,11 +2,11 @@ import org.gradle.internal.execution.caching.CachingState.enabled
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "2.2.10"
+    kotlin("jvm") version "2.4.20"
     id("java-library")
     id("maven-publish")
-    kotlin("plugin.serialization") version "2.2.10"
-    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+    kotlin("plugin.serialization") version "2.4.20"
+    id("com.google.devtools.ksp") version "2.3.12"
     id("kotlin-kapt")
 }
 

@@ -16,7 +16,7 @@ copy reviewed.
 
 | Plugin | For | What it gives you |
 |---|---|---|
-| `udea.kotlin-library` | every runtime module and `moba` | Kotlin JVM, JDK 17 toolchain, `explicitApi()`, kotlin.test on JUnit 5. **No GL.** |
+| `udea.kotlin-library` | every runtime module and `moba` | Kotlin JVM, JDK 21 toolchain, `explicitApi()`, kotlin.test on JUnit 5. **No GL.** |
 | `udea.kotlin-library-gl` | `udea-render` only | `udea.kotlin-library` plus gdx and the LWJGL3 backend, as `implementation` so GL cannot leak downstream |
 | `udea.kotlin-build-tool` | `udea-codegen`, `udea-compiler-plugin`, `udea-assets-compiler` | `udea.kotlin-library` plus the exact-Kotlin-version pin (spec §7), checked at configuration time |
 | `udea.gradle-plugin` | `udea-gradle` | `udea.kotlin-library` plus `compileOnly(gradleApi())` and TestKit for tests |
@@ -313,7 +313,7 @@ casually, and the other two are the reason `udeaVerifyKotlinPin` exists.
 
 | Version | Where | Chosen by |
 |---|---|---|
-| `2.2.10` | every `udea-*` module and `moba`, compiler and stdlib alike | `gradle/libs.versions.toml`, mirrored by `UdeaVersions.KOTLIN` |
+| `2.4.20` | every `udea-*` module and `moba`, compiler and stdlib alike | `gradle/libs.versions.toml`, mirrored by `UdeaVersions.KOTLIN` |
 | Gradle 8.13's embedded `2.0.21` | `build-logic` itself | the Gradle distribution — this is what prints "Unsupported Kotlin plugin version" on every build |
 | whatever KSP2 brings | `udea-codegen`'s **test** JVM only | KSP2's standalone compiler, and recorded as a `UdeaStdlibPin.Exemption` |
 
@@ -322,7 +322,8 @@ casually, and the other two are the reason `udeaVerifyKotlinPin` exists.
 The catalog's `kotlin` version controls the compiler. On its own it says nothing about the
 `kotlin-stdlib` that ends up on a classpath, because Gradle resolves the **highest** requested
 version — and Fleks 2.14 asks for `kotlin-stdlib:2.3.21` while KotlinPoet 2.3.0 asks for
-2.3.20. Before the pin, every `udea-*` module compiled with 2.2.10 against a 2.3.21 stdlib,
+2.3.20. Before the pin, every `udea-*` module compiled with the catalog's compiler against a
+higher stdlib than the catalog named,
 and `./gradlew :udea-core:dependencies` was the only way to find out.
 
 That is the direction that hurts. Newer stdlib metadata is read by the older compiler under a
@@ -346,12 +347,19 @@ rule meant to protect the compiler breaking it instead.
 ## Why `build-logic` uses `embeddedKotlin("test")`
 
 `kotlin-dsl` compiles build logic with the Kotlin the *Gradle distribution* embeds — 2.0.21
-for Gradle 8.13 — not with the catalog's 2.2.10. A 2.0.21 compiler cannot read kotlin-test
-2.2.10's metadata, so `libs.kotlin.test` here fails at compile time with a metadata-version
-error. `embeddedKotlin("test")` resolves the kotlin-test that matches the compiler actually
+for Gradle 8.13 — not with the catalog's version. A 2.0.21 compiler cannot read the catalog
+kotlin-test's metadata, so `libs.kotlin.test` here fails at compile time with a
+metadata-version error. `embeddedKotlin("test")` resolves the kotlin-test that matches the compiler actually
 running, which is the only version that can work.
 
 This is a third Kotlin version in the build and it is deliberate rather than accidental. The
 catalog pin governs the `udea-*` tree; it cannot govern `build-logic`, because Gradle chooses
 that compiler. The day build-logic needs the catalog's Kotlin, the fix is a Gradle upgrade,
 not a version override in `build-logic/build.gradle.kts`.
+
+`gradle-plugin` used to be a fourth case and is no longer. It applied `kotlin-dsl` *and*
+`kotlin("jvm")`, which is what printed the second "Unsupported Kotlin plugin version" warning,
+and on Kotlin 2.4 that clash stopped being survivable: `kotlin-dsl` pins `languageVersion` to
+1.8, and 2.4 refuses to compile below 2.0 at all. It applies `java-gradle-plugin` instead
+(issue #186) — the half of `kotlin-dsl` it was actually using, `gradlePlugin { }`, without the
+pin.

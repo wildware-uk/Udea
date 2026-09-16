@@ -125,19 +125,26 @@ data class AbilitySpec(
         if (active) activeInstance.tick()
     }
 
+    // `this.ability` and `this.getSetByCallerMagnitudes()` are spelled out because Kotlin 2.4
+    // refuses to choose between the implicit receiver and the `spec` context parameter, both of
+    // which are an `AbilitySpec` (issue #186). `this` is what the 2.2 compiler resolved a bare
+    // `ability` to -- the diagnostic says so: "uses an implicit receiver shadowed by a context
+    // parameter" -- so this spelling changes nothing. It also cannot: `commit()` has one caller,
+    // `Ability.commitAbility()`, which is itself `context(world, spec)` and calls `spec.commit()`,
+    // so the context `spec` inside here is the same object as `this` at every reachable call.
     context(_: World, spec: AbilitySpec)
     fun commit() {
-        if (ability.value.cooldownEffect != null) {
-            val cooldownSpec = GameplayEffectSpec(ability.value.cooldownEffect!!.value)
-            cooldownSpec.copySetByTags(getSetByCallerMagnitudes())
+        if (this.ability.value.cooldownEffect != null) {
+            val cooldownSpec = GameplayEffectSpec(this.ability.value.cooldownEffect!!.value)
+            cooldownSpec.copySetByTags(this.getSetByCallerMagnitudes())
             spec.entity[Abilities].applyGameplayEffectToSelf(spec.entity, cooldownSpec)
             this.cooldownHandle = cooldownSpec.handle
         }
 
-        ability.value.cost.forEach {
+        this.ability.value.cost.forEach {
             val costValue = it.value
             val gameplayEffectSpec = GameplayEffectSpec(costValue)
-            gameplayEffectSpec.copySetByTags(getSetByCallerMagnitudes())
+            gameplayEffectSpec.copySetByTags(this.getSetByCallerMagnitudes())
             spec.entity[Abilities].applyGameplayEffectToSelf(spec.entity, gameplayEffectSpec)
         }
     }

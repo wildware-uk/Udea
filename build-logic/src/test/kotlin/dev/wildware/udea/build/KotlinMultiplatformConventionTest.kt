@@ -61,11 +61,20 @@ class KotlinMultiplatformConventionTest {
     }
 
     @Test
-    fun `both conventions carry the stdlib pin and the compiler-plugin gate on check`(@TempDir root: File) {
+    fun `the no-iOS convention is the runtime set without iOS`(@TempDir root: File) {
+        // Issue #215: a module whose dependencies publish no iOS variant cannot declare an iOS
+        // target at all, because Kotlin compiles iOS klibs on every host and resolution fails.
+        val result = multiplatformFixture(root, "udea.kotlin-multiplatform-no-ios").build(":sample:printTargets")
+
+        assertEquals(listOf("android", "jvm", "wasmJs"), printed(result.output, "targets"))
+    }
+
+    @Test
+    fun `every multiplatform convention carries the stdlib pin and the compiler-plugin gate on check`(@TempDir root: File) {
         // A module moving from `udea.kotlin-library` to multiplatform must not lose the two gates
         // that convention hangs on `check`. `--dry-run` lists what `check` would execute without
         // compiling anything.
-        for (plugin in listOf("udea.kotlin-multiplatform", "udea.kotlin-multiplatform-render")) {
+        for (plugin in listOf("udea.kotlin-multiplatform", "udea.kotlin-multiplatform-no-ios", "udea.kotlin-multiplatform-render")) {
             val dir = File(root, plugin).also { it.mkdirs() }
             val output = multiplatformFixture(dir, plugin).build(":sample:check", "--dry-run").output
 

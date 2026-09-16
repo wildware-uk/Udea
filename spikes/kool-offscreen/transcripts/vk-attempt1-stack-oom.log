@@ -1,0 +1,65 @@
+
+> Configure project :
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :compileKotlin UP-TO-DATE
+> Task :compileJava NO-SOURCE
+> Task :processResources NO-SOURCE
+> Task :classes UP-TO-DATE
+
+> Task :run FAILED
+spike: GLFW pre-initialised on X11 (DISPLAY=:99)
+[38;2;161;136;127m   0.362 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Instance:[0m Enabling extensions:
+[38;2;161;136;127m   0.372 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Instance:[0m   VK_KHR_portability_enumeration
+[38;2;161;136;127m   0.373 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Instance:[0m   VK_KHR_surface
+[38;2;161;136;127m   0.373 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Instance:[0m   VK_KHR_xcb_surface
+Exception in thread "main" java.lang.OutOfMemoryError: Out of stack space.
+	at org.lwjgl.system.MemoryStack.nmalloc(MemoryStack.java:321)
+	at org.lwjgl.vulkan.VkExtensionProperties.malloc(VkExtensionProperties.java:208)
+	at org.lwjgl.vulkan.VkInstance.getAvailableDeviceExtensions(VkInstance.java:82)
+	at org.lwjgl.vulkan.VkInstance.getInstanceCapabilities(VkInstance.java:45)
+	at org.lwjgl.vulkan.VkInstance.<init>(VkInstance.java:29)
+	at de.fabmax.kool.pipeline.backend.vk.Instance.<init>(Instance.kt:45)
+	at de.fabmax.kool.pipeline.backend.vk.RenderBackendVk.<init>(RenderBackendVk.kt:66)
+	at de.fabmax.kool.pipeline.backend.vk.RenderBackendVk$Companion.createBackend-gIAlu-s(RenderBackendVk.kt:373)
+	at de.fabmax.kool.platform.Lwjgl3Context.createBackend$kool_core(Lwjgl3Context.kt:43)
+	at de.fabmax.kool.platform.Lwjgl3ContextKt.Lwjgl3Context(Lwjgl3Context.kt:20)
+	at de.fabmax.kool.DesktopImpl.createContext(Platform.desktop.kt:52)
+	at de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:28)
+	at de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+	at de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+	at dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:67)
+	at dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+
+[Incubating] Problems report is available at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-ac814346642cc446c/spikes/kool-offscreen/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':run'.
+> Process 'command '/home/shaun/.sdkman/candidates/java/21.0.11-tem/bin/java'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3s
+2 actionable tasks: 1 executed, 1 up-to-date

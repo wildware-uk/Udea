@@ -1,0 +1,13 @@
+diff --git a/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt b/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt
+index ce4c945..9a27855 100644
+--- a/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt
++++ b/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt
+@@ -50,7 +50,7 @@ fun main() {
+         else -> error("spike.backend must be gl or vk, was $backendName")
+     }
+     startWatchdog()
+-    initGlfwOnX11WhenNoWayland()
++    // initGlfwOnX11WhenNoWayland()
+ 
+     val config = KoolConfigJvm(
+         renderBackend = backend,

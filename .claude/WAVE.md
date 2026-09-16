@@ -2,12 +2,15 @@
 
 ## kmp baseline
 
-**Not taken yet.** The first lead of the port runs, on a detached `origin/kmp` checkout:
+SHA `d97517b` (kmp after #200 merge), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+`JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
-    JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue
+**BUILD SUCCESSFUL. Failing tasks: none.** (220 actionable tasks.) Refresh after every merge.
 
-and writes here the SHA and every failing task (expected: none, since `kmp` == `master` == old
-`example` plus docs). Refresh after every merge. The list only shrinks.
+## Wave 1 in flight
+
+- #200 Kool Offscreen spike: **merged** `d97517b`, round 1 PASS. Answer yes: Kool 0.19.0, GL on llvmpipe under xvfb. Needs X11 GLFW init workaround (see #200 comments).
+- #201 KMP convention plugin: `dev-201`, branch `issue-201-kmp-convention-plugin`.
 
 ## What happened
 

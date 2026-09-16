@@ -1,0 +1,491 @@
+Calculating task graph as no cached configuration is available for tasks: build
+> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :build-logic:generateExternalPluginSpecBuilders FROM-CACHE
+> Task :build-logic:extractPrecompiledScriptPluginPlugins FROM-CACHE
+> Task :build-logic:compilePluginsBlocks FROM-CACHE
+> Task :build-logic:generatePrecompiledScriptPluginAccessors FROM-CACHE
+> Task :build-logic:generateScriptPluginAdapters FROM-CACHE
+> Task :build-logic:compileKotlin FROM-CACHE
+> Task :build-logic:compileJava NO-SOURCE
+> Task :build-logic:pluginDescriptors
+> Task :build-logic:processResources
+> Task :build-logic:classes
+> Task :build-logic:jar
+
+> Configure project :common
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Task :udea-diagnostics:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-annotations:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-codegen:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-audio:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :moba:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-assets-compiler:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-net:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-render:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-agent:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-compiler-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-assets:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-net:processResources NO-SOURCE
+> Task :udea-render:processResources NO-SOURCE
+> Task :udea-assets-compiler:processResources NO-SOURCE
+> Task :udea-annotations:processResources NO-SOURCE
+> Task :udea-diagnostics:processResources NO-SOURCE
+> Task :compileJava NO-SOURCE
+> Task :udea-assets:processResources NO-SOURCE
+> Task :processResources NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :classes UP-TO-DATE
+> Task :udea-replay:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-gas:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-audio:processResources NO-SOURCE
+> Task :compileTestJava NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :udea-compiler-plugin:processResources
+> Task :udeaVerifyContracts
+> Task :udea-annotations:udeaVerifyModuleGraph
+> Task :udea-compiler-plugin:udeaVerifyModuleGraph
+> Task :udea-audio:udeaVerifyModuleGraph
+> Task :udea-diagnostics:udeaVerifyModuleGraph
+> Task :udea-core:udeaVerifyModuleGraph
+> Task :udea-agent-host:udeaVerifyModuleGraph
+> Task :udea-gas:udeaVerifyModuleGraph
+> Task :udea-gradle:udeaVerifyModuleGraph
+> Task :udea-agent:udeaVerifyModuleGraph
+> Task :udea-assets:udeaVerifyModuleGraph
+> Task :udea-net:udeaVerifyModuleGraph
+> Task :udea-codegen:udeaVerifyModuleGraph
+> Task :jar
+> Task :udeaVerifyAgentsMd
+> Task :test NO-SOURCE
+> Task :assemble
+> Task :moba:udeaVerifyModuleGraph
+> Task :udea-render:udeaVerifyModuleGraph
+> Task :udea-codegen:udeaVerifyNoLegacyDependencies
+> Task :common:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-gas:udeaVerifyNoLegacyDependencies
+> Task :udea-annotations:udeaVerifyNoLegacyDependencies
+> Task :gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-net:udeaVerifyNoLegacyDependencies
+> Task :udea-assets:udeaVerifyNoLegacyDependencies
+> Task :udea-replay:udeaVerifyNoLegacyDependencies
+> Task :udea-core:udeaVerifyNoLegacyDependencies
+> Task :udea-replay:udeaVerifyModuleGraph
+> Task :udea-render:udeaVerifyNoLegacyDependencies
+> Task :udea-agent-host:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:processTestResources NO-SOURCE
+> Task :example:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-diagnostics:udeaVerifyNoLegacyDependencies
+> Task :moba:udeaGenerateLaunchDeclaration FROM-CACHE
+> Task :udea-gradle:udeaVerifyNoLegacyDependencies
+> Task :udea-agent:udeaVerifyNoLegacyDependencies
+> Task :udea-audio:udeaVerifyNoLegacyDependencies
+> Task :udea-agent-host:udeaVerifyNoLegacyDependencies
+> Task :moba:udeaGenerateAgentBuildFlags FROM-CACHE
+> Task :gradle-plugin:pluginDescriptors
+> Task :udea-agent-host:processResources NO-SOURCE
+> Task :udea-annotations:processTestResources NO-SOURCE
+> Task :udea-assets-compiler:udeaVerifyNoLegacyDependencies
+> Task :udea-compiler-plugin:udeaVerifyNoLegacyDependencies
+> Task :udea-agent-host:udeaVerifyKotlinPin
+> Task :udeaVerifyTrelloMap
+> Task :udea-agent:udeaVerifyKotlinPin
+> Task :moba:udeaVerifyNoLegacyDependencies
+> Task :udea-agent-host:processTestResources NO-SOURCE
+> Task :udea-diagnostics:processTestFixturesResources NO-SOURCE
+> Task :udeaVerifyNoLegacyDependencies
+> Task :udea-audio:processTestResources NO-SOURCE
+> Task :udea-annotations:udeaVerifyKotlinPin
+> Task :udea-assets:udeaVerifyKotlinPin
+> Task :udea-compiler-plugin:udeaVerifyKotlinPin
+> Task :udea-audio:udeaVerifyKotlinPin
+> Task :udea-gradle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-diagnostics:udeaVerifyKotlinPin
+> Task :udea-compiler-plugin:udeaVerifyCompilerPlugin
+> Task :moba:udeaVerifyKotlinPin
+> Task :udea-codegen:udeaVerifyKotlinPin
+> Task :udea-core:udeaVerifyKotlinPin
+> Task :udea-gradle:processTestResources NO-SOURCE
+> Task :udea-gas:udeaVerifyKotlinPin
+> Task :gradle-plugin:processResources
+> Task :udea-compiler-plugin:processTestResources NO-SOURCE
+> Task :udea-diagnostics:processTestResources
+> Task :udea-gradle:udeaVerifyKotlinPin
+> Task :udea-diagnostics:udeaVerifyCompilerPlugin
+> Task :udea-assets:processTestResources NO-SOURCE
+> Task :udea-assets-compiler:udeaVerifyKotlinPin
+> Task :udea-net:udeaVerifyKotlinPin
+> Task :udea-render:udeaVerifyKotlinPin
+> Task :udea-replay:udeaVerifyKotlinPin
+> Task :udea-gradle:processResources
+> Task :example:assets:compileJava NO-SOURCE
+> Task :example:assets:processResources NO-SOURCE
+> Task :example:assets:classes UP-TO-DATE
+> Task :udea-assets-compiler:udeaVerifyModuleGraph
+> Task :udea-net:processTestResources
+> Task :udea-annotations:compileKotlin FROM-CACHE
+> Task :udeaVerifyModuleGraph
+> Task :udea-annotations:udeaVerifyCompilerPlugin
+> Task :udea-annotations:compileJava NO-SOURCE
+> Task :udea-diagnostics:compileKotlin FROM-CACHE
+> Task :udea-annotations:classes UP-TO-DATE
+> Task :example:assets:processTestResources NO-SOURCE
+> Task :example:assets:compileTestJava NO-SOURCE
+> Task :example:assets:testClasses UP-TO-DATE
+> Task :udea-diagnostics:compileJava NO-SOURCE
+> Task :udea-diagnostics:classes UP-TO-DATE
+> Task :example:assets:jar
+> Task :example:assets:assemble
+> Task :udea-assets-compiler:processTestResources
+> Task :example:assets:test NO-SOURCE
+> Task :example:assets:check UP-TO-DATE
+> Task :example:assets:build
+> Task :udea-render:processTestResources
+
+> Task :moba:udeaStageCharacterArt
+[udeaStageCharacterArt] staged 33 sheet(s) into /srv/ssd1/workspace/Udea/.claude/worktrees/agent-ac814346642cc446c/moba/assets/sprites
+
+> Task :udea-diagnostics:jar
+> Task :udea-diagnostics:assemble
+> Task :gradle-plugin:compileKotlin FROM-CACHE
+> Task :gradle-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:classes
+> Task :gradle-plugin:validatePlugins FROM-CACHE
+> Task :gradle-plugin:pluginUnderTestMetadata
+> Task :gradle-plugin:jar
+> Task :gradle-plugin:assemble
+> Task :udea-annotations:jar
+> Task :udea-annotations:assemble
+> Task :gradle-plugin:compileTestKotlin NO-SOURCE
+> Task :gradle-plugin:compileTestJava NO-SOURCE
+> Task :gradle-plugin:testClasses UP-TO-DATE
+> Task :gradle-plugin:test NO-SOURCE
+> Task :gradle-plugin:check UP-TO-DATE
+> Task :gradle-plugin:build
+> Task :udea-diagnostics:compileTestFixturesKotlin FROM-CACHE
+> Task :udea-gas:udeaVerifyGasTime
+> Task :udea-diagnostics:compileTestFixturesJava NO-SOURCE
+> Task :udea-diagnostics:testFixturesClasses UP-TO-DATE
+
+> Task :udeaLegacyReport
+ledger rows: 142
+legacy Kotlin files in the tree: 142
+
+module           remaining  deleted  total
+common                 106        0    106
+example                 28        0     28
+gradle-plugin            8        0      8
+compose-ui               0        -      -  (retired)
+idea-plugin              0        -      -  (retired)
+level-editor             0        -      -  (retired)
+
+
+> Task :udea-diagnostics:testFixturesJar
+> Task :udea-annotations:compileTestKotlin FROM-CACHE
+> Task :udea-annotations:compileTestJava NO-SOURCE
+> Task :udea-annotations:testClasses UP-TO-DATE
+> Task :udea-annotations:test FROM-CACHE
+> Task :udea-annotations:check
+> Task :udea-annotations:build
+> Task :udea-codegen:kspKotlin FROM-CACHE
+> Task :udea-diagnostics:compileTestKotlin FROM-CACHE
+> Task :udea-diagnostics:compileTestJava NO-SOURCE
+> Task :udea-diagnostics:testClasses
+> Task :udea-codegen:processResources
+> Task :udea-diagnostics:test FROM-CACHE
+> Task :udea-diagnostics:check
+> Task :udea-diagnostics:build
+> Task :udea-compiler-plugin:compileKotlin FROM-CACHE
+> Task :udea-compiler-plugin:compileJava NO-SOURCE
+> Task :udea-compiler-plugin:classes
+> Task :udea-compiler-plugin:jar
+> Task :udea-compiler-plugin:assemble
+> Task :udea-agent:udeaVerifyCompilerPlugin
+> Task :udea-agent-host:udeaVerifyCompilerPlugin
+> Task :udea-audio:udeaVerifyCompilerPlugin
+> Task :udea-assets-compiler:udeaVerifyCompilerPlugin
+> Task :moba:udeaVerifyCompilerPlugin
+> Task :common:kspKotlin FROM-CACHE
+> Task :udea-gradle:udeaVerifyCompilerPlugin
+> Task :udea-core:udeaVerifyCompilerPlugin
+> Task :udea-net:udeaVerifyCompilerPlugin
+> Task :udea-gas:udeaVerifyCompilerPlugin
+> Task :udea-codegen:udeaVerifyCompilerPlugin
+> Task :udea-replay:udeaVerifyCompilerPlugin
+> Task :udea-render:udeaVerifyCompilerPlugin
+> Task :udea-assets:udeaVerifyCompilerPlugin
+> Task :common:processResources
+> Task :udea-codegen:compileKotlin FROM-CACHE
+> Task :udea-codegen:compileJava NO-SOURCE
+> Task :udea-codegen:classes
+> Task :udea-compiler-plugin:compileTestKotlin FROM-CACHE
+> Task :udea-compiler-plugin:compileTestJava NO-SOURCE
+> Task :udea-compiler-plugin:testClasses UP-TO-DATE
+> Task :common:kaptGenerateStubsKotlin FROM-CACHE
+> Task :common:kaptKotlin SKIPPED
+> Task :udea-assets:compileKotlin FROM-CACHE
+> Task :udea-assets:compileJava NO-SOURCE
+> Task :udea-assets:classes UP-TO-DATE
+> Task :udea-codegen:jar
+> Task :udea-codegen:assemble
+> Task :udea-assets:jar
+> Task :udea-assets:assemble
+> Task :udea-assets:compileTestKotlin FROM-CACHE
+> Task :udea-assets:compileTestJava NO-SOURCE
+> Task :udea-assets:testClasses UP-TO-DATE
+> Task :udea-assets:test FROM-CACHE
+> Task :common:compileKotlin FROM-CACHE
+> Task :udea-assets:check
+> Task :udea-assets:build
+> Task :common:compileJava NO-SOURCE
+> Task :common:classes
+> Task :common:kspTestKotlin NO-SOURCE
+> Task :common:processTestResources NO-SOURCE
+> Task :udea-core:kspKotlin FROM-CACHE
+> Task :udea-core:processResources
+> Task :udea-assets-compiler:compileKotlin FROM-CACHE
+> Task :udea-assets-compiler:compileJava NO-SOURCE
+> Task :udea-assets-compiler:classes UP-TO-DATE
+> Task :udea-core:compileKotlin FROM-CACHE
+> Task :udea-core:compileJava NO-SOURCE
+> Task :udea-core:classes
+> Task :example:kspKotlin FROM-CACHE
+> Task :common:jar
+> Task :common:assemble
+> Task :udea-assets-compiler:jar
+> Task :udea-assets-compiler:assemble
+> Task :common:kaptGenerateStubsTestKotlin FROM-CACHE
+> Task :common:kaptTestKotlin SKIPPED
+> Task :common:compileTestKotlin NO-SOURCE
+> Task :common:compileTestJava NO-SOURCE
+> Task :common:testClasses UP-TO-DATE
+> Task :common:test NO-SOURCE
+> Task :common:check UP-TO-DATE
+> Task :common:build
+> Task :udea-core:jar
+> Task :udea-core:assemble
+> Task :example:compileKotlin FROM-CACHE
+> Task :example:compileJava NO-SOURCE
+> Task :udea-gradle:compileKotlin FROM-CACHE
+> Task :udea-gradle:compileJava NO-SOURCE
+> Task :udea-gradle:classes
+> Task :udea-core:kspTestFixturesKotlin FROM-CACHE
+> Task :udea-core:processTestFixturesResources NO-SOURCE
+> Task :udea-gradle:udeaWritePluginClasspath
+> Task :udea-gradle:jar
+> Task :udea-gradle:assemble
+> Task :udea-gas:kspKotlin FROM-CACHE
+> Task :udea-audio:compileKotlin FROM-CACHE
+> Task :udea-gas:processResources
+> Task :udea-audio:compileJava NO-SOURCE
+> Task :udea-audio:classes UP-TO-DATE
+> Task :udea-core:compileTestFixturesKotlin FROM-CACHE
+> Task :udea-core:compileTestFixturesJava NO-SOURCE
+> Task :udea-core:testFixturesClasses UP-TO-DATE
+> Task :udea-audio:jar
+> Task :udea-agent:kspKotlin FROM-CACHE
+> Task :udea-core:testFixturesJar
+> Task :udea-audio:assemble
+> Task :udea-agent:processResources
+> Task :udea-gradle:compileTestKotlin FROM-CACHE
+> Task :udea-gradle:compileTestJava NO-SOURCE
+> Task :udea-gradle:testClasses UP-TO-DATE
+> Task :udea-audio:compileTestKotlin FROM-CACHE
+> Task :udea-gas:compileKotlin FROM-CACHE
+> Task :udea-audio:compileTestJava NO-SOURCE
+> Task :udea-audio:testClasses UP-TO-DATE
+> Task :udea-gas:compileJava NO-SOURCE
+> Task :udea-gas:classes
+> Task :udea-net:compileKotlin FROM-CACHE
+> Task :udea-net:compileJava NO-SOURCE
+> Task :udea-net:classes UP-TO-DATE
+> Task :moba:udeaValidateAssets FROM-CACHE
+> Task :moba:udeaPackBundle FROM-CACHE
+> Task :moba:udeaScanAssets FROM-CACHE
+> Task :moba:udeaGenerateAccessors FROM-CACHE
+> Task :moba:udeaVerifyRelocatable
+> Task :udea-gas:kspTestKotlin FROM-CACHE
+> Task :udea-audio:test FROM-CACHE
+> Task :udea-audio:check
+> Task :udea-gas:processTestResources NO-SOURCE
+> Task :udea-audio:build
+> Task :example:processResources
+> Task :example:classes
+> Task :example:kspTestKotlin NO-SOURCE
+> Task :example:processTestResources NO-SOURCE
+> Task :udea-gas:jar
+> Task :udea-gas:assemble
+> Task :udea-core:kspTestKotlin FROM-CACHE
+> Task :udea-render:compileKotlin FROM-CACHE
+> Task :udea-agent:compileKotlin FROM-CACHE
+> Task :udea-core:processTestResources
+> Task :udea-render:compileJava NO-SOURCE
+> Task :udea-render:classes UP-TO-DATE
+> Task :udea-agent:compileJava NO-SOURCE
+> Task :udea-agent:classes
+> Task :udea-gas:compileTestKotlin FROM-CACHE
+> Task :udea-gas:compileTestJava NO-SOURCE
+> Task :udea-gas:testClasses UP-TO-DATE
+> Task :udea-net:jar
+> Task :udea-net:assemble
+> Task :udea-assets-compiler:compileTestKotlin FROM-CACHE
+> Task :udea-assets-compiler:compileTestJava NO-SOURCE
+> Task :udea-assets-compiler:testClasses
+> Task :example:jar
+> Task :example:assemble
+> Task :example:compileTestKotlin NO-SOURCE
+> Task :udea-render:jar
+> Task :udea-gas:udeaGasAllocationBudget FROM-CACHE
+> Task :udea-render:assemble
+> Task :example:compileTestJava NO-SOURCE
+> Task :example:testClasses UP-TO-DATE
+> Task :example:test NO-SOURCE
+> Task :example:check UP-TO-DATE
+> Task :example:build
+> Task :udea-agent:kspTestKotlin FROM-CACHE
+> Task :udea-agent:processTestResources NO-SOURCE
+> Task :udea-gas:test FROM-CACHE
+> Task :udea-gas:check
+> Task :udea-gas:build
+> Task :udea-agent:jar
+> Task :udea-agent:assemble
+> Task :udea-core:compileTestKotlin FROM-CACHE
+> Task :udea-core:compileTestJava NO-SOURCE
+> Task :udea-core:testClasses
+> Task :udea-replay:kspKotlin FROM-CACHE
+> Task :udea-replay:processResources
+> Task :udea-agent:compileTestKotlin FROM-CACHE
+> Task :udea-agent:compileTestJava NO-SOURCE
+> Task :udea-agent:testClasses UP-TO-DATE
+> Task :udea-net:compileTestKotlin FROM-CACHE
+> Task :udea-render:compileTestKotlin FROM-CACHE
+> Task :udea-net:compileTestJava NO-SOURCE
+> Task :udea-render:compileTestJava NO-SOURCE
+> Task :udea-net:testClasses
+> Task :udea-render:testClasses
+> Task :udea-codegen:kspTestKotlin FROM-CACHE
+> Task :udea-codegen:udeaCheckProtocolLock
+> Task :udea-codegen:processTestResources
+> Task :udea-render:udeaGlTest FROM-CACHE
+> Task :udea-replay:compileKotlin FROM-CACHE
+> Task :udea-replay:compileJava NO-SOURCE
+> Task :udea-replay:classes
+> Task :udea-replay:jar
+> Task :udea-replay:assemble
+> Task :udea-codegen:compileTestKotlin FROM-CACHE
+> Task :udea-agent-host:compileKotlin FROM-CACHE
+> Task :udea-agent-host:compileJava NO-SOURCE
+> Task :udea-agent-host:classes UP-TO-DATE
+> Task :udea-codegen:compileTestJava NO-SOURCE
+> Task :udea-codegen:testClasses
+> Task :udea-replay:kspTestFixturesKotlin FROM-CACHE
+> Task :udea-replay:processTestFixturesResources
+> Task :udea-agent-host:jar
+> Task :udea-agent-host:assemble
+> Task :udea-codegen:test FROM-CACHE
+> Task :udea-codegen:check
+> Task :udea-codegen:build
+> Task :udea-replay:compileTestFixturesKotlin FROM-CACHE
+> Task :udea-replay:compileTestFixturesJava NO-SOURCE
+> Task :udea-replay:testFixturesClasses
+> Task :moba:kspKotlin FROM-CACHE
+> Task :moba:udeaCheckProtocolLock
+> Task :udea-replay:kspTestKotlin FROM-CACHE
+> Task :moba:processResources
+> Task :udea-agent-host:compileTestKotlin FROM-CACHE
+> Task :udea-replay:processTestResources
+> Task :udea-agent-host:compileTestJava NO-SOURCE
+> Task :udea-agent-host:testClasses UP-TO-DATE
+> Task :udea-replay:testFixturesJar
+> Task :udea-replay:compileTestKotlin FROM-CACHE
+> Task :udea-replay:compileTestJava NO-SOURCE
+> Task :udea-replay:testClasses
+> Task :moba:compileKotlin FROM-CACHE
+> Task :moba:compileJava NO-SOURCE
+> Task :moba:classes
+> Task :moba:kspAgentKotlin FROM-CACHE
+> Task :moba:processAgentResources NO-SOURCE
+> Task :moba:kspTestKotlin FROM-CACHE
+> Task :moba:processTestResources
+> Task :udea-render:udeaVerifyHeadless FROM-CACHE
+> Task :udea-render:test FROM-CACHE
+> Task :udea-render:check
+> Task :udea-render:build
+> Task :moba:compileAgentKotlin FROM-CACHE
+> Task :moba:compileAgentJava NO-SOURCE
+> Task :moba:agentClasses UP-TO-DATE
+> Task :moba:jar
+> Task :moba:assemble
+> Task :moba:compileTestKotlin FROM-CACHE
+> Task :moba:compileTestJava NO-SOURCE
+> Task :moba:testClasses
+> Task :moba:kotlinSourcesJar
+> Task :moba:udeaVerifyRelease SKIPPED
+
+> Task :udeaVerifyDeterminism
+udeaVerifyDeterminism
+  scanned :udea-core: 274 class files
+  scanned :udea-gas: 134 class files
+  scanned :udea-net: 181 class files
+  scanned :moba: 369 class files
+  allowlist entries used: 0
+  findings: 0
+
+udeaVerifyDeterminism is a cheap first filter, not the determinism gate. It sees direct references only: nondeterminism laundered through Fleks internals, through an interface call whose receiver happens to be a HashMap, or through float differences between two JVMs is invisible to it. The gate is WorldHasher snapshot equivalence and the cross-OS replay-equality CI job. See determinism-audit.md for the full list of what this cannot see.
+
+
+> Task :udea-compiler-plugin:udeaVerifyPluginOptional
+> Task :udea-agent-host:udeaAgentGlTest
+> Task :udea-agent:test
+> Task :udea-replay:test
+> Task :udea-replay:check
+> Task :udea-replay:build
+> Task :udea-core:test
+> Task :udea-core:check
+> Task :udea-core:build
+> Task :udeaVerifyMigration
+> Task :check
+> Task :build
+> Task :udea-agent:udeaAssetTools
+> Task :udea-agent:check
+> Task :udea-agent:build
+> Task :udea-net:test
+> Task :udea-net:check
+> Task :udea-net:build
+> Task :udea-compiler-plugin:test
+> Task :udea-compiler-plugin:check
+> Task :udea-compiler-plugin:build
+> Task :udea-assets-compiler:udeaPackGate
+> Task :moba:test
+> Task :moba:check
+> Task :moba:build
+> Task :udea-gradle:test
+> Task :udea-assets-compiler:test
+> Task :udea-agent-host:test
+> Task :udea-gradle:check
+> Task :udea-gradle:build
+> Task :udea-agent-host:check
+> Task :udea-agent-host:build
+> Task :udea-assets-compiler:check
+> Task :udea-assets-compiler:build
+
+[Incubating] Problems report is available at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-ac814346642cc446c/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 26s
+220 actionable tasks: 139 executed, 81 from cache
+Configuration cache entry stored.
+exit=0

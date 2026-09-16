@@ -2,6 +2,7 @@ package dev.wildware.moba.level
 
 import dev.wildware.moba.Position
 import dev.wildware.moba.entry.MobaEntry
+import dev.wildware.moba.entry.MobaEntry.Rendering
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.level.LevelOutcome
@@ -9,6 +10,7 @@ import dev.wildware.udea.core.level.LevelService
 import dev.wildware.udea.core.loop.barrier
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.render.capture.CaptureResult
+import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
@@ -22,18 +24,29 @@ import kotlin.system.exitProcess
 
 /**
  * Issue #191, as pictures: a real match saved to a level file in one process, and loaded into a
- * fresh game in **another** process, photographed from the same camera at the same tick.
+ * fresh game in **another** process, photographed from the same camera.
  *
  * Two phases, two JVMs, run in order by `:moba:runLevelShot`:
  *
  * - `save` plays the real level to [SAVE_TICK], pauses, saves `match.udealevel` through the
- *   barrier, points the camera at the player and writes `saved.png`.
- * - `load` boots a game that never loads the scene, photographs it empty (`fresh.png`), loads the
- *   level file through the barrier, points the camera at the same spot and writes `loaded.png`.
+ *   barrier and photographs the world (`saved.png`), then steps one tick and photographs it again
+ *   (`saved-next.png`).
+ * - `load` boots a game that never lays out the level and photographs it (`fresh.png`), loads the
+ *   file through the barrier and photographs it (`loaded.png`), then steps one tick
+ *   (`loaded-next.png`).
  *
- * Then it decodes both PNGs and counts differing pixels, and exits non-zero unless there are none.
  * A separate process is the point: nothing in the loaded game can have been left over from the
- * saved one, so every pixel in `loaded.png` came out of the file.
+ * saved one, so everything in `loaded.png` came out of the file.
+ *
+ * ## Why the pair that must match is the one a tick later
+ *
+ * `saved.png` and `loaded.png` differ, in one place: the score strip across the top. The HUD draws
+ * it from `MatchService`, which is a mirror `MatchSystem` rewrites on every tick from the saved
+ * `MatchState` component - and a world that has been loaded but not yet stepped has not had that
+ * tick. The strip is not missing from the level; it is a cache the next tick fills. So the
+ * harness prints how many pixels that pair differs by and where, and **fails** only on the pair
+ * that has both had a tick: `saved-next.png` against `loaded-next.png`, which must be identical
+ * to the pixel. It also fails if `loaded.png` equals `fresh.png`, which is a load that did nothing.
  *
  * Needs a GL driver, so it is run by name and never from `check`, for the reason `MatchShot` gives.
  */
@@ -45,10 +58,10 @@ public object LevelShot {
     /** Where the level, the pictures and the camera note are written and read. */
     public const val OUTPUT_PROPERTY: String = "udea.levelshot.dir"
 
-    /** Mid-fight on the real level: units have met and abilities are going off. */
+    /** Mid-fight on the real level: the lines have met, the same moment `MatchShot` calls the melee. */
     public const val SAVE_TICK: Long = 420L
 
-    /** Frames between placing the camera and asking for a picture, so the placement has landed. */
+    /** Frames between a stage's action and its picture, so a camera placement has landed. */
     private const val SETTLE_FRAMES: Int = 3
 
     private const val LEVEL_FILE: String = "match.${LevelService.FILE_EXTENSION}"
@@ -57,9 +70,51 @@ public object LevelShot {
 
     private const val ZOOM: Float = 1f
 
+    /** One picture: [action] runs, the frames settle, then the frame is written as `<name>.png`. */
+    private class Stage(val name: String, val action: () -> Unit)
+
+    /**
+     * Runs [stages] one after another across render frames, then asks the renderer to exit.
+     *
+     * The capture is asked for on a frame and read on a later one because the render thread is the
+     * one that settles it; blocking on it here would deadlock the frame that has to draw it.
+     */
+    private class Script(
+        private val rendering: Rendering,
+        private val dir: Path,
+        private val log: StringBuilder,
+        private val stages: List<Stage>,
+    ) {
+        private var index = 0
+        private var started = false
+        private var settle = 0
+        private var shot: CompletableFuture<CaptureResult>? = null
+
+        fun frame() {
+            val pending = shot
+            when {
+                pending != null -> if (pending.isDone) {
+                    write(dir, stages[index].name, pending.get(), log)
+                    shot = null
+                    started = false
+                    index++
+                }
+                index == stages.size -> rendering.requestExit()
+                !started -> {
+                    stages[index].action()
+                    started = true
+                    settle = SETTLE_FRAMES
+                }
+                settle > 0 -> settle--
+                else -> shot = rendering.presentation().capture()
+            }
+        }
+    }
+
     @JvmStatic
     public fun main(args: Array<String>) {
-        val dir = Path.of(System.getProperty(OUTPUT_PROPERTY) ?: "build/reports/udea/level").also { it.createDirectories() }
+        val dir = Path.of(System.getProperty(OUTPUT_PROPERTY) ?: "build/reports/udea/level")
+        dir.createDirectories()
         val log = StringBuilder()
         when (val phase = System.getProperty(PHASE_PROPERTY)) {
             "save" -> save(dir, log)
@@ -69,81 +124,86 @@ public object LevelShot {
                 exitProcess(2)
             }
         }
-        print(log)
     }
 
     private fun save(dir: Path, log: StringBuilder) {
         MobaEntry.runWithGl(RenderMode.Offscreen) { host, rendering ->
             val player = MobaEntry.seed(host)
             MobaEntry.follow(rendering, player)
-            var settle = -1
-            var shot: CompletableFuture<CaptureResult>? = null
-            MobaEntry.Attachment(
-                frame = { delta ->
-                    host.frame(delta)
-                    val now = host.ctx.clock.tick.value
-                    if (settle < 0 && now >= SAVE_TICK) {
+            var camera = 0f to 0f
+            val script = Script(
+                rendering,
+                dir,
+                log,
+                listOf(
+                    Stage("saved") {
                         host.time.pause()
                         val bytes = saveLevel(host)
                         dir.resolve(LEVEL_FILE).writeBytes(bytes)
-                        val at = playerPosition(host)
-                        dir.resolve(CAMERA_FILE).writeText("${at.first} ${at.second}\n")
-                        rendering.presentation().lookAt(at.first, at.second, ZOOM)
+                        camera = playerPosition(host)
+                        dir.resolve(CAMERA_FILE).writeText("${camera.first} ${camera.second}\n")
+                        rendering.presentation().lookAt(camera.first, camera.second, ZOOM)
                         log.append("[level.shot] saved ").append(bytes.size).append(" bytes at tick ")
-                            .append(now).append(", camera at ").append(at).append('\n')
-                        settle = SETTLE_FRAMES
-                    } else if (settle > 0) {
-                        settle--
-                    } else if (settle == 0 && shot == null) {
-                        shot = rendering.presentation().capture()
-                    }
-                    shot?.takeIf { it.isDone }?.let { done ->
-                        write(dir, "saved", done.get(), log)
-                        rendering.requestExit()
-                    }
+                            .append(host.ctx.clock.tick.value).append(", camera at ").append(camera).append('\n')
+                    },
+                    Stage("saved-next") {
+                        host.time.step(1)
+                        rendering.presentation().lookAt(camera.first, camera.second, ZOOM)
+                    },
+                ),
+            )
+            MobaEntry.Attachment(
+                frame = { delta ->
+                    host.frame(delta)
+                    if (host.ctx.clock.tick.value >= SAVE_TICK) script.frame()
                 },
             )
         }
+        print(log)
     }
 
     private fun load(dir: Path, log: StringBuilder) {
         val bytes = dir.resolve(LEVEL_FILE).readBytes()
         val (x, y) = dir.resolve(CAMERA_FILE).readText().trim().split(' ').map(String::toFloat)
         MobaEntry.runWithGl(RenderMode.Offscreen) { host, rendering ->
-            host.time.pause()
-            rendering.presentation().lookAt(x, y, ZOOM)
-            var step = 0
-            var settle = SETTLE_FRAMES
-            var shot: CompletableFuture<CaptureResult>? = null
+            val script = Script(
+                rendering,
+                dir,
+                log,
+                listOf(
+                    Stage("fresh") {
+                        host.time.pause()
+                        rendering.presentation().lookAt(x, y, ZOOM)
+                    },
+                    Stage("loaded") {
+                        loadLevel(host, bytes)
+                        rendering.presentation().lookAt(x, y, ZOOM)
+                        log.append("[level.shot] loaded ").append(bytes.size).append(" bytes; clock now ")
+                            .append(host.ctx.clock.tick.value).append('\n')
+                    },
+                    Stage("loaded-next") {
+                        host.time.step(1)
+                        rendering.presentation().lookAt(x, y, ZOOM)
+                    },
+                ),
+            )
             MobaEntry.Attachment(
                 frame = { delta ->
                     host.frame(delta)
-                    when {
-                        settle > 0 -> settle--
-                        shot == null -> shot = rendering.presentation().capture()
-                        shot!!.isDone && step == 0 -> {
-                            write(dir, "fresh", shot!!.get(), log)
-                            loadLevel(host, bytes)
-                            rendering.presentation().lookAt(x, y, ZOOM)
-                            log.append("[level.shot] loaded ").append(bytes.size).append(" bytes; clock now ")
-                                .append(host.ctx.clock.tick.value).append('\n')
-                            step = 1
-                            settle = SETTLE_FRAMES
-                            shot = null
-                        }
-                        shot!!.isDone && step == 1 -> {
-                            write(dir, "loaded", shot!!.get(), log)
-                            step = 2
-                            rendering.requestExit()
-                        }
-                    }
+                    script.frame()
                 },
             )
         }
-        val differing = differingPixels(dir.resolve("saved.png"), dir.resolve("loaded.png"))
-        log.append("[level.shot] saved.png vs loaded.png: ").append(differing).append(" differing pixels\n")
-        if (differing != 0L) {
-            print(log)
+        val fresh = compare(dir, "fresh", "loaded", log)
+        compare(dir, "saved", "loaded", log)
+        val next = compare(dir, "saved-next", "loaded-next", log)
+        print(log)
+        if (fresh.count == 0L) {
+            System.err.println("[level.shot] loaded.png is the fresh game's picture: the load changed nothing")
+            exitProcess(1)
+        }
+        if (next.count != 0L) {
+            System.err.println("[level.shot] one tick after the save and one tick after the load look different")
             exitProcess(1)
         }
     }
@@ -178,16 +238,32 @@ public object LevelShot {
             .append(" at tick ").append(result.tick.value).append('\n')
     }
 
-    private fun differingPixels(a: Path, b: Path): Long {
-        val left = ImageIO.read(ByteArrayInputStream(a.readBytes()))
-        val right = ImageIO.read(ByteArrayInputStream(b.readBytes()))
-        if (left.width != right.width || left.height != right.height) return left.width.toLong() * left.height
-        var differing = 0L
-        for (y in 0 until left.height) {
-            for (x in 0 until left.width) {
-                if (left.getRGB(x, y) != right.getRGB(x, y)) differing++
+    /** How many pixels two pictures differ in, and the rows those pixels span. */
+    private class Difference(val count: Long, val firstRow: Int, val lastRow: Int)
+
+    private fun compare(dir: Path, left: String, right: String, log: StringBuilder): Difference {
+        val a = image(dir.resolve("$left.png"))
+        val b = image(dir.resolve("$right.png"))
+        check(a.width == b.width && a.height == b.height) { "$left.png and $right.png are different sizes" }
+        var count = 0L
+        var firstRow = -1
+        var lastRow = -1
+        for (row in 0 until a.height) {
+            for (column in 0 until a.width) {
+                if (a.getRGB(column, row) != b.getRGB(column, row)) {
+                    count++
+                    if (firstRow < 0) firstRow = row
+                    lastRow = row
+                }
             }
         }
-        return differing
+        val difference = Difference(count, firstRow, lastRow)
+        log.append("[level.shot] ").append(left).append(".png vs ").append(right).append(".png: ")
+            .append(count).append(" of ").append(a.width.toLong() * a.height).append(" pixels differ")
+        if (count > 0) log.append(", rows ").append(firstRow).append('-').append(lastRow).append(" from the top")
+        log.append('\n')
+        return difference
     }
+
+    private fun image(path: Path): BufferedImage = ImageIO.read(ByteArrayInputStream(path.readBytes()))
 }

@@ -44,6 +44,12 @@ allprojects {
         mavenLocal()
         gradlePluginPortal()
         google()
+        // TEMPORARY: A SNAPSHOT REPOSITORY, AND ONE OF THE TWO PLACES THAT SAY SO.
+        // ComposeGL 0.6.0 is not on Maven Central yet (issue #187), and Central's snapshot
+        // service is a separate host from Central proper. The other place is the `composegl`
+        // version in `gradle/libs.versions.toml`. When 0.6.0 releases, that entry becomes
+        // `"0.6.0"` and this line goes; nothing else in the build refers to a snapshot.
+        maven("https://central.sonatype.com/repository/maven-snapshots")
         maven("https://oss.sonatype.org/content/repositories/snapshots/")
         maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
         maven("https://s01.oss.sonatype.org")

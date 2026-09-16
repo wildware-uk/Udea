@@ -3,6 +3,8 @@ package dev.wildware.udea.render.support
 import com.badlogic.gdx.Application
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Graphics
+import com.badlogic.gdx.Input
+import com.badlogic.gdx.InputProcessor
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.utils.GdxNativesLoader
 import java.lang.reflect.InvocationHandler
@@ -10,7 +12,8 @@ import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 
 /**
- * A `Gdx.gl` and a `Gdx.graphics` that answer questions without a driver behind them.
+ * A `Gdx.gl`, a `Gdx.graphics` and a `Gdx.input` that answer questions without a driver behind
+ * them.
  *
  * ## Why this exists rather than "those tests need a window"
  *
@@ -64,6 +67,33 @@ internal class HeadlessGl private constructor(
         }
     }
 
+    /**
+     * `Gdx.input`, answering nothing and remembering what was installed on it.
+     *
+     * `GdxKeyboard.install` refuses to build an input chain without one -- deliberately, because
+     * the failure it replaces is a game whose controls silently do nothing -- so the *shipped*
+     * installer cannot be driven at all in a test with no window. That is exactly the class of
+     * claim this whole double exists for: nothing about "which processor is asked first" needs a
+     * keyboard, and one static lookup would otherwise make the input order untestable.
+     *
+     * `setInputProcessor` is recorded rather than dropped, so a test can assert that the chain
+     * reached the device instead of asserting on its own return value.
+     */
+    private val inputHandler = InvocationHandler { _, method: Method, args: Array<Any?>? ->
+        when (method.name) {
+            "setInputProcessor" -> {
+                inputProcessor = args?.firstOrNull() as InputProcessor?
+                null
+            }
+            "getInputProcessor" -> inputProcessor
+            else -> defaultFor(method)
+        }
+    }
+
+    /** Whatever was last installed through `Gdx.input.inputProcessor`. */
+    var inputProcessor: InputProcessor? = null
+        private set
+
     fun install() {
         // gdx-math is not pure Kotlin: `Matrix4.prj`, `inv` and `mul` are native, so a camera
         // update fails with an UnsatisfiedLinkError until the desktop natives are extracted.
@@ -74,6 +104,7 @@ internal class HeadlessGl private constructor(
         Gdx.gl20 = Gdx.gl
         Gdx.graphics = proxy(Graphics::class.java, graphicsHandler)
         Gdx.app = proxy(Application::class.java, appHandler)
+        Gdx.input = proxy(Input::class.java, inputHandler)
     }
 
     fun uninstall() {
@@ -81,6 +112,8 @@ internal class HeadlessGl private constructor(
         Gdx.gl20 = null
         Gdx.graphics = null
         Gdx.app = null
+        Gdx.input = null
+        inputProcessor = null
     }
 
     companion object {

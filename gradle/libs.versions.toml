@@ -53,7 +53,14 @@ junitPlatform = "1.13.4"
 # published release declares `kotlin-stdlib:2.4.20` and its jars carry `@Metadata(mv = [2, 4, 0])`,
 # which is why `kotlin` above had to move to 2.4.20 before any of this could be on the classpath
 # at all. `composegl-gdx` is a GL backend, so it is `udea-render`-only by UDEA-MG-002.
-composegl = "0.5.0"
+#
+# TEMPORARY: A SNAPSHOT, AND ONE OF THE TWO PLACES THAT SAY SO.
+# 0.6.0 is what `UiLayer` is written against (issue #187) and it is not on Maven Central yet, so
+# it resolves from the Sonatype snapshot repository declared in the root `build.gradle.kts`
+# `allprojects { repositories { ... } }` block -- the only other place this snapshot is mentioned.
+# When 0.6.0 releases on Central, the whole move is: change this line to `composegl = "0.6.0"`
+# and delete that repository line. Nothing else in the build refers to a snapshot.
+composegl = "0.6.0-SNAPSHOT"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -83,6 +90,11 @@ gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", vers
 # UDEA-MG-002 bans `com.badlogicgames.gdx:*-platform` from every headless module for exactly
 # that reason.
 gdx-platform = { module = "com.badlogicgames.gdx:gdx-platform", version.ref = "gdx" }
+# FreeType's desktop natives. `composegl-gdx` brings the Java binding (`gdx-freetype`)
+# transitively and not this, so a game that registers a `.ttf` through `GdxFonts` needs it
+# selected here; `udea-render/build.gradle.kts` says why at the call site. A `*-platform`
+# artifact, so UDEA-MG-002 keeps it out of every headless module.
+gdx-freetype-platform = { module = "com.badlogicgames.gdx:gdx-freetype-platform", version.ref = "gdx" }
 # Box2D. `gdx-box2d` is the Java binding and is headless in the sense UDEA-MG-002 cares about -
 # it names no GL type - but it is useless without `gdx-box2d-platform`, which is a
 # `*-platform` native loader and therefore banned from every designated headless module. Both are

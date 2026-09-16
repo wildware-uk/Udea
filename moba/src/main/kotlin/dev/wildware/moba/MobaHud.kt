@@ -26,8 +26,8 @@ import dev.wildware.udea.render.FrameTime
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
-import dev.wildware.udea.render.ui.UiLayer
-import dev.wildware.udea.render.ui.UiScreen
+import dev.wildware.udea.render.ui.scene2d.Scene2dUiLayer
+import dev.wildware.udea.render.ui.scene2d.Scene2dUiScreen
 import dev.wildware.moba.level.Team
 import dev.wildware.moba.match.MatchPhase
 import dev.wildware.moba.match.MatchService
@@ -351,7 +351,7 @@ public class MobaHudModel(
  *
  * ## On the scene2d layer, at [dev.wildware.udea.render.RenderPhase.UI]
  *
- * Which is before the capture point, on purpose - `UiLayer`'s own KDoc makes the argument: game
+ * Which is before the capture point, on purpose - `Scene2dUiLayer`'s own KDoc makes the argument: game
  * UI is part of the game, so an agent asking for a screenshot to check whether an ability is on
  * cooldown gets the cooldown in the picture. The agent activity **overlay** is the thing that
  * must stay out of a capture, and it is a different type on a different surface.
@@ -367,7 +367,7 @@ internal class MobaHudScreen(
     private val pixel: TextureRegion,
     /** What to print in each slot's box: the key actually bound to it, out of the asset graph. */
     private val keyLabels: Array<String>,
-) : UiScreen {
+) : Scene2dUiScreen {
 
     override fun build(stage: Stage): Actor = HudActor(model, font, pixel, keyLabels)
 }
@@ -725,10 +725,10 @@ private class HudActor(
 }
 
 /**
- * The HUD as one [RenderSystem]: a [UiLayer] with [MobaHudScreen] mounted in it.
+ * The HUD as one [RenderSystem]: a [Scene2dUiLayer] with [MobaHudScreen] mounted in it.
  *
  * Wrapping the layer rather than registering it directly is what gives the HUD the world. A
- * [UiScreen] is handed a `Stage` and nothing else - by design, since a menu has no business
+ * [Scene2dUiScreen] is handed a `Stage` and nothing else - by design, since a menu has no business
  * touching entities - so the binding arrives here, at the one type in the chain that has
  * [RenderSystem.onBind].
  *
@@ -769,7 +769,7 @@ public class MobaHudSystem(
         ),
     )
 
-    private val ui = UiLayer(resources, frameTime)
+    private val ui = Scene2dUiLayer(resources, frameTime)
 
     init {
         ui.show(MobaHudScreen(model, font, pixel, keyLabels()))

@@ -1,0 +1,12 @@
+diff --git a/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt b/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt
+index ce4c945..0452c1a 100644
+--- a/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt
++++ b/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt
+@@ -100,7 +100,6 @@ fun main() {
+ private fun offscreenPass(): OffscreenPass2d {
+     val bg = ExpectedFrame.BACKGROUND
+     val drawNode = Node("spike-draw-node")
+-    drawNode.addTexturedQuad()
+     val pass = OffscreenPass2d(
+         drawNode = drawNode,
+         attachmentConfig = AttachmentConfig {

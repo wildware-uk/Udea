@@ -1,0 +1,153 @@
+HEAD=f05a9f1 dirty=0
+Starting a Gradle Daemon, 1 busy and 1 incompatible and 2 stopped Daemons could not be reused, use --status for details
+
+> Configure project :
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :processResources NO-SOURCE
+> Task :compileKotlin
+> Task :compileJava NO-SOURCE
+> Task :classes UP-TO-DATE
+
+> Task :run
+spike: GLFW pre-initialised on X11 (DISPLAY=:99)
+[38;2;161;136;127m   0.098 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m RenderBackendGlImpl:[0m Create GL window
+[38;2;161;136;127m   0.455 s[0m|[38;2;186;104;200mf:   0[0m [48;2;139;195;74;38;2;255;255;255;1m I [0m[38;2;139;195;74;1m GlImpl:[0m Detected OpenGL version 4.5
+[38;2;161;136;127m   0.468 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m GlImpl:[0m Compute shader support available. Max workgroups: (65535, 65535, 65535), max workgroup size: (1024, 1024, 1024), max invocations per workgroup: 1024
+[38;2;161;136;127m   0.469 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m RenderBackendGlImpl:[0m Setting depth range to zero-to-one
+[LWJGL] GLFW_CURSOR_UNAVAILABLE error
+	Description : X11: Standard cursor shape unavailable
+	Stacktrace  :
+		org.lwjgl.glfw.GLFW.glfwCreateStandardCursor(GLFW.java:3983)
+		de.fabmax.kool.platform.glfw.GlfwInput.createStandardCursors(GlfwInput.kt:107)
+		de.fabmax.kool.platform.glfw.GlfwInput.onContextCreated$kool_core(GlfwInput.kt:47)
+		de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onBackendCreated(GlfwWindowSubsystem.kt:107)
+		de.fabmax.kool.platform.Lwjgl3Context.createBackend$kool_core(Lwjgl3Context.kt:54)
+		de.fabmax.kool.platform.Lwjgl3ContextKt.Lwjgl3Context(Lwjgl3Context.kt:20)
+		de.fabmax.kool.DesktopImpl.createContext(Platform.desktop.kt:52)
+		de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:28)
+		de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+		kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+		kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+		kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+		kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+		kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+		kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+		de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+[LWJGL] GLFW_CURSOR_UNAVAILABLE error
+	Description : X11: Standard cursor shape unavailable
+	Stacktrace  :
+		org.lwjgl.glfw.GLFW.glfwCreateStandardCursor(GLFW.java:3983)
+		de.fabmax.kool.platform.glfw.GlfwInput.createStandardCursors(GlfwInput.kt:108)
+		de.fabmax.kool.platform.glfw.GlfwInput.onContextCreated$kool_core(GlfwInput.kt:47)
+		de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onBackendCreated(GlfwWindowSubsystem.kt:107)
+		de.fabmax.kool.platform.Lwjgl3Context.createBackend$kool_core(Lwjgl3Context.kt:54)
+		de.fabmax.kool.platform.Lwjgl3ContextKt.Lwjgl3Context(Lwjgl3Context.kt:20)
+		de.fabmax.kool.DesktopImpl.createContext(Platform.desktop.kt:52)
+		de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:28)
+		de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+		kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+		kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+		kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+		kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+		kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+		kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+		de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+[LWJGL] GLFW_CURSOR_UNAVAILABLE error
+	Description : X11: Standard cursor shape unavailable
+	Stacktrace  :
+		org.lwjgl.glfw.GLFW.glfwCreateStandardCursor(GLFW.java:3983)
+		de.fabmax.kool.platform.glfw.GlfwInput.createStandardCursors(GlfwInput.kt:109)
+		de.fabmax.kool.platform.glfw.GlfwInput.onContextCreated$kool_core(GlfwInput.kt:47)
+		de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onBackendCreated(GlfwWindowSubsystem.kt:107)
+		de.fabmax.kool.platform.Lwjgl3Context.createBackend$kool_core(Lwjgl3Context.kt:54)
+		de.fabmax.kool.platform.Lwjgl3ContextKt.Lwjgl3Context(Lwjgl3Context.kt:20)
+		de.fabmax.kool.DesktopImpl.createContext(Platform.desktop.kt:52)
+		de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:28)
+		de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+		kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+		kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+		kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+		kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+		kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+		kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+		de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+[LWJGL] GLFW_CURSOR_UNAVAILABLE error
+	Description : X11: Standard cursor shape unavailable
+	Stacktrace  :
+		org.lwjgl.glfw.GLFW.glfwCreateStandardCursor(GLFW.java:3983)
+		de.fabmax.kool.platform.glfw.GlfwInput.createStandardCursors(GlfwInput.kt:110)
+		de.fabmax.kool.platform.glfw.GlfwInput.onContextCreated$kool_core(GlfwInput.kt:47)
+		de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onBackendCreated(GlfwWindowSubsystem.kt:107)
+		de.fabmax.kool.platform.Lwjgl3Context.createBackend$kool_core(Lwjgl3Context.kt:54)
+		de.fabmax.kool.platform.Lwjgl3ContextKt.Lwjgl3Context(Lwjgl3Context.kt:20)
+		de.fabmax.kool.DesktopImpl.createContext(Platform.desktop.kt:52)
+		de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:28)
+		de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+		kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+		kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+		kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+		kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+		kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+		kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+		de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+[LWJGL] GLFW_CURSOR_UNAVAILABLE error
+	Description : X11: Standard cursor shape unavailable
+	Stacktrace  :
+		org.lwjgl.glfw.GLFW.glfwCreateStandardCursor(GLFW.java:3983)
+		de.fabmax.kool.platform.glfw.GlfwInput.createStandardCursors(GlfwInput.kt:111)
+		de.fabmax.kool.platform.glfw.GlfwInput.onContextCreated$kool_core(GlfwInput.kt:47)
+		de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onBackendCreated(GlfwWindowSubsystem.kt:107)
+		de.fabmax.kool.platform.Lwjgl3Context.createBackend$kool_core(Lwjgl3Context.kt:54)
+		de.fabmax.kool.platform.Lwjgl3ContextKt.Lwjgl3Context(Lwjgl3Context.kt:20)
+		de.fabmax.kool.DesktopImpl.createContext(Platform.desktop.kt:52)
+		de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:28)
+		de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+		kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+		kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+		kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+		kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+		kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+		kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+		de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+[38;2;161;136;127m   0.485 s[0m|[38;2;186;104;200mf:   0[0m [48;2;139;195;74;38;2;255;255;255;1m I [0m[38;2;139;195;74;1m BlockingCoroutine:[0m Starting GLFW render loop
+spike: backend=OpenGL device=llvmpipe (LLVM 20.1.2, 256 bits) window-visible=false
+spike: wrote /srv/ssd1/workspace/Udea/.claude/worktrees/agent-ac814346642cc446c/spikes/kool-offscreen/build/spike/kool-offscreen-quad.png
+spike: PASS - the textured quad's known pixels are in the read-back
+[38;2;161;136;127m   0.705 s[0m|[38;2;186;104;200mf:   8[0m [48;2;139;195;74;38;2;255;255;255;1m I [0m[38;2;139;195;74;1m GlfwWindowSubsystem:[0m Exiting...
+[38;2;161;136;127m   0.708 s[0m|[38;2;186;104;200mf:   8[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Scene:[0m Released scene "content-scene"
+[38;2;161;136;127m   0.708 s[0m|[38;2;186;104;200mf:   8[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Scene:[0m Released scene "backgroundScene"
+
+[Incubating] Problems report is available at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-ac814346642cc446c/spikes/kool-offscreen/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 10s
+2 actionable tasks: 2 executed
+exit=0

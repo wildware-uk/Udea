@@ -14,16 +14,19 @@ the gate is the `WorldHasher` snapshot-equivalence test plus the cross-OS `repla
 in `.github/workflows/ci.yml`. When the two disagree, the replay result wins and the scanner
 grows a rule.
 
-- **Audited against:** Fleks `2.14`, LibGDX `1.13.5` — the versions pinned in
+- **Audited against:** Fleks `2.14`, LibGDX `1.14.2` — the versions pinned in
   `determinism-allowlist.txt`, which `udeaVerifyDeterminism` compares to the resolved ones on
   every run and fails on drift (`ALLOW005`). An upgrade invalidates the rows below silently, so
   an upgrade has to fail the build until somebody re-reads them.
 - **Audited surface:** the members actually referenced from the source sets
   `DeterminismRules.SIMULATION_SCOPES` declares simulation. This is a **used-surface** audit,
   not a library review: a Fleks method nothing calls is not a determinism risk this project has.
-- **Evidence:** `javap -p -c` over `Fleks-jvm-2.14.jar` and `gdx-1.13.5.jar` from the Gradle
+- **Evidence:** `javap -p -c` over `Fleks-jvm-2.14.jar` and `gdx-1.14.2.jar` from the Gradle
   module cache, plus a `Math`/`StrictMath` probe run on this JDK. Every row says what was
   looked at. No row says "assumed fine"; `AuditTest` in `build-logic` parses this table and fails the build if one does.
+  The gdx rows were first written against `1.13.5` and re-read against `1.14.2` in issue #186;
+  section 3.0 records that re-read, because a pin that moves without a written reason is a pin
+  somebody moved to make a build go green.
 
 ---
 
@@ -133,7 +136,7 @@ banned for what the *caller* passes rather than for anything Fleks does.
 
 ---
 
-## 3. LibGDX 1.13.5 — the used surface
+## 3. LibGDX 1.14.2 — the used surface
 
 **The declared simulation scopes of `:udea-core`, `:udea-gas` and `:udea-net` reference no
 `com.badlogic.gdx` member at all.** That was checked twice: `grep -rn "^import com.badlogic"`
@@ -146,6 +149,50 @@ over their `src/main` returns nothing, and `javap -p -c` over their compiled cla
 The rows below are therefore an audit of what simulation **would** be exposed to the moment
 somebody reaches for the obvious LibGDX helper — which is why they carry rules and replacements
 rather than "not applicable".
+
+### 3.0 The 1.13.5 to 1.14.2 re-read (issue #186)
+
+Issue #186 moved `gdx` from `1.13.5` to `1.14.2`, `ALLOW005` failed the build as designed, and
+this is the re-read it demanded. It is written down rather than summarised as "checked", because
+the next toolchain move will want to know *how much* was looked at, and a pin that moves without
+a reason is a pin somebody moved to make a build go green.
+
+**Method.** Both jars are in the Gradle module cache, so the re-read is a diff rather than a
+reading: `javap -p -c` over each class this section makes a claim about, in `1.13.5` and in
+`1.14.2`, then a per-class textual diff. That is stronger than re-reading the new jar alone,
+because it cannot miss a change in a method nobody thought to re-check. Constant-pool indexes
+were also normalised and diffed a second time, so a pool index shifting does not read as a
+behaviour change and a behaviour change does not hide behind one.
+
+**These audited classes disassemble identically:** `MathUtils`, `MathUtils$Sin`,
+`RandomXS128` and `Pool`. Each produced zero diff lines between the two versions — so the float story
+in 3.1, the `MathUtils.sin` table filled at class-init by `java.lang.Math.sin(double)`, the
+`RandomXS128()` seeding and the LIFO `Pool.freeObjects` are the same bytecode the rows were
+written against.
+
+**What did move, and why no verdict moves with it:**
+
+| Class | What changed between 1.13.5 and 1.14.2 | Why the row's verdict is unaffected |
+| --- | --- | --- |
+| `Vector2` | One added static: `public static final Vector2 One`, with the matching `<clinit>` store. Nothing else. | `len`, `len2`, `nor` and `angleDeg` are byte-identical, and those are what the rows are about. |
+| `ObjectMap`, `IntMap`, `LongMap` | An added `putMissing`, which reads `locateKey` and `resize` like every other write path. | Additive. The iteration rows depend on the open-addressed `keyTable`/`valueTable` plus `shift`, all still present and unmodified, so order is still a function of hash, capacity and insertion history. |
+| `ObjectSet` | One bytecode offset moved inside an existing method. | Same structure, same fields, same iteration. |
+| `Array` | The copy constructor widened from `Array<T>` to `Array<? extends T>`, and `toString` builds with `java.lang.StringBuilder` instead of gdx's own. | Neither touches the backing array or its order. |
+| `IntArray` | `truncate` now throws `IllegalArgumentException` on a negative argument; `toString` moved to `java.lang.StringBuilder`. | A new input rejection is not a new nondeterminism: it either throws or does exactly what it did before. |
+
+**The two checks that make this a used-surface audit were re-run, not assumed.**
+`grep -rn "^import com.badlogic"` over the three scopes' `src/main` still returns nothing — the
+only matches for `com.badlogic` anywhere in them are the two KDoc sentences in `PhysicsWorld.kt`
+and `NoOpPhysicsWorld.kt` this section already names. And `javap -p -c` over their compiled
+classes yields zero `com/badlogic/gdx` targets — over every `.class` file in each scope's
+`build/classes/kotlin/main`, at the class-file counts `udeaVerifyDeterminism` itself printed on
+the same tree (223, 120 and 181 when issue #186 ran it), so the dump covered the whole scope and
+not a subdirectory of it.
+
+A grep that returns nothing is worth nothing until it has been seen returning something, so the
+identical pipeline was pointed at `:moba`'s `dev.wildware.moba.physics` classes — a place in the
+new tree that does use gdx — and returned 197 matching lines. The zeros above are therefore
+about `udea-core`, `udea-gas` and `udea-net` rather than about the grep.
 
 ### 3.1 The float story
 

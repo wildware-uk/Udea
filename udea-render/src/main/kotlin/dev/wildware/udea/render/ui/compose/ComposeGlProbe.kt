@@ -24,12 +24,16 @@ import dev.wildware.composegl.ui.widget.Text
  *    Under the 2.2.10 compiler this file does not compile at all — the frontend rejects the jar
  *    before it reads a single call site.
  * 2. **`org.jetbrains.kotlin.plugin.compose` is applied to this module's `main` compilation.**
- *    Without it, [remember] and [mutableStateOf] still *compile* — `androidx.compose.runtime`
- *    declares `currentComposer` as an intrinsic whose Kotlin body throws — so nothing here would
- *    go red until something actually composed it. That is why the proof is a test that runs the
- *    function rather than a build that compiles it.
- * 3. **State survives recomposition.** [clicks] is `remember`ed, so the count the test reads back
- *    after a click is the count Compose's own slot table kept, not a fresh zero.
+ *    Measured, by removing the plugin and building: `:udea-render:compileKotlin` fails in the JVM
+ *    back end with `Couldn't inline method call: ... remember ...` and, underneath it,
+ *    `couldn't find inline method Landroidx/compose/runtime/ComposablesKt;.remember(Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;`.
+ *    The plugin is what rewrites a `@Composable` call to pass a `Composer`, so without it the
+ *    compiler looks for a signature the runtime jar does not publish. `BRIEF.md` carries the
+ *    transcript as mutation M1.
+ * 3. **State survives recomposition, at run time.** This is the part a compile cannot show.
+ *    [clicks] is `remember`ed, so the count the test reads back after a click is the count
+ *    Compose's own slot table kept, not a fresh zero — which needs the Compose *runtime* to work,
+ *    not merely to be on the classpath.
  *
  * ## Why it stays `internal`
  *

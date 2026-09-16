@@ -20,12 +20,14 @@ import kotlin.test.assertTrue
  * and there are three ways for that to be false while the build is green, so the test asserts
  * against all three:
  *
- * - the ComposeGL jars carry `@Metadata(mv = [2, 4, 0])`, so on the 2.2.10 compiler this file
- *   does not compile — the frontend rejects `composegl-ui` outright;
- * - without `org.jetbrains.kotlin.plugin.compose` on `udea-render`, [ComposeGlProbe] still
- *   compiles, and `remember` throws at the first composition. [greeting] is what catches that;
- * - with the plugin but no working runtime, a click would not recompose. [click] is what catches
- *   that: it reads the count back out of Compose's slot table after the state change.
+ * - the ComposeGL jars carry `@Metadata(mv = [2, 4, 0])`, so on the 2.2.10 compiler nothing here
+ *   compiles: the frontend rejects `composegl-ui-jvm`, `composegl-render-jvm` and `composegl-gdx`
+ *   with "the binary version of its metadata is 2.4.0, expected version is 2.2.0";
+ * - without `org.jetbrains.kotlin.plugin.compose` on `udea-render`, the *compile* fails too —
+ *   in the back end, on `remember` — so that half is caught before any test runs;
+ * - which leaves the part only a run can show: that the Compose runtime actually recomposes.
+ *   `clicking the probe's button` is that test. It presses a tagged `Button` and reads the count
+ *   back out of Compose's slot table, so a classpath that compiles but does not work is red.
  *
  * ## No GL, deliberately
  *

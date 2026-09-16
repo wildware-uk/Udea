@@ -265,7 +265,7 @@ def check_readme_matches_licence(clean):
 # it acts. Every committed file under a directory counts, not only markdown - the round-2 review of
 # #170 found a hit a `-- '*.md'` filter had hidden. The per-ticket `BRIEF-*.md` files are
 # deliberately out: they are records of what a developer ran at the time, and a record may quote
-# a command. So is source code, whose test fixtures may quote one too.
+# a command. Source code is out for the same reason: a test fixture may quote one.
 AGENT_DOCUMENTS = (".claude", "README.md", "AGENTS.md", "CLAUDE.md", "HANDOFF.md", "docs")
 
 # A repo-relative path to a script. Not preceded by a path character, so `/srv/x/tools/a.py` and
@@ -419,7 +419,8 @@ def check_no_instruction_to_run_a_missing_script(clean):
             f"{len(offences)} instruction(s) to run a script this checkout does not have:\n  "
             + "\n  ".join(offences)
             + "\nAn agent follows these literally. Delete the instruction, or, if the line is a "
-            "record of what used to be run, say in the same paragraph that the script was deleted."
+            "record of what used to be run, write it in prose - not a code block - and say in the "
+            "same paragraph that the script was deleted."
         )
     print(
         f"  {len(in_scope)} committed agent document(s) read, {len(candidates)} naming a script; "

@@ -2,12 +2,20 @@
 
 ## kmp baseline
 
-SHA `f45bbeb` (kmp after #202 merge), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `a634450` (kmp after #203 merge), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
 
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
+
+## Wave 3 (2026-09-16): done
+
+- #203 udea-core to KMP: merged `a634450`, round 1 PASS. jvm + android + wasmJs; **iOS OFF** because Fleks publishes
+  no iOS artifact (any version). Named convention `udea.kotlin-multiplatform-no-ios`; follow-up #215. Every module
+  depending on udea-core inherits no-iOS until #215. udea-core not in CI `ios-tests`.
+  `udeaVerifyDeterminism` now scans KMP jvm+android bytecode. Pin test `SimHarnessWorldHashPinTest` in udea-agent.
+  Worktree kept: `.claude/worktrees/agent-aba51a45c03b91d81`.
 
 ## Wave 2 (2026-09-16): done
 
@@ -29,6 +37,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 ## Standing rulings and traps
 
 - New runtime module must call `udeaModule("Name")` in its build script, or codegen errors (#202 ruling).
+- Modules depending on udea-core cannot have iOS until #215 (Fleks); use `udea.kotlin-multiplatform-no-ios` (#203 ruling).
 - #207 (audio) needs #203 and #205 too, not only #201: it `api`-depends on core and uses assets.
 
 - **Every build command needs `ANDROID_HOME=$HOME/Android/Sdk`** since #201 (put it in developer, reviewer
@@ -53,7 +62,6 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 
 ## Next
 
-1. Wave 3: **#203** (udea-core) alone - everything else needs it.
-2. Then #203 done: then #204, #205, #206, #209 in parallel (all need #203); #208 needs #202 and #203.
+1. Wave 4: #204, #205, #206, #209 in parallel (all need #203); #208 needs #202 and #203.
 3. #210 lives in `wildware-uk/composegl`; a separate `composegl-ef` session is active there. Check its state
    before dispatching.

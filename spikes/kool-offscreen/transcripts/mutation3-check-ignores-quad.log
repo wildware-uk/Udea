@@ -1,0 +1,49 @@
+Starting a Gradle Daemon, 1 busy and 1 incompatible and 1 stopped Daemons could not be reused, use --status for details
+
+> Configure project :
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :processResources NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :compileKotlin
+> Task :compileJava NO-SOURCE
+> Task :classes UP-TO-DATE
+> Task :jar
+> Task :compileTestKotlin
+> Task :compileTestJava NO-SOURCE
+> Task :testClasses UP-TO-DATE
+
+> Task :test FAILED
+
+FrameCheckTest > a cleared frame with no quad drawn fails on all four quadrants() FAILED
+    org.opentest4j.AssertionFailedError at FrameCheckTest.kt:31
+
+FrameCheckTest > a read-back upside down fails() FAILED
+    org.opentest4j.AssertionFailedError at FrameCheckTest.kt:37
+
+FrameCheckTest > a texture mirrored left to right fails() FAILED
+    org.opentest4j.AssertionFailedError at FrameCheckTest.kt:43
+
+6 tests completed, 3 failed
+
+[Incubating] Problems report is available at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-ac814346642cc446c/spikes/kool-offscreen/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-ac814346642cc446c/spikes/kool-offscreen/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to get full insights.
+
+BUILD FAILED in 12s
+4 actionable tasks: 4 executed

@@ -1,0 +1,221 @@
+
+> Configure project :
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :processResources NO-SOURCE
+> Task :compileKotlin
+> Task :compileJava NO-SOURCE
+> Task :classes UP-TO-DATE
+
+> Task :run FAILED
+spike: GLFW pre-initialised on X11 (DISPLAY=:99)
+[38;2;161;136;127m   0.365 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Instance:[0m Enabling extensions:
+[38;2;161;136;127m   0.376 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Instance:[0m   VK_KHR_portability_enumeration
+[38;2;161;136;127m   0.376 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Instance:[0m   VK_KHR_surface
+[38;2;161;136;127m   0.376 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Instance:[0m   VK_KHR_xcb_surface
+[38;2;161;136;127m   0.414 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Instance:[0m Created Vulkan instance
+[38;2;161;136;127m   0.418 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Surface:[0m Created surface
+[38;2;161;136;127m   0.428 s[0m|[38;2;186;104;200mf:   0[0m [48;2;139;195;74;38;2;255;255;255;1m I [0m[38;2;139;195;74;1m PhysicalDevice:[0m Multiple Vulkan capable GPUs found:
+[38;2;161;136;127m   0.429 s[0m|[38;2;186;104;200mf:   0[0m [48;2;139;195;74;38;2;255;255;255;1m I [0m[38;2;139;195;74;1m PhysicalDevice:[0m   NVIDIA GeForce RTX 2070 SUPER
+[38;2;161;136;127m   0.429 s[0m|[38;2;186;104;200mf:   0[0m [48;2;139;195;74;38;2;255;255;255;1m I [0m[38;2;139;195;74;1m PhysicalDevice:[0m   llvmpipe (LLVM 20.1.2, 256 bits)
+[38;2;161;136;127m   0.430 s[0m|[38;2;186;104;200mf:   0[0m [48;2;139;195;74;38;2;255;255;255;1m I [0m[38;2;139;195;74;1m PhysicalDevice:[0m Selected GPU: NVIDIA GeForce RTX 2070 SUPER [api: 1.4.329, driver: 595.336.0]
+[38;2;161;136;127m   0.431 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m PhysicalDevice:[0m Using queue families: present: 0, graphics: 0, compute: 0, transfer: 0
+[38;2;161;136;127m   0.432 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Device:[0m Enabling device extensions:
+[38;2;161;136;127m   0.432 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Device:[0m   VK_KHR_swapchain
+[38;2;161;136;127m   0.433 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Device:[0m   VK_KHR_maintenance4
+[38;2;161;136;127m   0.433 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Device:[0m   VK_KHR_maintenance5
+[38;2;161;136;127m   0.433 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Device:[0m   VK_EXT_memory_budget
+[38;2;161;136;127m   0.433 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Device:[0m   VK_EXT_memory_priority
+[38;2;161;136;127m   0.433 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Device:[0m   VK_KHR_dynamic_rendering
+[38;2;161;136;127m   0.434 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Device:[0m   VK_KHR_synchronization2
+[38;2;161;136;127m   0.434 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Device:[0m   VK_KHR_copy_commands2
+[38;2;161;136;127m   0.633 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Device:[0m Created logical device
+[38;2;161;136;127m   0.640 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m VmaMemManager:[0m Created VMA memory allocator
+[38;2;161;136;127m   0.642 s[0m|[38;2;186;104;200mf:   0[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m CommandPool:[0m Created command pool (queue index: 0)
+[LWJGL] GLFW_CURSOR_UNAVAILABLE error
+	Description : X11: Standard cursor shape unavailable
+	Stacktrace  :
+		org.lwjgl.glfw.GLFW.glfwCreateStandardCursor(GLFW.java:3983)
+		de.fabmax.kool.platform.glfw.GlfwInput.createStandardCursors(GlfwInput.kt:107)
+		de.fabmax.kool.platform.glfw.GlfwInput.onContextCreated$kool_core(GlfwInput.kt:47)
+		de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onBackendCreated(GlfwWindowSubsystem.kt:107)
+		de.fabmax.kool.platform.Lwjgl3Context.createBackend$kool_core(Lwjgl3Context.kt:54)
+		de.fabmax.kool.platform.Lwjgl3ContextKt.Lwjgl3Context(Lwjgl3Context.kt:20)
+		de.fabmax.kool.DesktopImpl.createContext(Platform.desktop.kt:52)
+		de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:28)
+		de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+		kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+		kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+		kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+		kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+		kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+		kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+		de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+[LWJGL] GLFW_CURSOR_UNAVAILABLE error
+	Description : X11: Standard cursor shape unavailable
+	Stacktrace  :
+		org.lwjgl.glfw.GLFW.glfwCreateStandardCursor(GLFW.java:3983)
+		de.fabmax.kool.platform.glfw.GlfwInput.createStandardCursors(GlfwInput.kt:108)
+		de.fabmax.kool.platform.glfw.GlfwInput.onContextCreated$kool_core(GlfwInput.kt:47)
+		de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onBackendCreated(GlfwWindowSubsystem.kt:107)
+		de.fabmax.kool.platform.Lwjgl3Context.createBackend$kool_core(Lwjgl3Context.kt:54)
+		de.fabmax.kool.platform.Lwjgl3ContextKt.Lwjgl3Context(Lwjgl3Context.kt:20)
+		de.fabmax.kool.DesktopImpl.createContext(Platform.desktop.kt:52)
+		de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:28)
+		de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+		kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+		kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+		kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+		kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+		kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+		kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+		de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+[LWJGL] GLFW_CURSOR_UNAVAILABLE error
+	Description : X11: Standard cursor shape unavailable
+	Stacktrace  :
+		org.lwjgl.glfw.GLFW.glfwCreateStandardCursor(GLFW.java:3983)
+		de.fabmax.kool.platform.glfw.GlfwInput.createStandardCursors(GlfwInput.kt:109)
+		de.fabmax.kool.platform.glfw.GlfwInput.onContextCreated$kool_core(GlfwInput.kt:47)
+		de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onBackendCreated(GlfwWindowSubsystem.kt:107)
+		de.fabmax.kool.platform.Lwjgl3Context.createBackend$kool_core(Lwjgl3Context.kt:54)
+		de.fabmax.kool.platform.Lwjgl3ContextKt.Lwjgl3Context(Lwjgl3Context.kt:20)
+		de.fabmax.kool.DesktopImpl.createContext(Platform.desktop.kt:52)
+		de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:28)
+		de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+		kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+		kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+		kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+		kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+		kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+		kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+		de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+[LWJGL] GLFW_CURSOR_UNAVAILABLE error
+	Description : X11: Standard cursor shape unavailable
+	Stacktrace  :
+		org.lwjgl.glfw.GLFW.glfwCreateStandardCursor(GLFW.java:3983)
+		de.fabmax.kool.platform.glfw.GlfwInput.createStandardCursors(GlfwInput.kt:110)
+		de.fabmax.kool.platform.glfw.GlfwInput.onContextCreated$kool_core(GlfwInput.kt:47)
+		de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onBackendCreated(GlfwWindowSubsystem.kt:107)
+		de.fabmax.kool.platform.Lwjgl3Context.createBackend$kool_core(Lwjgl3Context.kt:54)
+		de.fabmax.kool.platform.Lwjgl3ContextKt.Lwjgl3Context(Lwjgl3Context.kt:20)
+		de.fabmax.kool.DesktopImpl.createContext(Platform.desktop.kt:52)
+		de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:28)
+		de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+		kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+		kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+		kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+		kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+		kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+		kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+		de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+[LWJGL] GLFW_CURSOR_UNAVAILABLE error
+	Description : X11: Standard cursor shape unavailable
+	Stacktrace  :
+		org.lwjgl.glfw.GLFW.glfwCreateStandardCursor(GLFW.java:3983)
+		de.fabmax.kool.platform.glfw.GlfwInput.createStandardCursors(GlfwInput.kt:111)
+		de.fabmax.kool.platform.glfw.GlfwInput.onContextCreated$kool_core(GlfwInput.kt:47)
+		de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onBackendCreated(GlfwWindowSubsystem.kt:107)
+		de.fabmax.kool.platform.Lwjgl3Context.createBackend$kool_core(Lwjgl3Context.kt:54)
+		de.fabmax.kool.platform.Lwjgl3ContextKt.Lwjgl3Context(Lwjgl3Context.kt:20)
+		de.fabmax.kool.DesktopImpl.createContext(Platform.desktop.kt:52)
+		de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:28)
+		de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+		kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+		kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+		kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+		kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+		kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+		kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+		de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+[38;2;161;136;127m   0.858 s[0m|[38;2;186;104;200mf:   0[0m [48;2;139;195;74;38;2;255;255;255;1m I [0m[38;2;139;195;74;1m BlockingCoroutine:[0m Starting GLFW render loop
+spike: backend=Vulkan device=NVIDIA GeForce RTX 2070 SUPER window-visible=false
+[38;2;161;136;127m   1.166 s[0m|[38;2;186;104;200mf:   1[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m DescriptorPool:[0m Creating descriptor pool for: PoolLayout(numUbos=0, numTextures=1, numStorageBuffers=0, numStorageTextures=0) (size: 128 sets)
+[38;2;161;136;127m   1.171 s[0m|[38;2;186;104;200mf:   1[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m DescriptorPool:[0m Creating descriptor pool for: PoolLayout(numUbos=1, numTextures=0, numStorageBuffers=0, numStorageTextures=0) (size: 128 sets)
+java.lang.IllegalArgumentException: Texture is not copyable (misses VK_IMAGE_USAGE_TRANSFER_SRC_BIT usage flag)
+	at de.fabmax.kool.pipeline.backend.vk.RenderBackendVk.downloadTextureData(RenderBackendVk.kt:253)
+	at de.fabmax.kool.pipeline.Texture2d.download(Texture.kt:126)
+	at dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt$readBack$data$1.invokeSuspend(KoolOffscreenSpike.kt:151)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at de.fabmax.kool.util.TriggeredCoroutineDispatcher.executeDispatchedTasks$kool_core(KoolDispatchers.kt:61)
+	at de.fabmax.kool.platform.Lwjgl3Context.renderFrame$kool_core(Lwjgl3Context.kt:87)
+	at de.fabmax.kool.platform.Lwjgl3Context$renderFrame$1.invokeSuspend(Lwjgl3Context.kt)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+	at de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.runRenderLoop(GlfwWindowSubsystem.kt:112)
+	at de.fabmax.kool.platform.Lwjgl3Context.run(Lwjgl3Context.kt:67)
+	at de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:43)
+	at de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:34)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+	at de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+	at dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+	at dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+[38;2;161;136;127m   1.188 s[0m|[38;2;186;104;200mf:   8[0m [48;2;139;195;74;38;2;255;255;255;1m I [0m[38;2;139;195;74;1m GlfwWindowSubsystem:[0m Exiting...
+[38;2;161;136;127m   1.189 s[0m|[38;2;186;104;200mf:   8[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Scene:[0m Released scene "content-scene"
+[38;2;161;136;127m   1.190 s[0m|[38;2;186;104;200mf:   8[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Scene:[0m Released scene "backgroundScene"
+[38;2;161;136;127m   1.207 s[0m|[38;2;186;104;200mf:  13[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m CommandPool:[0m Destroyed command pool
+[38;2;161;136;127m   1.207 s[0m|[38;2;186;104;200mf:  13[0m [48;2;255;193;6;38;2;255;255;255;1m W [0m[38;2;255;193;6;1m MemoryManager:[0m [38;2;255;224;130mFreeing 1 leaked images:[0m
+[38;2;161;136;127m   1.207 s[0m|[38;2;186;104;200mf:  13[0m [48;2;255;193;6;38;2;255;255;255;1m W [0m[38;2;255;193;6;1m MemoryManager:[0m [38;2;255;224;130m * spike-2x2[0m
+[38;2;161;136;127m   1.208 s[0m|[38;2;186;104;200mf:  13[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m GlfwWindow:[0m Destroyed surface
+[38;2;161;136;127m   1.208 s[0m|[38;2;186;104;200mf:  13[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m GlfwWindow:[0m Destroyed GLFW window
+[38;2;161;136;127m   1.214 s[0m|[38;2;186;104;200mf:  13[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m VmaMemManager:[0m Destroyed VMA memory allocator
+[38;2;161;136;127m   1.237 s[0m|[38;2;186;104;200mf:  13[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Device:[0m Destroyed logical device
+[38;2;161;136;127m   1.254 s[0m|[38;2;186;104;200mf:  13[0m [48;2;0;151;167;38;2;255;255;255;1m D [0m[38;2;77;208;225m Instance:[0m Destroyed instance
+
+[Incubating] Problems report is available at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-ac814346642cc446c/spikes/kool-offscreen/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':run'.
+> Process 'command '/home/shaun/.sdkman/candidates/java/21.0.11-tem/bin/java'' finished with non-zero exit value 2
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 5s
+2 actionable tasks: 2 executed

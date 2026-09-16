@@ -1,0 +1,70 @@
+HEAD=f05a9f1 dirty=1
+
+> Configure project :
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :processResources NO-SOURCE
+> Task :compileKotlin
+> Task :compileJava NO-SOURCE
+> Task :classes UP-TO-DATE
+
+> Task :run FAILED
+[LWJGL] GLFW_PLATFORM_ERROR error
+	Description : Wayland: Failed to connect to display
+	Stacktrace  :
+		org.lwjgl.glfw.GLFW.glfwInit(GLFW.java:1109)
+		de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onEarlyInit(GlfwWindowSubsystem.kt:86)
+		de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:27)
+		de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+		kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+		kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+		kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+		kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+		kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+		kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+		kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+		de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+		dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+Exception in thread "main" java.lang.IllegalStateException: Unable to initialize GLFW
+	at de.fabmax.kool.platform.glfw.GlfwWindowSubsystem.onEarlyInit(GlfwWindowSubsystem.kt:86)
+	at de.fabmax.kool.Platform_desktopKt.createContext(Platform.desktop.kt:27)
+	at de.fabmax.kool.Platform_desktopKt$KoolApplication$1.invokeSuspend(Platform.desktop.kt:33)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+	at de.fabmax.kool.Platform_desktopKt.KoolApplication(Platform.desktop.kt:32)
+	at dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt:68)
+	at dev.wildware.udea.spike.kooloffscreen.KoolOffscreenSpikeKt.main(KoolOffscreenSpike.kt)
+
+[Incubating] Problems report is available at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-ac814346642cc446c/spikes/kool-offscreen/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':run'.
+> Process 'command '/home/shaun/.sdkman/candidates/java/21.0.11-tem/bin/java'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3s
+2 actionable tasks: 2 executed
+exit=1

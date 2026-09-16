@@ -1,0 +1,13 @@
+diff --git a/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt b/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt
+index ce4c945..b61a542 100644
+--- a/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt
++++ b/spikes/kool-offscreen/src/main/kotlin/dev/wildware/udea/spike/kooloffscreen/KoolOffscreenSpike.kt
+@@ -76,7 +76,7 @@ fun main() {
+             val copy = pass.copyOutput(isCopyColor = true, isCopyDepth = false, isSingleShot = false).colorCopy2d
+             addScene { addOffscreenPass(pass) }
+             delayFrames(FRAMES_BEFORE_READ_BACK)
+-            val frame = readBack(copy, bottomRowFirst = ctx.backend is RenderBackendGl)
++            val frame = readBack(copy, bottomRowFirst = false)
+             writePng(frame, out)
+             println("spike: wrote ${out.absolutePath}")
+             val mismatches = ExpectedFrame.mismatches(frame)

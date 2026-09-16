@@ -114,9 +114,8 @@ public class UdeaModuleOptions(
  *
  * The launcher list is read from `runtimeClasspath`, which is the classpath a program started
  * from this module's main sources actually has. A multiplatform module has one per target and
- * generates its registry once, into common code, so it reads `jvmRuntimeClasspath`: the JVM is
- * the authoritative target (spec D3), and every target of a Udea runtime module declares the same
- * common dependencies (issue #203).
+ * generates its registry once, into common code, so it reads the JVM target's,
+ * `jvmRuntimeClasspath`, because the JVM is the authoritative target (spec D3, issue #203).
  */
 public fun Project.udeaModule(name: String): UdeaModuleOptions {
     configurations.configureEach {

@@ -249,7 +249,9 @@ class TickLoopBudgetTest {
         ModuleFiles.moduleDir.resolve("build.gradle.kts").readText()
             .lines()
             .filter { it.contains("kotlin(\"reflect\")") }
-            .all { it.trimStart().startsWith("testImplementation") }
+            // `testImplementation` on the JVM layout, and the quoted `"jvmTestImplementation"` bucket
+            // since this module became multiplatform (issue #203).
+            .all { Regex("""^\s*"?(testImplementation|jvmTestImplementation)"?\s*\(""").containsMatchIn(it) }
 
     private fun File.invariantPath(): String = invariantSeparatorsPath
 

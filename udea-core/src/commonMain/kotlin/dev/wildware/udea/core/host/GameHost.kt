@@ -6,9 +6,9 @@ import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.loop.GameLoop
 import dev.wildware.udea.core.loop.Presentation
 import dev.wildware.udea.core.loop.TimeControl
+import dev.wildware.udea.core.loop.parkWhilePaused
 import dev.wildware.udea.core.module.UdeaGame
 import dev.wildware.udea.core.module.UdeaGameDef
-import dev.wildware.udea.core.loop.parkWhilePaused
 import kotlin.concurrent.Volatile
 
 /**

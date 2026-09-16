@@ -183,9 +183,19 @@ tasks.named<Test>("jvmTest") {
 val jvmTestCompilation: KotlinCompilation<*> =
     (the<KotlinMultiplatformExtension>().targets.getByName("jvm") as KotlinJvmTarget).compilations.getByName("test")
 
-/** What a `Test` task needs on its classpath to run [jvmTestCompilation]'s classes. */
-val jvmTestRuntimeClasspath: FileCollection =
-    files(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
+/**
+ * Points a budget task at [jvmTestCompilation]'s classes, on the runner `jvmTest` uses.
+ *
+ * `useJUnitPlatform()` is not decoration. The multiplatform convention sets it on `jvmTest` alone,
+ * and a `Test` task left on Gradle's default runner finds no JUnit 5 test and fails with "No tests
+ * found for given includes" - which is what all four of these did after issue #203 first moved
+ * this module, while `build` stayed green because none of them is on `check`.
+ */
+fun Test.runsJvmTestClasses() {
+    testClassesDirs = jvmTestCompilation.output.classesDirs
+    classpath = files(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
+    useJUnitPlatform()
+}
 
 val budgetTestClasses = listOf(
     "dev.wildware.udea.core.snapshot.SnapshotBudgetTest",
@@ -205,8 +215,7 @@ tasks.named<Test>("jvmTest") {
 tasks.register<Test>("udeaSnapshotBudget") {
     group = "verification"
     description = "Gates snapshot capture at 1000 entities: <1ms median, zero allocation, <64MB ring."
-    testClassesDirs = jvmTestCompilation.output.classesDirs
-    classpath = jvmTestRuntimeClasspath
+    runsJvmTestClasses()
     filter.includeTestsMatching("dev.wildware.udea.core.snapshot.SnapshotBudgetTest")
     // The measured numbers are the point of the task, so they go to the build log rather than
     // into a report nobody opens.
@@ -219,8 +228,7 @@ tasks.register<Test>("udeaBenchTickLoop") {
     description =
         "Gates the assembled tick loop at 200 entities and 600 ticks: <50ms median, zero " +
         "steady-state allocation, identical hash stream across a snapshot restore."
-    testClassesDirs = jvmTestCompilation.output.classesDirs
-    classpath = jvmTestRuntimeClasspath
+    runsJvmTestClasses()
     filter.includeTestsMatching("dev.wildware.udea.core.snapshot.TickLoopBudgetTest")
     testLogging.showStandardStreams = true
     // Published by the Phase 0 CI job as the gate's artifact.
@@ -239,8 +247,7 @@ tasks.register<Test>("udeaBenchCharacterMover") {
     group = "verification"
     description =
         "Gates CharacterMover at 200 movers x 60 replay steps: under a quarter of a 60Hz frame."
-    testClassesDirs = jvmTestCompilation.output.classesDirs
-    classpath = jvmTestRuntimeClasspath
+    runsJvmTestClasses()
     filter.includeTestsMatching("dev.wildware.udea.core.movement.CharacterMoverBudgetTest")
     testLogging.showStandardStreams = true
 }
@@ -256,8 +263,7 @@ tasks.register<Test>("udeaBenchCharacterMover") {
 tasks.register<Test>("udeaPhysicsRebuildBudget") {
     group = "verification"
     description = "Gates the physics rebuild at 500 bodies: under 2ms median."
-    testClassesDirs = jvmTestCompilation.output.classesDirs
-    classpath = jvmTestRuntimeClasspath
+    runsJvmTestClasses()
     filter.includeTestsMatching("dev.wildware.udea.core.physics.PhysicsRebuildBudgetTest")
     testLogging.showStandardStreams = true
 }

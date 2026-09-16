@@ -38,6 +38,14 @@ it until they are committed.
    for the fresh cloner who never opens the manifest, and a repeated instruction can drift from
    the one it repeats - which is exactly how `scripts/extract-art.py` came to be offered as an
    equivalent of a step it has never been able to perform.
+8. **No document an agent reads tells it to run a script the checkout does not have.** Issue
+   #177. #170 deleted `scripts/stage-moba-art.py` and four tracked files under `.claude/` went
+   on ordering their reader to run it - one of them told the lead to copy the line into every
+   developer prompt. Step 7 could not see them: it reads one section of one file. This step
+   reads every committed file in [AGENT_DOCUMENTS], whatever its extension, and fails naming
+   each `file:line`. The rule that separates an instruction from history is on
+   [check_no_instruction_to_run_a_missing_script]. It runs before step 1, because it needs no
+   build and a stale instruction should cost seconds to find rather than a Gradle run.
 
 Every step prints its own verdict, and exit status is 0 only if all of them hold.
 """
@@ -253,6 +261,173 @@ def check_readme_matches_licence(clean):
     print(f"  README.md's licence section and LICENSE agree on {short!r}")
 
 
+# The documents step 8 reads: what an agent is loaded with, or told by one of these to read, before
+# it acts. Every committed file under a directory counts, not only markdown - the round-2 review of
+# #170 found a hit a `-- '*.md'` filter had hidden. The per-ticket `BRIEF-*.md` files are
+# deliberately out: they are records of what a developer ran at the time, and a record may quote
+# a command. Source code is out for the same reason: a test fixture may quote one.
+AGENT_DOCUMENTS = (".claude", "README.md", "AGENTS.md", "CLAUDE.md", "HANDOFF.md", "docs")
+
+# A repo-relative path to a script. Not preceded by a path character, so `/srv/x/tools/a.py` and
+# `<worktree>/scripts/a.py` - which are not paths into this checkout - are not read as one.
+SCRIPT_MENTION = re.compile(r"(?<![\w./<>~$-])(\./)?((?:[\w.-]+/)+[\w.-]+\.(?:py|sh))(?![\w/-])")
+
+# What sits immediately before a path that is being run rather than named. Checked against the
+# text on the same line before the path.
+INVOKED_BY_INTERPRETER = re.compile(r"(?:^|[\s`'\"(|&;])(?:python3?|sh|bash|zsh|source|exec)(?:\s+-\S+)*\s+$")
+INVOKED_BY_VERB = re.compile(r"\b(?:run|execute|invoke)\s+[`'\"]?$", re.I)
+INVOKED_AS_COMMAND = re.compile(r"(?:^\s*(?:\$\s+)?|(?:&&|\|\||;)\s*)$")
+
+# A prose paragraph that says one of these about the script is recording history.
+SCRIPT_IS_GONE = re.compile(r"\b(?:deleted|removed|no\s+longer\s+exists?)\b", re.I)
+
+FENCE = re.compile(r"^\s*(```|~~~)")
+BLOCK_START = re.compile(r"^\s*(?:#|[-*+]\s|\d+[.)]\s|>)")
+
+
+def git_out(argv, cwd):
+    """`git` with argv, never through a shell - so no shell function named `grep` is involved."""
+    proc = subprocess.run(["git", *argv], cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return proc.returncode, proc.stdout, proc.stderr.decode("utf-8", "replace")
+
+
+def document_units(name, text):
+    """Split a document into (kind, [(line number, line)]) units, `kind` being "code" or "prose".
+
+    A markdown fenced block is one code unit, and so is an indented block that follows a blank
+    line. A prose unit ends at a blank line, a fence, a heading, a list item or a quote. Any file
+    that is not markdown is all code: a shell helper or a settings file is run, not read.
+    """
+    lines = list(enumerate(text.splitlines(), start=1))
+    if not name.endswith(".md"):
+        return [("code", lines)]
+    units, current, kind, fenced, previous_blank = [], [], None, False, True
+
+    def close():
+        nonlocal current, kind
+        if current:
+            units.append((kind, current))
+        current, kind = [], None
+
+    for number, line in lines:
+        blank = not line.strip()
+        if fenced:
+            current.append((number, line))
+            if FENCE.match(line):
+                close()
+                fenced = False
+        elif FENCE.match(line):
+            close()
+            kind, fenced = "code", True
+            current.append((number, line))
+        elif blank:
+            close()
+        elif (line.startswith("    ") or line.startswith("\t")) and (previous_blank or kind == "code"):
+            if kind != "code":
+                close()
+                kind = "code"
+            current.append((number, line))
+        else:
+            if kind != "prose" or BLOCK_START.match(line):
+                close()
+                kind = "prose"
+            current.append((number, line))
+        previous_blank = blank
+    close()
+    return units
+
+
+def instructions_to_run_a_missing_script(name, text, tracked):
+    """Every `(line number, script)` in one document that is an instruction to run a missing script.
+
+    The rule, in two parts, and both must hold for a mention to count:
+
+    * **It is run, not named.** An interpreter is right before it (`python3 scripts/a.py`), an
+      imperative verb is (`run scripts/a.py`), it is written `./scripts/a.py`, or it starts a
+      command - the first thing on a line, after a `$ ` prompt, or after `&&`, `||` or `;`. So
+      `git log -- scripts/a.py` and "`scripts/a.py` did the copying" are names.
+    * **Nothing around it records that the script is gone.** In a code block nothing can: a
+      command there is copied, not read. In a prose paragraph, the paragraph saying the script
+      was deleted, removed, or no longer exists makes the mention history. The paragraph and not
+      the sentence, because "Every checkout ran `python3 scripts/a.py` by hand. That script is
+      deleted." is one record in two sentences.
+
+    What this cannot do is read English: a paragraph that tells its reader to run a missing
+    script *and* says "deleted" about something else is excused.
+    """
+    found = []
+    for kind, unit in document_units(name, text):
+        excused = kind == "prose" and SCRIPT_IS_GONE.search(" ".join(line for _, line in unit))
+        for number, line in unit:
+            for mention in SCRIPT_MENTION.finditer(line):
+                script = mention.group(2)
+                if script in tracked:
+                    continue
+                before = line[: mention.start()]
+                run_here = (
+                    mention.group(1)
+                    or INVOKED_BY_INTERPRETER.search(before)
+                    or INVOKED_BY_VERB.search(before)
+                    or INVOKED_AS_COMMAND.search(before)
+                )
+                if run_here and not excused:
+                    found.append((number, script))
+    return found
+
+
+def check_no_instruction_to_run_a_missing_script(clean):
+    """No committed document an agent reads tells it to run a script `HEAD` does not have.
+
+    Reads committed content through `git` - `ls-tree`, `grep` and `show` against `HEAD` - rather
+    than walking the working tree, for two reasons that are both failures of a working-tree
+    search: `grep` on this box is a shell function wrapping ugrep, which skips gitignored
+    directories and reports nothing, and an untracked file (`.claude/worktrees/` is full of other
+    agents' checkouts) is not something a clone receives.
+    """
+    code, out, err = git_out(["ls-tree", "-r", "-z", "--name-only", "HEAD"], clean)
+    if code != 0:
+        raise Failure(f"git ls-tree could not list HEAD: {err.strip()}")
+    tracked = set(filter(None, out.decode("utf-8").split("\0")))
+    in_scope = sorted(
+        path for path in tracked
+        if any(path == doc or path.startswith(doc + "/") for doc in AGENT_DOCUMENTS)
+    )
+    if "README.md" not in in_scope:
+        raise Failure("HEAD has no README.md, so the agent documents this step reads are not where it looks.")
+
+    # `-I` skips binaries. `git grep` exits 1 for "no match", which is a pass, and anything else
+    # is an error that must not read as one.
+    code, out, err = git_out(
+        ["grep", "-l", "-z", "-I", "-E", "-e", r"\.(py|sh)", "HEAD", "--", *AGENT_DOCUMENTS], clean
+    )
+    if code not in (0, 1):
+        raise Failure(f"git grep failed reading the agent documents: {err.strip()}")
+    candidates = [hit.split(":", 1)[1] for hit in filter(None, out.decode("utf-8").split("\0"))]
+
+    offences = []
+    for name in candidates:
+        code, blob, err = git_out(["show", f"HEAD:{name}"], clean)
+        if code != 0:
+            raise Failure(f"git show could not read {name} at HEAD: {err.strip()}")
+        text = blob.decode("utf-8", "replace")
+        offences += [
+            f"{name}:{number}: {script}"
+            for number, script in instructions_to_run_a_missing_script(name, text, tracked)
+        ]
+    if offences:
+        raise Failure(
+            f"{len(offences)} instruction(s) to run a script this checkout does not have:\n  "
+            + "\n  ".join(offences)
+            + "\nAn agent follows these literally. Delete the instruction, or, if the line is a "
+            "record of what used to be run, write it in prose - not a code block - and say in the "
+            "same paragraph that the script was deleted."
+        )
+    print(
+        f"  {len(in_scope)} committed agent document(s) read, {len(candidates)} naming a script; "
+        "no instruction to run one that is missing"
+    )
+
+
 def main():
     print(f"repository: {ROOT}")
     _, sha = run(["git", "rev-parse", "--short", "HEAD"], ROOT)
@@ -273,7 +448,10 @@ def main():
         for line in step:
             print(f"    {line}")
 
-        print(f"\n[1/7] negative control: {VALIDATE} must FAIL with -x {STAGING_TASK}")
+        print("\n[8/8] no agent document may tell its reader to run a missing script (run first: no build)")
+        check_no_instruction_to_run_a_missing_script(clean)
+
+        print(f"\n[1/8] negative control: {VALIDATE} must FAIL with -x {STAGING_TASK}")
         code, out = run(
             ["sh", "gradlew", VALIDATE, "-x", STAGING_TASK, "--console=plain"], clean
         )
@@ -301,12 +479,12 @@ def main():
             )
         print(f"  FAILED as required, {diagnostics} x UDEA0032")
 
-        print(f"\n[2/7] a fresh checkout must carry no paid-pack art under {SPRITE_TREE}")
+        print(f"\n[2/8] a fresh checkout must carry no paid-pack art under {SPRITE_TREE}")
         check_no_committed_pack_art(clean)
 
         before = tree_files(clean)
 
-        print("\n[3/7] running the documented step in the clean tree")
+        print("\n[3/8] running the documented step in the clean tree")
         # The wrapper is checked in WITHOUT the executable bit - CI's first step after checkout is
         # `chmod +x ./gradlew` - so the documented step is given the same treatment rather than
         # being rewritten into something no reader would type. The bit is put back before step 4
@@ -327,7 +505,7 @@ def main():
 
         os.chmod(wrapper, mode)
 
-        print("\n[4/7] the build must have staged the art, packed it, and left the tree clean")
+        print("\n[4/8] the build must have staged the art, packed it, and left the tree clean")
         appeared = sorted(tree_files(clean) - before)
         staged = [path for path in appeared if path.startswith(SPRITE_TREE + os.sep)]
         if not staged:
@@ -355,13 +533,13 @@ def main():
             )
         print(f"  {len(staged)} sheet(s) staged, {BUNDLE} packed, `git status` clean")
 
-        print("\n[5/7] LICENSE must exclude wherever the build put the art")
+        print("\n[5/8] LICENSE must exclude wherever the build put the art")
         check_licence_covers_destinations(clean, staged)
 
-        print("\n[6/7] README.md's licence claim must match LICENSE")
+        print("\n[6/8] README.md's licence claim must match LICENSE")
         check_readme_matches_licence(clean)
 
-        print("\n[7/7] README.md must not name a staging script")
+        print("\n[7/8] README.md must not name a staging script")
         check_readme_names_the_same_step(clean, step)
     finally:
         # Say so rather than leaving a stale worktree registration behind silently. The check's

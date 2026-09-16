@@ -244,6 +244,36 @@ class LevelServiceTest {
     }
 
     @Test
+    fun `a level whose ids contradict each other is refused before the world is touched`() {
+        val original = host()
+        val saved = populated(original)
+        val bytes = save(original, levels(original, extra = arrayOf(linkComponent)))
+        val format = LevelFormat(LevelComponentModule.discover() + TestComponents(listOf(linkComponent)), LevelHooks())
+        val document = format.decode(bytes)
+        assertTrue(document.handles.freeIndices.isNotEmpty(), "the fixture has no freed id to contradict")
+
+        fun corrupted(netIds: List<LevelNetId>): ByteArray = format.encode(
+            LevelDocument(
+                document.formatVersion, document.tick, document.rng, document.world, netIds,
+                document.handles, document.sections,
+            ),
+        )
+        val boundTwice = corrupted(document.netIds + LevelNetId(saved.anonymous, saved.bodyId))
+        val boundWhileFree = corrupted(
+            document.netIds + LevelNetId(saved.anonymous, NetId.of(document.handles.freeIndices[0], 0)),
+        )
+
+        val fresh = host()
+        fresh.world.entity { it += MoverState(x = 5f) }
+        val levels = levels(fresh, extra = arrayOf(linkComponent))
+        for ((name, corrupt) in listOf("bound twice" to boundTwice, "bound while free" to boundWhileFree)) {
+            val refused = assertFailsWith<LevelFormatException>(name) { levels.read(corrupt) }
+            assertContains(refused.message.orEmpty(), "none, free, repeated or out of range", message = name)
+        }
+        assertEquals(1, fresh.world.numEntities)
+    }
+
+    @Test
     fun `a level that holds a component this game does not have is refused`() {
         val original = host()
         populated(original)

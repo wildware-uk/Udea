@@ -134,8 +134,9 @@ public class UdeaGameDef(
  * A built simulation: the context, the world, the thing that steps it, the resolved order, and
  * the level files that save and load its world.
  *
- * Deliberately not a god object — it holds references and no behaviour of its own. It exists so `build()` can hand back everything a host needs without a caller having to
- * reconstruct which world went with which context, which is exactly the mistake two worlds in
+ * Deliberately not a god object — it holds references and no behaviour of its own. It exists
+ * so `build()` can hand back everything a host needs without a caller having to reconstruct
+ * which world went with which context, which is exactly the mistake two worlds in
  * one JVM makes easy.
  */
 public class UdeaGame internal constructor(

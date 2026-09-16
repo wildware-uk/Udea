@@ -206,18 +206,22 @@ public class LevelService internal constructor(
                     "do not fit this game's $capacity ids",
             )
         }
-        val claimed = HashSet<Int>()
+        // A flag per index rather than a hash set: nothing here needs an order, and `validate`
+        // runs on the simulation thread, where `udeaVerifyDeterminism` refuses a hash-ordered one.
+        val claimed = BooleanArray(capacity)
         for (index in handles.freeIndices) {
-            if (index !in 0 until capacity || !claimed.add(index)) {
+            if (index !in 0 until capacity || claimed[index]) {
                 throw LevelFormatException("level's NetId free queue holds index $index twice or out of range")
             }
+            claimed[index] = true
         }
-        val bound = HashSet<Entity>()
+        val bound = LinkedHashSet<Entity>()
         for (binding in document.netIds) {
             val index = binding.netId.index
-            if (binding.netId.isNone || index >= capacity || !claimed.add(index)) {
+            if (binding.netId.isNone || index >= capacity || claimed[index]) {
                 throw LevelFormatException("level binds ${binding.netId}, which is none, free, repeated or out of range")
             }
+            claimed[index] = true
             if (binding.entity !in document.world || !bound.add(binding.entity)) {
                 throw LevelFormatException(
                     "level binds ${binding.netId} to ${binding.entity}, which the level does not " +

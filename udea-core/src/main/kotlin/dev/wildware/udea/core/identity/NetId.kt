@@ -130,9 +130,8 @@ public value class NetId private constructor(public val raw: Int) : Comparable<N
 /**
  * A [NetId] in a level file: the raw 32-bit word, read back through [NetId.ofRaw].
  *
- * Hand-written rather than the plugin's inline value-class serializer for one reason: the
- * generated one calls the private constructor directly and would accept a word with reserved
- * bits set. Public because the serializer the plugin generates for a saved component in another
+ * Hand-written so that every id read from a file goes through [NetId.ofRaw]'s reserved-bit check
+ * rather than being built from whatever word the file holds. Public because the serializer the plugin generates for a saved component in another
  * module - `moba`'s `Projectile.owner` - references it by name.
  */
 public object NetIdSerializer : KSerializer<NetId> {

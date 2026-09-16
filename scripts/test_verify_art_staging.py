@@ -267,6 +267,31 @@ class FenceTest(unittest.TestCase):
         self.repo.commit()
         self.assertFails(f".claude/WAVE.md:3: {GONE}")
 
+    def test_a_path_that_starts_a_command_is_run(self):
+        self.repo.write(
+            ".claude/agents/reviewer.md",
+            "Before the build:\n\n"
+            "    scripts/stage-moba-art.py --all\n"
+            "    $ scripts/stage-moba-art.py\n"
+            "    cd /tmp/checkout && scripts/stage-moba-art.py\n",
+        )
+        self.repo.commit()
+        self.assertFails(
+            f".claude/agents/reviewer.md:3: {GONE}",
+            f".claude/agents/reviewer.md:4: {GONE}",
+            f".claude/agents/reviewer.md:5: {GONE}",
+        )
+
+    def test_a_file_that_is_not_markdown_is_never_excused_as_history(self):
+        # A shell helper is one code unit from its first line to its last, so a comment in it
+        # that happens to say "deleted" must not turn the command it runs into a record.
+        self.repo.write(
+            ".claude/skills/dev-team/prepare.sh",
+            "#!/bin/sh\n# Restores sprites a clean checkout deleted.\npython3 scripts/stage-moba-art.py\n",
+        )
+        self.repo.commit()
+        self.assertFails(f".claude/skills/dev-team/prepare.sh:3: {GONE}")
+
     def test_a_script_the_checkout_has_may_be_run(self):
         self.repo.write("tools/collage.py", "print('ok')\n")
         self.repo.write(".claude/agents/engineer.md", "\n    tools/collage.py <dir-of-pngs> -o /tmp/x.png\n")

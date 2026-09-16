@@ -35,6 +35,14 @@ dependencies {
     // so the variant is selected here.
     runtimeOnly(variantOf(libs.gdx.platform) { classifier("natives-desktop") })
 
+    // FreeType's desktop natives, for the same reason and with the same shape as the line above.
+    // `composegl-gdx`'s POM brings `com.badlogicgames.gdx:gdx-freetype` -- the Java binding -- and
+    // no `gdx-freetype-platform`, so `GdxFonts.registerTrueType` compiles and then dies in
+    // `FreeType.initFreeType` with an UnsatisfiedLinkError the first time a game asks for a glyph.
+    // #186 could not draw a ComposeGL frame at all for exactly this reason; this line is half of
+    // what fixed it. Runtime-only because nothing compiles against the natives.
+    runtimeOnly(variantOf(libs.gdx.freetype.platform) { classifier("natives-desktop") })
+
     // Test-only, deliberately. `udeaVerifyHeadless` reports through the one UdeaDiagnostic
     // (spec 5) so its output has the same rule ids, spans and cap as every other producer;
     // nothing in the shipped module needs diagnostics, so it must not reach the runtime

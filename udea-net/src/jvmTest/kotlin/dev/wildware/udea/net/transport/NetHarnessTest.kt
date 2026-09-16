@@ -64,7 +64,7 @@ class NetHarnessTest {
      *
      * It used to be a two-second wall-clock bound on the whole session: a harness that slept a
      * frame per tick would take 600 x 16ms and blow through it. That worked, and it was a
-     * stopwatch inside `:udea-net:test`, which is on `check`, which is on `build` - so it was
+     * stopwatch inside `:udea-net:jvmTest`, which is on `check`, which is on `build` - so it was
      * read while nineteen modules compiled beside it, and it was one of the gates neither issue
      * #175 nor issue #182 had listed.
      *

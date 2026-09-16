@@ -119,6 +119,13 @@ class UiLayerTest {
         val beforeStall = screen.observed
         frameTime.frameSeconds = 40f
         pipeline.render(0f)
+        // One ordinary frame after the stall, and it is load-bearing. `UiHost.frame` publishes
+        // state writes at the *top* of a frame and only then asks the clock for one, so a value
+        // an animation writes while the clock is being advanced is not visible to a composition
+        // until the frame after. Assert without this and the test reads the value from before the
+        // stall, passes, and would pass with the clamp taken out -- which is what it did.
+        frameTime.frameSeconds = 1f / 60f
+        pipeline.render(0f)
 
         assertTrue(
             beforeStall < 0.2f,
@@ -126,8 +133,8 @@ class UiLayerTest {
         )
         assertTrue(
             screen.observed < 0.25f,
-            "a 40-second stall ran ${(screen.observed * 1000).toInt()}ms of a 1000ms tween to " +
-                "${screen.observed}; unclamped it would read 1.0",
+            "a 40-second stall ran a 1000ms linear tween to ${screen.observed}; the clamp puts " +
+                "about 33ms of it on the clock, and unclamped it reads 1.0",
         )
     }
 

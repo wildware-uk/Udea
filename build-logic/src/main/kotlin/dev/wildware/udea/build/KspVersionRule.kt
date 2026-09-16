@@ -35,8 +35,14 @@ package dev.wildware.udea.build
  * - `udeaCheckProtocolLock`, which regenerates the wire contract and compares it to
  *   `net-protocol.lock`;
  * - every module's own `kspKotlin`, which is a compile step and cannot pass without running.
+ *
+ * `internal`: nothing outside `build-logic` reads it, and no precompiled script plugin does
+ * either - the catalog check that uses it is `UdeaVersionsTest`, in this module's own test
+ * compilation. `docs/engineering-standards.md` section 8 rejects a `public` declaration nobody
+ * outside the module uses, and `UdeaVersions` is `public` only because the outer build's own
+ * scripts import it.
  */
-public object KspVersionRule {
+internal object KspVersionRule {
 
     /**
      * The old `<kotlin>-<ksp>` shape: a Kotlin version — which may itself carry a `-RC2` or
@@ -52,14 +58,14 @@ public object KspVersionRule {
      *
      * `null` is the decoupled scheme, which is every KSP from `2.3.0` onwards.
      */
-    public fun kotlinVersionNamedBy(kspVersion: String): String? =
+    fun kotlinVersionNamedBy(kspVersion: String): String? =
         KOTLIN_PREFIXED.matchEntire(kspVersion)?.groupValues?.get(1)
 
     /**
      * A message describing why [kspVersion] cannot be used with [kotlinVersion], or `null` if
      * there is nothing in the string that says it cannot.
      */
-    public fun mismatch(kspVersion: String, kotlinVersion: String): String? {
+    fun mismatch(kspVersion: String, kotlinVersion: String): String? {
         val named = kotlinVersionNamedBy(kspVersion) ?: return null
         if (named == kotlinVersion) return null
         return "gradle/libs.versions.toml has ksp='$kspVersion', which is on KSP's old " +

@@ -58,9 +58,9 @@ junitPlatform = "1.13.4"
 # at all. `composegl-gdx` is a GL backend, so it is `udea-render`-only by UDEA-MG-002.
 composegl = "0.6.0"
 # kotlinx.serialization, for level files (issue #191): a saved level is Fleks' own
-# `world.snapshot()` encoded as CBOR. 1.11.0 is not a free choice: it is the version Fleks 2.14
-# itself requires (its `Snapshot` and `Entity` are `@Serializable` against it), so a lower entry
-# here would be upgraded to it by resolution anyway and the catalog would say something untrue.
+# `world.snapshot()` encoded as CBOR. 1.11.0 is the version the Fleks 2.14 release was built and
+# tested against. Fleks is vendored source since issue #215 and compiles its `@Serializable`
+# `Snapshot` and `Entity` against this entry, so moving it moves what `udea-fleks`' own tests run on.
 # Runtime snapshots - rewind, replication, desync reports - stay on `Replicator<T>`; AGENTS.md.
 kotlinxSerialization = "1.11.0"
 # The Android Gradle Plugin, for its Kotlin Multiplatform library support

@@ -41,6 +41,7 @@ class UdpReaderStopTest {
             assertEquals(DisconnectReason.ReceiveFailed, pair.client.failure)
             assertEquals(listOf(PeerId.SERVER to DisconnectReason.ReceiveFailed), pair.clientEvents.disconnected)
             assertEquals(false, pair.client.isConnected)
+            assertTrue(pair.client.connections().isEmpty(), "a connection the client cannot hear is still listed")
             assertEquals(1L, pair.client.counters.receiveErrors)
         }
     }

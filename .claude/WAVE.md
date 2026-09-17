@@ -32,6 +32,8 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 
 - Ready: #215 (Fleks iOS; build-logic determinism pin + udea-core + ci.yml ios-tests). #210 composegl-kool lives in wildware-uk/composegl (check composegl-ef session). #211 needs #210; #212 needs #211; #221 needs #211; #192 needs #212; #194-#196 need #210-#212; #213 then #214 last.
 - So wave 7 is #215 alone in this repo, plus #210 if the ComposeGL repo is free.
+- #210: 2026-09-17 lead messaged peer session `composegl-ef` (busy in /srv/ssd1/workspace/composegl) asking whether composegl-kool is in progress and what to avoid; reply goes to this machine's Udea lead session. No `composegl-kool` module or branch exists in that repo yet. If no answer, dispatch #210 into a composegl worktree off origin/master touching only a new `composegl-kool` module + settings, and name the collision risk on #210.
+- Wave 6 cleanup: no Udea game instances live (7840-7859 free); stale registry entries are melon-merge's, left alone.
 
 ## Wave 5 (2026-09-17): done
 

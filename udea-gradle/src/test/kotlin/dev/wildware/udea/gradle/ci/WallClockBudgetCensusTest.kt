@@ -336,11 +336,11 @@ class WallClockBudgetCensusTest {
                 "a deadline: how long to wait for the host loop to reach a tick",
             "udea-core/src/jvmTest/kotlin/dev/wildware/udea/core/identity/NetIdIndexTest.kt" to
                 "a ratio: resolution at 64 000 ids over resolution at 64, which is an O(1) claim",
-            "udea-net/src/test/kotlin/dev/wildware/udea/net/proof/UdpProofClient.kt" to
+            "udea-net/src/jvmTest/kotlin/dev/wildware/udea/net/proof/UdpProofClient.kt" to
                 "a deadline: the socket read timeout in the UDP proof client",
-            "udea-net/src/test/kotlin/dev/wildware/udea/net/proof/UdpProofServer.kt" to
+            "udea-net/src/jvmTest/kotlin/dev/wildware/udea/net/proof/UdpProofServer.kt" to
                 "a deadline: the socket read timeout in the UDP proof server",
-            "udea-net/src/test/kotlin/dev/wildware/udea/net/proof/UdpTwoProcessTest.kt" to
+            "udea-net/src/jvmTest/kotlin/dev/wildware/udea/net/proof/UdpTwoProcessTest.kt" to
                 "a deadline: how long to wait for a line from a forked process",
             "udea-render/src/test/kotlin/dev/wildware/udea/render/capture/CaptureOrderingTest.kt" to
                 "a deadline: how long to wait for a captured frame",

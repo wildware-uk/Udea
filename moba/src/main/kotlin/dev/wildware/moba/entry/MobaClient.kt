@@ -28,11 +28,10 @@ import dev.wildware.udea.net.transport.PeerId
 import dev.wildware.udea.net.transport.UdpConfig
 import dev.wildware.udea.net.transport.UdpConnectionListener
 import dev.wildware.udea.net.transport.UdpTransport
+import io.ktor.network.sockets.InetSocketAddress
 import dev.wildware.udea.render.input.InjectedIntent
 import dev.wildware.udea.render.input.Intent
 import dev.wildware.udea.render.input.IntentState
-import java.net.InetAddress
-import java.net.InetSocketAddress
 import java.security.SecureRandom
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -196,10 +195,7 @@ public object MobaClient {
      */
     private fun udp(mode: RenderMode, bindPort: Int?, joinTo: InetSocketAddress?) {
         val serving = if (bindPort == null) null else bind(bindPort)
-        val serverAddress = joinTo ?: InetSocketAddress(
-            InetAddress.getLoopbackAddress(),
-            checkNotNull(serving).address.port,
-        )
+        val serverAddress = joinTo ?: InetSocketAddress(LOOPBACK, checkNotNull(serving).address.port)
         if (serving != null) {
             println("[moba.client] serving on ${serving.address}; tell the other player to run:")
             println("[moba.client]   ./gradlew :moba:runClient --args=\"join <this machine>:${serving.address.port}\"")
@@ -336,7 +332,7 @@ public object MobaClient {
         val key = ByteArray(ConnectionSecret.MIN_KEY_BYTES).also { SecureRandom().nextBytes(it) }
         val arrivals = ConcurrentLinkedQueue<Pair<PeerId, Boolean>>()
         val socket = UdpTransport.server(
-            bindAddress = InetSocketAddress(port),
+            bindAddress = InetSocketAddress(ANY_ADDRESS, port),
             clock = clock,
             secret = ConnectionSecret(key),
             protoHash = session.protocol.protoHash,
@@ -597,4 +593,10 @@ public object MobaClient {
 
     /** How many people may be in one `host` window's game, the host included. */
     private const val MAX_CLIENTS: Int = 8
+
+    /** Where a `listen` window's own client finds the server it is running. */
+    private const val LOOPBACK: String = "127.0.0.1"
+
+    /** What a `host` window binds, so a player on another machine can reach it. */
+    private const val ANY_ADDRESS: String = "0.0.0.0"
 }

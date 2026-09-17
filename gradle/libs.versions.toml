@@ -76,6 +76,17 @@ androidMinSdk = "24"
 # and by `atomicfu` where state is genuinely shared"). Only its `locks` API is used, which is an
 # ordinary class on every target, so no atomicfu compiler plugin is applied.
 atomicfu = "0.33.0"
+# udea-net's transports on Kotlin Multiplatform (issue #209, spec section 6 and D11). Ktor gives UDP
+# sockets on the socket-capable targets (`ktor-network`), a WebSocket client on every target
+# (`ktor-client-*`) and the desktop server's WebSocket endpoint (`ktor-server-*`). 3.6.0 is built
+# against coroutines 1.11.0, which is therefore the `kotlinxCoroutines` entry: a lower one would be
+# upgraded to it by resolution and this file would say something untrue.
+ktor = "3.6.0"
+kotlinxCoroutines = "1.11.0"
+# The connect-token HMAC, off `javax.crypto` (issue #209). The JDK provider by name, on the JVM and
+# Android, rather than the library's default-provider lookup, which on the JVM is a `ServiceLoader`.
+cryptography = "0.6.0"
+
 # kotlinx-io: how `udea-assets` reads a `.udeapak` from a file on every target (issue #205, spec
 # section 6: "kotlinx-io everywhere; on Wasm, a 'file' is an HTTP fetch or an in-memory buffer").
 kotlinxIo = "0.9.1"
@@ -133,6 +144,19 @@ kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.re
 kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinxSerialization" }
 junit5-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }
+# udea-net's transports (issue #209).
+ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
+ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography" }
+cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "cryptography" }
 
 [plugins]
 changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }

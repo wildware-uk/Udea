@@ -15,6 +15,8 @@ import dev.wildware.udea.replay.ReplayRecording
 import dev.wildware.udea.replay.ReplaySession
 import dev.wildware.udea.replay.ReplayVerification
 import dev.wildware.udea.replay.ReplayVerifier
+import dev.wildware.udea.replay.readFrom
+import dev.wildware.udea.replay.writeTo
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Random

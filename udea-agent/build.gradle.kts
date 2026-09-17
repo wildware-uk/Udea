@@ -139,8 +139,13 @@ tasks.matching { it.name.startsWith("ksp") && it.name != kspCommonMain }.configu
 
 // `udea.sourceSet` is `udea-codegen`'s `CodegenOptions.SOURCE_SET`: the JVM run processes only
 // `src/jvmMain/` and writes no registry and no manifest, which the common run already wrote.
+//
+// Declared as an input as well, because the option on its own is not one: measured on this module,
+// removing it left `kspKotlinJvm` UP-TO-DATE, and even FROM-CACHE, holding the other setting's
+// generated files.
 tasks.withType<KspAATask>().matching { it.name == "kspKotlinJvm" }.configureEach {
     kspConfig.processorOptions.put("udea.sourceSet", "jvmMain")
+    inputs.property("udea.sourceSet", "jvmMain")
 }
 
 // --- the agent surface's own codegen ---------------------------------------------------------

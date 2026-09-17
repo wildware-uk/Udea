@@ -44,6 +44,18 @@ class CleanBuildBudgetJobTest {
     }
 
     @Test
+    fun `the base checkout takes its commit from the script CleanBuildBaseScriptTest executes`() {
+        val checkout = job.steps.filter { "git worktree add" in it }
+        assertTrue(checkout.size == 1, "expected one step of `$JOB` to check out the base, found ${checkout.size}")
+        assertTrue(
+            BASE_SCRIPT in checkout.single(),
+            "the base checkout does not run `$BASE_SCRIPT`, so the base it times against is chosen by a " +
+                "rule no test executes - which is how it went on comparing against a retired branch " +
+                "(issue #218). The step was:\n${checkout.single()}",
+        )
+    }
+
+    @Test
     fun `the verdict is the comparison task, run after the samples are taken`() {
         val steps = job.steps
         val timingAt = steps.indexOfFirst { CLEAN_BUILD in it }
@@ -66,6 +78,7 @@ class CleanBuildBudgetJobTest {
         const val BASE_CHECKOUT = "UDEA_CLEAN_BUILD_BASE"
         const val BASE_ROW = "echo \"base "
         const val HEAD_ROW = "echo \"head "
+        const val BASE_SCRIPT = ".github/scripts/clean-build-base.sh"
         const val VERDICT_TASK = "udeaCleanBuildVerdict"
         const val SAMPLES_PROPERTY = "-Pudea.cleanBuild.samples="
     }

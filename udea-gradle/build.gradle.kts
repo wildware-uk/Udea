@@ -77,6 +77,11 @@ tasks.test {
     inputs.file(root.file("build.gradle.kts"))
         .withPropertyName("rootBuildScript")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // `CleanBuildBaseScriptTest` executes the script the clean-build job picks its base with
+    // (issue #218), for the same reason: an edit to it has to re-run the test.
+    inputs.file(root.file(".github/scripts/clean-build-base.sh"))
+        .withPropertyName("cleanBuildBaseScript")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 
     // `WallClockBudgetCensusTest` reads every test source in the repository (issue #182), so every
     // test source in the repository is an input. Without this the census is checked against

@@ -122,6 +122,8 @@ class CleanBuildBaseScriptTest {
         val head = clone("kmp")
         git(head, "checkout", "--orphan", "unrelated")
         commit(head, "u1")
+        // A second commit, so a fallback to HEAD's own parent would find one and succeed.
+        commit(head, "u2")
 
         val run = script(head, baseRef = "")
         assertNotEquals(0, run.exitCode, "the script chose a base for an unrelated history:\n${run.output}")

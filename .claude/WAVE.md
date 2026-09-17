@@ -2,7 +2,7 @@
 
 ## kmp baseline
 
-SHA `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -26,6 +26,8 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - #216: merged `6d95f67`, round 1 PASS. Paths were temp-dir fixture names, not repo reads: exempted in OuterBuildInputsTest (commented). build-logic check now green, fully. Worktree kept: `.claude/worktrees/agent-ae7538127c3c34047`.
 - #207: merged `e9639e0`, round 1 PASS (no findings). udea-audio no-ios KMP; mixer seed reads kotlin.time.Clock (presentation, reviewer-ruled OK). Worktree kept: `.claude/worktrees/agent-ad8fa4bba8720b520`.
 - #220: merged `89e6113`, round 1 PASS (no findings). Reader stop queues a marker; poll counts receiveErrors, disconnects with local-only DisconnectReason.ReceiveFailed(8), sets failure. Worktree kept: `.claude/worktrees/agent-af52e01da27821b3f`.
+- #208: merged `47ec3b9`, round 1 PASS (no findings). udea-agent no-ios KMP; KSP twice (common + jvmMain scoped by new `udea.sourceSet` option); Wasm refuses diag.memory and enum writes with typed errors; /tools byte-identical to master. Worktree kept: `.claude/worktrees/agent-a9f0019cbc1541a12`. #193 (editor tools) now unblocked.
+- For #214 cleanup (dropped as cards, noted on #214): docs/contracts/agent-tools.md says udea-agent `src/main` (stale path, frozen - lock route); ci.yml replay-equality-nightly `if:` still names refs/heads/example (schedule on default branch still runs).
 - Reviewers cannot SendMessage `main`; they reach the lead as `team-lead`.
 - Trap: the lead's scratchpad is shared with developers; name logs per issue.
 - Held to wave 6: #217 (build-logic, collides with #216), #219 (udea-net, collides with #220), #193 (needs #208).

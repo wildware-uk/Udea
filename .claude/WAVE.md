@@ -2,7 +2,7 @@
 
 ## kmp baseline
 
-SHA `6d95f67` (kmp after #216 merge; trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -24,6 +24,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - #208 ruling: targets jvm/android/wasmJs (no iOS until #215); assets-compiler code stays JVM. Commented.
 - Hand-offs: module-graph.md udea-assets row -> dev-207; ReplayFixtures.kt:106 `:udea-net:test` -> dev-208.
 - #216: merged `6d95f67`, round 1 PASS. Paths were temp-dir fixture names, not repo reads: exempted in OuterBuildInputsTest (commented). build-logic check now green, fully. Worktree kept: `.claude/worktrees/agent-ae7538127c3c34047`.
+- #207: merged `e9639e0`, round 1 PASS (no findings). udea-audio no-ios KMP; mixer seed reads kotlin.time.Clock (presentation, reviewer-ruled OK). Worktree kept: `.claude/worktrees/agent-ad8fa4bba8720b520`.
 - Trap: the lead's scratchpad is shared with developers; name logs per issue.
 - Held to wave 6: #217 (build-logic, collides with #216), #219 (udea-net, collides with #220), #193 (needs #208).
 

@@ -201,6 +201,17 @@ class OuterBuildInputsTest {
         )
 
         /**
+         * Why `DeterminismLayoutTest`'s multiplatform source directories are excused (issue #216).
+         *
+         * Declaring them would make every edit to `udea-core`'s sources re-run this whole suite
+         * for a test whose result cannot depend on them.
+         */
+        const val DETERMINISM_LAYOUT_FIXTURE =
+            "DeterminismLayoutTest creates it with mkdirs under its own @TempDir repository, to " +
+                "lay out a multiplatform module, and asserts DeterminismLayout.scopeInput returns " +
+                "it; the real udea-core directory of the same name is never read"
+
+        /**
          * Paths the scan finds that no test reads out of the repository.
          *
          * Each is a fixture path that happens to collide with a real file: the test writes it
@@ -222,6 +233,10 @@ class OuterBuildInputsTest {
             "common/src/main/kotlin/dev/wildware/udea/ecs/system/TransformSystem.kt" to
                 "MigrationVerifyTest's `legacyPath`: a plausible legacy path written into a " +
                 "fixture, which happens to name a file the old tree really still has",
+            "udea-core/src/commonMain/kotlin" to DETERMINISM_LAYOUT_FIXTURE,
+            "udea-core/src/jvmAndAndroidMain/kotlin" to DETERMINISM_LAYOUT_FIXTURE,
+            "udea-core/src/wasmJsMain/kotlin" to DETERMINISM_LAYOUT_FIXTURE,
+            "udea-core/src/jvmTest/kotlin" to DETERMINISM_LAYOUT_FIXTURE,
         )
     }
 }

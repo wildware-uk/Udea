@@ -2,7 +2,7 @@
 
 ## kmp baseline
 
-SHA `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -16,6 +16,15 @@ Reviewers and trial merges: run `-p build-logic check` too; that one test failin
 `clean build under budget` (ratio 1.116; it compares against retired `origin/example`, filed #218). Not branch findings.
 
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
+
+## Wave 6 (2026-09-17): in flight
+
+- Dispatched: #217 determinism TimeSource (dev-217, build-logic), #219 UDP straddle Position desync (dev-219, udea-net + moba UDP client), #193 editor.* tools (dev-193, udea-agent, udea-agent-host, MobaAgent, udea-core NetIdIndex/LevelService).
+- #215 held to wave 7: vendoring Fleks moves the Fleks pin (`determinism-allowlist.txt`, ALLOW005) that #217's scanner code owns, and touches udea-core beside #193. Commented on #215.
+- #193: port of the pre-restart branch `issue-193-editor-tools` (worktree agent-a2c3e8e4459ef1aea); new branch `issue-193-editor-tools-kmp`. Previous developer's five rulings on #193 stand.
+- #219: issue had no acceptance criteria; lead set them (root cause named, deterministic straddle test red on origin/kmp, >=20 runUdpProof runs reported).
+- CI checked: kmp run 35175857880 (7073adc) budget base = first parent 25cc650, ratio 1.030. Migration ledger + determinism jobs now green. Windows latency `CharacterMoverBudgetTest` (median 7.3ms vs 4ms) failed once, rerun green: flake. Whole run green.
+- #217: merged `303abe7`, round 1 PASS (no findings). DET001 gains TimeSource.Monotonic + mark elapsedNow/hasPassedNow; DET003 gains kotlin.time/kotlinx.datetime Clock.System. udeaVerifyGasTime kept (not equivalent). Dropped as cards (commented on #217, audit row): inlined-code spans past EOF; klib-only source sets unscanned. Worktree kept: `.claude/worktrees/agent-ab6b17f2ef1d868c5`. #215 now free of #217 collision.
 
 ## Wave 5 (2026-09-17): done
 

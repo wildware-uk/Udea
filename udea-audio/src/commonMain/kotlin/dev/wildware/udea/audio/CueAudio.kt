@@ -5,6 +5,7 @@ import dev.wildware.udea.core.CueId
 import dev.wildware.udea.core.CueQueue
 import kotlin.math.sqrt
 import kotlin.random.Random
+import kotlin.time.Clock
 
 /**
  * The thing that was missing: something that actually drains `GameContext.cues`.
@@ -43,6 +44,11 @@ import kotlin.random.Random
  * would couple it to the simulation stream: draw one fewer sound and every subsequent combat roll
  * shifts. Spec 5 puts a separately typed, wall-seeded generator in a module simulation cannot see,
  * and `udea-core` cannot see this one.
+ *
+ * The wall clock is `kotlin.time.Clock.System`, the one every target of this module has (issue
+ * #207); the JVM's `System.nanoTime` does not resolve in common code. Its resolution is the
+ * platform's - finer on the JVM than in a browser - which matters only to two mixers built in the
+ * same instant, and a test that needs two mixers to agree or differ passes [seed] itself.
  */
 public class CueAudio(
     /** Where the noise comes out. [AudioDevice.Silent] for a headless process. */
@@ -55,7 +61,7 @@ public class CueAudio(
     private val locator: CueSourceLocator = CueSourceLocator.Unlocated,
     /** At most this many voices per cue id per drain. See [DEFAULT_VOICE_CAP]. */
     private val voiceCap: Int = DEFAULT_VOICE_CAP,
-    seed: Long = System.nanoTime(),
+    seed: Long = Clock.System.now().let { it.epochSeconds * NANOS_PER_SECOND + it.nanosecondsOfSecond },
 ) {
 
     init {
@@ -201,6 +207,9 @@ public class CueAudio(
         "CueAudio(device=$device, bindings=$bindings, drained=$drained, played=$played)"
 
     public companion object {
+
+        /** Folds a wall-clock instant into the default seed. */
+        private const val NANOS_PER_SECOND: Long = 1_000_000_000L
 
         /**
          * Voices per cue id per frame.

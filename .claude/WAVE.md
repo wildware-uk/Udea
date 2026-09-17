@@ -44,6 +44,15 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - BLOCKER: Kool 0.19.0 (latest, 2025-12) publishes no wasmJs; wasm on Kool main since 2025-12-24, unreleased, main uses jvmToolchain(25). Filed #223 (options: self-publish pinned Kool main / wait 0.20 / Kotlin/JS / desktop+Android first). Interim: #222 ships Android only; #211 AC1 planned JVM+Android, Wasm to #223. Wave 9 candidate: #223 spike (option 1).
 - #222: round 1 PASS (no findings). Landed composegl master `d8f2da9a` (fast-forward, one commit; PR #233 shows merged). Wiki pushed. composegl-kool jvm + android (AGP KMP library, ContextGl expect object, AndroidFonts, `android` emulator CI job). Master CI 35190562150 green; snapshot release 35191171225 green: composegl-kool, -jvm, -android 0.7.0-SNAPSHOT on Sonatype (verified metadata). #222 closed. Dropped: CLAUDE.md release file count for -android publication (composegl doc), tap-in-one-frame Kool upstream. Worktree kept: `/srv/ssd1/workspace/composegl-wt/kool-222`. kmp CI run 35186519448 (7d4ebad): whole run green, clean-build budget green again.
 
+## Wave 9 (2026-09-17): in flight
+
+- Baseline unchanged: `5f7c3cf` fully green (last code merge `0befdec`).
+- #211 split (commented): #211 = GameHost, SpriteBatch2D, camera, capture, overlay, render modes; input + composegl-kool UI host -> #224 (needs #211). Targets JVM + Android.
+- #211 ruling (commented): moba may go red on this branch (D9 big bang; repaired by #212). Brief lists them as expected reds. Everything else, udea-agent-host included, stays green. Trial merge rule for #211: baseline + those named moba reds only.
+- #223 option-1 spike filed as #225 (spikes/kool-wasm/ only, publish nothing).
+- Dispatched: dev-211 (branch issue-211-udea-render-kool), dev-225 (branch issue-225-kool-wasm-spike). Disjoint. Stopped 2 idle Udea Gradle 8.13 daemons first (19G free after).
+- Epic #199 checklist gained 6c #225 and 7b #224.
+
 ## Wave 9 plan
 
 - Ready: #211 udea-render on Kool (needs #222 - landed), scoped JVM + Android; its Wasm AC moves to #223 (commented on #211). #223 spike (build pinned Kool main with toolchain 21, check wasmJs + WebGL2 draw; publish nothing). #211 is Udea repo (udea-render); #223 spike is outside Udea (Kool clone in scratch dir) - disjoint, can pair if box has memory (session hit low-memory kill once this wave).

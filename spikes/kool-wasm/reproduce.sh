@@ -55,7 +55,9 @@ stage_kool() {
     git -C "$KOOL_DIR" diff --stat
 
     printf 'sdk.dir=%s\n' "$ANDROID_HOME" > "$KOOL_DIR/local.properties"
-    rm -rf "$REPO/de/fabmax/kool"
+    # Every output this stage checks is produced by this run: nothing published by an earlier run,
+    # and no task left up to date by one.
+    rm -rf "$REPO/de/fabmax/kool" "$KOOL_DIR/build" "$KOOL_DIR/buildSrc/build" "$KOOL_DIR/kool-core/build"
 
     # The caps: this box is shared, and Kool's own gradle.properties asks for -Xmx8g twice.
     # --no-build-cache: Kool turns the build cache on, and a task restored from an earlier run
@@ -100,7 +102,7 @@ stage_kool() {
 
 stage_consumer() {
     say "consumer: Kotlin 2.4.20 on Udea's Gradle compiles jvm + wasmJs against the scratch repo"
-    rm -rf "$HERE/consumer/build/dist"
+    rm -rf "$HERE/consumer/build"
     (cd "$UDEA" && JAVA_HOME=$UDEA_JAVA sh gradlew -p spikes/kool-wasm/consumer --console=plain \
         --max-workers=4 -Pspike.repo="$REPO" compileKotlinJvm wasmJsBrowserDistribution)
     [ -f "$HERE/consumer/build/dist/wasmJs/productionExecutable/index.html" ] || fail "no wasm distribution"

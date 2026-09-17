@@ -38,6 +38,17 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - #215: merged `0befdec`, round 1 PASS (no findings). Fleks 2.14 vendored as `udea-fleks` (byte-identical to tag, reviewer diffed). iOS on: udea-fleks, core, gas, audio, replay (CI ios-tests 570 tests). udea-net + udea-agent stay no-iOS (expect with no native actual). UDEA-MG-007: udea-fleks deps stdlib + serialization-core only. Determinism pin = 2.14+sha256 of vendored source; DET002 flags Fleks random() picks. CI `clean build under budget` red once (1.636, accepted by lead, commented); merge push goes red once too, next kmp push should be green - CHECK. Worktree kept: `.claude/worktrees/agent-a5908c0877dd4f81f`.
 - Dropped cards: stale "Fleks requests stdlib 2.3.21" KDoc in udea.kotlin-base.
 
+## Wave 8 (2026-09-17): done
+
+- composegl-ef cleared #222: nothing in flight; standard wasmJs/android task names need no ci-legs edit; add karma.config.d (chromium --no-sandbox); WebGL1 task by name if Kool supports it; Kool Wasm demo out of `published`, pages.yml untouched; one snapshot release after landing. Dispatched dev-222 (worktree composegl-wt/kool-222, branch issue-222-composegl-kool-wasm-android).
+- BLOCKER: Kool 0.19.0 (latest, 2025-12) publishes no wasmJs; wasm on Kool main since 2025-12-24, unreleased, main uses jvmToolchain(25). Filed #223 (options: self-publish pinned Kool main / wait 0.20 / Kotlin/JS / desktop+Android first). Interim: #222 ships Android only; #211 AC1 planned JVM+Android, Wasm to #223. Wave 9 candidate: #223 spike (option 1).
+- #222: round 1 PASS (no findings). Landed composegl master `d8f2da9a` (fast-forward, one commit; PR #233 shows merged). Wiki pushed. composegl-kool jvm + android (AGP KMP library, ContextGl expect object, AndroidFonts, `android` emulator CI job). Master CI 35190562150 green; snapshot release 35191171225 green: composegl-kool, -jvm, -android 0.7.0-SNAPSHOT on Sonatype (verified metadata). #222 closed. Dropped: CLAUDE.md release file count for -android publication (composegl doc), tap-in-one-frame Kool upstream. Worktree kept: `/srv/ssd1/workspace/composegl-wt/kool-222`. kmp CI run 35186519448 (7d4ebad): whole run green, clean-build budget green again.
+
+## Wave 9 plan
+
+- Ready: #211 udea-render on Kool (needs #222 - landed), scoped JVM + Android; its Wasm AC moves to #223 (commented on #211). #223 spike (build pinned Kool main with toolchain 21, check wasmJs + WebGL2 draw; publish nothing). #211 is Udea repo (udea-render); #223 spike is outside Udea (Kool clone in scratch dir) - disjoint, can pair if box has memory (session hit low-memory kill once this wave).
+- Blocked: #212 needs #211; #221 needs #211; #192 needs #212; #194-#196 need #210-#212; #213 then #214.
+
 ## Wave 8 plan
 
 - Ready: #222 (composegl-kool Wasm + Android, composegl repo; composegl-ef session active there - message it before dispatch). Possible iOS follow-up for udea-net/udea-agent native actuals: not filed (not a spec ticket yet; file only if #214 needs it).

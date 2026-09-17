@@ -242,14 +242,16 @@ public object ModuleGraphRules {
      */
     public val ASSETS_MODEL_IS_A_LEAF: DependencyRule = DependencyRule(
         id = RuleId("UDEA-MG-006"),
-        summary = "udea-assets resolves only udea-annotations, udea-diagnostics and the stdlib",
+        summary = "udea-assets resolves only udea-annotations, udea-diagnostics, kotlinx-io and the stdlib",
         rationale = "The runtime asset model replaces `common/assets/*` and the `Assets` global, " +
             "and the old one could not be read without LibGDX, a Jackson databind stack and a " +
             "Kotlin scripting host, because asset values held live Sound and Texture handles and " +
             "were produced by evaluating scripts at runtime. Spec 3.6 compiles assets at build " +
             "time instead, so the runtime model is plain data: a dependency here means an asset " +
-            "value has started holding something that is not.",
-        specSection = "4, 3.6",
+            "value has started holding something that is not. kotlinx-io is the one exception, " +
+            "and it holds no asset value: it is how the .udeapak reader names and reads a file on " +
+            "every target once the module is multiplatform (spec 6, issue #205).",
+        specSection = "4, 3.6, 6",
         projects = setOf(":udea-assets"),
         configurations = setOf("compileClasspath", "runtimeClasspath"),
         allowOnly = listOf(
@@ -257,7 +259,16 @@ public object ModuleGraphRules {
             CoordinatePattern(":udea-assets"),
             CoordinatePattern(":udea-diagnostics"),
             CoordinatePattern("org.jetbrains.kotlin:kotlin-stdlib"),
+            // The stdlib as the wasmJs classpath resolves it once kotlinx-io asks for it by name.
+            CoordinatePattern("org.jetbrains.kotlin:kotlin-stdlib-wasm-js"),
             CoordinatePattern("org.jetbrains:annotations"),
+            // Issue #205. `kotlinx-io-core` and the `kotlinx-io-bytestring` it depends on, each
+            // with its per-target artifacts (`kotlinx-io-core-jvm`, `-wasm-js`, `-iosarm64`), by
+            // name: a `kotlinx-*` wildcard would let serialization or coroutines in unannounced.
+            CoordinatePattern("org.jetbrains.kotlinx:kotlinx-io-core"),
+            CoordinatePattern("org.jetbrains.kotlinx:kotlinx-io-core-*"),
+            CoordinatePattern("org.jetbrains.kotlinx:kotlinx-io-bytestring"),
+            CoordinatePattern("org.jetbrains.kotlinx:kotlinx-io-bytestring-*"),
         ),
     )
 

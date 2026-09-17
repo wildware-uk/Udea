@@ -2,7 +2,7 @@
 
 ## kmp baseline
 
-SHA `4ca994d` (kmp after #204 merge; before: `a634450` after #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `abba97b` (kmp after #205 merge; before: `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -12,13 +12,19 @@ SHA `4ca994d` (kmp after #204 merge; before: `a634450` after #203), refreshed 20
 udea-core KMP paths undeclared. Baseline failure, not any wave-4 branch's. Filed #216, dispatch in wave 5.
 Reviewers and trial merges: run `-p build-logic check` too; that one test failing is baseline.
 
+**CI baseline reds on kmp (run 35160551639, 07eddef):** migration ledger + 4x determinism (all #216), and
+`clean build under budget` (ratio 1.116; it compares against retired `origin/example`, filed #218). Not branch findings.
+
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
 
 ## Wave 4 (2026-09-16): in flight
 
 - Dispatched: #204 gas (dev-204), #205 assets (dev-205), #206 replay (dev-206), #209 net (dev-209). Disjoint modules.
-- Wave 5 candidates: #216 (build-logic inputs, found wave 4), #217 (determinism scanner misses TimeSource, found by dev-204).
+- Wave 5 candidates: #216 (build-logic inputs, found wave 4), #218 (CI budget job base is retired example), #217 (determinism scanner misses TimeSource, found by dev-204).
 - #204 gas: merged `4ca994d` (+ BRIEF-204.md `c58cb75`), round 1 PASS. Trial + merged build green; build-logic check only #216. udea-core `KClass.runtimeName` now public; `roundHalfUp` replaces Math.round (roundToInt differs on Wasm). Worktree kept: `.claude/worktrees/agent-a8b2f894959c4489d`.
+- #206 replay: round 1 PASS at 310b5b9, no findings. Trial merge onto ca2d5f5 CONFLICTED (ci.yml, AGENTS.md, module-graph.md vs #204) - dev-206b merging origin/kmp into branch in the same worktree (agent-a32c9ac76b37a1e7a); then re-trial and merge.
+- #205 assets: merged `abba97b` (+ BRIEF-205.md `0ee301b`), round 1 PASS. Full KMP incl. iOS (CI: 75 iOS tests). Windows latency red was noise (rerun 205ms). Shared build-logic: K2 plugin classpath transitive on Native; MG-006 allows kotlinx-io. Worktree kept: `.claude/worktrees/agent-a3cb3603dfb72ee9f`. #207 and #208 now unblocked (wave 5).
+- Owner ruling 2026-09-17: Kool/KMP work only; no LibGDX render tasks as evidence.
 - Ruling: developers leave BRIEF.md uncommitted in worktree root; lead commits it as BRIEF-<N>.md after the merge.
 - #205 touched shared build-logic: K2 plugin classpath transitive on Kotlin/Native compilations (iOS crash fix); UDEA-MG-006 allows kotlinx-io.
 - Held to wave 5: #208 (udea-agent `implementation`-depends on udea-assets, needs #205; commented), #207 (needs #205).

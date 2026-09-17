@@ -87,6 +87,10 @@ kotlinxCoroutines = "1.11.0"
 # Android, rather than the library's default-provider lookup, which on the JVM is a `ServiceLoader`.
 cryptography = "0.6.0"
 
+# kotlinx-io: how `udea-assets` reads a `.udeapak` from a file on every target (issue #205, spec
+# section 6: "kotlinx-io everywhere; on Wasm, a 'file' is an HTTP fetch or an in-memory buffer").
+kotlinxIo = "0.9.1"
+
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 opentest4j = { group = "org.opentest4j", name = "opentest4j", version.ref = "opentest4j" }
@@ -136,6 +140,7 @@ composegl-ui = { module = "dev.wildware.composegl:composegl-ui", version.ref = "
 composegl-gdx = { module = "dev.wildware.composegl:composegl-gdx", version.ref = "composegl" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerialization" }
 kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "atomicfu" }
+kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
 kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinxSerialization" }
 junit5-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }

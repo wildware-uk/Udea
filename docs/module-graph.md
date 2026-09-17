@@ -255,9 +255,11 @@ kill. Asset scripts are compiled at build time; discovery is a generated registr
 
 ## `UDEA-MG-006` — the runtime asset model is a leaf
 
-**Spec §4, §3.6.** Allowed on `:udea-assets`'s `compileClasspath` and `runtimeClasspath`, and
+**Spec §4, §3.6, §6.** Allowed on `:udea-assets`'s `compileClasspath` and `runtimeClasspath`, and
 nothing else: `:udea-annotations`, `:udea-diagnostics`, `org.jetbrains.kotlin:kotlin-stdlib`,
-`org.jetbrains:annotations`.
+`org.jetbrains:annotations`, `org.jetbrains.kotlinx:kotlinx-io-core` and
+`org.jetbrains.kotlinx:kotlinx-io-bytestring`, each also as the per-target artifact a target's
+classpath resolves it to (`kotlinx-io-core-jvm`, `kotlinx-io-core-wasm-js` and so on).
 
 An allow list rather than a deny list, for the same reason `UDEA-MG-001` is one: the budget is
 the point, and the interesting failure is the dependency nobody has thought of yet.
@@ -271,6 +273,12 @@ and validates assets at build time and ships a packed bundle, which makes the ru
 plain data — so a dependency appearing here means an asset value has started holding something
 that is not data, and that is exactly the regression this rule catches. `udea-assets-compiler`,
 which does the compiling, is deliberately not governed by it.
+
+kotlinx-io joined the list with the multiplatform port (issue #205). It holds no asset value: it
+is how the `.udeapak` reader names and reads a file on every target, where `java.io` and
+`java.nio` exist only on the JVM (spec §6, "kotlinx-io everywhere"). The two artifacts are named
+rather than matched by a `kotlinx-*` wildcard, so serialization or coroutines arriving here is
+still a failure.
 
 ## `UDEA-REL-001` — no agent class in the packaged artifact
 

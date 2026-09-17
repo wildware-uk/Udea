@@ -1,6 +1,7 @@
 package dev.wildware.moba.net
 
 import dev.wildware.moba.level.GameUnit
+import dev.wildware.udea.core.replication.MaskOps
 import dev.wildware.udea.core.rng.SimRandom
 import dev.wildware.udea.core.snapshot.WorldFieldStore
 import dev.wildware.udea.net.replication.BandwidthBudget
@@ -13,6 +14,7 @@ import dev.wildware.udea.net.transport.PeerId
 import dev.wildware.udea.net.transport.SimulatedTransport
 import dev.wildware.udea.net.transport.Transport
 import dev.wildware.udea.net.transport.TransportStats
+import dev.wildware.udea.net.wire.VisibilityPolicy
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -64,7 +66,9 @@ class MobaStraddledPollTest {
         val server = MobaHostSession(links[0], BandwidthBudget(MTU), MTU)
         val clients = (1..CLIENTS).map { MobaClientSession(PeerId.client(it), links[it], mtu = MTU) }
         clients.forEach { server.addClient(it.peer) }
-        val serverSink = DatagramSink { from, buffer, offset, length -> server.onPacket(from, buffer, offset, length) }
+        val serverSink = DatagramSink { from, buffer, offset, length ->
+            server.onPacket(from, buffer, offset, length)
+        }
         val clientSinks = clients.map { client ->
             DatagramSink { _, buffer, offset, length -> client.onPacket(buffer, offset, length) }
         }
@@ -104,18 +108,30 @@ class MobaStraddledPollTest {
         assertTrue(compared > TICKS, "seed $seed: only $compared client readings were compared")
     }
 
-    /** [NetStateProbe.differences], narrowed to the rows the unit hash folds. Left is the server. */
+    /**
+     * [NetStateProbe.differences], narrowed to what the unit hash folds: the unit rows, less the
+     * components no client but the owner is sent. Left is the server.
+     */
     private fun unitDifferences(server: WorldFieldStore, client: WorldFieldStore): List<String> {
         val units = unitIds(server) + unitIds(client)
+        val registry = server.registry
+        val ownerOnly = (0 until registry.size)
+            .map { registry.typeAt(it) }
+            .filter { MaskOps.isEmpty(VisibilityPolicy.visibleMask(it.replicator, recipientOwnsEntity = false)) }
+            .map { it.schema.typeName }
         return NetStateProbe.differences(server, client, limit = Int.MAX_VALUE)
             .filter { line -> units.any { line.startsWith("$it ") } }
+            .filterNot { line -> ownerOnly.any { line.substringAfter(' ').startsWith("$it ") } }
             .take(REPORTED)
     }
 
     private fun unitIds(fields: WorldFieldStore): Set<String> {
         val registry = fields.registry
         val unit = (0 until registry.size).first { registry.typeAt(it).componentClass == GameUnit::class }
-        return (0 until fields.rowCount).filter { fields.isPresent(it, unit) }.map { fields.netIdAt(it).toString() }.toSet()
+        return (0 until fields.rowCount)
+            .filter { fields.isPresent(it, unit) }
+            .map { fields.netIdAt(it).toString() }
+            .toSet()
     }
 
     /**
@@ -140,7 +156,9 @@ class MobaStraddledPollTest {
             inner.send(peer, bytes, offset, length)
 
         override fun poll(sink: DatagramSink): Int {
-            inner.poll { from, buffer, offset, length -> waiting.addLast(from to buffer.copyOfRange(offset, offset + length)) }
+            inner.poll { from, buffer, offset, length ->
+                waiting.addLast(from to buffer.copyOfRange(offset, offset + length))
+            }
             var delivered = 0
             while (waiting.isNotEmpty()) {
                 if (rng.nextInt(STOP_ONE_IN) == 0) {

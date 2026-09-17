@@ -124,7 +124,7 @@ public class ReplicationServer(
     /** Identifies the datagram being built, for the stamp arrays. Never zero once sending. */
     private var sendStamp = 0
 
-    /** Raw ids of dead generations whose index this datagram hands to a new occupant. See [writeRemovals]. */
+    /** Raw ids of dead generations whose index this datagram hands to a new occupant. */
     private var displaced = IntArray(INITIAL_INDICES)
     private var displacedCount = 0
 
@@ -141,9 +141,10 @@ public class ReplicationServer(
      *
      * Removals are written before any entity, so this is non-zero when the destroys *alone* exceed
      * the budget - a wave dying at once - or when a dead generation's new occupant was deferred
-     * and the `Destroy` written in its place did not fit either. It is counted rather than assumed away
-     * because the failure it replaces was silent: a truncated section loses destroys, and a
-     * client keeps corpses that the server deleted with nothing anywhere saying so.
+     * and the `Destroy` written in its place did not fit either (see `writeRemovals`). It is
+     * counted rather than assumed away because the failure it replaces was silent: a truncated
+     * section loses destroys, and a client keeps corpses that the server deleted with nothing
+     * anywhere saying so.
      */
     public var removalDeferrals: Long = 0L
         private set
@@ -452,9 +453,9 @@ public class ReplicationServer(
             // An entity whose own removal is unacknowledged waits for it: that is a `Leave` for an
             // entity back in view, which re-enters as a create once the client has confirmed it
             // left. Another generation at that index does not wait - see `writeRemovals`.
-            if (state.isDestroyPending(netId.index) && state.trackedGeneration(netId.index) == netId.generation) {
-                continue
-            }
+            val ownRemovalPending = state.isDestroyPending(netId.index) &&
+                state.trackedGeneration(netId.index) == netId.generation
+            if (ownRemovalPending) continue
             val priority = accumulator.accumulate(state, netId, tick, relevancy.weightOf(state.peer, netId))
             selector.add(netId, priority)
         }

@@ -464,7 +464,8 @@ public class ClientReplicationState(
         destroyTicks = destroyTicks.copyOf(capacity).also { it.fill(NO_BASELINE, destroyTicks.size, capacity) }
         pendingTicks = pendingTicks.copyOf(capacity * PENDING_PER_INDEX)
         pendingCounts = pendingCounts.copyOf(capacity)
-        untrackedThrough = untrackedThrough.copyOf(capacity).also { it.fill(NO_BASELINE, untrackedThrough.size, capacity) }
+        untrackedThrough = untrackedThrough.copyOf(capacity)
+            .also { it.fill(NO_BASELINE, untrackedThrough.size, capacity) }
     }
 
     /** One in-flight packet: which entities it carried, so an ack can promote their baselines. */

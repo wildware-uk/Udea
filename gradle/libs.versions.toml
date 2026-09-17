@@ -76,6 +76,9 @@ androidMinSdk = "24"
 # and by `atomicfu` where state is genuinely shared"). Only its `locks` API is used, which is an
 # ordinary class on every target, so no atomicfu compiler plugin is applied.
 atomicfu = "0.33.0"
+# kotlinx-io: how `udea-assets` reads a `.udeapak` from a file on every target (issue #205, spec
+# section 6: "kotlinx-io everywhere; on Wasm, a 'file' is an HTTP fetch or an in-memory buffer").
+kotlinxIo = "0.9.1"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -126,6 +129,7 @@ composegl-ui = { module = "dev.wildware.composegl:composegl-ui", version.ref = "
 composegl-gdx = { module = "dev.wildware.composegl:composegl-gdx", version.ref = "composegl" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerialization" }
 kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "atomicfu" }
+kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
 kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinxSerialization" }
 junit5-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }

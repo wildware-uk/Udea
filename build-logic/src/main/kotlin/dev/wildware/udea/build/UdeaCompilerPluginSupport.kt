@@ -66,6 +66,16 @@ public class UdeaCompilerPluginSupport : KotlinCompilerPluginSupportPlugin {
         val coordinates = "${UdeaCompilerPluginWiring.ARTIFACT_GROUP}:" +
             UdeaCompilerPluginWiring.ARTIFACT_NAME
         classpaths.configureEach {
+            // The Kotlin Gradle plugin creates a Kotlin/Native compilation's plugin classpath
+            // intransitive, where a JVM or Wasm one is transitive, so this plugin's jar reached the
+            // native compiler without `udea-diagnostics` and `udea-annotations`, and the first
+            // checker to touch one of their classes failed the compilation with a
+            // `NoClassDefFoundError` rather than a diagnostic. `udea-assets`, the first module with
+            // both this plugin and an iOS target, met it compiling its iOS tests (issue #205).
+            // Set when the classpath is about to resolve, because the Kotlin plugin clears the flag
+            // after the configuration is created and so after this block first runs.
+            val classpath = this
+            withDependencies { classpath.isTransitive = true }
             resolutionStrategy.dependencySubstitution {
                 substitute(module(coordinates))
                     .using(project(UdeaCompilerPluginWiring.PLUGIN_PROJECT_PATH))

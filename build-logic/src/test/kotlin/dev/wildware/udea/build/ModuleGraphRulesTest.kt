@@ -190,8 +190,9 @@ class ModuleGraphRulesTest {
     }
 
     @Test
-    fun `UDEA-MG-006 passes the three things the asset model is allowed`() {
-        assertTrue(
+    fun `UDEA-MG-006 passes what the asset model is allowed, kotlinx-io included`() {
+        assertEquals(
+            emptyList(),
             violate(
                 ":udea-assets",
                 "compileClasspath",
@@ -201,8 +202,42 @@ class ModuleGraphRulesTest {
                     ":udea-diagnostics",
                     "org.jetbrains.kotlin:kotlin-stdlib",
                     "org.jetbrains:annotations",
+                    // Issue #205: the `.udeapak` reader names a file by a kotlinx-io `Path` on
+                    // every target, and `kotlinx-io-core` brings `kotlinx-io-bytestring` with it.
+                    "org.jetbrains.kotlinx:kotlinx-io-core",
+                    "org.jetbrains.kotlinx:kotlinx-io-bytestring",
+                    // What a target's classpath actually resolves those two to.
+                    "org.jetbrains.kotlinx:kotlinx-io-core-jvm",
+                    "org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm",
+                    "org.jetbrains.kotlinx:kotlinx-io-core-wasm-js",
+                    "org.jetbrains.kotlinx:kotlinx-io-core-iosarm64",
                 ),
-            ).isEmpty(),
+            ).map { it.coordinate },
+        )
+    }
+
+    @Test
+    fun `UDEA-MG-006 allows kotlinx-io and not the rest of kotlinx`() {
+        val violations = violate(
+            ":udea-assets",
+            "runtimeClasspath",
+            graph(
+                ":udea-assets",
+                "org.jetbrains.kotlinx:kotlinx-io-core",
+                "org.jetbrains.kotlinx:kotlinx-serialization-core",
+                "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+                // kotlinx-io's other artifacts are not the reader's, and a prefix match on
+                // `kotlinx-io-` would have let them in.
+                "org.jetbrains.kotlinx:kotlinx-io-okio",
+            ),
+        )
+        assertEquals(
+            listOf(
+                "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+                "org.jetbrains.kotlinx:kotlinx-io-okio",
+                "org.jetbrains.kotlinx:kotlinx-serialization-core",
+            ),
+            violations.map { it.coordinate }.sorted(),
         )
     }
 

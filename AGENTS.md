@@ -100,6 +100,8 @@ because Fleks publishes no iOS artifact (issue #215); its build script carries t
 back. `udea-gas` (issue #204) and `udea-replay` (issue #206) are on the same convention for the
 same reason, through `udea-core`. `udea-net` is too (issue #209): its UDP transport runs on `jvm`
 and `android` through a shared `socketMain` source set, and `wasmJs` has the WebSocket client only.
+`udea-audio` is too (issue #207): the `AudioDevice` SPI, `AudioDevice.Silent` and the cue drain are
+`commonMain`, and a device that makes a noise is not in it on any target.
 `udea-agent` is too (issue #208): its tools and dispatcher are common, the `assets.*` toolset is
 `jvmMain` because the asset daemon is, and `udea-agent-host` stays JVM.
 Build-time modules stay on `udea.kotlin-library`. The module-graph gates govern each target's

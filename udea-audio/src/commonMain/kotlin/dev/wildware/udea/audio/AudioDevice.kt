@@ -1,5 +1,7 @@
 package dev.wildware.udea.audio
 
+import kotlin.jvm.JvmInline
+
 /**
  * The one thing this module cannot do for itself: turn a file into a noise.
  *

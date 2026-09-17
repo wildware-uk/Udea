@@ -2,12 +2,12 @@
 
 ## kmp baseline
 
-SHA `dc6c708` (kmp after #209 merge; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
 
-**Plus, outside root `build`:** `sh gradlew -p build-logic check` is RED on `07eddef` (CI runs it):
+**Plus, outside root `build`:** `sh gradlew -p build-logic check` GREEN since #216 (`6d95f67`). History: was RED on `07eddef` (CI runs it):
 `OuterBuildInputsTest > every repository file a build-logic test names is a declared input` - #203 left
 udea-core KMP paths undeclared. Baseline failure, not any wave-4 branch's. Filed #216, dispatch in wave 5.
 Reviewers and trial merges: run `-p build-logic check` too; that one test failing is baseline.
@@ -16,6 +16,17 @@ Reviewers and trial merges: run `-p build-logic check` too; that one test failin
 `clean build under budget` (ratio 1.116; it compares against retired `origin/example`, filed #218). Not branch findings.
 
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
+
+## Wave 5 (2026-09-17): in flight
+
+- Dispatched: #207 audio (dev-207, SPI+Silent+drain only), #208 agent (dev-208), #216 build-logic inputs (dev-216), #218 CI budget base (dev-218, may push its branch for CI), #220 UDP reader silent stop (dev-220). Disjoint modules; #207/#208 may both touch docs/module-graph.md and AGENTS.md.
+- #207 split: Kool AudioDevice + desktop/browser playback moved to #221 (lives in udea-render, needs #211). Commented on #207; #221 added to epic #199.
+- #208 ruling: targets jvm/android/wasmJs (no iOS until #215); assets-compiler code stays JVM. Commented.
+- Hand-offs: module-graph.md udea-assets row -> dev-207; ReplayFixtures.kt:106 `:udea-net:test` -> dev-208.
+- #216: merged `6d95f67`, round 1 PASS. Paths were temp-dir fixture names, not repo reads: exempted in OuterBuildInputsTest (commented). build-logic check now green, fully. Worktree kept: `.claude/worktrees/agent-ae7538127c3c34047`.
+- #207: merged `e9639e0`, round 1 PASS (no findings). udea-audio no-ios KMP; mixer seed reads kotlin.time.Clock (presentation, reviewer-ruled OK). Worktree kept: `.claude/worktrees/agent-ad8fa4bba8720b520`.
+- Trap: the lead's scratchpad is shared with developers; name logs per issue.
+- Held to wave 6: #217 (build-logic, collides with #216), #219 (udea-net, collides with #220), #193 (needs #208).
 
 ## Wave 4 (2026-09-16/17): done
 

@@ -219,8 +219,8 @@ jobs:
     # added to both steps below in the change that converts it. `udea-core` is multiplatform and
     # absent on purpose: it has no iOS target until Fleks publishes one (issue #215), and joins
     # both steps when the iOS switch in its build script flips. `udea-gas` (issue #204),
-    # `udea-replay` (issue #206), `udea-net` (issue #209) and `udea-agent` (issue #208) are absent
-    # for the same reason, through `udea-core`, and flip with it.
+    # `udea-replay` (issue #206), `udea-net` (issue #209), `udea-audio` (issue #207) and `udea-agent`
+    # (issue #208) are absent for the same reason, through `udea-core`, and flip with it.
     #
     # The step after the tests is the same defence the `build` job's atlas step makes, for the
     # same reason: a skipped test task is reported as a pass. It fails unless each module wrote an

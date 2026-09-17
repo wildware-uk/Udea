@@ -154,7 +154,18 @@ public object DeterminismRules {
         didYouMean = "SimClock.tick - a tick is the simulation's only clock; seconds are a " +
             "presentation unit (spec 5)",
         matches = { ref ->
-            ref.owner == "java.lang.System" && ref.member in setOf("currentTimeMillis", "nanoTime")
+            (ref.owner == "java.lang.System" && ref.member in setOf("currentTimeMillis", "nanoTime")) ||
+                // The monotonic clock multiplatform common code can reach, where `System.nanoTime`
+                // does not resolve (issue #217). Every reference to the object is a use of it:
+                // `INSTANCE` and the mangled `markNow-z9LOYto`.
+                ref.owner == MONOTONIC_TIME_SOURCE ||
+                // A mark taken elsewhere, read against now. `plus`/`minus`/`compareTo` and the
+                // value-class boxing are arithmetic on a reading already taken, so they do not
+                // match: flagging them would report one clock read several times over.
+                (
+                    ref.owner == MONOTONIC_TIME_MARK &&
+                        MONOTONIC_MARK_READS.any { ref.member.startsWith(it) }
+                    )
         },
     )
 
@@ -194,7 +205,12 @@ public object DeterminismRules {
                         ref.member in setOf("systemUTC", "systemDefaultZone")
                     ) ||
                 (ref.owner == "java.util.Date" && ref.member == "<init>") ||
-                (ref.owner == "java.util.Calendar" && ref.member == "getInstance")
+                (ref.owner == "java.util.Calendar" && ref.member == "getInstance") ||
+                // `Clock.System`, from the stdlib or from kotlinx-datetime before 0.7, which is
+                // the calendar clock common code can reach (issue #217). A `Clock` received
+                // through its interface does not match: it may be one driven by the tick, and
+                // the place a system clock is chosen is this reference.
+                ref.owner in SYSTEM_CLOCKS
         },
     )
 
@@ -291,6 +307,18 @@ public object DeterminismRules {
      * uses (spec 5).
      */
     public const val MAX_FINDINGS: Int = 25
+
+    private const val MONOTONIC_TIME_SOURCE = "kotlin.time.TimeSource\$Monotonic"
+
+    private const val MONOTONIC_TIME_MARK = "kotlin.time.TimeSource\$Monotonic\$ValueTimeMark"
+
+    /**
+     * Members of [MONOTONIC_TIME_MARK] that read the clock, as name prefixes: the JVM names are
+     * mangled (`elapsedNow-UwyO8pc`, `hasPassedNow-impl`) because the mark is a value class.
+     */
+    private val MONOTONIC_MARK_READS = listOf("elapsedNow", "hasPassedNow", "hasNotPassedNow")
+
+    private val SYSTEM_CLOCKS = setOf("kotlin.time.Clock\$System", "kotlinx.datetime.Clock\$System")
 
     private val HASH_ORDERED_TYPES = setOf(
         "java.util.HashMap",

@@ -64,6 +64,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - Ready now: #207 audio (needs #205 - merged), #208 agent (needs #205 - merged), #216 build-logic inputs, #217 determinism TimeSource, #218 CI budget base, #219 UDP straddle desync, #220 UDP reader silent stop, #210 composegl-kool (other repo; check composegl-ef session first).
 - Collisions: #216 and #217 both edit build-logic (determinism tests) - not together. #219 and #220 both udea-net - not together. #193 editor tools needs #208.
 - Editor epic #190 reopened by owner 2026-09-17 (#192-#196), part of the port; viewport is ComposeGL 0.7.0-SNAPSHOT `SceneView`. Order in #199.
+- Open offer to owner (2026-09-17, unanswered at reset): add `BASH_MAX_TIMEOUT_MS=120000` to `.claude/settings.json` env, and/or a PreToolUse hook rejecting foreground `gradlew`. Do it only if the owner says yes.
 - Lead rule: every gradle build runs `run_in_background`; never foreground (froze the session once). Verify a trial merge applied before trusting it.
 
 ## Standing rulings and traps

@@ -389,3 +389,30 @@ Other jobs in that CI run that were not green, compared with `kmp`'s own run for
 
 None. No replicated component was added or removed; `net-protocol.lock` and
 `expected-generated-hashes.txt` are untouched.
+
+## 7. Merge with origin/kmp
+
+Merge commit `eece16e` brings in `origin/kmp` at `ca2d5f5` (#204, `udea-gas` on KMP). The code
+under review at `310b5b9` is unchanged. Three files conflicted. Each conflict was the same
+sentence, where each branch had added its own module to the no-iOS convention. Every resolution
+keeps both modules:
+
+- `.github/workflows/ci.yml`: the iOS-tests comment now says `udea-gas` (#204) and `udea-replay`
+  (#206) are both left out for the same reason, through `udea-core`. It is a comment only; no step
+  changed.
+- `AGENTS.md`: the multiplatform paragraph names both modules on `udea.kotlin-multiplatform-no-ios`.
+- `docs/module-graph.md`: the `udea.kotlin-multiplatform-no-ios` row lists `udea-core`, `udea-gas`
+  and `udea-replay`, each with its reason.
+
+Results on `eece16e`. Other developers' Gradle builds were running on the box at the same time.
+Logs are in `dev206/merge-*.log`:
+
+- `sh gradlew build --continue`: `BUILD SUCCESSFUL in 1m 24s`, `446 actionable tasks: 86 executed, 69 from cache, 291 up-to-date`.
+  `:udea-replay:jvmTest`, `:udea-replay:testAndroidHostTest` and `:udea-replay:wasmJsNodeTest` all ran
+  in this build; none came from the cache.
+- `sh gradlew -p build-logic check --continue`: `310 tests completed, 1 failed`. The one failure is
+  `OuterBuildInputsTest > every repository file a build-logic test names is a declared input of this task()`,
+  the same test that fails on the baseline (#216).
+- `sh gradlew udeaVerifyModuleGraph udeaVerifyNoLegacyDependencies udeaVerifyAgentsMd :udea-replay:jvmTest :udea-replay:testAndroidHostTest :udea-replay:wasmJsNodeTest`:
+  `BUILD SUCCESSFUL in 29s`. The three test tasks were up to date from the build above. Their
+  result files show 104 JVM, 15 Android host and 15 wasmJs tests, with 0 failures.

@@ -20,6 +20,8 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 ## Wave 4 (2026-09-16): in flight
 
 - Dispatched: #204 gas (dev-204), #205 assets (dev-205), #206 replay (dev-206), #209 net (dev-209). Disjoint modules.
+- #209 net: done at d08998f (BRIEF.md committed at root; rename to BRIEF-209.md at merge), review-209-r1 running. runUdpProof lossy fails more often on branch (6/32 vs 1/26), dev filed #219 as the underlying replication defect; reviewer to rule.
+- Wave 5 note: stale `:udea-net:test` in udea-replay ReplayFixtures.kt:106 (after #209). docs/module-graph.md row for udea-assets still says `udea.kotlin-library` (stale after #205); hand the fix to the next ticket editing that file (#207 or #208).
 - Wave 5 candidates: #216 (build-logic inputs, found wave 4), #218 (CI budget job base is retired example), #217 (determinism scanner misses TimeSource, found by dev-204).
 - #204 gas: merged `4ca994d` (+ BRIEF-204.md `c58cb75`), round 1 PASS. Trial + merged build green; build-logic check only #216. udea-core `KClass.runtimeName` now public; `roundHalfUp` replaces Math.round (roundToInt differs on Wasm). Worktree kept: `.claude/worktrees/agent-a8b2f894959c4489d`.
 - #206 replay: merged `236ad47`, round 1 PASS (no findings). First trial conflicted with #204 (ci.yml/AGENTS.md/module-graph.md, one sentence each); dev-206b merged origin/kmp into the branch (docs-only resolutions), second trial clean + green. KSP on kspJvm only until #208; pure-Kotlin CRC-32. Worktree kept: `.claude/worktrees/agent-a32c9ac76b37a1e7a`.

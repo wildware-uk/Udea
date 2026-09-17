@@ -75,9 +75,20 @@ public class LevelService internal constructor(
      *   or a [LevelSaveException] naming the component or tag a level cannot carry.
      */
     public fun save(barrier: SimBarrier): LevelAction<ByteArray> =
-        LevelAction("save level") { encode() }.also(barrier::submit)
+        LevelAction("save level") { saveNow() }.also(barrier::submit)
 
-    internal fun encode(): ByteArray {
+    /**
+     * Encodes the world as a level now, on the calling thread.
+     *
+     * For a caller that is **already** inside a [SimBarrier] drain - an `editor.save` tool call
+     * (issue #193) - and is therefore at the boundary [save] queues for. Queueing from there
+     * would put the save on the *next* drain, after a tick had run, and the tool would have to
+     * answer before the level it named existed. The same split, and for the same reason, as
+     * `BlueprintSpawner.spawn` and `spawnNow`.
+     *
+     * @throws LevelSaveException naming a component or tag a level cannot carry.
+     */
+    public fun saveNow(): ByteArray {
         val format = format
         val live = world.snapshot()
         val entities = LinkedHashMap<Entity, Snapshot>(live.size)

@@ -65,6 +65,13 @@ kotlin {
                 // The locks around the rings and queues an HTTP thread writes and the simulation
                 // thread drains - the same lock `udea-core`'s `SimBarrier` uses (issue #203).
                 implementation(libs.kotlinx.atomicfu)
+
+                // Where `editor.save` writes a level file (issue #193): a kotlinx-io `Path` through
+                // `SystemFileSystem`, so the save is common code rather than a JVM-only toolset.
+                // `api`, because `EditorLevelStore`'s constructor names that `Path`, and a host
+                // building one has to resolve it. The same library `udea-assets` reads a
+                // `.udeapak` through (issue #205), so it adds no new artifact to a game.
+                api(libs.kotlinx.io.core)
             }
             // The tool definitions, manifest fragment and registry KSP generates from the common
             // source set, compiled into every target from there. See the KSP wiring below.

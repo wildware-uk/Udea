@@ -28,6 +28,7 @@ import dev.wildware.udea.agent.host.AgentHost
 import dev.wildware.udea.agent.host.AgentHostConfig
 import dev.wildware.udea.agent.host.AgentHostTools
 import dev.wildware.udea.agent.host.AgentInputTools
+import dev.wildware.udea.agent.host.EditorMode
 import dev.wildware.udea.agent.host.ArtifactToolset
 import dev.wildware.udea.agent.host.InputToolset
 import dev.wildware.udea.agent.host.GameIdentity
@@ -41,6 +42,7 @@ import dev.wildware.udea.agent.host.overlay.GdxOverlayKey
 import dev.wildware.udea.agent.host.render.OffscreenRenderControl
 import dev.wildware.udea.agent.query.AgentComponentIndex
 import dev.wildware.udea.agent.query.AgentComponentType
+import dev.wildware.udea.agent.query.PositionRef
 import dev.wildware.udea.agent.query.agentComponent
 import dev.wildware.udea.agent.state.ArchetypeVisitor
 import dev.wildware.udea.agent.state.DigestSources
@@ -49,6 +51,8 @@ import dev.wildware.udea.agent.state.LoopStatus
 import dev.wildware.udea.agent.state.StateDigest
 import dev.wildware.udea.agent.tools.BlueprintCatalog
 import dev.wildware.udea.agent.tools.DiagToolset
+import dev.wildware.udea.agent.tools.EditorLevelStore
+import dev.wildware.udea.agent.tools.EditorToolset
 import dev.wildware.udea.agent.tools.EngineToolModules
 import dev.wildware.udea.agent.tools.EventsToolset
 import dev.wildware.udea.agent.tools.LifecycleToolset
@@ -67,6 +71,7 @@ import dev.wildware.udea.render.input.IntentState
 import dev.wildware.udea.replay.tools.ReplayToolModules
 import dev.wildware.udea.replay.tools.ReplayToolset
 import java.nio.file.Path
+import kotlinx.io.files.Path as LevelDirectory
 
 /**
  * `moba.agent`: the instance `game-bridge-mcp` launches.
@@ -274,11 +279,13 @@ public object MobaAgent {
         // either of them directly.
         val shutdown = HostShutdown()
 
+        val position = positionAccess()
+        val components = AgentComponentIndex(
+            listOf(position, unitAccess(), matchAccess(), inventoryAccess()),
+        )
         val worldTools = WorldToolset(
             world = host.world,
-            components = AgentComponentIndex(
-                listOf(positionAccess(), unitAccess(), matchAccess(), inventoryAccess()),
-            ),
+            components = components,
             netIds = host.ctx[CoreModule.NET_IDS],
             bridge = bridge,
             clock = host.ctx.clock,
@@ -291,13 +298,35 @@ public object MobaAgent {
             // handle comes back as `resultRef` for one `GET /artifact`.
             spill = artifacts.textSpill(),
         )
+        // `editor.*` only when this process was started as an editor (`-Peditor=true`), because
+        // its tools write fields `world.set_component_field` refuses. A normal run's `/tools`
+        // does not list them, and `/health` says which this is.
+        val editor = EditorMode.resolve()
+        val editorTools = if (editor) {
+            EditorToolset(
+                world = host.world,
+                components = components,
+                netIds = host.ctx[CoreModule.NET_IDS],
+                sessions = sessions,
+                bridge = bridge,
+                clock = host.ctx.clock,
+                // `moba`'s position is `Position.x`/`Position.y`, not the lowered
+                // `position.x`/`position.y` the index would find on its own.
+                position = PositionRef(position, PositionReplicator.FIELD_X, PositionReplicator.FIELD_Y),
+                catalog = BlueprintCatalog.of(host.ctx[MobaBlueprints.KEY].all),
+                spawner = host.ctx.blueprints,
+                levels = EditorLevelStore(host.game.levels, LevelDirectory("build", "editor-levels")),
+            )
+        } else {
+            null
+        }
         val tools = EngineToolModules
             .wireAll(
                 // Every generated `ToolModule` facet on this game's registry (issue #202). None of
                 // `moba`'s modules sets `udea.toolModuleService` today, so this adds no tool; it is
                 // the wiring a game's own `@AgentTool` would arrive through.
                 ToolIndex.builder().registry(MobaUdeaRegistry),
-                worldTools,
+                *listOfNotNull(worldTools, editorTools).toTypedArray(),
                 TimeToolset(host.time, host.ctx.clock, bridge),
                 // The artifact store, not `TextSpill.NONE`: an event message too long for the
                 // bytes a command result is guaranteed goes there and comes back through
@@ -355,6 +384,7 @@ public object MobaAgent {
                     // intern every caller into a table of its own and the panel would name no
                     // session while showing that session's tool calls.
                     sessions = sessions,
+                    editor = editor,
                 )
             },
             // The generated per-variant flag, not `udea-agent-host`'s hand-written `true`. A

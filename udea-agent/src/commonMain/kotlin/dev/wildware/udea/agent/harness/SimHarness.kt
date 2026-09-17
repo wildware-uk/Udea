@@ -6,6 +6,7 @@ import dev.wildware.udea.agent.AgentCommand
 import dev.wildware.udea.agent.AgentErrorKind
 import dev.wildware.udea.agent.AgentResult
 import dev.wildware.udea.agent.AgentSubmission
+import dev.wildware.udea.agent.activity.AgentSessionId
 import dev.wildware.udea.agent.dispatch.AgentRuntime
 import dev.wildware.udea.agent.dispatch.DigestPublisher
 import dev.wildware.udea.agent.dispatch.ToolRegistry
@@ -127,8 +128,17 @@ public class SimHarness(
      *   the one the bridge feeds - into a failure with a message rather than a hang. It is
      *   deliberately not a *timeout*: nothing here is timed, so the failure is reproducible.
      */
-    public fun call(name: String, args: Map<String, String> = emptyMap()): AgentResult {
-        val command = AgentCommand(name, args)
+    public fun call(
+        name: String,
+        args: Map<String, String> = emptyMap(),
+        /**
+         * Who is calling. [AgentSessionId.LOCAL] unless a test is playing more than one author,
+         * which is what `AgentHost` stamps from `?session=` and what the `editor.*` history is
+         * kept per.
+         */
+        session: AgentSessionId = AgentSessionId.LOCAL,
+    ): AgentResult {
+        val command = AgentCommand(name, args, session = session)
         return when (val submission = bridge.submit(command)) {
             is AgentSubmission.Rejected -> AgentResult.Failed(submission.error)
             is AgentSubmission.Accepted -> pumpUntilComplete(submission.commandId, name)

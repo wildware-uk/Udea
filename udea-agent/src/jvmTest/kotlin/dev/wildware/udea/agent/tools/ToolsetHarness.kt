@@ -15,6 +15,8 @@ import dev.wildware.udea.agent.Team
 import dev.wildware.udea.agent.TeamReplicator
 import dev.wildware.udea.agent.Transform
 import dev.wildware.udea.agent.TransformReplicator
+import dev.wildware.udea.agent.activity.AgentSessionId
+import dev.wildware.udea.agent.activity.AgentSessions
 import dev.wildware.udea.agent.championAccess
 import dev.wildware.udea.agent.dispatch.ToolIndex
 import dev.wildware.udea.agent.harness.SimHarness
@@ -47,6 +49,7 @@ import dev.wildware.udea.core.snapshot.SnapshotService
 import dev.wildware.udea.core.snapshot.WorldHasher
 import dev.wildware.udea.core.snapshot.snapshotTimeTravel
 import dev.wildware.udea.generated.UdeaAgentUdeaRegistry
+import kotlinx.io.files.Path
 import kotlin.test.assertIs
 
 /**
@@ -61,6 +64,10 @@ internal class ToolsetHarness(
     withSnapshotRing: Boolean = true,
     /** Where an oversized event message goes. `NONE` is what a host with no store wires. */
     private val spill: TextSpill = TextSpill.NONE,
+    /** Whether the `editor.*` toolset is wired, as a host started in editor mode wires it. */
+    withEditor: Boolean = false,
+    /** Where `editor.save` writes. `null` wires no level store, so a save is refused. */
+    levelDirectory: Path? = null,
 ) {
 
     val bridge: AgentBridge = AgentBridge()
@@ -115,6 +122,12 @@ internal class ToolsetHarness(
     /** Extra teardown, run where a host's would run. For asserting *when* that is. */
     var onShutdown: ((String) -> Unit)? = null
 
+    /** The session table the editor names authors from, as a host's `AgentHostConfig.sessions` is. */
+    val sessions: AgentSessions = AgentSessions()
+
+    /** The `editor.*` toolset, or `null` when this harness was built without it. */
+    val editorTools: EditorToolset?
+
     val sim: SimHarness
 
     init {
@@ -152,14 +165,43 @@ internal class ToolsetHarness(
             digest = digest,
             barrier = definition.core.barrier,
         )
+        editorTools = if (withEditor) {
+            EditorToolset(
+                world = world,
+                components = components,
+                netIds = netIds,
+                sessions = sessions,
+                bridge = bridge,
+                clock = host.ctx.clock,
+                catalog = BlueprintCatalog.of(listOf(GruntBlueprint, ChampionBlueprint)),
+                spawner = spawner,
+                levels = levelDirectory?.let { EditorLevelStore(host.game.levels, it) },
+            )
+        } else {
+            null
+        }
+        val toolsets = listOfNotNull(worldTools, timeTools, eventTools, diagTools, closeTools, editorTools)
         val tools = EngineToolModules
-            .wireAll(ToolIndex.builder(), worldTools, timeTools, eventTools, diagTools, closeTools)
+            .wireAll(ToolIndex.builder(), *toolsets.toTypedArray())
             .build()
         sim = SimHarness(host, bridge, tools, digest)
     }
 
     /** Submits [name] through the bridge and returns its typed answer. */
     fun call(name: String, vararg args: Pair<String, String>): AgentResult = sim.call(name, *args)
+
+    /** The id [label] is interned under - what `AgentHost` stamps on a command sent with `?session=<label>`. */
+    fun author(label: String): AgentSessionId = sessions.intern(label)
+
+    /**
+     * `WorldHasher.hash` over a capture of the live world, taken now.
+     *
+     * The field hash and not the whole-snapshot one: an undone spawn gives its index back to the
+     * free queue with a bumped generation, which is the allocator doing its job and not a change
+     * to the world anyone could see.
+     */
+    fun fieldHash(): Long =
+        WorldHasher.hash(SnapshotService(componentRegistry, world, host.ctx, netIds).capture().fields)
 
     /**
      * [call], asserting success, and returning the rendered result document.

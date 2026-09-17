@@ -1,0 +1,136 @@
+package dev.wildware.udea.agent.tools
+
+import com.github.quillraven.fleks.Snapshot
+import dev.wildware.udea.agent.activity.AgentSessionId
+import dev.wildware.udea.agent.query.AgentComponentType
+import dev.wildware.udea.core.identity.NetId
+
+/**
+ * One undoable edit made through an `editor.*` tool.
+ *
+ * [sequence] orders edits across **every** author, which is what lets a refused undo name the
+ * author whose later edit is in the way: each author's history is ordered on its own, and two
+ * histories can only be compared through a counter they share.
+ */
+internal sealed class EditorEdit(
+    /** Position in the order every author's edits were made in. */
+    val sequence: Long,
+    /** Who made it: the session the command carried. */
+    val author: AgentSessionId,
+    /** The tool that made it, as an agent would call it. */
+    val tool: String,
+    /** The entity it was made to. */
+    val netId: NetId,
+) {
+
+    /** Whether this edit wrote field [fieldIndex] of [component] on [id]. */
+    open fun touches(id: NetId, component: AgentComponentType, fieldIndex: Int): Boolean = false
+
+    /** `editor.set_field` and `editor.move`: fields written, with what each held either side. */
+    class Fields(
+        sequence: Long,
+        author: AgentSessionId,
+        tool: String,
+        netId: NetId,
+        val changes: List<FieldChange>,
+    ) : EditorEdit(sequence, author, tool, netId) {
+        override fun touches(id: NetId, component: AgentComponentType, fieldIndex: Int): Boolean =
+            id == netId && changes.any { it.component === component && it.fieldIndex == fieldIndex }
+    }
+
+    /** `editor.spawn`: undone by removing the entity and giving its id back. */
+    class Spawn(sequence: Long, author: AgentSessionId, netId: NetId) :
+        EditorEdit(sequence, author, "editor.spawn", netId)
+
+    /**
+     * `editor.delete`: the removed entity's components, held so an undo can put them back.
+     *
+     * Fleks' own per-entity snapshot - the component instances themselves, not an encoding of
+     * them - so it is not a second codec: nothing is written, read or diffed, and an undo hands
+     * back the very objects the delete took away. The id stays an outstanding reservation in the
+     * `NetIdIndex` for as long as this edit is in a history; see `NetIdIndex.detach`.
+     */
+    class Delete(sequence: Long, author: AgentSessionId, netId: NetId, val removed: Snapshot) :
+        EditorEdit(sequence, author, "editor.delete", netId)
+}
+
+/** One field an edit wrote: which, what it held before, and what the edit left in it. */
+internal class FieldChange(
+    val component: AgentComponentType,
+    val fieldIndex: Int,
+    val before: Any?,
+    val after: Any?,
+) {
+    val fieldName: String get() = component.fieldNames[fieldIndex]
+}
+
+/**
+ * The undo histories: one per author, each capped, oldest dropped first.
+ *
+ * Indexed by [AgentSessionId.raw], which is dense from zero and bounded by the session table's
+ * capacity, so the histories are a flat array rather than a hash-ordered map on the simulation
+ * thread. Saving a level does not touch this: nothing here is cleared except by an undo.
+ */
+internal class EditorHistory(
+    /** How many authors can hold a history: the session table's capacity. */
+    authors: Int,
+    /** Edits kept per author. */
+    private val capacity: Int,
+    /** Told about every edit that falls off the old end, so it can release what the edit held. */
+    private val onDrop: (EditorEdit) -> Unit,
+) {
+
+    private val stacks = arrayOfNulls<ArrayDeque<EditorEdit>>(authors)
+
+    private var lastSequence = 0L
+
+    /** The sequence number the next recorded edit takes. */
+    fun nextSequence(): Long = ++lastSequence
+
+    /** Records [edit] as its author's newest, dropping that author's oldest past [capacity]. */
+    fun push(edit: EditorEdit) {
+        val stack = stackOf(edit.author) ?: ArrayDeque<EditorEdit>().also { stacks[edit.author.raw] = it }
+        stack.addLast(edit)
+        if (stack.size > capacity) onDrop(stack.removeFirst())
+    }
+
+    /** [author]'s newest edit, or `null` when there is nothing to undo. */
+    fun newest(author: AgentSessionId): EditorEdit? = stackOf(author)?.lastOrNull()
+
+    /** Removes [author]'s newest edit, which must be the one the caller just undid or discarded. */
+    fun pop(author: AgentSessionId): EditorEdit = checkNotNull(stackOf(author)).removeLast()
+
+    /** How many edits [author] can undo. */
+    fun size(author: AgentSessionId): Int = stackOf(author)?.size ?: 0
+
+    /** [author]'s edits, newest first, at most [limit] of them. */
+    fun newestFirst(author: AgentSessionId, limit: Int): List<EditorEdit> =
+        stackOf(author)?.asReversed()?.take(limit).orEmpty()
+
+    /**
+     * The latest edit by anyone but [edit]'s author, made after it, that [matches] accepts.
+     *
+     * What a refused undo names. Walks every history, which is at most the session capacity times
+     * [capacity] entries, once per refusal and never per tick.
+     */
+    fun latestByOthers(edit: EditorEdit, matches: (EditorEdit) -> Boolean): EditorEdit? {
+        var latest: EditorEdit? = null
+        for (stack in stacks) {
+            if (stack == null) continue
+            for (candidate in stack) {
+                if (candidate.author == edit.author || candidate.sequence <= edit.sequence) continue
+                if (!matches(candidate)) continue
+                if (latest == null || candidate.sequence > latest.sequence) latest = candidate
+            }
+        }
+        return latest
+    }
+
+    private fun stackOf(author: AgentSessionId): ArrayDeque<EditorEdit>? {
+        check(author.raw < stacks.size) {
+            "$author is outside the editor's session table of ${stacks.size}; the toolset and the " +
+                "host must share one AgentSessions"
+        }
+        return stacks[author.raw]
+    }
+}

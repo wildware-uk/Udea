@@ -29,6 +29,7 @@ internal class HostHarness(
      */
     val session: SessionIdentity = SessionIdentity(InstanceRole.Standalone, SessionId("s-test")),
     val peers: SessionPeers = SessionPeers(),
+    editor: Boolean = false,
 ) : AutoCloseable {
 
     val host: AgentHost = AgentHost.start(
@@ -44,6 +45,7 @@ internal class HostHarness(
             workingDirectory = workingDirectory,
             session = session,
             peers = peers,
+            editor = editor,
         ),
     )
 

@@ -41,7 +41,7 @@ class SessionAdditiveTest {
     }
 
     @Test
-    fun `the contract keys are unchanged in value and in order by the two additions`() {
+    fun `the contract keys are unchanged in value and in order by the additions`() {
         // The additions are appended, so a reader that scans for a key in document order - which a
         // hand-rolled parser in a shell script does - finds every contract key exactly where it
         // was. This asserts the prefix, character for character.
@@ -64,7 +64,7 @@ class SessionAdditiveTest {
                 "the additions changed the contract prefix.\n  was: $body\n  expected prefix: $prefix",
             )
             assertEquals(
-                """$prefix,"role":"standalone","sessionId":"s-test"}""",
+                """$prefix,"role":"standalone","sessionId":"s-test","editor":false}""",
                 body,
             )
         }

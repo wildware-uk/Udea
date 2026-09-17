@@ -129,8 +129,28 @@ public object EngineToolModules {
         listOf(LifecycleToolsetCloseTool),
     )
 
+    /**
+     * `editor.*`: set any field, move, spawn, delete, save, and one undo history per author.
+     *
+     * Its own module, and one a host registers **only when it was started as an editor**: these
+     * tools write fields `world.set_component_field` refuses, which is right while authoring a
+     * level and wrong in a match. See [EditorToolset].
+     */
+    public val Editor: ToolModule = of(
+        "UdeaAgentEditor",
+        listOf(
+            EditorToolsetDeleteTool,
+            EditorToolsetHistoryTool,
+            EditorToolsetMoveTool,
+            EditorToolsetSaveTool,
+            EditorToolsetSetFieldTool,
+            EditorToolsetSpawnTool,
+            EditorToolsetUndoTool,
+        ),
+    )
+
     /** Every engine module, ascending by module name. */
-    public val ALL: List<ToolModule> = listOf(Diag, Events, Lifecycle, Say, Time, World)
+    public val ALL: List<ToolModule> = listOf(Diag, Editor, Events, Lifecycle, Say, Time, World)
 
     /**
      * Registers every engine toolset that [toolsets] supplies an instance for.
@@ -150,6 +170,7 @@ public object EngineToolModules {
                 is DiagToolset -> Diag
                 is SayToolset -> Say
                 is LifecycleToolset -> Lifecycle
+                is EditorToolset -> Editor
                 else -> throw IllegalArgumentException(
                     "${toolset::class.qualifiedName} is not an engine toolset; register a " +
                         "generated module's toolset with ToolIndex.Builder.toolset and add " +

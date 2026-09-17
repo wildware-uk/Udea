@@ -116,14 +116,10 @@ public object NetStateProbe {
     /**
      * [netHash] restricted to the entities that carry [GameUnit]: the 27-unit battle itself.
      *
-     * The headline claim, and separated from the whole-world fold for a reason that is a property
-     * of the protocol rather than a convenience. `ReplicationServer` will not put a create for a
-     * **recycled** `NetId` index in the same section as the `Destroy` it replaces - one section
-     * addresses each index once, and a client that saw the create before the destroy would delete
-     * the entity it had just been given - so a recycled index waits exactly one acknowledgement.
-     * `moba` recycles indices constantly, because projectiles spawn and die every few ticks, so at
-     * any given tick a whole-world fold is very likely to be one short. The units are not
-     * recycled inside a match, so this number is comparable tick for tick.
+     * The headline claim. Creeps carry [GameUnit] and are folded too, so a creep that dies and
+     * whose `NetId` index is handed to the next wave is covered: issue #219 was a recycled creep
+     * index that stopped updating on the client, and this hash is what showed it. Projectiles are
+     * not folded; [netHash] is the fold that includes them.
      */
     public fun unitHash(fields: WorldFieldStore, include: (String) -> Boolean = ALL): Long {
         val registry = fields.registry

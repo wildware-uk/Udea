@@ -59,4 +59,23 @@ class AckWindowConvergenceTest {
         session.step(120)
         assertConverged(session, "loss desynced an oscillating field")
     }
+
+    @Test
+    fun `an oscillating field converges on a link whose round trip outlasts the pending-send list`() {
+        // Twenty ticks each way is a forty-tick round trip, longer than PENDING_PER_INDEX: every
+        // entity's unacknowledged sends outgrow the list and it overflows to full writes.
+        val session = oscillating(NetConditions(latencyTicks = 20), seed = 303L)
+        val client = session.clients.single()
+        val state = session.server.stateOf(client.peer)
+        var overflowed = false
+        repeat(240) {
+            session.step(1)
+            for (netId in client.world.liveNetIds()) {
+                if (state.pendingSendCount(netId) == ClientReplicationState.PENDING_OVERFLOW) overflowed = true
+            }
+            if (client.applied == 0L) return@repeat
+            assertConverged(session, "tick ${session.harness.clock.tick.value}")
+        }
+        assertTrue(overflowed, "no entity's pending-send list overflowed; this link did not exercise it")
+    }
 }

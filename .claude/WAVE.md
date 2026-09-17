@@ -2,7 +2,7 @@
 
 ## kmp baseline
 
-SHA `236ad47` (kmp after #206 merge; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `dc6c708` (kmp after #209 merge; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -17,10 +17,10 @@ Reviewers and trial merges: run `-p build-logic check` too; that one test failin
 
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
 
-## Wave 4 (2026-09-16): in flight
+## Wave 4 (2026-09-16/17): done
 
 - Dispatched: #204 gas (dev-204), #205 assets (dev-205), #206 replay (dev-206), #209 net (dev-209). Disjoint modules.
-- #209 net: done at d08998f (BRIEF.md committed at root; rename to BRIEF-209.md at merge), review-209-r1 running. runUdpProof lossy fails more often on branch (6/32 vs 1/26), dev filed #219 as the underlying replication defect; reviewer to rule.
+- #209 net: merged `dc6c708`, round 1 PASS (no findings). Conflicted with #206 (same three docs); dev-209 merged origin/kmp (75e3100). Ktor 3.6.0, coroutines 1.11.0, cryptography-kotlin 0.6.0. runUdpProof lossy fails more often (6/32 vs 1/26): reviewer ruled it exposes #219, not a branch defect. Filed #220 (UdpTransport reader stops silently). Worktree kept: `.claude/worktrees/agent-a4a820538f153b24b`.
 - Wave 5 note: stale `:udea-net:test` in udea-replay ReplayFixtures.kt:106 (after #209). docs/module-graph.md row for udea-assets still says `udea.kotlin-library` (stale after #205); hand the fix to the next ticket editing that file (#207 or #208).
 - Wave 5 candidates: #216 (build-logic inputs, found wave 4), #218 (CI budget job base is retired example), #217 (determinism scanner misses TimeSource, found by dev-204).
 - #204 gas: merged `4ca994d` (+ BRIEF-204.md `c58cb75`), round 1 PASS. Trial + merged build green; build-logic check only #216. udea-core `KClass.runtimeName` now public; `roundHalfUp` replaces Math.round (roundToInt differs on Wasm). Worktree kept: `.claude/worktrees/agent-a8b2f894959c4489d`.
@@ -58,6 +58,13 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `udea.kotlin-multiplatform-render`, `udea.kotlin-base`, `udea.jvm-test-fixtures`.
 - Cards filed: none. Notes carried as comments on #211 (Kool workarounds) and #203 (`udeaVerifyDeterminism`
   layout; add module to CI `ios-tests`).
+
+## Wave 5 plan
+
+- Ready now: #207 audio (needs #205 - merged), #208 agent (needs #205 - merged), #216 build-logic inputs, #217 determinism TimeSource, #218 CI budget base, #219 UDP straddle desync, #220 UDP reader silent stop, #210 composegl-kool (other repo; check composegl-ef session first).
+- Collisions: #216 and #217 both edit build-logic (determinism tests) - not together. #219 and #220 both udea-net - not together. #193 editor tools needs #208.
+- Editor epic #190 reopened by owner 2026-09-17 (#192-#196), part of the port; viewport is ComposeGL 0.7.0-SNAPSHOT `SceneView`. Order in #199.
+- Lead rule: every gradle build runs `run_in_background`; never foreground (froze the session once). Verify a trial merge applied before trusting it.
 
 ## Standing rulings and traps
 

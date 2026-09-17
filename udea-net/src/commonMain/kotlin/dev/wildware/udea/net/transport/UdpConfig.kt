@@ -216,8 +216,10 @@ public class UdpCounters internal constructor() {
         internal set
 
     /**
-     * Datagrams the socket would not take: most often a Windows ICMP port-unreachable, which
-     * surfaces as a failed write on a healthy socket. Named for where the old transport met it.
+     * Socket errors. Datagrams the socket would not take: most often a Windows ICMP
+     * port-unreachable, which surfaces as a failed write on a healthy socket. And the socket's
+     * reader ending while the transport was open, which also sets [UdpTransport.failure] to
+     * [DisconnectReason.ReceiveFailed] (issue #220). Named for where the old transport met it.
      */
     public var receiveErrors: Long = 0L
         internal set

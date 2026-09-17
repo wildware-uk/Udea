@@ -1,8 +1,16 @@
 import dev.wildware.udea.build.UdeaModuleRegistry
 import dev.wildware.udea.build.udeaModule
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
-    id("udea.kotlin-library")
+    // THE iOS SWITCH (issue #215). Multiplatform on jvm, android and wasmJs, and not iOS, because
+    // this module's `api` dependency `udea-core` has no iOS target: Fleks publishes no iOS variant.
+    // When udea-core's own switch flips, this line becomes `id("udea.kotlin-multiplatform")`, and
+    // udea-gas joins the `ios-tests` job in `ci.yml`.
+    id("udea.kotlin-multiplatform-no-ios")
     // Level files (issue #191): `Attributes`, `Abilities` and `GameplayEffects` are saved, so
     // they need serializers, and `udea-codegen` lists them in the generated `GasModuleRegistry`.
     alias(libs.plugins.kotlinSerialization)
@@ -16,16 +24,36 @@ ksp {
     arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
 }
 
+kotlin {
+    sourceSets {
+        commonMain {
+            dependencies {
+                api(project(":udea-core"))
+            }
+            // The registry KSP generates from the common source set (issue #202), compiled into
+            // every target from there. See the `kspCommonMainMetadata` wiring below.
+            kotlin.srcDir(layout.buildDirectory.dir("generated/ksp/metadata/commonMain/kotlin"))
+        }
+    }
+}
+
 dependencies {
-    api(project(":udea-core"))
-
-    ksp(project(":udea-codegen"))
-
     // The Replicator contract's executable specification: ArrayFieldStore and ArrayBitIo. The
     // attribute replication tests measure a real payload through them rather than asserting on a
-    // mock, and udea-core publishes them as a variant for exactly this.
-    testImplementation(testFixtures(project(":udea-core")))
+    // mock, and udea-core publishes them as a JVM variant for exactly this, so those tests are
+    // `jvmTest` rather than `commonTest`.
+    "jvmTestImplementation"(testFixtures(project(":udea-core")))
+
+    // KSP over the common source set, once, rather than once per target: the registry it writes
+    // names only common declarations, as udea-core's does (issue #203).
+    add("kspCommonMainMetadata", project(":udea-codegen"))
 }
+
+// Every compilation reads the generated registry, and so does each per-target KSP run the plugin
+// registers beside the common one, so none of them may start before it has been written.
+val kspCommonMain = "kspCommonMainKotlinMetadata"
+tasks.withType<KotlinCompilationTask<*>>().configureEach { dependsOn(kspCommonMain) }
+tasks.matching { it.name.startsWith("ksp") && it.name != kspCommonMain }.configureEach { dependsOn(kspCommonMain) }
 
 // --- Phase 3 time gate (spec 5, issue #95) ----------------------------------------------------
 //
@@ -50,10 +78,19 @@ val udeaVerifyGasTime = tasks.register("udeaVerifyGasTime") {
         "Instant.now" to "a wall clock; time comes from SimClock, denominated in Tick",
         "com.badlogic.gdx" to "LibGDX; udea-gas must never see graphics or audio (spec 3.5)",
         "deltaTime" to "a frame delta; accumulating one is what issue #95 exists to delete",
+        // The wall clocks common code can reach (issue #204). The JVM's own are unresolvable in
+        // `commonMain`, so without these the gate would police a source set in which the clocks it
+        // names cannot even compile.
+        "TimeSource" to "a wall clock (kotlin.time); time comes from SimClock, denominated in Tick",
+        "Clock.System" to "a wall clock (kotlin.time or kotlinx-datetime); time comes from SimClock, denominated in Tick",
     )
 
-    val sourceDir = layout.projectDirectory.dir("src/main/kotlin")
-    inputs.dir(sourceDir).withPropertyName("simulationSources")
+    // Every shipped source set, not only `commonMain` (issue #204): `commonMain` cannot resolve
+    // `System.nanoTime`, so a platform source set such as `jvmMain` is exactly where one would be
+    // written. Test source sets are not simulation and end in `Test`, so the glob leaves them out.
+    val sourceRoot = layout.projectDirectory.dir("src")
+    val sources = fileTree(sourceRoot) { include("*Main/kotlin/**/*.kt") }
+    inputs.files(sources).withPropertyName("simulationSources").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.property("forbidden", forbidden.keys.sorted().joinToString(","))
 
     // A verification task with no output is never up to date; the report keeps it incremental and
@@ -61,7 +98,7 @@ val udeaVerifyGasTime = tasks.register("udeaVerifyGasTime") {
     val reportFile = layout.buildDirectory.file("reports/udea/gas-time-gate.txt")
     outputs.file(reportFile)
 
-    val sources = sourceDir.asFile
+    val sourceRootDir = sourceRoot.asFile
     val report = reportFile.get().asFile
 
     doLast {
@@ -99,21 +136,23 @@ val udeaVerifyGasTime = tasks.register("udeaVerifyGasTime") {
 
         val violations = mutableListOf<String>()
         var scanned = 0
-        sources.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
+        sources.files
             .sortedBy { it.path }
             .forEach { file ->
                 scanned++
+                // Relative to `src`, so the source set is in the message: two platforms' `actual`
+                // files may share a name.
+                val name = file.relativeTo(sourceRootDir).invariantSeparatorsPath
                 stripComments(file.readText()).lineSequence().forEachIndexed { index, line ->
                     forbidden.forEach { (needle, why) ->
                         if (line.contains(needle)) {
-                            violations += "${file.name}:${index + 1} references '$needle' — $why"
+                            violations += "$name:${index + 1} references '$needle' — $why"
                         }
                     }
                 }
             }
 
-        require(scanned > 0) { "udeaVerifyGasTime scanned no sources; the gate is misaimed at $sources" }
+        require(scanned > 0) { "udeaVerifyGasTime scanned no sources; the gate is misaimed at $sourceRootDir/*Main/kotlin" }
 
         report.parentFile.mkdirs()
         report.writeText("scanned $scanned file(s)\n" + violations.joinToString("\n").ifEmpty { "clean" } + "\n")
@@ -133,19 +172,27 @@ val udeaVerifyGasTime = tasks.register("udeaVerifyGasTime") {
 // list per entity per tick; at 500 entities and 60Hz that is 30 000 lists a second, and the GC
 // pause it buys is a frame the simulation does not get. Same shape as `udea-core`'s snapshot and
 // tick-loop budgets: a separate task so the measurement reaches the build log, and excluded from
-// `test` so a normal run does not pay for it twice.
+// `jvmTest` so a normal run does not pay for it twice. It counts bytes rather than milliseconds, so
+// unlike those budgets it is not skewed by a busy machine and stays on `check`.
 
 val allocationTestClass = "dev.wildware.udea.gas.AttributeAllocationTest"
 
-tasks.named<Test>("test") {
+tasks.named<Test>("jvmTest") {
     filter.excludeTestsMatching(allocationTestClass)
 }
+
+/** The JVM target's test compilation: where the allocation test is compiled. */
+val jvmTestCompilation: KotlinCompilation<*> =
+    (the<KotlinMultiplatformExtension>().targets.getByName("jvm") as KotlinJvmTarget).compilations.getByName("test")
 
 val udeaGasAllocationBudget = tasks.register<Test>("udeaGasAllocationBudget") {
     group = "verification"
     description = "Gates the attribute recompute at 500 entities x 8 effects x 600 ticks: zero bytes."
-    testClassesDirs = sourceSets.test.get().output.classesDirs
-    classpath = sourceSets.test.get().runtimeClasspath
+    testClassesDirs = jvmTestCompilation.output.classesDirs
+    classpath = files(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
+    // `jvmTest` is on JUnit 5 by convention and a `Test` task registered here is not: left on
+    // Gradle's default runner it finds no test and fails "No tests found for given includes".
+    useJUnitPlatform()
     filter.includeTestsMatching(allocationTestClass)
     testLogging.showStandardStreams = true
 }

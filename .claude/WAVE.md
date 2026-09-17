@@ -17,6 +17,14 @@ Reviewers and trial merges: run `-p build-logic check` too; that one test failin
 
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
 
+## Wave 5 (2026-09-17): in flight
+
+- Dispatched: #207 audio (dev-207, SPI+Silent+drain only), #208 agent (dev-208), #216 build-logic inputs (dev-216), #218 CI budget base (dev-218, may push its branch for CI), #220 UDP reader silent stop (dev-220). Disjoint modules; #207/#208 may both touch docs/module-graph.md and AGENTS.md.
+- #207 split: Kool AudioDevice + desktop/browser playback moved to #221 (lives in udea-render, needs #211). Commented on #207; #221 added to epic #199.
+- #208 ruling: targets jvm/android/wasmJs (no iOS until #215); assets-compiler code stays JVM. Commented.
+- Hand-offs: module-graph.md udea-assets row -> dev-207; ReplayFixtures.kt:106 `:udea-net:test` -> dev-208.
+- Held to wave 6: #217 (build-logic, collides with #216), #219 (udea-net, collides with #220), #193 (needs #208).
+
 ## Wave 4 (2026-09-16/17): done
 
 - Dispatched: #204 gas (dev-204), #205 assets (dev-205), #206 replay (dev-206), #209 net (dev-209). Disjoint modules.

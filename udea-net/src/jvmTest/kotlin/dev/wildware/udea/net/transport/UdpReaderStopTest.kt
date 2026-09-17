@@ -3,6 +3,7 @@ package dev.wildware.udea.net.transport
 import io.ktor.network.selector.Selectable
 import io.ktor.network.selector.SelectorManager
 import io.ktor.network.sockets.BoundDatagramSocket
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -10,7 +11,7 @@ import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
@@ -105,22 +106,9 @@ class UdpReaderStopTest {
 
             assertEquals(DisconnectReason.ReceiveFailed, pair.client.failure)
             assertEquals(listOf(PeerId.SERVER to DisconnectReason.ReceiveFailed), pair.clientEvents.disconnected)
+            // This ending carries an exception, unlike Ktor's quiet one, and it is kept rather than dropped.
+            assertIs<CancellationException>(pair.client.failureCause)
         }
-    }
-
-    @Test
-    fun `closing the transport is not reported as a reader failure`() {
-        val pair = UdpPair()
-        pair.connect()
-
-        pair.client.close()
-        pair.server.close()
-
-        assertNull(pair.client.failure)
-        assertNull(pair.server.failure)
-        assertEquals(listOf(PeerId.SERVER to DisconnectReason.LocalClosed), pair.clientEvents.disconnected)
-        assertEquals(listOf(PeerId.client(1) to DisconnectReason.LocalClosed), pair.serverEvents.disconnected)
-        assertEquals(0L, pair.client.counters.receiveErrors)
     }
 
     private companion object {

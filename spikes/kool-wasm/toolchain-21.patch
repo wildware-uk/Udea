@@ -1,0 +1,53 @@
+--- a/buildSrc/src/main/kotlin/kool.lib-conventions.gradle.kts
++++ b/buildSrc/src/main/kotlin/kool.lib-conventions.gradle.kts
+@@ -13,7 +13,7 @@
+ 
+ kotlin {
+     jvm("desktop") { }
+-    jvmToolchain(25)
++    jvmToolchain(21)
+     js {
+         binaries.library()
+         browser()
+--- a/buildSrc/src/main/kotlin/kool.androidlib-conventions.gradle.kts
++++ b/buildSrc/src/main/kotlin/kool.androidlib-conventions.gradle.kts
+@@ -1,15 +1,15 @@
+ plugins {
+-//    id("com.android.kotlin.multiplatform.library")
++    id("com.android.kotlin.multiplatform.library")
+     id("org.jetbrains.kotlin.multiplatform")
+ }
+ 
+ kotlin {
+-//    android {
+-//        namespace = "de.fabmax.kool"
+-//        compileSdk = 34
+-//        minSdk = 24
+-//        compilerOptions {
+-//            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+-//        }
+-//    }
++    android {
++        namespace = "de.fabmax.kool"
++        compileSdk = 34
++        minSdk = 24
++        compilerOptions {
++            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
++        }
++    }
+ }
+--- a/kool-core/build.gradle.kts
++++ b/kool-core/build.gradle.kts
+@@ -43,9 +43,9 @@
+             implementation(npm("jszip", "3.10.1"))
+         }
+ 
+-//        androidMain.dependencies {
+-//            implementation(libs.androidsvg)
+-//        }
++        androidMain.dependencies {
++            implementation(libs.androidsvg)
++        }
+     }
+ }
+ 

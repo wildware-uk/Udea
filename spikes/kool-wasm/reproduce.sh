@@ -41,7 +41,9 @@ fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 stage_kool() {
     say "Kool at $KOOL_SHA"
     [ -d "$KOOL_DIR/.git" ] || git clone -q "$KOOL_URL" "$KOOL_DIR"
-    git -C "$KOOL_DIR" fetch -q origin "$KOOL_SHA" 2>/dev/null || true
+    # A failed fetch is not fatal here: an existing clone may already hold the commit, and if it
+    # does not, the checkout on the next line fails and stops the script.
+    git -C "$KOOL_DIR" fetch -q origin "$KOOL_SHA" || echo "fetch of $KOOL_SHA failed; trying the clone as it is"
     git -C "$KOOL_DIR" checkout -q --detach "$KOOL_SHA"
     git -C "$KOOL_DIR" reset -q --hard "$KOOL_SHA"
     [ "$(git -C "$KOOL_DIR" rev-parse HEAD)" = "$KOOL_SHA" ] || fail "Kool is not at the pinned commit"

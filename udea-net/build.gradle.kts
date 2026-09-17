@@ -8,10 +8,11 @@ import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 import java.util.concurrent.TimeUnit
 
 plugins {
-    // THE iOS SWITCH (issue #215). udea-net is built on udea-core, an `api` dependency, and
-    // udea-core has no iOS target because Fleks publishes no iOS artifact. When udea-core gets one,
-    // this line becomes `id("udea.kotlin-multiplatform")`, and the `socket` group below gains
-    // `withNative()` so the iOS targets get `UdpTransport` too.
+    // THE iOS SWITCH. udea-core has iOS targets since Fleks was vendored (issue #215), but this
+    // module does not yet: `webSocketEngine` is an `expect` with `actual`s for the socket targets
+    // and Wasm only, so an iOS target fails to compile. With a native engine for it, this line
+    // becomes `id("udea.kotlin-multiplatform")`, and the `socket` group below gains `withNative()`
+    // so the iOS targets get `UdpTransport` too.
     id("udea.kotlin-multiplatform-no-ios")
 }
 

@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
 class GameplayTagTableTest {
 
     @Test
-    fun `ids follow ascending name order, not declaration order`() {
+    fun `ids follow ascending name order - not declaration order`() {
         val forwards = GameplayTagTable.of(listOf("State.Stunned", "Ability.Fire", "Data.Damage"))
         val backwards = GameplayTagTable.of(listOf("Data.Damage", "Ability.Fire", "State.Stunned"))
 
@@ -31,7 +31,7 @@ class GameplayTagTableTest {
     }
 
     @Test
-    fun `names compare by character code, so upper case sorts before lower case`() {
+    fun `names compare by character code - so upper case sorts before lower case`() {
         val table = GameplayTagTable.of(listOf("ability.lower", "Ability.Upper", "_Underscore"))
 
         assertEquals(

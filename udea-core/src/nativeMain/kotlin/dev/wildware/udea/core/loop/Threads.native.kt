@@ -8,9 +8,6 @@ import kotlin.native.concurrent.ThreadLocal
 /**
  * One instance per thread: `@ThreadLocal` gives every thread its own copy of the object, so its
  * identity is the thread's.
- *
- * Compiled with the iOS targets, which are off until issue #215 is fixed. The source is here so
- * that switching them back on is the one-line change `udea-core/build.gradle.kts` describes.
  */
 @ThreadLocal
 private object ThisThread

@@ -69,7 +69,7 @@ class AbilityInstanceTest {
     }
 
     @Test
-    fun `an ungranted slot is an instance with no ability, not a null`() {
+    fun `an ungranted slot is an instance with no ability - not a null`() {
         val abilities = Abilities(3)
         assertTrue(!abilities.instanceAt(2).isGranted)
 

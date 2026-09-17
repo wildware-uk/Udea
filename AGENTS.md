@@ -63,6 +63,7 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `udea-diagnostics` | Zero-dependency leaf: `UdeaDiagnostic`, `Severity`, `SourceSpan`, `Fix`, rule ids, the JSON report |
 | `udea-codegen` | The KSP2 processor and KotlinPoet emitters; owns id assignment |
 | `udea-compiler-plugin` | The K2 FIR/IR plugin: checkers, KDoc propagation, gated declaration synthesis |
+| `udea-fleks` | Fleks 2.14, the ECS, vendored as source so it has iOS targets. Third-party, MIT; not refactored |
 | `udea-core` | Headless kernel. **No GL on the compile classpath** |
 | `udea-assets` | Runtime asset model and `.udeapak` reader |
 | `udea-assets-compiler` | Build-time only. **Zero Gradle types** |
@@ -95,15 +96,18 @@ rationale: `docs/module-graph.md`.
 **Multiplatform (the Kool/KMP port, issue #201).** A runtime module moves to KMP by applying
 `udea.kotlin-multiplatform` (`jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64`);
 `udea-render` will apply `udea.kotlin-multiplatform-render`, the same set without iOS.
-`udea-core` is multiplatform on `udea.kotlin-multiplatform-no-ios` - `jvm`, `android`, `wasmJs` -
-because Fleks publishes no iOS artifact (issue #215); its build script carries the one-line switch
-back. `udea-gas` (issue #204) and `udea-replay` (issue #206) are on the same convention for the
-same reason, through `udea-core`. `udea-net` is too (issue #209): its UDP transport runs on `jvm`
-and `android` through a shared `socketMain` source set, and `wasmJs` has the WebSocket client only.
-`udea-audio` is too (issue #207): the `AudioDevice` SPI, `AudioDevice.Silent` and the cue drain are
-`commonMain`, and a device that makes a noise is not in it on any target.
-`udea-agent` is too (issue #208): its tools and dispatcher are common, the `assets.*` toolset is
-`jvmMain` because the asset daemon is, and `udea-agent-host` stays JVM.
+`udea-core` is on `udea.kotlin-multiplatform`, iOS included, because Fleks is vendored as source
+in `udea-fleks` (issue #215): Fleks publishes no iOS artifact at any version. `udea-fleks` is
+third-party code under its own MIT licence (`udea-fleks/NOTICE.md`); do not refactor it, and an
+edit to it fails `udeaVerifyDeterminism` until `determinism-audit.md` is re-read. `udea-gas`
+(issue #204), `udea-replay` (issue #206) and `udea-audio` (issue #207) are on the full convention
+too. `udea-net` (issue #209) and `udea-agent` (issue #208) are on
+`udea.kotlin-multiplatform-no-ios` (`jvm`, `android`, `wasmJs`), because each has an `expect` with
+no native `actual` yet, and each build script names it. `udea-net`'s UDP transport runs on `jvm` and `android` through a shared
+`socketMain` source set, and `wasmJs` has the WebSocket client only. In `udea-audio` the
+`AudioDevice` SPI, `AudioDevice.Silent` and the cue drain are `commonMain`, and a device that makes
+a noise is not in it on any target. In `udea-agent` the tools and dispatcher are common, the
+`assets.*` toolset is `jvmMain` because the asset daemon is, and `udea-agent-host` stays JVM.
 Build-time modules stay on `udea.kotlin-library`. The module-graph gates govern each target's
 classpath as the JVM classpath it stands for. `sh gradlew :<module>:allTests` skips iOS off
 macOS; the `ios-tests` CI job runs it. The Android SDK comes from `ANDROID_HOME` or an

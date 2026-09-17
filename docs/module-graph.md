@@ -19,7 +19,7 @@ copy reviewed.
 | `udea.kotlin-base` | applied by the Kotlin conventions below, never on its own | JDK 21 toolchain, `explicitApi()`, the `kotlin-stdlib` pin with `udeaVerifyKotlinPin`, the K2 compiler plugin with `udeaVerifyCompilerPlugin` |
 | `udea.kotlin-library` | every JVM runtime module and `moba` | Kotlin JVM plus `udea.kotlin-base`, kotlin.test on JUnit 5. **No GL.** |
 | `udea.kotlin-multiplatform` | runtime modules ported to KMP (issue #201) | Kotlin Multiplatform on `jvm`, `android` (AGP's KMP library plugin), `wasmJs` (Node), `iosArm64`, `iosSimulatorArm64`, plus `udea.kotlin-base`; kotlin.test in `commonTest`, JUnit 5 on `jvmTest` |
-| `udea.kotlin-multiplatform-no-ios` | a runtime module that cannot have an iOS target yet, whose build script names why: `udea-core`, because Fleks publishes no iOS artifact (issue #215); `udea-gas`, which depends on `udea-core` (issue #204); `udea-replay`, which depends on `udea-core` (issue #206); `udea-net`, which depends on `udea-core` (issue #209); `udea-audio`, which depends on `udea-core` (issue #207) | `udea.kotlin-multiplatform` without the iOS targets; switching back to `udea.kotlin-multiplatform` re-enables them |
+| `udea.kotlin-multiplatform-no-ios` | a runtime module that cannot have an iOS target yet, whose build script names why: `udea-net`, whose `webSocketEngine` has no native `actual` (issue #209); `udea-agent`, whose `enumConstantsOf` and `heapFigures` have none (issue #208). `udea-core` left it when Fleks was vendored (issue #215) | `udea.kotlin-multiplatform` without the iOS targets; switching back to `udea.kotlin-multiplatform` re-enables them |
 | `udea.kotlin-multiplatform-render` | `udea-render`, once it is on Kool (spec D2) | `udea.kotlin-multiplatform-no-ios`, applied rather than copied |
 | `udea.jvm-test-fixtures` | a KMP module with JVM test fixtures | a `jvmTestFixtures` source set published under the `-test-fixtures` capability, so `testFixtures(project(...))` works from a JVM consumer |
 | `udea.kotlin-library-gl` | `udea-render` only | `udea.kotlin-library` plus gdx and the LWJGL3 backend, as `implementation` so GL cannot leak downstream |
@@ -37,13 +37,14 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 | `udea-diagnostics` | `udea.kotlin-multiplatform` | Zero-dependency leaf: the one `UdeaDiagnostic` — severity, stable rule id, `SourceSpan`, `assetId`, optional `Fix` (spec §5) | new — the shared vocabulary the K2 checkers and the asset validator both emit | *(Kotlin stdlib only)* | `udea-compiler-plugin`, `udea-assets`, `udea-assets-compiler`, `udea-gradle`; and, on `testImplementation(testFixtures(...))` only, `udea-core`, `udea-agent` and `udea-agent-host` for `LatencyBudget` (issue #175) |
 | `udea-codegen` | `udea.kotlin-build-tool` | KSP2 processor + KotlinPoet emitters; owns id assignment and `net-protocol.lock` | `NetworkGenerator`, `UdeaDslProcessor`, `@CreateDsl` | `udea-annotations`, `symbol-processing-api`, KotlinPoet | build-time only (`ksp(...)` from consumers) |
 | `udea-compiler-plugin` | `udea.kotlin-build-tool` | K2 FIR/IR plugin: checkers, KDoc propagation, gated declaration synthesis | new (D8) | `udea-annotations`, `udea-diagnostics`, `kotlin-compiler-embeddable` (`compileOnly`) | build-time only |
-| `udea-core` | `udea.kotlin-multiplatform-no-ios` | Headless kernel: `Simulation`, `SimBarrier`, `NetId`, `Tick`, snapshot ring, `Replicator`. **No GL on the compile classpath** | `UdeaGameManager`/`GameScreen`, the globals, `common/.../properties.kt`, `reflection.kt` | `udea-annotations` (api), Fleks (api), kotlinx-serialization-core (api) and -cbor for level files (issue #191), atomicfu for the `SimBarrier` inbox lock (issue #203) | `udea-gas`, `udea-net`, `udea-render`, `udea-agent`, `moba` |
+| `udea-fleks` | `udea.kotlin-multiplatform` | Fleks 2.14, the entity component system, vendored as source so it has iOS targets (issue #215). Third-party MIT code, not refactored; `NOTICE.md` records its origin and the build differences | the `io.github.quillraven.fleks:Fleks` Maven artifact | kotlinx-serialization-core (api), and nothing else by `UDEA-MG-007` | `udea-core` |
+| `udea-core` | `udea.kotlin-multiplatform` | Headless kernel: `Simulation`, `SimBarrier`, `NetId`, `Tick`, snapshot ring, `Replicator`. **No GL on the compile classpath** | `UdeaGameManager`/`GameScreen`, the globals, `common/.../properties.kt`, `reflection.kt` | `udea-annotations` (api), `udea-fleks` (api), kotlinx-serialization-core (api) and -cbor for level files (issue #191), atomicfu for the `SimBarrier` inbox lock (issue #203) | `udea-gas`, `udea-net`, `udea-render`, `udea-agent`, `moba` |
 | `udea-assets` | `udea.kotlin-multiplatform` | Runtime asset model + `.udeapak` reader | `common/assets/*`, the `Assets` global | `udea-annotations` (api), `udea-diagnostics` | `udea-assets-compiler`, `udea-render`, `moba` |
 | `udea-assets-compiler` | `udea.kotlin-build-tool` | The five-pass asset compiler. **Zero Gradle types** — one implementation behind both the Gradle task and the dev daemon | `scriptHost.kt`, `AssetScanner`, `GameAssetLoader` | `udea-assets` (api), `udea-diagnostics` | `udea-gradle` |
-| `udea-gas` | `udea.kotlin-multiplatform-no-ios` | Abilities, attributes, effects — tick-denominated | `common/ability/*`, `AbilitySystem`, `AttributeSystem` | `udea-core` (api) | `udea-agent-host`, `moba` |
+| `udea-gas` | `udea.kotlin-multiplatform` | Abilities, attributes, effects — tick-denominated | `common/ability/*`, `AbilitySystem`, `AttributeSystem` | `udea-core` (api) | `udea-agent-host`, `moba` |
 | `udea-net` | `udea.kotlin-multiplatform-no-ios` | Transports, baselines, relevancy, prediction, RPC | `common/network/*`, both `Network*System`s, KryoNet | `udea-core` (api); Ktor sockets and WebSocket client, cryptography-kotlin for the connect token; the Ktor WebSocket server on `jvm` only, without `kotlin-reflect` (issue #209) | `moba` |
 | `udea-render` | `udea.kotlin-library-gl` | The only module that touches GL | `SpriteBatchSystem` et al., `GameScreen`'s rendering half | `udea-core` (api), `udea-assets`, gdx + gdx-backend-lwjgl3 | `moba` |
-| `udea-audio` | `udea.kotlin-multiplatform-no-ios` | Cue-driven sound: the drain that empties `GameContext.cues`, the cue-to-`SoundCue` routing table, distance attenuation, stereo pan, pitch variance and a per-frame voice cap. **No GL and no `Gdx`** — playback is an `AudioDevice` SPI, and `AudioDevice.Silent` is a shipped implementation, so a headless process drains the queue and makes no noise | `common/.../ecs/system/SoundSystem.kt`, which read `gameScreen.camera` off a file-level global inside a Fleks system and called `play` on a `Sound` held by an asset value | `udea-core` (api), `udea-assets` | `moba` |
+| `udea-audio` | `udea.kotlin-multiplatform` | Cue-driven sound: the drain that empties `GameContext.cues`, the cue-to-`SoundCue` routing table, distance attenuation, stereo pan, pitch variance and a per-frame voice cap. **No GL and no `Gdx`** — playback is an `AudioDevice` SPI, and `AudioDevice.Silent` is a shipped implementation, so a headless process drains the queue and makes no noise | `common/.../ecs/system/SoundSystem.kt`, which read `gameScreen.camera` off a file-level global inside a Fleks system and called `play` on a `Sound` held by an asset value | `udea-core` (api), `udea-assets` | `moba` |
 | `udea-agent` | `udea.kotlin-multiplatform-no-ios` | MCP surface + test harness — same code path; common on `jvm`, `android` and `wasmJs`, with the `assets.*` toolset in `jvmMain` (issue #208) | FruitGameKTX's `DebugBridge` pattern, generalised | `udea-core` (api) | `udea-agent-host` |
 | `udea-agent-host` | `udea.kotlin-library` | HTTP server, plus the toolsets that need a render context (spec §4: render, input, ui). Debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` | `udea-agent` (api); `udea-render` + gdx + `udea-net` (`implementation` — see below) | *(nothing — deliberately not `moba`)* |
 | `udea-gradle` | `udea.gradle-plugin` | Tasks, verifiers, `gamebridge.json` emission | old `gradle-plugin` (which leaked `gradleApi` onto the game runtime) | `udea-assets-compiler`, `udea-diagnostics`, `gradleApi()` (`compileOnly`) | *(nothing — applied as a plugin, never depended on)* |
@@ -279,6 +280,28 @@ is how the `.udeapak` reader names and reads a file on every target, where `java
 `java.nio` exist only on the JVM (spec §6, "kotlinx-io everywhere"). The two artifacts are named
 rather than matched by a `kotlinx-*` wildcard, so serialization or coroutines arriving here is
 still a failure.
+
+## `UDEA-MG-007` — vendored Fleks is a leaf
+
+**Spec §4.** Allowed on `:udea-fleks`'s `compileClasspath` and `runtimeClasspath`, and nothing
+else: `org.jetbrains.kotlin:kotlin-stdlib` (and `kotlin-stdlib-wasm-js`),
+`org.jetbrains:annotations`, and `org.jetbrains.kotlinx:kotlinx-serialization-core` with the
+per-target artifacts a target's classpath resolves it to (`kotlinx-serialization-core-jvm` and so
+on), and `kotlinx-serialization-bom`, the classless platform it brings on the JVM and Android.
+
+`udea-fleks` is Fleks 2.14's own source, vendored in issue #215 because Fleks publishes no iOS
+artifact at any version. It is the bottom of the engine: `udea-core` exposes it as `api`, so
+whatever it resolves reaches every module above it and the shipped game. Two things this rule
+catches:
+
+- **An arrow back up.** Any Udea module on this classpath is an upward arrow from the library the
+  kernel is built on.
+- **Third-party code growing dependencies.** Upstream's main source needs only
+  `kotlinx-serialization-core`, for its `@Serializable` `Entity`, `Snapshot` and `ComponentType`.
+  Upstream's build also declares `kotlinx-serialization-json` on the main classpath, which that
+  source does not use; here it is a test dependency of the vendored tests, and this rule keeps it
+  there. The serialization artifacts are named rather than matched by a
+  `kotlinx-serialization-*` wildcard for that reason.
 
 ## `UDEA-REL-001` — no agent class in the packaged artifact
 

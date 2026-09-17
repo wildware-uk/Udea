@@ -9,10 +9,11 @@ import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
-    // THE iOS SWITCH (issue #215), the same one `udea-core` carries. Multiplatform on jvm, android
-    // and wasmJs, and not iOS, because `udea-core` - an `api` dependency below - has no iOS
-    // variant while Fleks publishes none. When `udea-core` switches to
-    // `id("udea.kotlin-multiplatform")`, this line switches with it.
+    // THE iOS SWITCH. Multiplatform on jvm, android and wasmJs, and not iOS. `udea-core` has iOS
+    // targets since Fleks was vendored (issue #215), but this module does not yet: the `expect`
+    // declarations `enumConstantsOf` and `heapFigures` have `actual`s for the JVM, Android and Wasm
+    // only, so an iOS target fails to compile. With a native `actual` for each, this line becomes
+    // `id("udea.kotlin-multiplatform")` and the module joins the `ios-tests` job in `ci.yml`.
     id("udea.kotlin-multiplatform-no-ios")
     // The engine's own toolsets go through the same `@AgentTool` KSP pass every game's do.
     // There is one mechanism on the agent surface, not an engine one and a game one - see

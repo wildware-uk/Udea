@@ -66,7 +66,7 @@ class GasModuleTest {
     }
 
     @Test
-    fun `the module registers both systems, in the phases the tick order expects`() {
+    fun `the module registers both systems - in the phases the tick order expects`() {
         val harness = Harness()
         val manifest = harness.game.world.systemManifest()
 
@@ -88,7 +88,7 @@ class GasModuleTest {
     }
 
     @Test
-    fun `the services are reachable through the context, not through a global`() {
+    fun `the services are reachable through the context - not through a global`() {
         val first = Harness()
         val second = Harness()
 

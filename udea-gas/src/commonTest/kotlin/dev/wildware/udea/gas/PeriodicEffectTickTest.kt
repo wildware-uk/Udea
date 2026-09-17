@@ -68,7 +68,7 @@ class PeriodicEffectTickTest {
     }
 
     @Test
-    fun `a periodic effect writes base, not current`() {
+    fun `a periodic effect writes base - not current`() {
         val fixture = GasFixture()
         val unit = fixture.unit()
         unit.attributes.setBase(fixture.health, 0f)

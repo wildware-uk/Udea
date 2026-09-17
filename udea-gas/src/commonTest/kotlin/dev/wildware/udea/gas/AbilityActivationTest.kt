@@ -139,7 +139,7 @@ class CooldownTickTest {
 class ActivationGatingTest {
 
     @Test
-    fun `too little mana refuses, names the resource, and changes nothing`() {
+    fun `too little mana refuses - names the resource - and changes nothing`() {
         val fixture = GasFixture()
         val unit = fixture.unit()
         unit.abilities.grant(0, fixture.fireball)
@@ -171,7 +171,7 @@ class ActivationGatingTest {
     }
 
     @Test
-    fun `a stunned entity is refused, and the tag is named`() {
+    fun `a stunned entity is refused - and the tag is named`() {
         val fixture = GasFixture()
         val unit = fixture.unit()
         unit.abilities.grant(0, fixture.fireball)
@@ -291,7 +291,7 @@ class AbilityExecStatelessTest {
     }
 
     @Test
-    fun `exec ids come from sorted class names, so two builds agree`() {
+    fun `exec ids come from sorted class names - so two builds agree`() {
         val forwards = AbilityExecRegistry.of(listOf(RecordingExec(), ChannelledExec()))
         val backwards = AbilityExecRegistry.of(listOf(ChannelledExec(), RecordingExec()))
         assertEquals(
@@ -301,7 +301,7 @@ class AbilityExecStatelessTest {
     }
 
     @Test
-    fun `exec ids are the same on every target, nested classes included`() {
+    fun `exec ids are the same on every target - nested classes included`() {
         // A nested class is `ExecHolder$InnerExec` on the JVM and `ExecHolder.InnerExec` on Wasm,
         // and `ExecHolderExec` shares its outer name as a prefix, so this is the ordering the two
         // spellings could disagree on if either separator sorted above an identifier character.

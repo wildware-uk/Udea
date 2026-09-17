@@ -6,11 +6,9 @@ import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
-    // THE iOS SWITCH (issue #215). Multiplatform on jvm, android and wasmJs, and not iOS, because
-    // this module's `api` dependency `udea-core` has no iOS target: Fleks publishes no iOS variant.
-    // When udea-core's own switch flips, this line becomes `id("udea.kotlin-multiplatform")`, and
-    // udea-gas joins the `ios-tests` job in `ci.yml`.
-    id("udea.kotlin-multiplatform-no-ios")
+    // Every target, iOS included: `udea-core` gained its iOS targets when Fleks was vendored
+    // (issue #215).
+    id("udea.kotlin-multiplatform")
     // Level files (issue #191): `Attributes`, `Abilities` and `GameplayEffects` are saved, so
     // they need serializers, and `udea-codegen` lists them in the generated `GasModuleRegistry`.
     alias(libs.plugins.kotlinSerialization)

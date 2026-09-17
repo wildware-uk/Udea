@@ -14,4 +14,4 @@
 # fence that goes with it is in `CrossPlatformDivergenceTest.assertGolden`, so a copy translated
 # by something other than a checkout fails by name rather than as a diff of two blocks that
 # render identically.
-src/test/resources/expected/*.txt -text
+src/jvmTest/resources/expected/*.txt -text

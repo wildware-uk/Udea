@@ -1,60 +1,93 @@
 import dev.wildware.udea.build.UdeaModuleRegistry
 import dev.wildware.udea.build.udeaModule
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 
 plugins {
-    id("udea.kotlin-library")
+    // THE iOS SWITCH (issue #215), the same one `udea-core` carries. Multiplatform on jvm, android
+    // and wasmJs, and not iOS, because `udea-core` - an `api` dependency below - has no iOS
+    // variant while Fleks publishes none. When `udea-core` switches to
+    // `id("udea.kotlin-multiplatform")`, this line switches with it.
+    id("udea.kotlin-multiplatform-no-ios")
+    // The `replay-equality` fixture world (issue #152). A published variant rather than this
+    // module's private test source for the same reason `udea-core` publishes `TransformReplicator`:
+    // the CI job runs it as a `JavaExec` main class, and a test main class is an entry point
+    // living inside the thing that is supposed to be testing it. `udea.jvm-test-fixtures` rather
+    // than `java-test-fixtures`, which cannot be applied beside the multiplatform plugin; its
+    // source set is `jvmTestFixtures` (issue #206).
+    id("udea.jvm-test-fixtures")
     // The replay toolset goes through the same `@AgentTool` KSP pass every other toolset does.
     // `EngineToolModules` deliberately does not name these tools - see `ReplayToolModules` for
     // why a replay session is a thing only a host that has one can register.
     id("com.google.devtools.ksp") version libs.versions.ksp.get()
+}
 
-    // The `replay-equality` fixture world (issue #152). A published variant rather than this
-    // module's private test source for the same reason `udea-core` publishes `TransformReplicator`:
-    // the CI job runs it as a `JavaExec` main class, and a `src/test` main class is an entry point
-    // living inside the thing that is supposed to be testing it.
-    `java-test-fixtures`
+// What is common and what is JVM (issue #206, spec D3). Any platform may record a `.udearep` and
+// replay one, so the format, the recorder, the replay world seam, the session and the verifier are
+// `commonMain`. The cross-OS digest and its join (`equality`), the checked-in fixture reconciler
+// (`fixture`) and the `replay.*` agent tools (`tools`) are `jvmMain`: verification is the JVM's job
+// under D3, and `udea-agent` is a JVM module until issue #208.
+kotlin {
+    sourceSets {
+        commonMain {
+            dependencies {
+                // `Tick`, `WorldSnapshot`, `WorldHasher`, `DivergenceReport`, `RngService`. The
+                // whole point of Phase 7 is that these already exist and a recording only has to
+                // name them.
+                api(project(":udea-core"))
+            }
+        }
+        jvmMain {
+            dependencies {
+                // `AgentResult`, `AgentToolDef`, `ToolModule`: the bisect tools of issue #149.
+                //
+                // **compileOnly, and that is a release gate rather than a preference.**
+                // `ReleaseRules.CLASSPATH_RULE` (UDEA-REL-002) forbids `:udea-agent` on `:moba`'s
+                // `runtimeClasspath`, because the agent surface mutates the live simulation and
+                // debug-only means absent from the shipped classpath rather than disabled in it.
+                // `moba` needs the *recording* half of this module in `src/main` - a shipped game
+                // records matches - so an `api` or `implementation` edge here would drag the agent
+                // surface into every release and fail that gate.
+                //
+                // The consequence, stated plainly: `ReplayToolset` and `ReplayToolModules` are
+                // simply unloadable in a process with no `udea-agent` on its classpath. That is the
+                // same bargain `udea-agent` itself strikes with `udea-assets-compiler` for
+                // `AssetsToolset`, and it is correct rather than a compromise - only a debug host
+                // serves `replay.*`, and `moba`'s `agent` source set is the one classpath in that
+                // project which resolves the agent surface.
+                compileOnly(project(":udea-agent"))
+
+                // `@AgentTool` and `@Arg`, on `ReplayToolset`.
+                implementation(project(":udea-annotations"))
+            }
+        }
+    }
 }
 
 dependencies {
-    // `Tick`, `WorldSnapshot`, `WorldHasher`, `DivergenceReport`, `RngService`. The whole point
-    // of Phase 7 is that these already exist and a recording only has to name them.
-    api(project(":udea-core"))
-
-    // `AgentResult`, `AgentToolDef`, `ToolModule`: the bisect tools of issue #149.
-    //
-    // **compileOnly, and that is a release gate rather than a preference.**
-    // `ReleaseRules.CLASSPATH_RULE` (UDEA-REL-002) forbids `:udea-agent` on `:moba`'s
-    // `runtimeClasspath`, because the agent surface mutates the live simulation and debug-only
-    // means absent from the shipped classpath rather than disabled in it. `moba` needs the
-    // *recording* half of this module in `src/main` - a shipped game records matches - so an
-    // `api` or `implementation` edge here would drag the agent surface into every release and
-    // fail that gate.
-    //
-    // The consequence, stated plainly: `ReplayToolset` and `ReplayToolModules` are simply
-    // unloadable in a process with no `udea-agent` on its classpath. That is the same bargain
-    // `udea-agent` itself strikes with `udea-assets-compiler` for `AssetsToolset`, and it is
-    // correct rather than a compromise - only a debug host serves `replay.*`, and `moba`'s
-    // `agent` source set is the one classpath in that project which resolves the agent surface.
-    compileOnly(project(":udea-agent"))
-
-    // `@AgentTool` and `@Arg`, on `ReplayToolset`.
-    implementation(project(":udea-annotations"))
-
-    ksp(project(":udea-codegen"))
-
     // `QueueingSceneManager`, `RecordingCueSink`, `RecordingPhysicsWorld`: the equality fixture is
     // a real Fleks world running a real `WorldSimulation`, and those are the two services a
     // headless world has no device for.
-    testFixturesImplementation(testFixtures(project(":udea-core")))
+    "jvmTestFixturesImplementation"(testFixtures(project(":udea-core")))
 
     // Real Fleks components on real entities and a wired `GameContext`, so a replay test drives
     // a real world through a real snapshot service rather than a mock of one.
-    testImplementation(testFixtures(project(":udea-core")))
+    "jvmTestImplementation"(testFixtures(project(":udea-core")))
 
     // The agent surface is `compileOnly` above, so this module's own tests have to put it back
     // on the classpath they run against - otherwise `ReplayToolset` could not be exercised here
     // at all and the bisect tools would be proven by nothing.
-    testImplementation(project(":udea-agent"))
+    "jvmTestImplementation"(project(":udea-agent"))
+
+    // KSP over the JVM target only, which is where `ReplayToolset` - the one `@AgentTool` class -
+    // lives. It also writes this module's registry there rather than into common code, unlike
+    // `udea-core`: one processor run cannot be told to skip the registry, and a second run over
+    // `commonMain` would put a second copy of it on the JVM classpath. The registry names nothing
+    // but the module, and every launcher that lists this module today is a JVM one; moving it to
+    // `kspCommonMainMetadata` is the change once `udea-agent` is multiplatform (issue #208) and the
+    // toolset can go to common code with it.
+    add("kspJvm", project(":udea-codegen"))
 }
 
 // The manifest fragment is named per module, or two modules emit `udea/-agent-tools.json` and
@@ -108,7 +141,7 @@ tasks.withType<Test>().configureEach {
     // half of them.
     inputs.file(
         layout.projectDirectory.file(
-            "src/main/kotlin/dev/wildware/udea/replay/equality/ReplayDigestCli.kt",
+            "src/jvmMain/kotlin/dev/wildware/udea/replay/equality/ReplayDigestCli.kt",
         ),
     ).withPropertyName("replayDigestCliSource")
         .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -142,7 +175,7 @@ tasks.withType<Test>().configureEach {
 // None of these is wired into `check`. `udeaReplayDigest` is a multi-second replay whose output is
 // only meaningful beside another machine's, and `udeaReplayEqualityProof` starts five JVMs - the
 // same reason `runUdpProof` and `runLaneShot` are named tasks rather than `check` dependencies.
-// What `check` does carry is `:udea-replay:test`, which holds `CrossPlatformDivergenceTest`,
+// What `check` does carry is `:udea-replay:jvmTest`, which holds `CrossPlatformDivergenceTest`,
 // `DivergenceReportFormatTest`, `ReplayDigestTest` and `ReplayEqualityProofTest`.
 
 val replayEqualityDir: Provider<Directory> =
@@ -166,8 +199,13 @@ val replayEqualityDir: Provider<Directory> =
  */
 val workspaceRoot: String = rootProject.layout.projectDirectory.asFile.absolutePath
 
+/** The JVM target's test-fixtures compilation, which `udea.jvm-test-fixtures` declares. */
+val jvmTestFixturesCompilation: KotlinCompilation<*> =
+    (the<KotlinMultiplatformExtension>().targets.getByName("jvm") as KotlinJvmTarget).compilations.getByName("testFixtures")
+
 /** The classpath every entry point below runs on: this module, its fixtures and `udea-core`. */
-val equalityClasspath: FileCollection = sourceSets["testFixtures"].runtimeClasspath
+val equalityClasspath: FileCollection =
+    files(jvmTestFixturesCompilation.output.allOutputs, jvmTestFixturesCompilation.runtimeDependencyFiles)
 
 /**
  * The launcher a digest runs on, honouring `-Pudea.replay.jvm=<feature version>`.
@@ -256,7 +294,7 @@ tasks.register<JavaExec>("udeaReplayDigest") {
  * stream on any machine.
  *
  * The convention is `--update-goldens`, spelled the way that one is actually typed:
- * `./gradlew :udea-replay:test -Dupdate.replay.fixtures=true` goes through
+ * `./gradlew :udea-replay:jvmTest -Dupdate.replay.fixtures=true` goes through
  * `ReplayFixturesCurrentTest` and reconciles the same set through the same
  * `ReplayFixtures.reconcile`. This task is the same call without the rest of the test suite.
  */
@@ -265,7 +303,7 @@ tasks.register<JavaExec>("udeaWriteReplayFixture") {
     description = "Rebuilds udea-replay's checked-in .udearep replay-equality fixtures."
     classpath = equalityClasspath
     mainClass.set("dev.wildware.udea.replay.equality.fixture.DriftFixturesMain")
-    val fixturesDir = layout.projectDirectory.dir("src/testFixtures/resources/fixtures")
+    val fixturesDir = layout.projectDirectory.dir("src/jvmTestFixtures/resources/fixtures")
     argumentProviders.add { listOf("--fixtures-dir", fixturesDir.asFile.absolutePath) }
 }
 

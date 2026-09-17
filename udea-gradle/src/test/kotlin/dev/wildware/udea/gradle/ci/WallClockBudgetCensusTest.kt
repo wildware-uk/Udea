@@ -348,9 +348,9 @@ class WallClockBudgetCensusTest {
                 "a deadline: how long to wait for the render thread to reach a frame",
             "udea-render/src/test/kotlin/dev/wildware/udea/render/gl/OffscreenBackendTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",
-            "udea-replay/src/test/kotlin/dev/wildware/udea/replay/ReplayEngineTest.kt" to
+            "udea-replay/src/jvmTest/kotlin/dev/wildware/udea/replay/ReplayEngineTest.kt" to
                 "a seed: the pilot must differ between runs",
-            "udea-replay/src/test/kotlin/dev/wildware/udea/replay/ReplayToolTest.kt" to
+            "udea-replay/src/jvmTest/kotlin/dev/wildware/udea/replay/ReplayToolTest.kt" to
                 "a seed: the pilot must differ between runs",
         )
     }

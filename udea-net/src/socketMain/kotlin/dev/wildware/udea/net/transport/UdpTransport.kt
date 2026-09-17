@@ -36,7 +36,7 @@ internal enum class HandshakeState {
     /** The connection is open. */
     Connected,
 
-    /** Refused or timed out. This transport will not connect. */
+    /** Refused, timed out, or its socket stopped delivering. This transport will not connect. */
     Failed,
 }
 
@@ -247,11 +247,11 @@ public class UdpTransport private constructor(
         get() = if (isServer) byAddress.isNotEmpty() else handshakeState == HandshakeState.Connected
 
     /**
-     * Why a client's handshake or connection ended, or null while it is running or open.
+     * On a client, why its handshake or connection ended, or null while it is running or open.
      *
-     * On a server, null unless the socket stopped delivering datagrams, which sets
-     * [DisconnectReason.ReceiveFailed] on either side: a server that cannot hear has no connection
-     * left to report it through once its clients are gone.
+     * On a server, null unless its socket stopped delivering datagrams, which sets
+     * [DisconnectReason.ReceiveFailed]: a server that cannot hear has no connection left to
+     * report it through once its clients are retired.
      */
     public var failure: DisconnectReason? = null
         private set

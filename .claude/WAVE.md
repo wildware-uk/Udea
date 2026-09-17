@@ -34,6 +34,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - #210 split: JVM desktop + SceneView + snapshot here; Wasm/Android + Wasm demo -> #222 (added to epic). #211 needs #222 too.
 - #215 ruling: vendor Fleks 2.14 as `udea-fleks` (Central latest 2.15, no iOS). Commented.
 - Dispatched: dev-215 (Udea worktree, branch issue-215-vendor-fleks), dev-210 (composegl-wt/kool-210, branch issue-210-composegl-kool).
+- #210: landed composegl master `1086a586`, round 1 PASS (no findings). Draft PR composegl#232 (CI only; composegl CI does not run on branch pushes) closed. Master CI 35183141663 green, snapshot release 35183678529 green: `dev.wildware.composegl:composegl-kool:0.7.0-SNAPSHOT`. Wiki pushed. Kool must start with `renderBackend = RenderBackendGl`. Worktree kept: `/srv/ssd1/workspace/composegl-wt/kool-210`. Next wave: #222 (composegl, Wasm/Android).
 
 ## Wave 7 plan
 

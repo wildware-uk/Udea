@@ -10,11 +10,14 @@ import io.ktor.network.sockets.InetSocketAddress
 import io.ktor.network.sockets.aSocket
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.Buffer
@@ -127,8 +130,19 @@ public class UdpTransport private constructor(
 
     private val sendBuffer = ByteArray(config.mtu)
 
+    /** What the reader hands the game loop's thread. */
+    private sealed interface Inbound
+
     /** One datagram off the socket, and where it came from. */
-    private class Arrival(val source: InetSocketAddress, val bytes: ByteArray)
+    private class Arrival(val source: InetSocketAddress, val bytes: ByteArray) : Inbound
+
+    /**
+     * The reader has ended while this transport was open, the last thing it ever queues.
+     *
+     * [cause] is null when Ktor completed `incoming` normally, which is what Ktor 3.6.0 does when
+     * a read throws an `IOException`: it catches it and gives nobody the exception.
+     */
+    private class ReaderStopped(val cause: Throwable?) : Inbound
 
     /**
      * What the reader has taken off the socket and [poll] has not yet handled.
@@ -136,7 +150,7 @@ public class UdpTransport private constructor(
      * Bounded at [UdpConfig.maxReceivesPerPoll]: one poll's worth. See the class KDoc for what
      * happens beyond it.
      */
-    private val inbox = Channel<Arrival>(config.maxReceivesPerPoll)
+    private val inbox = Channel<Inbound>(config.maxReceivesPerPoll)
 
     /**
      * The datagram [handle] is reading, whole.
@@ -171,11 +185,26 @@ public class UdpTransport private constructor(
 
     init {
         io.launch {
-            for (datagram in socket.incoming) {
-                val bytes = datagram.packet.readByteArray()
-                inbox.send(Arrival(datagram.address as InetSocketAddress, bytes))
-                synchronized(arrivalLock) { arrivals++ }
+            val cause: Throwable? = try {
+                for (datagram in socket.incoming) {
+                    val bytes = datagram.packet.readByteArray()
+                    inbox.send(Arrival(datagram.address as InetSocketAddress, bytes))
+                    synchronized(arrivalLock) { arrivals++ }
+                }
+                null
+            } catch (cancelled: CancellationException) {
+                // This coroutine's own cancellation is `close`, and rethrows here. Anything else
+                // is `incoming` cancelled underneath a reader that is still meant to be reading.
+                currentCoroutineContext().ensureActive()
+                cancelled
+            } catch (error: Exception) {
+                error
             }
+            // Not swallowed, whichever way the loop ended: queued behind every datagram that
+            // arrived first, and turned into this transport's `failure` by the `poll` that reaches
+            // it. There is no restarting the read instead - Ktor starts its one receive loop when
+            // the socket is created, and a finished one cannot be run again.
+            inbox.send(ReaderStopped(cause))
         }
     }
 
@@ -217,8 +246,22 @@ public class UdpTransport private constructor(
     public val isConnected: Boolean
         get() = if (isServer) byAddress.isNotEmpty() else handshakeState == HandshakeState.Connected
 
-    /** Why a client's handshake ended, or null while it is still running or succeeded. */
+    /**
+     * Why a client's handshake or connection ended, or null while it is running or open.
+     *
+     * On a server, null unless the socket stopped delivering datagrams, which sets
+     * [DisconnectReason.ReceiveFailed] on either side: a server that cannot hear has no connection
+     * left to report it through once its clients are gone.
+     */
     public var failure: DisconnectReason? = null
+        private set
+
+    /**
+     * What the socket reader ended with, when [failure] is [DisconnectReason.ReceiveFailed] and it
+     * ended on an exception. Null otherwise, including the usual case of Ktor ending the read
+     * quietly. Kept for the person reading [failure], as `WebSocketTransport.failureCause` is.
+     */
+    internal var failureCause: Throwable? = null
         private set
 
     /** Largest message [send] will accept, after which it throws. */
@@ -289,12 +332,37 @@ public class UdpTransport private constructor(
         var delivered = 0
         var taken = 0
         while (taken < config.maxReceivesPerPoll) {
-            val arrival = inbox.tryReceive().getOrNull() ?: break
+            val inbound = inbox.tryReceive().getOrNull() ?: break
             taken++
-            received = arrival.bytes
-            delivered += handle(arrival.source, arrival.bytes.size, sink)
+            when (inbound) {
+                is Arrival -> {
+                    received = inbound.bytes
+                    delivered += handle(inbound.source, inbound.bytes.size, sink)
+                }
+                is ReaderStopped -> onReaderStopped(inbound.cause)
+            }
         }
         return delivered
+    }
+
+    /**
+     * The socket will deliver nothing more, and this transport is not closed: fail it, loudly.
+     *
+     * Counted, recorded as [failure], and every connection is retired with
+     * [DisconnectReason.ReceiveFailed] so the listener hears it now. Left alone, a client would
+     * be timed out as though the server had gone quiet - the wrong reason, [UdpConfig.timeoutTicks]
+     * late - and a server would drop every client that way and then accept nobody, for ever,
+     * with nothing to say why. The socket is not closed here: [close] stays the caller's.
+     */
+    private fun onReaderStopped(cause: Throwable?) {
+        counters.receiveErrors++
+        failureCause = cause
+        for (connection in byPeer) if (connection != null) retire(connection, DisconnectReason.ReceiveFailed)
+        if (isServer) {
+            failure = DisconnectReason.ReceiveFailed
+        } else if (handshakeState != HandshakeState.Failed) {
+            failHandshake(DisconnectReason.ReceiveFailed)
+        }
     }
 
     override fun stats(peer: PeerId): TransportStats =
@@ -594,23 +662,25 @@ public class UdpTransport private constructor(
             return 0
         }
         if (handshakeState == HandshakeState.Connected) return 0
-        val reason = DisconnectReason.of(received[UdpLayout.DENIED_REASON].toInt() and 0xFF)
-        handshakeState = HandshakeState.Failed
-        failure = reason
         counters.handshakesDenied++
-        listener.onDisconnected(PeerId.SERVER, reason)
+        failHandshake(DisconnectReason.of(received[UdpLayout.DENIED_REASON].toInt() and 0xFF))
         return 0
     }
 
     private fun advanceHandshake(now: Tick) {
         if (handshakeState == HandshakeState.Connected || handshakeState == HandshakeState.Failed) return
         if (now >= handshakeDeadline) {
-            handshakeState = HandshakeState.Failed
-            failure = DisconnectReason.HandshakeTimeout
-            listener.onDisconnected(PeerId.SERVER, DisconnectReason.HandshakeTimeout)
+            failHandshake(DisconnectReason.HandshakeTimeout)
             return
         }
         if (now >= nextHandshakeSendAt) sendHandshake(now)
+    }
+
+    /** Ends a client's handshake that has no connection yet to retire, and tells the listener. */
+    private fun failHandshake(reason: DisconnectReason) {
+        handshakeState = HandshakeState.Failed
+        failure = reason
+        listener.onDisconnected(PeerId.SERVER, reason)
     }
 
     /**

@@ -88,6 +88,13 @@ public enum class DisconnectReason(internal val id: Int) {
      * tell it from silence and reports [HandshakeTimeout].
      */
     Unreachable(7),
+
+    /**
+     * This end's socket stopped delivering datagrams while the transport was still open, so it
+     * can no longer hear any peer (issue #220). Local: never sent in a denial, and a build that
+     * does not know the id reads it as [Timeout].
+     */
+    ReceiveFailed(8),
     ;
 
     internal companion object {

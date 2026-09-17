@@ -2,7 +2,7 @@
 
 ## kmp baseline
 
-SHA `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -25,6 +25,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - #219: issue had no acceptance criteria; lead set them (root cause named, deterministic straddle test red on origin/kmp, >=20 runUdpProof runs reported).
 - CI checked: kmp run 35175857880 (7073adc) budget base = first parent 25cc650, ratio 1.030. Migration ledger + determinism jobs now green. Windows latency `CharacterMoverBudgetTest` (median 7.3ms vs 4ms) failed once, rerun green: flake. Whole run green.
 - #217: merged `303abe7`, round 1 PASS (no findings). DET001 gains TimeSource.Monotonic + mark elapsedNow/hasPassedNow; DET003 gains kotlin.time/kotlinx.datetime Clock.System. udeaVerifyGasTime kept (not equivalent). Dropped as cards (commented on #217, audit row): inlined-code spans past EOF; klib-only source sets unscanned. Worktree kept: `.claude/worktrees/agent-ab6b17f2ef1d868c5`. #215 now free of #217 collision.
+- #193: merged `fcdeb63`, round 1 PASS (no findings). Cherry-picked pre-restart branch onto KMP; editor toolset commonMain; editor.save via kotlinx-io (udea-agent api dep), browser host gets typed no_level_store. Live runs need `-Pudea.render.mode=Headless` on this box. Dropped cards: entity_gone-after-rewind test, unit test normal run hides editor.*. Worktree kept: `.claude/worktrees/agent-a95a8d0403add24ba`. #194 still needs #210/#211/#212.
 
 ## Wave 5 (2026-09-17): done
 

@@ -6,6 +6,7 @@ import dev.wildware.udea.core.host.RenderMode
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -30,7 +31,7 @@ class AgentHostContractTest {
             assertEquals(200, response.statusCode())
             assertEquals(
                 """{"ok":true,"frame":1,"tick":412,"paused":false,"renderMode":"Offscreen",""" +
-                    """"role":"standalone","sessionId":"s-test"}""",
+                    """"role":"standalone","sessionId":"s-test","editor":false}""",
                 response.body(),
             )
         }
@@ -47,6 +48,27 @@ class AgentHostContractTest {
         }
         HostHarness(mode = RenderMode.Windowed).use { harness ->
             assertContains(harness.get("/health").body(), """"renderMode":"Windowed"""")
+        }
+    }
+
+    /** Issue #193: an agent learns from `/health` whether `editor.*` is live before calling it. */
+    @Test
+    fun `health reports whether the editor is running`() {
+        HostHarness(editor = true).use { harness ->
+            assertContains(harness.get("/health").body(), """"editor":true""")
+        }
+        HostHarness().use { harness ->
+            assertContains(harness.get("/health").body(), """"editor":false""")
+        }
+    }
+
+    @Test
+    fun `the editor switch reads true, false or absent and refuses anything else`() {
+        assertEquals(true, EditorMode.resolve { if (it == EditorMode.PROPERTY) "true" else null })
+        assertEquals(false, EditorMode.resolve { if (it == EditorMode.PROPERTY) "false" else null })
+        assertEquals(false, EditorMode.resolve { null })
+        assertFailsWith<IllegalArgumentException> {
+            EditorMode.resolve { if (it == EditorMode.PROPERTY) "yes" else null }
         }
     }
 

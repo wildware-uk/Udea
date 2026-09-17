@@ -279,6 +279,10 @@ tasks.register<JavaExec>("run") {
     systemProperty("udea.assets.root", layout.projectDirectory.dir("assets").asFile.absolutePath)
     systemProperty("udea.repoRoot", rootProject.layout.projectDirectory.asFile.absolutePath)
 
+    // `-Peditor=true` starts this instance as a level editor: the `editor.*` tools are registered
+    // and `/health` says `"editor":true` (issue #193). Absent is a normal run, which has neither.
+    providers.gradleProperty("editor").orNull?.let { systemProperty("udea.editor", it) }
+
     // A `CommandLineArgumentProvider` and not a `systemProperty`, because resolving a
     // configuration during configuration is a configuration-cache failure and because the
     // resolved classpath must be this invocation's rather than whichever one stored the cache.

@@ -36,9 +36,14 @@ public class AgentCommand(
      *
      * Defaulted, so every existing construction site - `SimHarness`, the barrier tests, the
      * codegen fixtures - keeps compiling and lands under [AgentSessionId.LOCAL]. It is
-     * deliberately **not** an entry in [args]: a tool must never be able to read it, or an
-     * agent could branch on which session it is, and the overlay's whole premise is that the
-     * agent cannot see the overlay's inputs.
+     * deliberately **not** an entry in [args]: an agent cannot send it as an argument and read
+     * it back, or it could branch on which session it is, and the overlay's whole premise is
+     * that the agent cannot see the overlay's inputs.
+     *
+     * One toolset does read it, through `AgentContext.command`, and only to *file* a call:
+     * `editor.*` keeps one undo history per author (issue #193), and this is the author. Who
+     * asked decides which history an edit is filed in and an undo reads from, and which author a
+     * refused undo names; it changes nothing else about an answer.
      */
     public val session: AgentSessionId = AgentSessionId.LOCAL,
 ) {

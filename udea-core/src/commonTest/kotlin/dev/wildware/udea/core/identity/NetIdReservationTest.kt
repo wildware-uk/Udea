@@ -166,4 +166,41 @@ class NetIdReservationTest {
         )
         assertEquals(0, index.liveCount)
     }
+
+    /**
+     * [NetIdIndex.detach]: the editor's delete (issue #193), which must be undoable under the
+     * same id. The id goes back to being a reservation, so nothing else can take its index and
+     * [NetIdIndex.attach] can put an entity back behind it.
+     */
+    @Test
+    fun `a detached id stops resolving, keeps its index, and attaches back under the same id`() {
+        val index = NetIdIndex(capacity = 8, entityCapacity = 8)
+        val entity = Entity(2, version = 0u)
+        val id = index.allocate(entity)
+
+        assertEquals(entity, index.detach(id))
+
+        assertNull(index.resolveOrNull(id), "a detached id must not resolve")
+        assertEquals(NetId.NONE, index.netIdOf(entity))
+        assertTrue(index.isOutstandingReservation(id))
+        val other = index.allocate(Entity(5, version = 0u))
+        assertTrue(other.index != id.index, "the detached index was handed out again as $other")
+
+        val restored = Entity(6, version = 0u)
+        index.attach(restored, id)
+        assertEquals(restored, index.resolveOrNull(id))
+        assertEquals(id, index.netIdOf(restored))
+        assertEquals(0, index.reservedCount)
+    }
+
+    @Test
+    fun `detaching an id that does not resolve changes nothing`() {
+        val index = NetIdIndex(capacity = 8, entityCapacity = 8)
+        val id = index.allocate(Entity(1, version = 0u))
+        index.free(id)
+
+        assertNull(index.detach(id))
+        assertEquals(0, index.reservedCount)
+        assertEquals(0, index.liveCount)
+    }
 }

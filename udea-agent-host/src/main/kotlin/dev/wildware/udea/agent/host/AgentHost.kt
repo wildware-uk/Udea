@@ -130,6 +130,9 @@ public class AgentHost private constructor(
      * none ever may - a bridge that ignores them would then silently get different semantics from
      * one that does not, and `SessionAdditiveTest` drives a parser that knows neither key.
      *
+     * `editor` is additive too: `true` when this instance was started as a level editor and has
+     * the `editor.*` toolset registered, so an agent knows those tools are live before calling one.
+     *
      * Discovery sweeps this across a whole port range, so it reads five atomics and allocates one
      * short string. Nothing here can block.
      */
@@ -145,6 +148,7 @@ public class AgentHost private constructor(
                 put("renderMode", config.renderMode.name)
                 put("role", config.session.role.id)
                 put("sessionId", config.session.sessionId.value)
+                put("editor", config.editor)
             },
         )
     }
@@ -620,6 +624,13 @@ public class AgentHostConfig(
      * costs one map entry per distinct caller and keeps the wiring identical in both cases.
      */
     public val sessions: AgentSessions = AgentSessions(),
+    /**
+     * Whether this instance was started as a level editor, reported by `/health` as `editor`.
+     *
+     * A statement about the tool index the host built, not a switch: the host that registers the
+     * `editor.*` toolset passes `true`, and one that does not passes nothing. See [EditorMode].
+     */
+    public val editor: Boolean = false,
 ) {
     init {
         require(port >= 0 && port <= AgentHostGate.MAX_PORT) {

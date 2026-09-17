@@ -171,6 +171,32 @@ public class NetIdIndex(
     }
 
     /**
+     * Takes the entity out from behind a live [netId] and leaves the id an outstanding reservation.
+     *
+     * The inverse of [attach], for a deletion that must be undoable under the **same** id: the
+     * editor's `editor.delete` (issue #193). [free] would bump the generation and queue the index
+     * for recycling, so an undo could only ever bring the entity back under a different id, and
+     * every reference another entity or an agent holds to it would read stale.
+     *
+     * While detached the id behaves as a reservation does everywhere: it resolves to `null`,
+     * [forEachLive] skips it, [allocate] and [reserve] never hand its index out, and [saveInto]
+     * records it as free with a bumped generation - so a snapshot or a level taken meanwhile does
+     * not contain the deleted entity. [attach] puts an entity back behind it; [free] gives it up
+     * for good.
+     *
+     * @return the entity that was behind [netId], or `null` - changing nothing - when [netId] did
+     *   not resolve to a live entity.
+     */
+    public fun detach(netId: NetId): Entity? {
+        val entity = resolveOrNull(netId) ?: return null
+        val entityId = entity.id
+        if (entityId < reverse.size && reverse[entityId] == netId.raw) reverse[entityId] = NONE_RAW
+        entities[netId.index] = null
+        reservedCount++
+        return entity
+    }
+
+    /**
      * True if [netId] is a [reserve]d index that no entity has been [attach]ed to yet.
      *
      * The predicate form of what [attach] checks, so a caller holding a reservation from an

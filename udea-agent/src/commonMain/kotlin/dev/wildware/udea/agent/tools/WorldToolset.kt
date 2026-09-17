@@ -18,8 +18,6 @@ import dev.wildware.udea.annotations.AgentTool
 import dev.wildware.udea.annotations.Arg
 import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
-import dev.wildware.udea.core.blueprint.SpawnPosition
-import dev.wildware.udea.core.blueprint.SpawnRequest
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.replication.MaskOps
@@ -285,7 +283,7 @@ public class WorldToolset(
         component: String,
     ): AgentResult {
         val netId = id
-        val entity = requireEntity(netId)
+        val entity = netIds.requireLive(netId)
         val type = components.requireByName(component)
         if (!type.isPresent(world, entity)) {
             throw AgentToolException(
@@ -362,27 +360,15 @@ public class WorldToolset(
         value: String,
     ): AgentResult {
         val netId = id
-        val entity = requireEntity(netId)
+        val entity = netIds.requireLive(netId)
         val type = components.requireByName(component)
-        val fieldIndex = type.fieldIndexOf(field)
-        if (fieldIndex < 0) {
-            throw AgentToolException(
-                AgentErrorKind.NO_SUCH_FIELD,
-                "${type.name} has no field $field; it has " + type.fieldNames.joinToString(),
-            )
-        }
+        val fieldIndex = type.requireFieldIndex(field)
         if (!type.isAgentWritable(fieldIndex)) {
             return AgentResult.failed(FIELD_NOT_WRITABLE, refusalFor(type, field))
         }
 
         val current = type.read(world, entity, fieldIndex)
-        val parsed = FieldValues.parse(current, value)
-            ?: throw AgentToolException(
-                AgentErrorKind.BAD_ARGUMENT,
-                "world.set_component_field got value=$value for ${type.name}.$field, " +
-                    "which holds ${FieldValues.typeNameOf(current)}",
-            )
-        type.write(world, entity, fieldIndex, parsed)
+        type.write(world, entity, fieldIndex, parseFieldText("world.set_component_field", type, fieldIndex, current, value))
         audit("set_component_field", netId, "${type.name}.$field=$value")
 
         return AgentResult.ok {
@@ -417,20 +403,7 @@ public class WorldToolset(
         y: Float?,
     ): AgentResult {
         val name = blueprint
-        val spawner = this.spawner ?: return AgentResult.failed(
-            NO_SPAWNER,
-            "this game has no BlueprintSpawner wired, so nothing can be spawned; a spawner " +
-                "needs the game's SpawnPlacement, which names its spatial component",
-        )
-        val found = catalog.find(name) ?: return AgentResult.failed(
-            NO_SUCH_BLUEPRINT,
-            "no blueprint named $name; ${didYouMean(name)}",
-        )
-        // Either coordinate present means a placement was asked for; the missing half is 0,
-        // which is what the old `command.float("x")` did when only `y` was sent - except that
-        // one threw instead.
-        val position = if (x == null && y == null) null else SpawnPosition(x ?: 0f, y ?: 0f)
-        val netId = spawner.spawnNow(world, SpawnRequest(found, position))
+        val netId = catalog.spawnNow(world, spawner, name, x, y)
         audit("spawn_blueprint", netId, name)
         return AgentResult.ok {
             put("id", netId.raw)
@@ -466,12 +439,6 @@ public class WorldToolset(
 
     // --- shared --------------------------------------------------------------------------
 
-    private fun requireEntity(netId: NetId) = netIds.resolveOrNull(netId) ?: throw AgentToolException(
-        AgentErrorKind.NO_SUCH_ENTITY,
-        "no live entity for NetId #${netId.index}@${netId.generation}; it has been destroyed, " +
-            "or its slot has been recycled since the id was issued",
-    )
-
     private fun maskOf(component: AgentComponentType, fieldIndex: Int): String = when {
         MaskOps.test(component.replicator.netMask, fieldIndex) -> "net"
         MaskOps.test(component.replicator.allMask, fieldIndex) -> "sim"
@@ -498,12 +465,6 @@ public class WorldToolset(
             "the default on @Net, so an agent write is opt-in per field; $instead"
     }
 
-    private fun didYouMean(name: String): String {
-        if (catalog.names.isEmpty()) return "this game's blueprint catalogue is empty"
-        val nearest = catalog.names.minByOrNull { editDistance(name, it) }
-        return "did you mean $nearest? (world.list_blueprints has all ${catalog.names.size})"
-    }
-
     private fun audit(tool: String, netId: NetId, detail: String) {
         mutations++
         bridge.event(
@@ -517,11 +478,12 @@ public class WorldToolset(
     public companion object {
 
         /**
-         * The one description four tools share, and the reason it is a constant.
+         * The one description every tool taking an entity id shares, `world.*` and `editor.*`
+         * alike, and the reason it is a constant.
          *
          * `@Arg(description)` is an annotation argument, so it has to be a compile-time
-         * constant - a `val` here is one, a function call is not. Four tools take the same
-         * entity id and a model reads all four; four hand-copied sentences would drift.
+         * constant - a `val` here is one, a function call is not. A model reads every one of
+         * those tools, and hand-copied sentences would drift.
          */
         internal const val ID_DESCRIPTION: String =
             "The entity's packed NetId, generation included, exactly as a query returned it."
@@ -563,28 +525,5 @@ public class WorldToolset(
             "tags" to "gas.apply_effect",
         )
 
-        /**
-         * Levenshtein distance, iterative and over one row.
-         *
-         * Blueprint names are short and a catalogue is tens of entries, so this runs once on a
-         * failed spawn and never on a hot path. It is here rather than borrowed because
-         * `udea-assets`, which owns the build-time validator's did-you-mean, does not exist yet
-         * - and when it does, this whole answer moves there under its rule id.
-         */
-        private fun editDistance(a: String, b: String): Int {
-            var previous = IntArray(b.length + 1) { it }
-            var current = IntArray(b.length + 1)
-            for (i in 1..a.length) {
-                current[0] = i
-                for (j in 1..b.length) {
-                    val substitution = previous[j - 1] + if (a[i - 1] == b[j - 1]) 0 else 1
-                    current[j] = minOf(current[j - 1] + 1, previous[j] + 1, substitution)
-                }
-                val swap = previous
-                previous = current
-                current = swap
-            }
-            return previous[b.length]
-        }
     }
 }

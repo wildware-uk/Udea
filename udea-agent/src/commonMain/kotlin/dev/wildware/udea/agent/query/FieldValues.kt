@@ -1,0 +1,112 @@
+package dev.wildware.udea.agent.query
+
+import dev.wildware.udea.agent.Json
+import dev.wildware.udea.core.Tick
+import dev.wildware.udea.core.identity.NetId
+
+/**
+ * How a boxed field value from `Replicator.getField` is compared and rendered.
+ *
+ * One place, because the query engine and `describe_entity` must agree: an agent that filters
+ * on `target=131073` and then reads `"target":131073` back has a coherent picture, and one that
+ * reads `"target":"NetId(#1@2)"` has to reverse-engineer a `toString`.
+ *
+ * ## Entity references render as their packed word
+ *
+ * A [NetId] is written as `raw`, the 32-bit index-plus-generation word, and never as its index
+ * alone. That is the whole reason the generation exists: an id an agent stores and sends back
+ * ten seconds later must be *detectably* stale rather than silently addressing whatever now
+ * occupies the slot. Rendering the index alone would throw the generation away at the surface
+ * where staleness is most likely.
+ */
+internal object FieldValues {
+
+    /** [value] as a number, or `null` when it is not one. */
+    fun numericOrNull(value: Any?): Double? = when (value) {
+        is Float -> value.toDouble()
+        is Double -> value
+        is Int -> value.toDouble()
+        is Long -> value.toDouble()
+        is Short -> value.toDouble()
+        is Byte -> value.toDouble()
+        is NetId -> value.raw.toDouble()
+        is Tick -> value.value.toDouble()
+        else -> null
+    }
+
+    /** [value] as the text an `=` comparison uses. */
+    fun textOf(value: Any?): String = when (value) {
+        null -> "null"
+        is String -> value
+        is Boolean -> if (value) "true" else "false"
+        is NetId -> value.raw.toString()
+        is Tick -> value.value.toString()
+        is Enum<*> -> value.name
+        else -> value.toString()
+    }
+
+    /**
+     * [text] coerced to the type [current] already holds, or `null` when it will not convert.
+     *
+     * The field's declared type is not available here - `Replicator` carries field *names* and
+     * a mask, not a type table - so the value that is already in the slot is what says what the
+     * slot holds. That is exact for every type this surface can write, and it is why
+     * `set_component_field` reads before it writes rather than guessing from the text: `"1"` is
+     * a perfectly good Int, Long, Float and String, and writing the wrong one of those into a
+     * component is a corruption nothing downstream reports.
+     *
+     * Returns `null` rather than throwing so the caller can name the tool, the field and the
+     * supplied text in one typed `bad_argument` - which is the whole of what fixes the call.
+     */
+    fun parse(current: Any?, text: String): Any? = when (current) {
+        is Float -> text.toFloatOrNull()
+        is Double -> text.toDoubleOrNull()
+        is Int -> text.toIntOrNull()
+        is Long -> text.toLongOrNull()
+        is Short -> text.toShortOrNull()
+        is Byte -> text.toByteOrNull()
+        is Boolean -> when (text) {
+            "true", "1" -> true
+            "false", "0" -> false
+            else -> null
+        }
+        is String -> text
+        is NetId -> text.toIntOrNull()?.let(NetId::ofRaw)
+        is Tick -> text.toLongOrNull()?.let(::Tick)
+        // An enum constant by name, never by ordinal: an ordinal is a number that silently
+        // means something else the moment a constant is inserted.
+        is Enum<*> -> enumConstantsOf(current)?.firstOrNull { it.name == text }
+        // Null tells us nothing about the slot, and neither does a reference-typed value we
+        // have no constructor for.
+        else -> null
+    }
+
+    /** What [current] is, for a `bad_argument` message. `nothing` when the slot reads null. */
+    fun typeNameOf(current: Any?): String = when (current) {
+        null -> "nothing this surface can type a write against"
+        is Enum<*> -> enumConstantsOf(current)?.let { constants -> "one of ${constants.joinToString { it.name }}" }
+            ?: "a ${current::class.simpleName} constant, which this platform cannot list"
+        else -> current::class.simpleName ?: "a value of an unnamed type"
+    }
+
+    /** Writes [value] as a JSON value, using the narrowest honest representation. */
+    fun renderInto(json: Json, value: Any?) {
+        when (value) {
+            null -> json.value(null as String?)
+            is Float -> json.value(value)
+            is Double -> json.value(value.toFloat())
+            is Int -> json.value(value)
+            is Long -> json.value(value)
+            is Short -> json.value(value.toInt())
+            is Byte -> json.value(value.toInt())
+            is Boolean -> json.value(value)
+            is String -> json.value(value)
+            is NetId -> json.value(value.raw)
+            is Tick -> json.value(value.value)
+            is Enum<*> -> json.value(value.name)
+            // A reference-typed field. `FieldKind.Object` requires a stable, value-based
+            // toString-able type, so this is a readable answer rather than an address.
+            else -> json.value(value.toString())
+        }
+    }
+}

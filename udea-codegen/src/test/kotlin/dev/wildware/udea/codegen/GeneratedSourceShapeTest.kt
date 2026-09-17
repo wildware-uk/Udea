@@ -134,6 +134,24 @@ class GeneratedSourceShapeTest {
     }
 
     @Test
+    fun `no generated source names a JVM-only type, so it compiles in common code`() {
+        // Issue #208: `udea-agent` runs this processor over `commonMain`, where a `java.*`
+        // reference does not resolve. Nothing in the generated code needs one - every type it
+        // names has a Kotlin counterpart - so one appearing is a portability defect in the
+        // emitter, found here rather than in the next multiplatform module's metadata compile.
+        val offenders = GeneratedSources.files.flatMap { file ->
+            file.readLines().mapIndexedNotNull { index, line ->
+                "${file.name}:${index + 1}: ${line.trim()}".takeIf { JVM_ONLY.containsMatchIn(line) }
+            }
+        }
+        assertEquals(emptyList(), offenders, "JVM-only types in generated code:\n$offenders")
+        // The control: the pattern has to match the shape it exists to catch, and not a Kotlin
+        // package that merely contains the letters.
+        assertTrue(JVM_ONLY.containsMatchIn("import java.lang.UnsupportedOperationException"))
+        assertTrue(!JVM_ONLY.containsMatchIn("import kotlin.UnsupportedOperationException"))
+    }
+
+    @Test
     fun `the reflection exemption is one property on the agent surface and nothing else`() {
         // The exemption below is the only hole in the ban, so its size is asserted rather than
         // trusted. A `Replicator` must never take it - the whole rationale for banning `::class`
@@ -199,6 +217,9 @@ class GeneratedSourceShapeTest {
             Regex("""import kotlin\.reflect\.KClass"""),
             Regex("""\s*override val owner: KClass<\*> = [A-Za-z_][A-Za-z0-9_.]*::class"""),
         )
+
+        /** A `java.` or `javax.` package reference: unresolvable in a `commonMain` source set. */
+        val JVM_ONLY: Regex = Regex("""\bjavax?\.[a-z]""")
 
         val BANNED: List<Pair<Regex, String>> = listOf(
             Regex("""::class""") to "reflection",

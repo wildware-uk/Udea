@@ -39,6 +39,12 @@ package dev.wildware.udea.codegen
  *   `udeaModule` from the resolved graph (issue #202). Required whenever [moduleName] is set,
  *   because a module that set its name by hand publishes no module attribute and no launcher
  *   would ever list it.
+ * @param sourceSet the one source set a **platform** KSP run of a multiplatform module processes,
+ *   by name - `jvmMain`. KSP hands a per-target run the common sources as well as the target's
+ *   own, so a module that runs the processor over `commonMain` and also declares an `@AgentTool`
+ *   in a platform source set would get every common declaration generated twice. Set, the run
+ *   processes only declarations under `src/<sourceSet>/` and writes none of the module-level
+ *   files - registries, lock, manifest - which belong to the common run (issue #208).
  */
 internal data class CodegenOptions(
     val moduleName: String?,
@@ -47,6 +53,7 @@ internal data class CodegenOptions(
     val toolModuleService: String?,
     val stateModuleService: String?,
     val registryModules: List<String>? = null,
+    val sourceSet: String? = null,
 ) {
     companion object {
         const val MODULE_NAME: String = "udea.moduleName"
@@ -68,6 +75,12 @@ internal data class CodegenOptions(
          * [NET_MODULE_SERVICE] follows and the opposite of the classpath scan being retired.
          */
         const val PROJECT_COMPONENTS: String = "udea.projectComponents"
+
+        /** See [sourceSet]. */
+        const val SOURCE_SET: String = "udea.sourceSet"
+
+        /** A Gradle source set name: `jvmMain`, `androidMain`. Never a path. */
+        val SOURCE_SET_FORMAT: Regex = Regex("[a-z][A-Za-z0-9]*")
 
         /** How [PROJECT_COMPONENTS] separates names; a FQN can never contain one. */
         const val LIST_SEPARATOR: Char = ','
@@ -94,6 +107,7 @@ internal data class CodegenOptions(
                 ?.split(LIST_SEPARATOR)
                 ?.map(String::trim)
                 ?.filter(String::isNotEmpty),
+            sourceSet = options[SOURCE_SET]?.takeIf(String::isNotBlank),
         )
     }
 }

@@ -102,6 +102,8 @@ same reason, through `udea-core`. `udea-net` is too (issue #209): its UDP transp
 and `android` through a shared `socketMain` source set, and `wasmJs` has the WebSocket client only.
 `udea-audio` is too (issue #207): the `AudioDevice` SPI, `AudioDevice.Silent` and the cue drain are
 `commonMain`, and a device that makes a noise is not in it on any target.
+`udea-agent` is too (issue #208): its tools and dispatcher are common, the `assets.*` toolset is
+`jvmMain` because the asset daemon is, and `udea-agent-host` stays JVM.
 Build-time modules stay on `udea.kotlin-library`. The module-graph gates govern each target's
 classpath as the JVM classpath it stands for. `sh gradlew :<module>:allTests` skips iOS off
 macOS; the `ios-tests` CI job runs it. The Android SDK comes from `ANDROID_HOME` or an

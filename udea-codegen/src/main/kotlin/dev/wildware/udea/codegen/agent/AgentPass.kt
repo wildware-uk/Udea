@@ -9,6 +9,7 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.squareup.kotlinpoet.FileSpec
 import dev.wildware.udea.codegen.AnnotationNames
+import dev.wildware.udea.codegen.SourceSetScope
 import dev.wildware.udea.diagnostics.UdeaRules
 
 /**
@@ -21,7 +22,10 @@ import dev.wildware.udea.diagnostics.UdeaRules
  * need the whole classpath belong to the runtime index the generated registry feeds, since
  * no KSP round ever sees more than one module.
  */
-internal class AgentPass(private val logger: KSPLogger) {
+internal class AgentPass(
+    private val logger: KSPLogger,
+    private val scope: SourceSetScope,
+) {
 
     private val toolModels = ToolModelBuilder(logger)
     private val stateModels = AgentStateBuilder(logger)
@@ -39,17 +43,19 @@ internal class AgentPass(private val logger: KSPLogger) {
 
     /** True when the round has no agent symbols at all, so nothing below needs running. */
     fun isEmpty(resolver: Resolver): Boolean =
-        resolver.getSymbolsWithAnnotation(AnnotationNames.AGENT_TOOL).none() &&
-            resolver.getSymbolsWithAnnotation(AnnotationNames.AGENT_STATE).none()
+        resolver.getSymbolsWithAnnotation(AnnotationNames.AGENT_TOOL).none(scope::admits) &&
+            resolver.getSymbolsWithAnnotation(AnnotationNames.AGENT_STATE).none(scope::admits)
 
     fun run(resolver: Resolver): Result {
         val functions = resolver.getSymbolsWithAnnotation(AnnotationNames.AGENT_TOOL)
+            .filter(scope::admits)
             .filterIsInstance<KSFunctionDeclaration>()
             // Sorted by FQN so the emitted set and its contents depend on the sources alone,
             // never on the order KSP happened to hand the symbols over.
             .sortedBy(::sortKey)
             .toList()
         val properties = resolver.getSymbolsWithAnnotation(AnnotationNames.AGENT_STATE)
+            .filter(scope::admits)
             .filterIsInstance<KSPropertyDeclaration>()
             .sortedBy(::sortKey)
             .toList()

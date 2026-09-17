@@ -104,7 +104,7 @@ public class ReplayFixtureStatus(
  * ## The convention is `--update-goldens`, not a second one
  *
  * `docs/engineering-standards.md` §5 names `--update-goldens`, and what is actually typed for it
- * is `./gradlew :udea-net:test -Dupdate.goldens=true` - Gradle has no `--update-goldens` option
+ * is `./gradlew :udea-net:jvmTest -Dupdate.goldens=true` - Gradle has no `--update-goldens` option
  * for a plain `Test` task, so the documented flag is a system property. This mirrors it exactly:
  * [UPDATE_FLAG] is what it is called and [UPDATE_PROPERTY] is what is typed, and
  * [requireCurrent] prints the typed form so nobody has to work out the mapping.

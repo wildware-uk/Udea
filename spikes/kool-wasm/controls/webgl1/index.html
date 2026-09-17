@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>WebGL 1 control</title>
+<style>body { margin: 0; background: black; } canvas { width: 100vw; height: 100vh; display: block; }</style></head>
+<body>
+<canvas id="glCanvas"></canvas>
+<script>
+// Control for draw-check.mjs: the same canvas id and the same ready line, but a WebGL 1 context,
+// cleared to a colour with a multicoloured square scissored into the centre, so only the WebGL 2
+// probe has a reason to fail.
+const c = document.getElementById('glCanvas');
+c.width = 800; c.height = 600;
+const gl = c.getContext('webgl', { preserveDrawingBuffer: true });
+gl.clearColor(0.05, 0.25, 0.3, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+gl.enable(gl.SCISSOR_TEST);
+[[1,0,0],[0,1,0],[0,0,1],[1,1,0]].forEach(([r,g,b], i) => {
+  gl.scissor(340 + (i % 2) * 60, 240 + (i >> 1) * 60, 60, 60);
+  gl.clearColor(r, g, b, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+});
+console.log('KOOL_SPIKE_READY frames=0 backend=control api=' + gl.getParameter(gl.VERSION));
+</script>
+</body>
+</html>

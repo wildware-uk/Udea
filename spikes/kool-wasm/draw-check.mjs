@@ -5,7 +5,8 @@
 //     node draw-check.mjs <chrome binary> <dist dir> <out.png>
 //
 // Chrome DevTools Protocol over Node's built-in WebSocket; no npm packages. Exits non-zero, with
-// the reason, on every failure.
+// the reason, on every failure. `controls/webgl1` and `controls/webgl2` are two hand-written pages
+// that differ only in the context they ask for: pointed at them, this must fail and pass.
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -170,7 +171,7 @@ if (dist(corners[0], [0, 0, 0]) < 30) fail('the corners are black: the page back
 if (dist(centre, corners[0]) < 30) fail('the centre is the clear colour: the cube was not drawn');
 if (centreColours.size < 3) fail('fewer than 3 colours near the centre: not a vertex-coloured cube');
 
-console.log('DRAW CHECK OK: Kool drew on WebGL 2 in headless Chrome');
+console.log('DRAW CHECK OK: a WebGL 2 context, and a drawn scene in the screenshot');
 for (const c of cleanups.reverse()) c();
 ws.close();
 process.exit(0);

@@ -1,0 +1,280 @@
+
+== Kool at ab762acde2bac4f2c078a34da636e49423b11811
+
+== applying toolchain-21.patch
+Checking patch buildSrc/src/main/kotlin/kool.lib-conventions.gradle.kts...
+Checking patch buildSrc/src/main/kotlin/kool.androidlib-conventions.gradle.kts...
+Checking patch kool-core/build.gradle.kts...
+Applied patch buildSrc/src/main/kotlin/kool.lib-conventions.gradle.kts cleanly.
+Applied patch buildSrc/src/main/kotlin/kool.androidlib-conventions.gradle.kts cleanly.
+Applied patch kool-core/build.gradle.kts cleanly.
+ .../main/kotlin/kool.androidlib-conventions.gradle.kts | 18 +++++++++---------
+ .../src/main/kotlin/kool.lib-conventions.gradle.kts    |  2 +-
+ kool-core/build.gradle.kts                             |  6 +++---
+ 3 files changed, 13 insertions(+), 13 deletions(-)
+
+== Kool Gradle launched by openjdk version "21.0.11" 2026-04-21 LTS
+Parallel Configuration Cache is an incubating feature.
+Calculating task graph as configuration cache cannot be reused because an input to plugin class 'org.gradle.kotlin.dsl.plugins.precompiled.PrecompiledScriptPlugins' has changed.
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :buildSrc:generateExternalPluginSpecBuilders
+> Task :buildSrc:extractPrecompiledScriptPluginPlugins
+> Task :buildSrc:generateScriptPluginAdapters
+> Task :buildSrc:pluginDescriptors
+> Task :buildSrc:processResources
+> Task :buildSrc:compilePluginsBlocks
+> Task :buildSrc:generatePrecompiledScriptPluginAccessors
+> Task :buildSrc:compileKotlin
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:classes
+> Task :buildSrc:jar
+Configuration 'jsNpmAggregated' was resolved during configuration time.
+This is a build performance and scalability issue.
+See https://github.com/gradle/gradle/issues/2298
+Run with --info for a stacktrace.
+Configuration 'wasmJsNpmAggregated' was resolved during configuration time.
+This is a build performance and scalability issue.
+See https://github.com/gradle/gradle/issues/2298
+Run with --info for a stacktrace.
+> Task :kool-core:metadataCommonMainProcessResources NO-SOURCE
+> Task :kool-core:kmpPartiallyResolvedDependenciesChecker
+> Task :kool-core:androidPreBuild UP-TO-DATE
+> Task :kool-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :kool-core:preAndroidMainBuild UP-TO-DATE
+> Task :kool-core:checkAndroidMainAarMetadata
+> Task :kool-core:mergeAndroidMainJniLibFolders
+> Task :kool-core:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :kool-core:extractAndroidMainAnnotations
+> Task :kool-core:copyAndroidMainJniLibsProjectOnly
+> Task :kool-core:generateAndroidMainEmptyResourceFiles
+> Task :kool-core:androidSourcesJar
+> Task :kool-core:prepareAndroidMainArtProfile UP-TO-DATE
+> Task :kool-core:prepareLintJarForPublish UP-TO-DATE
+> Task :kool-core:writeAndroidMainAarMetadata
+> Task :kool-core:generatePomFileForAndroidPublication
+> Task :kool-core:generateDoubleAndIntVariants
+> Task :kool-core:processAndroidMainManifest
+> Task :kool-core:transformCommonMainDependenciesMetadata
+> Task :kool-core:desktopProcessResources
+> Task :kool-core:transformWebMainDependenciesMetadata
+> Task :kool-core:transformWasmJsMainDependenciesMetadata
+> Task :kool-core:processDesktopMainResources SKIPPED
+> Task :kool-core:generateDoubleOnlyVariants
+> Task :kool-core:generateTypeVariants
+> Task :kool-core:desktopSourcesJar
+> Task :kool-core:generatePomFileForDesktopPublication
+
+> Task :kool-core:compileCommonMainKotlinMetadata
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotlin/de/fabmax/kool/pipeline/deferred/PbrLightingPass.kt:8:33 'class DeferredPipeline : Any' is deprecated. Use Deferred2Pipeline instead.
+
+> Task :kool-core:metadataCommonMainClasses
+
+> Task :kool-core:compileKotlinJs
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotlin/de/fabmax/kool/pipeline/deferred/PbrLightingPass.kt:8:33 'class DeferredPipeline : Any' is deprecated. Use Deferred2Pipeline instead.
+
+> Task :kool-core:jsProcessResources NO-SOURCE
+> Task :kool-core:jsMainClasses
+> Task :kotlinKotlinNpmCachesSetup
+> Task :kool-core:jsPackageJson
+> Task :kool-core:jsPublicPackageJson
+> Task :kool-core:jsJar
+> Task :kool-core:jsSourcesJar
+> Task :kool-core:generateMetadataFileForJsPublication
+> Task :kool-core:generatePomFileForJsPublication
+> Task :kool-core:compileWebMainKotlinMetadata
+> Task :kool-core:generateProjectStructureMetadata
+> Task :kool-core:metadataWebMainProcessResources NO-SOURCE
+> Task :kool-core:metadataWebMainClasses
+> Task :kool-core:allMetadataJar
+> Task :kool-core:buildKotlinToolingMetadata
+> Task :kool-core:sourcesJar
+> Task :kool-core:generateMetadataFileForKotlinMultiplatformPublication
+> Task :kool-core:generatePomFileForKotlinMultiplatformPublication
+> Task :kool-core:compileAndroidMain
+> Task :kool-core:compileKotlinDesktop
+
+> Task :kool-core:compileAndroidMain
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/androidMain/kotlin/de/fabmax/kool/modules/audio/AudioOutput.android.kt:14:29 This class is not recommended for use in Kotlin. Use 'kotlin.Any' instead.
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotlin/de/fabmax/kool/pipeline/deferred/PbrLightingPass.kt:8:33 'class DeferredPipeline : Any' is deprecated. Use Deferred2Pipeline instead.
+
+> Task :kool-core:mergeAndroidMainGeneratedProguardFiles UP-TO-DATE
+> Task :kool-core:mergeAndroidMainConsumerProguardFiles UP-TO-DATE
+> Task :kool-core:processAndroidMainJavaRes
+> Task :kool-core:mergeAndroidMainJavaResource
+> Task :kool-core:syncAndroidMainLibJars
+> Task :kool-core:bundleAndroidMainAar
+> Task :kool-core:generateMetadataFileForAndroidPublication
+> Task :kool-core:wasmJsProcessResources NO-SOURCE
+> Task :kotlinWasmKotlinNpmCachesSetup
+> Task :kool-core:wasmJsPackageJson
+> Task :kool-core:wasmJsPublicPackageJson
+> Task :kool-core:wasmJsSourcesJar
+> Task :kool-core:generatePomFileForWasmJsPublication
+
+> Task :kool-core:compileKotlinDesktop
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotlin/de/fabmax/kool/pipeline/deferred/PbrLightingPass.kt:8:33 'class DeferredPipeline : Any' is deprecated. Use Deferred2Pipeline instead.
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/desktopMain/kotlin/de/fabmax/kool/modules/audio/AudioOutput.desktop.kt:13:29 This class is not recommended for use in Kotlin. Use 'kotlin.Any' instead.
+
+> Task :kool-core:compileDesktopMainJava NO-SOURCE
+> Task :kool-core:desktopMainClasses
+> Task :kool-core:desktopJar
+> Task :kool-core:generateMetadataFileForDesktopPublication
+> Task :kool-core:dokkaGeneratePublicationHtml
+
+> Task :kool-core:compileKotlinWasmJs
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotlin/de/fabmax/kool/pipeline/deferred/PbrLightingPass.kt:8:33 'class DeferredPipeline : Any' is deprecated. Use Deferred2Pipeline instead.
+
+> Task :kool-core:wasmJsMainClasses
+> Task :kool-core:wasmJsJar
+> Task :kool-core:generateMetadataFileForWasmJsPublication
+> Task :kool-core:logLinkDokkaGeneratePublicationHtml SKIPPED
+> Task :kool-core:jsDokkaJavadocJar
+> Task :kool-core:kotlinMultiplatformDokkaJavadocJar
+> Task :kool-core:desktopDokkaJavadocJar
+> Task :kool-core:publishJsPublicationToMavenLocal
+> Task :kool-core:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :kool-core:androidDokkaJavadocJar
+> Task :kool-core:publishDesktopPublicationToMavenLocal
+> Task :kool-core:publishAndroidPublicationToMavenLocal
+> Task :kool-core:wasmJsDokkaJavadocJar
+> Task :kool-core:publishWasmJsPublicationToMavenLocal
+> Task :kool-core:publishToMavenLocal
+
+[Incubating] Problems report is available at: file:///srv/ssd1/workspace/kool-spike-225/kool/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 1m 18s
+75 actionable tasks: 71 executed, 4 up-to-date
+Configuration cache entry stored.
+Kool Gradle build took 78s
+
+== published variants of kool-core
+kool-core
+kool-core-android
+kool-core-desktop
+kool-core-js
+kool-core-wasm-js
+
+== jvm (desktop): class-file major version
+de/fabmax/kool/KoolSystem.class: major version 65
+de/fabmax/kool/platform/Lwjgl3Context.class: major version 65
+
+== android: aar present, classes major version
+de/fabmax/kool/KoolSystem.class (aar): major version 55
+
+== wasmJs: klib present and built for wasm
+abi_version=2.4.0
+builtins_platform=WASM
+compiler_version=2.4.10
+metadata_version=2.4.0
+wasm_targets=wasm-js
+
+== consumer: Kotlin 2.4.20 on Udea's Gradle compiles jvm + wasmJs against the scratch repo
+
+> Configure project :
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Task :kmpPartiallyResolvedDependenciesChecker
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :kotlinWasmKotlinNpmCachesSetup
+> Task :kotlinWasmNodeJsSetup UP-TO-DATE
+> Task :kotlinWasmRestoreYarnLock
+> Task :kotlinWasmYarnSetup UP-TO-DATE
+> Task :wasmJsPackageJson
+> Task :wasmJsTestPackageJson
+> Task :wasmJsPublicPackageJson
+> Task :wasmJsTestPublicPackageJson
+> Task :kotlinWasmPackageJsonUmbrella
+> Task :wasmRootPackageJson
+> Task :compileKotlinJvm
+> Task :kotlinWasmNpmInstall
+> Task :kotlinWasmToolingSetup UP-TO-DATE
+> Task :kotlinWasmStoreYarnLock UP-TO-DATE
+> Task :wasmJsProcessResources
+> Task :kotlinWasmBinaryenSetup UP-TO-DATE
+> Task :compileKotlinWasmJs
+> Task :wasmJsMainClasses
+> Task :compileProductionExecutableKotlinWasmJs
+> Task :compileProductionExecutableKotlinWasmJsOptimize
+> Task :wasmJsProductionExecutableCompileSync
+
+> Task :wasmJsBrowserProductionWebpack
+asset size limit: The following asset(s) exceed the recommended size limit (244 KiB).
+This can impact web performance.
+Assets: 
+  c60812f9ffb59976be4e.wasm (919 KiB)
+webpack performance recommendations: 
+You can limit the size of your bundles by using import() or require.ensure to lazy load some parts of your application.
+For more info visit https://webpack.js.org/guides/code-splitting/
+asset c60812f9ffb59976be4e.wasm 919 KiB [emitted] [immutable] [from: kotlin/kool-wasm-spike.wasm] [big] (auxiliary name: main)
+asset kool-wasm-spike.js 38.6 KiB [emitted] [minimized] (name: main) 1 related asset
+runtime modules 4.83 KiB 7 modules
+orphan modules 2.05 KiB [orphan] 1 module
+cacheable modules 51.2 KiB (javascript) 919 KiB (asset)
+  ./kotlin/kool-wasm-spike.mjs 3.12 KiB [built] [code generated]
+  ./kotlin/kool-wasm-spike.import-object.mjs + 1 modules 48 KiB [built] [code generated]
+  ./kotlin/kool-wasm-spike.wasm 919 KiB (asset) 42 bytes (javascript) [built] [code generated]
+webpack 5.108.1 compiled with 2 warnings in 471 ms
+
+> Task :wasmJsBrowserDistribution
+
+[Incubating] Problems report is available at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-aee3e20c78d24843c/spikes/kool-wasm/consumer/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 26s
+22 actionable tasks: 17 executed, 5 up-to-date
+c60812f9ffb59976be4e.wasm
+index.html
+kool-wasm-spike.js
+kool-wasm-spike.js.map
+
+== browser: Google Chrome for Testing 153.0.8010.12 
+chrome flags: --headless=new --no-sandbox --no-first-run --no-default-browser-check --use-angle=swiftshader --enable-unsafe-swiftshader --window-size=800,600 --user-data-dir=/tmp/issue225-chrome-dKV7wV --remote-debugging-port=0 about:blank
+navigate: http://127.0.0.1:39163/index.html
+[console.log] D/GlImpl: Supported WebGL extensions:
+[console.log] D/GlImpl: - EXT_clip_control
+[console.log] D/GlImpl: - EXT_color_buffer_float
+[console.log] D/GlImpl: - EXT_color_buffer_half_float
+[console.log] D/GlImpl: - EXT_conservative_depth
+[console.log] D/GlImpl: - EXT_depth_clamp
+[console.log] D/GlImpl: - EXT_disjoint_timer_query_webgl2
+[console.log] D/GlImpl: - EXT_float_blend
+[console.log] D/GlImpl: - EXT_polygon_offset_clamp
+[console.log] D/GlImpl: - EXT_texture_compression_bptc
+[console.log] D/GlImpl: - EXT_texture_compression_rgtc
+[console.log] D/GlImpl: - EXT_texture_filter_anisotropic
+[console.log] D/GlImpl: - EXT_texture_mirror_clamp_to_edge
+[console.log] D/GlImpl: - NV_shader_noperspective_interpolation
+[console.log] D/GlImpl: - OES_draw_buffers_indexed
+[console.log] D/GlImpl: - OES_sample_variables
+[console.log] D/GlImpl: - OES_shader_multisample_interpolation
+[console.log] D/GlImpl: - OES_texture_float_linear
+[console.log] D/GlImpl: - OVR_multiview2
+[console.log] D/GlImpl: - WEBGL_clip_cull_distance
+[console.log] D/GlImpl: - WEBGL_compressed_texture_astc
+[console.log] D/GlImpl: - WEBGL_compressed_texture_etc
+[console.log] D/GlImpl: - WEBGL_compressed_texture_etc1
+[console.log] D/GlImpl: - WEBGL_compressed_texture_s3tc
+[console.log] D/GlImpl: - WEBGL_compressed_texture_s3tc_srgb
+[console.log] D/GlImpl: - WEBGL_debug_renderer_info
+[console.log] D/GlImpl: - WEBGL_debug_shaders
+[console.log] D/GlImpl: - WEBGL_lose_context
+[console.log] D/GlImpl: - WEBGL_multi_draw
+[console.log] D/GlImpl: - WEBGL_polygon_mode
+[console.log] D/GlImpl: - WEBGL_stencil_texturing
+[console.log] D/RenderBackendGlImpl: Setting depth range to zero-to-one
+[console.log] D/PlatformInputWasm: installed gamepad listeners
+[console.log] KOOL_SPIKE_READY frames=60 backend=WebGL api=WebGL 2.0
+page WebGL probe: {"webgl2":true,"webgl1Null":true,"version":"WebGL 2.0 (OpenGL ES 3.0 Chromium)","glsl":"WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)","renderer":"ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)","drawingBuffer":"800x600"}
+screenshot: /srv/ssd1/workspace/kool-spike-225/out/issue225-kool-wasm-webgl2-scene.png (4433 bytes)
+image 800x600; corners [[13,64,77],[13,64,77],[13,64,77],[13,64,77]]; centre [87,4,113]; distinct colours near centre: 4
+DRAW CHECK OK: a WebGL 2 context, and a drawn scene in the screenshot
+
+== OK: kool consumer browser
+exit=0

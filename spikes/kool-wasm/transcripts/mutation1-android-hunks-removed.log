@@ -1,0 +1,120 @@
+
+== Kool at ab762acde2bac4f2c078a34da636e49423b11811
+
+== applying toolchain-21.patch
+Checking patch buildSrc/src/main/kotlin/kool.lib-conventions.gradle.kts...
+Applied patch buildSrc/src/main/kotlin/kool.lib-conventions.gradle.kts cleanly.
+ buildSrc/src/main/kotlin/kool.lib-conventions.gradle.kts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+== Kool Gradle launched by openjdk version "21.0.11" 2026-04-21 LTS
+Starting a Gradle Daemon, 1 stopped Daemon could not be reused, use --status for details
+Parallel Configuration Cache is an incubating feature.
+Calculating task graph as configuration cache cannot be reused because an input to plugin class 'org.gradle.kotlin.dsl.plugins.precompiled.PrecompiledScriptPlugins' has changed.
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :buildSrc:generateExternalPluginSpecBuilders
+> Task :buildSrc:extractPrecompiledScriptPluginPlugins
+> Task :buildSrc:generateScriptPluginAdapters
+> Task :buildSrc:pluginDescriptors
+> Task :buildSrc:processResources
+> Task :buildSrc:compilePluginsBlocks
+> Task :buildSrc:generatePrecompiledScriptPluginAccessors
+> Task :buildSrc:compileKotlin
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:classes
+> Task :buildSrc:jar
+> Task :kool-core:kmpPartiallyResolvedDependenciesChecker
+> Task :kool-core:metadataCommonMainProcessResources NO-SOURCE
+> Task :kool-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :kool-core:desktopProcessResources
+> Task :kool-core:processDesktopMainResources SKIPPED
+> Task :kool-core:generateDoubleAndIntVariants
+> Task :kool-core:generateDoubleOnlyVariants
+> Task :kool-core:generateTypeVariants
+> Task :kool-core:desktopSourcesJar
+> Task :kool-core:transformCommonMainDependenciesMetadata
+> Task :kool-core:generatePomFileForDesktopPublication
+> Task :kool-core:transformWebMainDependenciesMetadata
+> Task :kool-core:transformWasmJsMainDependenciesMetadata
+> Task :kool-core:jsProcessResources NO-SOURCE
+> Task :kotlinKotlinNpmCachesSetup
+> Task :kool-core:jsPackageJson
+> Task :kool-core:jsPublicPackageJson
+> Task :kool-core:jsSourcesJar
+> Task :kool-core:generatePomFileForJsPublication
+> Task :kool-core:generateProjectStructureMetadata
+> Task :kool-core:metadataWebMainProcessResources NO-SOURCE
+> Task :kool-core:buildKotlinToolingMetadata
+> Task :kool-core:sourcesJar
+> Task :kool-core:generatePomFileForKotlinMultiplatformPublication
+
+> Task :kool-core:compileCommonMainKotlinMetadata
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotlin/de/fabmax/kool/pipeline/deferred/PbrLightingPass.kt:8:33 'class DeferredPipeline : Any' is deprecated. Use Deferred2Pipeline instead.
+
+> Task :kool-core:metadataCommonMainClasses
+> Task :kool-core:compileKotlinDesktop
+> Task :kool-core:compileKotlinJs
+> Task :kool-core:compileKotlinWasmJs
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotlin/de/fabmax/kool/pipeline/deferred/PbrLightingPass.kt:8:33 'class DeferredPipeline : Any' is deprecated. Use Deferred2Pipeline instead.
+
+> Task :kool-core:compileKotlinJs
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotlin/de/fabmax/kool/pipeline/deferred/PbrLightingPass.kt:8:33 'class DeferredPipeline : Any' is deprecated. Use Deferred2Pipeline instead.
+
+> Task :kool-core:jsMainClasses
+> Task :kool-core:jsJar
+> Task :kool-core:generateMetadataFileForJsPublication
+> Task :kool-core:wasmJsProcessResources NO-SOURCE
+> Task :kool-core:wasmJsMainClasses
+> Task :kotlinWasmKotlinNpmCachesSetup
+> Task :kool-core:wasmJsPackageJson
+> Task :kool-core:wasmJsPublicPackageJson
+> Task :kool-core:wasmJsJar
+> Task :kool-core:wasmJsSourcesJar
+> Task :kool-core:generateMetadataFileForWasmJsPublication
+> Task :kool-core:generatePomFileForWasmJsPublication
+> Task :kool-core:compileWebMainKotlinMetadata
+> Task :kool-core:metadataWebMainClasses
+> Task :kool-core:allMetadataJar
+> Task :kool-core:generateMetadataFileForKotlinMultiplatformPublication
+
+> Task :kool-core:compileKotlinDesktop
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotlin/de/fabmax/kool/pipeline/deferred/PbrLightingPass.kt:8:33 'class DeferredPipeline : Any' is deprecated. Use Deferred2Pipeline instead.
+w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/desktopMain/kotlin/de/fabmax/kool/modules/audio/AudioOutput.desktop.kt:13:29 This class is not recommended for use in Kotlin. Use 'kotlin.Any' instead.
+
+> Task :kool-core:dokkaGeneratePublicationHtml
+> Task :kool-core:compileDesktopMainJava NO-SOURCE
+> Task :kool-core:desktopMainClasses
+> Task :kool-core:desktopJar
+> Task :kool-core:generateMetadataFileForDesktopPublication
+> Task :kool-core:logLinkDokkaGeneratePublicationHtml SKIPPED
+> Task :kool-core:desktopDokkaJavadocJar
+> Task :kool-core:kotlinMultiplatformDokkaJavadocJar
+> Task :kool-core:wasmJsDokkaJavadocJar
+> Task :kool-core:jsDokkaJavadocJar
+> Task :kool-core:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :kool-core:publishWasmJsPublicationToMavenLocal
+> Task :kool-core:publishDesktopPublicationToMavenLocal
+> Task :kool-core:publishJsPublicationToMavenLocal
+> Task :kool-core:publishToMavenLocal
+
+[Incubating] Problems report is available at: file:///srv/ssd1/workspace/kool-spike-225/kool/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 1m 46s
+54 actionable tasks: 54 executed
+Configuration cache entry stored.
+Kool Gradle build took 107s
+
+== published variants of kool-core
+kool-core
+kool-core-desktop
+kool-core-js
+kool-core-wasm-js
+
+== jvm (desktop): class-file major version
+de/fabmax/kool/KoolSystem.class: major version 65
+de/fabmax/kool/platform/Lwjgl3Context.class: major version 65
+
+== android: aar present, classes major version
+FAIL: no android aar at /srv/ssd1/workspace/kool-spike-225/m2/de/fabmax/kool/kool-core-android/0.20.0-SNAPSHOT/kool-core-android-0.20.0-SNAPSHOT.aar (upstream ships Android commented out)
+exit=1

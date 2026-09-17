@@ -1,0 +1,108 @@
+
+== consumer: Kotlin 2.4.20 on Udea's Gradle compiles jvm + wasmJs against the scratch repo
+
+> Configure project :
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Task :kmpPartiallyResolvedDependenciesChecker
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :kotlinWasmKotlinNpmCachesSetup
+> Task :kotlinWasmNodeJsSetup UP-TO-DATE
+> Task :kotlinWasmRestoreYarnLock
+> Task :kotlinWasmYarnSetup UP-TO-DATE
+> Task :wasmJsPackageJson
+> Task :wasmJsTestPackageJson
+> Task :wasmJsPublicPackageJson
+> Task :wasmJsTestPublicPackageJson
+> Task :kotlinWasmPackageJsonUmbrella
+> Task :wasmRootPackageJson
+> Task :compileKotlinJvm
+> Task :kotlinWasmNpmInstall
+> Task :kotlinWasmToolingSetup UP-TO-DATE
+> Task :kotlinWasmStoreYarnLock UP-TO-DATE
+> Task :wasmJsProcessResources
+> Task :kotlinWasmBinaryenSetup UP-TO-DATE
+> Task :compileKotlinWasmJs
+> Task :wasmJsMainClasses
+> Task :compileProductionExecutableKotlinWasmJs
+> Task :compileProductionExecutableKotlinWasmJsOptimize
+> Task :wasmJsProductionExecutableCompileSync
+
+> Task :wasmJsBrowserProductionWebpack
+asset size limit: The following asset(s) exceed the recommended size limit (244 KiB).
+This can impact web performance.
+Assets: 
+  e67c34454f3cca156914.wasm (919 KiB)
+webpack performance recommendations: 
+You can limit the size of your bundles by using import() or require.ensure to lazy load some parts of your application.
+For more info visit https://webpack.js.org/guides/code-splitting/
+asset e67c34454f3cca156914.wasm 919 KiB [emitted] [immutable] [from: kotlin/kool-wasm-spike.wasm] [big] (auxiliary name: main)
+asset kool-wasm-spike.js 38.6 KiB [emitted] [minimized] (name: main) 1 related asset
+runtime modules 4.83 KiB 7 modules
+orphan modules 2.05 KiB [orphan] 1 module
+cacheable modules 51.2 KiB (javascript) 919 KiB (asset)
+  ./kotlin/kool-wasm-spike.mjs 3.12 KiB [built] [code generated]
+  ./kotlin/kool-wasm-spike.import-object.mjs + 1 modules 48 KiB [built] [code generated]
+  ./kotlin/kool-wasm-spike.wasm 919 KiB (asset) 42 bytes (javascript) [built] [code generated]
+webpack 5.108.1 compiled with 2 warnings in 465 ms
+
+> Task :wasmJsBrowserDistribution
+
+[Incubating] Problems report is available at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-aee3e20c78d24843c/spikes/kool-wasm/consumer/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 26s
+22 actionable tasks: 17 executed, 5 up-to-date
+e67c34454f3cca156914.wasm
+index.html
+kool-wasm-spike.js
+kool-wasm-spike.js.map
+
+== browser: Google Chrome for Testing 153.0.8010.12 
+chrome flags: --headless=new --no-sandbox --no-first-run --no-default-browser-check --use-angle=swiftshader --enable-unsafe-swiftshader --window-size=800,600 --user-data-dir=/tmp/issue225-chrome-bueGMn --remote-debugging-port=0 about:blank
+navigate: http://127.0.0.1:41353/index.html
+[console.log] D/GlImpl: Supported WebGL extensions:
+[console.log] D/GlImpl: - EXT_clip_control
+[console.log] D/GlImpl: - EXT_color_buffer_float
+[console.log] D/GlImpl: - EXT_color_buffer_half_float
+[console.log] D/GlImpl: - EXT_conservative_depth
+[console.log] D/GlImpl: - EXT_depth_clamp
+[console.log] D/GlImpl: - EXT_disjoint_timer_query_webgl2
+[console.log] D/GlImpl: - EXT_float_blend
+[console.log] D/GlImpl: - EXT_polygon_offset_clamp
+[console.log] D/GlImpl: - EXT_texture_compression_bptc
+[console.log] D/GlImpl: - EXT_texture_compression_rgtc
+[console.log] D/GlImpl: - EXT_texture_filter_anisotropic
+[console.log] D/GlImpl: - EXT_texture_mirror_clamp_to_edge
+[console.log] D/GlImpl: - NV_shader_noperspective_interpolation
+[console.log] D/GlImpl: - OES_draw_buffers_indexed
+[console.log] D/GlImpl: - OES_sample_variables
+[console.log] D/GlImpl: - OES_shader_multisample_interpolation
+[console.log] D/GlImpl: - OES_texture_float_linear
+[console.log] D/GlImpl: - OVR_multiview2
+[console.log] D/GlImpl: - WEBGL_clip_cull_distance
+[console.log] D/GlImpl: - WEBGL_compressed_texture_astc
+[console.log] D/GlImpl: - WEBGL_compressed_texture_etc
+[console.log] D/GlImpl: - WEBGL_compressed_texture_etc1
+[console.log] D/GlImpl: - WEBGL_compressed_texture_s3tc
+[console.log] D/GlImpl: - WEBGL_compressed_texture_s3tc_srgb
+[console.log] D/GlImpl: - WEBGL_debug_renderer_info
+[console.log] D/GlImpl: - WEBGL_debug_shaders
+[console.log] D/GlImpl: - WEBGL_lose_context
+[console.log] D/GlImpl: - WEBGL_multi_draw
+[console.log] D/GlImpl: - WEBGL_polygon_mode
+[console.log] D/GlImpl: - WEBGL_stencil_texturing
+[console.log] D/RenderBackendGlImpl: Setting depth range to zero-to-one
+[console.log] D/PlatformInputWasm: installed gamepad listeners
+[console.log] KOOL_SPIKE_READY frames=60 backend=WebGL api=WebGL 2.0
+page WebGL probe: {"webgl2":true,"webgl1Null":true,"version":"WebGL 2.0 (OpenGL ES 3.0 Chromium)","glsl":"WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)","renderer":"ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)","drawingBuffer":"800x600"}
+screenshot: /srv/ssd1/workspace/kool-spike-225/out/issue225-kool-wasm-webgl2-scene.png (2731 bytes)
+image 800x600; corners [[13,64,77],[13,64,77],[13,64,77],[13,64,77]]; centre [13,64,77]; distinct colours near centre: 1
+FAIL: the centre is the clear colour: the cube was not drawn
+exit=1

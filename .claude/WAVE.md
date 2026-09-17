@@ -2,7 +2,7 @@
 
 ## kmp baseline
 
-SHA `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -28,13 +28,21 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - #193: merged `fcdeb63`, round 1 PASS (no findings). Cherry-picked pre-restart branch onto KMP; editor toolset commonMain; editor.save via kotlinx-io (udea-agent api dep), browser host gets typed no_level_store. Live runs need `-Pudea.render.mode=Headless` on this box. Dropped cards: entity_gone-after-rewind test, unit test normal run hides editor.*. Worktree kept: `.claude/worktrees/agent-a95a8d0403add24ba`. #194 still needs #210/#211/#212.
 - #219: merged `73a09e5`, round 1 PASS (no findings). Root cause: late ack re-tracked a dead generation whose index a new creep reused; pending Destroy withheld the new occupant (frozen at spawn = Position only). Fix: occupant Create replaces dead generation client-side, Destroy only if Create not sent. Also pending-send overflow (>32) ended on any ack; now only on ack covering the unfitted send. runUdpProof lossy: old 6/30 Position-only, fix 0/50. HANDOFF.md's 'runUdpProof RED' note is now stale. Dropped cards: generation regression inside one ack (unobserved); MobaStraddledPollTest seeds 2/9 may need re-pick if level changes. Worktree kept: `.claude/worktrees/agent-a626c4bc6ebbd60ae`.
 
-## Wave 7 (2026-09-17): in flight
+## Wave 7 (2026-09-17): done
 
 - composegl-ef replied: composegl-kool free. Must also touch root build.gradle.kts `published`, `.github/ci-legs.json`, ci.yml OpenGL job. Avoid WorldPanel.kt/ScenePass.kt (composegl #230). Model: KorgeCanvas (HostState.Restore, maxSceneSize), SceneView proof c61c2a30. `--max-workers=2`, never `--stop` there. Land squashed+rebased `push origin HEAD:master`; snapshot via `release.yml -f kind=snapshot` only.
 - #210 split: JVM desktop + SceneView + snapshot here; Wasm/Android + Wasm demo -> #222 (added to epic). #211 needs #222 too.
 - #215 ruling: vendor Fleks 2.14 as `udea-fleks` (Central latest 2.15, no iOS). Commented.
 - Dispatched: dev-215 (Udea worktree, branch issue-215-vendor-fleks), dev-210 (composegl-wt/kool-210, branch issue-210-composegl-kool).
 - #210: landed composegl master `1086a586`, round 1 PASS (no findings). Draft PR composegl#232 (CI only; composegl CI does not run on branch pushes) closed. Master CI 35183141663 green, snapshot release 35183678529 green: `dev.wildware.composegl:composegl-kool:0.7.0-SNAPSHOT`. Wiki pushed. Kool must start with `renderBackend = RenderBackendGl`. Worktree kept: `/srv/ssd1/workspace/composegl-wt/kool-210`. Next wave: #222 (composegl, Wasm/Android).
+- #215: merged `0befdec`, round 1 PASS (no findings). Fleks 2.14 vendored as `udea-fleks` (byte-identical to tag, reviewer diffed). iOS on: udea-fleks, core, gas, audio, replay (CI ios-tests 570 tests). udea-net + udea-agent stay no-iOS (expect with no native actual). UDEA-MG-007: udea-fleks deps stdlib + serialization-core only. Determinism pin = 2.14+sha256 of vendored source; DET002 flags Fleks random() picks. CI `clean build under budget` red once (1.636, accepted by lead, commented); merge push goes red once too, next kmp push should be green - CHECK. Worktree kept: `.claude/worktrees/agent-a5908c0877dd4f81f`.
+- Dropped cards: stale "Fleks requests stdlib 2.3.21" KDoc in udea.kotlin-base.
+
+## Wave 8 plan
+
+- Ready: #222 (composegl-kool Wasm + Android, composegl repo; composegl-ef session active there - message it before dispatch). Possible iOS follow-up for udea-net/udea-agent native actuals: not filed (not a spec ticket yet; file only if #214 needs it).
+- Blocked: #211 needs #222. #212 needs #211; #221 needs #211; #192 needs #212; #194-#196 need #210-#212; #213 then #214.
+- So wave 8 is #222 alone. Udea repo has nothing free until #211.
 
 ## Wave 7 plan
 

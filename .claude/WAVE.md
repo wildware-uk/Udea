@@ -2,7 +2,7 @@
 
 ## kmp baseline
 
-SHA `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -17,7 +17,7 @@ Reviewers and trial merges: run `-p build-logic check` too; that one test failin
 
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
 
-## Wave 6 (2026-09-17): in flight
+## Wave 6 (2026-09-17): done
 
 - Dispatched: #217 determinism TimeSource (dev-217, build-logic), #219 UDP straddle Position desync (dev-219, udea-net + moba UDP client), #193 editor.* tools (dev-193, udea-agent, udea-agent-host, MobaAgent, udea-core NetIdIndex/LevelService).
 - #215 held to wave 7: vendoring Fleks moves the Fleks pin (`determinism-allowlist.txt`, ALLOW005) that #217's scanner code owns, and touches udea-core beside #193. Commented on #215.
@@ -26,6 +26,12 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - CI checked: kmp run 35175857880 (7073adc) budget base = first parent 25cc650, ratio 1.030. Migration ledger + determinism jobs now green. Windows latency `CharacterMoverBudgetTest` (median 7.3ms vs 4ms) failed once, rerun green: flake. Whole run green.
 - #217: merged `303abe7`, round 1 PASS (no findings). DET001 gains TimeSource.Monotonic + mark elapsedNow/hasPassedNow; DET003 gains kotlin.time/kotlinx.datetime Clock.System. udeaVerifyGasTime kept (not equivalent). Dropped as cards (commented on #217, audit row): inlined-code spans past EOF; klib-only source sets unscanned. Worktree kept: `.claude/worktrees/agent-ab6b17f2ef1d868c5`. #215 now free of #217 collision.
 - #193: merged `fcdeb63`, round 1 PASS (no findings). Cherry-picked pre-restart branch onto KMP; editor toolset commonMain; editor.save via kotlinx-io (udea-agent api dep), browser host gets typed no_level_store. Live runs need `-Pudea.render.mode=Headless` on this box. Dropped cards: entity_gone-after-rewind test, unit test normal run hides editor.*. Worktree kept: `.claude/worktrees/agent-a95a8d0403add24ba`. #194 still needs #210/#211/#212.
+- #219: merged `73a09e5`, round 1 PASS (no findings). Root cause: late ack re-tracked a dead generation whose index a new creep reused; pending Destroy withheld the new occupant (frozen at spawn = Position only). Fix: occupant Create replaces dead generation client-side, Destroy only if Create not sent. Also pending-send overflow (>32) ended on any ack; now only on ack covering the unfitted send. runUdpProof lossy: old 6/30 Position-only, fix 0/50. HANDOFF.md's 'runUdpProof RED' note is now stale. Dropped cards: generation regression inside one ack (unobserved); MobaStraddledPollTest seeds 2/9 may need re-pick if level changes. Worktree kept: `.claude/worktrees/agent-a626c4bc6ebbd60ae`.
+
+## Wave 7 plan
+
+- Ready: #215 (Fleks iOS; build-logic determinism pin + udea-core + ci.yml ios-tests). #210 composegl-kool lives in wildware-uk/composegl (check composegl-ef session). #211 needs #210; #212 needs #211; #221 needs #211; #192 needs #212; #194-#196 need #210-#212; #213 then #214 last.
+- So wave 7 is #215 alone in this repo, plus #210 if the ComposeGL repo is free.
 
 ## Wave 5 (2026-09-17): done
 

@@ -416,3 +416,23 @@ Logs are in `dev206/merge-*.log`:
 - `sh gradlew udeaVerifyModuleGraph udeaVerifyNoLegacyDependencies udeaVerifyAgentsMd :udea-replay:jvmTest :udea-replay:testAndroidHostTest :udea-replay:wasmJsNodeTest`:
   `BUILD SUCCESSFUL in 29s`. The three test tasks were up to date from the build above. Their
   result files show 104 JVM, 15 Android host and 15 wasmJs tests, with 0 failures.
+
+### Second merge: origin/kmp at `0a760f1` (#205, `udea-assets` on KMP)
+
+Merge commit `c286c6c`. Git merged it with no conflicts. I read the three shared texts after the
+merge, and each still names `udea-gas` and `udea-replay` correctly:
+
+- the `ios-tests` comment in `ci.yml`;
+- the `udea.kotlin-multiplatform-no-ios` row in `docs/module-graph.md`;
+- the multiplatform paragraph in `AGENTS.md`.
+
+`udea-assets` has iOS and joins the iOS job itself, so none of the three needed an edit.
+
+Results on `c286c6c`, with logs in `dev206/merge2-*.log`:
+
+- `sh gradlew build --continue`: `BUILD SUCCESSFUL in 2m 19s`, `501 actionable tasks: 286 executed, 151 from cache, 64 up-to-date`.
+  The three `udea-replay` test tasks ran in this build.
+- `sh gradlew -p build-logic check --continue`: `311 tests completed, 1 failed`. The one failure is
+  `OuterBuildInputsTest`, the known baseline failure (#216).
+- The verifiers plus the three `udea-replay` test tasks: `BUILD SUCCESSFUL in 11s`. The test result
+  files show 104 JVM, 15 Android host and 15 wasmJs tests, with 0 failures.

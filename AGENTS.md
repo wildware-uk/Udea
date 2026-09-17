@@ -103,8 +103,8 @@ edit to it fails `udeaVerifyDeterminism` until `determinism-audit.md` is re-read
 (issue #204), `udea-replay` (issue #206) and `udea-audio` (issue #207) are on the full convention
 too. `udea-net` (issue #209) and `udea-agent` (issue #208) are on
 `udea.kotlin-multiplatform-no-ios` (`jvm`, `android`, `wasmJs`), because each has an `expect` with
-no native `actual` yet, and each build script names it. `udea-net`'s UDP transport runs on `jvm` and `android` through a shared
-`socketMain` source set, and `wasmJs` has the WebSocket client only. In `udea-audio` the
+no native `actual` yet, and each build script names it. `udea-net`'s UDP transport runs on `jvm`
+and `android` through a shared `socketMain` source set, and `wasmJs` has the WebSocket client only. In `udea-audio` the
 `AudioDevice` SPI, `AudioDevice.Silent` and the cue drain are `commonMain`, and a device that makes
 a noise is not in it on any target. In `udea-agent` the tools and dispatcher are common, the
 `assets.*` toolset is `jvmMain` because the asset daemon is, and `udea-agent-host` stays JVM.

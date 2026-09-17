@@ -14,7 +14,7 @@ and notes drift.
 | **Spec target** | 90 000 ms (spec §6, Phase 0 exit: "clean build <90s") — **reported, not gated**; see *Why the absolute number is not the gate* |
 | **Gate** | `clean-build-budget` job in `.github/workflows/ci.yml` |
 | **Command timed** | `./gradlew clean udeaAssemble --no-build-cache`, configuration-cache entry deleted first |
-| **Compared against** | the same command on the commit's base, in a second checkout on the same runner: the merge base with `example`, or the first parent for a commit already on it |
+| **Compared against** | the same command on the commit's base, in a second checkout on the same runner: the merge base with the branch the commit merges into - a pull request's target, or else the nearest of `kmp` and `master` - or the first parent for a commit already on it. The rule is `.github/scripts/clean-build-base.sh`, executed by `CleanBuildBaseScriptTest` (issue #218) |
 | **Samples** | 6 per side, in base/head/head/base order, after one untimed clean build of each |
 | **Rule** | the head's fastest sample may be at most `CleanBuildComparison.TOLERANCE` (1.10) times the base's fastest — `build-logic`, tested by `CleanBuildComparisonTest` |
 | **Verdict task** | `./gradlew udeaCleanBuildVerdict -Pudea.cleanBuild.samples=<file>` |

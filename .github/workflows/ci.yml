@@ -982,19 +982,18 @@ jobs:
         shell: bash
         run: chmod +x ./gradlew
 
-      # The base is where this commit leaves `example`: the merge base for a branch or a pull
-      # request, and the first parent for a commit that is already on `example` (a push to it, or a
-      # scheduled run of a ref behind it), where the merge base is the commit itself.
+      # The base is where this commit leaves the branch it merges into (issue #218): the pull
+      # request's target, or else the nearest of the integration branches named below; and the
+      # first parent for a commit already on that branch (a push to it, or a scheduled run of its
+      # tip). The rule is `.github/scripts/clean-build-base.sh`, which `CleanBuildBaseScriptTest`
+      # executes. `kmp` is listed while the port runs; once it is merged into `master` and deleted,
+      # the script skips it, so retiring it needs no edit here.
       - name: Check out the base beside the head
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags origin example
           head=$(git rev-parse HEAD)
-          base=$(git merge-base HEAD origin/example)
-          if [ "$base" = "$head" ]; then
-            base=$(git rev-parse HEAD^1)
-          fi
+          base=$(bash .github/scripts/clean-build-base.sh kmp master)
           git worktree add --detach "$RUNNER_TEMP/base" "$base"
           chmod +x "$RUNNER_TEMP/base/gradlew"
           echo "UDEA_CLEAN_BUILD_BASE=$RUNNER_TEMP/base" >> "$GITHUB_ENV"

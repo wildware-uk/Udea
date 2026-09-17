@@ -1,6 +1,7 @@
 package dev.wildware.udea.net.transport
 
 import dev.wildware.udea.core.Tick
+import io.ktor.network.sockets.InetSocketAddress
 import java.nio.ByteBuffer
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -276,7 +277,9 @@ class UdpHostileTest {
         val token = secret.token(here, clientSalt = 5L, expiry = Tick(100))
 
         assertTrue(secret.verifies(here, 5L, Tick(100), token), "the token does not verify against itself")
-        assertTrue(!secret.verifies(elsewhere, 5L, Tick(100), token), "the address is not in the token")
+        assertTrue(!secret.verifies(elsewhere, 5L, Tick(100), token), "the port is not in the token")
+        val otherHost = InetSocketAddress("127.0.0.2", here.port)
+        assertTrue(!secret.verifies(otherHost, 5L, Tick(100), token), "the host is not in the token")
         assertTrue(!secret.verifies(here, 6L, Tick(100), token), "the client salt is not in the token")
         assertTrue(!secret.verifies(here, 5L, Tick(101), token), "the expiry is not in the token")
 

@@ -60,6 +60,14 @@ public abstract class UdeaVerifyDeterminismTask : DefaultTask() {
     @get:Input
     public abstract val resolvedVersions: MapProperty<String, String>
 
+    /**
+     * `udea-fleks/src/commonMain`, whose digest is part of the version Fleks' pin is compared
+     * against ([VendoredFleks]). Declared so an edit to the vendored source reruns the task.
+     */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    public abstract val vendoredFleksSources: ConfigurableFileCollection
+
     /** The declared scopes, as strings, so editing the table invalidates the task. */
     @get:Input
     public val declaredScopes: List<String>
@@ -79,11 +87,17 @@ public abstract class UdeaVerifyDeterminismTask : DefaultTask() {
     public fun verify() {
         val repoRoot = File(repoRootPath.get())
         val allowlistText = allowlistFile.get().asFile.readText()
+        val catalogVersions = resolvedVersions.get()
+        val release = requireNotNull(catalogVersions[VendoredFleks.ALIAS]) {
+            "no '${VendoredFleks.ALIAS}' version to stamp the vendored Fleks source with"
+        }
+        val auditedVersions = catalogVersions +
+            (VendoredFleks.ALIAS to VendoredFleks.auditedVersion(release, repoRoot.resolve(VendoredFleks.SOURCE_DIRECTORY)))
         val result = DeterminismScan.run(
             inputs = DeterminismRules.SIMULATION_SCOPES.map { DeterminismLayout.scopeInput(repoRoot, it) },
             allowlist = Allowlist.parse(allowlistText),
             repoRoot = repoRoot,
-            resolvedVersions = resolvedVersions.get(),
+            resolvedVersions = auditedVersions,
         )
         val text = DeterminismScan.report(result)
         report.get().asFile.apply { parentFile.mkdirs(); writeText(text) }

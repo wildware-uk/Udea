@@ -2,6 +2,7 @@ import dev.wildware.udea.build.ModuleGraphRules
 import dev.wildware.udea.build.determinism.DeterminismLayout
 import dev.wildware.udea.build.determinism.DeterminismRules
 import dev.wildware.udea.build.determinism.UdeaVerifyDeterminismTask
+import dev.wildware.udea.build.determinism.VendoredFleks
 import dev.wildware.udea.build.udeaCatalog
 
 /**
@@ -83,6 +84,7 @@ val udeaVerifyDeterminism =
         )
         simulationClasses.from(simulationClassDirs)
         resolvedVersions.set(auditedVersions)
+        vendoredFleksSources.from(fileTree(layout.projectDirectory.dir(VendoredFleks.SOURCE_DIRECTORY)))
         report.set(layout.buildDirectory.file("reports/udea/determinism.txt"))
 
         // The bytecode has to exist before it can be scanned, and a gate that reads whatever

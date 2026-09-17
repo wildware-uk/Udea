@@ -25,7 +25,7 @@ class TickConversionTest {
     }
 
     @Test
-    fun `a half tick rounds up, always`() {
+    fun `a half tick rounds up - always`() {
         // 0.008333.. seconds at 120Hz is exactly one tick; 0.0041666 is exactly half of one.
         assertEquals(1, ticksFromSeconds(0.5f / 120f, 120), "exactly half a tick rounds up to one")
         assertEquals(2, ticksFromSeconds(1.5f / 60f, 60), "exactly one and a half ticks rounds up to two")

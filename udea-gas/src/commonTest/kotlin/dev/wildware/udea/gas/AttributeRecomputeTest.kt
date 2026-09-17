@@ -65,7 +65,7 @@ class AttributeRecomputeOrderTest {
     }
 
     @Test
-    fun `two overrides on one attribute resolve in handle order, later application winning`() {
+    fun `two overrides on one attribute resolve in handle order - later application winning`() {
         val fixture = GasFixture()
         val unit = fixture.unit()
         unit.apply(fixture.rootEffect, Tick.ZERO)
@@ -163,7 +163,7 @@ class AttributeIdempotenceTest {
 class GasSnapshotEquivalenceTest {
 
     @Test
-    fun `snapshot at one hundred, run to two twenty, restore and run again - identical state`() {
+    fun `snapshot at one hundred - run to two twenty - restore and run again - identical state`() {
         val fixture = GasFixture()
         val unit = fixture.unit()
         unit.attributes.setBase(fixture.health, 0f)

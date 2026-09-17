@@ -31,19 +31,15 @@ import kotlin.test.assertTrue
  * configuration - which is the direction that matters, since a serialiser added "just for tests"
  * is a serialiser somebody moves to `implementation` a week later.
  *
- * ## One serialiser is already there, and it is not ours
+ * ## The JSON serialiser Fleks used to bring
  *
- * `kotlinx-serialization-json` **is** on this classpath, transitively, because
- * `io.github.quillraven.fleks:Fleks:2.14` depends on it - so it reaches every module that depends
- * on `udea-core`, which is all of them, and it was there before this module existed. Banning it
- * by jar name here would fail a gate for a pre-existing condition in somebody else's module and
- * teach the next reader to delete the rule.
- *
- * So the rule this module can honestly enforce is the source-level one below - `udea-agent`
- * writes JSON with [Json] and imports no serialiser - plus a scan of this module's own build
- * script, which is where a *new* serialiser would be declared. The Fleks transitive is recorded
- * here rather than hidden: it is worth someone deciding about at the kernel, not worth this test
- * pretending it is absent.
+ * `kotlinx-serialization-json` used to reach this classpath transitively, because the Maven
+ * artifact `io.github.quillraven.fleks:Fleks:2.14` declared it. Fleks is vendored in `udea-fleks`
+ * since issue #215, where its main source - which never used JSON - resolves only
+ * `kotlinx-serialization-core`, so the JSON serialiser is now on the banned list with the rest.
+ * `kotlinx-serialization-core` and `-cbor` are still here, through `udea-core`'s level files; the
+ * source-level rule below - `udea-agent` writes JSON with [Json] and imports no serialiser - and
+ * the scan of this module's own build script are what hold this module to its own writer.
  */
 class AgentModuleBoundaryTest {
 
@@ -122,8 +118,8 @@ class AgentModuleBoundaryTest {
             .filter { (_, line) -> DECLARED_SERIALISER.containsMatchIn(line) }
             .map { (index, line) -> "build.gradle.kts:${index + 1}  ${line.trim()}" }
 
-        // The half of the serialiser rule this module can own: Fleks already puts
-        // kotlinx-serialization on every classpath in the tree, but nothing here may declare one.
+        // The half of the serialiser rule this module can own: `udea-core` puts
+        // kotlinx-serialization on this classpath, but nothing here may declare one.
         assertEquals(
             emptyList(),
             offenders,
@@ -157,6 +153,7 @@ class AgentModuleBoundaryTest {
             "jackson",
             "gson",
             "moshi",
+            "kotlinx-serialization-json",
             "reflections",
             "kotlin-reflect",
         )

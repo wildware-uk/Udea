@@ -73,7 +73,7 @@ class EffectDurationTickTest {
     }
 
     @Test
-    fun `a set-by-caller duration is resolved once, at application`() {
+    fun `a set-by-caller duration is resolved once - at application`() {
         val fixture = GasFixture()
         val unit = fixture.unit()
         unit.apply(fixture.cooldownEffect, Tick(100), fixture.cooldownTag to 50f)

@@ -14,10 +14,14 @@ the gate is the `WorldHasher` snapshot-equivalence test plus the cross-OS `repla
 in `.github/workflows/ci.yml`. When the two disagree, the replay result wins and the scanner
 grows a rule.
 
-- **Audited against:** Fleks `2.14`, LibGDX `1.14.2` — the versions pinned in
-  `determinism-allowlist.txt`, which `udeaVerifyDeterminism` compares to the resolved ones on
-  every run and fails on drift (`ALLOW005`). An upgrade invalidates the rows below silently, so
-  an upgrade has to fail the build until somebody re-reads them.
+- **Audited against:** Fleks `2.14+sha256:220b74bf865c68a5e99f9f340855148d9a078b7a1e158eaba82d35f7230441bf`,
+  LibGDX `1.14.2` — the versions pinned in `determinism-allowlist.txt`, which
+  `udeaVerifyDeterminism` compares to the resolved ones on every run and fails on drift
+  (`ALLOW005`). An upgrade invalidates the rows below silently, so an upgrade has to fail the
+  build until somebody re-reads them. Fleks is vendored source in `udea-fleks` since issue #215,
+  so its version is the release it was copied from plus a digest of `udea-fleks/src/commonMain`:
+  an edit to that source fails the pin exactly as a release bump does. Section 2.0 records the
+  re-read the move to vendored source demanded.
 - **Audited surface:** the members actually referenced from the source sets
   `DeterminismRules.SIMULATION_SCOPES` declares simulation. This is a **used-surface** audit,
   not a library review: a Fleks method nothing calls is not a determinism risk this project has.
@@ -95,7 +99,7 @@ Written first because it is the part people skip.
 | --- | --- | --- |
 | Hash order across a class boundary | Kotlin **never** emits the concrete owner at an iteration site: `for ((k, v) in someHashMap)` compiles to `checkcast java/util/Map` + `INVOKEINTERFACE java/util/Map.entrySet` whatever the static type is (verified by `javap` on a planted probe). The concrete type appears only at the `NEW`. `DET004` therefore joins the two halves **at class level** - a class that constructs a hash-ordered collection *and* walks a map or set. A `HashMap` built in one class and iterated in another, or a class handed a map it did not build, is invisible. | Replay equality; `WorldHasher` over two runs with different insertion histories |
 | Indirection | The scan sees direct references only. `helper()` calling `System.nanoTime()` in a module nobody declared simulation, called from a system, reports nothing. | Replay equality |
-| Fleks internals | Nothing in Fleks is in a declared simulation scope, so no rule ever inspects it. Section 2 below is the manual substitute for that. | This document; replay equality |
+| Fleks internals | Nothing in `udea-fleks` is in a declared simulation scope, so no rule inspects Fleks' own bytecode. It is not declared one because the allowlist excuses a *referenced member* wherever it is referenced: excusing Fleks' own `Random.nextInt` would excuse it in every simulation scope. Section 2 below is the manual substitute, and `DET002` matches calls to the one Fleks surface that launders unseeded randomness (section 2.0). | This document; replay equality |
 | Float differences across JVMs | Bytecode is identical on both platforms. That is exactly the failure mode `Math.sin` has (section 3.1). | The cross-OS `replay-equality` CI job, replaying `moba` since issue #172. Nothing else. |
 | Iteration order of a `LinkedHashMap` fed in nondeterministic order | Insertion-ordered is only reproducible if the *insertions* are. A `LinkedHashMap` filled from a `HashSet` is as unstable as the `HashSet`. | Replay equality |
 | A clock received through its interface | `DET001` and `DET003` match the system clocks by owner: `System`, `java.time`, `TimeSource.Monotonic` and its marks, and `Clock.System` from the stdlib and kotlinx-datetime (issue #217). A `kotlin.time.TimeSource` or `kotlin.time.Clock` parameter compiles to an interface call whose receiver the scan cannot see, and it may be a clock driven by the tick, so it is not matched. The reference that picks the system clock is matched wherever it is written in declared simulation; picked outside it and handed in, it is invisible. | Replay equality |
@@ -105,6 +109,36 @@ Written first because it is the part people skip.
 ---
 
 ## 2. Fleks 2.14 — the used surface
+
+### 2.0 The Maven-to-vendored re-read (issue #215)
+
+Issue #215 replaced the `io.github.quillraven.fleks:Fleks:2.14` artifact with Fleks' own source,
+vendored in `udea-fleks` from the `2.14` tag, and moved the pin to include a digest of that
+source. `ALLOW005` failed the build as designed, and this is the re-read it demanded.
+
+**What was compared.** The vendored `src/commonMain` against upstream's `2.14` tag: `diff -r`
+reports no difference. Then the bytecode, because the rows below were written against
+`Fleks-jvm-2.14.jar` and the vendored source is compiled here with this repository's Kotlin rather
+than upstream's: `javap -p` over the seven classes these rows name most (`DefaultEntityProvider`,
+`Family`, `collection.Bag`, `World`, `EntityService`, `collection.MutableEntityBag`,
+`collection.BitArray`), in the Maven jar and in `udea-fleks/build/classes/kotlin/jvm/main`,
+diffed per class.
+
+**What moved, and why no verdict moves with it.** Every class has the same member count in both.
+The only differing lines are the names of `internal` members, which Kotlin suffixes with the
+module name: `getMutableSystems$Fleks` is `getMutableSystems$dev_wildware_udea_udea_fleks`, and
+likewise across `Family`, `World` and `EntityService`. A name is not an order, a table or a
+pool. The fields the rows below cite are unchanged: `recycledEntities` is still a
+`kotlin.collections.ArrayDeque`, `Bag.values` still a `T[]`, `World.allFamilies` a `Family[]`,
+`mutableSystems` a `java.util.ArrayList`, `injectables` and `tagCache` a `java.util.Map`.
+
+**Found by the re-read, and added below.** A reference scan over every class in the vendored JVM
+output finds exactly one thing the determinism rules key on: `MutableEntityBag.random` and
+`randomOrNull` read `kotlin.random.Random.Default` and call `nextInt`. `Family.random` and
+`randomOrNull` delegate to them. None is referenced from a declared simulation scope today, and
+the used-surface audit never looked at them for that reason. But a system calling
+`family.random()` makes no reference to `Random.Default` of its own, so `DET002` could not see
+it. `DET002` now matches the calls themselves, and the row is `banned`.
 
 The referenced members were enumerated by running `javap -p -c` over every compiled class of
 `:udea-core` and `:udea-gas` and extracting `com/github/quillraven/fleks/*` targets, sorted by
@@ -119,6 +153,7 @@ member at all. The high-frequency members are `ComponentType.getId` (94), `Compo
 | `Family.forEach` | deterministic | — | Delegates to the same `Bag` walk as above; `isIterating`/`isDirty` only defer *mutation*, not reorder the walk. Deferred removals go to `EntityService.delayedEntities`, itself a `MutableEntityBag`. |
 | `Family.sort(Comparator)` | deterministic-if-used-thus | replacement: pass a **total** comparator | Sorting an array with a comparator that returns 0 for distinct entities leaves their relative order to the sort algorithm. Not referenced from any declared simulation scope today. If it becomes so, the comparator must break every tie — `Entity.id` is the obvious tiebreak. |
 | `Family.associate` / `associateBy` (no destination) | deterministic | — | Kotlin's `associate` builds a `LinkedHashMap`, so the result is insertion-ordered over a deterministic walk. Not currently referenced from simulation. |
+| `Family.random` / `randomOrNull`, `EntityBag.random` / `randomOrNull` | banned | DET002 | `MutableEntityBag.random` is `values[Random.nextInt(size)]`: `javap -c` over the vendored `MutableEntityBag` shows `getstatic kotlin/random/Random.Default` then `invokevirtual kotlin/random/Random$Default.nextInt`, and `Family` delegates to its `mutableEntities`. That is the unseeded default generator behind an ECS-looking call. The replacement is a pick by index from a named `RngService` stream over the family's ordered walk. Not referenced from any declared simulation scope today. |
 | `Family.associateTo(M)` / `associateByTo(M)` | banned | DET004 | The destination is the caller's. Passing a `HashMap` reintroduces hash order behind an insertion-ordered-looking API. `DET004` catches the `NEW java/util/HashMap` *if* the constructing class also walks a map or set; a map built here and iterated elsewhere is in the blind-spot table above. |
 | `World.getAllFamilies` | deterministic | — | The field is `Family[]` (`javap -p World`), populated in configuration order. System and family registration order is decided by `SimRegistry`, not by Fleks. |
 | `World.getSystems` / `mutableSystems` | deterministic | — | `java.util.ArrayList<IntervalSystem>`, in the order `SystemConfiguration.add` was called. |
@@ -133,8 +168,9 @@ member at all. The high-frequency members are `ComponentType.getId` (94), `Compo
 | `World.family` / `FamilyDefinition.all` | deterministic | — | Builds a `BitArray` from component ids. Family identity is the three bit arrays, so two definitions written in different orders are the same family. |
 | `Injectable.getInjObj` / `setUsed`, `WorldCfgKt.configureWorld` | deterministic | — | Configuration-time only; nothing here runs inside a tick. |
 
-**No Fleks member is on the banned list except `associateTo`/`associateByTo`**, and that one is
-banned for what the *caller* passes rather than for anything Fleks does.
+**`associateTo`/`associateByTo` are banned for what the *caller* passes rather than for anything
+Fleks does.** The random picks are banned for what Fleks does, and that row came from the
+section 2.0 re-read.
 
 ---
 

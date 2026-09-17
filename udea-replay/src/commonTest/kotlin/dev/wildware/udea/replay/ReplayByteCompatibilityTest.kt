@@ -37,7 +37,7 @@ class ReplayByteCompatibilityTest {
     }
 
     @Test
-    fun `a recording master's build wrote decodes, and every sample and hash is the one recorded`() {
+    fun `a recording master's build wrote decodes - and every sample and hash is the one recorded`() {
         val fromMaster = ReplayRecording.decode(unhex(MASTER_BYTES))
         val rebuilt = recordGolden()
 

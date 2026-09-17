@@ -114,7 +114,7 @@ class AttributeTableTest {
 class AttributeClampDefaultTest {
 
     @Test
-    fun `the default lower bound is the most negative float, not the smallest positive one`() {
+    fun `the default lower bound is the most negative float - not the smallest positive one`() {
         assertEquals(-Float.MAX_VALUE, (ValueResolver.MIN as ValueResolver.Constant).value)
         assertTrue(Float.MIN_VALUE > 0f, "the defect exists because Float.MIN_VALUE is positive")
     }

@@ -189,7 +189,10 @@ public object DeterminismRules {
                         ref.descriptor == "()V"
                     ) ||
                 ref.owner == "java.util.concurrent.ThreadLocalRandom" ||
-                (ref.owner == "com.badlogic.gdx.math.MathUtils" && ref.member.startsWith("random"))
+                (ref.owner == "com.badlogic.gdx.math.MathUtils" && ref.member.startsWith("random")) ||
+                // Fleks' random entity picks call `Random.nextInt` inside Fleks, where no
+                // simulation scope's reference to `Random.Default` exists to match (issue #215).
+                (ref.owner in FLEKS_RANDOM_PICK_OWNERS && ref.member in FLEKS_RANDOM_PICKS)
         },
     )
 
@@ -317,6 +320,18 @@ public object DeterminismRules {
      * mangled (`elapsedNow-UwyO8pc`, `hasPassedNow-impl`) because the mark is a value class.
      */
     private val MONOTONIC_MARK_READS = listOf("elapsedNow", "hasPassedNow", "hasNotPassedNow")
+
+    /**
+     * The Fleks types that declare `random` and `randomOrNull`. A call compiles against the
+     * receiver's static type, so each of the three is an owner a reference can name.
+     */
+    private val FLEKS_RANDOM_PICK_OWNERS = setOf(
+        "com.github.quillraven.fleks.Family",
+        "com.github.quillraven.fleks.collection.EntityBag",
+        "com.github.quillraven.fleks.collection.MutableEntityBag",
+    )
+
+    private val FLEKS_RANDOM_PICKS = setOf("random", "randomOrNull")
 
     private val SYSTEM_CLOCKS = setOf("kotlin.time.Clock\$System", "kotlinx.datetime.Clock\$System")
 

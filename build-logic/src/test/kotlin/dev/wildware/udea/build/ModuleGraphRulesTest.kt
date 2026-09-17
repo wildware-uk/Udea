@@ -253,6 +253,62 @@ class ModuleGraphRulesTest {
     }
 
     @Test
+    fun `UDEA-MG-007 fails any Udea module and any library but serialization on vendored Fleks`() {
+        val violations = violate(
+            ":udea-fleks",
+            "runtimeClasspath",
+            graph(
+                ":udea-fleks",
+                "org.jetbrains.kotlin:kotlin-stdlib",
+                "org.jetbrains.kotlinx:kotlinx-serialization-core",
+                // An arrow from the vendored library back into the engine it sits under.
+                ":udea-core",
+                ":udea-annotations",
+                // Upstream declares this on its main classpath; its main source does not use it.
+                "org.jetbrains.kotlinx:kotlinx-serialization-json",
+            ),
+        )
+        assertEquals(
+            listOf(":udea-annotations", ":udea-core", "org.jetbrains.kotlinx:kotlinx-serialization-json"),
+            violations.map { it.coordinate }.sorted(),
+        )
+        assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-007") })
+    }
+
+    @Test
+    fun `UDEA-MG-007 passes the stdlib and serialization core on every target`() {
+        assertEquals(
+            emptyList(),
+            violate(
+                ":udea-fleks",
+                "compileClasspath",
+                graph(
+                    ":udea-fleks",
+                    "org.jetbrains.kotlin:kotlin-stdlib",
+                    "org.jetbrains.kotlin:kotlin-stdlib-wasm-js",
+                    "org.jetbrains:annotations",
+                    "org.jetbrains.kotlinx:kotlinx-serialization-core",
+                    "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm",
+                    "org.jetbrains.kotlinx:kotlinx-serialization-bom",
+                    "org.jetbrains.kotlinx:kotlinx-serialization-core-wasm-js",
+                    "org.jetbrains.kotlinx:kotlinx-serialization-core-iosarm64",
+                ),
+            ).map { it.coordinate },
+        )
+    }
+
+    @Test
+    fun `UDEA-MG-007 governs only the vendored module`() {
+        assertTrue(
+            violate(
+                ":udea-core",
+                "runtimeClasspath",
+                graph(":udea-core", ":udea-fleks", "org.jetbrains.kotlinx:kotlinx-serialization-cbor"),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
     fun `a transitive violation is reported with the path that produced it`() {
         val transitive = ResolvedGraph(
             root = ":udea-core",

@@ -95,6 +95,7 @@ public object ModuleGraphRules {
         ":udea-compiler-plugin",
         ":udea-core",
         ":udea-diagnostics",
+        ":udea-fleks",
         ":udea-gas",
         ":udea-gradle",
         ":udea-net",
@@ -272,6 +273,38 @@ public object ModuleGraphRules {
         ),
     )
 
+    /**
+     * Fleks is third-party source vendored so it has iOS targets (issue #215). It sits under
+     * `udea-core`, so an arrow from it to any Udea module is an arrow pointing upward, and a
+     * dependency added to it is added under the whole engine.
+     */
+    public val VENDORED_FLEKS_IS_A_LEAF: DependencyRule = DependencyRule(
+        id = RuleId("UDEA-MG-007"),
+        summary = "udea-fleks resolves only kotlinx-serialization-core and the stdlib",
+        rationale = "udea-fleks is Fleks 2.14's own source, vendored because Fleks publishes no " +
+            "iOS artifact. It is the bottom of the engine: udea-core exposes it as api, so what it " +
+            "resolves reaches every module and the shipped game. Upstream's source needs only " +
+            "kotlinx-serialization-core, for its @Serializable Entity and Snapshot. A Udea module " +
+            "here is an upward arrow, and a new library is an edit to third-party code's " +
+            "dependencies that nobody vendoring it agreed to.",
+        specSection = "4",
+        projects = setOf(":udea-fleks"),
+        configurations = setOf("compileClasspath", "runtimeClasspath"),
+        allowOnly = listOf(
+            CoordinatePattern(":udea-fleks"),
+            CoordinatePattern("org.jetbrains.kotlin:kotlin-stdlib"),
+            CoordinatePattern("org.jetbrains.kotlin:kotlin-stdlib-wasm-js"),
+            CoordinatePattern("org.jetbrains:annotations"),
+            // With its per-target artifacts (`-jvm`, `-wasm-js`, `-iosarm64`), by name: a
+            // `kotlinx-serialization-*` wildcard would let JSON or CBOR in unannounced.
+            CoordinatePattern("org.jetbrains.kotlinx:kotlinx-serialization-core"),
+            CoordinatePattern("org.jetbrains.kotlinx:kotlinx-serialization-core-*"),
+            // The platform `kotlinx-serialization-core` pulls in on the JVM and Android to align
+            // versions. It carries constraints and no classes.
+            CoordinatePattern("org.jetbrains.kotlinx:kotlinx-serialization-bom"),
+        ),
+    )
+
     /** Every rule, in id order. */
     public val ALL: List<DependencyRule> = listOf(
         ANNOTATIONS_ARE_A_LEAF,
@@ -280,6 +313,7 @@ public object ModuleGraphRules {
         NOBODY_DEPENDS_ON_UDEA_GRADLE,
         NO_SCRIPTING_OR_REFLECTION_IN_THE_GAME,
         ASSETS_MODEL_IS_A_LEAF,
+        VENDORED_FLEKS_IS_A_LEAF,
     )
 
     /** True when [projectPath] is part of the rewrite tree and therefore subject to [ALL]. */

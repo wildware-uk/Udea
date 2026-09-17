@@ -173,7 +173,7 @@ class NetIdReservationTest {
      * [NetIdIndex.attach] can put an entity back behind it.
      */
     @Test
-    fun `a detached id stops resolving, keeps its index, and attaches back under the same id`() {
+    fun `a detached id stops resolving but keeps its index and attaches back under the same id`() {
         val index = NetIdIndex(capacity = 8, entityCapacity = 8)
         val entity = Entity(2, version = 0u)
         val id = index.allocate(entity)

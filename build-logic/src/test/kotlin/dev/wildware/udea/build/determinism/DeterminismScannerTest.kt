@@ -115,6 +115,60 @@ class DeterminismScannerTest {
     }
 
     @Test
+    fun `DET002 fires on Fleks' random entity picks, which draw from the default Random`() {
+        // Issue #215. `Family.random`, `EntityBag.random` and their `OrNull` forms call
+        // `Random.nextInt` inside Fleks, so a system that calls one makes no reference the rule
+        // above can see. Reached three ways: on the family, through the bag interface, and on the
+        // concrete bag.
+        val result = scan(
+            FLEKS_RANDOM_STUBS + mapOf(
+                "sim/Picks.java" to """
+                    package sim;
+                    import com.github.quillraven.fleks.Family;
+                    import com.github.quillraven.fleks.collection.EntityBag;
+                    import com.github.quillraven.fleks.collection.MutableEntityBag;
+                    public class Picks {
+                        public Object onFamily(Family family) {
+                            return family.random();
+                        }
+                        public Object onBag(EntityBag bag) {
+                            return bag.randomOrNull();
+                        }
+                        public Object onMutableBag(MutableEntityBag bag) {
+                            return bag.random();
+                        }
+                    }
+                """.trimIndent(),
+            ),
+        )
+        val det002 = result.findings.filter { it.ruleId == "DET002" }
+        assertEquals(setOf("onFamily", "onBag", "onMutableBag"), det002.map { it.method }.toSet())
+        assertEquals(
+            "com.github.quillraven.fleks.collection.EntityBag.randomOrNull",
+            det002.single { it.method == "onBag" }.target,
+        )
+        assertEquals("sim/Picks.java:7:1", det002.single { it.method == "onFamily" }.span)
+    }
+
+    @Test
+    fun `DET002 does not fire on Fleks' ordered entity reads`() {
+        val result = scan(
+            FLEKS_RANDOM_STUBS + mapOf(
+                "sim/Walks.java" to """
+                    package sim;
+                    import com.github.quillraven.fleks.Family;
+                    public class Walks {
+                        public Object first(Family family) {
+                            return family.first();
+                        }
+                    }
+                """.trimIndent(),
+            ),
+        )
+        assertEquals(emptyList(), result.findings.map { it.render() })
+    }
+
+    @Test
     fun `DET003 fires on calendar time`() {
         val result = scan(
             mapOf(
@@ -413,6 +467,34 @@ class DeterminismScannerTest {
         assertTrue(
             error?.message?.contains("a scan of nothing passes forever") == true,
             "expected the empty-scan guard, got $error",
+        )
+    }
+
+    private companion object {
+        /** Fleks' entity-picking surface, shaped as Kotlin compiles it: a class, an interface, a class. */
+        val FLEKS_RANDOM_STUBS: Map<String, String> = mapOf(
+            "com/github/quillraven/fleks/Family.java" to """
+                package com.github.quillraven.fleks;
+                public class Family {
+                    public Object random() { return null; }
+                    public Object randomOrNull() { return null; }
+                    public Object first() { return null; }
+                }
+            """.trimIndent(),
+            "com/github/quillraven/fleks/collection/EntityBag.java" to """
+                package com.github.quillraven.fleks.collection;
+                public interface EntityBag {
+                    Object random();
+                    Object randomOrNull();
+                }
+            """.trimIndent(),
+            "com/github/quillraven/fleks/collection/MutableEntityBag.java" to """
+                package com.github.quillraven.fleks.collection;
+                public class MutableEntityBag implements EntityBag {
+                    public Object random() { return null; }
+                    public Object randomOrNull() { return null; }
+                }
+            """.trimIndent(),
         )
     }
 }

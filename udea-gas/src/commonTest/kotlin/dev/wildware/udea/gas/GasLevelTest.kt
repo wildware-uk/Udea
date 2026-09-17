@@ -102,7 +102,7 @@ class GasLevelTest {
     }
 
     @Test
-    fun `what a level can hold is decided by the registry the game was started with, not the classpath`() {
+    fun `what a level can hold is decided by the registry the game was started with - not the classpath`() {
         // `udea-gas` is on this test's classpath either way. Started with the kernel's registry, the
         // same game cannot save a GAS component, and says which one; that is the registry being
         // read, where run-time service discovery would have found the module and saved it anyway.
@@ -120,7 +120,7 @@ class GasLevelTest {
     }
 
     @Test
-    fun `a loaded game plays on exactly as the saved one does, new effect handles included`() {
+    fun `a loaded game plays on exactly as the saved one does - new effect handles included`() {
         val original = Game()
         val ids = busy(original)
         val bytes = original.save()
@@ -143,7 +143,7 @@ class GasLevelTest {
     }
 
     @Test
-    fun `a level saved against other attributes is refused, naming them`() {
+    fun `a level saved against other attributes is refused - naming them`() {
         val original = Game()
         busy(original)
         val bytes = original.save()

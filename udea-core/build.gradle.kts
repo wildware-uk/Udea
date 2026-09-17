@@ -8,12 +8,10 @@ import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
-    // THE iOS SWITCH (issue #215). Multiplatform on jvm, android and wasmJs, and not iOS, because
-    // Fleks - an `api` dependency below, used throughout common code - publishes no iOS variant in
-    // any version, and Kotlin compiles iOS klibs on Linux too, so an iOS target fails dependency
-    // resolution on every machine. When Fleks has iOS, this line becomes
-    // `id("udea.kotlin-multiplatform")`, and udea-core joins the `ios-tests` job in `ci.yml`.
-    id("udea.kotlin-multiplatform-no-ios")
+    // Every target, iOS included (issue #215). Fleks publishes no iOS variant at any version, so
+    // it is built from source in `udea-fleks` rather than resolved from Maven; with the Maven
+    // artifact back, the iOS targets here fail dependency resolution on every machine, Linux too.
+    id("udea.kotlin-multiplatform")
     // The Replicator contract ships an executable specification: TransformReplicator and
     // ArrayFieldStore. udea-codegen's golden tests consume them, so they have to be a
     // published variant rather than this module's private test source (issue #28 scope).
@@ -39,7 +37,7 @@ ksp {
 kotlin {
     // Two shared source sets beside the default hierarchy, for the few `expect` declarations whose
     // `actual`s split along the JVM line rather than per target: `jvmAndAndroidMain` reaches
-    // `java.lang`, and `nonJvmMain` (Wasm and, once issue #215 lets iOS back in, native) has only
+    // `java.lang`, and `nonJvmMain` (Wasm and native) has only
     // Kotlin's own reflection.
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     applyDefaultHierarchyTemplate {
@@ -73,7 +71,8 @@ kotlin {
                 // `api`, not `implementation`: SimSystem extends Fleks' IntervalSystem and
                 // NetIdIndex resolves to a Fleks Entity, so both are part of udea-core's public
                 // surface. Fleks is headless - this does not put GL on anyone's classpath (spec 4).
-                api(libs.fleks)
+                // Fleks' own source, vendored (issue #215): see `udea-fleks/NOTICE.md`.
+                api(project(":udea-fleks"))
 
                 // The lock around `SimBarrier`'s inbox, the one queue another thread writes to.
                 implementation(libs.kotlinx.atomicfu)

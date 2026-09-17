@@ -33,6 +33,9 @@ junitJupiter = "5.8.1"
 # for what is still checkable and where the executable proof lives instead.
 ksp = "2.3.12"
 kotlinpoet = "2.3.0"
+# The Fleks release `udea-fleks` vendors as source (issue #215), not a version anything downloads
+# for the engine. `udeaVerifyDeterminism` stamps it, with a digest of the vendored source, as the
+# version `determinism-audit.md` describes; change it only when re-vendoring.
 fleks = "2.14"
 # libGDX. Moved 1.13.5 -> 1.14.2 with the ComposeGL move (issue #186), and not for its own
 # sake: `composegl-gdx:0.5.0` depends on `com.badlogicgames.gdx:gdx:1.14.2`, so Gradle upgraded
@@ -55,9 +58,9 @@ junitPlatform = "1.13.4"
 # at all. `composegl-gdx` is a GL backend, so it is `udea-render`-only by UDEA-MG-002.
 composegl = "0.6.0"
 # kotlinx.serialization, for level files (issue #191): a saved level is Fleks' own
-# `world.snapshot()` encoded as CBOR. 1.11.0 is not a free choice: it is the version Fleks 2.14
-# itself requires (its `Snapshot` and `Entity` are `@Serializable` against it), so a lower entry
-# here would be upgraded to it by resolution anyway and the catalog would say something untrue.
+# `world.snapshot()` encoded as CBOR. 1.11.0 is the version the Fleks 2.14 release was built and
+# tested against. Fleks is vendored source since issue #215 and compiles its `@Serializable`
+# `Snapshot` and `Entity` against this entry, so moving it moves what `udea-fleks`' own tests run on.
 # Runtime snapshots - rewind, replication, desync reports - stay on `Replicator<T>`; AGENTS.md.
 kotlinxSerialization = "1.11.0"
 # The Android Gradle Plugin, for its Kotlin Multiplatform library support
@@ -111,6 +114,8 @@ kotlin-scripting-jvm-host = { module = "org.jetbrains.kotlin:kotlin-scripting-jv
 kotlin-scripting-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable", version.ref = "kotlin" }
 ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
 kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
+# The old tree's Fleks, from Maven. Only `common` names it: every `udea-*` module has Fleks' source
+# through `udea-fleks` (issue #215), and this entry goes when `common` does.
 fleks = { module = "io.github.quillraven.fleks:Fleks", version.ref = "fleks" }
 gdx = { module = "com.badlogicgames.gdx:gdx", version.ref = "gdx" }
 gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", version.ref = "gdx" }
@@ -141,6 +146,8 @@ composegl-gdx = { module = "dev.wildware.composegl:composegl-gdx", version.ref =
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerialization" }
 kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "atomicfu" }
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
+# Test-only: `udea-fleks` runs upstream Fleks' own tests, which encode a snapshot to JSON.
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinxSerialization" }
 junit5-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit5-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }

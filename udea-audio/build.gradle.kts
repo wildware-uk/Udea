@@ -1,9 +1,7 @@
 plugins {
-    // THE iOS SWITCH (issue #215), the same one `udea-core` carries. Multiplatform on jvm, android
-    // and wasmJs, and not iOS, because `udea-core` - an `api` dependency below - has no iOS variant
-    // while Fleks publishes none (issue #207). When `udea-core` switches to
-    // `id("udea.kotlin-multiplatform")`, this line switches with it.
-    id("udea.kotlin-multiplatform-no-ios")
+    // Every target, iOS included: `udea-core` gained its iOS targets when Fleks was vendored
+    // (issue #215).
+    id("udea.kotlin-multiplatform")
 }
 
 // What is common and what is JVM (issue #207). The SPI, `AudioDevice.Silent`, the binding table and

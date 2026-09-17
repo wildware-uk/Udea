@@ -145,7 +145,7 @@ class CooldownGroupTest {
      * on passing and would stop meaning anything.
      */
     @Test
-    fun `the plain grant does not adopt, which is what the group-aware one is for`() {
+    fun `the plain grant does not adopt - which is what the group-aware one is for`() {
         val gas = fixture()
         val unit = gas.unit(abilitySlots = 3)
         unit.abilities.grant(1, gas.fireball)

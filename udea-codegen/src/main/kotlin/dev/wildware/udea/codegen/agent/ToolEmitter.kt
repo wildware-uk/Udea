@@ -162,7 +162,7 @@ internal object ToolEmitter {
                 .returns(ANY.copy(nullable = true))
                 .addStatement(
                     "throw %T(%S)",
-                    UnsupportedOperationException::class,
+                    AgentNames.UNSUPPORTED_OPERATION,
                     "${tool.name} needs the AgentContext of the command it is serving; call " +
                         "the three-argument invoke, which is what ToolIndex does for a " +
                         "ContextualToolDef",

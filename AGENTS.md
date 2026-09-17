@@ -100,6 +100,8 @@ because Fleks publishes no iOS artifact (issue #215); its build script carries t
 back. `udea-gas` (issue #204) and `udea-replay` (issue #206) are on the same convention for the
 same reason, through `udea-core`. `udea-net` is too (issue #209): its UDP transport runs on `jvm`
 and `android` through a shared `socketMain` source set, and `wasmJs` has the WebSocket client only.
+`udea-agent` is too (issue #208): its tools and dispatcher are common, the `assets.*` toolset is
+`jvmMain` because the asset daemon is, and `udea-agent-host` stays JVM.
 Build-time modules stay on `udea.kotlin-library`. The module-graph gates govern each target's
 classpath as the JVM classpath it stands for. `sh gradlew :<module>:allTests` skips iOS off
 macOS; the `ios-tests` CI job runs it. The Android SDK comes from `ANDROID_HOME` or an

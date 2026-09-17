@@ -74,6 +74,13 @@ internal object AgentNames {
      */
     val BAD_ARGUMENT: ClassName = ClassName(PACKAGE, "BadArgumentException")
 
+    /**
+     * `kotlin.UnsupportedOperationException`, named through the `kotlin` package and never as a
+     * class literal: on the JVM the literal resolves to `java.lang`, and a generated import of
+     * that does not compile in a `commonMain` source set (issue #208).
+     */
+    val UNSUPPORTED_OPERATION: ClassName = ClassName("kotlin", "UnsupportedOperationException")
+
     /** One declaring class's `@AgentState` properties, written straight into the digest. */
     val AGENT_STATE_SOURCE: ClassName = ClassName(PACKAGE, "AgentStateSource")
 

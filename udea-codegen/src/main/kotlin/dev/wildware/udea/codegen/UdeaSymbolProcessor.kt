@@ -62,11 +62,21 @@ import java.nio.charset.StandardCharsets
 internal class UdeaSymbolProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
-    private val options: CodegenOptions,
+    options: CodegenOptions,
 ) : SymbolProcessor {
 
+    /**
+     * The options this run acts on. A platform run - [CodegenOptions.sourceSet] set - writes no
+     * module-level file, because the common run over the same module already wrote them, so it
+     * is handed no module name to write them under.
+     */
+    private val options: CodegenOptions =
+        if (options.sourceSet == null) options else options.copy(moduleName = null)
+
+    private val scope = SourceSetScope(options.sourceSet)
+
     private val models = ComponentModelBuilder(logger)
-    private val agent = AgentPass(logger)
+    private val agent = AgentPass(logger, scope)
     private val rpcs = RpcModelBuilder(logger)
     private val levelComponents = LevelComponentScanner(logger)
 
@@ -77,11 +87,16 @@ internal class UdeaSymbolProcessor(
      */
     private var emittedModuleFiles = false
 
+    /** So a malformed `udea.sourceSet` is reported once and not once per KSP round. */
+    private var reportedSourceSet = false
+
     /** So a malformed `udea.moduleName` is reported once and not once per KSP round. */
     private var reportedModuleName = false
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
+        if (!checkSourceSet()) return emptyList()
         val components = resolver.getSymbolsWithAnnotation(AnnotationNames.REPLICATED)
+            .filter(scope::admits)
             .filterIsInstance<KSClassDeclaration>()
             // Sorted by FQN so the set of emitted files, and their contents, depend on the
             // sources alone and not on the order KSP happened to hand them over. Two clean
@@ -103,7 +118,7 @@ internal class UdeaSymbolProcessor(
         // module may declare saveable components and nothing else at all - `udea-core` and
         // `udea-gas` do exactly that - and an early return keyed on the other three would
         // generate no list for them, so their levels would refuse to save.
-        val saveable = levelComponents.find(resolver)
+        val saveable = levelComponents.find(resolver).filter { scope.admitsFile(it.containingFile) }
         // A named module with nothing in it still gets its registry, once: a launcher whose
         // classpath holds the module names that registry, and a reference to a class nobody
         // wrote is a compile error that is only meant to happen when the module is absent.
@@ -259,6 +274,7 @@ internal class UdeaSymbolProcessor(
      */
     private fun rpcFunctions(resolver: Resolver): List<KSFunctionDeclaration> =
         resolver.getSymbolsWithAnnotation(AnnotationNames.RPC)
+            .filter(scope::admits)
             .filterIsInstance<KSFunctionDeclaration>()
             .sortedBy { it.qualifiedName?.asString() ?: it.simpleName.asString() }
             .toList()
@@ -287,6 +303,27 @@ internal class UdeaSymbolProcessor(
             }
             writeIsolating(RpcEmitter.emit(model), containingFile)
         }
+    }
+
+    /**
+     * False, having reported it, when `udea.sourceSet` is not a source set name.
+     *
+     * A path, or anything else that is not a name, would match no file, and the run would
+     * silently generate nothing: the platform compilation would then fail naming a missing tool
+     * object, a long way from the option that caused it.
+     */
+    private fun checkSourceSet(): Boolean {
+        val sourceSet = options.sourceSet ?: return true
+        if (CodegenOptions.SOURCE_SET_FORMAT.matches(sourceSet)) return true
+        if (!reportedSourceSet) {
+            reportedSourceSet = true
+            logger.error(
+                "${CodegenOptions.SOURCE_SET} is '$sourceSet', which is not a source set name. " +
+                    "It must match ${CodegenOptions.SOURCE_SET_FORMAT.pattern}, for example " +
+                    "'jvmMain': the run processes the declarations under src/<name>/ and no others.",
+            )
+        }
+        return false
     }
 
     /**

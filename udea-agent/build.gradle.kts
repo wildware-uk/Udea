@@ -1,70 +1,146 @@
+import com.google.devtools.ksp.gradle.KspAATask
 import dev.wildware.udea.build.UdeaModuleRegistry
 import dev.wildware.udea.build.udeaModule
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
-    id("udea.kotlin-library")
+    // THE iOS SWITCH (issue #215), the same one `udea-core` carries. Multiplatform on jvm, android
+    // and wasmJs, and not iOS, because `udea-core` - an `api` dependency below - has no iOS
+    // variant while Fleks publishes none. When `udea-core` switches to
+    // `id("udea.kotlin-multiplatform")`, this line switches with it.
+    id("udea.kotlin-multiplatform-no-ios")
     // The engine's own toolsets go through the same `@AgentTool` KSP pass every game's do.
     // There is one mechanism on the agent surface, not an engine one and a game one - see
     // `EngineToolModules` for what that took and for the one thing it deliberately does not do.
     id("com.google.devtools.ksp") version libs.versions.ksp.get()
 }
 
+// What is common and what is JVM (issue #208, spec D8). The tools, the dispatcher, the bridge, the
+// digest and the harness are `commonMain`: a game on any platform can be driven in-process. The
+// `assets.*` toolset and the daemon threads are `jvmMain`: the toolset compiles against the warm
+// asset daemon, which carries the Kotlin compiler and is build-time JVM only, and the thread
+// factory exists for the JVM HTTP host (`udea-agent-host`, which stays JVM).
+kotlin {
+    @OptIn(ExperimentalKotlinGradlePluginApi::class)
+    applyDefaultHierarchyTemplate {
+        common {
+            // The few `expect` declarations whose `actual`s split along the JVM line: the heap
+            // figures `diag.memory` reports and an enum's constants, both of which the JVM and
+            // Android runtimes can answer and Wasm cannot.
+            group("jvmAndAndroid") {
+                withCompilations {
+                    it.target.platformType == KotlinPlatformType.jvm || it.target.platformType == KotlinPlatformType.androidJvm
+                }
+            }
+        }
+    }
+
+    sourceSets {
+        commonMain {
+            dependencies {
+                api(project(":udea-core"))
+
+                // `@AgentTool` and `@Arg`, on the toolsets in `tools/`. `compileOnly` is not an
+                // option: the annotations are BINARY-retained, so they are on this module's own
+                // bytecode, and a consumer compiling against `WorldToolset` needs them resolvable.
+                implementation(project(":udea-annotations"))
+
+                // The stable rule ids, so the runtime description gate in `ToolIndex.Builder.build`
+                // reports under exactly the id the KSP checker and the K2 checker report under
+                // (spec 5: one defect, one name, wherever it surfaces). `implementation` and not
+                // `api`: nothing in this module's public surface names a `UdeaRule`, only its
+                // refusal messages quote one.
+                implementation(project(":udea-diagnostics"))
+
+                // The runtime asset model, for `AssetHotReload`: a GraphDelta applied to an
+                // AssetRegistry through the SimBarrier. `udea-assets` is a leaf (UDEA-MG-006 keeps
+                // it one), so this costs a shipped game nothing beyond plain data classes.
+                implementation(project(":udea-assets"))
+
+                // The locks around the rings and queues an HTTP thread writes and the simulation
+                // thread drains - the same lock `udea-core`'s `SimBarrier` uses (issue #203).
+                implementation(libs.kotlinx.atomicfu)
+            }
+            // The tool definitions, manifest fragment and registry KSP generates from the common
+            // source set, compiled into every target from there. See the KSP wiring below.
+            kotlin.srcDir(layout.buildDirectory.dir("generated/ksp/metadata/commonMain/kotlin"))
+            // The manifest fragment, built by the common KSP run - which every target's resource
+            // processing therefore has to wait on.
+            resources.srcDir(
+                files(layout.buildDirectory.dir("generated/ksp/metadata/commonMain/resources"))
+                    .builtBy("kspCommonMainKotlinMetadata"),
+            )
+        }
+        jvmMain {
+            dependencies {
+                // The warm daemon behind the `assets` toolset, **compileOnly** and deliberately so.
+                //
+                // `udea-assets-compiler` carries kotlin-compiler-embeddable and the scripting
+                // host, and `UDEA-MG-005` forbids `kotlin-scripting-*` on `:moba`'s runtime
+                // classpath - the shipped game compiles no scripts, which is the entire point of
+                // spec 3.6. A plain `implementation` here would put it there through `udea-agent`
+                // and fail that gate.
+                //
+                // So `AssetsToolset` and `AssetToolModule` compile against the daemon and are
+                // simply unloadable in a process that has no daemon on its classpath. That is the
+                // correct behaviour rather than a compromise: only the `udeaDev` daemon and a dev
+                // host serve these tools, and `EngineToolModules` deliberately does not name them,
+                // so nothing a shipped game touches can reach the missing classes.
+                // `AssetToolSurfaceTest` runs with the daemon present.
+                compileOnly(project(":udea-assets-compiler"))
+            }
+        }
+    }
+}
+
 dependencies {
-    api(project(":udea-core"))
-
-    // `@AgentTool` and `@Arg`, on the toolsets in `tools/`. `compileOnly` is not an option:
-    // the annotations are BINARY-retained, so they are on this module's own bytecode, and a
-    // consumer compiling against `WorldToolset` needs them resolvable.
-    implementation(project(":udea-annotations"))
-
     // `LatencyBudget`, the contention note the two budget tests below end their failure
     // messages with (issue #175). Test scope, and `udea-diagnostics` is the zero-dependency
     // leaf, so this adds the fixture and nothing else.
-    testImplementation(testFixtures(project(":udea-diagnostics")))
-
-    // The processor over *this module's* main source set. The reverse edge exists too -
-    // `udea-codegen`'s tests compile against `udea-agent` so the generated code they exercise
-    // is dispatched through the real `ToolIndex` - and the two do not form a task cycle:
-    // `:udea-codegen:compileKotlin` needs nothing from here, and it is that compilation, not
-    // `:udea-codegen:test`, that `:udea-agent:kspKotlin` waits on.
-    ksp(project(":udea-codegen"))
-
-    // The stable rule ids, so the runtime description gate in `ToolIndex.Builder.build` reports
-    // under exactly the id the KSP checker and the K2 checker report under (spec 5: one defect,
-    // one name, wherever it surfaces). `implementation` and not `api`: nothing in this module's
-    // public surface names a `UdeaRule`, only its refusal messages quote one.
-    implementation(project(":udea-diagnostics"))
-
-    // The runtime asset model, for `AssetHotReload`: a GraphDelta applied to an AssetRegistry
-    // through the SimBarrier. `udea-assets` is a leaf (UDEA-MG-006 keeps it one), so this costs a
-    // shipped game nothing beyond plain data classes.
-    implementation(project(":udea-assets"))
-
-    // The warm daemon behind the `assets` toolset, **compileOnly** and deliberately so.
-    //
-    // `udea-assets-compiler` carries kotlin-compiler-embeddable and the scripting host, and
-    // `UDEA-MG-005` forbids `kotlin-scripting-*` on `:moba`'s runtime classpath - the shipped game
-    // compiles no scripts, which is the entire point of spec 3.6. A plain `implementation` here
-    // would put it there through `udea-agent` and fail that gate.
-    //
-    // So `AssetsToolset` and `AssetToolModule` compile against the daemon and are simply
-    // unloadable in a process that has no daemon on its classpath. That is the correct behaviour
-    // rather than a compromise: only the `udeaDev` daemon and a dev host serve these tools, and
-    // `EngineToolModules` deliberately does not name them, so nothing a shipped game touches can
-    // reach the missing classes. `AssetToolSurfaceTest` runs with the daemon present.
-    compileOnly(project(":udea-assets-compiler"))
+    "jvmTestImplementation"(testFixtures(project(":udea-diagnostics")))
 
     // Real Fleks components on real entities, a wired GameContext, and the ArrayFieldStore /
     // ArrayBitWriter pair, so the hand-written test replicators can implement the whole frozen
     // contract rather than only the two methods the agent surface calls.
-    testImplementation(testFixtures(project(":udea-core")))
+    "jvmTestImplementation"(testFixtures(project(":udea-core")))
     // Compile-time only, and that is the whole point. `AgentModuleBoundaryTest` scans the test
     // JVM's own classpath and bans `kotlin-scripting-*` from it, because this module is compiled
-    // into every game and anything on its classpath is on the game's. A `testImplementation` here
-    // would put the scripting host on `testRuntimeClasspath` and break that gate rather than
-    // satisfy it. The asset-toolset tests get the daemon at run time from their own Test task
-    // below, whose classpath is assembled separately and never becomes this module's.
-    testCompileOnly(project(":udea-assets-compiler"))
+    // into every game and anything on its classpath is on the game's. A `jvmTestImplementation`
+    // here would put the scripting host on `jvmTestRuntimeClasspath` and break that gate rather
+    // than satisfy it. The asset-toolset tests get the daemon at run time from their own Test
+    // task below, whose classpath is assembled separately and never becomes this module's.
+    "jvmTestCompileOnly"(project(":udea-assets-compiler"))
+
+    // The processor over *this module's* common source set, once, rather than once per target:
+    // every engine toolset is common code, so one generated copy compiled everywhere cannot
+    // disagree between targets about what a tool is called or what it says. The reverse edge
+    // exists too - `udea-codegen`'s tests compile against `udea-agent` so the generated code they
+    // exercise is dispatched through the real `ToolIndex` - and the two do not form a task cycle:
+    // `:udea-codegen:compileKotlin` needs nothing from here.
+    add("kspCommonMainMetadata", project(":udea-codegen"))
+
+    // And over `jvmMain`, for the one toolset that cannot be common: `AssetsToolset` compiles
+    // against the warm asset daemon. KSP hands this run the common sources too, so it is scoped
+    // to its own source set below, or it would generate every engine tool and the registry a
+    // second time and the JVM compilation would fail on the redeclarations.
+    add("kspJvm", project(":udea-codegen"))
+}
+
+// Every compilation reads the generated code, and so does each per-target KSP run the plugin
+// registers beside the common one, so none of them may start before it has been written.
+val kspCommonMain = "kspCommonMainKotlinMetadata"
+tasks.withType<KotlinCompilationTask<*>>().configureEach { dependsOn(kspCommonMain) }
+tasks.matching { it.name.startsWith("ksp") && it.name != kspCommonMain }.configureEach { dependsOn(kspCommonMain) }
+
+// `udea.sourceSet` is `udea-codegen`'s `CodegenOptions.SOURCE_SET`: the JVM run processes only
+// `src/jvmMain/` and writes no registry and no manifest, which the common run already wrote.
+tasks.withType<KspAATask>().matching { it.name == "kspKotlinJvm" }.configureEach {
+    kspConfig.processorOptions.put("udea.sourceSet", "jvmMain")
 }
 
 // --- the agent surface's own codegen ---------------------------------------------------------
@@ -128,11 +204,22 @@ dependencies {
 /** The tool names this task owns, excluded from `test` so they run once, in the right JVM. */
 val assetToolTests = "dev.wildware.udea.agent.assets.*"
 
+/** The JVM target's test compilation: where every JVM test here, the budgets included, is compiled. */
+val jvmTestCompilation: KotlinCompilation<*> =
+    (the<KotlinMultiplatformExtension>().targets.getByName("jvm") as KotlinJvmTarget).compilations.getByName("test")
+
+/** What `jvmTest` runs on. `udeaAssetTools` adds the daemon to it; the budgets take it as is. */
+val jvmTestRuntime: FileCollection =
+    files(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
+
 val udeaAssetTools = tasks.register<Test>("udeaAssetTools") {
     group = "verification"
     description = "The assets.* toolset against a real warm daemon and a real headless game."
-    testClassesDirs = sourceSets.test.get().output.classesDirs
-    classpath = sourceSets.test.get().runtimeClasspath + assetToolsRuntime
+    testClassesDirs = jvmTestCompilation.output.classesDirs
+    classpath = jvmTestRuntime + assetToolsRuntime
+    // `jvmTest` is on JUnit 5 by convention and a `Test` task registered here is not: left on
+    // Gradle's default runner it finds no test and fails "No tests found for given includes".
+    useJUnitPlatform()
     filter.includeTestsMatching(assetToolTests)
 }
 
@@ -149,7 +236,7 @@ tasks.named("check") {
 // the toolset's whole reason for existing (a warm compiler answering in under 300ms) untested.
 tasks.withType<Test>().configureEach {
     systemProperty("udea.repoRoot", rootProject.layout.projectDirectory.asFile.absolutePath)
-    // **This task's own** classpath, not `sourceSets.test.runtimeClasspath`. The two differ for
+    // **This task's own** classpath, not `jvmTest`'s. The two differ for
     // `udeaAssetTools`, which is the only task that has a daemon at all, and a script compiled
     // against the wrong one fails with "Unresolved reference 'spriteSheet'" - the DSL receiver
     // missing from the classpath the scripts are compiled against.
@@ -163,7 +250,7 @@ val budgetTestClasses = listOf(
     "dev.wildware.udea.agent.query.EntityQueryBudgetTest",
 )
 
-tasks.named<Test>("test") {
+tasks.named<Test>("jvmTest") {
     budgetTestClasses.forEach { filter.excludeTestsMatching(it) }
     // Not a disabled test: `udeaAssetTools` runs every one of these, on `check`, in a JVM whose
     // classpath carries the daemon. Running them here as well would put the scripting host on this
@@ -175,8 +262,9 @@ tasks.named<Test>("test") {
 tasks.register<Test>("udeaDigestBudget") {
     group = "verification"
     description = "Gates the Tier-0 digest at 500 entities: <0.3ms median, zero render allocation."
-    testClassesDirs = sourceSets.test.get().output.classesDirs
-    classpath = sourceSets.test.get().runtimeClasspath
+    testClassesDirs = jvmTestCompilation.output.classesDirs
+    classpath = jvmTestRuntime
+    useJUnitPlatform()
     filter.includeTestsMatching("dev.wildware.udea.agent.state.DigestBudgetTest")
     // The measured numbers are the point of the task, so they go to the build log rather than
     // into a report nobody opens.
@@ -187,8 +275,9 @@ tasks.register<Test>("udeaDigestBudget") {
 tasks.register<Test>("udeaQueryBudget") {
     group = "verification"
     description = "Gates entity query at 500 entities returning 20: <1ms median, bounded allocation."
-    testClassesDirs = sourceSets.test.get().output.classesDirs
-    classpath = sourceSets.test.get().runtimeClasspath
+    testClassesDirs = jvmTestCompilation.output.classesDirs
+    classpath = jvmTestRuntime
+    useJUnitPlatform()
     filter.includeTestsMatching("dev.wildware.udea.agent.query.EntityQueryBudgetTest")
     testLogging.showStandardStreams = true
 }

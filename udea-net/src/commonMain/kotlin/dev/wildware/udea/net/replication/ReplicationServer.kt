@@ -110,6 +110,24 @@ public class ReplicationServer(
     private val states = LinkedHashMap<Int, ClientReplicationState>()
     private val jitterBuffers = LinkedHashMap<Int, JitterBuffer>()
 
+    /**
+     * Per `NetId.index`, for the datagram being built: the live occupant's generation, valid only
+     * where [occupantStamps] holds [sendStamp]. Stamped rather than cleared, so a send costs one
+     * walk of the rows and no fill.
+     */
+    private var occupantGenerations = IntArray(INITIAL_INDICES)
+    private var occupantStamps = IntArray(INITIAL_INDICES)
+
+    /** Per `NetId.index`: [sendStamp] when this datagram wrote an entity record for that index. */
+    private var writtenStamps = IntArray(INITIAL_INDICES)
+
+    /** Identifies the datagram being built, for the stamp arrays. Never zero once sending. */
+    private var sendStamp = 0
+
+    /** Raw ids of dead generations whose index this datagram hands to a new occupant. See [writeRemovals]. */
+    private var displaced = IntArray(INITIAL_INDICES)
+    private var displacedCount = 0
+
     /** Entities that were written in full because their baseline had aged out of the ring. */
     public var baselineRecoveries: Long = 0L
         private set
@@ -121,8 +139,9 @@ public class ReplicationServer(
     /**
      * `Destroy` records that did not fit this datagram and will be written again next tick.
      *
-     * Removals are written before anything else, so this is only ever non-zero when the destroys
-     * *alone* exceed the budget - a wave dying at once. It is counted rather than assumed away
+     * Removals are written before any entity, so this is non-zero when the destroys *alone* exceed
+     * the budget - a wave dying at once - or when a dead generation's new occupant was deferred
+     * and the `Destroy` written in its place did not fit either. It is counted rather than assumed away
      * because the failure it replaces was silent: a truncated section loses destroys, and a
      * client keeps corpses that the server deleted with nothing anywhere saying so.
      */
@@ -249,9 +268,11 @@ public class ReplicationServer(
         // is the buffer minus that tail, never the buffer.
         val budgetBytes = minOf(budget.bytesPerPacket, buffer.size - SECTION_TAIL_BYTES)
 
+        stampOccupants(fields)
         writeRemovals(payload, state, fields, seq, current.tick, budgetBytes)
         accumulateAndSelect(state, fields, current.tick)
         packSelected(payload, state, current, fields, seq, budgetBytes)
+        writeDisplacedRemovals(payload, state, seq, current.tick, budgetBytes)
 
         section.end(payload)
         frames.endMessage()
@@ -281,6 +302,20 @@ public class ReplicationServer(
      * worse for a `Leave` - the entity could never be given back, because the server would think
      * the client had it. That is what makes this loop walk *state* rather than a per-tick event
      * list: the state is still true next tick, so the record is simply written again.
+     *
+     * ## A dead generation whose index already has a new occupant
+     *
+     * Is not written here. One section addresses each index once, and the new occupant's `Create`
+     * removes the dead generation on the client by itself: a create for another generation
+     * replaces the row at that index (`ReplicaStore.createRow`), and a removal names its
+     * generation exactly, so it could never have deleted the new occupant either. The index is left
+     * for [packSelected], and [writeDisplacedRemovals] writes the `Destroy` after all if the new
+     * occupant did not make it into this datagram.
+     *
+     * Issue #219 is what the other order did. A dead occupant whose create was acknowledged late -
+     * after the index had been handed on and the new occupant's create had left - was destroyed
+     * first, and the new occupant held back until the destroy was confirmed. The client already
+     * held the new occupant, and kept it frozen where it was created for a whole round trip.
      */
     private fun writeRemovals(
         out: BitWriter,
@@ -300,34 +335,113 @@ public class ReplicationServer(
                 !relevancy.isRelevant(state.peer, netId) -> EntityOp.Leave
                 else -> continue
             }
-
-            // Enough units dying in one tick will fill a datagram with destroys alone. The
-            // section must not be truncated mid-record: the same rollback pair the entity packer
-            // uses puts the bytes and the delta chain back, and the destroys that did not fit
-            // are simply not marked pending, so they are written again next tick.
-            val mark = writer.bitPosition
-            val cursor = section.cursor()
-            try {
-                section.writeRemoval(out, netId, op)
-            } catch (overflow: BitBufferOverflow) {
-                writer.truncateTo(mark)
-                section.rewindTo(cursor)
-                removalDeferrals++
-                return
+            if (gone && hasRelevantOccupant(state, index)) {
+                displace(netId)
+                continue
             }
-            if (writer.byteLength > budgetBytes) {
-                writer.truncateTo(mark)
-                section.rewindTo(cursor)
-                removalDeferrals++
-                return
-            }
-            state.markDestroyPending(netId, tick)
-            if (op == EntityOp.Leave) leaveWrites++
-            // Recorded *as a removal*, so the ack that confirms the datagram retires the id and
-            // is never mistaken for the client acknowledging that it holds one — and an unacked
-            // removal is simply written again next tick.
-            state.recordRemovalSent(netId, seq, tick)
+            if (!writeRemoval(out, state, netId, op, seq, tick, budgetBytes)) return
         }
+    }
+
+    /**
+     * Writes the `Destroy` for each [displaced] generation whose new occupant this datagram did not
+     * carry after all - deferred by the budget, or with nothing this client may see. The client may
+     * still hold the dead generation, and nothing else in the datagram removes it.
+     */
+    private fun writeDisplacedRemovals(
+        out: BitWriter,
+        state: ClientReplicationState,
+        seq: Int,
+        tick: Tick,
+        budgetBytes: Int,
+    ) {
+        for (position in 0 until displacedCount) {
+            val netId = NetId.ofRaw(displaced[position])
+            if (writtenStamps[netId.index] == sendStamp) continue
+            if (!writeRemoval(out, state, netId, EntityOp.Destroy, seq, tick, budgetBytes)) return
+        }
+    }
+
+    /**
+     * Writes one removal record for [netId] and marks it pending.
+     *
+     * @return false when the record did not fit. Nothing was written, and the caller writes no
+     *   further removals into this datagram.
+     */
+    private fun writeRemoval(
+        out: BitWriter,
+        state: ClientReplicationState,
+        netId: NetId,
+        op: EntityOp,
+        seq: Int,
+        tick: Tick,
+        budgetBytes: Int,
+    ): Boolean {
+        // Enough units dying in one tick will fill a datagram with destroys alone. The
+        // section must not be truncated mid-record: the same rollback pair the entity packer
+        // uses puts the bytes and the delta chain back, and the destroys that did not fit
+        // are simply not marked pending, so they are written again next tick.
+        val mark = writer.bitPosition
+        val cursor = section.cursor()
+        try {
+            section.writeRemoval(out, netId, op)
+        } catch (overflow: BitBufferOverflow) {
+            writer.truncateTo(mark)
+            section.rewindTo(cursor)
+            removalDeferrals++
+            return false
+        }
+        if (writer.byteLength > budgetBytes) {
+            writer.truncateTo(mark)
+            section.rewindTo(cursor)
+            removalDeferrals++
+            return false
+        }
+        state.markDestroyPending(netId, tick)
+        if (op == EntityOp.Leave) leaveWrites++
+        // Recorded *as a removal*, so the ack that confirms the datagram retires the id and
+        // is never mistaken for the client acknowledging that it holds one — and an unacked
+        // removal is simply written again next tick.
+        state.recordRemovalSent(netId, seq, tick)
+        return true
+    }
+
+    /** Records, for this datagram, which generation occupies each index of [fields]. */
+    private fun stampOccupants(fields: WorldFieldStore) {
+        sendStamp++
+        if (sendStamp == 0) {
+            // Wrapped round: every stale stamp would read as this datagram's. Start over.
+            occupantStamps.fill(0)
+            writtenStamps.fill(0)
+            sendStamp = 1
+        }
+        displacedCount = 0
+        for (row in 0 until fields.rowCount) {
+            val netId = fields.netIdAt(row)
+            ensureIndices(netId.index + 1)
+            occupantGenerations[netId.index] = netId.generation
+            occupantStamps[netId.index] = sendStamp
+        }
+    }
+
+    /** Whether [index] holds a live entity that [state]'s client may be told about. */
+    private fun hasRelevantOccupant(state: ClientReplicationState, index: Int): Boolean {
+        if (index >= occupantStamps.size || occupantStamps[index] != sendStamp) return false
+        return relevancy.isRelevant(state.peer, NetId.of(index, occupantGenerations[index]))
+    }
+
+    private fun displace(netId: NetId) {
+        if (displacedCount == displaced.size) displaced = displaced.copyOf(displaced.size * 2)
+        displaced[displacedCount++] = netId.raw
+    }
+
+    private fun ensureIndices(required: Int) {
+        if (required <= occupantStamps.size) return
+        var capacity = occupantStamps.size
+        while (capacity < required) capacity *= 2
+        occupantGenerations = occupantGenerations.copyOf(capacity)
+        occupantStamps = occupantStamps.copyOf(capacity)
+        writtenStamps = writtenStamps.copyOf(capacity)
     }
 
     private fun accumulateAndSelect(state: ClientReplicationState, fields: WorldFieldStore, tick: Tick) {
@@ -335,10 +449,12 @@ public class ReplicationServer(
         for (row in 0 until fields.rowCount) {
             val netId = fields.netIdAt(row)
             if (!relevancy.isRelevant(state.peer, netId)) continue
-            // An index whose Destroy is still unacknowledged cannot also carry its new occupant:
-            // one section addresses each index once, and a client that saw the create before the
-            // destroy would delete the entity it had just been given. It waits one ack.
-            if (state.isDestroyPending(netId.index)) continue
+            // An entity whose own removal is unacknowledged waits for it: that is a `Leave` for an
+            // entity back in view, which re-enters as a create once the client has confirmed it
+            // left. Another generation at that index does not wait - see `writeRemovals`.
+            if (state.isDestroyPending(netId.index) && state.trackedGeneration(netId.index) == netId.generation) {
+                continue
+            }
             val priority = accumulator.accumulate(state, netId, tick, relevancy.weightOf(state.peer, netId))
             selector.add(netId, priority)
         }
@@ -405,6 +521,7 @@ public class ReplicationServer(
                 return
             }
             state.recordSent(netId, seq, current.tick)
+            writtenStamps[netId.index] = sendStamp
         }
     }
 
@@ -460,5 +577,8 @@ public class ReplicationServer(
          * out of room for the terminator is a thrown `BitBufferOverflow` at the top of `send`.
          */
         public const val SECTION_TAIL_BYTES: Int = 4
+
+        /** Starting size of the per-index scratch arrays. Grown to the highest index sent. */
+        private const val INITIAL_INDICES: Int = 256
     }
 }

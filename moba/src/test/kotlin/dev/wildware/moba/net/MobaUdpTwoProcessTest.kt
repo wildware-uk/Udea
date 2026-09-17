@@ -39,18 +39,12 @@ import kotlin.test.fail
  * ## The residue, stated rather than hidden
  *
  * The per-component assertion now covers **every** replicated component: [MobaUdpProof.EXCUSED_COMPONENTS]
- * is empty, and that KDoc says which two defects used to be in it and how each was fixed. One
- * thing still legitimately differs, and it is why the asserted hash is over the `GameUnit` roster
- * ([NetStateProbe.unitHash]) rather than over the whole world:
+ * is empty, and that KDoc says which two defects used to be in it and how each was fixed. The
+ * asserted hash is over the `GameUnit` roster ([NetStateProbe.unitHash]), creeps included, and not
+ * over projectiles.
  *
- *  - **In-flight projectiles** are created and destroyed between the two captures, and a recycled
- *    `NetId` index waits one acknowledgement before its new occupant is sent - so a whole-world
- *    fold is very often one entity short at any given tick. That is the replication protocol
- *    working, not failing: an index cannot carry a new entity while the client's `Destroy` for the
- *    old one is unacknowledged, or the client would delete the entity it had just been given.
- *
- * The whole-roster hash is printed on every run beside the asserted one. It is printed and not
- * asserted for the reason above: it folds the projectiles too.
+ * `MobaStraddledPollTest` makes the same assertion on every tick of an in-process session, with
+ * datagrams deliberately left for the next poll - the deterministic form of the lossy case here.
  */
 class MobaUdpTwoProcessTest {
 

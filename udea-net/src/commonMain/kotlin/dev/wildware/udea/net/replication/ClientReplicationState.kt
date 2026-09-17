@@ -81,8 +81,27 @@ public class ClientReplicationState(
      */
     private var pendingTicks = LongArray(initialIndices * PENDING_PER_INDEX)
 
-    /** Per `NetId.index`: how many of [pendingTicks] are live, or [PENDING_OVERFLOW]. */
+    /** Per `NetId.index`: how many of [pendingTicks] are live, `0..`[PENDING_PER_INDEX]. */
     private var pendingCounts = IntArray(initialIndices)
+
+    /**
+     * Per `NetId.index`: the newest send that did **not** fit in [pendingTicks], or [NO_BASELINE]
+     * while every unacknowledged send is listed there.
+     *
+     * A tick and not a flag, because what ends the overflow is an acknowledgement *at or after
+     * this tick*, and nothing earlier. When the list fills, the sends it held and the one that
+     * did not fit are all at or before this tick; the list is emptied and later sends are listed
+     * again as normal. Until the client acknowledges a packet at or after this tick it may be
+     * holding any of those forgotten states, so the entity is written in full. Once it has, it
+     * holds that packet's state or a newer one - and every newer send is back in the list.
+     *
+     * Issue #219 is what a sentinel count did here. Any acknowledgement cleared it, including one
+     * for a packet that left before the overflow, and the list it cleared had stopped recording.
+     * The packer then diffed against a single baseline while the client held a later full write,
+     * omitted a field that had changed and changed back, and the client kept the wrong value
+     * until the field next moved. A round trip longer than [PENDING_PER_INDEX] ticks was enough.
+     */
+    private var untrackedThrough = LongArray(initialIndices) { NO_BASELINE }
 
     private val records = Array(RECORD_RING) { SentPacket() }
 
@@ -127,12 +146,14 @@ public class ClientReplicationState(
      *
      * [PENDING_OVERFLOW] means the tracking ran out of room and the server must stop guessing:
      * write the entity in full. That is the same recovery a baseline that has aged out of the
-     * ring takes, and it clears itself, because the ack for the full write empties the list.
+     * ring takes, and it ends when the client acknowledges a packet sent at or after the send
+     * that did not fit - see [untrackedThrough] for why no earlier acknowledgement may end it.
      */
     public fun pendingSendCount(netId: NetId): Int {
         val index = netId.index
         if (index >= pendingCounts.size) return 0
         if (baselineGenerations[index] != netId.generation) return 0
+        if (untrackedThrough[index] != NO_BASELINE) return PENDING_OVERFLOW
         return pendingCounts[index]
     }
 
@@ -306,6 +327,7 @@ public class ClientReplicationState(
         lastSentTicks[index] = NO_BASELINE
         slotStates[index] = TRACKED
         pendingCounts[index] = 0
+        untrackedThrough[index] = NO_BASELINE
         destroyTicks[index] = NO_BASELINE
     }
 
@@ -367,29 +389,38 @@ public class ClientReplicationState(
         destroyTicks[index] = NO_BASELINE
     }
 
-    /** Appends [tick] to [index]'s unacknowledged-send list, or marks the list overflowed. */
+    /**
+     * Appends [tick] to [index]'s unacknowledged-send list.
+     *
+     * A send that does not fit empties the list and becomes [untrackedThrough], so the list keeps
+     * recording every send after it. It must: those are states the client may be holding when
+     * the overflow ends.
+     */
     private fun pushPending(index: Int, tick: Long) {
         val count = pendingCounts[index]
-        if (count == PENDING_OVERFLOW) return
         val base = index * PENDING_PER_INDEX
         if (count > 0 && pendingTicks[base + count - 1] == tick) return
         if (count == PENDING_PER_INDEX) {
-            pendingCounts[index] = PENDING_OVERFLOW
+            untrackedThrough[index] = tick
+            pendingCounts[index] = 0
             return
         }
         pendingTicks[base + count] = tick
         pendingCounts[index] = count + 1
     }
 
-    /** Drops every unacknowledged-send tick at or before [tick]: it is the baseline, or older. */
+    /**
+     * Drops every unacknowledged-send tick at or before [tick]: it is the baseline, or older.
+     *
+     * Ends an overflow only when [tick] is at or after [untrackedThrough]: the client then holds
+     * this packet's state or a newer one, and every newer send is in the list.
+     */
     private fun prunePending(index: Int, tick: Long) {
-        val count = pendingCounts[index]
-        if (count <= 0) {
-            // An overflowed list is restored by the ack for the full write it forced, and only
-            // then: clearing it earlier would resume delta-encoding against an incomplete set.
-            if (count == PENDING_OVERFLOW) pendingCounts[index] = 0
-            return
+        if (untrackedThrough[index] != NO_BASELINE && tick >= untrackedThrough[index]) {
+            untrackedThrough[index] = NO_BASELINE
         }
+        val count = pendingCounts[index]
+        if (count == 0) return
         val base = index * PENDING_PER_INDEX
         var kept = 0
         for (position in 0 until count) {
@@ -433,6 +464,7 @@ public class ClientReplicationState(
         destroyTicks = destroyTicks.copyOf(capacity).also { it.fill(NO_BASELINE, destroyTicks.size, capacity) }
         pendingTicks = pendingTicks.copyOf(capacity * PENDING_PER_INDEX)
         pendingCounts = pendingCounts.copyOf(capacity)
+        untrackedThrough = untrackedThrough.copyOf(capacity).also { it.fill(NO_BASELINE, untrackedThrough.size, capacity) }
     }
 
     /** One in-flight packet: which entities it carried, so an ack can promote their baselines. */

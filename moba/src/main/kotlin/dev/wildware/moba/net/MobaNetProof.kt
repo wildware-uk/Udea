@@ -211,10 +211,7 @@ public object MobaNetProof {
         /**
          * True when this client holds exactly the server's `@Net` state **for the battle**.
          *
-         * The units, and not the whole world, for the reason [NetStateProbe.unitHash] carries: a
-         * recycled `NetId` index waits one acknowledgement by protocol, and `moba` recycles
-         * indices every few ticks because projectiles are short-lived, so a whole-world fold is
-         * very likely to be one entity short at any given tick without anything being wrong.
+         * The units, and not the whole world: see [NetStateProbe.unitHash].
          */
         public val agrees: Boolean get() = unitHash == serverUnitHash
     }

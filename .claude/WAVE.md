@@ -2,7 +2,7 @@
 
 ## kmp baseline
 
-SHA `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+SHA `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -17,7 +17,7 @@ Reviewers and trial merges: run `-p build-logic check` too; that one test failin
 
 Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` to every build command (developers, reviewers, trial merges). Without it: `SDK location not found`. That is environment, not a red build. Refresh after every merge.
 
-## Wave 5 (2026-09-17): in flight
+## Wave 5 (2026-09-17): done
 
 - Dispatched: #207 audio (dev-207, SPI+Silent+drain only), #208 agent (dev-208), #216 build-logic inputs (dev-216), #218 CI budget base (dev-218, may push its branch for CI), #220 UDP reader silent stop (dev-220). Disjoint modules; #207/#208 may both touch docs/module-graph.md and AGENTS.md.
 - #207 split: Kool AudioDevice + desktop/browser playback moved to #221 (lives in udea-render, needs #211). Commented on #207; #221 added to epic #199.
@@ -27,6 +27,8 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - #207: merged `e9639e0`, round 1 PASS (no findings). udea-audio no-ios KMP; mixer seed reads kotlin.time.Clock (presentation, reviewer-ruled OK). Worktree kept: `.claude/worktrees/agent-ad8fa4bba8720b520`.
 - #220: merged `89e6113`, round 1 PASS (no findings). Reader stop queues a marker; poll counts receiveErrors, disconnects with local-only DisconnectReason.ReceiveFailed(8), sets failure. Worktree kept: `.claude/worktrees/agent-af52e01da27821b3f`.
 - #208: merged `47ec3b9`, round 1 PASS (no findings). udea-agent no-ios KMP; KSP twice (common + jvmMain scoped by new `udea.sourceSet` option); Wasm refuses diag.memory and enum writes with typed errors; /tools byte-identical to master. Worktree kept: `.claude/worktrees/agent-a9f0019cbc1541a12`. #193 (editor tools) now unblocked.
+- #218: merged `25cc650`, round 1 PASS (no findings). Base picked by .github/scripts/clean-build-base.sh ("kmp master"). Branch CI ratio 1.015. CHECK: first kmp push CI run's budget job base should be HEAD^1. Windows UDEA0021 asset-validation flake seen once (rerun green). Worktree kept: `.claude/worktrees/agent-a693b967af25ee619`; remote branch issue-218-ci-budget-base pushed.
+- Trap: this session's memory guard kills `run_in_background` builds even with 25G free; run trial builds via `setsid nohup ... &` and a Monitor on the log. Stop Gradle daemons after (`sh gradlew --stop`).
 - For #214 cleanup (dropped as cards, noted on #214): docs/contracts/agent-tools.md says udea-agent `src/main` (stale path, frozen - lock route); ci.yml replay-equality-nightly `if:` still names refs/heads/example (schedule on default branch still runs).
 - Reviewers cannot SendMessage `main`; they reach the lead as `team-lead`.
 - Trap: the lead's scratchpad is shared with developers; name logs per issue.
@@ -74,7 +76,12 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - Cards filed: none. Notes carried as comments on #211 (Kool workarounds) and #203 (`udeaVerifyDeterminism`
   layout; add module to CI `ios-tests`).
 
-## Wave 5 plan
+## Wave 6 plan
+
+- Ready: #217 (determinism TimeSource; build-logic), #219 (UDP straddle desync; udea-net), #193 (editor.* tools; needs #208 - merged), #215 (Fleks iOS), #210 (composegl-kool, other repo; check composegl-ef session first). #211 needs #210. #221 needs #211.
+- #217 vs #193: check module overlap before pairing.
+
+## Wave 5 plan (done)
 
 - Ready now: #207 audio (needs #205 - merged), #208 agent (needs #205 - merged), #216 build-logic inputs, #217 determinism TimeSource, #218 CI budget base, #219 UDP straddle desync, #220 UDP reader silent stop, #210 composegl-kool (other repo; check composegl-ef session first).
 - Collisions: #216 and #217 both edit build-logic (determinism tests) - not together. #219 and #220 both udea-net - not together. #193 editor tools needs #208.

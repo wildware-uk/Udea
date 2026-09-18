@@ -31,6 +31,19 @@ import dev.wildware.udea.render.input.UiInput
  * it would eat W as readily as Escape. The stack still decides *whether this handler is asked* -
  * something above may have consumed an event already, and [onKeyEvents] honours that.
  *
+ * ## Typing is judged on the character, not the key
+ *
+ * A keystroke arrives twice: the key going down, then the character it typed. A text field takes
+ * only the character - a bare letter key means nothing to it - so asking about the key alone would
+ * let "w" typed into a name field walk the hero as well (issue #230). So a key-down the interface
+ * declines is held back for one event, and if the event after it is its character and the
+ * interface takes *that*, the key was typing and is not recorded. Anything else and it is recorded
+ * as it would have been. The rule follows the interface's answer: a focused button takes no text,
+ * so it swallows no letters, and with no interface shown every key is the game's.
+ *
+ * It relies on the character following its key directly within one frame's events. GLFW reports
+ * both from the same keystroke in the same poll, and Kool queues them in that order in one list.
+ *
  * ## Counted edges, not a per-frame flag
  *
  * [pressesSince] counts and [endSample] spends, which is [KeyboardState]'s contract and the reason
@@ -91,14 +104,24 @@ public class KoolKeyboard(
      * `KoolKeyboardOrderTest` calls it with hand-built events, and Kool calls it with real ones.
      */
     internal fun onKeyEvents(events: List<KeyEvent>) {
+        // A key-down the interface declined, held back for one event: if the event after it is the
+        // character it typed and the interface takes that, the key was typing and is not recorded.
+        var typing: KeyEvent? = null
         for (event in events) {
             if (event.isConsumed) continue
-            if (ui.onKey(strokeOf(event))) {
-                event.isConsumed = true
-                continue
+            val taken = ui.onKey(strokeOf(event))
+            val held = typing
+            typing = null
+            if (held != null) {
+                if (taken && event.isCharTyped) held.isConsumed = true else record(held)
             }
-            record(event)
+            when {
+                taken -> event.isConsumed = true
+                event.isPressed && !event.isCharTyped -> typing = event
+                else -> record(event)
+            }
         }
+        typing?.let(::record)
     }
 
     private fun record(event: KeyEvent) {

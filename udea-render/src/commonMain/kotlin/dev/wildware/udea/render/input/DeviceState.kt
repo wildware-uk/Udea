@@ -25,7 +25,8 @@ public interface KeyboardState {
      * Whether [keycode] is down right now.
      *
      * The code is the *backend's* own table, and there is exactly one per build: Kool's universal
-     * key codes since issue #224 - `'w'.code` for W, a small negative for Escape and the rest - where
+     * key codes since issue #224 - GLFW's constant for a printable key, so `'W'.code` (87, the ASCII
+     * uppercase) for W, and a small negative for Escape and the other special keys - where
      * it used to be `com.badlogic.gdx.Input.Keys`. `ActionBinding.keys` speaks the same table, and
      * `KoolKeyboard` is what fills this in.
      */

@@ -139,12 +139,96 @@ class KoolKeyboardOrderTest {
         assertEquals(0, keyboard.pressesSince(W), "the presses were counted twice")
     }
 
+    @Test
+    fun `a key whose character a text field took never reaches the keyboard`() {
+        val typing = KoolKeyboard(TakesText)
+        try {
+            val w = down(W)
+            typing.onKeyEvents(listOf(w, typed('w')))
+            typing.onKeyEvents(listOf(up(W)))
+
+            assertEquals(0, typing.pressesSince(W), "typing 'w' into a text field also pressed W for the game")
+            assertFalse(typing.isKeyDown(W), "typing 'w' into a text field left W held for the game")
+            assertTrue(w.isConsumed, "the key that typed the character was not marked consumed")
+        } finally {
+            typing.close()
+        }
+    }
+
+    @Test
+    fun `a key held down in a text field never becomes held for the game`() {
+        val typing = KoolKeyboard(TakesText)
+        try {
+            typing.onKeyEvents(listOf(down(W), typed('w'), repeat(W), typed('w', repeated = true)))
+
+            assertFalse(typing.isKeyDown(W), "the platform's auto-repeat put W down for the game")
+            assertEquals(0, typing.pressesSince(W), "holding a letter in a text field pressed it for the game")
+        } finally {
+            typing.close()
+        }
+    }
+
+    @Test
+    fun `a key whose character the interface declined still reaches the keyboard`() {
+        keyboard.onKeyEvents(listOf(down(W), typed('w')))
+
+        assertTrue(keyboard.isKeyDown(W), "a focused control that takes no text swallowed W")
+        assertEquals(1, keyboard.pressesSince(W), "a focused control that takes no text swallowed W's press")
+    }
+
+    @Test
+    fun `a character only speaks for the key immediately before it`() {
+        val typing = KoolKeyboard(TakesText)
+        try {
+            val s = 'S'.code
+            typing.onKeyEvents(listOf(down(W), down(s), typed('s')))
+
+            assertEquals(1, typing.pressesSince(W), "W typed nothing, and a later key's character took it anyway")
+            assertEquals(0, typing.pressesSince(s), "S typed 's' into the field and still pressed S")
+        } finally {
+            typing.close()
+        }
+    }
+
+    @Test
+    fun `a key with nothing after it in the frame is recorded`() {
+        val typing = KoolKeyboard(TakesText)
+        try {
+            typing.onKeyEvents(listOf(down(W)))
+
+            assertEquals(1, typing.pressesSince(W), "a key waiting for a character that never came was lost")
+        } finally {
+            typing.close()
+        }
+    }
+
     // --- fixture -------------------------------------------------------------------------
 
     /** An interface that wants Escape and nothing else. */
     private object TakesEscape : UiInput {
         override fun onKey(event: KeyStroke): Boolean = event.keycode == ESCAPE
     }
+
+    /** A focused text field: it takes every printable character and no key. */
+    private object TakesText : UiInput {
+        override fun onKey(event: KeyStroke): Boolean = event.phase == KeyPhase.Character
+    }
+
+    private fun repeat(code: Int) = KeyEvent(
+        UniversalKeyCode(code),
+        LocalKeyCode(code),
+        KeyboardInput.KEY_EV_DOWN or KeyboardInput.KEY_EV_REPEATED,
+        0,
+    )
+
+    /** What Kool queues from GLFW's character callback: the code point as the key code, and the char. */
+    private fun typed(char: Char, repeated: Boolean = false) = KeyEvent(
+        UniversalKeyCode(char.code),
+        LocalKeyCode(char.code),
+        KeyboardInput.KEY_EV_CHAR_TYPED or (if (repeated) KeyboardInput.KEY_EV_REPEATED else 0),
+        0,
+        char,
+    )
 
     private fun down(code: Int) = KeyEvent(
         UniversalKeyCode(code),
@@ -162,6 +246,7 @@ class KoolKeyboardOrderTest {
 
     private companion object {
         val ESCAPE = KeyboardInput.KEY_ESC.code
-        val W = UniversalKeyCode('w').code
+        /** What GLFW sends for W, and so what Kool reports: the ASCII uppercase, 87. */
+        val W = 'W'.code
     }
 }

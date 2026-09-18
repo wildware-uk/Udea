@@ -28,7 +28,7 @@ val legacyModuleDirectories: List<java.io.File> =
  * adding a module to `settings.gradle.kts` is the only step needed to bring it under the gate.
  */
 val rewriteModuleDirectories: List<java.io.File> = subprojects
-    .filter { it.path.startsWith(":udea-") || it.path == ":moba" }
+    .filter { it.path.startsWith(":udea-") || it.path == ":moba" || it.path.startsWith(":moba:") }
     .sortedBy { it.path }
     .map { it.projectDir }
 

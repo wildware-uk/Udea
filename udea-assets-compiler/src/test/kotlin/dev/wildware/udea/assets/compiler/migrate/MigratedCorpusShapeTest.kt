@@ -14,14 +14,14 @@ import kotlin.io.path.readText
 /**
  * The syntactic properties of the game's asset tree, and the one trap its DSL could fall into.
  *
- * The tree is `moba/assets`, which is the *only* asset root this game has since `character`,
+ * The tree is `moba/game/assets`, which is the *only* asset root this game has since `character`,
  * `gameplayEffect` and `effect` became published kinds and `moba/src/main/assets` was merged into
  * it and deleted.
  */
 class MigratedCorpusShapeTest {
 
     private val scripts = dev.wildware.udea.assets.compiler.AssetCompiler
-        .scriptsUnder(TestPaths.repoRoot.resolve("moba/assets"))
+        .scriptsUnder(TestPaths.repoRoot.resolve("moba/game/assets"))
 
     /**
      * Issue #93's grep criterion: none of the three shapes the migration deletes survives.

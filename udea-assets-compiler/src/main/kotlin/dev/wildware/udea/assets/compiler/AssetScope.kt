@@ -472,7 +472,7 @@ public class AssetScope(
 
     /**
      * `defaultCharacter` is stamped [SpawnRecipe] and not `Blueprint`, because both corpora point
-     * it at one of the two: `moba/assets/config.udea.kts` names a `blueprint/` and the migrated
+     * it at one of the two: `moba/game/assets/config.udea.kts` names a `blueprint/` and the migrated
      * one names a `blueprint/player` that inherits a `character/`. Widening it is not a loosening
      * - a `soundCue` there is still `UDEA0013` - it is naming what the field always meant.
      */

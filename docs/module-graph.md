@@ -242,6 +242,25 @@ rejected — and `composegl-gdx` would bring gdx in transitively without the bui
 This is the rule behind the ticket's first acceptance criterion ("`udea-render` builds for JVM and
 Android with no LibGDX dependency"), kept as a rule so the criterion stays true after the ticket.
 
+## `UDEA-MG-009` — no `moba` project resolves LibGDX
+
+**Kool port spec §3, §4, D4, D9, D12.** Banned on `compileClasspath` and `runtimeClasspath` of
+`:moba`, `:moba:game`, `:moba:desktop`, `:moba:android` and `:moba:web`, on every target:
+`com.badlogicgames.gdx:*` and `dev.wildware.composegl:composegl-gdx*`.
+
+`UDEA-MG-008` is the same ban one module along. `moba` was the last project in the rewrite tree
+that legitimately named gdx: it took `libs.gdx` so a `RenderSystem` could name `Batch` and
+`TextureRegion`, and `libs.gdx.box2d` plus the desktop natives for `Box2DPhysicsWorld`. Issue #211
+took the first reason away — the game draws through `udea-render`, which draws with Kool — and
+spec D4 takes the second: Box2D leaves with LibGDX, and `MobaPhysicsModule` was never installed.
+Issue #212 removes both and this is what keeps them removed.
+
+Every `:moba:*` project rather than the one that used to name it, because `:moba:desktop` and
+`:moba:android` both resolve `:moba:game`: a gdx artifact put back on any of them reaches the
+shipped game. `:moba` itself stays listed although the project no longer exists, so that
+re-creating a flat `moba` module does not re-open the hole, and `:moba:web` is listed for the same
+reason ahead of issue #226.
+
 ## `UDEA-MG-003` — `udea-assets-compiler` holds zero Gradle types
 
 **Spec §4.** Banned on every scanned classpath: `org.gradle:*`, `file:Gradle *` (which is

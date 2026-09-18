@@ -368,7 +368,7 @@ and you comment the disagreement on the issue.
     real one while the others `TODO()`.
   - Kool and ComposeGL backends live ONLY in `udea-render` (spec section 3).
 
-THERE IS NO ART STEP, AND YOU TYPE NOTHING. `moba/assets/sprites/` is gitignored
+THERE IS NO ART STEP, AND YOU TYPE NOTHING. `moba/game/assets/sprites/` is gitignored
 third-party licensed art, so a fresh worktree carries none of it - and it does
 not need to. The build stages it: `:moba:udeaStageCharacterArt` copies the sheets
 out of `example/src/main/resources/assets/sprites/`, where they already are,

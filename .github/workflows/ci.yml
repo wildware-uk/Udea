@@ -312,10 +312,10 @@ jobs:
     # `udea-core` benches hung off `check`. `check` runs inside `build`, so every one of them was
     # timed while nineteen other modules compiled on the same cores. On run 33428671524 -- the
     # first run that reached them at all, because before #170 the build died at
-    # `:moba:udeaPackBundle` -- `udeaPhase2Exit` measured 1485ms against its 1000ms budget on
+    # `:moba:game:udeaPackBundle` -- `udeaPhase2Exit` measured 1485ms against its 1000ms budget on
     # `ubuntu-latest` and failed again on `windows-latest`, and `udeaDaemonBudget` and
     # `udeaPackGate` failed on the plugin-disabled leg. Nothing in any of those tests had changed;
-    # none of them reads `moba/assets`; all three use synthetic fixtures.
+    # none of them reads `moba/game/assets`; all three use synthetic fixtures.
     #
     # The same tasks on this project's own development box, inside a parallel build and then
     # alone: warm reload 646ms then 195ms, warm validate 377ms then 151ms, graph deserialisation
@@ -1262,7 +1262,7 @@ jobs:
             echo "::error::gamebridge.json is present in a fresh checkout; it is generated, not committed"
             exit 1
           }
-          ./gradlew :moba:udeaGenerateLaunchDeclaration --console=plain
+          ./gradlew :moba:desktop:udeaGenerateLaunchDeclaration --console=plain
           test -f gamebridge.json || {
             echo "::error::udeaGenerateLaunchDeclaration did not write gamebridge.json"
             exit 1
@@ -1481,7 +1481,7 @@ jobs:
     # `DriftWorld` stays checked in as the gate's **self-test**: `:udea-replay:udeaReplayEqualityProof`
     # plants a one-ulp divergence into it across five processes on one machine, and
     # `CrossPlatformDivergenceTest` pins the rendered cross-platform failure against a checked-in
-    # expected output. `:moba:udeaReplayEqualityProof` does the same for this fixture, naming
+    # expected output. `:moba:desktop:udeaReplayEqualityProof` does the same for this fixture, naming
     # `Position.x`.
     #
     # `ReplayDigestWriter` refolds its own cells into the world hash and refuses to write a tick
@@ -1506,7 +1506,7 @@ jobs:
     # `main` classes (`ReplayDigestCli`, `ReplayDigestRecorder`, `ReplayEquality`) and is covered
     # by `CrossPlatformDivergenceTest`, `DivergenceReportFormatTest`, `ReplayDigestTest`,
     # `ReplayEqualityProofTest` and `MobaReplayEqualityTest`, plus the two five-process proofs
-    # `:udea-replay:udeaReplayEqualityProof` and `:moba:udeaReplayEqualityProof`. What is `moba`'s
+    # `:udea-replay:udeaReplayEqualityProof` and `:moba:desktop:udeaReplayEqualityProof`. What is `moba`'s
     # own - its fixtures, its world, its component registry, and what a plant perturbs - is
     # `MobaDigestMain`, which is six lines. Nobody can run GitHub Actions locally, so anything
     # expressed only here would be unverifiable until it had already gone wrong once.
@@ -1557,7 +1557,7 @@ jobs:
         run: chmod +x ./gradlew
 
       # `-Pudea.replay.out` is workspace-relative, and that is only safe because
-      # `:moba:udeaReplayDigest` hands `MobaDigestMain` a `--workspace` naming the repository
+      # `:moba:desktop:udeaReplayDigest` hands `MobaDigestMain` a `--workspace` naming the repository
       # root - a `JavaExec` on its own would resolve this against `moba/`, which is issue #169
       # and is why no join step ever ran. `MobaReplayEqualityTest` drives the entry point with
       # this exact string and checks the answer against the upload glob below.
@@ -1567,7 +1567,7 @@ jobs:
       - name: Replay the moba fixture and write this leg's digest
         shell: bash
         run: >-
-          ./gradlew :moba:udeaReplayDigest
+          ./gradlew :moba:desktop:udeaReplayDigest
           -Pudea.replay.label=${{ matrix.os }}/${{ matrix.distribution }}-17
           -Pudea.replay.jvmVendor=${{ matrix.vendor }}
           -Pudea.replay.out=digests/${{ matrix.os }}-${{ matrix.distribution }}.udeaeq
@@ -1717,7 +1717,7 @@ jobs:
     # inside a minute has a chance to surface.
     #
     # There is no `plant: true` leg here. The plant proves the gate can fail, and it is proven on
-    # every push by the job above and by `:moba:udeaReplayEqualityProof`; carrying it here as well
+    # every push by the job above and by `:moba:desktop:udeaReplayEqualityProof`; carrying it here as well
     # would buy nothing and would make the "exactly one leg" fence a fence over two jobs' worth of
     # legs.
     #
@@ -1780,7 +1780,7 @@ jobs:
       - name: Replay the 36000-tick moba fixture and write this leg's digest
         shell: bash
         run: >-
-          ./gradlew :moba:udeaReplayDigest
+          ./gradlew :moba:desktop:udeaReplayDigest
           -Pudea.replay.fixture=moba-36000.udearep
           -Pudea.replay.label=nightly/${{ matrix.os }}/${{ matrix.distribution }}-17
           -Pudea.replay.jvmVendor=${{ matrix.vendor }}

@@ -66,7 +66,7 @@ public object CharacterArtStaging {
     internal const val SOURCE_TREE: String = "example/src/main/resources/assets/sprites"
 
     /** Repo-relative tree the sheets are copied into: the part of `:moba`'s asset root git ignores. */
-    internal const val DESTINATION_TREE: String = "moba/assets/sprites"
+    internal const val DESTINATION_TREE: String = "moba/game/assets/sprites"
 
     /**
      * The sheets each character's `.udea.kts` names, by the file name it names them at.

@@ -46,7 +46,7 @@ pins the rendered cross-platform failure against.
 
 | | replays | checked in at | length |
 | --- | --- | --- | --- |
-| `replay-equality`, every push | `moba-3600.udearep` | `moba/src/test/resources/fixtures/` | 3600 ticks |
+| `replay-equality`, every push | `moba-3600.udearep` | `moba/desktop/src/test/resources/fixtures/` | 3600 ticks |
 | `replay-equality-nightly` | `moba-36000.udearep` | the same directory | 36000 ticks |
 | `:udea-replay:udeaReplayEqualityProof`, the self-test | `drift-3600.udearep` | `udea-replay/src/testFixtures/resources/fixtures/` | 3600 ticks |
 
@@ -56,7 +56,7 @@ A `.udearep` carries the `BuildIdentity` of the build that recorded it — root 
 asset graph hash, input schema hash — and a replay refuses it the moment any of the four moves.
 `moba`'s `protoHash` moves whenever a replicated component is added or removed, its asset graph
 hash whenever an asset changes, and its input schema hash whenever a key is rebound, so this is
-ordinary gameplay work rather than a rare event. `:moba:test` fails on the machine that made the
+ordinary gameplay work rather than a rare event. `:moba:desktop:test` fails on the machine that made the
 change, with `MobaReplayFixturesCurrentTest` naming which identity field moved and what both
 sides hold.
 
@@ -64,8 +64,8 @@ Two front doors, one reconciliation (`ReplayFixtures.reconcile`), so they cannot
 what "stale" means or about what they write:
 
 ```
-./gradlew :moba:udeaWriteReplayFixture                 # rebuilds moba's two, and nothing else
-./gradlew :moba:test -Dupdate.replay.fixtures=true     # the --update-goldens-shaped route
+./gradlew :moba:desktop:udeaWriteReplayFixture                 # rebuilds moba's two, and nothing else
+./gradlew :moba:desktop:test -Dupdate.replay.fixtures=true     # the --update-goldens-shaped route
 ./gradlew :udea-replay:udeaWriteReplayFixture          # the self-test world's two
 ```
 
@@ -82,7 +82,7 @@ somebody types on purpose — the same bargain `udeaWriteProtocolLock` strikes w
 ### Running the gate on one machine
 
 ```
-./gradlew :moba:udeaReplayEqualityProof         # five processes: two honest legs agree, a planted one fails
+./gradlew :moba:desktop:udeaReplayEqualityProof         # five processes: two honest legs agree, a planted one fails
 ./gradlew :udea-replay:udeaReplayEqualityProof  # the same shape over the self-test world
 ```
 
@@ -176,13 +176,35 @@ section 2.0 re-read.
 
 ## 3. LibGDX 1.14.2 — the used surface
 
+> **Issue #212, 2026-09-18: `moba` resolves no LibGDX artifact any more, and this section has not
+> been re-audited against what replaced it.** `UDEA-MG-009` fails the build if any `moba` project
+> puts `com.badlogicgames.gdx:*` on a compile or runtime classpath, so every row below is now a
+> statement about a library the game cannot reach. Three specific claims in it are **false as
+> written** and are marked inline where they appear:
+>
+> - `dev.wildware.moba.physics.Box2DPhysicsWorld` is deleted, with the whole `physics` package,
+>   `Box2DPhysicsWorldTest` and `MobaPhysicsProofTest` (spec D4). `MobaGame.definition()` never
+>   installed `MobaPhysicsModule`, so the shipped game always ran on `NoOpPhysicsWorld`; what the
+>   deletion removes is code nothing reached, not behaviour.
+> - The 3.0 negative control was pointed at those classes. **It names a tree that no longer
+>   exists**, so re-running it would return zero for a reason that says nothing about the grep.
+>   Re-point it before trusting it again.
+> - `:moba` is three projects (`:moba:game`, `:moba:desktop`, `:moba:android`), and the declared
+>   simulation scope is `:moba:game`.
+>
+> What has **not** been done here is the audit of Kool's used surface, which is what the rows
+> below will have to become. That is issue #211's tree and neither #212 nor this note closes it:
+> until it is written, this section documents the risk the *old* renderer carried and nothing
+> about the new one.
+
 **The declared simulation scopes of `:udea-core`, `:udea-gas` and `:udea-net` reference no
 `com.badlogic.gdx` member at all.** That was checked twice: `grep -rn "^import com.badlogic"`
 over their `src/main` returns nothing, and `javap -p -c` over their compiled classes yields zero
 `com/badlogic/gdx` targets. The two mentions of Box2D in `udea-core` are KDoc prose in
 `PhysicsWorld.kt` and `NoOpPhysicsWorld.kt`. The kernel talks to physics through its own
-`PhysicsWorld` interface, and the Box2D implementation lives in `:moba`
-(`dev.wildware.moba.physics.Box2DPhysicsWorld`).
+`PhysicsWorld` interface, and the Box2D implementation lived in `:moba`
+(`dev.wildware.moba.physics.Box2DPhysicsWorld`). **Deleted in issue #212**; `NoOpPhysicsWorld` is
+now the only implementation in the tree, and it is what the shipped game always resolved.
 
 The rows below are therefore an audit of what simulation **would** be exposed to the moment
 somebody reaches for the obvious LibGDX helper — which is why they carry rules and replacements
@@ -229,8 +251,15 @@ not a subdirectory of it.
 
 A grep that returns nothing is worth nothing until it has been seen returning something, so the
 identical pipeline was pointed at `:moba`'s `dev.wildware.moba.physics` classes — a place in the
-new tree that does use gdx — and returned 197 matching lines. The zeros above are therefore
-about `udea-core`, `udea-gas` and `udea-net` rather than about the grep.
+tree that used gdx when this was written — and returned 197 matching lines. The zeros above are
+therefore about `udea-core`, `udea-gas` and `udea-net` rather than about the grep.
+
+**That control is dead as written (issue #212).** `dev.wildware.moba.physics` is deleted, so
+pointing the pipeline at it now returns zero — and a zero from a package that does not exist is
+not evidence about the grep. Whoever next re-reads this section needs a *new* known-positive: a
+place in the current tree that really does resolve the library being audited. There is no such
+place for gdx any more, which is itself the point, and for Kool the honest candidate is
+`udea-render`'s own `build/classes`.
 
 ### 3.1 The float story
 
@@ -272,7 +301,7 @@ bit on a different machine.
 | `Array` / `IntArray` (gdx) iteration | deterministic | — | Backed by a plain array in insertion order; `removeIndex` shifts, `removeValueSwap` does not, and the difference is the caller's decision, not a hidden one. Not currently referenced from simulation. |
 | `Pool.obtain` / `free` / `freeAll` | deterministic-if-used-thus | replacement: never let pooled identity or residual field values reach state | `javap -p Pool` shows `freeObjects: Array<T>` — a LIFO stack, so reuse order is a pure function of the obtain/free history and is reproducible. The risk is not the order: it is that `obtain()` returns an object whose fields hold the previous user's values unless `reset()` clears every one of them. That is a correctness bug that *looks* like nondeterminism. |
 | `com.badlogic.gdx.physics.box2d.*` from **predicted** code | banned | DET005 | The solver accumulates state across steps and is not re-enterable from an arbitrary rewind point, so re-running a predicted tick against it does not reproduce the server's answer. The server owns the solver; prediction re-runs `CharacterMover`, which is closed-form. |
-| `com.badlogic.gdx.physics.box2d.*` from **authoritative** code | deterministic-if-used-thus | replacement: `PhysicsWorld`, stepped exactly once per tick from `PhysicsStepSystem` | Box2D is deterministic for an identical sequence of identical steps in the same process, and *not* across platforms — it is C++ float code compiled per platform in `gdx-platform` natives. `:moba`'s `Box2DPhysicsWorld` is the only implementation and it is reached only through the `PhysicsWorld` interface. This is the row most likely to be what the `replay-equality` job finds first. |
+| `com.badlogic.gdx.physics.box2d.*` from **authoritative** code | deterministic-if-used-thus | replacement: `PhysicsWorld`, stepped exactly once per tick from `PhysicsStepSystem` | Box2D is deterministic for an identical sequence of identical steps in the same process, and *not* across platforms — it is C++ float code compiled per platform in `gdx-platform` natives. `:moba`'s `Box2DPhysicsWorld` was the only implementation and it was reached only through the `PhysicsWorld` interface. **Both are gone (issue #212):** the class is deleted and no `moba` project resolves gdx at all, so this row describes a risk the tree no longer carries. |
 | `Gdx.graphics` / `Gdx.input` / `Gdx.files` / `Gdx.app` | banned | DET006 | The device. `Gdx.graphics.getDeltaTime()` is a frame duration in seconds, which is a presentation unit; input must arrive as a replicated `InputCommand`; files must come from the compiled asset registry. This is the exact defect `common/.../UIScreen.kt:16` shipped. |
 
 ---

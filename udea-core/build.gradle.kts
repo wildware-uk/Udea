@@ -157,19 +157,21 @@ tasks.withType<Test>().configureEach {
  *
  * A glob rather than a `listFiles()` scan so a module added later is covered without anyone
  * remembering this line. `.kts` is deliberately not matched: the asset corpus under
- * `moba/assets` is not Kotlin the rule reads.
+ * `moba/game/assets` is not Kotlin the rule reads.
  */
 val fieldMaskScanSources: ConfigurableFileTree = fileTree(rootProject.layout.projectDirectory) {
     include("udea-*/src/main/**/*.kt")
     include("udea-*/src/testFixtures/**/*.kt")
-    include("moba/src/main/**/*.kt")
-    include("moba/src/testFixtures/**/*.kt")
+    // `moba` is three nested projects since issue #212 (`game`, `desktop`, `android`), so the
+    // glob has a level in it that `udea-*` does not.
+    include("moba/*/src/main/**/*.kt")
+    include("moba/*/src/testFixtures/**/*.kt")
     // A multiplatform module's shipped source sets (issue #201): `commonMain`, `jvmMain`,
     // `jvmTestFixtures` and the like.
     include("udea-*/src/*Main/**/*.kt")
     include("udea-*/src/*TestFixtures/**/*.kt")
-    include("moba/src/*Main/**/*.kt")
-    include("moba/src/*TestFixtures/**/*.kt")
+    include("moba/*/src/*Main/**/*.kt")
+    include("moba/*/src/*TestFixtures/**/*.kt")
 }
 
 tasks.named<Test>("jvmTest") {

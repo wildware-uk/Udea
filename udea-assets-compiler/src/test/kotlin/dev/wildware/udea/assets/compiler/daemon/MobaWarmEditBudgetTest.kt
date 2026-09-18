@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  * it measures the *decision* half only - the daemon says "this compiles" and touches nothing. Two
  * things spec 6's Phase 2 number is about are missing from it:
  *
- * - **the real tree.** `moba/assets` is the game's whole authored corpus - its characters, its
+ * - **the real tree.** `moba/game/assets` is the game's whole authored corpus - its characters, its
  *   abilities, its effects, its controls, its shop, and a level with twenty-seven entities in it.
  *   Every reload re-walks that graph, re-packs every value and diffs the result against the
  *   last-good one, and none of that appears in a three-script fixture. What the corpus is *made

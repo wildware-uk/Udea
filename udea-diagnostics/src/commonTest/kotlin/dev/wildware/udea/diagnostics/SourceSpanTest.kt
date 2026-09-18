@@ -45,7 +45,7 @@ class SourceSpanTest {
 
     @Test
     fun `allows dots inside a file name`() {
-        assertEquals("moba/assets/orc..idle.png", SourceSpan("moba/assets/orc..idle.png", 1, 1, 1, 1).path)
+        assertEquals("moba/game/assets/orc..idle.png", SourceSpan("moba/game/assets/orc..idle.png", 1, 1, 1, 1).path)
     }
 
     @Test

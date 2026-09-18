@@ -75,7 +75,9 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `udea-agent-host` | HTTP server. Debug-only, verified absent from release |
 | `udea-replay` | `.udearep` input recording, deterministic headless replay, and the bisect tools |
 | `udea-gradle` | Tasks, verifiers, `gamebridge.json` emission |
-| `moba` | The example game: a 5v5 three-lane MOBA |
+| `moba:game` | The example game: a 5v5 three-lane MOBA. A library - components, systems, assets and what it draws - with no entry point in it |
+| `moba:desktop` | The desktop launcher: `run`, `runServer`, `runClient`, the shot mains, the proofs and the agent surface. JVM |
+| `moba:android` | The Android launcher. One activity, and it boots the simulation headless because `udea-render` has no Android Kool backend yet |
 | `common` | **Old tree.** Replaced module by module, deleted in Phase 6 |
 | `gradle-plugin` | **Old tree.** Replaced by `udea-codegen` + `udea-gradle` |
 | `example` | **Old tree.** Replaced by `moba` |
@@ -95,7 +97,7 @@ rationale: `docs/module-graph.md`.
 
 **Multiplatform (the Kool/KMP port, issue #201).** A runtime module moves to KMP by applying
 `udea.kotlin-multiplatform` (`jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64`);
-`udea-render` will apply `udea.kotlin-multiplatform-render`, the same set without iOS.
+`udea-render` applies `udea.kotlin-multiplatform-render` (issue #211): `jvm` and `android` only, because Kool has no iOS backend (spec D2) and publishes no wasmJs artifact (issue #223).
 `udea-core` is on `udea.kotlin-multiplatform`, iOS included, because Fleks is vendored as source
 in `udea-fleks` (issue #215): Fleks publishes no iOS artifact at any version. `udea-fleks` is
 third-party code under its own MIT licence (`udea-fleks/NOTICE.md`); do not refactor it, and an
@@ -108,7 +110,7 @@ and `android` through a shared `socketMain` source set, and `wasmJs` has the Web
 `AudioDevice` SPI, `AudioDevice.Silent` and the cue drain are `commonMain`, and a device that makes
 a noise is not in it on any target. In `udea-agent` the tools and dispatcher are common, the
 `assets.*` toolset is `jvmMain` because the asset daemon is, and `udea-agent-host` stays JVM.
-Build-time modules stay on `udea.kotlin-library`. The module-graph gates govern each target's
+`moba` is three projects (spec D12, issue #212): `moba:game` is on `udea.kotlin-multiplatform-render`, so it builds for every target `udea-render` has, and each launcher is a single-platform project whose targets are the platform's. Two things do not cross that line yet, and both are a module's gap rather than the game's: `udea-replay` generates its registry on its JVM target alone, so `MobaReplay` lives in `moba:desktop`; and `:moba:game` runs KSP through `kspJvm` rather than `kspCommonMainMetadata`, because the Kotlin plugin creates no `commonMain` metadata compilation for a project whose targets are all JVM-family - `moba/game/build.gradle.kts` writes that out at length. Build-time modules stay on `udea.kotlin-library`. The module-graph gates govern each target's
 classpath as the JVM classpath it stands for. `sh gradlew :<module>:allTests` skips iOS off
 macOS; the `ios-tests` CI job runs it. The Android SDK comes from `ANDROID_HOME` or an
 untracked `local.properties` (`sdk.dir=...`), which is never committed.
@@ -229,8 +231,8 @@ replaced**, not left "for reference".
 
 No `-x` exclusions. The whole repository is green; if it is not, that is your change.
 
-- **There is no art step.** `moba/assets/sprites/` is gitignored licensed art, and
-  `:moba:udeaStageCharacterArt` copies it out of the tree that already holds it, ahead of the
+- **There is no art step.** `moba/game/assets/sprites/` is gitignored licensed art, and
+  `:moba:game:udeaStageCharacterArt` copies it out of the tree that already holds it, ahead of the
   asset pipeline, on every build. So a clone builds, `git status` stays clean, and a `UDEA0032`
   about a `spritePath` is a real defect rather than a step you forgot. `docs/art-assets.md`.
 - Tests assert **behaviour**. A test that cannot fail is a defect a reviewer will reject.

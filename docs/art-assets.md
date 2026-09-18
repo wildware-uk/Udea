@@ -3,10 +3,10 @@
 Source: **Tiny RPG Character Asset Pack**, parts 1 and 2 (40 characters).
 
 The pixels are **not committed** - they are third-party licensed art and this repo is public.
-`.gitignore` excludes `moba/src/main/resources/assets/sprites/`, `moba/assets/sprites/` and
+`.gitignore` excludes `moba/src/main/resources/assets/sprites/`, `moba/game/assets/sprites/` and
 `moba/raw-assets/`.
 
-`moba/assets/sprites/` is the path the character scripts under `moba/assets/character/` actually
+`moba/game/assets/sprites/` is the path the character scripts under `moba/game/assets/character/` actually
 name and the one `:moba:udeaPackBundle` reads, so a clone carries none of it. **The build puts it
 there.** `:moba:udeaStageCharacterArt` copies the sheets out of
 `example/src/main/resources/assets/sprites/`, where this repository already holds them, and runs
@@ -58,8 +58,8 @@ separate things make it useless as a fresh-clone step:
   needs files nobody who clones this repository has.
 - Its `MOBA` destination is an absolute path on the author's own machine.
 - It writes `sprites/<char>/idle.png`, lowercased and un-hyphenated, under
-  `moba/src/main/resources/assets/sprites/` — the old asset root. `moba/assets/character/*.udea.kts`
-  name `sprites/wizard/Wizard-Idle.png` under `moba/assets/`. Neither the root nor the filenames
+  `moba/src/main/resources/assets/sprites/` — the old asset root. `moba/game/assets/character/*.udea.kts`
+  name `sprites/wizard/Wizard-Idle.png` under `moba/game/assets/`. Neither the root nor the filenames
   match.
 
 It is kept, and not only for provenance: **it is the only thing that produces its output.**
@@ -281,7 +281,7 @@ the last step alone breaks the build. `scripts/verify-art-staging.py` will tell 
 
 ### The ongoing mechanism for `moba`'s art
 
-**Unchanged in substance, and deliberately so:** `.gitignore` excludes `moba/assets/sprites/`,
+**Unchanged in substance, and deliberately so:** `.gitignore` excludes `moba/game/assets/sprites/`,
 the build populates it from art the repository already holds, and this file is the committed
 manifest. Issue #170 changed only who runs the copying — the build rather than a person who had
 read this file. Three alternatives were considered for the same decision and rejected:

@@ -164,7 +164,7 @@ public object ReplayDigestCli {
      * @param worlds a factory-of-factories, taking the tick to plant a one-ulp divergence at.
      *   Every game's plant is a different field of a different component, so the perturbation is
      *   the game's and only the tick is this function's.
-     * @param gradleProject the Gradle project this entry point belongs to, e.g. `:moba`. It goes
+     * @param gradleProject the Gradle project this entry point belongs to, e.g. `:moba:desktop`. It goes
      *   into the digest header so the join step's reproduce block names the module that can
      *   actually replay this fixture - see [ReplayDigestHeader.gradleProject].
      * @param plantDescription what [worlds] does when it is handed a tick, in one sentence, for a

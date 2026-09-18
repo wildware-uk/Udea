@@ -82,16 +82,29 @@ allprojects {
 // which is the wrong person to be able to switch off the rule that stops the old tree leaking
 // into the new one.
 
-/** Gradle paths of the rewrite tree: everything the Phase 0 gates apply to. */
-val rewriteProjects = subprojects.filter { it.path.startsWith(":udea-") || it.path == ":moba" }
+/**
+ * Gradle paths of the rewrite tree: everything the Phase 0 gates apply to.
+ *
+ * `buildFile.exists()` is not a nicety. `:moba` is a container since issue #212 - it holds
+ * `:moba:game`, `:moba:desktop` and `:moba:android` and has no build script, no plugins and no
+ * configurations of its own - and both gates refuse a project they would inspect nothing of:
+ * *"matched none of the configurations [...], so udeaVerifyModuleGraph inspected nothing. A gate
+ * with no input passes forever"*. That refusal is right, so the container is excluded here rather
+ * than the message being softened there.
+ */
+val rewriteProjects = subprojects.filter {
+    (it.path.startsWith(":udea-") || it.path.startsWith(":moba:")) && it.buildFile.exists()
+}
 
 subprojects {
     if (this in rewriteProjects) {
         apply(plugin = "udea.legacy-dependency-check")
         apply(plugin = "udea.module-graph-check")
     }
-    // The release gate lives on the one project that actually ships a jar.
-    if (path == ":moba") {
+    // The release gate lives on the project that actually ships a runnable process. That is the
+    // desktop launcher now (issue #212): `:moba:game` is a library with no entry point in it, and
+    // the classpath `UDEA-REL-002` is about is the one a player's or an agent's process runs on.
+    if (path == ":moba:desktop") {
         apply(plugin = "udea.release-check")
     }
 }
@@ -103,20 +116,20 @@ subprojects {
  */
 val udeaVerifyNoLegacyDependencies by tasks.registering {
     group = "verification"
-    description = "Runs udeaVerifyNoLegacyDependencies on every udea-* project and on moba."
+    description = "Runs udeaVerifyNoLegacyDependencies on every udea-* project and every moba project."
     dependsOn(rewriteProjects.map { "${it.path}:udeaVerifyNoLegacyDependencies" })
 }
 
 val udeaVerifyModuleGraph by tasks.registering {
     group = "verification"
-    description = "Runs udeaVerifyModuleGraph on every udea-* project and on moba."
+    description = "Runs udeaVerifyModuleGraph on every udea-* project and every moba project."
     dependsOn(rewriteProjects.map { "${it.path}:udeaVerifyModuleGraph" })
 }
 
 val udeaVerifyRelease by tasks.registering {
     group = "verification"
     description = "Runs the release artifact scan on the shipping project."
-    dependsOn(":moba:udeaVerifyRelease")
+    dependsOn(":moba:desktop:udeaVerifyRelease")
 }
 
 /**

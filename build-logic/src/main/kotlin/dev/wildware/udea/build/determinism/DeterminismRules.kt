@@ -118,7 +118,9 @@ public object DeterminismRules {
                 "excluded by these prefixes.",
         ),
         SimScope(
-            project = ":moba",
+            // `:moba:game` since issue #212 split the launchers off. The game's rules are the
+            // whole of what simulates; neither launcher holds a system.
+            project = ":moba:game",
             sourceSet = "main",
             packagePrefixes = listOf(
                 "dev.wildware.moba.ability",

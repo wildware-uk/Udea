@@ -114,6 +114,39 @@ class ModuleGraphRulesTest {
     }
 
     @Test
+    fun `UDEA-MG-009 fails LibGDX on every nested moba project`() {
+        // Issue #212: `moba` drew with `Batch` and solved collisions with `gdx-box2d`, and both
+        // left with LibGDX. `:moba:desktop` and `:moba:android` each resolve `:moba:game`, so the
+        // ban has to name all of them or the artifact comes back one project along.
+        listOf(":moba", ":moba:game", ":moba:desktop", ":moba:android", ":moba:web").forEach { project ->
+            val violations = violate(
+                project,
+                "runtimeClasspath",
+                graph(project, "com.badlogicgames.gdx:gdx", "com.badlogicgames.gdx:gdx-box2d"),
+            )
+            assertEquals(
+                listOf("com.badlogicgames.gdx:gdx", "com.badlogicgames.gdx:gdx-box2d"),
+                violations.map { it.coordinate },
+                "$project is not guarded",
+            )
+            assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-009") }, "$project")
+        }
+    }
+
+    @Test
+    fun `UDEA-MG-009 leaves Kool alone - the game draws through udea-render, which draws with Kool`() {
+        // The ban is on the renderer that left, not on drawing. `:moba:desktop` resolves Kool
+        // transitively through `udea-render` and that is the arrangement, not a violation.
+        assertTrue(
+            violate(
+                ":moba:desktop",
+                "runtimeClasspath",
+                graph(":moba:desktop", "de.fabmax.kool:kool-core", ":udea-render"),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
     fun `UDEA-MG-002 leaves udea-render alone - it is the module allowed to see GL`() {
         assertTrue(
             violate(

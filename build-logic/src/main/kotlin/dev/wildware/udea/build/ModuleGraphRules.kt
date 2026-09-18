@@ -334,6 +334,34 @@ public object ModuleGraphRules {
         ),
     )
 
+    /**
+     * The game draws with Kool too, because it draws through `udea-render` (issue #212).
+     *
+     * `moba` was the last project in the rewrite tree with LibGDX on it: it named `libs.gdx` to
+     * write a `RenderSystem` against `Batch`, and `gdx-box2d` plus its desktop natives for a
+     * physics world spec D4 retires with LibGDX. Both are gone with the split, and this is what
+     * stops either coming back through a nested project nobody thought to check.
+     *
+     * Every `:moba:*` project, not only the one that used to name it: `:moba:desktop` and
+     * `:moba:android` each resolve `:moba:game`, so a gdx artifact reintroduced on any of them
+     * reaches the shipped game the same way.
+     */
+    public val MOBA_HAS_NO_LIBGDX: DependencyRule = DependencyRule(
+        id = RuleId("UDEA-MG-009"),
+        summary = "no moba project resolves a LibGDX artifact",
+        rationale = "moba draws through udea-render, which draws with Kool (issue #211). LibGDX " +
+            "on a moba classpath is a second renderer in the shipped game - the parallel-renderer " +
+            "arrangement spec D9 rejected - and it is how the Box2D world spec D4 retires would " +
+            "come back. The rule covers every target classpath each nested project has.",
+        specSection = "kool port 3, 4, D4, D9, D12",
+        projects = setOf(":moba", ":moba:game", ":moba:desktop", ":moba:android", ":moba:web"),
+        configurations = setOf("compileClasspath", "runtimeClasspath"),
+        banned = listOf(
+            CoordinatePattern("com.badlogicgames.gdx:*"),
+            CoordinatePattern("dev.wildware.composegl:composegl-gdx*"),
+        ),
+    )
+
     /** Every rule, in id order. */
     public val ALL: List<DependencyRule> = listOf(
         ANNOTATIONS_ARE_A_LEAF,
@@ -344,6 +372,7 @@ public object ModuleGraphRules {
         ASSETS_MODEL_IS_A_LEAF,
         VENDORED_FLEKS_IS_A_LEAF,
         RENDER_HAS_NO_LIBGDX,
+        MOBA_HAS_NO_LIBGDX,
     )
 
     /** True when [projectPath] is part of the rewrite tree and therefore subject to [ALL]. */

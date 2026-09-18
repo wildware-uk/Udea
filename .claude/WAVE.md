@@ -187,6 +187,28 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   Udea modules, against seven that already build wasmJs. Lead recommended Route A on that asymmetry; the
   owner shelved instead.
 
+- **#224 SPLIT: pointer half -> new issue #227.** The composegl-ef session was CLEARED and lost the
+  per-pointer report it had promised - no branch, no commit, no memory of it, master still `d8f2da9a`, no
+  snapshot since. It advised splitting rather than holding, and the lead agreed: no snapshot, no honest ETA.
+  The full option-2 spec was re-sent to composegl-ef from the lead's record so it can be rebuilt.
+  **#224's revised ACs (commented): key/pad intents + UI first refusal, ComposeGL screen over the Kool scene
+  and absent from captures, module-graph gate.** All three already done and proved at `97b0ca4`.
+  #224 must state in BRIEF.md what a user experiences with pointers unhandled - known-wrong or absent.
+  **NOTE for composegl:** Udea no longer needs the render-thread key/pad hook (`asyncSceneUpdate = false`
+  puts Udea's key path on the render thread already); only the pointer report is wanted. Told them so.
+- **#224 findings worth keeping:** `UiFonts` (abstract, internal constructor) instead of exposing
+  `AtlasFonts` - keeps a renderer off every game's compile classpath, confirmed correct by composegl-ef;
+  `RenderModuleGraphTest` asserting dependency SCOPES because the gate cannot see a frontend arriving
+  transitively; `android.useAndroidX=true` needed (AGP refuses `androidx.compose.runtime` from
+  `composegl-ui`, and udea-render has an Android target); `WallClockBudgetCensusTest` census rows for two GL
+  tests that spin-wait on `System.nanoTime` for a frame deadline.
+- **CROSS-TICKET, relayed to dev-212 as urgent:** Kool's key table is not LibGDX's.
+  `moba/assets/control/controls.udea.kts` holds gdx literals (`KeyW = 51`); under Kool 51 is `'3'` and W is
+  `'w'.code` = 119. It compiles, the asset validates, nothing catches it - a wrong binding is invisible in a
+  screenshot. dev-212 owns the fix (it is in moba), told to use named constants not fresh literals and to
+  prove the bindings with a test or transcript. dev-224 rejected an engine-owned `UdeaKeys` table for its
+  own ticket and commented why on #224.
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).

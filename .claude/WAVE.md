@@ -2,15 +2,15 @@
 
 ## kmp baseline
 
-**SHA `7ac6559`** (kmp after #229 merge; merged tree differs from the trial tree ONLY in `.claude/WAVE.md`,
-so the trial build IS the merged build), refreshed 2026-09-18 with
+**SHA `26333d5`** (kmp after #230 merge; merged tree byte-identical to the trial tree, so the trial build
+IS the merged build), refreshed 2026-09-18 with
 `ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **Failing tasks: `:moba:compileKotlin` ONLY** - and every moba task downstream of it does not run.
 That is the authorised D9 red: moba still draws with LibGDX until #212 ports it. Nothing else fails.
 A reviewer or trial merge sees exactly that one red and treats any other as the branch's.
 
-Earlier: `18bb13f` (after #224), `87d8b7c` (after #211), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+Earlier: `7ac6559` (after #229), `18bb13f` (after #224), `87d8b7c` (after #211), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -359,6 +359,16 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   PASS. Trial: only baseline `:moba:compileKotlin`; `:udea-replay:jvmTest` green. Baseline unchanged.
   Worktree kept: `.claude/worktrees/agent-a9cc4e1091da97349`. THIS push to kmp is the first real run of the
   new push arm - check it started three replay-equality-nightly legs.
+
+- **#230 MERGED `26333d5`**, round 1 PASS, no findings. Table keyed on GLFW codes (never via the case-flipping
+  `UniversalKeyCode(Char)`); all-26-letter real-GLFW upgrade guard; KDocs fixed; the REAL defect fixed:
+  `KoolKeyboard` holds a UI-declined key for one event, and if the UI then takes that key's character it
+  was typing and never becomes an intent. **Hold-back ruled sound by the reviewer:** a declined key-down is
+  released at the next event or at the end of the same `onKeyEvents` list (`typing?.let(::record)`), so
+  nothing waits across frames, non-printables and Ctrl chords cannot stick; `KoolKeyboard` carries no tick
+  stamp (it counts presses), so tick attribution is unchanged; A is recorded before B, no reordering. Each
+  case unit-tested; mutations m2-m4 red. Trial: only baseline red; GL under xvfb green. Tree identical.
+  Worktree kept: `.claude/worktrees/agent-a5ecd4c2831637278`. `udea-render` now free -> #227 next.
 
 ## Wave 10 plan
 

@@ -8,6 +8,11 @@ plugins {
     // other two targets are missing: Kool has no iOS backend (spec D2) and publishes no wasmJs
     // artifact yet (issue #223).
     id("udea.kotlin-multiplatform-render")
+
+    // The interface is ComposeGL, so this module compiles `@Composable` (spec D5, issue #224).
+    // Applied here and in no convention: this is the only module that hosts a UI backend, and a
+    // convention would put the plugin on every module that has no composable in it.
+    alias(libs.plugins.composeCompiler)
 }
 
 kotlin {
@@ -25,6 +30,18 @@ kotlin {
                 // without being able to reach past it.
                 implementation(libs.kool.core)
 
+                // ComposeGL, in two halves that are on opposite sides of UDEA-MG-002 (issue #224).
+                //
+                // `composegl-ui` is the toolkit - nodes, modifiers, widgets, input events - and it
+                // names no GL. `api`, because a game writes its own screens: `UiScreen.content` is
+                // `@Composable`, and moba cannot implement one without these types on its compile
+                // classpath. The module-graph rule allows exactly that and bans every frontend.
+                api(libs.composegl.ui)
+
+                // `composegl-kool` is a frontend: it draws that tree through Kool's GL context.
+                // `implementation`, so it stops here - the same reason `kool-core` does.
+                implementation(libs.composegl.kool)
+
                 // `PresentationControl.capture` answers with a `Deferred`, the common-code future
                 // (spec section 6: `java.util.concurrent` is replaced by coroutines). `api`
                 // because the type is on this module's public surface.
@@ -35,6 +52,14 @@ kotlin {
                 // ordinary class on every target, the same choice `udea-core` made for the
                 // `SimBarrier` inbox (issue #203).
                 implementation(libs.kotlinx.atomicfu)
+            }
+        }
+        jvmMain {
+            dependencies {
+                // stb_truetype, for `DesktopFonts`. A ComposeGL frontend artefact, so `udea-render`
+                // only (UDEA-MG-002), and JVM only: Android rasterises with its own `Typeface`
+                // inside `composegl-kool`, which is why `DesktopFonts` is not in `commonMain`.
+                implementation(libs.composegl.lwjgl3)
             }
         }
         jvmTest {

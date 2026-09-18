@@ -46,6 +46,11 @@ allprojects {
         mavenLocal()
         gradlePluginPortal()
         google()
+        // ComposeGL's snapshots. Sonatype moved its snapshot hosting here; the two `oss.sonatype.org`
+        // hosts below answer 404 for `dev.wildware.composegl` today, so this is the line that makes
+        // `composegl-kool:0.7.0-SNAPSHOT` resolve at all (issue #224). It is the host ComposeGL's own
+        // `docs/wiki/Kool.md` names.
+        maven("https://central.sonatype.com/repository/maven-snapshots/")
         maven("https://oss.sonatype.org/content/repositories/snapshots/")
         maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
         maven("https://s01.oss.sonatype.org")

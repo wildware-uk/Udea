@@ -3,7 +3,7 @@ package dev.wildware.udea.render.input
 /**
  * The keyboard, as the sampler needs it: what is down, and what was tapped since the last tick.
  *
- * An interface rather than direct `Gdx.input` calls for two reasons and only one of them is
+ * An interface rather than direct device calls for two reasons and only one of them is
  * testability. The other is the reason this whole issue exists: `Gdx.input.isKeyJustPressed` is
  * reset **per frame**, so a tick that runs twice in one frame reads the same "just pressed"
  * twice, and a key tapped and released between two frames is never reported at all. This shape -
@@ -13,13 +13,22 @@ package dev.wildware.udea.render.input
  * ## Threading
  *
  * Presses are recorded by whatever pumps the window's event queue (the render thread) and
- * consumed by the tick. On every host this engine ships those are the same thread - `GameLoop`
- * ticks from inside the render callback - so the implementation is deliberately not synchronised.
- * A host that ticks on a thread of its own must supply its own implementation and say so.
+ * consumed by the tick. On every host this engine ships those are the same thread - `KoolThread`
+ * ticks from inside Kool's frame callback, and configures Kool with `asyncSceneUpdate = false` so
+ * that polling input and drawing are that same thread too - and `GlKoolInputTest` asserts it. So
+ * the implementation is deliberately not synchronised. A host that ticks on a thread of its own
+ * must supply its own implementation and say so.
  */
 public interface KeyboardState {
 
-    /** Whether [keycode] (a `com.badlogic.gdx.Input.Keys` value) is down right now. */
+    /**
+     * Whether [keycode] is down right now.
+     *
+     * The code is the *backend's* own table, and there is exactly one per build: Kool's universal
+     * key codes since issue #224 - `'w'.code` for W, a small negative for Escape and the rest - where
+     * it used to be `com.badlogic.gdx.Input.Keys`. `ActionBinding.keys` speaks the same table, and
+     * `KoolKeyboard` is what fills this in.
+     */
     public fun isKeyDown(keycode: Int): Boolean
 
     /** How many times [keycode] went down since [endSample] was last called. */

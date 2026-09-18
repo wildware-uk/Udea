@@ -74,7 +74,7 @@ import kotlinx.io.files.Path as LevelDirectory
 /**
  * `moba.agent`: the instance `game-bridge-mcp` launches.
  *
- * `gradlew.bat :moba:run -PdebugPort=7825 --console=plain` - which is exactly the command line
+ * `gradlew.bat :moba:desktop:run -PdebugPort=7825 --console=plain` - which is exactly the command line
  * the generated `gamebridge.json` names, because `UdeaAgentPlugin` writes both from the same
  * property.
  *
@@ -105,7 +105,7 @@ import kotlinx.io.files.Path as LevelDirectory
  *
  * Real, and Windowed-only: the agent activity overlay. [overlayFor] registers
  * [AgentOverlaySystem] over the same [AgentBridge] the toolsets narrate into, so a human running
- * `:moba:runClient`-style Windowed instance watches the panel while every capture taken through
+ * `:moba:desktop:runClient`-style Windowed instance watches the panel while every capture taken through
  * the same process is byte-identical to one taken with the overlay off (spec 3.7).
  *
  * Real, and new: `input.*` and `render.follow_entity`. Input goes through the same

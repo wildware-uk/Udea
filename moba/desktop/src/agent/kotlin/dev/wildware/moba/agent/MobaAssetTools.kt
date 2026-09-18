@@ -36,7 +36,7 @@ import kotlin.io.path.isDirectory
  * ## The daemon and the bundle agree by construction
  *
  * The running graph is [MobaAssets.registry], decoded from the `.udeapak` that
- * `:moba:udeaPackBundle` wrote. The daemon compiles the *same* asset root and turns declarations
+ * `:moba:game:udeaPackBundle` wrote. The daemon compiles the *same* asset root and turns declarations
  * into values through `PackedValues`, which is the bundle writer and the bundle reader rather
  * than a second interpretation of the DSL. So a hot-reloaded `SpriteSheet` is the same object a
  * rebuild would have produced, and an agent cannot get the game into a state a build could not
@@ -51,10 +51,10 @@ import kotlin.io.path.isDirectory
  */
 internal object MobaAssetTools {
 
-    /** Where the asset tree is, absolute. Set by `:moba:run`; absent in a packaged game. */
+    /** Where the asset tree is, absolute. Set by `:moba:desktop:run`; absent in a packaged game. */
     const val ASSET_ROOT_PROPERTY: String = "udea.assets.root"
 
-    /** The repository root every diagnostic span is relative to. Set by `:moba:run`. */
+    /** The repository root every diagnostic span is relative to. Set by `:moba:desktop:run`. */
     const val REPO_ROOT_PROPERTY: String = "udea.repoRoot"
 
     /** The classpath `.udea.kts` compile against. The spelling every other host uses. */
@@ -70,7 +70,7 @@ internal object MobaAssetTools {
         if (assetRoot == null || !assetRoot.isDirectory()) {
             System.err.println(
                 "[moba.agent] no asset source tree, so assets.* is not registered. " +
-                    "`-D$ASSET_ROOT_PROPERTY=<dir>` names one; `:moba:run` sets it. A packaged " +
+                    "`-D$ASSET_ROOT_PROPERTY=<dir>` names one; `:moba:desktop:run` sets it. A packaged " +
                     "game legitimately has none - it ships the .udeapak and not the scripts.",
             )
             return Wired(builder, null)
@@ -97,7 +97,7 @@ internal object MobaAssetTools {
             // Under `build/`, never the process working directory: the old runtime script host
             // wrote `./scripts/cache` wherever the JVM happened to start, which meant a cache
             // per launch directory and none of them ever cleaned.
-            cacheDirectory = repoRoot.resolve("moba/build/udea/agent-script-cache"),
+            cacheDirectory = repoRoot.resolve("moba/desktop/build/udea/agent-script-cache"),
         )
         val started = daemon.start()
         println(

@@ -112,7 +112,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
  * The three costs listed above are unchanged: poses do not animate, there is no prediction, and
  * a `host` window's own input still makes a round trip through its own socket.
  *
- * `./gradlew :moba:runClient`, or `./gradlew :moba:runClient --args="host 27015"`.
+ * `./gradlew :moba:desktop:runClient`, or `./gradlew :moba:desktop:runClient --args="host 27015"`.
  */
 public object MobaClient {
 
@@ -156,7 +156,7 @@ public object MobaClient {
      * `MobaFogTest` is what asserts the on case, against the same real session this builds.
      *
      * ```
-     * ./gradlew :moba:runClient --args="host 7777" -Dudea.moba.fog=60
+     * ./gradlew :moba:desktop:runClient --args="host 7777" -Dudea.moba.fog=60
      * ```
      */
     public const val FOG_PROPERTY: String = "udea.moba.fog"
@@ -198,7 +198,7 @@ public object MobaClient {
         val serverAddress = joinTo ?: InetSocketAddress(LOOPBACK, checkNotNull(serving).address.port)
         if (serving != null) {
             println("[moba.client] serving on ${serving.address}; tell the other player to run:")
-            println("[moba.client]   ./gradlew :moba:runClient --args=\"join <this machine>:${serving.address.port}\"")
+            println("[moba.client]   ./gradlew :moba:desktop:runClient --args=\"join <this machine>:${serving.address.port}\"")
         }
         println("[moba.client] connecting to $serverAddress")
 

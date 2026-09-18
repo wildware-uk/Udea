@@ -35,7 +35,9 @@ class NoRenderSystemIsAFleksSystemTest {
         }
 
         val message = failure.message.orEmpty()
-        assertTrue(FleksAndRenderFixture::class.java.name in message, message)
+        // `RenderRegistry.requireNotAFleksSystem` builds its message from `::class.qualifiedName`
+        // (dotted nesting, `Outer.Inner`), not `::class.java`'s binary name (`Outer$Inner`).
+        assertTrue(checkNotNull(FleksAndRenderFixture::class.qualifiedName) in message, message)
         assertTrue("IntervalSystem" in message, message)
     }
 

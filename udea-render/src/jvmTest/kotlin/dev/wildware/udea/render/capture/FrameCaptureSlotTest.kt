@@ -13,6 +13,7 @@ import dev.wildware.udea.render.support.FakePixelSource
 import dev.wildware.udea.render.support.testTargets
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -41,6 +42,7 @@ import kotlin.test.assertTrue
  * `drain` alone and see a result settle now calls `drain` then `collect`, except the cases that
  * were always settled inside `drain` itself: a refused region, and a slot that is closing.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class FrameCaptureSlotTest {
 
     // A real context and a real simulation, because SimClock only moves for the kernel: the

@@ -114,8 +114,12 @@ class DrawSystemPortTest {
 
         val draw = batch.snapshot().single()
         // Half way between the tick's starting pose (0) and the current one (10), less half the
-        // sprite's width, because the batch draws from a corner.
-        assertEquals(5f - SPRITE_SIZE / 2f, draw.x, "drew at ${draw.x}")
+        // sprite's width, because the batch draws from a corner - in *world* units. `SpriteBatch2D`
+        // bakes the camera's projection into the recorded floats at draw time (unlike the LibGDX
+        // era, which left that to a GPU-side matrix), so the recorded value is in target pixels
+        // and has to be compared through the same projection the renderer drew with.
+        val worldX = 5f - SPRITE_SIZE / 2f
+        assertEquals(rig.projection.pixelX(worldX), draw.x, "drew at ${draw.x}")
     }
 
     @Test

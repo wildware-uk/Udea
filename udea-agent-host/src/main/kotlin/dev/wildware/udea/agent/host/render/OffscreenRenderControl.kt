@@ -9,6 +9,7 @@ import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.render.camera.CameraOutcome as RenderCameraOutcome
 import dev.wildware.udea.render.capture.CaptureRegion
 import dev.wildware.udea.render.control.PresentationControl
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Future
 
@@ -58,6 +59,7 @@ public class OffscreenRenderControl(
      * at the capture point, exactly as `Future.thenApply` did. That is deliberate and it is why
      * the mapping is four field reads: the render thread must not be handed work here.
      */
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun capture(region: PixelRegion?): Future<CaptureFrame> {
         val deferred = presentation.capture(region?.let { CaptureRegion(it.x, it.y, it.w, it.h) })
         val future = CompletableFuture<CaptureFrame>()

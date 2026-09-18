@@ -101,7 +101,7 @@ val udeaPhase1Demo = tasks.register<JavaExec>("udeaPhase1Demo") {
 // --- the Phase 1 exit demo, offscreen half -----------------------------------------------------
 //
 // `./gradlew :udea-agent-host:udeaPhase1OffscreenDemo -Pudea.agent.port=7821` boots the same
-// surface behind a real LWJGL3 context with a hidden window, so `render.screenshot` returns PNG
+// surface behind a real Kool context with a hidden window, so `render.screenshot` returns PNG
 // bytes instead of `no_render_context`. Same reasons as `udeaPhase1Demo` for being a `JavaExec`
 // over the test runtime classpath: the game is a fixture, and the adapter that joins the render
 // toolset's port to `udea-render` cannot live in the main sources of either module.
@@ -118,6 +118,27 @@ val udeaPhase1OffscreenDemo = tasks.register<JavaExec>("udeaPhase1OffscreenDemo"
     // `udeaPhase1Demo` until this one was run. Still read lazily: the port arrives on *this*
     // invocation's command line, so baking the value in at configuration time would hand every
     // later run whichever value the cache was stored with.
+    val port = providers.gradleProperty("udea.agent.port")
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            val value = port.orNull
+            if (value == null) emptyList() else listOf("-Dudea.agent.port=$value")
+        },
+    )
+}
+
+// --- the Phase 1 exit demo, windowed half (issue #211) -------------------------------------
+//
+// `./gradlew :udea-agent-host:udeaPhase1WindowedDemo -Pudea.agent.port=7822` boots the same
+// surface again, this time with `RenderMode.Windowed` and a *visible* window - the third of
+// the three render modes issue #211 asks `/health` to report from a real boot. Same reasons as
+// the other two Phase 1 tasks for being a `JavaExec` over the test runtime classpath.
+val udeaPhase1WindowedDemo = tasks.register<JavaExec>("udeaPhase1WindowedDemo") {
+    group = "udea"
+    description = "Boots a Windowed game with the agent surface bound, and blocks. " +
+        "-Pudea.agent.port=N"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.wildware.udea.agent.host.demo.Phase1WindowedDemo")
     val port = providers.gradleProperty("udea.agent.port")
     jvmArgumentProviders.add(
         CommandLineArgumentProvider {

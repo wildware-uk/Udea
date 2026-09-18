@@ -92,7 +92,10 @@ class OverlayResourcesTest {
 
         val resources = checkNotNull(handed) { "the overlay factory never ran" }
         assertSame(targets.screen, resources.screen)
-        assertSame(targets.batch, resources.batch)
+        // The screen batch, not the offscreen one: an overlay draws through the batch that
+        // reaches only the window (spec 3.7). `targets.batch` is the capturable one, and an
+        // overlay handed that would be handed a route to the very thing it must never reach.
+        assertSame(targets.screenBatch, resources.batch)
     }
 
     /**

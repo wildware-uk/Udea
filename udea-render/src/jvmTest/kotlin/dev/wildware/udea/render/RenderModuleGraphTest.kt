@@ -46,11 +46,15 @@ class RenderModuleGraphTest {
 
     @Test
     fun `udea-render is the only module on the GL convention`() {
+        // "udea.kotlin-library-gl" was the pre-Kool convention id, applied when udea-render was
+        // a plain JVM module. Issue #211 moved it onto "udea.kotlin-multiplatform-render"
+        // instead (jvm + android, no iOS, no wasmJs - Kool has neither), and that plugin id is
+        // now the one and only marker of "this module owns GL".
         val offenders = RepoLayout.repoRoot.listFiles()
             .orEmpty()
             .filter { it.isDirectory && (it.name.startsWith("udea-") || it.name == "moba") }
             .map { it to it.resolve("build.gradle.kts") }
-            .filter { (_, script) -> script.isFile && "udea.kotlin-library-gl" in script.readText() }
+            .filter { (_, script) -> script.isFile && "udea.kotlin-multiplatform-render" in script.readText() }
             .map { (module, _) -> module.name }
 
         assertEquals(listOf("udea-render"), offenders)
@@ -68,8 +72,18 @@ class RenderModuleGraphTest {
         // udea-diagnostics is test-only: the bytecode gate reports through UdeaDiagnostic, and
         // a rule that invented its own report shape would drift from every other producer.
         assertEquals(listOf(":udea-assets", ":udea-core", ":udea-diagnostics"), declared)
+        // A multiplatform module's `jvmTest { dependencies { ... } }` block uses the bare
+        // `implementation(...)` DSL function, not the flat `testImplementation(...)` bucket name
+        // a plain JVM module's build script would - the source-set scoping is what makes it
+        // test-only, not the function name. So the check is that the dependency appears inside
+        // that block and nowhere in `commonMain`'s, rather than a literal "testImplementation".
+        val commonMain = script.substringAfter("commonMain {").substringBefore("jvmTest {")
         assertTrue(
-            "testImplementation(project(\":udea-diagnostics\"))" in script,
+            ":udea-diagnostics" !in commonMain,
+            "udea-diagnostics must not be a commonMain (shipped) dependency:\n$commonMain",
+        )
+        assertTrue(
+            "implementation(project(\":udea-diagnostics\"))" in script,
             "udea-diagnostics must not reach udea-render's runtime classpath",
         )
     }

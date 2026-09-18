@@ -17,6 +17,7 @@ import dev.wildware.udea.render.support.FakePixelSource
 import dev.wildware.udea.render.support.testTargets
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.render.FrameTime
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -31,6 +32,7 @@ import kotlin.test.assertTrue
  * of it is checkable in a plain JVM because `PixelSource` is the seam. The pixels themselves are
  * `GlCaptureTest`'s.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class PresentationControlTest {
 
     @Test
@@ -57,6 +59,11 @@ class PresentationControlTest {
 
         assertFalse(pending.isCompleted, "capture must not wait for a frame")
 
+        // On Kool the pipeline records a frame and Kool draws it afterwards, so the first
+        // `render` only claims the request (`FrameCaptureSlot.drain`); the second `render`'s
+        // own `collect`, at its top, is what reads the pixels and settles it. See that class's
+        // KDoc for why the read moved a frame later.
+        pipeline.render(alpha = 0f)
         pipeline.render(alpha = 0f)
 
         assertTrue(pending.isCompleted)
@@ -70,6 +77,8 @@ class PresentationControlTest {
         val control = PresentationControl(pipeline)
 
         control.capture(CaptureRegion(4, 8, 16, 16))
+        // Claim, then collect at the top of the next frame. See the note above.
+        pipeline.render(alpha = 0f)
         pipeline.render(alpha = 0f)
 
         assertEquals(listOf("4,8,16,16"), pixels.requests)

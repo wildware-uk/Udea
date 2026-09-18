@@ -342,11 +342,11 @@ class WallClockBudgetCensusTest {
                 "a deadline: the socket read timeout in the UDP proof server",
             "udea-net/src/jvmTest/kotlin/dev/wildware/udea/net/proof/UdpTwoProcessTest.kt" to
                 "a deadline: how long to wait for a line from a forked process",
-            "udea-render/src/test/kotlin/dev/wildware/udea/render/capture/CaptureOrderingTest.kt" to
+            "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/capture/CaptureOrderingTest.kt" to
                 "a deadline: how long to wait for a captured frame",
-            "udea-render/src/test/kotlin/dev/wildware/udea/render/gl/GlOverlayIsolationTest.kt" to
+            "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlOverlayIsolationTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",
-            "udea-render/src/test/kotlin/dev/wildware/udea/render/gl/OffscreenBackendTest.kt" to
+            "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/OffscreenBackendTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",
             "udea-replay/src/jvmTest/kotlin/dev/wildware/udea/replay/ReplayEngineTest.kt" to
                 "a seed: the pilot must differ between runs",

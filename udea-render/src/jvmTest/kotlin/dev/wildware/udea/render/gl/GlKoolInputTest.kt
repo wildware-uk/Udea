@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import de.fabmax.kool.input.KeyboardInput
 import dev.wildware.composegl.ui.geometry.Size
 import dev.wildware.composegl.ui.input.Key
+import dev.wildware.composegl.ui.input.KeyEventType
 import dev.wildware.composegl.ui.layout.Box
 import dev.wildware.composegl.ui.modifier.Modifier
 import dev.wildware.composegl.ui.modifier.fillMaxSize
@@ -96,7 +97,7 @@ class GlKoolInputTest {
             actions = listOf(
                 ActionBinding(name = "test/walk", keys = intArrayOf(W)),
                 ActionBinding(name = "test/menu", keys = intArrayOf(ESCAPE)),
-            ),
+            ) + PRINTABLE.map { ActionBinding(name = it.action, keys = intArrayOf(it.glfw)) },
             axes = emptyList(),
         )
         val walk = bindings.catalog.action("test/walk")
@@ -181,6 +182,53 @@ class GlKoolInputTest {
                 composing,
                 frame,
                 "the simulation ticks on $frame and the toolkit draws on $composing; same cause as above",
+            )
+
+            // 4. Every key the toolkit names, pressed on Kool's own GLFW callback into a focused
+            //    control that takes whatever it recognises (issue #230). The code is Kool's; the key
+            //    the control saw is the table's answer to it; the intent is the game's.
+            backend.release(GLFW.GLFW_KEY_ESCAPE)
+            val recorder = KeyRecordingScreen()
+            ui.show(recorder)
+            awaitFrames(frames, frames.count.get() + 3)
+            backend.onRenderThread { sample(source, bindings) } // spends anything left from above
+
+            val wrong = mutableListOf<String>()
+            for (case in PRINTABLE + SPECIAL) {
+                backend.onRenderThread { recorder.downs.clear() }
+                backend.press(case.glfw)
+                backend.release(case.glfw)
+                awaitFrames(frames, frames.count.get() + 2)
+                val seen = backend.onRenderThread { recorder.downs.toList() }
+                val typed = backend.onRenderThread { sample(source, bindings) }
+                if (seen != listOf(case.key)) {
+                    wrong += "${case.name}: GLFW key ${case.glfw} reached the focused control as $seen, " +
+                        "not [${case.key}]"
+                }
+                if (case in PRINTABLE && typed.pressCount(bindings.catalog.action(case.action)) != 0) {
+                    wrong += "${case.name}: the focused control was offered it and it became an intent anyway"
+                }
+            }
+            assertTrue(
+                wrong.isEmpty(),
+                "A key pressed into a focused control must arrive as the key the control recognises, " +
+                    "and nothing the control takes may become an intent.\n" + wrong.joinToString("\n"),
+            )
+
+            // 5. ...and with nothing shown, the same letters are the game's again. Fixing the table
+            //    must not have fixed it by taking letters away from the player.
+            ui.show(null)
+            awaitFrames(frames, frames.count.get() + 3)
+            for (case in LETTERS) {
+                backend.press(case.glfw)
+                backend.release(case.glfw)
+            }
+            awaitFrames(frames, frames.count.get() + 2)
+            val unfocused = backend.onRenderThread { sample(source, bindings) }
+            val lost = LETTERS.filter { unfocused.pressCount(bindings.catalog.action(it.action)) != 1 }
+            assertTrue(
+                lost.isEmpty(),
+                "with no interface shown, ${lost.map { it.name }} did not become exactly one intent each",
             )
 
             backend.onRenderThread { keyboard.close() }
@@ -303,6 +351,49 @@ class GlKoolInputTest {
         }
     }
 
+    /**
+     * A panel that takes every key the toolkit recognises, with a focused button inside it - the
+     * shape of a key-binding capture, or a menu with letter shortcuts.
+     *
+     * It takes anything but [Key.Unknown], so a key the table fails to name is *declined* and falls
+     * through to the game: exactly issue #230, where a focused control never took a letter and the
+     * letter became an intent.
+     */
+    private class KeyRecordingScreen : UiScreen {
+
+        /** The toolkit key of every key-down offered, in order. Render thread only. */
+        val downs: MutableList<Key> = mutableListOf()
+
+        @Composable
+        override fun content() {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .onKeyEvent { event ->
+                        if (event.type == KeyEventType.Down) downs += event.key
+                        event.key != Key.Unknown
+                    },
+            ) {
+                Button(
+                    "BIND",
+                    {},
+                    Modifier.size(BUTTON_WIDTH, BUTTON_HEIGHT),
+                    initialFocus = true,
+                )
+            }
+        }
+    }
+
+    /**
+     * One physical key: the constant GLFW hands Kool's callback, and the toolkit key it must become.
+     * Written out by name on both sides, so the expectation shares nothing with the table under test.
+     */
+    private class Case(val name: String, val glfw: Int, val key: Key) {
+
+        /** The binding a [PRINTABLE] key fires when the interface declines it. */
+        val action: String = "test/key-$name"
+    }
+
     private companion object {
 
         const val WIDTH = 320
@@ -330,5 +421,76 @@ class GlKoolInputTest {
 
         /** W is not in that map, so its code is the raw GLFW key: `GLFW_KEY_W`, which is `'W'.code`. */
         val W = GLFW.GLFW_KEY_W
+
+        /** Every letter, because the failure in issue #230 was per key. */
+        val LETTERS = listOf(
+            Case("A", GLFW.GLFW_KEY_A, Key.A), Case("B", GLFW.GLFW_KEY_B, Key.B),
+            Case("C", GLFW.GLFW_KEY_C, Key.C), Case("D", GLFW.GLFW_KEY_D, Key.D),
+            Case("E", GLFW.GLFW_KEY_E, Key.E), Case("F", GLFW.GLFW_KEY_F, Key.F),
+            Case("G", GLFW.GLFW_KEY_G, Key.G), Case("H", GLFW.GLFW_KEY_H, Key.H),
+            Case("I", GLFW.GLFW_KEY_I, Key.I), Case("J", GLFW.GLFW_KEY_J, Key.J),
+            Case("K", GLFW.GLFW_KEY_K, Key.K), Case("L", GLFW.GLFW_KEY_L, Key.L),
+            Case("M", GLFW.GLFW_KEY_M, Key.M), Case("N", GLFW.GLFW_KEY_N, Key.N),
+            Case("O", GLFW.GLFW_KEY_O, Key.O), Case("P", GLFW.GLFW_KEY_P, Key.P),
+            Case("Q", GLFW.GLFW_KEY_Q, Key.Q), Case("R", GLFW.GLFW_KEY_R, Key.R),
+            Case("S", GLFW.GLFW_KEY_S, Key.S), Case("T", GLFW.GLFW_KEY_T, Key.T),
+            Case("U", GLFW.GLFW_KEY_U, Key.U), Case("V", GLFW.GLFW_KEY_V, Key.V),
+            Case("W", GLFW.GLFW_KEY_W, Key.W), Case("X", GLFW.GLFW_KEY_X, Key.X),
+            Case("Y", GLFW.GLFW_KEY_Y, Key.Y), Case("Z", GLFW.GLFW_KEY_Z, Key.Z),
+        )
+
+        /**
+         * The keys Kool reports by their raw GLFW constant, because none of them is in
+         * `GlfwInput`'s map - so a binding names them by that constant.
+         */
+        val PRINTABLE = LETTERS + listOf(
+            Case("0", GLFW.GLFW_KEY_0, Key.Digit0), Case("1", GLFW.GLFW_KEY_1, Key.Digit1),
+            Case("2", GLFW.GLFW_KEY_2, Key.Digit2), Case("3", GLFW.GLFW_KEY_3, Key.Digit3),
+            Case("4", GLFW.GLFW_KEY_4, Key.Digit4), Case("5", GLFW.GLFW_KEY_5, Key.Digit5),
+            Case("6", GLFW.GLFW_KEY_6, Key.Digit6), Case("7", GLFW.GLFW_KEY_7, Key.Digit7),
+            Case("8", GLFW.GLFW_KEY_8, Key.Digit8), Case("9", GLFW.GLFW_KEY_9, Key.Digit9),
+            Case("Space", GLFW.GLFW_KEY_SPACE, Key.Space),
+            Case("Minus", GLFW.GLFW_KEY_MINUS, Key.Minus),
+            Case("Equal", GLFW.GLFW_KEY_EQUAL, Key.Equals),
+            Case("LeftBracket", GLFW.GLFW_KEY_LEFT_BRACKET, Key.LeftBracket),
+            Case("RightBracket", GLFW.GLFW_KEY_RIGHT_BRACKET, Key.RightBracket),
+            Case("Backslash", GLFW.GLFW_KEY_BACKSLASH, Key.Backslash),
+            Case("Semicolon", GLFW.GLFW_KEY_SEMICOLON, Key.Semicolon),
+            Case("Apostrophe", GLFW.GLFW_KEY_APOSTROPHE, Key.Apostrophe),
+            Case("Grave", GLFW.GLFW_KEY_GRAVE_ACCENT, Key.Grave),
+            Case("Comma", GLFW.GLFW_KEY_COMMA, Key.Comma),
+            Case("Period", GLFW.GLFW_KEY_PERIOD, Key.Period),
+            Case("Slash", GLFW.GLFW_KEY_SLASH, Key.Slash),
+        )
+
+        /** The keys Kool renames to its own negative codes, which the table maps by Kool's constants. */
+        val SPECIAL = listOf(
+            Case("F1", GLFW.GLFW_KEY_F1, Key.F1), Case("F2", GLFW.GLFW_KEY_F2, Key.F2),
+            Case("F3", GLFW.GLFW_KEY_F3, Key.F3), Case("F4", GLFW.GLFW_KEY_F4, Key.F4),
+            Case("F5", GLFW.GLFW_KEY_F5, Key.F5), Case("F6", GLFW.GLFW_KEY_F6, Key.F6),
+            Case("F7", GLFW.GLFW_KEY_F7, Key.F7), Case("F8", GLFW.GLFW_KEY_F8, Key.F8),
+            Case("F9", GLFW.GLFW_KEY_F9, Key.F9), Case("F10", GLFW.GLFW_KEY_F10, Key.F10),
+            Case("F11", GLFW.GLFW_KEY_F11, Key.F11), Case("F12", GLFW.GLFW_KEY_F12, Key.F12),
+            Case("Left", GLFW.GLFW_KEY_LEFT, Key.Left), Case("Right", GLFW.GLFW_KEY_RIGHT, Key.Right),
+            Case("Up", GLFW.GLFW_KEY_UP, Key.Up), Case("Down", GLFW.GLFW_KEY_DOWN, Key.Down),
+            Case("Home", GLFW.GLFW_KEY_HOME, Key.Home), Case("End", GLFW.GLFW_KEY_END, Key.End),
+            Case("PageUp", GLFW.GLFW_KEY_PAGE_UP, Key.PageUp),
+            Case("PageDown", GLFW.GLFW_KEY_PAGE_DOWN, Key.PageDown),
+            Case("Enter", GLFW.GLFW_KEY_ENTER, Key.Enter),
+            Case("KeypadEnter", GLFW.GLFW_KEY_KP_ENTER, Key.Enter),
+            Case("Escape", GLFW.GLFW_KEY_ESCAPE, Key.Escape),
+            Case("Tab", GLFW.GLFW_KEY_TAB, Key.Tab),
+            Case("Backspace", GLFW.GLFW_KEY_BACKSPACE, Key.Backspace),
+            Case("Delete", GLFW.GLFW_KEY_DELETE, Key.Delete),
+            Case("Insert", GLFW.GLFW_KEY_INSERT, Key.Insert),
+            Case("LeftShift", GLFW.GLFW_KEY_LEFT_SHIFT, Key.Shift),
+            Case("RightShift", GLFW.GLFW_KEY_RIGHT_SHIFT, Key.Shift),
+            Case("LeftControl", GLFW.GLFW_KEY_LEFT_CONTROL, Key.Control),
+            Case("RightControl", GLFW.GLFW_KEY_RIGHT_CONTROL, Key.Control),
+            Case("LeftAlt", GLFW.GLFW_KEY_LEFT_ALT, Key.Alt),
+            Case("RightAlt", GLFW.GLFW_KEY_RIGHT_ALT, Key.Alt),
+            Case("LeftSuper", GLFW.GLFW_KEY_LEFT_SUPER, Key.Meta),
+            Case("RightSuper", GLFW.GLFW_KEY_RIGHT_SUPER, Key.Meta),
+        )
     }
 }

@@ -1,19 +1,26 @@
 package dev.wildware.udea.render.ui
 
 import de.fabmax.kool.input.KeyboardInput
-import de.fabmax.kool.input.UniversalKeyCode
 import dev.wildware.composegl.ui.input.Key
 
 /**
  * The one place Kool's key codes become the toolkit's, and the one place that has to move if the
  * renderer ever changes again.
  *
- * Two numberings, both deliberate and neither reducible to the other. Kool's universal codes are the
- * lowercase character for a printable key (`'w'` is 119) and a small negative number for everything
- * else; ComposeGL numbers its own `Key` from 1 so that a binding can be saved by name and survive a
- * backend change. So this is a table rather than arithmetic, and a key missing from it is
- * [Key.Unknown] - representable, routed, and not a crash, which is the behaviour ComposeGL's own
- * `Key` KDoc asks for.
+ * Two numberings, both deliberate and neither reducible to the other. Kool's universal code for a
+ * printable key is whatever the platform sent, and on the desktop that is GLFW's constant - the
+ * ASCII *uppercase* for a letter (`W` is 87), the character itself for a digit, the space bar or a
+ * punctuation key - because `GlfwInput` renames only the special keys and passes the rest through.
+ * Every special key is a small negative number of Kool's own. ComposeGL numbers its own `Key` from 1
+ * so that a binding can be saved by name and survive a backend change. So this is a table rather
+ * than arithmetic, and a key missing from it is [Key.Unknown] - representable, routed, and not a
+ * crash, which is the behaviour ComposeGL's own `Key` KDoc asks for.
+ *
+ * The printable keys are keyed on the character codes GLFW sends, never on
+ * `UniversalKeyCode(Char)`. That constructor is a convenience for callers, GLFW never goes through
+ * it, and its case is not stable: Kool 0.19.0 uppercases the character and Kool's `main` lowercases
+ * it. Keyed on it, this table would be right or wrong depending on the Kool release (issue #230).
+ * `GlKoolInputTest` presses every key here through Kool's real GLFW callback, and is what goes red.
  *
  * Only keys the toolkit names are here. A game binding F13 still works: that path never comes
  * through this table, because a game's bindings read [dev.wildware.udea.render.input.KeyboardState]
@@ -25,11 +32,11 @@ internal object KeyTable {
     fun toolkitKey(code: Int): Key = byKoolCode[code] ?: Key.Unknown
 
     private val byKoolCode: Map<Int, Key> = buildMap {
-        ('a'..'z').forEach { letter ->
-            put(UniversalKeyCode(letter).code, Key(Key.A.code + (letter - 'a')))
+        ('A'..'Z').forEach { letter ->
+            put(letter.code, Key(Key.A.code + (letter - 'A')))
         }
         ('0'..'9').forEach { digit ->
-            put(UniversalKeyCode(digit).code, Key(Key.Digit0.code + (digit - '0')))
+            put(digit.code, Key(Key.Digit0.code + (digit - '0')))
         }
         listOf(
             KeyboardInput.KEY_F1 to Key.F1,
@@ -68,9 +75,9 @@ internal object KeyTable {
             KeyboardInput.KEY_SUPER_LEFT to Key.Meta,
             KeyboardInput.KEY_SUPER_RIGHT to Key.Meta,
         ).forEach { (kool, key) -> put(kool.code, key) }
-        // Space is a printable key Kool reports by its character, like a letter, and the toolkit
-        // names. Without this line a menu could not be driven by the space bar.
-        put(UniversalKeyCode(' ').code, Key.Space)
+        // Space is a printable key Kool reports by GLFW's constant, which is its character, and the
+        // toolkit names. Without this line a menu could not be driven by the space bar.
+        put(' '.code, Key.Space)
         listOf(
             '-' to Key.Minus,
             '=' to Key.Equals,
@@ -83,6 +90,6 @@ internal object KeyTable {
             ',' to Key.Comma,
             '.' to Key.Period,
             '/' to Key.Slash,
-        ).forEach { (char, key) -> put(UniversalKeyCode(char).code, key) }
+        ).forEach { (char, key) -> put(char.code, key) }
     }
 }

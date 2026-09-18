@@ -1,6 +1,10 @@
 package dev.wildware.udea.render.gl
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import de.fabmax.kool.input.KeyboardInput
 import dev.wildware.composegl.ui.geometry.Size
 import dev.wildware.composegl.ui.input.Key
@@ -11,6 +15,7 @@ import dev.wildware.composegl.ui.modifier.fillMaxSize
 import dev.wildware.composegl.ui.modifier.onKeyEvent
 import dev.wildware.composegl.ui.modifier.size
 import dev.wildware.composegl.ui.widget.Button
+import dev.wildware.composegl.ui.widget.TextField
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
@@ -150,9 +155,9 @@ class GlKoolInputTest {
             assertFalse(
                 keyboard.isKeyDown('w'.code),
                 "the physical W key came out as the *lowercase* code ${'w'.code}. That is what " +
-                    "`UniversalKeyCode(Char)`'s convenience constructor would produce, and GLFW " +
-                    "never calls it - `GlfwInput` passes the raw GLFW key. A controls asset written " +
-                    "in lowercase codes would bind the wrong keys silently.",
+                    "`UniversalKeyCode(Char)` produces on Kool main (0.19.0 uppercases instead), and " +
+                    "GLFW never calls it - `GlfwInput` passes the raw GLFW key. A controls asset " +
+                    "written in lowercase codes would bind the wrong keys silently.",
             )
 
             // 2. A key the interface takes never does.
@@ -212,18 +217,59 @@ class GlKoolInputTest {
             assertTrue(
                 wrong.isEmpty(),
                 "A key pressed into a focused control must arrive as the key the control recognises, " +
-                    "and nothing the control takes may become an intent.\n" + wrong.joinToString("\n"),
+                    "and nothing the control takes may become an intent. If only letters are wrong " +
+                    "after a Kool upgrade, look first at `UniversalKeyCode(Char)`: Kool 0.19.0 " +
+                    "uppercases the character and Kool main lowercases it (KeyCode.kt line 16), while " +
+                    "GLFW sends a letter as its ASCII uppercase in both. The table must be keyed on " +
+                    "what GLFW sends, never on that constructor.\n" + wrong.joinToString("\n"),
             )
 
-            // 5. ...and with nothing shown, the same letters are the game's again. Fixing the table
-            //    must not have fixed it by taking letters away from the player.
+            // 5. Typing into a focused text field is typing, not playing (issue #230). GLFW reports
+            //    a letter twice - the key, then the character it typed - and the real `TextField`
+            //    takes only the character. The key must not become an intent either.
+            val field = TextFieldScreen()
+            ui.show(field)
+            awaitFrames(frames, frames.count.get() + 3)
+            backend.onRenderThread { sample(source, bindings) }
+            for (case in LETTERS) backend.type(case)
+            awaitFrames(frames, frames.count.get() + 3)
+            val typing = backend.onRenderThread { sample(source, bindings) }
+            assertEquals(
+                LETTERS.joinToString("") { it.typed.toString() },
+                field.text.get(),
+                "the text field did not receive the letters typed into it, so nothing below says " +
+                    "anything about typing",
+            )
+            val moved = LETTERS.filter { typing.pressCount(bindings.catalog.action(it.action)) != 0 }
+            assertTrue(
+                moved.isEmpty(),
+                "typing into a focused text field also pressed $moved for the game: a player writing " +
+                    "their name would walk while doing it",
+            )
+            assertTrue(
+                LETTERS.none { keyboard.isKeyDown(it.glfw) },
+                "a letter typed into the text field is still held down for the game",
+            )
+
+            // 6. ...but a focused control that does not take text leaves every letter with the game.
+            //    The rule follows the interface's answer, so a focused button swallows nothing.
+            ui.show(screen)
+            awaitFrames(frames, frames.count.get() + 3)
+            backend.onRenderThread { sample(source, bindings) }
+            for (case in LETTERS) backend.type(case)
+            awaitFrames(frames, frames.count.get() + 3)
+            val buttoned = backend.onRenderThread { sample(source, bindings) }
+            val swallowed = LETTERS.filter { buttoned.pressCount(bindings.catalog.action(it.action)) != 1 }
+            assertTrue(
+                swallowed.isEmpty(),
+                "with a button focused, ${swallowed.map { it.name }} did not become exactly one intent each",
+            )
+
+            // 7. ...and with nothing shown, every letter is the game's.
             ui.show(null)
             awaitFrames(frames, frames.count.get() + 3)
-            for (case in LETTERS) {
-                backend.press(case.glfw)
-                backend.release(case.glfw)
-            }
-            awaitFrames(frames, frames.count.get() + 2)
+            for (case in LETTERS) backend.type(case)
+            awaitFrames(frames, frames.count.get() + 3)
             val unfocused = backend.onRenderThread { sample(source, bindings) }
             val lost = LETTERS.filter { unfocused.pressCount(bindings.catalog.action(it.action)) != 1 }
             assertTrue(
@@ -267,9 +313,35 @@ class GlKoolInputTest {
 
     private fun KoolBackend.release(glfwKey: Int) = key(glfwKey, GLFW.GLFW_RELEASE)
 
+    /**
+     * Types [case]'s letter the way GLFW reports a real keystroke: the key callback and then the
+     * character callback from the same poll, so Kool queues them together, and the release after.
+     */
+    private fun KoolBackend.type(case: Case) {
+        onRenderThread {
+            val window = GLFW.glfwGetCurrentContext()
+            check(window != 0L) { "no GLFW window is current on the render thread" }
+            invokeKeyCallback(window, case.glfw, GLFW.GLFW_PRESS)
+            val chars = checkNotNull(GLFW.glfwSetCharCallback(window, null)) {
+                "Kool installed no GLFW character callback, so this test would be typing into nothing"
+            }
+            try {
+                chars.invoke(window, case.typed.code)
+            } finally {
+                GLFW.glfwSetCharCallback(window, chars)
+            }
+        }
+        release(case.glfw)
+    }
+
     private fun KoolBackend.key(glfwKey: Int, action: Int) = onRenderThread {
         val window = GLFW.glfwGetCurrentContext()
         check(window != 0L) { "no GLFW window is current on the render thread" }
+        invokeKeyCallback(window, glfwKey, action)
+    }
+
+    /** Kool's installed key callback, taken off, called once and put straight back. Render thread. */
+    private fun invokeKeyCallback(window: Long, glfwKey: Int, action: Int) {
         val callback = checkNotNull(GLFW.glfwSetKeyCallback(window, null)) {
             "Kool installed no GLFW key callback, so this test would be driving nothing"
         }
@@ -392,6 +464,31 @@ class GlKoolInputTest {
 
         /** The binding a [PRINTABLE] key fires when the interface declines it. */
         val action: String = "test/key-$name"
+
+        /** The character GLFW's character callback reports for a [LETTERS] key with no shift held. */
+        val typed: Char get() = name.single().lowercaseChar()
+
+        override fun toString(): String = name
+    }
+
+    /** A real `TextField`, focused, and what it holds - written by the toolkit on the render thread. */
+    private class TextFieldScreen : UiScreen {
+
+        val text: AtomicReference<String> = AtomicReference("")
+
+        @Composable
+        override fun content() {
+            var value by remember { mutableStateOf("") }
+            TextField(
+                value,
+                {
+                    value = it
+                    text.set(it)
+                },
+                Modifier.size(BUTTON_WIDTH, BUTTON_HEIGHT),
+                initialFocus = true,
+            )
+        }
     }
 
     private companion object {

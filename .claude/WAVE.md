@@ -349,6 +349,12 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   deletion is irreversible and outward-facing - the owner's call, raise in the wave report.
 - dev-230 build finished 22:36:31 (only baseline red); it had stopped mid-build and was nudged.
 
+- **#229 round 1 PASS** (`review-229-r1`, SHA `c7c9d7a`), no findings. Rulings: the udea-replay test edit
+  WAS forced (the old test pinned `refs/heads/example`); a dispatch that honestly reports kmp red meets AC1;
+  the dispatch arm fired before the fix too, so the push-arm proof is the probe `35400527981` plus the two
+  controls, and that suffices; at #214 nothing needs editing (control C2 green). ReplayEqualityProofTest:
+  21 tests, 0 failures. Out of scope: every kmp push now runs 3 long legs - handled by batching pushes.
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).
@@ -454,6 +460,10 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   that module, or dispatched directly - no new issue. A round-3 split keeps its remainder on the SAME issue as
   a comment. Commenting on existing issues is still required for decisions. Triggered by wave 10 filing five
   issues (#226-#230) while closing one. Saved to memory as `owner-no-new-issues`.
+- **Batch WAVE.md pushes - once per merge, not per note (from #229).** Since #229, EVERY push to `kmp`
+  runs replay-equality-nightly's three 36000-tick legs. The lead had been pushing bookkeeping ~20 times a
+  session. Commit WAVE.md locally as often as needed; push it WITH the next merge. Reviewer ruled the
+  over-firing out of scope (CI minutes, breaks nothing); this is the lead-side mitigation, no code change.
 - **The scratchpad is SESSION-WIDE** - every developer and reviewer resolves it to the same path. Each agent
   writes only under `scratchpad/issue<N>/` and never cites a file it did not write. Put this in EVERY
   dispatch. (Wave 10: dev-212 found dev-229's generic `build.log`/`final/`/`ev/`/`mutations/` in "its"

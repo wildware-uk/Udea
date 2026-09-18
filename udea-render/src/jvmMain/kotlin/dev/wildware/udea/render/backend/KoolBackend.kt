@@ -9,6 +9,7 @@ import dev.wildware.udea.render.RenderPipeline
 import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.capture.BlockingFrameCapture
 import dev.wildware.udea.render.kool.KoolSurface
+import dev.wildware.udea.render.ui.UiLayer
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -62,6 +63,9 @@ public class KoolBackend private constructor(
      * pipeline's bound Families on its way to throwing.
      */
     private val claimed = AtomicBoolean(false)
+
+    /** The interface [show] was given, which [close] then owns. `null` until it is. */
+    private val shown = AtomicReference<UiLayer?>(null)
 
     /** The pipeline, once [create] has run. `null` before that. */
     public val pipeline: RenderPipeline? get() = built.get()
@@ -124,6 +128,26 @@ public class KoolBackend private constructor(
     }
 
     /**
+     * Puts [ui]'s screens on the context, over everything the game draws, and takes ownership.
+     *
+     * The door a game goes through to have an interface at all (issue #224). Here rather than on
+     * [UiLayer] itself for two reasons: attaching is render-thread work, which only this class can
+     * submit; and a `KoolContext` is a Kool type, which `UDEA-MG-002` keeps out of every game's
+     * hands, so a game that had to name one to show a menu could not show a menu.
+     *
+     * Owned from here on: [close] detaches and closes it, on the render thread, before the pipeline
+     * goes. A second call is refused - one backend draws one interface, the same way it builds one
+     * pipeline - because two layers would both be "the top scene" and the second would silently win.
+     *
+     * @throws IllegalStateException if an interface has been shown already.
+     * @throws GlContextException if the render thread is gone.
+     */
+    public fun show(ui: UiLayer) {
+        check(shown.compareAndSet(null, ui)) { "$this is already showing $shown" }
+        kool.submit { ui.attach(kool.ctx) }
+    }
+
+    /**
      * Runs [block] on the render thread and returns its result.
      *
      * The door for the render work a host legitimately has outside a frame: making a texture,
@@ -156,6 +180,20 @@ public class KoolBackend private constructor(
      * but its captures are still failed, by the shutdown hook [create] installed.
      */
     override fun close() {
+        val ui = shown.getAndSet(null)
+        if (ui != null && kool.isRunning) {
+            // Before the pipeline: the interface's scene sits on the context above the pipeline's,
+            // and a scene left listed after its canvas has gone is a scene Kool still tries to draw.
+            try {
+                kool.submit { ui.detachAndClose() }
+            } catch (stopped: GlContextException) {
+                // The loop ended between the check and the task, so the scene and its GL objects
+                // went with the context and there is nothing left to detach. Reported rather than
+                // rethrown because `close` still has a pipeline to dispose and a context to stop,
+                // and the same condition is about to be met - and reported - by both.
+                System.err.println("udea-render: interface not closed, the render loop had stopped: ${stopped.message}")
+            }
+        }
         val pipeline = built.getAndSet(null)
         if (pipeline != null && kool.isRunning) {
             try {

@@ -2,14 +2,15 @@
 
 ## kmp baseline
 
-**SHA `87d8b7c`** (kmp after #211 merge), refreshed 2026-09-18 on the merged branch with
+**SHA `18bb13f`** (kmp after #224 merge; merged tree byte-identical to the trial tree `41140c7`, so the trial
+build IS the merged build), refreshed 2026-09-18 with
 `ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **Failing tasks: `:moba:compileKotlin` ONLY** - and every moba task downstream of it does not run.
 That is the authorised D9 red: moba still draws with LibGDX until #212 ports it. Nothing else fails.
 A reviewer or trial merge sees exactly that one red and treats any other as the branch's.
 
-Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+Earlier: `87d8b7c` (kmp after #211 merge), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -71,6 +72,273 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   - Trial and merged kmp both show `:moba:compileKotlin` as the only red. Worktree kept: `.claude/worktrees/agent-a27b81d547010a2d9`.
   - Dropped as a card: AGENTS.md's Kool-port paragraph still says "udea-render will apply" in future tense (not the module table; udeaVerifyAgentsMd green). Fold into #212 or #213.
 - **Wave 9 is done. #224 (input + composegl-kool UI host) and #212 (moba split) are the wave 10 candidates; #221 is now unblocked too.**
+
+## Wave 10 (2026-09-18): in flight
+
+- Baseline unchanged: `87d8b7c`, one red: `:moba:compileKotlin` (authorised D9; #212 repairs it).
+- **#212 split (commented):** `:moba:web` + `runWebShot` moved to new issue **#226** (needs #212 and #223).
+  #212 keeps `:moba:game`, `:moba:desktop`, `:moba:android` and must leave zero failing tasks.
+  Reason: #211 shipped udea-render on Kool for JVM+Android only, and #223 (no published Kool has a
+  wasmJs artifact) is open - a web AC nothing can satisfy fails review by construction.
+- **#212 ruling (commented):** input wiring belongs to #224, not #212. `:moba:desktop` takes the input
+  seam on origin/kmp at branch time; shot tasks are harness-driven, no keyboard. dev-212 told not to
+  edit udea-render; dev-224 told not to edit moba/settings.gradle.kts.
+- **#223 decided: option 1** (build Kool `main` pinned `ab762acd` with the 13-line patch, publish
+  ourselves). Commented with the alternatives and how to overturn. Kool is Apache-2.0.
+  **NOT dispatched - two owner gates, raised by `composegl-ef` and put to Shaun on the dashboard:**
+  (a) publishing a patched third-party library under his `dev.wildware` Sonatype namespace is his call;
+  (b) **the snapshot-to-release trap** - a released `composegl-kool` wasmJs target cannot depend on a
+  Kool snapshot, so before that target lands one of: permanent release of the patched Kool under our
+  namespace / wasmJs left out of the next ComposeGL release / Kool 0.20.0 shipped.
+  Hosting revised on composegl-ef's advice: a **manually triggered workflow** with the pin+patch+NOTICE
+  in `third_party/kool/`, NOT a subproject (a subproject makes every ComposeGL CI run build Kool and
+  puts a foreign renderer past the architecture confinement checks). Do not touch ComposeGL's version
+  logic; `javap` in the publish job AND on the jar a consumer resolves; `karma.config.d/` needed but no
+  ci-legs.json edit; WorldPanel.kt / ScenePass.kt still off limits (ComposeGL #230).
+- **#221 held to wave 11**: it lives in `udea-render`, which #224 owns this wave. Same-module rule.
+- Dispatched: dev-212 (branch `issue-212-moba-split`), dev-224 (branch `issue-224-kool-input-ui-host`).
+  Box at dispatch: 24 cores, load 1.4, 19G free / 24G available. Two developers only.
+- Epic #199 gained 8b (#226); row 8 reworded to drop web.
+- **CI baseline on kmp (run 35390467276, `aaacad4`, checked 2026-09-18): 13 jobs red, ALL of them the same
+  `:moba:compileKotlin` D9 red.** Confirmed from the logs: every failure is moba source against APIs #211
+  replaced - `Unresolved reference 'projectionMatrix'/'color'/'combined'/'viewportWidth'` on `SpriteBatch2D`
+  and `Camera2D`, `Texture` where `RenderResource` is wanted, `TextureRegion` where `SpriteRegion` is,
+  `Unresolved reference 'Scene2dUiScreen'` in `MobaHud.kt:370`. Red jobs: build (ubuntu, windows), build with
+  the K2 plugin disabled, the FIR checkers fail a real build, clean build under budget, 4x determinism,
+  3x replay-equality, latency budgets (windows). **Green and worth noting as green:** gl tests (xvfb),
+  iOS simulator tests, agent brief matches the tree, game-bridge-mcp conformance, migration ledger,
+  KSP stays incremental, latency budgets (ubuntu). **#212 is what turns all 13 green.** Not a branch finding
+  for anyone this wave.
+- **Owner ruling on #212 parity (dashboard, 2026-09-18):** "Yes but the UI would look slightly different
+  because of compose gl so account for that." So: the pixel threshold covers WORLD content only; UI regions
+  are masked before the diff and the brief names which and why; inflating one whole-frame threshold until the
+  UI difference fits under it is explicitly rejected (it would hide a world regression behind a cosmetic one);
+  a UI difference is not a parity failure, a world difference is; a missing/partial HUD in the Kool shots is
+  EXPECTED at this SHA (#224 brings the UI host, #188 ports MobaHud and is undispatched) and is named, not
+  fixed; unmasked side-by-side collages still go to the gallery - the owner comparing scenes is the primary
+  evidence, the threshold is secondary. Relayed to dev-212 and commented on #212.
+
+- **#224 blocker found and routed (2026-09-18):** `composegl-kool` 0.7.0-SNAPSHOT honours the `InputSink`
+  contract for keys/pads but NOT pointers. `ComposeGlScene` installs its own private `InputStack` pointer
+  listener in `init`, calls `KoolPointerInput.onFrame(...)` a frame later on the render thread and
+  **discards the `used` boolean**, and never calls `Pointer.consume()`. So `isConsumed()` is always false
+  and Udea cannot learn whether the UI took a click; asking `scene.player` ourselves double-delivers.
+  Asked composegl-ef for the upstream 3-line fix (`if (used) pointer.consume()`) + a fresh snapshot.
+  **BOTH OF THOSE WERE WRONG and are withdrawn.** composegl-ef checked the code: the listener
+  (`ComposeGlScene.kt:134`) runs on Kool's UPDATE thread and only samples; the toolkit handles pointers at
+  the start of the next RENDER (`:169`), where `used` first exists - a frame later, another thread. So
+  `consume()` cannot go in the listener. And the fallback was a DATA RACE, not merely fragile: `scene.player`
+  goes straight to `KeyRouter`/`KeyNavigator`/`GamepadNavigator`, which read and move `FocusManager` and the
+  node tree, none thread-safe, none marshalling. Rule: **every `scene.player` call must be on the render
+  thread**, keys and pads included. The KDoc never said so; composegl is fixing that KDoc and `Input.md`.
+- **#224 input DECIDED - composegl-ef's option 2, one seam.** After `onFrame`, on the render thread, the
+  scene reports per pointer whether the UI took it; plus a **render-thread hook just before each frame** in
+  which a consumer drains queued key/pad events, calls `player` and gets `used` immediately. Being built
+  with tests, then a snapshot. **Rejected option 1** (thread-safe prediction published each frame so Kool's
+  own `isConsumed()` is right same-frame): needs new public hit-query API on composegl-ui plus an owner gate,
+  and buys a same-frame `isConsumed()` nothing in Udea reads. **Accepted cost:** Udea's pointer translation
+  moves to the render thread after the report, so pointer intents land ONE FRAME LATER. Fine - 60Hz fixed
+  sim, decoupled render, inputs stamped in `Tick`; determinism rests on the stamped tick, not wall-clock.
+- **#224 threading, CORRECTED by dev-224 from Kool's source:** Udea's key path is NOT racy and never was.
+  `udea-render`'s `KoolThread.config()` passes **`asyncSceneUpdate = false`** (so sprite batches are not read
+  while a renderer writes them). With it off, Kool 0.19.0's `Lwjgl3Context.renderFrame()` never sets
+  `nextFrameData`, so `render()` - holding `Input.poll(this)` and the `onRender` callbacks - runs INLINE on
+  the same thread that then calls `backend.renderFrame(...)` where `ComposeGlScene.render()` touches the
+  toolkit. One thread, `udea-kool`. Udea's input callback IS the render thread: it satisfies the rule.
+  Android: both are the `GLSurfaceView` thread. So the key/pad half proceeds as written and does NOT migrate
+  onto the new hook (churn for a property already held). Guarded by a GL test recording
+  `Thread.currentThread()` at the Kool input callback and inside the scene's render, failing if they differ -
+  which reddens the day somebody flips `asyncSceneUpdate` back on. The KDoc names that test and names the
+  hook as the migration path. **"One thread" does NOT buy a same-frame verdict:** frame ordering is
+  poll -> Udea's tick -> ComposeGL's `onFrame`, so the verdict on frame N exists only after N has ticked.
+  One frame late for an ORDERING reason, not a threading one. All commented on #224.
+- **Kool fork NOT approved.** The owner dismissed the question rather than answering; composegl-ef correctly
+  read that as a no. Nothing published, no publish path in composegl. It has since come back round: the owner
+  asked on the dashboard what the browser needs, and the lead put it to him plainly (no released Kool has a
+  wasmJs artifact; the only route is publishing the patched pinned build ourselves; his yes or no), with the
+  release trap attached. Owner also ruled: **the browser frontend is Udea (`:moba:web`), not a Kool app** -
+  Kool is the renderer only. That is already the design (module-graph gate).
+- **Repository defect found by dev-224:** `composegl-kool:0.7.0-SNAPSHOT` resolves from
+  `https://central.sonatype.com/repository/maven-snapshots/`; **both Sonatype hosts `build.gradle.kts`
+  declares today 404.** Fix is in #224's branch. One-sided: composegl's wiki (`Kool.md:22`) already names
+  the right host, so this is Udea's build file being stale, not composegl documenting the wrong one.
+- **#212 plan change, approved:** dev-212 ports `MobaHudSystem` off scene2d onto `udea-render`'s existing
+  `BitmapFont2D` rather than deleting the HUD, so parity compares a HUD against a HUD. Not scope creep -
+  `MobaHud.kt:370` cannot resolve `Scene2dUiScreen` since #211, so moba cannot compile until scene2d goes.
+  Interim only; #188 now replaces `BitmapFont2D` drawing rather than scene2d (commented on #188).
+  `HudState` stays untouched. Reference PNGs captured from `origin/master` `409c044`, 9 frames, in gallery.
+
+- **WEB IS SHELVED (owner, 2026-09-18).** He asked "Does kool not have a snapshot we can use? If not, then
+  shelve web for now, make a note." Checked: `de/fabmax/kool/kool-core/maven-metadata.xml` is **404** on
+  `central.sonatype.com/repository/maven-snapshots/`, on `oss.sonatype.org/.../snapshots` (host retired 2025)
+  and on `s01.oss.sonatype.org/.../snapshots`; Maven Central releases 200 with `<latest>0.19.0</latest>`,
+  `lastUpdated 20251220180520`. Kool is CONFIGURED to publish snapshots and never has (`build.gradle.kts`
+  `version = "0.20.0-SNAPSHOT"`, `publishToMavenCentral()`, README points at the retired host).
+  **That README line is stale - do not chase it again.**
+  **#223 and #226 are parked**, retitled `[SHELVED]`, commented, and marked in epic #199. Unshelve on any of:
+  Kool 0.20.0 shipping with a wasmJs artifact (watch `<latest>` in that metadata URL); the owner reversing
+  the publish decision (`spikes/kool-wasm/` holds pin `ab762acd`, `toolchain-21.patch`, `reproduce.sh`,
+  transcripts - nothing to rediscover); or Kotlin/JS chosen instead.
+  **Nothing else is affected:** #212 and #224 were already JVM+Android; web was never in `sh gradlew build`,
+  so #214 does not wait on it; every merged `wasmJs` target stays (core, gas, assets, replay, audio, net,
+  agent). Spec D1 is DEFERRED, not overturned.
+- **Route B exists and was put to the owner too** (composegl-ef corrected the lead for calling the fork "the
+  only route"): Kool 0.19.0 publishes a Kotlin/JS build, so no fork and nothing published under his name -
+  but ComposeGL's browser target is Wasm only, so it needs a Kotlin/JS target adding as well, and so do nine
+  Udea modules, against seven that already build wasmJs. Lead recommended Route A on that asymmetry; the
+  owner shelved instead.
+
+- **#224 SPLIT: pointer half -> new issue #227.** The composegl-ef session was CLEARED and lost the
+  per-pointer report it had promised - no branch, no commit, no memory of it, master still `d8f2da9a`, no
+  snapshot since. It advised splitting rather than holding, and the lead agreed: no snapshot, no honest ETA.
+  The full option-2 spec was re-sent to composegl-ef from the lead's record so it can be rebuilt.
+  **#224's revised ACs (commented): key/pad intents + UI first refusal, ComposeGL screen over the Kool scene
+  and absent from captures, module-graph gate.** All three already done and proved at `97b0ca4`.
+  #224 must state in BRIEF.md what a user experiences with pointers unhandled - known-wrong or absent.
+  **NOTE for composegl:** Udea no longer needs the render-thread key/pad hook (`asyncSceneUpdate = false`
+  puts Udea's key path on the render thread already); only the pointer report is wanted. Told them so.
+- **#224 findings worth keeping:** `UiFonts` (abstract, internal constructor) instead of exposing
+  `AtlasFonts` - keeps a renderer off every game's compile classpath, confirmed correct by composegl-ef;
+  `RenderModuleGraphTest` asserting dependency SCOPES because the gate cannot see a frontend arriving
+  transitively; `android.useAndroidX=true` needed (AGP refuses `androidx.compose.runtime` from
+  `composegl-ui`, and udea-render has an Android target); `WallClockBudgetCensusTest` census rows for two GL
+  tests that spin-wait on `System.nanoTime` for a frame deadline.
+- **CROSS-TICKET, relayed to dev-212 as urgent:** Kool's key table is not LibGDX's.
+  `moba/assets/control/controls.udea.kts` holds gdx literals (`KeyW = 51`); under Kool 51 is `'3'` and W is
+  `'w'.code` = 119. It compiles, the asset validates, nothing catches it - a wrong binding is invisible in a
+  screenshot. dev-212 owns the fix (it is in moba), told to use named constants not fresh literals and to
+  prove the bindings with a test or transcript. dev-224 rejected an engine-owned `UdeaKeys` table for its
+  own ticket and commented why on #224.
+
+- **Key-code dispute, routed not adjudicated.** The lead relayed dev-224's "W is `'w'.code` = 119".
+  dev-212 disputed it from bytecode: `GlfwInput` builds the universal code as
+  `KEY_CODE_MAP[glfwKey] ?: UniversalKeyCode(glfwKey)`, `KEY_CODE_MAP`'s 41 entries are all SPECIAL keys, so
+  a printable key is the raw GLFW int - and `GLFW_KEY_W = 87` (GLFW letters are ASCII UPPERCASE).
+  `localKeyCode` is also uppercased (`Character.toUpperCase(glfwGetKeyName(...)[0])`). 119 is `'w'.code`,
+  which GLFW never sends. **dev-212 proceeds on 87/65/83/68/81/69/82/32**, written as `'W'.code` not bare
+  ints, with a per-key test driving `DeviceIntent` and asserting movement. dev-224 asked to settle it
+  empirically from its running `GlKoolInputTest` and to say WHICH FIELD it matches (universal vs local -
+  they agree on GLFW, may not elsewhere) and whether its test would pass with the other number.
+  Lesson: the lead should have questioned a lowercase-ASCII *key code* before relaying it.
+- **SETTLED: W is 87.** dev-224 measured it and retracted its own number without softening.
+  **CORRECTED LATER (dev-230, lead-verified):** the explanation of the 119 below was itself wrong.
+  `UniversalKeyCode(Char)` is `Character.toUpperCase` in **Kool 0.19.0** (our dependency, `javap -c`) and
+  `lowercaseChar()` only in **Kool `main`** (`KeyCode.kt:16` in the #225 spike clone, which is what dev-224
+  read). **The helper's case FLIPS between Kool versions.** So KeyTable was CORRECT on 0.19.0 and #230's
+  premise was false today - but it is TRUE after the Kool upgrade that would unshelve web. Never key a table
+  through `UniversalKeyCode(Char)`; key on raw ints. The "W is 87" measurement itself was never in doubt.
+  **Second fact, and it matters more:** printable keys are raw GLFW ints, but SPECIAL keys go through
+  `KEY_CODE_MAP` and become **Kool's own NEGATIVE codes** - `GLFW_KEY_ESCAPE` is 256 but Kool's `KEY_ESC` is
+  **-9**. Map covers ctrl/shift/alt/super/escape/menu/enter/numpad/backspace/tab/delete/insert/home/end/
+  pageup/pagedown/cursors/F1-F12. So ONE integer field holds two incompatible schemes with nothing saying
+  which - an independent second reason for #228. dev-212 told to check moba's asset for any non-letter
+  binding. `KoolKeyboard` reads the UNIVERSAL code (`event.keyCode.code`), the physical key - correct half.
+  lwjgl on this box is **3.4.3**, not 3.3.6; constants agree.
+- **dev-224 found its own evidence hole and is fixing it rather than writing it up:** `GlKoolInputTest` built
+  the `KeyEvent` itself and bound the same code, so it passed for ANY number - it proved the path and nothing
+  about the table. Now driving Kool's real GLFW key callback with raw `GLFW_KEY_W`, asserting
+  `isKeyDown(GLFW_KEY_W)` true AND `isKeyDown('w'.code)` false, so the wrong belief cannot come back green.
+  dev-212 asked whether its own per-key test has the same hole (supplying the code it asserts).
+- **MEASURED, settled for good.** dev-224 drove Kool's installed GLFW key callback with raw `GLFW_KEY_W`
+  (retrieved via `glfwSetKeyCallback(glfwGetCurrentContext(), null)` on the render thread and restored
+  straight after - GLFW has no getter) and observed the code where `UiLayer` is offered it. Negative control
+  bound `'w'.code`: `"W never became an intent. ... The interface saw [87]"`. **THE TABLE:**
+  letters/digits/space = raw GLFW constant, ASCII UPPERCASE (W 87, A 65, S 83, D 68, Q 81, E 69, R 82,
+  space 32); the 41 SPECIAL keys = Kool's own NEGATIVE codes via `KEY_CODE_MAP` (**Escape is `-9`, NOT
+  GLFW's 256**) and must be written `KeyboardInput.KEY_*.code`. `KoolKeyboard` reads the UNIVERSAL code.
+  lwjgl on this box is **3.4.3**. All relayed to dev-212, which is auditing moba's asset for non-letter
+  bindings.
+- **TEST-DESIGN LESSON, applies beyond this wave:** a binding test that SYNTHESISES the event it then binds
+  against passes for any number - it proves the path and asserts nothing about the table. The fix is the
+  negative: assert the WRONG code produces no intent. Both developers now carry it; recorded on #228.
+- **Filed #228** (udea-render owns the key table; games stop writing backend key codes). Cleared the bar:
+  it compiles, validates, gates green, and the game responds to the WRONG KEYS - invisible to screenshots.
+  `InputBindings.keys`' KDoc still claims "com.badlogic.gdx.Input.Keys codes", which is false and is what
+  makes the next game write gdx numbers. Needs #224. Added to epic as 7d.
+
+- **Owner asked to run 4 developers. Dispatched a THIRD (#229); a fourth is not safely available.**
+  Every other open ticket either collides with #212 (`moba`) or #224 (`udea-render`), or is blocked by
+  them: #221 and #228 are udea-render (and collide with each other); #227 waits on a composegl snapshot;
+  #213 deletes `example/`, which `:moba:udeaStageCharacterArt` still reads the character art out of, so it
+  cannot land before #212; #188/#192 are moba; #194-#196 need #212; #189 needs #188 AND edits
+  `udea-render/src/test/.../BannedOwner.kt`; #223/#226 shelved. Checked the old-tree edges directly: only
+  `example` depends on `common` and `gradle-plugin`, so #213 is genuinely one unit and cannot be split to
+  free a slot. Box was also at **load 26.4 on 24 cores** with 12G available when asked.
+- **Filed and dispatched #229** (dev-229, branch `issue-229-nightly-branch-trigger`, `.github/` only):
+  `ci.yml:1746` gates replay-equality-nightly on `github.ref == 'refs/heads/example'`, a branch retired
+  2026-09-16 - a push clause that can never fire. Worse than tidy-up: the surviving `schedule` clause runs
+  on the DEFAULT branch, `master`, the pre-port LibGDX tree. So the nightly verifies the engine being
+  replaced while the port's own replay determinism has no nightly coverage - and replay equality is exactly
+  the gate that catches determinism drift across JDK vendors and OSes, the defect class a KMP port
+  introduces. Cleared the "file it" bar as a gate that cannot fire. dev-229 authorised to push ITS OWN
+  branch to origin (the deliverable is a real `workflow_dispatch` run); told not to delete the `example`
+  branch.
+- **Slot 4 opens on the next merge.** #224 frees `udea-render` for #221 or #228 (not both - same module);
+  #212 frees `moba` for #188/#192 and unblocks #213 and #194.
+
+- **#227 UNBLOCKED, dispatch on the next merge.** composegl-kool `0.7.0-SNAPSHOT` from **`007ea1cf`**
+  carries the pointer report: `ComposeGlScene.onPointerUsed: ((PointerUse) -> Unit)?` with
+  `data class PointerUse(val pointer: Int, val frame: Int, val used: Boolean)`. Fires on the RENDER thread
+  at the start of the ComposeGL scene's render, ONCE PER VALID POINTER PER KOOL FRAME (used or not,
+  including a final report when a finger lifts or the mouse leaves). **`frame` is `Time.frameCount` from
+  when the LISTENER READ the pointer, not when the report arrives** - the detail most likely to produce an
+  off-by-one that only shows under load. `isConsumed()` stays false, deliberately (option-1 rejection).
+  Confirms the one-frame ordering from the other side: under `asyncSceneUpdate = false` it fires AFTER the
+  game's update for that frame. composegl skipped the render-thread key/pad hook entirely - dev-224's
+  `asyncSceneUpdate` finding made it unnecessary, and their docs now tell default-Kool consumers to queue
+  and hand over on the render thread. Wiki gained the render-thread rule on `player`, the `Input.md` rule,
+  the `Kool.md` "holds only under the default" correction, a "Did the interface take that click?" section
+  and the `android.useAndroidX=true` line. Full API recorded on #227.
+  **Not dispatched: it is `udea-render`, which #224 owns until it merges.**
+
+- **#224 MERGED `18bb13f`**, round 1 PASS, no findings. Kool key/pad input to intents with UI first refusal,
+  `composegl-kool` UI host (`UiLayer`, owned by `KoolBackend.show` on the render thread), capture isolation
+  proved structural AND measured mid-redraw (all five captures hash `cdb6bdc8...`), `RenderModuleGraphTest`
+  scope fence. Trial: build red ONLY on baseline `:moba:compileKotlin`; GL suite under xvfb with
+  `-Pudea.render.requireGl=true` green. Merged tree == trial tree (`41140c7`). Baseline unchanged.
+  Worktree kept: `.claude/worktrees/agent-a01eb6c762a84065b`.
+  **Out-of-scope card the reviewer raised, CONFIRMED by the lead and filed as #230, not dropped:**
+  `KeyTable.kt` (new in #224) line 29 keys letters with `UniversalKeyCode(letter)` over 'a'..'z' - the
+  lowercasing constructor - so W maps to 119 not the 87 GLFW sends. Every letter reaches a focused ComposeGL
+  control as `Key.Unknown`, is not taken, and leaks through as a game intent: typing in a text field also
+  moves the player. #224's tests only pressed Escape (special-key map, correct). Latent - moba has no
+  ComposeGL screen until #188 - so merging on the PASS was safe; #230 must land BEFORE #188. The reviewer's
+  out-of-scope label was generous (it is new code breaking the ticket's own AC1 for letters) but the PASS
+  is the sign-off and the lead did not overrule it.
+
+- **Dispatched #230** (dev-230, branch `issue-230-keytable-letters`, `udea-render` only) the moment #224
+  merged - fix before feature, so it goes AHEAD of #227 (same module; only one at a time). Told it to key the
+  table on what GLFW actually sends rather than lowercase incoming codes (that would make the table agree
+  with itself while disagreeing with Kool about what a key code is); extend `GlKoolInputTest` rather than add
+  a class (one Kool context per JVM); drive Kool's REAL GLFW callback for all 26 letters; prove the
+  lowercase mutation red; check line 86's punctuation `forEach`, which uses the same constructor; and prove
+  an UNFOCUSED letter still reaches the game, so fixing the UI does not break movement.
+- **In flight: 3** (dev-212 moba, dev-229 .github, dev-230 udea-render). A 4th is still not available:
+  #227/#221/#228 are all `udea-render` (dev-230's), and everything else needs #212. Slot 4 opens when
+  #212 merges (frees moba; unblocks #213/#188/#192/#194) or #230 merges (frees udea-render for #227).
+- Xvfb at merge time: one server, 49s old, a live developer's - left alone.
+
+- **#230 REFRAMED, not abandoned.** dev-230 measured three ways (javap on desktop jar + Android aar;
+  all-26-letters real-GLFW test PASSES on merged code; lowercase mutation reds exactly A-Z): the constructor
+  UPPERCASES on 0.19.0, so KeyTable was right. The lead found why everyone believed otherwise: Kool `main`
+  lowercases. Now lands: (1) key the table on RAW INTS, never via the Char helper, so the upgrade cannot
+  break it; line-86 punctuation same check; (2) the 26-letter real-GLFW test as the UPGRADE GUARD, failure
+  message naming the constructor and the version flip; (3) corrected KDocs; (4) **the real player-visible
+  defect, different cause:** ComposeGL `TextField` does not take a bare letter key-down
+  (`KeyboardEditor.onKey` returns null for plain letters; typing arrives as TEXT), so typing "w" into it
+  still sends W to the game - #230's AC1. dev-230 wanted to file it as a new issue; told NO (owner rule, and
+  it is AC1 in its own module). Fix: judge the key event and its text event together; an unfocused letter
+  must still reach the game; a focused BUTTON must not swallow W. Corrections posted on #230 and #228.
+- **Lesson for the lead:** I "confirmed" #230 by reading line 29 and trusting the relayed claim about what
+  the constructor does, not by reading the constructor in the version we ship. That is confirming a claim
+  from the sentence that made it. Check the dependency version before trusting a source read.
+
+## Wave 10 plan
+
+- Ready: #212 (moba, scoped down), #224 (udea-render).
+- Held: #221 (udea-render, collides with #224) - wave 11. #223 (owner-gated, above).
+- Blocked: #226 needs #212 and #223. #192 needs #212. #194-#196 need #212. #188 needs #224's UI host.
+  #213 then #214.
 
 ## Wave 9 plan
 
@@ -163,6 +431,17 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - Lead rule: every gradle build runs `run_in_background`; never foreground (froze the session once). Verify a trial merge applied before trusting it.
 
 ## Standing rulings and traps
+
+- **OWNER RULE (dashboard, 2026-09-18): "STOP CREATING ISSUES, if things need fixing, just do it, stop
+  creating new issues."** Overrides the dev-team skill wherever it says `gh issue create`. A defect found in a
+  ticket's own module is fixed ON THAT BRANCH. A defect elsewhere is folded into the next existing ticket in
+  that module, or dispatched directly - no new issue. A round-3 split keeps its remainder on the SAME issue as
+  a comment. Commenting on existing issues is still required for decisions. Triggered by wave 10 filing five
+  issues (#226-#230) while closing one. Saved to memory as `owner-no-new-issues`.
+- **The scratchpad is SESSION-WIDE** - every developer and reviewer resolves it to the same path. Each agent
+  writes only under `scratchpad/issue<N>/` and never cites a file it did not write. Put this in EVERY
+  dispatch. (Wave 10: dev-212 found dev-229's generic `build.log`/`final/`/`ev/`/`mutations/` in "its"
+  scratchpad; nothing clobbered, all three told.)
 
 - New runtime module must call `udeaModule("Name")` in its build script, or codegen errors (#202 ruling).
 - Modules depending on udea-core cannot have iOS until #215 (Fleks); use `udea.kotlin-multiplatform-no-ios` (#203 ruling).

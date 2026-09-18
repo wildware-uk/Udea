@@ -56,7 +56,12 @@ junitPlatform = "1.13.4"
 # published release declares `kotlin-stdlib:2.4.20` and its jars carry `@Metadata(mv = [2, 4, 0])`,
 # which is why `kotlin` above had to move to 2.4.20 before any of this could be on the classpath
 # at all. `composegl-gdx` is a GL backend, so it is `udea-render`-only by UDEA-MG-002.
-composegl = "0.6.0"
+#
+# 0.7.0-SNAPSHOT is the first release carrying `composegl-kool`, the Kool frontend `udea-render`
+# hosts its interface on (issue #224). A snapshot rather than a release because there is no 0.7.0
+# yet. Every composegl artifact moves together: `composegl-kool:0.7.0-SNAPSHOT` declares
+# `composegl-ui` and `composegl-render` at the same version, and a mixed graph would not link.
+composegl = "0.7.0-SNAPSHOT"
 # kotlinx.serialization, for level files (issue #191): a saved level is Fleks' own
 # `world.snapshot()` encoded as CBOR. 1.11.0 is the version the Fleks 2.14 release was built and
 # tested against. Fleks is vendored source since issue #215 and compiles its `@Serializable`
@@ -149,6 +154,12 @@ composegl-ui = { module = "dev.wildware.composegl:composegl-ui", version.ref = "
 # The libGDX backend: it draws a ComposeGL tree through a gdx `Batch`, so it names GL types and
 # may only ever be a dependency of `udea-render`.
 composegl-gdx = { module = "dev.wildware.composegl:composegl-gdx", version.ref = "composegl" }
+# The Kool backend: it draws a ComposeGL tree inside Kool's frame, through Kool's own GL context,
+# so like every other frontend it may only ever be a dependency of `udea-render` (UDEA-MG-002).
+composegl-kool = { module = "dev.wildware.composegl:composegl-kool", version.ref = "composegl" }
+# Desktop glyph rasterisation (stb_truetype, through LWJGL). A frontend artifact, `udea-render`-only
+# and JVM-only: Android rasterises with its own `Typeface`, inside `composegl-kool`.
+composegl-lwjgl3 = { module = "dev.wildware.composegl:composegl-lwjgl3", version.ref = "composegl" }
 # Kool's multiplatform core. Gradle's variant matching picks `kool-core-desktop` for the JVM
 # target and `kool-core-android` for the Android one.
 kool-core = { module = "de.fabmax.kool:kool-core", version.ref = "kool" }

@@ -14,7 +14,14 @@ package dev.wildware.udea.render.input
 public class ActionBinding(
     /** Namespaced, e.g. `moba/attack`. See [InputCatalog] for why the namespace matters. */
     public val name: String,
-    /** `com.badlogic.gdx.Input.Keys` codes, any of which triggers it. */
+    /**
+     * Key codes, any of which triggers it, in the backend's own table.
+     *
+     * Kool's universal key codes since issue #224 - the same ints `KeyboardState.isKeyDown` reads -
+     * where they used to be `com.badlogic.gdx.Input.Keys`. A build draws with one renderer, so there
+     * is one table; the asset that declares a binding stores whichever one that build speaks, which
+     * is what `BindingInput.Key`'s own KDoc means by "what every backend speaks".
+     */
     public val keys: IntArray = IntArray(0),
     /** Gamepad button indices, any of which triggers it. */
     public val buttons: IntArray = IntArray(0),

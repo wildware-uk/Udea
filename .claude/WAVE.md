@@ -98,6 +98,16 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - Dispatched: dev-212 (branch `issue-212-moba-split`), dev-224 (branch `issue-224-kool-input-ui-host`).
   Box at dispatch: 24 cores, load 1.4, 19G free / 24G available. Two developers only.
 - Epic #199 gained 8b (#226); row 8 reworded to drop web.
+- **CI baseline on kmp (run 35390467276, `aaacad4`, checked 2026-09-18): 13 jobs red, ALL of them the same
+  `:moba:compileKotlin` D9 red.** Confirmed from the logs: every failure is moba source against APIs #211
+  replaced - `Unresolved reference 'projectionMatrix'/'color'/'combined'/'viewportWidth'` on `SpriteBatch2D`
+  and `Camera2D`, `Texture` where `RenderResource` is wanted, `TextureRegion` where `SpriteRegion` is,
+  `Unresolved reference 'Scene2dUiScreen'` in `MobaHud.kt:370`. Red jobs: build (ubuntu, windows), build with
+  the K2 plugin disabled, the FIR checkers fail a real build, clean build under budget, 4x determinism,
+  3x replay-equality, latency budgets (windows). **Green and worth noting as green:** gl tests (xvfb),
+  iOS simulator tests, agent brief matches the tree, game-bridge-mcp conformance, migration ledger,
+  KSP stays incremental, latency budgets (ubuntu). **#212 is what turns all 13 green.** Not a branch finding
+  for anyone this wave.
 - **Owner ruling on #212 parity (dashboard, 2026-09-18):** "Yes but the UI would look slightly different
   because of compose gl so account for that." So: the pixel threshold covers WORLD content only; UI regions
   are masked before the diff and the brief names which and why; inflating one whole-frame threshold until the

@@ -2,7 +2,14 @@
 
 ## kmp baseline
 
-SHA `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+**SHA `87d8b7c`** (kmp after #211 merge), refreshed 2026-09-18 on the merged branch with
+`ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
+
+**Failing tasks: `:moba:compileKotlin` ONLY** - and every moba task downstream of it does not run.
+That is the authorised D9 red: moba still draws with LibGDX until #212 ports it. Nothing else fails.
+A reviewer or trial merge sees exactly that one red and treats any other as the branch's.
+
+Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -57,6 +64,13 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 
 - **#225 merged `3544c40`** (brief `52e92aa`), round 1 PASS, no findings. Answer YES: Kool main `ab762acd`, 13-line patch in 3 build files, no source change, jvm major 65 + android + wasmJs; Kotlin 2.4.20 consumer reads both; WebGL 2 draw in headless Chrome. Nothing published. Reviewer reproduced the whole run. Trial + merged kmp both green (0 failing tasks). Baseline refreshed: **`52e92aa`, failing tasks: none**; `-p build-logic check` green. Worktree kept: `.claude/worktrees/agent-aee3e20c78d24843c`. Dropped as cards: duplicate #223 answer comments (dev-225 and dev-225b each posted one).
 - #223 now has the option-1 answer and recommendation; the owner's call on which option to take is still open.
+
+- **#211 merged `b708767`** (brief `87d8b7c`), round 1 PASS, no findings. udea-render off LibGDX: Kool GameHost, SpriteBatch2D (instanced quads + KslUnlitShader), orthographic camera, OffscreenPass2d capture to PNG, agent overlay moved out of udea-agent-host as an OverlaySystem. JVM + Android only. 159 files, most of them moves into commonMain.
+  - Two real defects found on the way, both fixed here: (1) the GL suite had NEVER run - its availability probe created and closed a throwaway Kool context, spending the one-context-per-process allowance, so every GL test failed before its body and blamed a missing display; now it checks `$DISPLAY`, and several test classes that opened two contexts per JVM were merged/split, plus a missing `forkEvery = 1` on udea-agent-host's GL test task. (2) `render.screenshot` DEADLOCKED on every real Offscreen/Windowed host: `answerLater` runs its work synchronously in the tick that queued it, which suited LibGDX's one-call readback and not Kool's two-phase capture. New `AgentContext.answerWhenReady` polls once per host tick; `answerLater` untouched.
+  - Reviewer re-ran the xvfb evidence command and read the JUnit XML: 10 GL test classes executed, 0 skipped, 0 failed, both overlay-isolation tests assert real pixels in both directions. `CAPTURE_GRACE_MILLIS` is wall-clock but unchanged from origin/kmp and lives in `AgentRuntime.afterFrame`, outside `Simulation.step()` - pre-existing, not an item-20 violation.
+  - Trial and merged kmp both show `:moba:compileKotlin` as the only red. Worktree kept: `.claude/worktrees/agent-a27b81d547010a2d9`.
+  - Dropped as a card: AGENTS.md's Kool-port paragraph still says "udea-render will apply" in future tense (not the module table; udeaVerifyAgentsMd green). Fold into #212 or #213.
+- **Wave 9 is done. #224 (input + composegl-kool UI host) and #212 (moba split) are the wave 10 candidates; #221 is now unblocked too.**
 
 ## Wave 9 plan
 

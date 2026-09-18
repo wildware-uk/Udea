@@ -1768,7 +1768,7 @@ jobs:
     if: >-
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/kmp')
+      (github.event_name == 'push' && github.ref == 'refs/heads/issue-229-nightly-branch-trigger')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

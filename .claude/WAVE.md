@@ -52,6 +52,8 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - #223 option-1 spike filed as #225 (spikes/kool-wasm/ only, publish nothing).
 - Dispatched: dev-211 (branch issue-211-udea-render-kool), dev-225 (branch issue-225-kool-wasm-spike). Disjoint. Stopped 2 idle Udea Gradle 8.13 daemons first (19G free after).
 - Epic #199 checklist gained 6c #225 and 7b #224.
+- 2026-09-18: dev-211 and dev-225 both killed by an API weekly limit on Opus (resets Sep 22 16:00 UTC) after a day's work. Work survived on disk. Took over on **sonnet**: dev-211b and dev-225b, pointed at the SAME worktrees/branches (`agent-a27b81d547010a2d9` = issue-211-udea-render-kool, 120 uncommitted changes, told to WIP-commit first; `agent-aee3e20c78d24843c` = issue-225-kool-wasm-spike, 3 commits, README says ANSWER YES).
+- #225 preliminary answer (from its README, not yet reviewed): Kool main pinned `ab762acd` builds kool-core for jvm (major 65), android and wasmJs with a 13-line build-script patch in 3 files, no source change; a Kotlin 2.4.20 consumer compiles against it and draws in headless Chrome on WebGL 2. Reviewer must confirm.
 
 ## Wave 9 plan
 

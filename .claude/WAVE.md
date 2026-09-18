@@ -303,6 +303,18 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   out-of-scope label was generous (it is new code breaking the ticket's own AC1 for letters) but the PASS
   is the sign-off and the lead did not overrule it.
 
+- **Dispatched #230** (dev-230, branch `issue-230-keytable-letters`, `udea-render` only) the moment #224
+  merged - fix before feature, so it goes AHEAD of #227 (same module; only one at a time). Told it to key the
+  table on what GLFW actually sends rather than lowercase incoming codes (that would make the table agree
+  with itself while disagreeing with Kool about what a key code is); extend `GlKoolInputTest` rather than add
+  a class (one Kool context per JVM); drive Kool's REAL GLFW callback for all 26 letters; prove the
+  lowercase mutation red; check line 86's punctuation `forEach`, which uses the same constructor; and prove
+  an UNFOCUSED letter still reaches the game, so fixing the UI does not break movement.
+- **In flight: 3** (dev-212 moba, dev-229 .github, dev-230 udea-render). A 4th is still not available:
+  #227/#221/#228 are all `udea-render` (dev-230's), and everything else needs #212. Slot 4 opens when
+  #212 merges (frees moba; unblocks #213/#188/#192/#194) or #230 merges (frees udea-render for #227).
+- Xvfb at merge time: one server, 49s old, a live developer's - left alone.
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).

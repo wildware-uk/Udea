@@ -1,4 +1,4 @@
-"""Writes moba/assets/sprites/champion_idle.png: the committed placeholder the atlas is packed from.
+"""Writes moba/game/assets/sprites/champion_idle.png: the committed placeholder the atlas is packed from.
 
 Why this exists
 ---------------
@@ -7,7 +7,7 @@ third-party art and gitignored (docs/art-assets.md). The build-time asset pipeli
 sheets a `.udea.kts` declares, so on a fresh clone with no art extracted it would pack nothing
 and `:moba:run` would draw nothing - a green build proving nothing about the sprite path.
 
-So `moba/assets` declares its own sheet over art this repository may actually ship: six 64x64
+So `moba/game/assets` declares its own sheet over art this repository may actually ship: six 64x64
 frames of a bobbing figure, drawn from arithmetic so the bytes are a function of this file and
 nothing else. It is deliberately ugly. It is not concept art; it is the smallest thing that
 makes "the game draws packed atlas regions" a claim a screenshot can settle, and it animates so
@@ -84,7 +84,7 @@ def main():
         + chunk(b"IEND", b"")
     )
 
-    out = Path(__file__).resolve().parent.parent / "moba" / "assets" / "sprites" / "champion_idle.png"
+    out = Path(__file__).resolve().parent.parent / "moba" / "game" / "assets" / "sprites" / "champion_idle.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(png)
     print(f"{out} ({len(png)} bytes, {WIDTH}x{HEIGHT}, {FRAMES} frames)")

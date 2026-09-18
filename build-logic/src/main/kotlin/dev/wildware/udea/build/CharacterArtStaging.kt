@@ -24,7 +24,7 @@ import java.nio.file.StandardCopyOption
  *
  * ## Why a build stages art at all
  *
- * `moba/assets/character` names sheets under `sprites/`, and those pixels are third-party licensed
+ * `moba/game/assets/character` names sheets under `sprites/`, and those pixels are third-party licensed
  * art from the Tiny RPG Character Asset Pack. This repository is public and has no right to
  * sublicense them, so `.gitignore` excludes the whole destination tree and a clone carries none of
  * it. Until this task existed, `:moba:udeaValidateAssets` therefore refused the manifest on every
@@ -231,7 +231,7 @@ public abstract class UdeaStageCharacterArtTask : DefaultTask() {
  * `udeaValidateAssets` is where a missing sheet is *diagnosed*, but a build that ordered only the
  * validator would have Gradle rejecting the graph for an undeclared dependency on files another
  * task produces. Consumers outside this project order themselves the same way — see the `Test`
- * tasks in `udea-assets-compiler/build.gradle.kts`, which read `moba/assets` by path.
+ * tasks in `udea-assets-compiler/build.gradle.kts`, which read `moba/game/assets` by path.
  *
  * `tasks.named` rather than `pluginManager.withPlugin`: a game that calls this without the assets
  * plugin applied has nothing to stage art for, and an immediate `UnknownTaskException` naming the

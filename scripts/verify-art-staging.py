@@ -13,7 +13,7 @@ it until they are committed.
 
 ## What it asserts, and why each one can fail
 
-1. **The negative control.** `:moba:udeaValidateAssets` must FAIL on the clean tree when the
+1. **The negative control.** `:moba:game:udeaValidateAssets` must FAIL on the clean tree when the
    staging task is excluded with `-x`. Two things would make it pass: the art being committed
    after all, or the pipeline no longer minding a `spritePath` it cannot resolve. Either would
    make every later assertion here pass for the wrong reason. This is the assertion #154 shipped;
@@ -64,16 +64,16 @@ MANIFEST = os.path.join("docs", "art-assets.md")
 BEGIN = "<!-- verify-art-staging: the documented step begins -->"
 END = "<!-- verify-art-staging: the documented step ends -->"
 
-VALIDATE = ":moba:udeaValidateAssets"
+VALIDATE = ":moba:game:udeaValidateAssets"
 
 # The task the build runs to put the art in place, excluded in step 1 to make the control mean
 # something. A rename fails step 1 as "task not found" rather than passing quietly.
 STAGING_TASK = "udeaStageCharacterArt"
 
-SPRITE_TREE = os.path.join("moba", "assets", "sprites")
+SPRITE_TREE = os.path.join("moba", "game", "assets", "sprites")
 
-# The bundle `:moba:build` packs those pixels into.
-BUNDLE = os.path.join("moba", "build", "udea", "pack", "assets.udeapak")
+# The bundle `:moba:game:build` packs those pixels into.
+BUNDLE = os.path.join("moba", "game", "build", "udea", "pack", "assets.udeapak")
 
 # Every file a clone is supposed to carry under the sprite tree, repo-relative.
 #
@@ -87,11 +87,11 @@ COMMITTED_SPRITES = {
     os.path.join(SPRITE_TREE, "arrow", "arrow.udea.kts"),
 }
 
-# Directory paths in `LICENSE`, e.g. `moba/assets/sprites/`. Two constraints, and dropping
+# Directory paths in `LICENSE`, e.g. `moba/game/assets/sprites/`. Two constraints, and dropping
 # either one lets a false pass through:
 #
 #   * a trailing slash, because a token without one names a file and a file is nobody's prefix;
-#   * a lookahead for the end of the path, so `moba/assets/sprites/champion_idle.png` - which
+#   * a lookahead for the end of the path, so `moba/game/assets/sprites/champion_idle.png` - which
 #     the licence names in order to *exempt* it - does not read as a directory exclusion
 #     covering everything beside it. That is precisely the false pass this check exists to
 #     catch, and without the lookahead the exemption would satisfy the rule it is an exemption

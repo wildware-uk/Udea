@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  *
  * ## The defect
  *
- * `moba/assets/sprites/` is gitignored - it is paid-pack art this public repository has no right
+ * `moba/game/assets/sprites/` is gitignored - it is paid-pack art this public repository has no right
  * to sublicense - so a clone carries none of it and `:moba:udeaValidateAssets` refused the
  * manifest with a `UDEA0032` per sheet. The fix is for the build to stage the sheets out of
  * `example/src/main/resources/assets/sprites/`, where this repository already holds them.
@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  * The first four read the **real** asset scripts rather than a fixture, because the failure being
  * prevented is a mismatch between what the game names and what the build stages, and a fixture
  * agrees with whatever it was written next to. Adding a seventh character to
- * `moba/assets/character/` therefore fails [the plan stages every sprite the game names that a
+ * `moba/game/assets/character/` therefore fails [the plan stages every sprite the game names that a
  * clone does not carry] naming the sheets nobody wired up, instead of failing a CI run three
  * pushes later with a page of `UDEA0032`.
  *
@@ -39,7 +39,7 @@ class CharacterArtStagingTest {
     /**
      * The sprites a clone really does carry, asset-root-relative.
      *
-     * `.gitignore` excludes everything under `moba/assets/sprites/` and then excepts these two:
+     * `.gitignore` excludes everything under `moba/game/assets/sprites/` and then excepts these two:
      * `champion_idle.png` predates the rule, and `arrow.png` is the free demo pack's 260-byte
      * file - it is not from the paid pack and is committed at both paths. Nothing stages
      * them and nothing needs to. Held here as a list rather than as a count, and checked against
@@ -64,7 +64,7 @@ class CharacterArtStagingTest {
 
     /** Every sprite the game's own asset scripts name, asset-root-relative. */
     private fun spritesTheGameNames(): Set<String> =
-        File(repoRoot, "moba/assets").walkTopDown()
+        File(repoRoot, "moba/game/assets").walkTopDown()
             .filter { it.isFile && it.name.endsWith(".udea.kts") }
             .flatMap { script -> spritePath.findAll(script.readText()).map { it.groupValues[1] } }
             .filter { it.startsWith("sprites/") }
@@ -73,14 +73,14 @@ class CharacterArtStagingTest {
     @Test
     fun `the plan stages every sprite the game names that a clone does not carry`() {
         val named = spritesTheGameNames()
-        assertTrue(named.isNotEmpty(), "no .udea.kts under moba/assets names a sprite at all")
+        assertTrue(named.isNotEmpty(), "no .udea.kts under moba/game/assets names a sprite at all")
 
         val staged = CharacterArtStaging.PLAN.keys.map { "sprites/$it" }.toSortedSet()
 
         assertEquals(
             (named - committed).toSortedSet(),
             staged,
-            "the build stages a different set of sheets from the one moba/assets/**/*.udea.kts " +
+            "the build stages a different set of sheets from the one moba/game/assets/**/*.udea.kts " +
                 "names. Every sprite the game names has to be either committed or staged; one " +
                 "that is neither is a UDEA0032 on every clean clone.",
         )
@@ -89,7 +89,7 @@ class CharacterArtStagingTest {
     @Test
     fun `the committed sprites this test exempts are really in the tree`() {
         for (sprite in committed) {
-            val file = File(repoRoot, "moba/assets/$sprite")
+            val file = File(repoRoot, "moba/game/assets/$sprite")
             assertTrue(file.isFile, "$file is exempted from staging but is not in the tree")
         }
     }

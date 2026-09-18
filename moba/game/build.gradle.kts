@@ -216,11 +216,30 @@ udea {
 /**
  * The character art, put where the asset root expects it before anything reads the asset root.
  *
- * It moved to this project with the assets, and the guarantee is unchanged: the sheets under
- * `assets/sprites` are paid-pack art this repository cannot sublicense, so they are gitignored, a
- * clone has none of them, and this copies them out of the tree that already holds them on every
- * build. A clone builds, `git status` stays clean, and a `UDEA0032` about a `spritePath` is a
- * real defect rather than a step somebody forgot. The task is now `:moba:game:udeaStageCharacterArt`.
+ * It moved to this project with the assets (issue #212), so the task is
+ * `:moba:game:udeaStageCharacterArt`; the guarantee is unchanged.
+ *
+ * ## What this replaces
+ *
+ * A shell step. The sheets under `assets/sprites` are paid-pack art this public repository cannot
+ * sublicense, so they are gitignored and a clone has none of them - and the pipeline said so, with
+ * a `UDEA0032` for each `spritePath` it could not resolve. The step that fixed it was
+ * `scripts/stage-moba-art.py`, named in `docs/art-assets.md` and nowhere the build could see.
+ * Nothing in CI ran it, so every job that built this module had been red since the characters
+ * landed - and because every one of those runs stopped here, the failures behind this one went
+ * unread for as long. Issue #170 enumerates what they were.
+ *
+ * ## Why staging rather than teaching the pipeline a second root
+ *
+ * Two other fixes were available and both are worse. Resolving a `spritePath` against a *second*
+ * tree means the asset pipeline supporting two roots, which `UdeaAssetsExtension` declines to do
+ * for a reason that has not changed: ids are relative to a root, so two roots need a rule for a
+ * colliding id. Staging into `build/` and packing from there means the daemon, the diagnostics'
+ * repo-relative spans and `:moba:desktop:run`'s `udea.assets.root` all naming a generated
+ * directory instead of the tree a developer edits.
+ *
+ * So the art lands where the manifest already says it lands, and the only thing that changed is
+ * who puts it there.
  */
 registerCharacterArtStaging()
 

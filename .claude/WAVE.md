@@ -209,6 +209,21 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   prove the bindings with a test or transcript. dev-224 rejected an engine-owned `UdeaKeys` table for its
   own ticket and commented why on #224.
 
+- **Key-code dispute, routed not adjudicated.** The lead relayed dev-224's "W is `'w'.code` = 119".
+  dev-212 disputed it from bytecode: `GlfwInput` builds the universal code as
+  `KEY_CODE_MAP[glfwKey] ?: UniversalKeyCode(glfwKey)`, `KEY_CODE_MAP`'s 41 entries are all SPECIAL keys, so
+  a printable key is the raw GLFW int - and `GLFW_KEY_W = 87` (GLFW letters are ASCII UPPERCASE).
+  `localKeyCode` is also uppercased (`Character.toUpperCase(glfwGetKeyName(...)[0])`). 119 is `'w'.code`,
+  which GLFW never sends. **dev-212 proceeds on 87/65/83/68/81/69/82/32**, written as `'W'.code` not bare
+  ints, with a per-key test driving `DeviceIntent` and asserting movement. dev-224 asked to settle it
+  empirically from its running `GlKoolInputTest` and to say WHICH FIELD it matches (universal vs local -
+  they agree on GLFW, may not elsewhere) and whether its test would pass with the other number.
+  Lesson: the lead should have questioned a lowercase-ASCII *key code* before relaying it.
+- **Filed #228** (udea-render owns the key table; games stop writing backend key codes). Cleared the bar:
+  it compiles, validates, gates green, and the game responds to the WRONG KEYS - invisible to screenshots.
+  `InputBindings.keys`' KDoc still claims "com.badlogic.gdx.Input.Keys codes", which is false and is what
+  makes the next game write gdx numbers. Needs #224. Added to epic as 7d.
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).

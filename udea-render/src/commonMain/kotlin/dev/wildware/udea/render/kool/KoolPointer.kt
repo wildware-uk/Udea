@@ -43,7 +43,8 @@ import dev.wildware.udea.render.ui.UiLayer
  *
  * A verdict carries the Kool frame the interface's own listener read the pointer in, and this matches
  * it against the frame *its* listener read the pointer in - both read `Time.frameCount` inside the same
- * pass over Kool's `InputStack`. Never against when the verdict arrives, which is a frame later.
+ * pass over Kool's `InputStack`. Never against when the verdict arrives, which is after that frame's
+ * tick, and after the next frame's pointers have been read whenever the two overlap.
  * A frame with no verdict of its own is settled as not used when a later verdict for the same pointer
  * arrives: the interface began listening after it, so nothing can have taken it.
  *
@@ -55,7 +56,7 @@ import dev.wildware.udea.render.ui.UiLayer
  * ## The verdict's granularity is the toolkit's
  *
  * `used` covers everything one pointer did in one frame. A press on the scene in the same frame as a
- * move a control handled is held back with it. That is conservative - it can cost a click, never leak
+ * move a control handled is dropped with it. That is conservative - it can cost a click, never leak
  * one - and it is ComposeGL's report as specified, not a choice made here.
  *
  * ## Threads

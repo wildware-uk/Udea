@@ -348,6 +348,8 @@ class WallClockBudgetCensusTest {
                 "a deadline: how long to wait for a captured frame",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlKoolInputTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",
+            "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlKoolPointerTest.kt" to
+                "a deadline: how long to wait for the render thread to reach a frame or a tick",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlOverlayIsolationTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlUiLayerTest.kt" to

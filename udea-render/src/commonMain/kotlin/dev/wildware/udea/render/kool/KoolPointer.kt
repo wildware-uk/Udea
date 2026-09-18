@@ -158,7 +158,7 @@ public class KoolPointer internal constructor(
      * folds into a level that never moved - sets no bit in it either. And where it does say more, it is
      * wrong: a mouse that left the window holding a button comes back listed with nothing down and that
      * button marked as changed, left over from before it went. Read as a click shorter than a frame, that
-     * was a press nobody made (`GlKoolPointerTest`, step 6, found it).
+     * was a press nobody made (`GlKoolPointerTest`, step 5, found it).
      */
     internal fun onPointer(pointer: PointerId, buttons: Int) {
         val was = listed[pointer.value] ?: 0

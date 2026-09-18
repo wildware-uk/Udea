@@ -1,5 +1,6 @@
 package dev.wildware.udea.render.audio
 
+import de.fabmax.kool.modules.audio.AudioClip
 import dev.wildware.udea.assets.AssetId
 import dev.wildware.udea.assets.ResPath
 import dev.wildware.udea.assets.SoundCue
@@ -8,6 +9,7 @@ import dev.wildware.udea.audio.AudioDevice
 import dev.wildware.udea.audio.AudioLoadException
 import dev.wildware.udea.audio.CueAudio
 import dev.wildware.udea.audio.CueSound
+import dev.wildware.udea.audio.SoundHandle
 import dev.wildware.udea.core.Cue
 import dev.wildware.udea.core.CueId
 import dev.wildware.udea.core.CueQueue
@@ -27,6 +29,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -56,13 +59,21 @@ class KoolAudioDeviceTest {
         Paths.get(checkNotNull(javaClass.getResource("/$tone")) { "fixture $tone is missing" }.toURI())
             .parent.parent
 
-    private lateinit var device: KoolAudioDevice
+    /**
+     * Typed as the SPI, exactly as a game holds it, so a device that plays nothing fails the
+     * assertions about the line rather than a cast.
+     */
+    private lateinit var device: AudioDevice
 
     @BeforeTest
     fun selectCaptureMixer() {
         CaptureMixerProvider.select()
-        device = assertIs<KoolAudioDevice>(koolAudioDevice(resourceRoot))
+        device = koolAudioDevice(resourceRoot)
     }
+
+    /** Kool's clip behind [sound], read only after the line itself has been checked. */
+    private fun clipOf(sound: SoundHandle): AudioClip =
+        assertIs<KoolAudioDevice>(device, "koolAudioDevice built a $device").clipAt(sound)
 
     @AfterTest
     fun release() {
@@ -75,16 +86,16 @@ class KoolAudioDeviceTest {
         val bindings = AudioBindings.of(
             listOf(CueSound.load(hit, SoundCue(AssetId("tone"), listOf(ResPath(tone)), volume = 0.5F), device)),
         )
-        val clip = device.clipAt(bindings[hit]!!.handleAt(0))
+        val line = assertNotNull(CaptureMixer.lines.singleOrNull(), "loading opened exactly one line: ${CaptureMixer.lines}")
+        transcript("line Kool opened: format=${line.format} frames=${line.frameLength} peak=${line.peak}")
+        assertEquals(toneFrames, line.frameLength, "the whole file reached the line")
+        // ffmpeg's `sine` source is an eighth of full scale, so 4096 give or take the codec.
+        assertTrue(line.peak in 3_500..5_000, "the line was opened on the tone, not on silence: peak ${line.peak}")
+        assertEquals(0, line.starts, "loading opens a line; it does not start one")
+
+        val clip = clipOf(bindings[hit]!!.handleAt(0))
         transcript("loaded '$tone': Kool AudioClip duration=${clip.duration}s isEnded=${clip.isEnded}")
         assertEquals(toneSeconds, clip.duration, 0.01F, "Kool's clip is the decoded tone's length")
-
-        val line = CaptureMixer.lines.single()
-        transcript("line Kool opened: format=${line.format} frames=${line.frameLength} peak=${line.peak}")
-        assertEquals(toneFrames, line.frameLength, "Kool decoded the whole file onto the line")
-        // ffmpeg's `sine` source is an eighth of full scale, so 4096 give or take the codec.
-        assertTrue(line.peak in 3_500..5_000, "Kool opened the line on the tone, not on silence: peak ${line.peak}")
-        assertEquals(0, line.starts, "loading opens a line; it does not start one")
 
         val queue = CueQueue()
         queue.emit(Cue(hit, Tick(120L), NetId.NONE))
@@ -113,7 +124,6 @@ class KoolAudioDeviceTest {
     @Test
     fun `the same sound twice at once takes a second line rather than restarting the first`() {
         val sound = device.load(tone)
-        val clip = device.clipAt(sound)
         device.play(sound, volume = 0.5F, pitch = 1F, pan = 0F)
         device.play(sound, volume = 0.25F, pitch = 1F, pan = 0F)
 
@@ -122,7 +132,7 @@ class KoolAudioDeviceTest {
         assertEquals(listOf(1, 1), lines.map { it.starts }, "each line started once; neither was restarted")
         assertEquals(decibels(0.5F), lines[0].gain.value, 0.01F, "the first play kept its own volume")
         assertEquals(decibels(0.25F), lines[1].gain.value, 0.01F, "the second play got its own volume")
-        assertFalse(clip.isEnded)
+        assertFalse(clipOf(sound).isEnded)
     }
 
     @Test
@@ -135,7 +145,7 @@ class KoolAudioDeviceTest {
     fun `volume zero is the quietest gain the line has, not an error`() {
         val sound = device.load(tone)
         device.play(sound, volume = 0F, pitch = 1F, pan = 0F)
-        val line = CaptureMixer.lines.single()
+        val line = assertNotNull(CaptureMixer.lines.singleOrNull())
         assertEquals(1, line.starts)
         assertTrue(line.gain.value <= -79F, "gain at volume 0 was ${line.gain.value}dB")
     }
@@ -188,10 +198,10 @@ class KoolAudioDeviceTest {
     @Test
     fun `close stops a sound that is playing and refuses to play afterwards`() {
         val sound = device.load(tone)
-        val clip = device.clipAt(sound)
         device.play(sound, volume = 1F, pitch = 1F, pan = 0F)
-        val line = CaptureMixer.lines.single()
+        val line = assertNotNull(CaptureMixer.lines.singleOrNull())
         assertTrue(line.isRunning)
+        val clip = clipOf(sound)
 
         device.close()
         assertFalse(line.isRunning, "close stopped the line Kool was playing on")
@@ -202,7 +212,7 @@ class KoolAudioDeviceTest {
 
     private fun decibels(volume: Float): Float = 20F * log10(volume)
 
-    private fun awaitEnded(clip: de.fabmax.kool.modules.audio.AudioClip) {
+    private fun awaitEnded(clip: AudioClip) {
         val deadline = System.nanoTime() + 3_000_000_000L
         while (!clip.isEnded) {
             check(System.nanoTime() < deadline) { "Kool never reported the clip ended; at ${clip.currentTime}s" }

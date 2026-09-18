@@ -135,6 +135,26 @@ class KoolAudioDeviceTest {
         assertFalse(clipOf(sound).isEnded)
     }
 
+    /**
+     * The regression test for Kool 0.19.0's Vorbis decode, which frees stb's buffer through
+     * LWJGL's jemalloc allocator (see `OggToWav`). Freeing a foreign pointer is heap-layout
+     * dependent, and with Kool decoding, this suite's handful of loads crashed the test JVM in some
+     * runs and not others. So this loads the file through many devices - each its own clip, its
+     * own decode - to make the crash a certainty rather than a coin toss. The failure is the test
+     * JVM dying with `SIGSEGV`, not an assertion.
+     */
+    @Test
+    fun `decoding the ogg many times leaves the process standing`() {
+        val devices = List(DECODES) { koolAudioDevice(resourceRoot) }
+        try {
+            devices.forEach { it.load(tone) }
+            assertEquals(DECODES, CaptureMixer.lines.size, "every decode reached a line")
+            assertTrue(CaptureMixer.lines.all { it.frameLength == toneFrames })
+        } finally {
+            devices.forEach { it.close() }
+        }
+    }
+
     @Test
     fun `loading one path twice shares the clip`() {
         assertEquals(device.load(tone), device.load(tone))
@@ -218,6 +238,11 @@ class KoolAudioDeviceTest {
             check(System.nanoTime() < deadline) { "Kool never reported the clip ended; at ${clip.currentTime}s" }
             Thread.sleep(20L)
         }
+    }
+
+    private companion object {
+        /** Enough decodes that a foreign free cannot get lucky every time. */
+        const val DECODES = 32
     }
 
     /** One line of the desktop-run transcript BRIEF-221 splices from this test's report. */

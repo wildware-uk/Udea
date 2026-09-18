@@ -156,21 +156,50 @@ public object ModuleGraphRules {
      */
     public val NO_GL_OUTSIDE_RENDER: DependencyRule = DependencyRule(
         id = RuleId("UDEA-MG-002"),
-        summary = "only udea-render may see a GL backend or a native platform artifact",
+        summary = "only udea-render may see Kool, a ComposeGL backend, a GL backend or a native platform artifact",
         rationale = "udea-core is a headless kernel: the simulation must run in a test JVM, in a " +
-            "dedicated server and inside an agent harness with no display. Once a GL backend is " +
-            "on the compile classpath, a static initialiser or a Gdx.gl reference gets written and " +
-            "the headless path is gone. gdx-math (com.badlogicgames.gdx:gdx) is deliberately still " +
-            "allowed - Vector2 is not GL. udea-render and udea-agent-host are the two exempt " +
-            "modules; see ModuleGraphRules.GL_ALLOWED_PROJECTS for why the debug HTTP host is " +
-            "one of them and why udea-core's guarantee is untouched by it.",
-        specSection = "4, 3.5",
+            "dedicated server and inside an agent harness with no display. Once a renderer is " +
+            "on the compile classpath, a static initialiser or a context reference gets written and " +
+            "the headless path is gone. Kool and the ComposeGL backends are the renderer after the " +
+            "port (spec section 3: no Kool and no ComposeGL backend outside udea-render); " +
+            "composegl-ui, the toolkit with no backend in it, stays legal. gdx-math " +
+            "(com.badlogicgames.gdx:gdx) is still allowed - Vector2 is not GL. udea-render and " +
+            "udea-agent-host are the two exempt modules; see ModuleGraphRules.GL_ALLOWED_PROJECTS " +
+            "for why the debug HTTP host is one of them and why udea-core's guarantee is untouched by it.",
+        specSection = "4, 3.5; kool port 3",
         projects = HEADLESS_PROJECTS,
         configurations = setOf("compileClasspath", "runtimeClasspath"),
         banned = listOf(
+            CoordinatePattern("de.fabmax.kool:*"),
+            CoordinatePattern("dev.wildware.composegl:composegl-kool*"),
+            CoordinatePattern("dev.wildware.composegl:composegl-gdx*"),
+            CoordinatePattern("dev.wildware.composegl:composegl-lwjgl3*"),
+            CoordinatePattern("dev.wildware.composegl:composegl-webgl*"),
+            CoordinatePattern("dev.wildware.composegl:composegl-android*"),
             CoordinatePattern("com.badlogicgames.gdx:gdx-backend-lwjgl3"),
             CoordinatePattern("org.lwjgl:*"),
             CoordinatePattern("com.badlogicgames.gdx:*-platform"),
+        ),
+    )
+
+    /**
+     * `udea-render` draws with Kool (spec section 4, issue #211), and LibGDX left it in the same
+     * change. A gdx artifact back on its classpath - directly, or through `composegl-gdx` - is two
+     * renderers in one module, which is the parallel-renderer arrangement spec D9 rejected.
+     */
+    public val RENDER_HAS_NO_LIBGDX: DependencyRule = DependencyRule(
+        id = RuleId("UDEA-MG-008"),
+        summary = "udea-render resolves no LibGDX artifact and no LibGDX ComposeGL backend",
+        rationale = "udea-render draws with Kool (spec section 4, issue #211). LibGDX on its " +
+            "classpath would be a second renderer in the one module that owns rendering, which is " +
+            "the parallel-renderers migration spec D9 rejected, and composegl-gdx drags gdx in " +
+            "transitively. The rule covers every target classpath the module has.",
+        specSection = "kool port 4, D9",
+        projects = setOf(":udea-render"),
+        configurations = setOf("compileClasspath", "runtimeClasspath"),
+        banned = listOf(
+            CoordinatePattern("com.badlogicgames.gdx:*"),
+            CoordinatePattern("dev.wildware.composegl:composegl-gdx*"),
         ),
     )
 
@@ -314,6 +343,7 @@ public object ModuleGraphRules {
         NO_SCRIPTING_OR_REFLECTION_IN_THE_GAME,
         ASSETS_MODEL_IS_A_LEAF,
         VENDORED_FLEKS_IS_A_LEAF,
+        RENDER_HAS_NO_LIBGDX,
     )
 
     /** True when [projectPath] is part of the rewrite tree and therefore subject to [ALL]. */

@@ -72,12 +72,54 @@ class ModuleGraphRulesTest {
     }
 
     @Test
+    fun `UDEA-MG-002 fails Kool and a ComposeGL backend outside udea-render`() {
+        // Spec section 3: "No GL outside udea-render" became "No Kool and no ComposeGL backend
+        // outside udea-render" (issue #211). `composegl-ui` is the toolkit, not a backend, and
+        // stays legal: a module can compose a tree without being able to draw one.
+        val violations = violate(
+            ":udea-gas",
+            "runtimeClasspath",
+            graph(
+                ":udea-gas",
+                "de.fabmax.kool:kool-core",
+                "de.fabmax.kool:kool-core-desktop",
+                "dev.wildware.composegl:composegl-kool",
+                "dev.wildware.composegl:composegl-ui",
+            ),
+        )
+        assertEquals(
+            listOf("de.fabmax.kool:kool-core", "de.fabmax.kool:kool-core-desktop", "dev.wildware.composegl:composegl-kool"),
+            violations.map { it.coordinate },
+        )
+        assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-002") })
+    }
+
+    @Test
+    fun `UDEA-MG-008 fails LibGDX anywhere on udea-render's classpaths`() {
+        val violations = violate(
+            ":udea-render",
+            "runtimeClasspath",
+            graph(
+                ":udea-render",
+                "de.fabmax.kool:kool-core",
+                "com.badlogicgames.gdx:gdx",
+                "dev.wildware.composegl:composegl-gdx",
+            ),
+        )
+        assertEquals(
+            listOf("com.badlogicgames.gdx:gdx", "dev.wildware.composegl:composegl-gdx"),
+            violations.map { it.coordinate },
+        )
+        assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-008") })
+    }
+
+    @Test
     fun `UDEA-MG-002 leaves udea-render alone - it is the module allowed to see GL`() {
         assertTrue(
             violate(
                 ":udea-render",
                 "compileClasspath",
-                graph(":udea-render", "com.badlogicgames.gdx:gdx-backend-lwjgl3"),
+                graph(":udea-render", "de.fabmax.kool:kool-core-desktop", "org.lwjgl:lwjgl-glfw"),
             ).isEmpty(),
         )
     }

@@ -165,11 +165,20 @@ it empties this module's `runtimeClasspath`. `udea-annotations` used to enforce 
 second time, in a `udeaVerifyAnnotationsLeaf` task with a private allow list and no rule id;
 that task is gone and its one unique branch is the vacuity guard above.
 
-## `UDEA-MG-002` — only the GL-allowed modules may see a GL backend or a native
+## `UDEA-MG-002` — only the GL-allowed modules may see Kool, a ComposeGL backend, a GL backend or a native
 
-**Spec §4, §3.5.** Banned on `compileClasspath` and `runtimeClasspath` of **every `udea-*`
-module except `udea-render` and `udea-agent-host`**: `com.badlogicgames.gdx:gdx-backend-lwjgl3`,
-`org.lwjgl:*`, `com.badlogicgames.gdx:*-platform`.
+**Spec §4, §3.5; Kool port spec §3.** Banned on `compileClasspath` and `runtimeClasspath` of
+**every `udea-*` module except `udea-render` and `udea-agent-host`**: `de.fabmax.kool:*`, the
+ComposeGL backends `dev.wildware.composegl:composegl-kool*`, `composegl-gdx*`,
+`composegl-lwjgl3*`, `composegl-webgl*` and `composegl-android*`, and
+`com.badlogicgames.gdx:gdx-backend-lwjgl3`, `org.lwjgl:*`, `com.badlogicgames.gdx:*-platform`.
+
+The port to Kool (issue #211) turned "no GL outside `udea-render`" into "no Kool and no ComposeGL
+backend outside `udea-render`". `dev.wildware.composegl:composegl-ui` is the toolkit with no
+backend in it — a tree can be composed and asserted on with no window — so it is not on the list.
+The LibGDX coordinates stay until the old tree and `moba`'s LibGDX launcher are gone (issues #212
+and the old-tree deletion): a coordinate nothing resolves costs nothing, and it is what stops one
+being quietly re-added.
 
 The module set is not written out here, or anywhere twice. It is
 `ModuleGraphRules.HEADLESS_PROJECTS` in `build-logic`, and `ModuleGraphRulesTest` derives the
@@ -221,6 +230,17 @@ The second case is how the old tree lost the property: `SpriteRenderer.kt` impor
 failed. `UDEA-MG-002` is checked first, because "you added `gdx-backend-lwjgl3` to
 `udea-core`" is a better message than forty class-level ones. There is no per-module
 allowlist: the fix is always to move the code to `udea-render`.
+
+## `UDEA-MG-008` — `udea-render` resolves no LibGDX
+
+**Kool port spec §4, D9.** Banned on `:udea-render`'s `compileClasspath` and `runtimeClasspath`,
+on every target: `com.badlogicgames.gdx:*` and `dev.wildware.composegl:composegl-gdx*`.
+
+`udea-render` draws with Kool from issue #211 on. LibGDX back on its classpath would be a second
+renderer in the one module that owns rendering — the parallel-renderers migration spec D9
+rejected — and `composegl-gdx` would bring gdx in transitively without the build script naming it.
+This is the rule behind the ticket's first acceptance criterion ("`udea-render` builds for JVM and
+Android with no LibGDX dependency"), kept as a rule so the criterion stays true after the ticket.
 
 ## `UDEA-MG-003` — `udea-assets-compiler` holds zero Gradle types
 

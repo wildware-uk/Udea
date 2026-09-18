@@ -52,12 +52,13 @@ class KotlinMultiplatformConventionTest {
     }
 
     @Test
-    fun `the render convention is the same set without iOS`(@TempDir root: File) {
+    fun `the render convention is JVM and Android - Kool has neither iOS nor a Wasm artifact`(@TempDir root: File) {
         // Spec D2: Kool has no iOS backend, so the one module that draws cannot have an iOS
-        // target until it does. Everything else about the two conventions is shared.
+        // target until it does. Issue #223: Kool 0.19.0 publishes no wasmJs artifact, so a wasmJs
+        // target fails resolution. Everything else about the conventions is shared.
         val result = multiplatformFixture(root, "udea.kotlin-multiplatform-render").build(":sample:printTargets")
 
-        assertEquals(listOf("android", "jvm", "wasmJs"), printed(result.output, "targets"))
+        assertEquals(listOf("android", "jvm"), printed(result.output, "targets"))
     }
 
     @Test

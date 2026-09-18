@@ -1,111 +1,98 @@
 import dev.wildware.udea.build.ModuleGraphRules
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 
 plugins {
-    id("udea.kotlin-library-gl")
-
-    // ComposeGL is a Compose library, so consuming it needs the Compose compiler plugin: it is
-    // what rewrites a `@Composable` into a function taking a `Composer` and what makes
-    // `remember`/`mutableStateOf` anything other than an intrinsic that throws. Applied here and
-    // nowhere else -- `udea-render` is the only module the graph lets see a renderer at all, and
-    // the plugin has nothing to do in a module with no composables.
-    //
-    // Not in `udea.kotlin-library-gl`, even though `udea-render` is that convention's only user
-    // today. The convention's stated job is "this module is allowed GL"; Compose is a separate
-    // permission, and rolling the two together would mean the next GL-allowed module silently
-    // acquired a compiler plugin it never asked for.
-    alias(libs.plugins.composeCompiler)
+    // Kotlin Multiplatform on `jvm` and `android` (issue #211). The convention states why the
+    // other two targets are missing: Kool has no iOS backend (spec D2) and publishes no wasmJs
+    // artifact yet (issue #223).
+    id("udea.kotlin-multiplatform-render")
 }
 
-dependencies {
-    api(project(":udea-core"))
-    implementation(project(":udea-assets"))
+kotlin {
+    sourceSets {
+        commonMain {
+            dependencies {
+                api(project(":udea-core"))
+                implementation(project(":udea-assets"))
 
-    // ComposeGL (issue #186; #187 puts `UiLayer` on it). `udea-render` only: `composegl-gdx` is a
-    // GL backend, so UDEA-MG-002 bans it from every headless module, and this is the one module
-    // the graph allows GL in. `implementation` rather than `api` for the same reason gdx is:
-    // nothing consuming this module should be able to see the renderer's toolkit.
-    implementation(libs.composegl.ui)
-    implementation(libs.composegl.gdx)
+                // Kool draws, and nothing else in the engine may name it: UDEA-MG-002 bans
+                // `de.fabmax.kool:*` from every headless module, and UDEA-MG-008 bans LibGDX from
+                // this one. `implementation`, so a consumer's compile classpath carries no Kool
+                // type - the public surface of this module is Udea's own (`SpriteBatch2D`,
+                // `SpriteTexture`, `Rgba`), which is what lets `moba` and the agent host draw
+                // without being able to reach past it.
+                implementation(libs.kool.core)
 
-    // The gdx desktop natives. Runtime-only because nothing compiles against them: the
-    // LWJGL3 backend loads `gdx64.dll`/`libgdx64.so` through `SharedLibraryLoader` at
-    // context creation, and without this artifact `Lwjgl3Application` dies in its own
-    // constructor with an UnsatisfiedLinkError rather than anywhere a stack trace explains.
-    // `natives-desktop` is a classifier, which `gradle/libs.versions.toml` cannot express,
-    // so the variant is selected here.
-    runtimeOnly(variantOf(libs.gdx.platform) { classifier("natives-desktop") })
+                // `PresentationControl.capture` answers with a `Deferred`, the common-code future
+                // (spec section 6: `java.util.concurrent` is replaced by coroutines). `api`
+                // because the type is on this module's public surface.
+                api(libs.kotlinx.coroutines.core)
 
-    // FreeType's desktop natives, for the same reason and with the same shape as the line above.
-    // `composegl-gdx`'s POM brings `com.badlogicgames.gdx:gdx-freetype` -- the Java binding -- and
-    // no `gdx-freetype-platform`, so `GdxFonts.registerTrueType` compiles and then dies in
-    // `FreeType.initFreeType` with an UnsatisfiedLinkError the first time a game asks for a glyph.
-    // #186 could not draw a ComposeGL frame at all for exactly this reason; this line is half of
-    // what fixed it. Runtime-only because nothing compiles against the natives.
-    runtimeOnly(variantOf(libs.gdx.freetype.platform) { classifier("natives-desktop") })
+                // The capture queue is the one structure another thread writes to: an agent's
+                // HTTP thread submits, the render thread drains. atomicfu's `locks` API is an
+                // ordinary class on every target, the same choice `udea-core` made for the
+                // `SimBarrier` inbox (issue #203).
+                implementation(libs.kotlinx.atomicfu)
+            }
+        }
+        jvmTest {
+            dependencies {
+                // Test-only, deliberately. `udeaVerifyHeadless` reports through the one
+                // UdeaDiagnostic (spec 5) so its output has the same rule ids, spans and cap as
+                // every other producer; nothing shipped here needs diagnostics.
+                // RenderModuleGraphTest asserts it stays test-only.
+                implementation(project(":udea-diagnostics"))
 
-    // Test-only, deliberately. `udeaVerifyHeadless` reports through the one UdeaDiagnostic
-    // (spec 5) so its output has the same rule ids, spans and cap as every other producer;
-    // nothing in the shipped module needs diagnostics, so it must not reach the runtime
-    // classpath. RenderModuleGraphTest asserts that this stays a testImplementation.
-    testImplementation(project(":udea-diagnostics"))
+                // Fleks worlds and a wired GameContext, so the pipeline tests drive the real
+                // kernel rather than a mock of it.
+                implementation(testFixtures(project(":udea-core")))
 
-    // Fleks worlds and a wired GameContext, so the pipeline tests drive the real kernel
-    // rather than a mock of it.
-    testImplementation(testFixtures(project(":udea-core")))
+                // The bytecode gate. A class-file parser is a check, not a runtime feature.
+                implementation(libs.asm)
 
-    // The bytecode gate. ASM is a test dependency because the gate is a check, not a
-    // runtime feature: putting a class-file parser on a renderer's classpath would be the
-    // sort of thing this module exists to stop.
-    testImplementation(libs.asm)
+                // The GL tests name Kool directly: they build scenes and read pixels back.
+                implementation(libs.kool.core)
+            }
+        }
+    }
 }
+
+/** The JVM test compilation every `Test` task below runs from. */
+val jvmTestCompilation: KotlinCompilation<*> =
+    (the<KotlinMultiplatformExtension>().targets.getByName("jvm") as KotlinJvmTarget)
+        .compilations.getByName("test")
+
+val jvmTestRuntime: FileCollection =
+    files(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
 
 // --- udeaVerifyHeadless (issue #117) -----------------------------------------------------
 //
-// The bytecode half of the "no GL in the kernel" rule. It EXTENDS `UDEA-MG-002`, the
-// configuration-level rule owned by `udeaVerifyModuleGraph` in the build tooling, and does
-// not restate it: that rule fails when a GL *dependency* resolves onto a headless module's
-// compile classpath, and this one fails when a compiled class *names* a GL type, which is
-// the case a configuration check structurally cannot see (a transitive type from an allowed
-// jar, or a `compileOnly` dependency). A configuration-level failure is the clearer message
-// of the two, which is why it is checked first, by that task.
+// The bytecode half of the "no renderer in the kernel" rule. It EXTENDS `UDEA-MG-002`, the
+// configuration-level rule owned by `udeaVerifyModuleGraph` in the build tooling, and does not
+// restate it: that rule fails when a renderer *dependency* resolves onto a headless module's
+// classpath, and this one fails when a compiled class *names* a renderer type, which is the case
+// a configuration check structurally cannot see (a transitive type from an allowed jar, or a
+// `compileOnly` dependency).
 //
-// It runs as a Test task rather than a bespoke one so that the scan itself has unit tests
-// that can fail (`HeadlessScanTest`), which a `doLast` block would not.
+// It runs as a Test task rather than a bespoke one so that the scan itself has unit tests that can
+// fail (`HeadlessScanTest`), which a `doLast` block would not.
 
-/**
- * Modules that must stay free of GL, read from the one place that decides it.
- *
- * `ModuleGraphRules.HEADLESS_PROJECTS` is also what `UDEA-MG-002` -- the configuration-level
- * half of this rule -- governs, so the two levels cannot drift apart. Before this was
- * derived, the list here and `HeadlessScan.HEADLESS_MODULES` disagreed in both directions:
- * the gate compiled modules it never scanned, scanned modules it never compiled (reading
- * whatever stale `build/classes` happened to be present), and four modules were in neither.
- */
+/** Modules that must stay free of GL, read from the one place that decides it. */
 val headlessModules: List<String> =
     ModuleGraphRules.HEADLESS_PROJECTS.map { it.removePrefix(":") }.sorted()
 
-/**
- * How [headlessModules] reaches `HeadlessScan`, which lives in this module's test sources
- * and therefore cannot see `build-logic`. `HeadlessScan` fails loudly when this is absent,
- * so a broken hand-off is a red gate rather than a scan of nothing.
- */
+/** How [headlessModules] reaches `HeadlessScan`, which cannot see `build-logic`. */
 val headlessModulesProperty: String = ModuleGraphRules.HEADLESS_MODULES_PROPERTY
 
 /**
- * The compiled output the scan reads. Declared as an input so the gate is up-to-date-checked.
- *
- * Narrowed to the `main` source set of each language directory, matching
- * `RepoLayout.classFiles`, which only ever walks `build/classes/<lang>/main`. The whole of
- * `build/classes` would also cover `<lang>/test` and `<lang>/testFixtures`, and Gradle then
- * (correctly) refuses the build: this task would be consuming the output of every module's
- * `compileTestKotlin`/`compileTestJava` without depending on it. Those source sets are not
- * part of the rule -- a GL reference in a test is legal, and a headless module's *shipped*
- * bytecode is what "no GL in the kernel" is about.
+ * The compiled output the scan reads, narrowed to each module's shipped bytecode: `<lang>/main`
+ * for a JVM module, `<lang>/jvm/main` and `<lang>/android/main` for a multiplatform one
+ * (`RepoLayout.classFiles` reads the same three).
  */
 val headlessModuleClasses = files(
     headlessModules.map { module ->
-        // `*/jvm/main` and `*/android/main` are where a multiplatform module compiles the same
-        // bytecode (issue #201); `RepoLayout.classFiles` reads the same three.
         fileTree(rootDir.resolve("$module/build/classes")) {
             include("*/main/**", "*/jvm/main/**", "*/android/main/**")
         }
@@ -114,10 +101,8 @@ val headlessModuleClasses = files(
 
 /**
  * Build scripts the module-graph tests read; without these they would be checked stale.
- *
  * `settings.gradle.kts` is in here because `UdeaVerifyHeadlessTest` re-derives the designated
- * module set from it: including a new `udea-*` module has to make the gate out of date, or
- * the assertion that the set is complete is checked against a cached pass.
+ * module set from it.
  */
 val moduleBuildScripts = fileTree(rootDir) {
     include("udea-*/build.gradle.kts", "moba/build.gradle.kts", "settings.gradle.kts")
@@ -127,12 +112,11 @@ val gateTestClass = "dev.wildware.udea.render.headless.UdeaVerifyHeadlessTest"
 
 val udeaVerifyHeadless = tasks.register<Test>("udeaVerifyHeadless") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
-    description = "Fails if any headless module's bytecode references a GL type " +
+    description = "Fails if any headless module's bytecode references a renderer type " +
         "(bytecode extension of UDEA-MG-002)."
 
-    val testSourceSet = sourceSets.test.get()
-    testClassesDirs = testSourceSet.output.classesDirs
-    classpath = testSourceSet.runtimeClasspath
+    testClassesDirs = jvmTestCompilation.output.classesDirs
+    classpath = jvmTestRuntime
     useJUnitPlatform()
     filter { includeTestsMatching(gateTestClass) }
     systemProperty(headlessModulesProperty, headlessModules.joinToString(","))
@@ -146,20 +130,20 @@ val udeaVerifyHeadless = tasks.register<Test>("udeaVerifyHeadless") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
-tasks.test {
+val glTestPackage = "dev.wildware.udea.render.gl"
+
+tasks.named<Test>("jvmTest") {
     // The gate is `udeaVerifyHeadless`'s job; running it twice per `check` buys nothing.
     filter { excludeTestsMatching(gateTestClass) }
 
-    // The GL tests belong to `udeaGlTest`, in a JVM of their own: they boot a real LWJGL3
-    // application, which populates `Gdx.gl`/`Gdx.graphics`/`Gdx.app` for the whole process and
-    // would make `PureSimulationTest`'s "no context existed" assertion meaningless here.
-    filter { excludeTestsMatching("dev.wildware.udea.render.gl.*") }
+    // The GL tests belong to `udeaGlTest`, in JVMs of their own - see that task.
+    filter { excludeTestsMatching("$glTestPackage.*") }
 
     // HeadlessScanTest reads the same designated list, so it needs the same hand-off.
     systemProperty(headlessModulesProperty, headlessModules.joinToString(","))
 
-    // HeadlessScanTest and RenderModuleGraphTest read the compiled output and the build
-    // scripts of modules this one does not depend on.
+    // HeadlessScanTest and RenderModuleGraphTest read the compiled output and the build scripts
+    // of modules this one does not depend on.
     dependsOn(headlessModules.map { ":$it:${ModuleGraphRules.MAIN_BYTECODE_TASK}" })
     inputs.files(headlessModuleClasses)
         .withPropertyName("headlessModuleClasses")
@@ -169,41 +153,43 @@ tasks.test {
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
-// --- udeaGlTest (issues #118, #121) ------------------------------------------------------
+// --- udeaGlTest (issues #118, #121, #211) ------------------------------------------------
 //
-// The tests that need a real LWJGL3 context, in a JVM of their own.
+// The tests that need a real Kool context, each test class in a JVM of its own.
 //
-// Not a preference. `PureSimulationTest` proves the simulation runs with no context by
-// asserting `Gdx.gl`, `Gdx.graphics` and `Gdx.app` are null -- and those are JVM-wide statics
-// that `Lwjgl3Application` populates on start and does not fully clear on exit. Run in one
-// JVM, a backend test that had already booted a window would make that assertion fail, or
-// (worse, depending on order) make it pass while proving nothing. Two JVMs makes the claim
-// true again in both directions.
+// Two reasons, and the first is not a preference. Kool allows **one context per process**:
+// `createContext` refuses a second call ("Context was already created") and GLFW's window
+// subsystem keeps its primary window for the life of the JVM. A test class that starts a backend
+// therefore owns its JVM, and `forkEvery = 1` is what gives it one. `PureSimulationTest`, which
+// asserts that no Kool context exists, runs in `jvmTest` where no test ever creates one.
 //
-// It buys a second thing: a driver that segfaults takes down a JVM that contains only the
-// tests that asked for a driver.
-
-val glTestPackage = "dev.wildware.udea.render.gl"
+// The second: a driver that segfaults takes down a JVM that contains only the tests that asked
+// for a driver.
 
 val udeaGlTest = tasks.register<Test>("udeaGlTest") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
-    description = "Runs the render tests that need a real LWJGL3 context and a display."
+    description = "Runs the render tests that need a real Kool context and a display."
 
-    val testSourceSet = sourceSets.test.get()
-    testClassesDirs = testSourceSet.output.classesDirs
-    classpath = testSourceSet.runtimeClasspath
+    testClassesDirs = jvmTestCompilation.output.classesDirs
+    classpath = jvmTestRuntime
     useJUnitPlatform()
     filter { includeTestsMatching("$glTestPackage.*") }
+    forkEvery = 1
 
-    // A machine with no display cannot run these, and they say so out loud and skip. Set this
-    // on any CI job that *does* have one, so that a backend which quietly stops booting fails
-    // the build instead of hiding behind a skip forever.
+    // A machine with no display cannot run these, and they say so out loud and skip. Set this on
+    // any CI job that *does* have one, so that a backend which quietly stops booting fails the
+    // build instead of hiding behind a skip forever.
     systemProperty(
         "udea.render.requireGl",
         providers.gradleProperty("udea.render.requireGl").getOrElse("false"),
     )
+    // Where the GL tests write the frames they read back, so a person can look at them.
+    systemProperty(
+        "udea.render.glReportDir",
+        layout.buildDirectory.dir("reports/udea/gl").get().asFile.absolutePath,
+    )
 }
 
-tasks.check {
+tasks.named("check") {
     dependsOn(udeaVerifyHeadless, udeaGlTest)
 }

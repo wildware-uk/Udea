@@ -400,17 +400,31 @@ class ReplayEqualityProofTest {
         )
     }
 
+    /**
+     * The `if:` expression on the nightly job, read off [workflowCode] and so with the workflow's
+     * comments already gone.
+     *
+     * That matters more here than anywhere else in this class: the block above this condition is
+     * prose about which branch it names and why, so a fence reading the raw file
+     * would be satisfied by the explanation of the defect rather than by the fix for it.
+     */
+    private val nightlyCondition: String by lazy {
+        Regex("(?m)^ {4}if: (?:>-)?\\s*\\n((?: {6}.*\\n)+)")
+            .find(jobBlock(NIGHTLY_JOB))?.groupValues?.get(1)
+            ?: fail("the `$NIGHTLY_JOB` job has no `if:` condition, so it runs on pull requests")
+    }
+
     @Test
     fun `the nightly never runs on a pull request and the gate always does`() {
         // The whole reason this is a second job. A leg cannot be skipped by event without the
         // runner starting anyway, so the condition has to be on the job.
-        val condition = Regex("(?m)^ {4}if: (?:>-)?\\s*\\n((?: {6}.*\\n)+)")
-            .find(jobBlock(NIGHTLY_JOB))?.groupValues?.get(1)
-            ?: fail("the `$NIGHTLY_JOB` job has no `if:` condition, so it runs on pull requests")
+        //
+        // Which branch the push arm names is issue #229's test below, kept separate so this one
+        // goes on saying only what issue #165 asked of the condition.
+        val condition = nightlyCondition
 
         assertContains(condition, "github.event_name")
         assertContains(condition, "'schedule'")
-        assertContains(condition, "refs/heads/example")
         assertTrue(
             "pull_request" !in condition,
             "the nightly's condition mentions pull_request:\n$condition",
@@ -420,6 +434,53 @@ class ReplayEqualityProofTest {
             "the `$PR_JOB` job has grown a condition. It is the gate: it runs on everything, and " +
                 "issue #165 is explicitly not allowed to change that.",
         )
+    }
+
+    @Test
+    fun `the nightly covers every integration branch and names no other`() {
+        // Issue #229, which was both halves of this at once. The push arm went on naming the
+        // `example` branch after that branch was retired on 2026-09-16, so it could not fire; and
+        // the `schedule` arm, which GitHub runs only on the default branch, was replaying the tree
+        // the Kool/KMP port replaces - so the branch the work was actually on had no nightly
+        // coverage at all. From inside this file a dead clause and real coverage look identical,
+        // which is why the branch is derived rather than spelled: a literal here goes stale the
+        // same way the clause did.
+        //
+        // The integration branches are already named once, in the `clean-build-budget` job, and
+        // `clean-build-base.sh` skips any that origin no longer has (issue #218). So that argument
+        // list is the authority in both directions: every branch the push arm names must be on it,
+        // and every branch on it that `schedule` cannot reach must be named. When #214 merges the
+        // port and `kmp` leaves that list, neither direction asks anything of the push arm any more
+        // and it may be deleted - which is what the comment above the job's `if:` promises.
+        val integration = Regex("""clean-build-base\.sh((?: [\w.\-/]+)+)""")
+            .find(workflowCode)?.groupValues?.get(1)?.trim()?.split(" ")
+            ?: fail("no job runs clean-build-base.sh, so there is no list of integration branches")
+
+        val named = Regex("""refs/heads/([\w.\-/]+)""")
+            .findAll(nightlyCondition).map { it.groupValues[1] }.toList()
+
+        assertTrue(
+            "'push'" !in nightlyCondition || named.isNotEmpty(),
+            "the nightly's condition admits a push without naming a branch, so the ten-times " +
+                "recording would be replayed on every push to every branch:\n$nightlyCondition",
+        )
+        for (branch in named) {
+            assertContains(
+                integration, branch,
+                "the nightly runs on a push to '$branch', which is not one of the integration " +
+                    "branches this workflow names ($integration). A branch nothing is pushed to " +
+                    "is a clause that cannot fire, and from here it reads exactly like coverage",
+            )
+        }
+        for (branch in integration - DEFAULT_BRANCH) {
+            assertContains(
+                named, branch,
+                "'$branch' is an integration branch this workflow names, and the nightly neither " +
+                    "runs on a push to it nor can reach it by `schedule`, which GitHub runs only " +
+                    "on '$DEFAULT_BRANCH'. Nothing replays the long recording on the branch the " +
+                    "work is on",
+            )
+        }
     }
 
     @Test
@@ -581,6 +642,12 @@ class ReplayEqualityProofTest {
         const val PR_JOIN_JOB: String = "replay-equality-join"
         const val NIGHTLY_JOB: String = "replay-equality-nightly"
         const val NIGHTLY_JOIN_JOB: String = "replay-equality-nightly-join"
+
+        /**
+         * The repository's default branch: the one branch GitHub runs a `schedule` on, and so the
+         * one integration branch the nightly covers without a push arm naming it.
+         */
+        const val DEFAULT_BRANCH: String = "master"
     }
 
     /** Whether [name] matches [glob], where `*` runs up to a path separator. */

@@ -164,12 +164,14 @@ class KoolPointerOrderTest {
     @Test
     fun `a frame the interface never reports on is the game's once a later report arrives`() {
         // The interface's scene began listening a frame after this did, so frame 1 has no verdict and
-        // never will. Nothing looked at it, so nothing can have taken it.
+        // never will. Nothing looked at it, so nothing can have taken it - and the first verdict that
+        // does arrive, used, is about frame 2 and says nothing about frame 1.
         frame(1) { press(MOUSE, LEFT) }
         frame(2) { move(MOUSE) }
-        ui.report(MOUSE, 2, used = false)
+        ui.report(MOUSE, 2, used = true)
 
-        assertEquals(1, pointer.pressesSince(LEFT_BUTTON), "a frame the interface never saw was dropped")
+        assertEquals(1, pointer.pressesSince(LEFT_BUTTON), "a frame the interface never saw was judged by a later frame's verdict")
+        assertTrue(pointer.isButtonDown(LEFT_BUTTON), "a press the interface never saw was not held")
     }
 
     @Test

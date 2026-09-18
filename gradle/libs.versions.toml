@@ -61,6 +61,13 @@ junitPlatform = "1.13.4"
 # hosts its interface on (issue #224). A snapshot rather than a release because there is no 0.7.0
 # yet. Every composegl artifact moves together: `composegl-kool:0.7.0-SNAPSHOT` declares
 # `composegl-ui` and `composegl-render` at the same version, and a mixed graph would not link.
+#
+# `udea-render` needs a snapshot built from ComposeGL `007ea1cf` or later (issue #227): that is the
+# one carrying `ComposeGlScene.onPointerUsed`, published 2026-09-18 as `0.7.0-20260918.215548-*`.
+# Gradle keeps a snapshot it has already resolved for 24 hours, so a machine that fetched an older
+# one that day builds `udea-render` red until `--refresh-dependencies` is run once. Not pinned to the
+# timestamp: each artifact of one publish carries its own build number (`-3` on the JVM jar, `-2` on
+# the Android one), so no single version names them all, and a snapshot repository purges old ones.
 composegl = "0.7.0-SNAPSHOT"
 # kotlinx.serialization, for level files (issue #191): a saved level is Fleks' own
 # `world.snapshot()` encoded as CBOR. 1.11.0 is the version the Fleks 2.14 release was built and

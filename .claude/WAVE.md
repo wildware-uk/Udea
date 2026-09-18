@@ -2,15 +2,15 @@
 
 ## kmp baseline
 
-**SHA `26333d5`** (kmp after #230 merge; merged tree byte-identical to the trial tree, so the trial build
-IS the merged build), refreshed 2026-09-18 with
+**SHA `30731e4`** (kmp after #227 merge; merged tree differs from the trial tree ONLY in `.claude/WAVE.md`,
+so the trial build IS the merged build), refreshed 2026-09-18 with
 `ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **Failing tasks: `:moba:compileKotlin` ONLY** - and every moba task downstream of it does not run.
 That is the authorised D9 red: moba still draws with LibGDX until #212 ports it. Nothing else fails.
 A reviewer or trial merge sees exactly that one red and treats any other as the branch's.
 
-Earlier: `7ac6559` (after #229), `18bb13f` (after #224), `87d8b7c` (after #211), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+Earlier: `26333d5` (after #230), `7ac6559` (after #229), `18bb13f` (after #224), `87d8b7c` (after #211), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -381,6 +381,24 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   no new issues; scratchpad `issue227/`; will not be re-notified if it stops mid-build.
 - **In flight: 2** (dev-212 moba, dev-227 udea-render). Nothing else free: #221/#228 are udea-render
   (dev-227's), everything else waits on #212.
+
+- **#227 MERGED `30731e4`**, round 1 PASS, no findings. Clicks were ABSENT (no intent at all); now
+  `ActionBinding.pointerButtons` -> `DeviceIntent` via new `PointerState`. `KoolPointer` holds each frame's
+  button changes until `onPointerUsed` for that pointer+frame (matched on listener-read frame); a press the UI
+  used is dropped, a release always applies, a leaving pointer releases all it held. Seam: internal
+  `UiPointers` beside `UiInput`. Edges from button LEVELS - Kool 0.19 reports a stale `buttonEventMask` bit on
+  mouse re-entry, and dev-227's first version phantom-pressed from it (GL step 5 guards). **Reviewer rulings:**
+  no layer / detached layer applies at once; attached-with-no-screen still reports, and GL step 6 asserts one
+  press so a held-forever press fails it; a later report settles all earlier frames for that pointer as
+  unused (tested); release-without-press is a no-op in `apply()` (tested); `InputFrame` internal, never
+  reaches `Intent`; floating snapshot out of scope. #224/#230 key tests byte-identical. **Decision to flag to
+  owner:** clicks are button actions only, NO screen position in `Intent` - click-to-move needs a separate
+  `Intent` change (moba moves by WASD today, nothing breaks). **Probable ComposeGL bug** (stale mask on
+  re-entry -> `KoolPointerInput.onFrame` may click a button on mouse re-entry) sent to composegl-ef directly,
+  not filed. **Stale-snapshot trap:** a box that fetched `composegl-kool` 0.7.0-SNAPSHOT before `007ea1cf`
+  fails `:udea-render:compileAndroidMain` with `Unresolved reference onPointerUsed` - run
+  `--refresh-dependencies` once (done on this box 23:07). Trial: only baseline red; GL green.
+  Worktree kept: `.claude/worktrees/agent-ab22c07454e2b1eaa`. `udea-render` free -> #221 next.
 
 ## Wave 10 plan
 

@@ -2,15 +2,15 @@
 
 ## kmp baseline
 
-**SHA `18bb13f`** (kmp after #224 merge; merged tree byte-identical to the trial tree `41140c7`, so the trial
-build IS the merged build), refreshed 2026-09-18 with
+**SHA `7ac6559`** (kmp after #229 merge; merged tree differs from the trial tree ONLY in `.claude/WAVE.md`,
+so the trial build IS the merged build), refreshed 2026-09-18 with
 `ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **Failing tasks: `:moba:compileKotlin` ONLY** - and every moba task downstream of it does not run.
 That is the authorised D9 red: moba still draws with LibGDX until #212 ports it. Nothing else fails.
 A reviewer or trial merge sees exactly that one red and treats any other as the branch's.
 
-Earlier: `87d8b7c` (kmp after #211 merge), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+Earlier: `18bb13f` (after #224), `87d8b7c` (after #211), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -354,6 +354,11 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   the dispatch arm fired before the fix too, so the push-arm proof is the probe `35400527981` plus the two
   controls, and that suffices; at #214 nothing needs editing (control C2 green). ReplayEqualityProofTest:
   21 tests, 0 failures. Out of scope: every kmp push now runs 3 long legs - handled by batching pushes.
+
+- **#229 MERGED `7ac6559`** (+ `d04b5c7` renaming BRIEF.md -> BRIEF-229.md per standing ruling), round 1
+  PASS. Trial: only baseline `:moba:compileKotlin`; `:udea-replay:jvmTest` green. Baseline unchanged.
+  Worktree kept: `.claude/worktrees/agent-a9cc4e1091da97349`. THIS push to kmp is the first real run of the
+  new push arm - check it started three replay-equality-nightly legs.
 
 ## Wave 10 plan
 

@@ -2,15 +2,15 @@
 
 ## kmp baseline
 
-**SHA `18bb13f`** (kmp after #224 merge; merged tree byte-identical to the trial tree `41140c7`, so the trial
-build IS the merged build), refreshed 2026-09-18 with
+**SHA `30731e4`** (kmp after #227 merge; merged tree differs from the trial tree ONLY in `.claude/WAVE.md`,
+so the trial build IS the merged build), refreshed 2026-09-18 with
 `ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **Failing tasks: `:moba:compileKotlin` ONLY** - and every moba task downstream of it does not run.
 That is the authorised D9 red: moba still draws with LibGDX until #212 ports it. Nothing else fails.
 A reviewer or trial merge sees exactly that one red and treats any other as the branch's.
 
-Earlier: `87d8b7c` (kmp after #211 merge), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+Earlier: `26333d5` (after #230), `7ac6559` (after #229), `18bb13f` (after #224), `87d8b7c` (after #211), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -333,6 +333,73 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   the constructor does, not by reading the constructor in the version we ship. That is confirming a claim
   from the sentence that made it. Check the dependency version before trusting a source read.
 
+- **#229 done, under review** (`review-229-r1`, SHA `c7c9d7a`; change `a3dfb1a`). Push arm now names
+  `refs/heads/kmp`; comment block explains GitHub runs `schedule` only on the default branch, and that #214
+  needs no edit (the arm stops matching, the cron covers the ported master). **One forced change outside
+  `.github/`:** `ReplayEqualityProofTest` (udea-replay) asserted the `if:` CONTAINS `refs/heads/example` - a
+  test pinning the defect - so the ci.yml fix alone turned `:udea-replay:jvmTest` red; it now checks against
+  the clean-build job's branch list (`kmp master`) both ways. CI proof: before - scheduled `35323890628`
+  green on master (old engine), push `35397674705` on kmp SKIPPED the nightly; probe `35400527981` started
+  all 3 legs; controls `35400489693`/`35401417595` skipped; dispatch `35401442677` ran all 3 legs on
+  `a3dfb1a`, each stopping at `:moba:compileKotlin` (D9 red) - failure is the true answer about kmp today.
+  **Lead asked the reviewer to rule on over-firing:** every push to kmp (incl. WAVE.md bookkeeping) now runs
+  three 36000-tick legs.
+- **Owner decision pending, not an issue:** the `example` branch is still on origin at `409c0442` (same
+  commit as master); nothing in `.github/` names it now. dev-229 thinks it can be deleted. Remote branch
+  deletion is irreversible and outward-facing - the owner's call, raise in the wave report.
+- dev-230 build finished 22:36:31 (only baseline red); it had stopped mid-build and was nudged.
+
+- **#229 round 1 PASS** (`review-229-r1`, SHA `c7c9d7a`), no findings. Rulings: the udea-replay test edit
+  WAS forced (the old test pinned `refs/heads/example`); a dispatch that honestly reports kmp red meets AC1;
+  the dispatch arm fired before the fix too, so the push-arm proof is the probe `35400527981` plus the two
+  controls, and that suffices; at #214 nothing needs editing (control C2 green). ReplayEqualityProofTest:
+  21 tests, 0 failures. Out of scope: every kmp push now runs 3 long legs - handled by batching pushes.
+
+- **#229 MERGED `7ac6559`** (+ `d04b5c7` renaming BRIEF.md -> BRIEF-229.md per standing ruling), round 1
+  PASS. Trial: only baseline `:moba:compileKotlin`; `:udea-replay:jvmTest` green. Baseline unchanged.
+  Worktree kept: `.claude/worktrees/agent-a9cc4e1091da97349`. THIS push to kmp is the first real run of the
+  new push arm - check it started three replay-equality-nightly legs.
+
+- **#230 MERGED `26333d5`**, round 1 PASS, no findings. Table keyed on GLFW codes (never via the case-flipping
+  `UniversalKeyCode(Char)`); all-26-letter real-GLFW upgrade guard; KDocs fixed; the REAL defect fixed:
+  `KoolKeyboard` holds a UI-declined key for one event, and if the UI then takes that key's character it
+  was typing and never becomes an intent. **Hold-back ruled sound by the reviewer:** a declined key-down is
+  released at the next event or at the end of the same `onKeyEvents` list (`typing?.let(::record)`), so
+  nothing waits across frames, non-printables and Ctrl chords cannot stick; `KoolKeyboard` carries no tick
+  stamp (it counts presses), so tick attribution is unchanged; A is recorded before B, no reordering. Each
+  case unit-tested; mutations m2-m4 red. Trial: only baseline red; GL under xvfb green. Tree identical.
+  Worktree kept: `.claude/worktrees/agent-a5ecd4c2831637278`. `udea-render` now free -> #227 next.
+
+- **#227 dispatched** (dev-227, branch `issue-227-kool-pointer-intents`, off `1cc5f60`), `udea-render` (+
+  `udea-core` if the binding model lives there; nobody else in it). Told: AC3 re-worded (NO fake verdict
+  exists - pointers get a SECOND seam beside `UiInput`); pointers are ABSENT today (no ActionBinding mouse
+  field, no PointerState) so AC1 builds pointer->intent from nothing; the full `PointerUse` API from
+  composegl `007ea1cf`, esp. MATCH ON `frame` (listener-read), it is a STREAM (once per pointer per frame,
+  used or not, final report on lift/leave), `isConsumed()` stays false; `PointerUse.frame` must never leak
+  into the sim as an input stamp (Tick only); extend `GlKoolInputTest` (one Kool context per JVM); drive
+  Kool's REAL pointer path, assert the negative; do not disturb #230's `KoolKeyboard` hold-back; no moba;
+  no new issues; scratchpad `issue227/`; will not be re-notified if it stops mid-build.
+- **In flight: 2** (dev-212 moba, dev-227 udea-render). Nothing else free: #221/#228 are udea-render
+  (dev-227's), everything else waits on #212.
+
+- **#227 MERGED `30731e4`**, round 1 PASS, no findings. Clicks were ABSENT (no intent at all); now
+  `ActionBinding.pointerButtons` -> `DeviceIntent` via new `PointerState`. `KoolPointer` holds each frame's
+  button changes until `onPointerUsed` for that pointer+frame (matched on listener-read frame); a press the UI
+  used is dropped, a release always applies, a leaving pointer releases all it held. Seam: internal
+  `UiPointers` beside `UiInput`. Edges from button LEVELS - Kool 0.19 reports a stale `buttonEventMask` bit on
+  mouse re-entry, and dev-227's first version phantom-pressed from it (GL step 5 guards). **Reviewer rulings:**
+  no layer / detached layer applies at once; attached-with-no-screen still reports, and GL step 6 asserts one
+  press so a held-forever press fails it; a later report settles all earlier frames for that pointer as
+  unused (tested); release-without-press is a no-op in `apply()` (tested); `InputFrame` internal, never
+  reaches `Intent`; floating snapshot out of scope. #224/#230 key tests byte-identical. **Decision to flag to
+  owner:** clicks are button actions only, NO screen position in `Intent` - click-to-move needs a separate
+  `Intent` change (moba moves by WASD today, nothing breaks). **Probable ComposeGL bug** (stale mask on
+  re-entry -> `KoolPointerInput.onFrame` may click a button on mouse re-entry) sent to composegl-ef directly,
+  not filed. **Stale-snapshot trap:** a box that fetched `composegl-kool` 0.7.0-SNAPSHOT before `007ea1cf`
+  fails `:udea-render:compileAndroidMain` with `Unresolved reference onPointerUsed` - run
+  `--refresh-dependencies` once (done on this box 23:07). Trial: only baseline red; GL green.
+  Worktree kept: `.claude/worktrees/agent-ab22c07454e2b1eaa`. `udea-render` free -> #221 next.
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).
@@ -438,6 +505,10 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   that module, or dispatched directly - no new issue. A round-3 split keeps its remainder on the SAME issue as
   a comment. Commenting on existing issues is still required for decisions. Triggered by wave 10 filing five
   issues (#226-#230) while closing one. Saved to memory as `owner-no-new-issues`.
+- **Batch WAVE.md pushes - once per merge, not per note (from #229).** Since #229, EVERY push to `kmp`
+  runs replay-equality-nightly's three 36000-tick legs. The lead had been pushing bookkeeping ~20 times a
+  session. Commit WAVE.md locally as often as needed; push it WITH the next merge. Reviewer ruled the
+  over-firing out of scope (CI minutes, breaks nothing); this is the lead-side mitigation, no code change.
 - **The scratchpad is SESSION-WIDE** - every developer and reviewer resolves it to the same path. Each agent
   writes only under `scratchpad/issue<N>/` and never cites a file it did not write. Put this in EVERY
   dispatch. (Wave 10: dev-212 found dev-229's generic `build.log`/`final/`/`ev/`/`mutations/` in "its"

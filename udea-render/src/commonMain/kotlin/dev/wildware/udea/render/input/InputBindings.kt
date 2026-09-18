@@ -25,6 +25,14 @@ public class ActionBinding(
     public val keys: IntArray = IntArray(0),
     /** Gamepad button indices, any of which triggers it. */
     public val buttons: IntArray = IntArray(0),
+    /**
+     * Pointer button indices, any of which triggers it: the mouse's buttons, and a finger. The
+     * backend's own table, as [keys] is - see `PointerState` for Kool's.
+     *
+     * Only a press the interface did not use reaches it (issue #227): a click on a button is the
+     * button's, and never also fires the binding underneath.
+     */
+    public val pointerButtons: IntArray = IntArray(0),
 ) {
     override fun toString(): String = "ActionBinding($name, ${keys.size} key(s))"
 }

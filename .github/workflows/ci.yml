@@ -1737,13 +1737,38 @@ jobs:
     # legs at the same seven-day retention - against 47.1MiB when this job replayed `drift-36000`.
     # That is the number to revisit if the storage bill ever matters, and `retention-days` below is
     # the lever.
+    #
+    # ## Which branch this covers, and what happens at #214
+    #
+    # The push clause names the **integration branch**, which is the only thing it has ever meant.
+    # It named the `example` branch until 2026-09-16, when the Kool/KMP port (#199) retired that
+    # branch and `kmp` replaced it. `git ls-remote` still lists the retired ref, so the clause went
+    # on looking correct while being unable to fire - and #229 is that: a gate whose push arm was
+    # dead and whose surviving `schedule` arm verified the tree being replaced.
+    #
+    # `schedule` cannot be pointed at `kmp`. GitHub runs a cron only on the default branch, and only
+    # from that branch's copy of this file, so no edit here changes what the cron replays until the
+    # port lands. Measured on the two runs that showed it up: the scheduled run of 2026-09-18
+    # (35323890628) replayed `master` at `409c0442` - the pre-port LibGDX tree - and passed all
+    # three legs, while the push run of `kmp` at `3002076f` (35397674705) skipped this job outright.
+    # The push clause is what closes that, and it fires on every merge into `kmp`, which is more
+    # often than a nightly cron would.
+    #
+    # At #214, when `kmp` merges into `master` and is retired, this configuration is already the one
+    # that day wants and needs no edit: `refs/heads/kmp` stops existing so the clause stops
+    # matching, and `schedule` - by then running on the ported tree, because `master` is it - is the
+    # coverage again. The clause may be deleted with the branch; leaving it costs nothing.
+    # `ReplayEqualityProofTest` holds this clause to the integration branches the
+    # `clean-build-budget` job passes `clean-build-base.sh`, in both directions, so a branch retired
+    # there and still named here - or listed there and covered by nothing here - fails the build.
     name: replay-equality-nightly (${{ matrix.os }}, ${{ matrix.distribution }})
     # Never on a pull request. `workflow_dispatch` is here so the job can be proven to run without
-    # waiting a day for the cron; it is how issue #165's own evidence was produced.
+    # waiting a day for the cron; it is how issue #165's own evidence was produced, and how #229's
+    # run against the port tree was.
     if: >-
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/example')
+      (github.event_name == 'push' && github.ref == 'refs/heads/kmp')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

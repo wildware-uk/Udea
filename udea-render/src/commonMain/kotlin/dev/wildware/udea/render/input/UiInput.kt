@@ -55,7 +55,10 @@ public class KeyStroke(
 }
 
 /**
- * The interface's **first refusal** on a device event.
+ * The interface's **first refusal** on a key.
+ *
+ * Pointers are [UiPointers], beside this rather than inside it: the toolkit's verdict on a pointer is
+ * per frame, a frame late and pushed, where this one is per event, immediate and returned.
  *
  * ```kotlin
  * override fun onKey(event: KeyStroke): Boolean {

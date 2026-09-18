@@ -187,6 +187,10 @@ public class KoolBackend private constructor(
             try {
                 kool.submit { ui.detachAndClose() }
             } catch (stopped: GlContextException) {
+                // The loop ended between the check and the task, so the scene and its GL objects
+                // went with the context and there is nothing left to detach. Reported rather than
+                // rethrown because `close` still has a pipeline to dispose and a context to stop,
+                // and the same condition is about to be met - and reported - by both.
                 System.err.println("udea-render: interface not closed, the render loop had stopped: ${stopped.message}")
             }
         }

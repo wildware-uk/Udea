@@ -1,5 +1,5 @@
-chrome flags: --headless=new --no-sandbox --no-first-run --no-default-browser-check --use-angle=swiftshader --enable-unsafe-swiftshader --window-size=800,600 --user-data-dir=/tmp/issue225-chrome-pYOrq5 --remote-debugging-port=0 about:blank
-navigate: http://127.0.0.1:45301/index.html
+chrome flags: --headless=new --no-sandbox --no-first-run --no-default-browser-check --use-angle=swiftshader --enable-unsafe-swiftshader --window-size=800,600 --user-data-dir=/tmp/issue225-chrome-3Yjvgk --remote-debugging-port=0 about:blank
+navigate: http://127.0.0.1:35033/index.html
 [console.log] KOOL_SPIKE_READY frames=0 backend=control api=WebGL 1.0 (OpenGL ES 2.0 Chromium)
 page WebGL probe: {"webgl2":false,"webgl1Null":false}
 FAIL: the canvas has no WebGL 2 context

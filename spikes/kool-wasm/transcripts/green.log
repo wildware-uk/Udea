@@ -40,29 +40,29 @@ Run with --info for a stacktrace.
 > Task :kool-core:metadataCommonMainProcessResources NO-SOURCE
 > Task :kool-core:kmpPartiallyResolvedDependenciesChecker
 > Task :kool-core:androidPreBuild UP-TO-DATE
-> Task :kool-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :kool-core:preAndroidMainBuild UP-TO-DATE
+> Task :kool-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :kool-core:checkAndroidMainAarMetadata
 > Task :kool-core:mergeAndroidMainJniLibFolders
 > Task :kool-core:mergeAndroidMainNativeLibs NO-SOURCE
 > Task :kool-core:extractAndroidMainAnnotations
 > Task :kool-core:copyAndroidMainJniLibsProjectOnly
 > Task :kool-core:generateAndroidMainEmptyResourceFiles
-> Task :kool-core:androidSourcesJar
 > Task :kool-core:prepareAndroidMainArtProfile UP-TO-DATE
 > Task :kool-core:prepareLintJarForPublish UP-TO-DATE
+> Task :kool-core:androidSourcesJar
 > Task :kool-core:writeAndroidMainAarMetadata
 > Task :kool-core:generatePomFileForAndroidPublication
-> Task :kool-core:generateDoubleAndIntVariants
 > Task :kool-core:processAndroidMainManifest
-> Task :kool-core:transformCommonMainDependenciesMetadata
+> Task :kool-core:generateDoubleAndIntVariants
 > Task :kool-core:desktopProcessResources
+> Task :kool-core:processDesktopMainResources SKIPPED
+> Task :kool-core:transformCommonMainDependenciesMetadata
+> Task :kool-core:generateDoubleOnlyVariants
+> Task :kool-core:desktopSourcesJar
+> Task :kool-core:generateTypeVariants
 > Task :kool-core:transformWebMainDependenciesMetadata
 > Task :kool-core:transformWasmJsMainDependenciesMetadata
-> Task :kool-core:processDesktopMainResources SKIPPED
-> Task :kool-core:generateDoubleOnlyVariants
-> Task :kool-core:generateTypeVariants
-> Task :kool-core:desktopSourcesJar
 > Task :kool-core:generatePomFileForDesktopPublication
 
 > Task :kool-core:compileCommonMainKotlinMetadata
@@ -91,8 +91,6 @@ w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotli
 > Task :kool-core:sourcesJar
 > Task :kool-core:generateMetadataFileForKotlinMultiplatformPublication
 > Task :kool-core:generatePomFileForKotlinMultiplatformPublication
-> Task :kool-core:compileAndroidMain
-> Task :kool-core:compileKotlinDesktop
 
 > Task :kool-core:compileAndroidMain
 w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/androidMain/kotlin/de/fabmax/kool/modules/audio/AudioOutput.android.kt:14:29 This class is not recommended for use in Kotlin. Use 'kotlin.Any' instead.
@@ -111,7 +109,6 @@ w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotli
 > Task :kool-core:wasmJsPublicPackageJson
 > Task :kool-core:wasmJsSourcesJar
 > Task :kool-core:generatePomFileForWasmJsPublication
-
 > Task :kool-core:compileKotlinDesktop
 w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotlin/de/fabmax/kool/pipeline/deferred/PbrLightingPass.kt:8:33 'class DeferredPipeline : Any' is deprecated. Use Deferred2Pipeline instead.
 w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/desktopMain/kotlin/de/fabmax/kool/modules/audio/AudioOutput.desktop.kt:13:29 This class is not recommended for use in Kotlin. Use 'kotlin.Any' instead.
@@ -120,33 +117,33 @@ w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/desktopMain/kotl
 > Task :kool-core:desktopMainClasses
 > Task :kool-core:desktopJar
 > Task :kool-core:generateMetadataFileForDesktopPublication
-> Task :kool-core:dokkaGeneratePublicationHtml
 
 > Task :kool-core:compileKotlinWasmJs
 w: file:///srv/ssd1/workspace/kool-spike-225/kool/kool-core/src/commonMain/kotlin/de/fabmax/kool/pipeline/deferred/PbrLightingPass.kt:8:33 'class DeferredPipeline : Any' is deprecated. Use Deferred2Pipeline instead.
 
 > Task :kool-core:wasmJsMainClasses
+> Task :kool-core:dokkaGeneratePublicationHtml
 > Task :kool-core:wasmJsJar
 > Task :kool-core:generateMetadataFileForWasmJsPublication
 > Task :kool-core:logLinkDokkaGeneratePublicationHtml SKIPPED
-> Task :kool-core:jsDokkaJavadocJar
 > Task :kool-core:kotlinMultiplatformDokkaJavadocJar
-> Task :kool-core:desktopDokkaJavadocJar
-> Task :kool-core:publishJsPublicationToMavenLocal
-> Task :kool-core:publishKotlinMultiplatformPublicationToMavenLocal
 > Task :kool-core:androidDokkaJavadocJar
-> Task :kool-core:publishDesktopPublicationToMavenLocal
+> Task :kool-core:desktopDokkaJavadocJar
+> Task :kool-core:jsDokkaJavadocJar
+> Task :kool-core:publishKotlinMultiplatformPublicationToMavenLocal
 > Task :kool-core:publishAndroidPublicationToMavenLocal
+> Task :kool-core:publishDesktopPublicationToMavenLocal
+> Task :kool-core:publishJsPublicationToMavenLocal
 > Task :kool-core:wasmJsDokkaJavadocJar
 > Task :kool-core:publishWasmJsPublicationToMavenLocal
 > Task :kool-core:publishToMavenLocal
 
 [Incubating] Problems report is available at: file:///srv/ssd1/workspace/kool-spike-225/kool/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 1m 18s
+BUILD SUCCESSFUL in 1m 15s
 75 actionable tasks: 71 executed, 4 up-to-date
 Configuration cache entry stored.
-Kool Gradle build took 78s
+Kool Gradle build took 76s
 
 == published variants of kool-core
 kool-core
@@ -221,13 +218,13 @@ cacheable modules 51.2 KiB (javascript) 919 KiB (asset)
   ./kotlin/kool-wasm-spike.mjs 3.12 KiB [built] [code generated]
   ./kotlin/kool-wasm-spike.import-object.mjs + 1 modules 48 KiB [built] [code generated]
   ./kotlin/kool-wasm-spike.wasm 919 KiB (asset) 42 bytes (javascript) [built] [code generated]
-webpack 5.108.1 compiled with 2 warnings in 471 ms
+webpack 5.108.1 compiled with 2 warnings in 476 ms
 
 > Task :wasmJsBrowserDistribution
 
 [Incubating] Problems report is available at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-aee3e20c78d24843c/spikes/kool-wasm/consumer/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 26s
+BUILD SUCCESSFUL in 30s
 22 actionable tasks: 17 executed, 5 up-to-date
 c60812f9ffb59976be4e.wasm
 index.html
@@ -235,8 +232,8 @@ kool-wasm-spike.js
 kool-wasm-spike.js.map
 
 == browser: Google Chrome for Testing 153.0.8010.12 
-chrome flags: --headless=new --no-sandbox --no-first-run --no-default-browser-check --use-angle=swiftshader --enable-unsafe-swiftshader --window-size=800,600 --user-data-dir=/tmp/issue225-chrome-dKV7wV --remote-debugging-port=0 about:blank
-navigate: http://127.0.0.1:39163/index.html
+chrome flags: --headless=new --no-sandbox --no-first-run --no-default-browser-check --use-angle=swiftshader --enable-unsafe-swiftshader --window-size=800,600 --user-data-dir=/tmp/issue225-chrome-d3CPTI --remote-debugging-port=0 about:blank
+navigate: http://127.0.0.1:33175/index.html
 [console.log] D/GlImpl: Supported WebGL extensions:
 [console.log] D/GlImpl: - EXT_clip_control
 [console.log] D/GlImpl: - EXT_color_buffer_float

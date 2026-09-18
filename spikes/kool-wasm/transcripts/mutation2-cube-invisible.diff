@@ -1,8 +1,8 @@
 diff --git a/spikes/kool-wasm/consumer/src/commonMain/kotlin/dev/wildware/udea/spike/koolwasm/SpikeScene.kt b/spikes/kool-wasm/consumer/src/commonMain/kotlin/dev/wildware/udea/spike/koolwasm/SpikeScene.kt
-index d3ba482..d58d009 100644
+index e3478ef..f1fadc2 100644
 --- a/spikes/kool-wasm/consumer/src/commonMain/kotlin/dev/wildware/udea/spike/koolwasm/SpikeScene.kt
 +++ b/spikes/kool-wasm/consumer/src/commonMain/kotlin/dev/wildware/udea/spike/koolwasm/SpikeScene.kt
-@@ -40,6 +40,7 @@ fun KoolApplication.spikeScene(onReady: (String) -> Unit) {
+@@ -40,6 +40,7 @@ internal fun KoolApplication.spikeScene(onReady: (String) -> Unit) {
              }
              transform.rotate(15f.deg, Vec3f.Y_AXIS)
              transform.scale(3f)

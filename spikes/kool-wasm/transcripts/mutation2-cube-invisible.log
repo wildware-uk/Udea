@@ -51,13 +51,13 @@ cacheable modules 51.2 KiB (javascript) 919 KiB (asset)
   ./kotlin/kool-wasm-spike.mjs 3.12 KiB [built] [code generated]
   ./kotlin/kool-wasm-spike.import-object.mjs + 1 modules 48 KiB [built] [code generated]
   ./kotlin/kool-wasm-spike.wasm 919 KiB (asset) 42 bytes (javascript) [built] [code generated]
-webpack 5.108.1 compiled with 2 warnings in 465 ms
+webpack 5.108.1 compiled with 2 warnings in 478 ms
 
 > Task :wasmJsBrowserDistribution
 
 [Incubating] Problems report is available at: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-aee3e20c78d24843c/spikes/kool-wasm/consumer/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 26s
+BUILD SUCCESSFUL in 27s
 22 actionable tasks: 17 executed, 5 up-to-date
 e67c34454f3cca156914.wasm
 index.html
@@ -65,8 +65,8 @@ kool-wasm-spike.js
 kool-wasm-spike.js.map
 
 == browser: Google Chrome for Testing 153.0.8010.12 
-chrome flags: --headless=new --no-sandbox --no-first-run --no-default-browser-check --use-angle=swiftshader --enable-unsafe-swiftshader --window-size=800,600 --user-data-dir=/tmp/issue225-chrome-bueGMn --remote-debugging-port=0 about:blank
-navigate: http://127.0.0.1:41353/index.html
+chrome flags: --headless=new --no-sandbox --no-first-run --no-default-browser-check --use-angle=swiftshader --enable-unsafe-swiftshader --window-size=800,600 --user-data-dir=/tmp/issue225-chrome-0v6dyw --remote-debugging-port=0 about:blank
+navigate: http://127.0.0.1:35555/index.html
 [console.log] D/GlImpl: Supported WebGL extensions:
 [console.log] D/GlImpl: - EXT_clip_control
 [console.log] D/GlImpl: - EXT_color_buffer_float

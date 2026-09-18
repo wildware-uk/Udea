@@ -2,14 +2,15 @@
 
 ## kmp baseline
 
-**SHA `87d8b7c`** (kmp after #211 merge), refreshed 2026-09-18 on the merged branch with
+**SHA `18bb13f`** (kmp after #224 merge; merged tree byte-identical to the trial tree `41140c7`, so the trial
+build IS the merged build), refreshed 2026-09-18 with
 `ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **Failing tasks: `:moba:compileKotlin` ONLY** - and every moba task downstream of it does not run.
 That is the authorised D9 red: moba still draws with LibGDX until #212 ports it. Nothing else fails.
 A reviewer or trial merge sees exactly that one red and treats any other as the branch's.
 
-Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+Earlier: `87d8b7c` (kmp after #211 merge), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -286,6 +287,21 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   the `Kool.md` "holds only under the default" correction, a "Did the interface take that click?" section
   and the `android.useAndroidX=true` line. Full API recorded on #227.
   **Not dispatched: it is `udea-render`, which #224 owns until it merges.**
+
+- **#224 MERGED `18bb13f`**, round 1 PASS, no findings. Kool key/pad input to intents with UI first refusal,
+  `composegl-kool` UI host (`UiLayer`, owned by `KoolBackend.show` on the render thread), capture isolation
+  proved structural AND measured mid-redraw (all five captures hash `cdb6bdc8...`), `RenderModuleGraphTest`
+  scope fence. Trial: build red ONLY on baseline `:moba:compileKotlin`; GL suite under xvfb with
+  `-Pudea.render.requireGl=true` green. Merged tree == trial tree (`41140c7`). Baseline unchanged.
+  Worktree kept: `.claude/worktrees/agent-a01eb6c762a84065b`.
+  **Out-of-scope card the reviewer raised, CONFIRMED by the lead and filed as #230, not dropped:**
+  `KeyTable.kt` (new in #224) line 29 keys letters with `UniversalKeyCode(letter)` over 'a'..'z' - the
+  lowercasing constructor - so W maps to 119 not the 87 GLFW sends. Every letter reaches a focused ComposeGL
+  control as `Key.Unknown`, is not taken, and leaks through as a game intent: typing in a text field also
+  moves the player. #224's tests only pressed Escape (special-key map, correct). Latent - moba has no
+  ComposeGL screen until #188 - so merging on the PASS was safe; #230 must land BEFORE #188. The reviewer's
+  out-of-scope label was generous (it is new code breaking the ticket's own AC1 for letters) but the PASS
+  is the sign-off and the lead did not overrule it.
 
 ## Wave 10 plan
 

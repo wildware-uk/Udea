@@ -55,6 +55,9 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - 2026-09-18: dev-211 and dev-225 both killed by an API weekly limit on Opus (resets Sep 22 16:00 UTC) after a day's work. Work survived on disk. Took over on **sonnet**: dev-211b and dev-225b, pointed at the SAME worktrees/branches (`agent-a27b81d547010a2d9` = issue-211-udea-render-kool, 120 uncommitted changes, told to WIP-commit first; `agent-aee3e20c78d24843c` = issue-225-kool-wasm-spike, 3 commits, README says ANSWER YES).
 - #225 preliminary answer (from its README, not yet reviewed): Kool main pinned `ab762acd` builds kool-core for jvm (major 65), android and wasmJs with a 13-line build-script patch in 3 files, no source change; a Kotlin 2.4.20 consumer compiles against it and draws in headless Chrome on WebGL 2. Reviewer must confirm.
 
+- **#225 merged `3544c40`** (brief `52e92aa`), round 1 PASS, no findings. Answer YES: Kool main `ab762acd`, 13-line patch in 3 build files, no source change, jvm major 65 + android + wasmJs; Kotlin 2.4.20 consumer reads both; WebGL 2 draw in headless Chrome. Nothing published. Reviewer reproduced the whole run. Trial + merged kmp both green (0 failing tasks). Baseline refreshed: **`52e92aa`, failing tasks: none**; `-p build-logic check` green. Worktree kept: `.claude/worktrees/agent-aee3e20c78d24843c`. Dropped as cards: duplicate #223 answer comments (dev-225 and dev-225b each posted one).
+- #223 now has the option-1 answer and recommendation; the owner's call on which option to take is still open.
+
 ## Wave 9 plan
 
 - Ready: #211 udea-render on Kool (needs #222 - landed), scoped JVM + Android; its Wasm AC moves to #223 (commented on #211). #223 spike (build pinned Kool main with toolchain 21, check wasmJs + WebGL2 draw; publish nothing). #211 is Udea repo (udea-render); #223 spike is outside Udea (Kool clone in scratch dir) - disjoint, can pair if box has memory (session hit low-memory kill once this wave).

@@ -400,6 +400,19 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `--refresh-dependencies` once (done on this box 23:07). Trial: only baseline red; GL green.
   Worktree kept: `.claude/worktrees/agent-ab22c07454e2b1eaa`. `udea-render` free -> #221 next.
 
+- **ComposeGL re-entry phantom click: CONFIRMED and FIXED upstream** in composegl-kool `0.7.0-SNAPSHOT` from
+  **`9cf8a04c`**. Their real-GLFW demo test counted 2 clicks where 1 was right before the fix. Fix: a
+  newly-seen pointer is read by current button levels only (mask ignored); a known pointer still uses the
+  mask, so a one-frame click still registers. No Udea change needed (#227 reads levels itself). Routed as a
+  direct report, not an issue, per owner rule - it worked.
+- **#221 dispatched** (dev-221, branch `issue-221-kool-audio-device`, udea-render). Browser half shelved;
+  ACs = desktop transcript + udea-audio free of Kool. Box has ALSA cards (HDA NVidia, HD-Audio Generic, snd_hda
+  loaded) but NO aplay / PulseAudio / PipeWire and nobody to listen - evidence proves the PATH (device opened,
+  clip loaded, playback started, from Kool's own state) and must go red with `Silent` swapped in; never claim
+  audible. Told to read the Kool 0.19.0 JAR, not the `main` spike clone. A device that cannot open must not
+  be a swallowed exception.
+- **In flight: 2** (dev-212 moba, dev-221 udea-render).
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).

@@ -236,7 +236,7 @@ public object MobaClient {
             val scripted = walk?.let { axis ->
                 InjectedIntent(intent.bindings.catalog).also { it.setAxis(MobaControls.MOVE_AXIS, axis, 0f) }
             }
-            MobaLaunch.wireInput(host, extra = scripted)
+            MobaLaunch.wireInput(host, MobaLaunch.keyboard(rendering), extra = scripted)
             val limit = System.getProperty(FRAMES_PROPERTY)?.trim()?.toLongOrNull() ?: 0L
             var audioBuilt: MobaAudio? = null
             rendering.onRenderThread { audioBuilt = MobaAudio.forHost(host) }
@@ -496,7 +496,7 @@ public object MobaClient {
             // The keyboard, through the identical `IntentSource` seam a local client uses. Its
             // axis is read here and put in a command; it is never written into a component that
             // then goes to the server. A client sends what the player *did*.
-            MobaLaunch.wireInput(host)
+            MobaLaunch.wireInput(host, MobaLaunch.keyboard(rendering))
             val intent = host.ctx[IntentState.KEY]
             var audioBuilt: MobaAudio? = null
             rendering.onRenderThread { audioBuilt = MobaAudio.forHost(host) }
@@ -552,7 +552,7 @@ public object MobaClient {
     private fun local(mode: RenderMode) {
         MobaLaunch.runWithGl(mode) { host, rendering ->
             val player = MobaEntry.seed(host)
-            MobaLaunch.wireInput(host)
+            MobaLaunch.wireInput(host, MobaLaunch.keyboard(rendering))
             MobaLaunch.follow(rendering, player)
             println("[moba.client] you are net id ${player.raw}; WASD to walk, Space to swing")
             var built: MobaAudio? = null

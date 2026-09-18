@@ -1,6 +1,7 @@
 package dev.wildware.moba
 
 import dev.wildware.moba.entry.MobaEntry
+import dev.wildware.moba.entry.MobaLaunch
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
@@ -170,6 +171,40 @@ class MobaInputTest {
         assertEquals(fixture.playerPosition().x, pose.x)
     }
 
+    /**
+     * The launcher's own wiring reads the keyboard it is handed, alone and alongside an agent.
+     *
+     * Every other test here installs its [DeviceIntent] by hand, so none of them can see whether
+     * `MobaLaunch.wireInput` - the one function every windowed entry point calls - puts a keyboard
+     * behind the player at all. Until issue #212 it could not: it built its `DeviceIntent` over
+     * `KeyboardState.NONE`, because Kool's keyboard did not exist yet, and a player at a real window
+     * pressed D and nothing happened. Both shapes are driven because both ship - a client passes no
+     * `extra`, and an agent instance passes its `InjectedIntent`, which puts the keyboard inside a
+     * `CompositeIntent` rather than on its own.
+     */
+    @Test
+    fun `the launcher wires the keyboard it is handed`() {
+        for (agent in listOf(false, true)) {
+            val host = MobaGame.host(RenderMode.Headless)
+            val player = MobaEntry.seed(host)
+            val keys = FakeKeys()
+            val extra = if (agent) InjectedIntent(host.ctx[IntentState.KEY].bindings.catalog) else null
+            MobaLaunch.wireInput(host, keys, extra)
+            host.run(1)
+            val before = positionOf(host, player)
+
+            keys.hold(MobaControls.Keys.D)
+            host.run(TICKS)
+
+            val after = positionOf(host, player)
+            assertTrue(
+                after.x > before.x + 1f,
+                "with an agent source ${if (agent) "present" else "absent"}, holding D through " +
+                    "MobaLaunch.wireInput moved the player from ${before.x} to ${after.x}",
+            )
+        }
+    }
+
     /** A real host, seeded with the real level, driven by a keyboard nobody is at. */
     private class Fixture {
 
@@ -187,19 +222,8 @@ class MobaInputTest {
             host.run(1)
         }
 
-        /**
-         * A **copy** of where the player is, and the `copy` is load-bearing.
-         *
-         * `entity[Position]` hands back the live component, so a `before` and an `after` taken
-         * either side of a `run` are the same object and compare equal whatever moved. This test
-         * passed for a broken game once already for exactly that reason.
-         */
-        fun playerPosition(): Pose {
-            val entity = host.ctx[CoreModule.NET_IDS].resolveOrNull(player)
-                ?: error("the player entity is gone")
-            val position = with(host.world) { entity[Position] }
-            return Pose(position.x, position.y)
-        }
+        /** Where the player is, as a copy - see [positionOf]. */
+        fun playerPosition(): Pose = positionOf(host, player)
     }
 
     /**
@@ -232,6 +256,20 @@ class MobaInputTest {
     }
 
     private companion object {
+
+        /**
+         * A **copy** of where [player] is, and the `copy` is load-bearing.
+         *
+         * `entity[Position]` hands back the live component, so a `before` and an `after` taken
+         * either side of a `run` are the same object and compare equal whatever moved. This test
+         * passed for a broken game once already for exactly that reason.
+         */
+        fun positionOf(host: GameHost, player: NetId): Pose {
+            val entity = host.ctx[CoreModule.NET_IDS].resolveOrNull(player)
+                ?: error("the player entity is gone")
+            val position = with(host.world) { entity[Position] }
+            return Pose(position.x, position.y)
+        }
 
         /** Long enough for movement to be unambiguous, short enough that the fight has not moved on. */
         const val TICKS: Int = 10

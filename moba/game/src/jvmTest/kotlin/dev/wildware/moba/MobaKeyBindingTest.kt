@@ -37,11 +37,11 @@ import kotlin.test.assertTrue
  * asset to the intent is a stand-in.
  *
  * `KeyboardState` is, and that is the seam rather than a shortcut: `DeviceIntent` names no
- * backend type, and the class that feeds it real key events is issue #224's and does not exist
- * yet. What a Kool key event *is* - and therefore whether 87 is the number a driver delivers -
- * is that ticket's to pin, in `udea-render`, against a running context. What this file pins is
- * that the game asks for 87, that the asset and the constant table agree it is "walk up", and
- * that no other key does.
+ * backend type, and the class that feeds it real key events is `udea-render`'s `KoolKeyboard`
+ * (issue #224). What a Kool key event *is* - and therefore whether 87 is the number a driver
+ * delivers - is pinned there, against a running context. What this file pins is that the game
+ * asks for 87, that the asset and the constant table agree it is "walk up", and that no other key
+ * does.
  *
  * ## The eight are all printable, which is why they are GLFW's own numbers
  *
@@ -211,8 +211,9 @@ class MobaKeyBindingTest {
      *
      * Each of them holds `MobaControls.Keys.W` and asserts the axis moved, so it proves the code
      * in the table reaches the action the table says it does. It cannot notice that the table
-     * holds the wrong number, because it asks the question using the answer. Issue #224 made
-     * exactly this mistake in `udea-render` and it is what let a wrong key code look tested.
+     * holds the wrong number, because it asks the question using the answer. The first draft of
+     * `udea-render`'s `GlKoolInputTest` had that shape - it built the key event and bound the same
+     * code - and so passed for any number at all.
      *
      * The negative closes it. Holding the **LibGDX** code for a key and getting nothing is a
      * measurement of the table rather than a restatement of it: a branch that reverts these eight

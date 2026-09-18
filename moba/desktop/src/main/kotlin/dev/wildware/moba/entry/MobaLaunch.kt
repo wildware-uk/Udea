@@ -16,6 +16,9 @@ import dev.wildware.udea.render.input.CompositeIntent
 import dev.wildware.udea.render.input.DeviceIntent
 import dev.wildware.udea.render.input.IntentSource
 import dev.wildware.udea.render.input.IntentState
+import dev.wildware.udea.render.input.KeyboardState
+import dev.wildware.udea.render.input.UiInput
+import dev.wildware.udea.render.kool.KoolKeyboard
 
 /**
  * The desktop half of what was `MobaEntry`: the mode, the window, the backend and the boot order.
@@ -81,20 +84,16 @@ public object MobaLaunch {
     }
 
     /**
-     * Wires this process's input into the simulation's [IntentState], and returns the source.
+     * Wires [keyboard] - and [extra], if any - into the simulation's [IntentState], and returns
+     * the source.
      *
-     * ## There is no physical keyboard behind this yet, and that is a known state of the port
+     * Every windowed entry point passes the keyboard [keyboard]`(rendering)` builds, which is
+     * Kool's. It is a parameter rather than built in here so the wiring can be driven by a keyboard
+     * a test holds keys on (`MobaInputTest`), with no window and no context; the device half is
+     * `udea-render`'s `KoolKeyboard`, tested there against Kool's real GLFW callback.
      *
-     * `GdxKeyboard` was the device half - the one class in the tree that read a physical key - and
-     * it left with LibGDX in issue #211. Kool's pointer and key events reaching
-     * [dev.wildware.udea.render.input.KeyboardState] is issue #224, in `udea-render`. Until it
-     * lands, [DeviceIntent] is built over `KeyboardState.NONE`: every binding reads "not pressed",
-     * every mapped action is reachable through an agent's [IntentSource] and none through a key.
-     *
-     * That is deliberately not hidden behind a stub that pretends otherwise. The mapping half is
-     * whole and tested (`MobaInputTest` drives it with no window at all); the device half is one
-     * class, in the module that owns input, and the day it exists this function takes it instead of
-     * the `NONE`.
+     * The codes the bindings speak are Kool's own, not LibGDX's - see `MobaControls.Keys` for what
+     * that ties this game to and the issue that moves the table into the engine.
      *
      * ## Where an agent's input joins
      *
@@ -105,10 +104,11 @@ public object MobaLaunch {
      */
     public fun wireInput(
         host: GameHost,
+        keyboard: KeyboardState,
         extra: IntentSource? = null,
     ): IntentSource {
         val state = host.ctx[IntentState.KEY]
-        val device = DeviceIntent(state.bindings)
+        val device = DeviceIntent(state.bindings, keyboard)
         val source = if (extra == null) {
             device
         } else {
@@ -116,6 +116,20 @@ public object MobaLaunch {
         }
         state.source = source
         return source
+    }
+
+    /**
+     * Kool's keyboard for this window, built on the render thread.
+     *
+     * The render thread because `KoolKeyboard` pushes itself onto Kool's `InputStack` as it is
+     * built, and that stack is polled on the render thread - `udea-render`'s own `GlKoolInputTest`
+     * builds it the same way. Nothing takes keys ahead of the game ([UiInput.NONE]): `MobaHud`
+     * draws text and has no widget a key could land in.
+     */
+    public fun keyboard(rendering: Rendering): KoolKeyboard {
+        var built: KoolKeyboard? = null
+        rendering.onRenderThread { built = KoolKeyboard(UiInput.NONE) }
+        return checkNotNull(built) { "KoolKeyboard was not built on the render thread" }
     }
 
     /**

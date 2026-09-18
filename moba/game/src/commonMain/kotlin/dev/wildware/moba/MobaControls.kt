@@ -129,13 +129,13 @@ public object MobaControls {
      *
      * ## These are the *backend's* numbers, and that is a gap rather than a design
      *
-     * A key code is a renderer's vocabulary, not a game's. `InputBindings.keys` in `udea-render`
-     * still documents these as gdx codes, which is false since #211, and nothing in the engine
-     * offers a table to bind against - so each game writes the codes of whatever backend it
-     * happens to run on. Swap the desktop backend, or add one whose codes differ, and this
-     * object is wrong again in exactly the same silent way. Closing it is a `udea-render`
-     * change, that module belongs to issue #224 this wave, and issue #212 is not the ticket to
-     * make it in; when an engine-owned table exists this object becomes an alias for it.
+     * A key code is a renderer's vocabulary, not a game's, and nothing in the engine offers a
+     * table to bind against - so each game writes the codes of whatever backend it happens to run
+     * on. Swap the desktop backend, or add one whose codes differ, and this object is wrong again
+     * in exactly the same silent way. The special keys are worse: Kool gives them its own negative
+     * codes (Escape is -9, where GLFW's is 256), so one integer field holds two schemes. Closing it
+     * is a `udea-render` change and issue #228's; when an engine-owned table exists this object
+     * becomes an alias for it.
      */
     public object Keys {
 

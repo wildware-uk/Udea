@@ -180,7 +180,7 @@ public object MobaAgent {
             // Keyboard *and* agent, combined rather than one replacing the other: a human
             // watching a Windowed agent instance can still play. See `CompositeIntent` for why
             // there is deliberately no priority rule between the two.
-            MobaLaunch.wireInput(host, extra = injected)
+            MobaLaunch.wireInput(host, MobaLaunch.keyboard(rendering), extra = injected)
             val session = attach(host, mode, control, bridge, sessions, injected)
             // The camera goes on the unit the agent drives, so a screenshot after an `input.*`
             // call shows the thing that moved. Real now: `CameraRig` follows a game-supplied

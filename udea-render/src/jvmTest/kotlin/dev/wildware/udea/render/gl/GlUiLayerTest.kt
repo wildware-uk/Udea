@@ -1,6 +1,9 @@
 package dev.wildware.udea.render.gl
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import dev.wildware.composegl.ui.geometry.Size
 import dev.wildware.composegl.ui.graphics.Colour
 import dev.wildware.composegl.ui.layout.Box
@@ -166,6 +169,44 @@ class GlUiLayerTest {
             ui.show(PanelScreen())
             val with = captureOnce(slot, probe, "shown")
 
+            // The third question, and it is the one "the two captures matched" cannot answer on its
+            // own: is the interface absent from a capture taken while it is *changing*, rather than
+            // only from a settled frame? A screen whose panel moves with Compose state this thread
+            // rewrites in a tight loop, so the toolkit is recomposing, laying out and drawing
+            // different pixels while each capture is served.
+            val moving = MovingScreen()
+            ui.show(moving)
+            val before = moving.compositions.get()
+            val churn = Thread {
+                while (!Thread.currentThread().isInterrupted) {
+                    moving.step++
+                }
+            }.apply { isDaemon = true; start() }
+            val duringChurn = try {
+                List(CHURNED_CAPTURES) { index -> captureOnce(slot, probe, "moving-$index") }
+            } finally {
+                churn.interrupt()
+            }
+            val recompositions = moving.compositions.get() - before
+
+            // Not a vacuity guard bolted on: without it, three identical captures of a screen that
+            // never redrew would look exactly like three identical captures of a screen the capture
+            // path cannot see.
+            assertTrue(
+                recompositions >= CHURNED_CAPTURES,
+                "the moving screen composed $recompositions times while $CHURNED_CAPTURES captures " +
+                    "were taken, so nothing was changing and this proves nothing about a capture " +
+                    "taken mid-composition",
+            )
+            duringChurn.forEachIndexed { index, run ->
+                assertContentEquals(
+                    without.png,
+                    run.png,
+                    "capture $index, taken while the interface was redrawing, is not the same " +
+                        "picture as one taken with no interface at all",
+                )
+            }
+
             return without to with
         } finally {
             // The backend owns the layer from `show` on, and closes it on the render thread before
@@ -224,6 +265,34 @@ class GlUiLayerTest {
         }
     }
 
+    /**
+     * A panel that moves with [step], which the test rewrites from another thread.
+     *
+     * The movement is what matters, not where it ends up: every write is a Compose snapshot write, so
+     * the toolkit recomposes, lays out and draws a different frame, and [compositions] counts that it
+     * really did.
+     */
+    private class MovingScreen : UiScreen {
+
+        var step: Int by mutableIntStateOf(0)
+
+        val compositions: AtomicInteger = AtomicInteger()
+
+        @Composable
+        override fun content() {
+            compositions.incrementAndGet()
+            val shift = (step % TRAVEL).toFloat()
+            Box(Modifier.size(WINDOW_WIDTH.toFloat(), WINDOW_HEIGHT.toFloat())) {
+                Box(
+                    Modifier
+                        .offset(PANEL_X + shift, PANEL_Y + shift)
+                        .size(PANEL_WIDTH, PANEL_HEIGHT)
+                        .background(Colour.rgb(PANEL.toLong())),
+                )
+            }
+        }
+    }
+
     /** A panel over the middle of the window, with a border, and nothing that needs a glyph. */
     private class PanelScreen : UiScreen {
 
@@ -265,6 +334,12 @@ class GlUiLayerTest {
 
         const val FONT = "udea-test"
         const val FONT_SIZE = 24
+
+        /** How many captures are taken while the screen is redrawing. */
+        const val CHURNED_CAPTURES = 3
+
+        /** How far the moving panel travels before it wraps, in design units. */
+        const val TRAVEL = 60
 
         const val SCENE = 0x0000FF
         const val PANEL = 0xC62828

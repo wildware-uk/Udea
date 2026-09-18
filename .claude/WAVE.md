@@ -252,6 +252,26 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `InputBindings.keys`' KDoc still claims "com.badlogic.gdx.Input.Keys codes", which is false and is what
   makes the next game write gdx numbers. Needs #224. Added to epic as 7d.
 
+- **Owner asked to run 4 developers. Dispatched a THIRD (#229); a fourth is not safely available.**
+  Every other open ticket either collides with #212 (`moba`) or #224 (`udea-render`), or is blocked by
+  them: #221 and #228 are udea-render (and collide with each other); #227 waits on a composegl snapshot;
+  #213 deletes `example/`, which `:moba:udeaStageCharacterArt` still reads the character art out of, so it
+  cannot land before #212; #188/#192 are moba; #194-#196 need #212; #189 needs #188 AND edits
+  `udea-render/src/test/.../BannedOwner.kt`; #223/#226 shelved. Checked the old-tree edges directly: only
+  `example` depends on `common` and `gradle-plugin`, so #213 is genuinely one unit and cannot be split to
+  free a slot. Box was also at **load 26.4 on 24 cores** with 12G available when asked.
+- **Filed and dispatched #229** (dev-229, branch `issue-229-nightly-branch-trigger`, `.github/` only):
+  `ci.yml:1746` gates replay-equality-nightly on `github.ref == 'refs/heads/example'`, a branch retired
+  2026-09-16 - a push clause that can never fire. Worse than tidy-up: the surviving `schedule` clause runs
+  on the DEFAULT branch, `master`, the pre-port LibGDX tree. So the nightly verifies the engine being
+  replaced while the port's own replay determinism has no nightly coverage - and replay equality is exactly
+  the gate that catches determinism drift across JDK vendors and OSes, the defect class a KMP port
+  introduces. Cleared the "file it" bar as a gate that cannot fire. dev-229 authorised to push ITS OWN
+  branch to origin (the deliverable is a real `workflow_dispatch` run); told not to delete the `example`
+  branch.
+- **Slot 4 opens on the next merge.** #224 frees `udea-render` for #221 or #228 (not both - same module);
+  #212 frees `moba` for #188/#192 and unblocks #213 and #194.
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).

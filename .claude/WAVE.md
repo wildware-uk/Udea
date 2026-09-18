@@ -370,6 +370,18 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   case unit-tested; mutations m2-m4 red. Trial: only baseline red; GL under xvfb green. Tree identical.
   Worktree kept: `.claude/worktrees/agent-a5ecd4c2831637278`. `udea-render` now free -> #227 next.
 
+- **#227 dispatched** (dev-227, branch `issue-227-kool-pointer-intents`, off `1cc5f60`), `udea-render` (+
+  `udea-core` if the binding model lives there; nobody else in it). Told: AC3 re-worded (NO fake verdict
+  exists - pointers get a SECOND seam beside `UiInput`); pointers are ABSENT today (no ActionBinding mouse
+  field, no PointerState) so AC1 builds pointer->intent from nothing; the full `PointerUse` API from
+  composegl `007ea1cf`, esp. MATCH ON `frame` (listener-read), it is a STREAM (once per pointer per frame,
+  used or not, final report on lift/leave), `isConsumed()` stays false; `PointerUse.frame` must never leak
+  into the sim as an input stamp (Tick only); extend `GlKoolInputTest` (one Kool context per JVM); drive
+  Kool's REAL pointer path, assert the negative; do not disturb #230's `KoolKeyboard` hold-back; no moba;
+  no new issues; scratchpad `issue227/`; will not be re-notified if it stops mid-build.
+- **In flight: 2** (dev-212 moba, dev-227 udea-render). Nothing else free: #221/#228 are udea-render
+  (dev-227's), everything else waits on #212.
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).

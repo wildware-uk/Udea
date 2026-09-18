@@ -103,7 +103,17 @@ class RenderModuleGraphTest {
         // `composegl-ui` is the other way round on purpose. A game writes its own `UiScreen`, whose
         // `content()` is `@Composable`, so the toolkit has to be on its compile classpath. That is
         // the whole of the rule in one line: toolkit yes, renderer no.
-        val script = RepoLayout.moduleDir("udea-render").resolve("build.gradle.kts").readText()
+        // Comments stripped before anything is searched for. That build script explains each of
+        // these dependencies in prose that names the scope it is *not*, so a raw search would find
+        // `api(libs.composegl.kool)` in a sentence saying why it must never be written - a fence
+        // that fails on prose is as wrong as one that passes on a real breach.
+        val script = RepoLayout.moduleDir("udea-render").resolve("build.gradle.kts")
+            .readLines()
+            .filterNot { line ->
+                val trimmed = line.trimStart()
+                trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")
+            }
+            .joinToString("\n")
 
         assertTrue(
             "api(libs.composegl.ui)" in script,

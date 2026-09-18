@@ -272,6 +272,21 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - **Slot 4 opens on the next merge.** #224 frees `udea-render` for #221 or #228 (not both - same module);
   #212 frees `moba` for #188/#192 and unblocks #213 and #194.
 
+- **#227 UNBLOCKED, dispatch on the next merge.** composegl-kool `0.7.0-SNAPSHOT` from **`007ea1cf`**
+  carries the pointer report: `ComposeGlScene.onPointerUsed: ((PointerUse) -> Unit)?` with
+  `data class PointerUse(val pointer: Int, val frame: Int, val used: Boolean)`. Fires on the RENDER thread
+  at the start of the ComposeGL scene's render, ONCE PER VALID POINTER PER KOOL FRAME (used or not,
+  including a final report when a finger lifts or the mouse leaves). **`frame` is `Time.frameCount` from
+  when the LISTENER READ the pointer, not when the report arrives** - the detail most likely to produce an
+  off-by-one that only shows under load. `isConsumed()` stays false, deliberately (option-1 rejection).
+  Confirms the one-frame ordering from the other side: under `asyncSceneUpdate = false` it fires AFTER the
+  game's update for that frame. composegl skipped the render-thread key/pad hook entirely - dev-224's
+  `asyncSceneUpdate` finding made it unnecessary, and their docs now tell default-Kool consumers to queue
+  and hand over on the render thread. Wiki gained the render-thread rule on `player`, the `Input.md` rule,
+  the `Kool.md` "holds only under the default" correction, a "Did the interface take that click?" section
+  and the `android.useAndroidX=true` line. Full API recorded on #227.
+  **Not dispatched: it is `udea-render`, which #224 owns until it merges.**
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).

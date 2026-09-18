@@ -3,6 +3,10 @@ package dev.wildware.udea.agent.host.overlay
 import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.activity.AgentSessions
 import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.render.overlay.EntityLocator
+import dev.wildware.udea.render.overlay.HardwareKeyState
+import dev.wildware.udea.render.overlay.OverlayCanvas
+import dev.wildware.udea.render.overlay.WorldProjector
 
 /**
  * The agent activity overlay: a corner panel and world-space markers, drawn for the human and
@@ -15,13 +19,15 @@ import dev.wildware.udea.core.host.RenderMode
  * through [WorldProjector], so every assertion about what a human would be reading is testable
  * with no context at all.
  *
- * [AgentOverlaySystem] is the GL half - the `OverlaySystem` that implements [OverlayCanvas] over
- * a `Batch` and a `BitmapFont` and drives this class from it. It sits in `src/main` beside this
- * file **as of the ruling that took this module out of `ModuleGraphRules.HEADLESS_PROJECTS`**;
- * before that it was in test sources, because a module that owns the overlay and may not name a
- * `udea.render` type has nowhere legal to put the adapter - so the panel spec 3.7 describes was
- * drawn by nothing but its own tests. `OverlayCaptureIsolationTest` boots a real LWJGL3 context,
- * drives that adapter, and asserts both halves of spec 3.7's guarantee.
+ * `dev.wildware.udea.render.overlay.AgentOverlaySystem` is the render half - the `OverlaySystem`
+ * that implements [OverlayCanvas] over `udea-render`'s own `SpriteBatch2D` and `BitmapFont2D` and
+ * drives an `OverlayContent` from it. It lives in `udea-render`, not here (issue #211): the arrow
+ * runs `udea-agent-host` -> `udea-render` and not back, so the class that names `SpriteBatch2D`
+ * has to sit on the side that owns that type, while this class - the layout, the ordering, the
+ * verbosity gate - stays here because it reads [AgentBridge], which `udea-render` may never
+ * depend on. A composition root joins the two through `OverlayContent`, wrapping `this::render`.
+ * `OverlayCaptureIsolationTest` boots a real Kool context, drives that adapter, and asserts both
+ * halves of spec 3.7's guarantee.
  *
  * ## Windowed only
  *

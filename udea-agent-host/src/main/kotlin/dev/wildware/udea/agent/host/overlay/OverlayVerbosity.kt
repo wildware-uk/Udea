@@ -1,5 +1,7 @@
 package dev.wildware.udea.agent.host.overlay
 
+import dev.wildware.udea.render.overlay.HardwareKeyState
+
 /**
  * How much of the agent activity overlay is on screen.
  *
@@ -44,40 +46,11 @@ public enum class OverlayVerbosity(
 }
 
 /**
- * Whether the human's overlay key is physically down **right now**, read from the hardware.
- *
- * ## Why this is its own port, and the whole of issue #161
- *
- * The agent can synthesise input. That is a deliberate feature - an agent has to be able to
- * drive the game - and it is implemented by injecting into whatever the game reads intents from.
- * If the overlay key were read from *that*, an agent replaying a recorded input stream, or
- * fuzzing, or simply pressing the wrong key, could **switch the human's overlay off, or on, in
- * the middle of a capture**. On means the human sees nothing they expected; on mid-capture is
- * worse, because the agent has then changed a thing it is not supposed to be able to observe and
- * a human's understanding of the session silently diverges from it.
- *
- * So this reads the physical device, upstream of any injected intent source, and there is
- * deliberately no way to write to it: the interface has one method and it returns a state rather
- * than consuming an event queue. An implementation is `Gdx.input.isKeyPressed` in `udea-render`
- * - the *real* keyboard, not the game's input mapping - and that is exactly one hop with nothing
- * agent-writable on it.
- *
- * `OverlayHotkeyIsHardwareTest` asserts the separation by driving the injected side and the
- * hardware side independently and checking only the hardware one moves the level.
- */
-public fun interface HardwareKeyState {
-
-    /** Whether the overlay key is down at this instant. */
-    public fun isOverlayKeyDown(): Boolean
-
-    public companion object {
-        /** Never pressed. What a headless or offscreen instance is wired with. */
-        public val NEVER: HardwareKeyState = HardwareKeyState { false }
-    }
-}
-
-/**
  * Turns the hardware key into a verbosity level, one step per press.
+ *
+ * [HardwareKeyState] itself now lives in `udea-render` (issue #211): the LibGDX implementation,
+ * `GdxOverlayKey`, went with LibGDX, and its Kool replacement is issue #224's. This class is
+ * unaffected either way - it only ever depended on the port, never on a real device.
  *
  * ## Edge-triggered, and why that is not a detail
  *

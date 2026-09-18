@@ -1,13 +1,5 @@
 package dev.wildware.udea.render.gl
 
-import com.badlogic.gdx.Gdx
-import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.graphics.GL20
-import com.badlogic.gdx.graphics.Pixmap
-import com.badlogic.gdx.graphics.Texture
-import com.badlogic.gdx.graphics.g2d.TextureRegion
-import com.badlogic.gdx.math.Matrix4
-import com.badlogic.gdx.utils.BufferUtils
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
@@ -20,10 +12,14 @@ import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.ScreenTarget
-import dev.wildware.udea.render.backend.Lwjgl3Backend
+import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.capture.CaptureRequest
+import dev.wildware.udea.render.capture.capture
+import dev.wildware.udea.render.draw.Rgba
+import org.lwjgl.opengl.GL11
 import java.io.ByteArrayInputStream
+import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import javax.imageio.ImageIO
@@ -50,9 +46,9 @@ import kotlin.test.assertTrue
  * A call-order log over fakes. `CaptureOrderingTest` drives a `RecordingSurface` that records
  * `begin`/`endAndPresent` and a `RecordingOverlaySystem` that records a string, and asserts the
  * sequence — which is worth having and is not this. No test drew overlay pixels and compared
- * captures, and the GL suite registered no `OverlaySystem` at all, so a `GlFrameSurface` that
- * forgot `buffer.end()` before the blit would have left every ordering test green while every
- * agent screenshot carried the agent's own narration.
+ * captures, and the GL suite registered no `OverlaySystem` at all, so a `KoolSurface` that
+ * forgot to unbind the offscreen pass before presenting would have left every ordering test
+ * green while every agent screenshot carried the agent's own narration.
  *
  * ## The scene is deliberately not empty
  *
@@ -99,13 +95,13 @@ class GlOverlayIsolationTest {
             BLUE,
             with.captureCentre,
             "the capture's centre pixel is ${hex(with.captureCentre)}; overlay pixels reached " +
-                "the offscreen framebuffer",
+                "the offscreen pass",
         )
     }
 
     // --- fixture -------------------------------------------------------------------------
 
-    /** One boot, one capture, and one readback of the window the frame was blitted to. */
+    /** One boot, one capture, and one readback of the window the frame was presented to. */
     private class Run(val png: ByteArray, val captureCentre: Int, val windowCentre: Int)
 
     private fun runOnce(overlay: Boolean): Run {
@@ -119,7 +115,7 @@ class GlOverlayIsolationTest {
         val probe = BackbufferProbe()
         registry.overlay({ probe })
 
-        val backend = Lwjgl3Backend.start(
+        val backend = KoolBackend.start(
             RenderMode.Offscreen,
             WindowConfig(
                 title = "udea-overlay-isolation",
@@ -165,18 +161,11 @@ class GlOverlayIsolationTest {
     /** Fills the capturable target with opaque blue, at a position no wall clock decides. */
     private class BlueSceneSystem(private val resources: RenderResources) : RenderSystem {
 
-        private val projection = Matrix4()
-        private val pixel = TextureRegion(resources.own(whitePixel()))
-
         override fun render(target: OffscreenTarget, alpha: Float) {
-            projection.setToOrtho2D(0f, 0f, target.width.toFloat(), target.height.toFloat())
             val batch = resources.batch
-            batch.projectionMatrix = projection
-            batch.color = Color.BLUE
-            batch.begin()
-            batch.draw(pixel, 0f, 0f, target.width.toFloat(), target.height.toFloat())
+            batch.beginPixels()
+            batch.fill(0f, 0f, target.width.toFloat(), target.height.toFloat(), Rgba.of(0f, 0f, 1f, 1f))
             batch.end()
-            batch.color = Color.WHITE
         }
     }
 
@@ -188,18 +177,11 @@ class GlOverlayIsolationTest {
      */
     private class RedOverlaySystem(private val resources: OverlayResources) : OverlaySystem {
 
-        private val projection = Matrix4()
-        private val pixel = TextureRegion(resources.own(whitePixel()))
-
         override fun render(target: ScreenTarget, dtSeconds: Float) {
-            projection.setToOrtho2D(0f, 0f, target.width.toFloat(), target.height.toFloat())
             val batch = resources.batch
-            batch.projectionMatrix = projection
-            batch.color = Color.RED
-            batch.begin()
-            batch.draw(pixel, 0f, 0f, target.width.toFloat(), target.height.toFloat())
+            batch.beginPixels()
+            batch.fill(0f, 0f, target.width.toFloat(), target.height.toFloat(), Rgba.of(1f, 0f, 0f, 1f))
             batch.end()
-            batch.color = Color.WHITE
         }
     }
 
@@ -208,25 +190,27 @@ class GlOverlayIsolationTest {
      *
      * An `OverlaySystem` rather than a hook, because the point in the frame this has to run at
      * is "after the last overlay", and the pipeline already orders overlays by registration
-     * index. `glReadPixels` reads the bound framebuffer, and by this point the offscreen one has
-     * been unbound and the frame blitted, so this is the human's picture and not the agent's.
+     * index. `glReadPixels`, called directly through LWJGL rather than through Kool's own
+     * texture-download path, reads whatever framebuffer is bound on this thread right now — the
+     * default framebuffer, i.e. the window — and by this point the offscreen pass has been
+     * unbound and its texture presented, so this is the human's picture and not the agent's.
      */
     private class BackbufferProbe : OverlaySystem {
 
         val frames = AtomicInteger()
         val centre = AtomicInteger()
 
-        private val buffer = BufferUtils.newByteBuffer(4)
+        private val buffer: ByteBuffer = ByteBuffer.allocateDirect(4)
 
         override fun render(target: ScreenTarget, dtSeconds: Float) {
             buffer.clear()
-            Gdx.gl.glReadPixels(
+            GL11.glReadPixels(
                 target.width / 2,
                 target.height / 2,
                 1,
                 1,
-                GL20.GL_RGBA,
-                GL20.GL_UNSIGNED_BYTE,
+                GL11.GL_RGBA,
+                GL11.GL_UNSIGNED_BYTE,
                 buffer,
             )
             val r = buffer.get(0).toInt() and 0xFF
@@ -243,21 +227,14 @@ class GlOverlayIsolationTest {
         const val WINDOW_HEIGHT = 240
 
         /**
-         * 64x32 into a 320x240 window: the blit is letterboxed at scale 5, so the drawn area is
-         * 320x160 and the window's centre pixel lands inside it rather than in the black bars.
+         * 64x32 into a 320x240 window: the presented image is letterboxed at scale 5, so the
+         * drawn area is 320x160 and the window's centre pixel lands inside it rather than in the
+         * black bars.
          */
         const val RENDER_WIDTH = 64
         const val RENDER_HEIGHT = 32
 
         const val RED = 0xFF0000
         const val BLUE = 0x0000FF
-
-        /** A one-pixel white texture, tinted at the draw call. No asset pipeline needed. */
-        fun whitePixel(): Texture = Texture(
-            Pixmap(1, 1, Pixmap.Format.RGBA8888).apply {
-                setColor(Color.WHITE)
-                fill()
-            },
-        )
     }
 }

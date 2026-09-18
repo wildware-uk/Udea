@@ -58,10 +58,13 @@ public object AgentInputErrors {
  *
  * ## What an agent still cannot reach through it
  *
- * The overlay hotkey. `GdxOverlayKey` polls `Gdx.input.isKeyPressed` directly - it is upstream of
- * every [dev.wildware.udea.render.input.IntentSource], and nothing here can reach it (issue #161).
- * An agent cannot turn off the panel that narrates what it is doing, and that is structural: the
- * arrow runs from a device to an intent and there is no arrow back.
+ * The overlay hotkey. A `dev.wildware.udea.render.overlay.HardwareKeyState` implementation reads
+ * the device directly - it is upstream of every [dev.wildware.udea.render.input.IntentSource],
+ * and nothing here can reach it (issue #161). An agent cannot turn off the panel that narrates
+ * what it is doing, and that is structural: the arrow runs from a device to an intent and there
+ * is no arrow back. (The LibGDX implementation, `GdxOverlayKey`, went with LibGDX in issue #211;
+ * its Kool replacement is issue #224's. Nothing about the boundary this section describes moves
+ * either way.)
  *
  * ## Threading
  *

@@ -11,8 +11,11 @@ import dev.wildware.udea.core.host.RenderUnavailable
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.support.FakePixelSource
 import dev.wildware.udea.render.support.testTargets
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -25,8 +28,18 @@ import kotlin.test.assertTrue
 /**
  * The request slot: when a capture is served, when it is not, and what a caller is told.
  *
- * All of it with no GL context — the pixel read is behind [PixelSource] precisely so the timing
- * rules, which are the part that is easy to get subtly wrong, can be checked in a plain JVM.
+ * All of it with no render context — the pixel read is behind [PixelSource] precisely so the
+ * timing rules, which are the part that is easy to get subtly wrong, can be checked in a plain
+ * JVM.
+ *
+ * ## The two-step split, and why it runs through every test here
+ *
+ * [FrameCaptureSlot.drain] and [FrameCaptureSlot.collect] used to be one step: [drain] claimed a
+ * request and read its pixels in the same call. On Kool the pipeline *records* a frame and Kool
+ * draws it afterwards (see the class KDoc), so [drain] now only claims, and [collect] - at the
+ * top of the *next* frame - is what reads pixels and settles. Every test that used to call
+ * `drain` alone and see a result settle now calls `drain` then `collect`, except the cases that
+ * were always settled inside `drain` itself: a refused region, and a slot that is closing.
  */
 class FrameCaptureSlotTest {
 
@@ -49,7 +62,7 @@ class FrameCaptureSlotTest {
     fun `a request with no afterTick is served by the next drained frame`() {
         val result = submit(CaptureRequest())
 
-        val captured = drainUntilSettled(result)
+        val captured = drainAndCollect(result)
 
         assertEquals(64, captured.width)
         assertEquals(32, captured.height)
@@ -65,23 +78,26 @@ class FrameCaptureSlotTest {
      * would be waiting for itself - which is what `ToolRegistry` forbids in as many words.
      */
     @Test
-    fun `submit returns before any frame is drawn`() {
+    fun `submit returns before any frame is drawn, drain only claims, and collect settles`() {
         val result = slot.submit(CaptureRequest())
 
-        assertFalse(result.isDone, "submit must not wait for a frame")
-        assertEquals(1, slot.queuedRequests)
+        assertFalse(result.isCompleted, "submit must not wait for a frame")
+        assertEquals(1, slot.queuedRequests.value)
         assertEquals(emptyList(), pixels.requests, "no pixels may be read before a frame is drawn")
 
         slot.drain(target)
+        assertFalse(result.isCompleted, "drain only claims the request; collect reads and settles it")
+        assertEquals(0, slot.queuedRequests.value, "a claimed request is no longer queued")
 
-        assertTrue(result.isDone)
+        slot.collect()
+        assertTrue(result.isCompleted)
     }
 
     @Test
     fun `a region is read verbatim rather than replaced by the full frame`() {
         val result = submit(CaptureRequest(region = CaptureRegion(4, 8, 16, 16)))
 
-        val captured = drainUntilSettled(result)
+        val captured = drainAndCollect(result)
 
         assertEquals(listOf("4,8,16,16"), pixels.requests)
         assertEquals(16, captured.width)
@@ -89,12 +105,14 @@ class FrameCaptureSlotTest {
 
     @Test
     fun `a region larger than the target is refused rather than read past the end`() {
+        // Settled inside drain itself: there is no frame that could ever satisfy this request,
+        // so it is failed at the capture point rather than claimed for collect to read.
         val result = slot.submit(CaptureRequest(region = CaptureRegion(0, 0, 128, 32)))
 
         slot.drain(target)
 
-        val failure = assertFailsWith<CompletionException> { result.join() }.cause
-        assertTrue(failure is IllegalArgumentException, "was $failure")
+        assertTrue(result.isCompleted)
+        assertFailsWith<IllegalArgumentException> { result.getCompleted() }
         assertEquals(emptyList(), pixels.requests, "nothing may be read for a refused region")
     }
 
@@ -104,17 +122,17 @@ class FrameCaptureSlotTest {
         val result = submit(CaptureRequest(afterTick = Tick(7)))
 
         slot.drain(target)
-        assertFalse(result.isDone, "tick 7 has not been simulated at clock tick 5")
+        assertFalse(result.isCompleted, "tick 7 has not been simulated at clock tick 5")
 
         repeat(2) { sim.step() }
         slot.drain(target)
         assertFalse(
-            result.isDone,
+            result.isCompleted,
             "clock tick 7 means tick 7 is about to run, so it is not finished yet",
         )
 
         sim.step()
-        val captured = drainUntilSettled(result)
+        val captured = drainAndCollect(result)
 
         assertEquals(Tick(8), captured.tick)
         assertEquals(1, pixels.requests.size, "the frame must be read exactly once")
@@ -125,7 +143,7 @@ class FrameCaptureSlotTest {
         repeat(200) { sim.step() }
         val result = submit(CaptureRequest())
 
-        assertEquals(Tick(200), drainUntilSettled(result).tick)
+        assertEquals(Tick(200), drainAndCollect(result).tick)
     }
 
     @Test
@@ -149,9 +167,8 @@ class FrameCaptureSlotTest {
 
         val result = slot.submit(CaptureRequest())
 
-        assertTrue(result.isDone)
-        val failure = assertFailsWith<CompletionException> { result.join() }.cause
-        assertTrue(failure is CaptureStalledException, "was $failure")
+        assertTrue(result.isCompleted)
+        assertFailsWith<CaptureStalledException> { result.getCompleted() }
     }
 
     @Test
@@ -160,9 +177,8 @@ class FrameCaptureSlotTest {
 
         slot.close()
 
-        assertTrue(result.isDone, "the queued request was left outstanding")
-        val failure = assertFailsWith<CompletionException> { result.join() }.cause
-        assertTrue(failure is CaptureStalledException, "was $failure")
+        assertTrue(result.isCompleted, "the queued request was left outstanding")
+        assertFailsWith<CaptureStalledException> { result.getCompleted() }
     }
 
     @Test
@@ -184,7 +200,7 @@ class FrameCaptureSlotTest {
     fun `the FrameCapture contract reports no_capture_backend once closed`() {
         slot.close()
 
-        val outcome = slot.capture()
+        val outcome = BlockingFrameCapture(slot).capture()
 
         val unavailable = outcome as? CaptureOutcome.Unavailable
         assertEquals(RenderUnavailable.NoCaptureBackend, unavailable?.reason)
@@ -194,9 +210,10 @@ class FrameCaptureSlotTest {
     fun `two waiting requests are both served by one frame`() {
         val first = submit(CaptureRequest())
         val second = submit(CaptureRequest(region = CaptureRegion(0, 0, 8, 8)))
-        assertEquals(2, slot.queuedRequests)
+        assertEquals(2, slot.queuedRequests.value)
 
         slot.drain(target)
+        slot.collect()
 
         assertEquals(setOf(64, 8), setOfWidths(first, second))
         assertEquals(2L, slot.completedCaptures)
@@ -205,8 +222,9 @@ class FrameCaptureSlotTest {
     /**
      * A capture callback runs with the slot's lock **released**.
      *
-     * Not hypothetical: the render toolset's adapter chains `thenApply` onto the future, so
-     * whatever a caller attaches runs on the render thread inside [FrameCaptureSlot.drain].
+     * Not hypothetical: the render toolset's adapter chains onto the `Deferred` with
+     * `invokeOnCompletion`, so whatever a caller attaches runs on the render thread inside
+     * [FrameCaptureSlot.collect].
      *
      * The assertion has to be made from *another* thread to mean anything. A callback that simply
      * called back into the slot would prove nothing, because a `ReentrantLock` is reentrant and
@@ -220,30 +238,37 @@ class FrameCaptureSlotTest {
     fun `a completion callback does not hold the slot's lock`() {
         val enqueuedFromCallback = CountDownLatch(1)
         val heldTheLock = AtomicReference<Boolean?>(null)
-        val chained = slot.submit(CaptureRequest()).thenApply { result ->
-            val other = Thread {
-                slot.submit(CaptureRequest(afterTick = Tick(9_000)))
-                enqueuedFromCallback.countDown()
+        val original = slot.submit(CaptureRequest())
+        val chained = CompletableDeferred<CaptureResult>()
+        original.invokeOnCompletion { cause ->
+            if (cause != null) {
+                chained.completeExceptionally(cause)
+            } else {
+                val other = Thread {
+                    slot.submit(CaptureRequest(afterTick = Tick(9_000)))
+                    enqueuedFromCallback.countDown()
+                }
+                other.isDaemon = true
+                other.start()
+                // Recorded rather than asserted inside the callback: an assertion that throws
+                // here is swallowed into the completion handler, and the test would fail on a
+                // generic completion exception with the real message two causes deep.
+                heldTheLock.set(!enqueuedFromCallback.await(5, TimeUnit.SECONDS))
+                chained.complete(original.getCompleted())
             }
-            other.isDaemon = true
-            other.start()
-            // Recorded rather than asserted inside the callback: an assertion that throws here is
-            // swallowed into the future, and the test would fail as a `CompletionException` with
-            // the real message two causes deep.
-            heldTheLock.set(!enqueuedFromCallback.await(5, TimeUnit.SECONDS))
-            result
         }
 
         slot.drain(target)
+        slot.collect()
 
-        chained.join()
+        runBlocking { chained.await() }
         assertEquals(
             false,
             heldTheLock.get(),
-            "a second thread could not enqueue while a capture callback was running, so drain is " +
-                "completing futures with the slot's lock held",
+            "a second thread could not enqueue while a capture callback was running, so collect " +
+                "is completing deferreds with the slot's lock held",
         )
-        assertEquals(1, slot.queuedRequests, "the callback's own request was not queued")
+        assertEquals(1, slot.queuedRequests.value, "the callback's own request was not queued")
     }
 
     @Test
@@ -256,18 +281,17 @@ class FrameCaptureSlotTest {
 
     // --- helpers -------------------------------------------------------------------------
 
-    private fun setOfWidths(vararg results: CompletableFuture<CaptureResult>): Set<Int> =
-        results.mapNotNull { it.getNow(null)?.width }.toSet()
+    private fun setOfWidths(vararg results: Deferred<CaptureResult>): Set<Int> =
+        results.mapNotNull { if (it.isCompleted) it.getCompleted().width else null }.toSet()
 
     /**
-     * Submits from this thread and hands back the future, which is the shape a tool uses.
+     * Submits from this thread and hands back the `Deferred`, which is the shape a tool uses.
      *
      * No worker thread and no `AtomicReference`: [FrameCaptureSlot.submit] does not block, so the
      * apparatus the blocking form needed - start a thread, wait for it to reach the queue, spin
      * until it publishes a result - is gone, and with it both places this test could flake.
      */
-    private fun submit(request: CaptureRequest): CompletableFuture<CaptureResult> =
-        slot.submit(request)
+    private fun submit(request: CaptureRequest): Deferred<CaptureResult> = slot.submit(request)
 
     private fun thread(
         failure: AtomicReference<Throwable?>,
@@ -290,45 +314,34 @@ class FrameCaptureSlotTest {
     /**
      * Waits until [expected] requests are queued.
      *
-     * Waits on the slot's own condition rather than polling [FrameCaptureSlot.queuedRequests].
-     * This helper used to spin on that property, and it flaked once during the wave with "only
-     * 0 of 1 requests were queued" before passing on a re-run — with a five-second deadline,
-     * which is not a slow thread. The cause is that reading `queuedRequests` takes the slot's
-     * lock, the lock is non-fair, and a thread spinning on `Thread.onSpinWait()` between
-     * acquisitions barges ahead of the worker parked trying to enqueue. The poller could
-     * therefore starve the thread it was waiting for, for as long as it kept polling. Waiting
-     * on a condition cannot: the waiter parks, and the enqueue signals it.
+     * Waits on [FrameCaptureSlot.queuedRequests] as a flow rather than by polling its value in a
+     * spin loop: a spin loop that keeps re-reading the flow's value between acquisitions can
+     * barge ahead of the worker parked trying to enqueue on a non-fair lock, starving the very
+     * thread it is waiting for. `first { }` suspends instead of spinning.
      */
     private fun awaitQueued(expected: Int = 1) {
-        val queued = slot.awaitQueued(expected, timeoutMillis = TimeUnit.SECONDS.toMillis(5))
-        assertTrue(queued, "only ${slot.queuedRequests} of $expected requests were queued")
+        val queued = runBlocking {
+            withTimeoutOrNull(TimeUnit.SECONDS.toMillis(5)) {
+                slot.queuedRequests.first { it >= expected }
+                true
+            }
+        }
+        assertTrue(queued == true, "only ${slot.queuedRequests.value} of $expected requests were queued")
     }
 
     /**
-     * Drains one frame and waits for the request it served to be handed back to its caller.
+     * Drains one frame, then collects the next, and returns what the request settled to.
      *
-     * The second wait is over an `AtomicReference` the worker writes *after* it has released the
-     * slot's lock, so nothing here contends with anything; a bounded spin is the right shape.
-     * It fails rather than returning quietly, so a request that is never settled reports itself
-     * instead of surfacing as a confusing `null` in whatever the caller asserted next.
+     * [FrameCaptureSlot.drain] claims the request against the frame just recorded;
+     * [FrameCaptureSlot.collect] - modelling the top of the next frame - reads the pixels that
+     * frame produced and settles it. Both complete synchronously on the calling thread, so the
+     * request is settled by the time this line finishes.
      */
-    /**
-     * Drains one frame and returns what the request settled to.
-     *
-     * There is nothing to wait for any more. [FrameCaptureSlot.drain] completes the future on the
-     * calling thread before it returns, so a request is settled by the time this line finishes -
-     * which is also the property the render toolset depends on, since the frame that serves a
-     * capture and the code that answers for it run on one thread in one iteration.
-     *
-     * This helper used to start a worker thread and spin on an `AtomicReference` with a
-     * five-second deadline. That spin was the second half of the anti-pattern that made this
-     * class flake: a `Thread.onSpinWait()` loop is a core held flat out against the thread it is
-     * waiting for, and on a loaded machine it can lose to it for a long time.
-     */
-    private fun drainUntilSettled(result: CompletableFuture<CaptureResult>): CaptureResult {
-        assertTrue(result.isDone || slot.queuedRequests > 0, "the request never reached the queue")
+    private fun drainAndCollect(result: Deferred<CaptureResult>): CaptureResult {
+        assertTrue(result.isCompleted || slot.queuedRequests.value > 0, "the request never reached the queue")
         slot.drain(target)
-        assertTrue(result.isDone, "the drained frame never settled the request")
-        return result.join()
+        slot.collect()
+        assertTrue(result.isCompleted, "the drained and collected frame never settled the request")
+        return result.getCompleted()
     }
 }

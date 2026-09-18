@@ -14,13 +14,9 @@ import dev.wildware.udea.render.draw.DebugDraw
 import dev.wildware.udea.render.interp.InterpSnapshotSystem
 import dev.wildware.udea.render.interp.Interpolator
 import dev.wildware.udea.render.support.FakePixelSource
-import dev.wildware.udea.render.support.HeadlessGl
 import dev.wildware.udea.render.support.testTargets
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.render.FrameTime
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import java.util.concurrent.CompletionException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -36,20 +32,6 @@ import kotlin.test.assertTrue
  * `GlCaptureTest`'s.
  */
 class PresentationControlTest {
-
-    /** `Viewport.update` reaches `Gdx.gl` through `HdpiUtils`, and the rig binds one. */
-    private var gl: HeadlessGl? = null
-
-    @BeforeEach
-    fun installGl() {
-        gl = HeadlessGl.installed(width = 64, height = 32)
-    }
-
-    @AfterEach
-    fun removeGl() {
-        gl?.uninstall()
-        gl = null
-    }
 
     @Test
     fun `the framebuffer size is the offscreen target's and not the window's`() {
@@ -73,12 +55,12 @@ class PresentationControlTest {
 
         val pending = control.capture()
 
-        assertFalse(pending.isDone, "capture must not wait for a frame")
+        assertFalse(pending.isCompleted, "capture must not wait for a frame")
 
         pipeline.render(alpha = 0f)
 
-        assertTrue(pending.isDone)
-        assertEquals(64, pending.join().width)
+        assertTrue(pending.isCompleted)
+        assertEquals(64, pending.getCompleted().width)
     }
 
     @Test
@@ -106,9 +88,8 @@ class PresentationControlTest {
 
         val pending = control.capture()
 
-        assertTrue(pending.isDone)
-        val failure = assertFailsWith<CompletionException> { pending.join() }.cause
-        assertTrue(failure is IllegalStateException, "was $failure")
+        assertTrue(pending.isCompleted)
+        assertFailsWith<IllegalStateException> { pending.getCompleted() }
         assertFalse(control.capturable)
     }
 

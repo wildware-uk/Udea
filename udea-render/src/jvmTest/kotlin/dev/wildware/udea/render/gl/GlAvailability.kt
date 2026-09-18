@@ -2,12 +2,12 @@ package dev.wildware.udea.render.gl
 
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.render.RenderRegistry
-import dev.wildware.udea.render.backend.Lwjgl3Backend
+import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import org.junit.jupiter.api.Assumptions
 
 /**
- * Whether this JVM can actually create an LWJGL3 context, decided once and cached.
+ * Whether this JVM can actually create a Kool context, decided once and cached.
  *
  * ## Why a skip is allowed here, and only here
  *
@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Assumptions
  *
  * So it is a skip **with a stated reason**, and it can be turned into a hard failure with
  * `-Dudea.render.requireGl=true` — which is what a CI job with a display should set, so that a
- * GL backend which quietly stops booting cannot hide behind a skip forever.
+ * backend which quietly stops booting cannot hide behind a skip forever.
  */
 internal object GlAvailability {
 
@@ -33,15 +33,15 @@ internal object GlAvailability {
     fun require() {
         val reason = failure ?: return
         check(System.getProperty(REQUIRE_PROPERTY) != "true") {
-            "$REQUIRE_PROPERTY=true but no GL context could be created: $reason"
+            "$REQUIRE_PROPERTY=true but no Kool context could be created: $reason"
         }
-        Assumptions.abort<Unit>("no LWJGL3 context on this machine: $reason")
+        Assumptions.abort<Unit>("no Kool context on this machine: $reason")
     }
 
     private fun probe(): String? = try {
         // A 1x1 hidden window: the cheapest thing that still exercises GLFW, the driver and the
-        // gdx natives, which are the three things that fail on a machine with no display.
-        Lwjgl3Backend.start(
+        // Kool natives, which are the three things that fail on a machine with no display.
+        KoolBackend.start(
             RenderMode.Offscreen,
             WindowConfig(title = "udea-gl-probe", windowWidth = 1, windowHeight = 1),
             RenderRegistry(),

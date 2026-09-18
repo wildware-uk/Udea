@@ -15,10 +15,7 @@ import dev.wildware.udea.render.FrameTime
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.interp.InterpSnapshotSystem
 import dev.wildware.udea.render.interp.Interpolator
-import dev.wildware.udea.render.support.HeadlessGl
 import dev.wildware.udea.render.support.testTargets
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,23 +32,6 @@ import kotlin.test.assertTrue
 class CameraRigTest {
 
     private val target: OffscreenTarget = testTargets(width = 1280, height = 720).offscreen
-
-    /**
-     * A `Viewport.update` binds the GL viewport, so even the arithmetic needs `Gdx.gl` present.
-     * Nothing here draws; see [HeadlessGl] for why that one static lookup is worth faking.
-     */
-    private var gl: HeadlessGl? = null
-
-    @BeforeEach
-    fun installGl() {
-        gl = HeadlessGl.installed(width = 1280, height = 720)
-    }
-
-    @AfterEach
-    fun removeGl() {
-        gl?.uninstall()
-        gl = null
-    }
 
     @Test
     fun `the camera settles at a bounded lag behind a moving target`() {

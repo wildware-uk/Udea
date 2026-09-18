@@ -40,7 +40,7 @@ import dev.wildware.udea.core.snapshot.snapshotTimeTravel
 import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
-import dev.wildware.udea.render.backend.Lwjgl3Backend
+import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.camera.CameraRig
 import dev.wildware.udea.render.control.PresentationControl
@@ -73,7 +73,7 @@ import kotlin.test.assertTrue
  * human to drive over HTTP, so a green run here means that demo works, and the transcript and the
  * test cannot drift apart.
  *
- * Everything runs on the render thread via [Lwjgl3Backend.onRenderThread]: on an `Offscreen` host
+ * Everything runs on the render thread via [KoolBackend.onRenderThread]: on an `Offscreen` host
  * that thread is the simulation thread, so pumping the loop from the test thread would be a
  * different, easier arrangement than the one that ships.
  */
@@ -318,7 +318,7 @@ class OffscreenRenderToolsTest {
         registry.register(RenderPhase.World, { r -> BodyQuadRenderSystem(r, camera) })
         registry.register(RenderPhase.Debug, { r -> DebugGridRenderSystem(r, camera, debugDraw) })
 
-        val backend = Lwjgl3Backend.start(
+        val backend = KoolBackend.start(
             RenderMode.Offscreen,
             WindowConfig(
                 title = "udea-agent-host-gl-test",
@@ -366,7 +366,7 @@ class OffscreenRenderToolsTest {
 
     /** One command at a time, pumped on the render thread, exactly as a live host runs. */
     private class Fixture(
-        private val backend: Lwjgl3Backend,
+        private val backend: KoolBackend,
         private val bridge: AgentBridge,
         private val loop: AgentGameLoop,
         private val artifacts: AgentArtifacts,

@@ -5,11 +5,13 @@ import kotlin.math.sqrt
 /**
  * The [IntentSource] that reads a keyboard and a gamepad. **The only thing that reads a device.**
  *
- * It names no LibGDX type: it talks to [KeyboardState] and [GamepadState], and `GdxKeyboard` is
- * the one class in this repository that binds those to `Gdx.input`. That split is what lets the
- * whole of the input model - the edge counting, the vector accumulation, the deadzone, the
- * normalisation - be tested with no window, no context and no hardware, which is the half of the
- * old `ControllerSystem` that could never be tested at all.
+ * It names no render backend type: it talks to [KeyboardState] and [GamepadState], and the class
+ * that binds those to a real device lives outside this module. `GdxKeyboard` was that class on
+ * LibGDX and is gone with it (issue #211); Kool input reaching [KeyboardState]/[GamepadState] is
+ * issue #224's, not written yet. That split is what lets the whole of the input model - the edge
+ * counting, the vector accumulation, the deadzone, the normalisation - be tested with no window,
+ * no context and no hardware, which is the half of the old `ControllerSystem` that could never be
+ * tested at all.
  *
  * Runs on the simulation thread, once per tick, and allocates nothing.
  */

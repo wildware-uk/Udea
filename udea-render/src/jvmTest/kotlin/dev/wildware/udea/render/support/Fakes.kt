@@ -1,7 +1,5 @@
 package dev.wildware.udea.render.support
 
-import com.badlogic.gdx.graphics.g2d.Batch
-import com.badlogic.gdx.utils.Disposable
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.render.FrameClock
@@ -12,18 +10,25 @@ import dev.wildware.udea.render.RenderConstraints
 import dev.wildware.udea.render.RenderHandle
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
+import dev.wildware.udea.render.RenderResource
 import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.RenderTargets
 import dev.wildware.udea.render.ScreenTarget
 import dev.wildware.udea.render.capture.PixelSource
+import dev.wildware.udea.render.draw.SpriteBatch2D
+import dev.wildware.udea.render.draw.SpriteTexture
 
 /**
  * Observable stand-ins for the things a pipeline drives.
  *
- * None of them touch GL, which is the point: every ordering, binding, timing and disposal
- * claim this module makes is checkable in a plain JVM with no window and no context. A test
- * that needed a real `SpriteBatch` could not run in CI, and a rule nobody can run in CI is
- * a comment.
+ * None of them touch a render context, which is the point. Every ordering, binding, timing and
+ * disposal claim this module makes is checkable in a plain JVM with no window and no context.
+ *
+ * [testTargets] builds real [SpriteBatch2D]s rather than a fake `Batch`: the class itself is
+ * allocation-free in steady state (its own KDoc), and its constructor and
+ * [SpriteTexture.whitePixel] are `internal` and reachable here because a test source set is a
+ * friend of `commonMain`. There is no longer a "fake batch that counts calls" - the real one
+ * already does not allocate, so `RenderAllocationTest` measures it directly.
  */
 
 /** What happened this frame, in order, across every fake. */
@@ -85,16 +90,16 @@ internal class RecordingOverlaySystem(
     }
 }
 
-/** A GL resource stand-in that counts its own disposal. */
+/** A render resource stand-in that counts its own release. */
 internal class CountingDisposable(
     private val name: String,
     private val log: FrameLog,
-) : Disposable {
+) : RenderResource {
 
     var disposeCount: Int = 0
         private set
 
-    override fun dispose() {
+    override fun release() {
         disposeCount++
         log.record("dispose:$name")
     }
@@ -135,10 +140,18 @@ internal fun RenderRegistry.overlayScene(
     constrain: RenderConstraints.() -> Unit = {},
 ): RenderHandle = overlay({ RecordingOverlaySystem(name, log) }, constrain)
 
-/** Targets of a plausible window size, built without a GL context. */
+/**
+ * Targets of a plausible window size, built without a render context.
+ *
+ * [batch] and [screenBatch] default to real, freshly built [SpriteBatch2D]s - the same type
+ * production code draws with - rather than to a fake: the class is cheap to build headless and
+ * a system under test can be handed the real thing and inspected through its `internal` fields
+ * (`instanceCount`, `runCount`, ...), which a friend test source set can see.
+ */
 internal fun testTargets(
-    owned: List<Disposable> = emptyList(),
-    batch: Batch = RecordingBatch().batch,
+    owned: List<RenderResource> = emptyList(),
+    batch: SpriteBatch2D = SpriteBatch2D(SpriteTexture.whitePixel("test-offscreen-white")),
+    screenBatch: SpriteBatch2D = SpriteBatch2D(SpriteTexture.whitePixel("test-screen-white")),
     surface: FrameSurface = FrameSurface.None,
     pixels: PixelSource? = null,
     width: Int = WIDTH,
@@ -147,6 +160,7 @@ internal fun testTargets(
     offscreen = OffscreenTarget(width, height),
     screen = ScreenTarget(width, height),
     batch = batch,
+    screenBatch = screenBatch,
     surface = surface,
     pixels = pixels,
     owned = owned,
@@ -161,7 +175,7 @@ internal class RecordingSurface(private val log: FrameLog) : FrameSurface {
         log.record("surface:begin")
     }
 
-    override fun endAndPresent() {
+    override fun endAndPresent(screen: ScreenTarget) {
         log.record("surface:endAndPresent")
     }
 }

@@ -1,6 +1,7 @@
 package dev.wildware.udea.render.kool
 
 import de.fabmax.kool.math.MutableMat4f
+import de.fabmax.kool.math.Vec3f
 import de.fabmax.kool.math.deg
 import de.fabmax.kool.modules.ksl.KslUnlitShader
 import de.fabmax.kool.modules.ksl.blocks.ColorBlockConfig
@@ -89,9 +90,13 @@ internal class SpriteBatchNode(
                 // Unit quad -> scaled about its corner -> rotated about the origin -> placed.
                 model.setIdentity()
                     .translate(x + originX, y + originY, 0f)
-                    .rotate(rotation.deg, 0f, 0f, 1f)
+                    // `rotate(angle: AngleF, axis: Vec3f)`: Kool has no four-float overload, and
+                    // an untyped `Float` there is exactly the bare-angle mistake `.deg` exists
+                    // to rule out.
+                    .rotate(rotation.deg, Vec3f.Z_AXIS)
                     .translate(-originX, -originY, 0f)
-                    .scale(width, height, 1f)
+                    // No three-float overload: `scale(Vec3f)` or `scale(Float)` only.
+                    .scale(Vec3f(width, height, 1f))
                 val tint = Rgba(tints[index])
                 buffer.put {
                     set(it.modelMat, model)
@@ -171,6 +176,11 @@ internal class SpriteBatchNode(
             }
             modelCustomizer = {
                 vertexStage {
+                    // `KslShaderStage.main`'s scope only publishes its enclosing stage as
+                    // `parentStage: KslShaderStage`; `instanceAttribFloat4`/`vertexAttribFloat2`
+                    // are declared on `KslVertexStage` specifically. Held here, on the vertex
+                    // stage's own receiver, rather than cast inside `main` from `parentStage`.
+                    val stage = this
                     main {
                         val texCoords = checkNotNull(parentStage.findBlock<TexCoordAttributeBlock>()) {
                             "KslUnlitShader built no texture coordinate block to remap"
@@ -179,8 +189,8 @@ internal class SpriteBatchNode(
                         @Suppress("UNCHECKED_CAST")
                         val uv = parentStage.interStageVars.first { it.output === sampled }
                             as KslInterStageVector<KslFloat2, KslFloat1>
-                        val rect = parentStage.instanceAttribFloat4(SpriteInstanceLayout.uvRect.name)
-                        val vertexUv = parentStage.vertexAttribFloat2(VertexLayouts.TexCoord.texCoord.name)
+                        val rect = stage.instanceAttribFloat4(SpriteInstanceLayout.uvRect.name)
+                        val vertexUv = stage.vertexAttribFloat2(VertexLayouts.TexCoord.texCoord.name)
                         uv.input set rect.xy + vertexUv * rect.zw
                     }
                 }

@@ -7,38 +7,9 @@ import dev.wildware.udea.agent.activity.AnchorKind
 import dev.wildware.udea.agent.query.AgentComponentIndex
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
-
-/**
- * Where an entity is *right now*, by packed [NetId].
- *
- * ## The `false` case is the interesting one
- *
- * A marker must **track** the entity it rings as the entity moves, so it cannot cache a position
- * from the moment the tool was called - the ring stores what the call was *about*, not where the
- * subject was. And a `NetId` whose generation has gone stale must draw **nothing**: the index is
- * dense and recycled, so ringing "whatever is in slot 7 now" would put a marker on an unrelated
- * entity and tell a human the agent had inspected it.
- *
- * That is precisely what [NetIdIndex.resolveOrNull] already guarantees - *"it is never the wrong
- * entity: that is the whole point of the generation counter"* - so [NetIdEntityLocator] is a
- * thin, honest adapter over it rather than a second implementation of identity.
- */
-public fun interface EntityLocator {
-
-    /**
-     * Writes the world position of the entity with this packed NetId into [out].
-     *
-     * @param out a two-slot array the caller owns and reuses, `[x, y]`.
-     * @return `false` when the id is stale, freed, unknown, or the entity carries no position.
-     *   The caller must draw nothing; there is deliberately no "last known position" fallback.
-     */
-    public fun locate(packedNetId: Int, out: FloatArray): Boolean
-
-    public companion object {
-        /** Nothing is ever locatable. What an instance with no world index is wired with. */
-        public val NONE: EntityLocator = EntityLocator { _, _ -> false }
-    }
-}
+import dev.wildware.udea.render.overlay.EntityLocator
+import dev.wildware.udea.render.overlay.OverlayCanvas
+import dev.wildware.udea.render.overlay.WorldProjector
 
 /**
  * [EntityLocator] over the real [NetIdIndex] and the real component index.

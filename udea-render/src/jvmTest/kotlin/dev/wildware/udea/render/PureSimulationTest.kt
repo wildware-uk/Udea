@@ -1,6 +1,6 @@
 package dev.wildware.udea.render
 
-import com.badlogic.gdx.Gdx
+import de.fabmax.kool.KoolSystem
 import com.github.quillraven.fleks.configureWorld
 import dev.wildware.udea.core.SimSystem
 import dev.wildware.udea.core.Tick
@@ -13,17 +13,18 @@ import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.interp.InterpSnapshotSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Ten seconds of simulation in a JVM with no window, no GL context and no LibGDX
- * `Application` -- run from *inside* the one module that has gdx and LWJGL3 on its classpath.
+ * Ten seconds of simulation in a JVM with no window and no Kool context -- run from *inside*
+ * the one module that has Kool and LWJGL3 on its classpath.
  *
  * That last part is why this test lives here rather than in `udea-core`. `udea-core` cannot
- * see GL at all, so it proving "no GL was needed" is nearly tautological. Here every GL class
- * is one import away and `Gdx.gl` is a field this test could read: the simulation still runs
- * to completion without one, because presentation is behind [dev.wildware.udea.core.loop.Presentation]
+ * see a renderer at all, so it proving "no context was needed" is nearly tautological. Here
+ * every Kool class is one import away and [KoolSystem.isContextCreated] is a fact this test
+ * could check for a live context: the simulation still runs to completion with none, because
+ * presentation is behind [dev.wildware.udea.core.loop.Presentation]
  * and `null` is a legitimate value for it (spec 3.5, `RenderMode.Headless`).
  *
  * In the old tree this was structurally impossible: every drawing system was a Fleks system
@@ -54,13 +55,13 @@ class PureSimulationTest {
     }
 
     @Test
-    fun `no GL context existed while those ticks ran`() {
-        // The control for the test above. If a LibGDX Application had been booted -- by this
-        // test, or by anything else sharing the JVM -- these statics would be populated, and
-        // "it ran headless" would be an unproven claim.
-        assertNull(Gdx.gl, "a GL context was live; this test can no longer prove anything")
-        assertNull(Gdx.graphics, "a graphics backend was live")
-        assertNull(Gdx.app, "a LibGDX Application was live")
+    fun `no Kool context existed while those ticks ran`() {
+        // The control for the test above. If a Kool context had been created -- by this test,
+        // or by anything else sharing the JVM -- `isContextCreated` would be true, and "it ran
+        // headless" would be an unproven claim. (Kool allows at most one context per process, so
+        // this is also the reason no other test in this JVM may have created one - see
+        // `KoolThread`'s KDoc.)
+        assertFalse(KoolSystem.isContextCreated, "a Kool context was live; this test can no longer prove anything")
     }
 
     @Test

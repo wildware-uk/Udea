@@ -1,10 +1,5 @@
 package dev.wildware.udea.render.gl
 
-import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.graphics.Pixmap
-import com.badlogic.gdx.graphics.Texture
-import com.badlogic.gdx.graphics.g2d.TextureRegion
-import com.badlogic.gdx.math.Matrix4
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
@@ -14,27 +9,30 @@ import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
-import dev.wildware.udea.render.backend.Lwjgl3Backend
+import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.capture.CaptureRequest
+import dev.wildware.udea.render.capture.capture
+import dev.wildware.udea.render.draw.Rgba
+import dev.wildware.udea.render.draw.SpriteRegion
+import dev.wildware.udea.render.draw.SpriteTexture
 import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 /**
- * What "deterministic capture" actually means here, checked against a real driver.
+ * What "deterministic capture" actually means here, checked against a real Kool context.
  *
  * ## The claim, and the claim it is not
  *
  * `WindowConfig` says out loud that the epic's wording — *an `Offscreen` and a `Windowed` capture
  * of the same seeded scene at the same tick are byte-identical* — **does not hold** for a
- * free-running host, and lists the four wall-clock inputs that stop it: the loop's interpolation
- * alpha, the animation playhead, particle emitters and camera smoothing. All four accumulate over
- * frames, so two runs that reach tick 200 by different frame paths draw different pictures of it.
+ * free-running host, and lists the wall-clock inputs that stop it: the loop's interpolation
+ * alpha, the animation playhead and camera smoothing. All of them accumulate over frames, so two
+ * runs that reach tick 200 by different frame paths draw different pictures of it.
  *
  * The narrower claim this test pins is the one the agent's workflow depends on, and it is a
  * property of the *paused* loop rather than of the capture path:
@@ -125,8 +123,8 @@ class GlCaptureDeterminismTest {
     /**
      * A region capture of a paused frame is stable too, and is a strict crop of the full frame.
      *
-     * Worth its own assertion because the region path takes a different `glReadPixels` rectangle,
-     * and an off-by-one in the origin would still produce a plausible, stable image.
+     * Worth its own assertion because the region path takes a different read-back rectangle, and
+     * an off-by-one in the origin would still produce a plausible, stable image.
      */
     @Test
     fun `a region capture is the same crop every time`() {
@@ -156,13 +154,13 @@ class GlCaptureDeterminismTest {
      * `GameLoop.frame` only touches the accumulator when it is running, which is precisely why
      * `alpha` stops moving.
      */
-    private fun withPausedHost(block: (Lwjgl3Backend, GameHost, BarScene) -> Unit) {
+    private fun withPausedHost(block: (KoolBackend, GameHost, BarScene) -> Unit) {
         val registry = RenderRegistry()
         var scene: BarScene? = null
         registry.register(RenderPhase.World, { resources ->
             BarScene(resources).also { scene = it }
         })
-        val backend = Lwjgl3Backend.start(
+        val backend = KoolBackend.start(
             RenderMode.Offscreen,
             WindowConfig(
                 title = "udea-determinism-test",
@@ -186,7 +184,7 @@ class GlCaptureDeterminismTest {
     /**
      * Draws a red bar [step] pixels wide across the middle of the frame.
      *
-     * Deliberately reads nothing but its own field: no wall clock, no alpha, no `Gdx.graphics`.
+     * Deliberately reads nothing but its own field: no wall clock, no alpha, no window state.
      * The point of the determinism claim is that everything else in the frame is already stable,
      * so a scene that varied on its own would be testing the fixture.
      */
@@ -195,23 +193,14 @@ class GlCaptureDeterminismTest {
         @Volatile
         var step: Int = 1
 
-        private val projection = Matrix4()
-
-        private val pixel: TextureRegion = resources.own(
-            Texture(
-                Pixmap(1, 1, Pixmap.Format.RGBA8888).apply {
-                    setColor(Color.RED)
-                    fill()
-                },
-            ),
-        ).let(::TextureRegion)
+        private val pixel = SpriteRegion(
+            resources.own(SpriteTexture.fromRgba(1, 1, byteArrayOf(-1, 0, 0, -1), "determinism-bar")),
+        )
 
         override fun render(target: OffscreenTarget, alpha: Float) {
-            projection.setToOrtho2D(0f, 0f, target.width.toFloat(), target.height.toFloat())
             val batch = resources.batch
-            batch.projectionMatrix = projection
-            batch.begin()
-            batch.draw(pixel, 0f, 0f, step.toFloat(), target.height.toFloat())
+            batch.beginPixels()
+            batch.draw(pixel, 0f, 0f, step.toFloat(), target.height.toFloat(), Rgba.WHITE)
             batch.end()
         }
     }

@@ -55,7 +55,7 @@ class HeadlessScanTest {
 
         val span = diagnostic.span
         assertNotNull(span, "a violation with no location is a grep task, not a diagnostic")
-        assertEquals("udea-render/src/test/kotlin/dev/wildware/udea/render/headless/GlFixtures.kt", span.path)
+        assertEquals("udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/headless/GlFixtures.kt", span.path)
         assertTrue(span.startLine > 0, "line ${span.startLine}")
 
         // The span must actually point at the offending source, not merely at the file.

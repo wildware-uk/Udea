@@ -9,30 +9,27 @@ dependencies {
     //
     // Spec 4 gives this module "the toolsets that need a render context or live input: render,
     // input, ui". It owns `RenderToolset` and `RenderControl`, and it owns `AgentOverlayView`,
-    // which spec 3.7 says is drawn on the human's screen. Both of those need the other half of a
-    // pair that lives here: `RenderControl` needs `PresentationControl`, and the overlay needs an
-    // `OverlaySystem` over a `Batch`.
+    // which spec 3.7 says is drawn on the human's screen. `RenderControl` needs
+    // `PresentationControl`, the other half of `OffscreenRenderControl`'s pair.
     //
     // This line used to be `testImplementation`, because this module was in
     // `ModuleGraphRules.HEADLESS_PROJECTS`. The result was not a headless agent host; it was
-    // `OffscreenRenderControl` and the GL overlay adapter sitting in *test* sources with no
-    // shipped path able to reach either - so `render.screenshot` answered `no_render_context` on
-    // every real run and the overlay was drawn only by tests. A module that owns the render
-    // toolset and may not name a render type is a contradiction, and the ruling resolved it here
-    // rather than by writing the adapter out a third time in each game.
+    // `OffscreenRenderControl` sitting in *test* sources with no shipped path able to reach it -
+    // so `render.screenshot` answered `no_render_context` on every real run. A module that owns
+    // the render toolset and may not name a render type is a contradiction, and the ruling
+    // resolved it here rather than by writing the adapter out a third time in each game.
     //
     // What still holds: the module is debug-only, and `ReleaseRules.CLASSPATH_RULE`
     // (`UDEA-REL-002`) fails any release build whose runtime classpath resolves it. That is the
     // gate the exemption leans on, it is enforced by `udeaVerifyRelease`, and it is asserted by
     // `ModuleGraphRulesTest` alongside the exemption itself. `:udea-core` - the headless
     // guarantee that matters - is untouched and still cannot name a `udea.render` type.
+    //
+    // No `libs.gdx` line here any more (issue #211): the one class that named LibGDX types in
+    // this module, `AgentOverlaySystem`, moved into `udea-render` and now draws with
+    // `SpriteBatch2D`/`BitmapFont2D` instead. `AgentOverlayView` names no render backend type
+    // either way - it draws through `dev.wildware.udea.render.overlay.OverlayCanvas`.
     implementation(project(":udea-render"))
-
-    // gdx types this module's own code names: `Batch`, `BitmapFont`, `Texture` and `Color` in
-    // `AgentOverlaySystem`. `udea-render` declares gdx as `implementation` so GL cannot leak onto
-    // a consumer's *compile* classpath by default - which is the rule working as intended: a
-    // module that writes a renderer opts in, visibly, on this line.
-    implementation(libs.gdx)
 
     /*
      * The wire, and why this line is no longer `testImplementation`.
@@ -63,6 +60,12 @@ dependencies {
     // adds the fixture and nothing else to a module `udeaVerifyRelease` already keeps out of
     // every shipped artifact.
     testImplementation(testFixtures(project(":udea-diagnostics")))
+
+    // Test-only. `udea-render` declares Kool as `implementation`, so it does not reach this
+    // module's classpath transitively even though this module is GL-allowed; the GL tests here
+    // (`OverlayCaptureIsolationTest`, and any that read the window's own framebuffer) name
+    // `org.lwjgl.opengl.GL11` directly, the same way `udea-render`'s own GL tests do.
+    testImplementation(libs.kool.core)
 }
 
 // --- the Phase 1 exit demo -------------------------------------------------------------------

@@ -1,8 +1,5 @@
 package dev.wildware.udea.render.draw
 
-import com.badlogic.gdx.graphics.g2d.Animation
-import com.badlogic.gdx.graphics.g2d.ParticleEffect
-import com.badlogic.gdx.graphics.g2d.TextureRegion
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.configureWorld
@@ -13,18 +10,12 @@ import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.loop.WorldSimulation
 import dev.wildware.udea.core.physics.PhysicsBody
 import dev.wildware.udea.render.FrameTime
-import dev.wildware.udea.render.OffscreenTarget
-import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.camera.CameraRig
 import dev.wildware.udea.render.interp.InterpSnapshotSystem
 import dev.wildware.udea.render.interp.Interpolator
-import dev.wildware.udea.render.support.HeadlessGl
-import dev.wildware.udea.render.support.RecordingBatch
 import dev.wildware.udea.render.support.testTargets
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -32,17 +23,18 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * The ported drawing systems, driven through a real [RenderRegistry] with a recording batch.
+ * The ported drawing systems, driven through a real [RenderRegistry] over a real
+ * [SpriteBatch2D].
  *
- * None of this needs a GL context, which is the point of the port: every one of the originals
- * constructed a `SpriteBatch` (or called `VisUI.getSkin()`) in a field initialiser, so not one
- * of them could be instantiated in a test, and not one of them had a test.
+ * None of this needs a render context, which is the point of the port: every one of the
+ * LibGDX-era originals constructed a `SpriteBatch` (or called `VisUI.getSkin()`) in a field
+ * initialiser, so not one of them could be instantiated in a test, and not one of them had one.
+ *
+ * `ParticleRenderSystem` is gone from this suite along with the LibGDX `ParticleEffect` it drew:
+ * particles were not ported to Kool in issue #211 (spec section 4 names the systems that were),
+ * and nothing in the new `draw` package replaces it.
  */
 class DrawSystemPortTest {
-
-    private var gl: HeadlessGl? = null
-
-    private val batch = RecordingBatch()
 
     private val ctx: GameContext = testGameContext(seed = 9L)
 
@@ -61,18 +53,9 @@ class DrawSystemPortTest {
 
     private val rig = CameraRig(netIds, interpolator, frameTime)
 
-    private val targets = testTargets(batch = batch.batch, width = 640, height = 360)
+    private val targets = testTargets(width = 640, height = 360)
 
-    @BeforeEach
-    fun installGl() {
-        gl = HeadlessGl.installed(width = 640, height = 360)
-    }
-
-    @AfterEach
-    fun removeGl() {
-        gl?.uninstall()
-        gl = null
-    }
+    private val batch = targets.batch
 
     @Test
     fun `every ported renderer draws at least once over a frame`() {
@@ -80,7 +63,6 @@ class DrawSystemPortTest {
         with(world) {
             entity.configure {
                 it += SpriteAnimation(animation = twoFrameAnimation())
-                it += ParticleEffects(mutableListOf(ParticleEffect()))
                 it += DebugLabels(mutableListOf(DebugLabel("hello", ctx.clock.tick + 100L)))
             }
         }
@@ -92,10 +74,9 @@ class DrawSystemPortTest {
         assertEquals(1L, background.drawnCount, "the background did not draw")
         assertEquals(1, sprites.drawnCount, "the sprite did not draw")
         assertEquals(1, animations.advancedCount, "the animation playhead did not advance")
-        assertEquals(1, particles.drawnCount, "the particle effect did not draw")
         assertEquals(1, debug.drawnCount, "the debug label did not draw")
-        assertTrue(batch.draws.isNotEmpty(), "nothing reached the batch at all")
-        assertFalse(batch.mismatchedBeginEnd, "a renderer left the batch begun")
+        assertTrue(batch.instanceCount > 0, "nothing reached the batch at all")
+        assertFalse(batch.isDrawing, "a renderer left the batch begun")
     }
 
     @Test
@@ -109,7 +90,7 @@ class DrawSystemPortTest {
 
         buildPipeline().render(1f)
 
-        val widths = batch.draws.mapNotNull { it.region?.regionWidth }
+        val widths = batch.snapshot().map { it.textureWidth }
         assertEquals(listOf(1, 3, 2), widths, "$far $middle $near drew out of order")
     }
 
@@ -131,7 +112,7 @@ class DrawSystemPortTest {
 
         buildPipeline().render(0.5f)
 
-        val draw = batch.draws.single()
+        val draw = batch.snapshot().single()
         // Half way between the tick's starting pose (0) and the current one (10), less half the
         // sprite's width, because the batch draws from a corner.
         assertEquals(5f - SPRITE_SIZE / 2f, draw.x, "drew at ${draw.x}")
@@ -153,8 +134,8 @@ class DrawSystemPortTest {
         val second = with(world) { entity[SpriteRenderer].region }
 
         assertNotNull(first)
-        assertEquals(1, first.regionWidth, "the first key frame was not shown")
-        assertEquals(2, second?.regionWidth, "the playhead never reached the second frame")
+        assertEquals(1, first.width, "the first key frame was not shown")
+        assertEquals(2, second?.width, "the playhead never reached the second frame")
     }
 
     @Test
@@ -196,35 +177,32 @@ class DrawSystemPortTest {
     fun `the draw count per frame does not drift over a run`() {
         // Named for what it measures. It used to be called "steady state rendering allocates no
         // per-frame comparator or pose", which it could not tell you: it counts draw calls, and
-        // a `sortedBy` or a `Vector3(...)` in the draw loop leaves the draw count alone. The
-        // allocation claim is measured in `RenderAllocationTest`, which now exists; what is
-        // worth checking here is that a system does not start dropping or duplicating draws as
-        // a run goes on.
+        // a `sortedBy` or a position object in the draw loop leaves the draw count alone. The
+        // allocation claim is measured in `RenderAllocationTest`; what is worth checking here is
+        // that a system does not start dropping or duplicating draws as a run goes on. Frames are
+        // deliberately not cleared between renders, so `instanceCount` accumulates and the
+        // per-frame contribution is exactly its growth.
         repeat(20) { spawnSprite(x = it.toFloat(), y = 0f) }
         sim.step()
         val pipeline = buildPipeline()
         pipeline.render(0.5f)
-        val drawsPerFrame = batch.draws.size
+        val drawsPerFrame = batch.instanceCount
 
         repeat(10) { pipeline.render(0.5f) }
 
-        assertEquals(drawsPerFrame * 11, batch.draws.size, "draw count per frame changed")
-        assertFalse(batch.mismatchedBeginEnd)
+        assertEquals(drawsPerFrame * 11, batch.instanceCount, "draw count per frame changed")
+        assertFalse(batch.isDrawing)
     }
 
     @Test
-    fun `a debug label is placed against the target it draws on, not against the window`() {
-        // The regression: `camera.project(v)` is the one-argument overload, defined as
-        // `project(v, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight())` -- the *window*.
-        // Two lines earlier the batch projection is set to the target's extent. In
-        // RenderMode.Offscreen those differ by construction (GlCaptureTest boots a 320x240
-        // window over a 64x32 framebuffer), so every label was placed at a wrong scale and
-        // landed off the captured frame. This fixture makes the window deliberately half the
-        // target's size, so the one-argument form yields exactly half the right coordinates and
-        // cannot come back green.
-        gl?.uninstall()
-        gl = HeadlessGl.installed(width = 320, height = 180)
-
+    fun `a debug label is placed against the target it draws on`() {
+        // The regression this guarded on LibGDX: `camera.project(v)`'s one-argument overload
+        // read `Gdx.graphics.getWidth()/getHeight()` - the *window* - rather than the target
+        // being drawn on, which differ by construction on an Offscreen host (`GlCaptureTest`
+        // boots a window bigger than its framebuffer). On Kool there is no such overload to
+        // reach for: `CameraRig` sizes itself from the `OffscreenTarget` alone and is never
+        // handed a window at all (see its KDoc), so what is left to check is that the label
+        // lands where `camera.projection` and the renderer's own offsets say it should.
         val entity = spawnSprite(x = 0f, y = 0f)
         with(world) {
             entity.configure {
@@ -236,13 +214,18 @@ class DrawSystemPortTest {
         buildPipeline().render(1f)
 
         // The camera is centred on the origin over a 640x360 target, so world (0, 0) projects to
-        // the middle of the target: (320, 180). The offsets are the renderer's own.
-        val id = font.drawn.first()
-        assertEquals(320f + 40f, id.x, absoluteTolerance = 0.01f, "label x: ${font.drawn}")
-        assertEquals(180f - 20f, id.y, absoluteTolerance = 0.01f, "label y: ${font.drawn}")
-        // And the window it is *not* projected through, spelled out: half these numbers is what
-        // the one-argument overload would have produced.
-        assertTrue(id.x > 320f, "the label was placed through Gdx.graphics: ${font.drawn}")
+        // the middle of the target: (320, 180). The offsets are `DebugOverlayRenderSystem`'s
+        // own (`LABEL_OFFSET_X` = 40, `LABEL_OFFSET_Y` = -20), and the glyph's own baseline
+        // correction is `BitmapFont2D`'s (`bottom = baselineY - scale`, `scale` = 2 by default).
+        //
+        // Instance 0 is the sprite `SpriteRenderSystem` draws in `RenderPhase.World`, which
+        // always runs before `RenderPhase.Debug`; instance 1 is therefore the debug label's own
+        // leading `#` glyph, the first character `BitmapFont2D.draw` records.
+        val snapshot = batch.snapshot()
+        assertTrue(snapshot.size >= 2, "expected at least one sprite and one glyph: $snapshot")
+        val glyph = snapshot[1]
+        assertEquals(320f + 40f, glyph.x, absoluteTolerance = 0.01f, "glyph x: $snapshot")
+        assertEquals(180f - 20f - 2f, glyph.y, absoluteTolerance = 0.01f, "glyph y: $snapshot")
     }
 
     // --- fixture -------------------------------------------------------------------------
@@ -250,12 +233,11 @@ class DrawSystemPortTest {
     private lateinit var background: BackgroundRenderSystem
     private lateinit var sprites: SpriteRenderSystem
     private lateinit var animations: AnimationRenderSystem
-    private lateinit var particles: ParticleRenderSystem
     private lateinit var debug: DebugOverlayRenderSystem
 
-    private val font = NoOpFont()
+    private val font = BitmapFont2D.builtIn()
 
-    private fun buildPipeline(background: TextureRegion? = null) = RenderRegistry().apply {
+    private fun buildPipeline(background: SpriteRegion? = null) = RenderRegistry().apply {
         // `frameTime` unqualified here would resolve to RenderRegistry's own property: inside
         // `apply` the receiver's member wins over this class's field, and the systems would be
         // handed the registry's real wall clock instead of the fixed one this test drives.
@@ -274,13 +256,6 @@ class DrawSystemPortTest {
             { resources -> SpriteRenderSystem(resources, rig, interpolator).also { sprites = it } },
         )
         register(
-            RenderPhase.World,
-            { resources ->
-                ParticleRenderSystem(resources, rig, interpolator, frameTime)
-                    .also { particles = it }
-            },
-        )
-        register(
             RenderPhase.Debug,
             { resources ->
                 DebugOverlayRenderSystem(resources, rig, interpolator, netIds, font)
@@ -293,7 +268,7 @@ class DrawSystemPortTest {
         x: Float,
         y: Float,
         order: Int = 0,
-        region: TextureRegion? = region(),
+        region: SpriteRegion? = region(),
     ): Entity = world.entity {
         it += PhysicsBody(x = x, y = y)
         it += SpriteRenderer(
@@ -304,57 +279,40 @@ class DrawSystemPortTest {
         )
     }.also { netIds.allocate(it) }
 
-    private fun region(width: Int = 8, height: Int = 8): TextureRegion = SizedRegion(width, height)
-
     /**
-     * A [TextureRegion] with a size and no texture behind it.
+     * A region backed by a real texture exactly [width] x [height], and no atlas packing.
      *
-     * `TextureRegion.setRegion(x, y, w, h)` derives its UVs from the texture's dimensions, so
-     * the ordinary way to make one needs a real `Texture` and therefore a GL context. Nothing
-     * here samples the region — the batch is a recorder — so overriding the two accessors is
-     * enough, and it keeps the whole port testable without a window.
+     * A distinct texture per call (rather than one shared page) is what makes
+     * `sprites are drawn in ascending order` able to tell the three sprites apart by their
+     * texture's own width: each draw starts its own run, and the run's texture is this one.
      */
-    private class SizedRegion(private val width: Int, private val height: Int) : TextureRegion() {
-        override fun getRegionWidth(): Int = width
-        override fun getRegionHeight(): Int = height
-        override fun toString(): String = "SizedRegion(${width}x$height)"
-    }
+    private fun region(width: Int = 8, height: Int = 8): SpriteRegion =
+        SpriteRegion(SpriteTexture.fromRgba(width, height, ByteArray(width * height * 4), "region-$width"))
 
-    private fun twoFrameAnimation(): Animation<TextureRegion> =
-        Animation(0.1f, com.badlogic.gdx.utils.Array(arrayOf(region(1), region(2))))
+    private fun twoFrameAnimation(): SpriteClip = SpriteClip(listOf(region(1), region(2)), frameSeconds = 0.1f)
 
     private class FixedFrameTime(override val frameSeconds: Float) : FrameTime
 
-    /**
-     * A `BitmapFont` that draws nothing.
-     *
-     * `BitmapFont()` loads its default `.fnt` and a `Texture` for it, and a `Texture` needs a
-     * context. Overriding `draw` keeps the debug renderer exercised without one.
-     */
-    private class NoOpFont : com.badlogic.gdx.graphics.g2d.BitmapFont(
-        com.badlogic.gdx.graphics.g2d.BitmapFont.BitmapFontData(),
-        com.badlogic.gdx.utils.Array(arrayOf<TextureRegion>(SizedRegion(1, 1))),
-        true,
-    ) {
-        /** Every string drawn this run, with the position it was drawn at. */
-        val drawn = ArrayList<DrawnText>()
-
-        override fun draw(
-            batch: com.badlogic.gdx.graphics.g2d.Batch,
-            str: CharSequence,
-            x: Float,
-            y: Float,
-        ): com.badlogic.gdx.graphics.g2d.GlyphLayout {
-            // `toString()` because the renderer reuses one StringBuilder for every label, so
-            // holding the CharSequence would record whatever the *last* label happened to be.
-            drawn += DrawnText(str.toString(), x, y)
-            return com.badlogic.gdx.graphics.g2d.GlyphLayout()
-        }
+    /** One decoded instance: where it landed, and the width of the texture it sampled. */
+    private class Draw(val x: Float, val y: Float, val textureWidth: Int) {
+        override fun toString(): String = "Draw(($x, $y), texture width $textureWidth)"
     }
 
-    /** One `font.draw` call: what text, and where on the target it landed. */
-    private class DrawnText(val text: String, val x: Float, val y: Float) {
-        override fun toString(): String = "'$text' at ($x, $y)"
+    /** Every instance currently recorded, decoded from the batch's own arrays. */
+    private fun SpriteBatch2D.snapshot(): List<Draw> {
+        val textureOfInstance = arrayOfNulls<SpriteTexture>(instanceCount)
+        for (run in 0 until runCount) {
+            val texture = runTexture(run)
+            for (index in runStart(run) until runEnd(run)) textureOfInstance[index] = texture
+        }
+        return (0 until instanceCount).map { index ->
+            val at = index * SpriteBatch2D.FLOATS_PER_INSTANCE
+            Draw(
+                x = floats[at + SpriteBatch2D.X],
+                y = floats[at + SpriteBatch2D.Y],
+                textureWidth = checkNotNull(textureOfInstance[index]) { "instance $index has no run" }.width,
+            )
+        }
     }
 
     private companion object {

@@ -14,6 +14,9 @@ import dev.wildware.udea.render.support.RecordingSurface
 import dev.wildware.udea.render.support.overlayScene
 import dev.wildware.udea.render.support.scene
 import dev.wildware.udea.render.support.testTargets
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
@@ -38,7 +41,17 @@ class CaptureOrderingTest {
     private val log = FrameLog()
 
     @Test
-    fun `the capture is drained after every renderer and before the surface is presented`() {
+    fun `the capture is claimed after every renderer, and read at the top of the next frame`() {
+        // On Kool the pipeline records a frame and Kool draws it afterwards, so `drain` (the
+        // capture point) only claims a request against the frame just recorded, and `collect`
+        // - at the top of the *next* `render` call, before that frame's own surface:begin -
+        // reads the pixels and settles it (see `FrameCaptureSlot`'s KDoc). So the two claims
+        // spec 3.7 makes now span two frames rather than one:
+        //
+        // 1. everything the agent is meant to see is in the claiming frame (world, then debug);
+        // 2. nothing the agent is not meant to see is: the read happens before the collecting
+        //    frame has drawn anything of its own, so no overlay pixels from any frame can be in
+        //    it, and this frame's own surface is not yet even begun.
         val pixels = FakePixelSource(log)
         val registry = RenderRegistry(ManualFrameClock())
         registry.scene(RenderPhase.World, "world", log)
@@ -54,7 +67,8 @@ class CaptureOrderingTest {
         )
         val result = requestOnAnotherThread(pipeline.capture!!)
         awaitQueued(pipeline.capture!!)
-        // Binding happens in `build`, and this test is about the order *within a frame*.
+        // Binding happens in `build`, and this test is about the order *within* and *across*
+        // frames.
         log.clear()
 
         pipeline.render(0f)
@@ -64,11 +78,28 @@ class CaptureOrderingTest {
                 "surface:begin",
                 "draw:world@0.0",
                 "draw:debug@0.0",
-                "capture:read",
                 "surface:endAndPresent",
                 "overlay:agentPanel@0.0",
             ),
             log.calls,
+            "the claiming frame must not read pixels itself",
+        )
+        assertNull(result.get(), "the request settled before any frame had read it")
+        log.clear()
+
+        pipeline.render(0f)
+
+        assertEquals(
+            listOf(
+                "capture:read",
+                "surface:begin",
+                "draw:world@0.0",
+                "draw:debug@0.0",
+                "surface:endAndPresent",
+                "overlay:agentPanel@0.0",
+            ),
+            log.calls,
+            "the collecting frame must read pixels before it draws anything of its own",
         )
         assertTrue(awaitSettled(result), "the capture was never served")
     }
@@ -123,7 +154,7 @@ class CaptureOrderingTest {
         // The capture must *not* be served: a frame that threw part-way through drawing is a
         // half-drawn frame, and handing it back would give an agent a picture of a partial
         // world to reason about. Waiters are released by `FrameCaptureSlot.close`, which
-        // `Lwjgl3Backend` wires to the render loop's exit -- see `OffscreenBackendTest`.
+        // `KoolBackend` wires to the render loop's exit -- see `OffscreenBackendTest`.
         val pixels = FakePixelSource(log)
         val registry = RenderRegistry(ManualFrameClock())
         registry.scene(RenderPhase.World, "world", log)
@@ -175,10 +206,13 @@ class CaptureOrderingTest {
      * trying to enqueue — so the poller starves the thread it is waiting for.
      */
     private fun awaitQueued(slot: FrameCaptureSlot) {
-        assertTrue(
-            slot.awaitQueued(count = 1, timeoutMillis = TimeUnit.SECONDS.toMillis(5)),
-            "no capture request was queued",
-        )
+        val queued = runBlocking {
+            withTimeoutOrNull(TimeUnit.SECONDS.toMillis(5)) {
+                slot.queuedRequests.first { it >= 1 }
+                true
+            }
+        }
+        assertTrue(queued == true, "no capture request was queued")
     }
 
     private fun awaitSettled(result: AtomicReference<CaptureResult?>): Boolean {

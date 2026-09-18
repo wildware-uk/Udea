@@ -1,24 +1,23 @@
 package dev.wildware.udea.render.gl
 
-import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.graphics.Pixmap
-import com.badlogic.gdx.graphics.Texture
-import com.badlogic.gdx.graphics.g2d.TextureRegion
-import com.badlogic.gdx.math.Matrix4
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.OffscreenTarget
-import dev.wildware.udea.render.capture.CaptureRegion
-import dev.wildware.udea.render.capture.CaptureRequest
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
-import dev.wildware.udea.render.backend.Lwjgl3Backend
+import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
+import dev.wildware.udea.render.capture.CaptureRegion
+import dev.wildware.udea.render.capture.CaptureRequest
+import dev.wildware.udea.render.capture.capture
+import dev.wildware.udea.render.draw.Rgba
+import dev.wildware.udea.render.draw.SpriteRegion
+import dev.wildware.udea.render.draw.SpriteTexture
 import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
 import kotlin.test.Test
@@ -26,23 +25,22 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The pixel path, against a real driver: the alpha stomp, the ordering, and `afterTick`.
+ * The pixel path, against a real Kool context: the alpha stomp, the ordering, and `afterTick`.
  *
  * The alpha test is the one that has already cost this engine's ancestor eight rounds of
- * visual review — see `GlPixelSource.forceOpaque`. It is asserted here by decoding the PNG
- * that actually came back, rather than by inspecting the pixmap before encoding, because the
- * bug was that the *shipped bytes* carried junk alpha.
+ * visual review — see `KoolPixelSource.topRowFirst`'s alpha stomp. It is asserted here by
+ * decoding the PNG that actually came back, rather than by inspecting a buffer before encoding,
+ * because the bug was that the *shipped bytes* carried junk alpha.
  */
 class GlCaptureTest {
 
     @Test
     fun `every alpha byte of a captured frame is 255`() {
         GlAvailability.require()
-        // A **translucent** quad, deliberately. LibGDX's default blend func
-        // (SRC_ALPHA, ONE_MINUS_SRC_ALPHA) applies to the alpha channel too, so drawing at
-        // alpha 0.5 over an opaque clear leaves destination alpha at 0.75 -- and glReadPixels
-        // hands back exactly that. A frame with nothing drawn on it comes back opaque whether
-        // or not `forceOpaque` runs, so a test over an empty scene could not fail.
+        // A **translucent** quad, deliberately. Kool's `BLEND_MULTIPLY_ALPHA` mode writes a
+        // product into destination alpha wherever anything is drawn, so a frame with nothing
+        // drawn on it comes back opaque whether or not the stomp runs, and a test over an empty
+        // scene could not fail.
         withHost(sentinel = true, quadAlpha = 0.5f) { backend, _ ->
             val slot = backend.pipeline!!.capture!!
 
@@ -61,8 +59,8 @@ class GlCaptureTest {
             assertEquals(
                 255,
                 lowest,
-                "glReadPixels hands back destination alpha and LibGDX's default blend func " +
-                    "writes nonsense into it; forceOpaque must stomp every byte",
+                "the read-back hands back destination alpha and the blend mode writes " +
+                    "nonsense into it; the stomp in KoolPixelSource must overwrite every byte",
             )
         }
     }
@@ -136,13 +134,13 @@ class GlCaptureTest {
     private fun withHost(
         sentinel: Boolean = false,
         quadAlpha: Float = 1f,
-        block: (Lwjgl3Backend, GameHost) -> Unit,
+        block: (KoolBackend, GameHost) -> Unit,
     ) {
         val registry = RenderRegistry()
         if (sentinel) {
             registry.register(RenderPhase.Debug, { resources -> RedQuadSystem(resources, quadAlpha) })
         }
-        val backend = Lwjgl3Backend.start(
+        val backend = KoolBackend.start(
             RenderMode.Offscreen,
             WindowConfig(
                 title = "udea-capture-test",
@@ -166,36 +164,26 @@ class GlCaptureTest {
         ?: error("the captured bytes are not a decodable image")
 
     /**
-     * Fills the offscreen target with opaque red.
+     * Fills the offscreen target with red at [alpha].
      *
      * Its own one-pixel texture rather than an asset, because `udea-assets` has no pipeline
      * yet and this test is about the pixel path, not about loading.
      */
     private class RedQuadSystem(
         private val resources: RenderResources,
-        private val alpha: Float,
+        alpha: Float,
     ) : RenderSystem {
 
-        private val projection = Matrix4()
+        private val pixel = SpriteRegion(
+            resources.own(SpriteTexture.fromRgba(1, 1, byteArrayOf(-1, 0, 0, -1), "red-quad")),
+        )
 
-        private val tint = Color(1f, 1f, 1f, alpha)
-
-        private val pixel: TextureRegion = resources.own(
-            Texture(
-                Pixmap(1, 1, Pixmap.Format.RGBA8888).apply {
-                    setColor(Color.RED)
-                    fill()
-                },
-            ),
-        ).let(::TextureRegion)
+        private val tint = Rgba.of(1f, 1f, 1f, alpha)
 
         override fun render(target: OffscreenTarget, alpha: Float) {
-            projection.setToOrtho2D(0f, 0f, target.width.toFloat(), target.height.toFloat())
             val batch = resources.batch
-            batch.projectionMatrix = projection
-            batch.color = tint
-            batch.begin()
-            batch.draw(pixel, 0f, 0f, target.width.toFloat(), target.height.toFloat())
+            batch.beginPixels()
+            batch.draw(pixel, 0f, 0f, target.width.toFloat(), target.height.toFloat(), tint)
             batch.end()
         }
     }

@@ -10,10 +10,7 @@ import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.render.FrameTime
 import dev.wildware.udea.render.interp.Pose
 import dev.wildware.udea.render.interp.PoseSource
-import dev.wildware.udea.render.support.HeadlessGl
 import dev.wildware.udea.render.support.testTargets
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,19 +33,6 @@ import kotlin.test.assertTrue
 class CameraFollowsAnyPoseSourceTest {
 
     private val target = testTargets(width = 640, height = 360).offscreen
-
-    private var gl: HeadlessGl? = null
-
-    @BeforeEach
-    fun installGl() {
-        gl = HeadlessGl.installed(width = 640, height = 360)
-    }
-
-    @AfterEach
-    fun removeGl() {
-        gl?.uninstall()
-        gl = null
-    }
 
     @Test
     fun `the camera tracks an entity whose position is a game component`() {

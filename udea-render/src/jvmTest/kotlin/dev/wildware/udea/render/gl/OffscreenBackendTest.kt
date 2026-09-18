@@ -1,9 +1,7 @@
 package dev.wildware.udea.render.gl
 
-import com.badlogic.gdx.Gdx
-import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Graphics
+import de.fabmax.kool.KoolSystem
 import dev.wildware.udea.generated.CoreUdeaRegistry
-import org.lwjgl.glfw.GLFW
 import dev.wildware.udea.core.host.CaptureOutcome
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
@@ -12,11 +10,12 @@ import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.RenderSystem
-import dev.wildware.udea.render.backend.Lwjgl3Backend
+import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.capture.CaptureRequest
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.render.capture.CaptureStalledException
+import dev.wildware.udea.render.capture.capture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -31,7 +30,7 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
- * The `Offscreen` backend, against a real driver.
+ * The `Offscreen` backend, against a real Kool context on OpenGL.
  *
  * Everything here needs a context, which is exactly why the rest of this module's tests do not:
  * ordering, timing, interpolation and the capture queue are all checked in a plain JVM, and
@@ -49,7 +48,7 @@ class OffscreenBackendTest {
             assertNotNull(report, "the pipeline was never built")
 
             val state = backend.probeContext()
-            assertTrue(state.hasGl, "Gdx.gl was null on the render thread")
+            assertTrue(state.hasGl, "the render backend was not OpenGL")
             assertTrue(state.width > 0 && state.height > 0, "backbuffer was ${state.width}x${state.height}")
             assertTrue(!state.visible, "an Offscreen window must not be visible")
             assertEquals(RenderMode.Offscreen, host.mode)
@@ -107,20 +106,20 @@ class OffscreenBackendTest {
     @Test
     fun `Headless is refused rather than quietly opening a window`() {
         assertFailsWith<IllegalArgumentException> {
-            Lwjgl3Backend.start(RenderMode.Headless, WindowConfig(), RenderRegistry())
+            KoolBackend.start(RenderMode.Headless, WindowConfig(), RenderRegistry())
         }
     }
 
     @Test
     fun `a second create is refused before it allocates anything`() {
         GlAvailability.require()
-        // The bug: `create` allocated the SpriteBatch, the FrameBuffer and a whole pipeline
-        // inside `gl.submit { ... }` and only then called `built.compareAndSet(null, pipeline)`.
-        // A second call therefore made a second batch and framebuffer, leaked both, and ran
+        // The bug: `create` allocated the batches and the pass and a whole pipeline inside
+        // `kool.submit { ... }` and only then called `built.compareAndSet(null, pipeline)`. A
+        // second call therefore made a second pipeline and leaked it, and ran
         // `registry.build` again -- which re-invokes `onBind(world, ctx)` on the *same retained
         // system instances*, replacing the live pipeline's bound Families -- on its way to
         // throwing. `OffscreenBackendTest` appeared to cover this and did not: it called
-        // `create` after `close()`, so it failed at `GlThread.submit`'s `check(isRunning)` and
+        // `create` after `close()`, so it failed at `KoolThread.submit`'s `check(isRunning)` and
         // the guard itself was never reached.
         val builds = AtomicInteger()
         val registry = RenderRegistry()
@@ -132,9 +131,9 @@ class OffscreenBackendTest {
 
             assertFailsWith<IllegalStateException> { backend.create(definition().build()) }
 
-            // The factory runs *after* the FrameBuffer and the SpriteBatch inside the same
-            // submitted block, so one invocation is one framebuffer: had the refused call
-            // reached the submit, this would read 2 and two GL objects would have leaked.
+            // The factory runs *after* the pass and the batches inside the same submitted
+            // block, so one invocation is one pipeline: had the refused call reached the
+            // submit, this would read 2 and two render objects would have leaked.
             assertEquals(1, builds.get(), "a second pipeline was built and then thrown away")
             assertSame<Any?>(
                 first.presentation,
@@ -149,7 +148,7 @@ class OffscreenBackendTest {
     @Test
     fun `a renderer that throws releases every waiting capture instead of stranding it`() {
         GlAvailability.require()
-        // The failure: `GlThread.run` records the exception and exits, and nothing closed the
+        // The failure: `KoolThread.run` records the exception and exits, and nothing closed the
         // capture slot. Every thread blocked in `capture()` then burned its full 10s deadline
         // and reported "the render thread drew no frame that satisfied it" -- a timeout message
         // for what was a renderer exception seconds earlier.
@@ -177,7 +176,7 @@ class OffscreenBackendTest {
             }
             worker.isDaemon = true
             worker.start()
-            assertTrue(slot.awaitQueued(count = 1, timeoutMillis = 5_000), "the request never queued")
+            assertTrue(awaitQueued(slot, count = 1, timeoutMillis = 5_000), "the request never queued")
 
             explode.set(true)
 
@@ -207,7 +206,7 @@ class OffscreenBackendTest {
         // budget has run out, so this asks about something that has already happened either
         // way. There is no deadline in this test to lose a race against -- which is the whole
         // of issue #178: the assertion below used to be the only one here, and it was reading
-        // `Thread.isAlive` through `GlThread.submit`, so on a loaded runner it saw a live
+        // `Thread.isAlive` through `KoolThread.submit`, so on a loaded runner it saw a live
         // thread running a loop that was over and got a `GlContextException` instead.
         assertFalse(backend.renderLoopRunning, "the render loop was still running after close()")
 
@@ -221,7 +220,7 @@ class OffscreenBackendTest {
 
     private fun withBackend(
         counting: AtomicInteger? = null,
-        block: (Lwjgl3Backend, GameHost) -> Unit,
+        block: (KoolBackend, GameHost) -> Unit,
     ) {
         val registry = RenderRegistry()
         registry.register(RenderPhase.World, { CountingRenderSystem(counting ?: AtomicInteger()) })
@@ -234,7 +233,7 @@ class OffscreenBackendTest {
         }
     }
 
-    private fun startBackend(registry: RenderRegistry): Lwjgl3Backend = Lwjgl3Backend.start(
+    private fun startBackend(registry: RenderRegistry): KoolBackend = KoolBackend.start(
         RenderMode.Offscreen,
         WindowConfig(
             title = "udea-test",
@@ -253,6 +252,13 @@ class OffscreenBackendTest {
         while (counter.get() < target && System.nanoTime() < deadline) Thread.onSpinWait()
     }
 
+    /** Waits until [count] requests are queued on [slot], up to [timeoutMillis]. */
+    private fun awaitQueued(slot: dev.wildware.udea.render.capture.FrameCaptureSlot, count: Int, timeoutMillis: Long): Boolean {
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
+        while (slot.queuedRequests.value < count && System.nanoTime() < deadline) Thread.onSpinWait()
+        return slot.queuedRequests.value >= count
+    }
+
     private class CountingRenderSystem(private val frames: AtomicInteger) : RenderSystem {
         override fun render(target: OffscreenTarget, alpha: Float) {
             frames.incrementAndGet()
@@ -268,7 +274,7 @@ class OffscreenBackendTest {
         override fun render(target: OffscreenTarget, alpha: Float): Unit = Unit
     }
 
-    /** Throws out of a frame once armed, taking the render loop down with it. */
+    /** Throws out of a frame, standing in for any renderer that hits a bad asset or a null. */
     private class ExplodingRenderSystem(private val armed: AtomicBoolean) : RenderSystem {
         override fun render(target: OffscreenTarget, alpha: Float) {
             if (armed.get()) error("a renderer threw in the middle of a frame")
@@ -292,20 +298,22 @@ internal class ContextState(
 /**
  * Asks the render thread about its own context.
  *
- * On the render thread, because `Gdx.graphics` is only meaningful there: read from the
- * caller's thread it is a static the GL thread owns.
+ * On the render thread, because the context is only meaningful there: read from the caller's
+ * thread it is a static the render thread owns.
  *
- * Visibility is asked of **GLFW** rather than of LibGDX, because LibGDX has no "is this window
- * visible" accessor and the assertion that matters — `setInitialVisible(false)` actually
- * produced a hidden window — is precisely the one a wrapper would not answer.
+ * Visibility is asked of Kool's own [de.fabmax.kool.KoolWindow.flags] rather than through a
+ * platform-specific window handle, because that is the one place "is this window visible" is
+ * published on every Kool backend, and the assertion that matters -- `showWindowOnStart = false`
+ * actually produced a hidden window -- is precisely the one a lower-level check would not answer
+ * any more directly.
  */
-internal fun Lwjgl3Backend.probeContext(): ContextState = onRenderThread {
-    val graphics = Gdx.graphics as Lwjgl3Graphics
-    val handle = graphics.window.windowHandle
+internal fun KoolBackend.probeContext(): ContextState = onRenderThread {
+    val ctx = KoolSystem.requireContext()
+    val size = ctx.window.framebufferSize
     ContextState(
-        hasGl = Gdx.gl != null,
-        width = Gdx.graphics.backBufferWidth,
-        height = Gdx.graphics.backBufferHeight,
-        visible = GLFW.glfwGetWindowAttrib(handle, GLFW.GLFW_VISIBLE) == GLFW.GLFW_TRUE,
+        hasGl = ctx.backend.name.contains("OpenGL", ignoreCase = true),
+        width = size.x,
+        height = size.y,
+        visible = ctx.window.flags.isVisible,
     )
 }

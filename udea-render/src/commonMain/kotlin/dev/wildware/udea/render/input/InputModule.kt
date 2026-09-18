@@ -20,7 +20,8 @@ import dev.wildware.udea.core.module.UdeaModule
  * It is a `UdeaModule` and not a `RenderSystem` even though it lives in `udea-render`, and that
  * is deliberate rather than sloppy: sampling has to happen at a *tick* boundary (see
  * [IntentState]), and a `RenderSystem` runs at a frame boundary. The device-reading half - the
- * one class that names `Gdx.input` - is `GdxKeyboard`, and nothing here references it.
+ * one class that would name a real input API - was `GdxKeyboard` on LibGDX and is gone with it
+ * (issue #211); its Kool replacement is issue #224's, and nothing here references either one.
  */
 public class InputModule(
     /** What this game binds. */

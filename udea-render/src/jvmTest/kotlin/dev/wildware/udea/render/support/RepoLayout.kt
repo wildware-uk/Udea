@@ -104,6 +104,10 @@ internal object RepoLayout {
             "src/androidMain/kotlin",
             // Both targets' shared source set, where a module keeps one (issue #203).
             "src/jvmAndAndroidMain/kotlin",
+            // A multiplatform module's own test source set (issue #211: udea-render's fixtures
+            // moved from src/test/kotlin here when the module went multiplatform).
+            "src/jvmTest/kotlin",
+            "src/commonTest/kotlin",
         )
         return roots.asSequence()
             .map { root -> moduleDir(module).resolve("$root/$packagePath/$sourceFileName") }

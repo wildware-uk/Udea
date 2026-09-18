@@ -45,18 +45,35 @@ kotlin {
                 // RenderModuleGraphTest asserts it stays test-only.
                 implementation(project(":udea-diagnostics"))
 
-                // Fleks worlds and a wired GameContext, so the pipeline tests drive the real
-                // kernel rather than a mock of it.
-                implementation(testFixtures(project(":udea-core")))
-
                 // The bytecode gate. A class-file parser is a check, not a runtime feature.
                 implementation(libs.asm)
 
                 // The GL tests name Kool directly: they build scenes and read pixels back.
                 implementation(libs.kool.core)
+
+                // Test-only, for `GlFixtures`: the headless bytecode gate's positive/negative
+                // controls have to *be* gdx types to prove the scanner catches a real one. The
+                // gate itself scans other modules' compiled output (`udea-core` and friends);
+                // this module needing gdx on its own test classpath to compile its fixtures is
+                // unrelated to whether udea-render's shipped code names gdx, which it does not
+                // (issue #211: udea-render draws with Kool now). The ban this gate extends
+                // (`UDEA-MG-002`) keeps its gdx entries until the old tree and moba's LibGDX
+                // launcher are gone (docs/module-graph.md); this line goes with them.
+                implementation(libs.gdx)
             }
         }
     }
+}
+
+dependencies {
+    // `testFixtures(...)` is a `DependencyHandler` extension and is not visible inside the
+    // `kotlin.sourceSets { jvmTest { dependencies { ... } } }` block above (its scope is
+    // `KotlinDependencyHandler`), so it is wired here by bucket name, the same pattern
+    // `udea-net`, `udea-replay`, `udea-gas` and `udea-agent` use for the identical edge.
+    //
+    // Fleks worlds and a wired GameContext, so the pipeline tests drive the real kernel rather
+    // than a mock of it.
+    "jvmTestImplementation"(testFixtures(project(":udea-core")))
 }
 
 /** The JVM test compilation every `Test` task below runs from. */

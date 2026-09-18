@@ -167,6 +167,26 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   Interim only; #188 now replaces `BitmapFont2D` drawing rather than scene2d (commented on #188).
   `HudState` stays untouched. Reference PNGs captured from `origin/master` `409c044`, 9 frames, in gallery.
 
+- **WEB IS SHELVED (owner, 2026-09-18).** He asked "Does kool not have a snapshot we can use? If not, then
+  shelve web for now, make a note." Checked: `de/fabmax/kool/kool-core/maven-metadata.xml` is **404** on
+  `central.sonatype.com/repository/maven-snapshots/`, on `oss.sonatype.org/.../snapshots` (host retired 2025)
+  and on `s01.oss.sonatype.org/.../snapshots`; Maven Central releases 200 with `<latest>0.19.0</latest>`,
+  `lastUpdated 20251220180520`. Kool is CONFIGURED to publish snapshots and never has (`build.gradle.kts`
+  `version = "0.20.0-SNAPSHOT"`, `publishToMavenCentral()`, README points at the retired host).
+  **That README line is stale - do not chase it again.**
+  **#223 and #226 are parked**, retitled `[SHELVED]`, commented, and marked in epic #199. Unshelve on any of:
+  Kool 0.20.0 shipping with a wasmJs artifact (watch `<latest>` in that metadata URL); the owner reversing
+  the publish decision (`spikes/kool-wasm/` holds pin `ab762acd`, `toolchain-21.patch`, `reproduce.sh`,
+  transcripts - nothing to rediscover); or Kotlin/JS chosen instead.
+  **Nothing else is affected:** #212 and #224 were already JVM+Android; web was never in `sh gradlew build`,
+  so #214 does not wait on it; every merged `wasmJs` target stays (core, gas, assets, replay, audio, net,
+  agent). Spec D1 is DEFERRED, not overturned.
+- **Route B exists and was put to the owner too** (composegl-ef corrected the lead for calling the fork "the
+  only route"): Kool 0.19.0 publishes a Kotlin/JS build, so no fork and nothing published under his name -
+  but ComposeGL's browser target is Wasm only, so it needs a Kotlin/JS target adding as well, and so do nine
+  Udea modules, against seven that already build wasmJs. Lead recommended Route A on that asymmetry; the
+  owner shelved instead.
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).

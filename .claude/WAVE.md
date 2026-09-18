@@ -72,6 +72,40 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   - Dropped as a card: AGENTS.md's Kool-port paragraph still says "udea-render will apply" in future tense (not the module table; udeaVerifyAgentsMd green). Fold into #212 or #213.
 - **Wave 9 is done. #224 (input + composegl-kool UI host) and #212 (moba split) are the wave 10 candidates; #221 is now unblocked too.**
 
+## Wave 10 (2026-09-18): in flight
+
+- Baseline unchanged: `87d8b7c`, one red: `:moba:compileKotlin` (authorised D9; #212 repairs it).
+- **#212 split (commented):** `:moba:web` + `runWebShot` moved to new issue **#226** (needs #212 and #223).
+  #212 keeps `:moba:game`, `:moba:desktop`, `:moba:android` and must leave zero failing tasks.
+  Reason: #211 shipped udea-render on Kool for JVM+Android only, and #223 (no published Kool has a
+  wasmJs artifact) is open - a web AC nothing can satisfy fails review by construction.
+- **#212 ruling (commented):** input wiring belongs to #224, not #212. `:moba:desktop` takes the input
+  seam on origin/kmp at branch time; shot tasks are harness-driven, no keyboard. dev-212 told not to
+  edit udea-render; dev-224 told not to edit moba/settings.gradle.kts.
+- **#223 decided: option 1** (build Kool `main` pinned `ab762acd` with the 13-line patch, publish
+  ourselves). Commented with the alternatives and how to overturn. Kool is Apache-2.0.
+  **NOT dispatched - two owner gates, raised by `composegl-ef` and put to Shaun on the dashboard:**
+  (a) publishing a patched third-party library under his `dev.wildware` Sonatype namespace is his call;
+  (b) **the snapshot-to-release trap** - a released `composegl-kool` wasmJs target cannot depend on a
+  Kool snapshot, so before that target lands one of: permanent release of the patched Kool under our
+  namespace / wasmJs left out of the next ComposeGL release / Kool 0.20.0 shipped.
+  Hosting revised on composegl-ef's advice: a **manually triggered workflow** with the pin+patch+NOTICE
+  in `third_party/kool/`, NOT a subproject (a subproject makes every ComposeGL CI run build Kool and
+  puts a foreign renderer past the architecture confinement checks). Do not touch ComposeGL's version
+  logic; `javap` in the publish job AND on the jar a consumer resolves; `karma.config.d/` needed but no
+  ci-legs.json edit; WorldPanel.kt / ScenePass.kt still off limits (ComposeGL #230).
+- **#221 held to wave 11**: it lives in `udea-render`, which #224 owns this wave. Same-module rule.
+- Dispatched: dev-212 (branch `issue-212-moba-split`), dev-224 (branch `issue-224-kool-input-ui-host`).
+  Box at dispatch: 24 cores, load 1.4, 19G free / 24G available. Two developers only.
+- Epic #199 gained 8b (#226); row 8 reworded to drop web.
+
+## Wave 10 plan
+
+- Ready: #212 (moba, scoped down), #224 (udea-render).
+- Held: #221 (udea-render, collides with #224) - wave 11. #223 (owner-gated, above).
+- Blocked: #226 needs #212 and #223. #192 needs #212. #194-#196 need #212. #188 needs #224's UI host.
+  #213 then #214.
+
 ## Wave 9 plan
 
 - Ready: #211 udea-render on Kool (needs #222 - landed), scoped JVM + Android; its Wasm AC moves to #223 (commented on #211). #223 spike (build pinned Kool main with toolchain 21, check wasmJs + WebGL2 draw; publish nothing). #211 is Udea repo (udea-render); #223 spike is outside Udea (Kool clone in scratch dir) - disjoint, can pair if box has memory (session hit low-memory kill once this wave).

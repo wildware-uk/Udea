@@ -3,11 +3,13 @@ package dev.wildware.udea.render.input
 import kotlin.math.sqrt
 
 /**
- * The [IntentSource] that reads a keyboard and a gamepad. **The only thing that reads a device.**
+ * The [IntentSource] that reads a keyboard, a gamepad and a pointer. **The only thing that reads a
+ * device.**
  *
- * It names no render backend type: it talks to [KeyboardState] and [GamepadState], and the class
- * that binds those to a real device is `KoolKeyboard`, elsewhere in this module. It is also where
- * the interface gets first refusal, so a key a menu took never reaches a binding here. That split is
+ * It names no render backend type: it talks to [KeyboardState], [GamepadState] and [PointerState],
+ * and the classes that bind those to a real device are `KoolKeyboard` and `KoolPointer`, elsewhere in
+ * this module. They are also where the interface gets first refusal, so a key a menu took or a click
+ * on a button never reaches a binding here. That split is
  * what lets the whole of the input model - the edge
  * counting, the vector accumulation, the deadzone, the normalisation - be tested with no window,
  * no context and no hardware, which is the half of the old `ControllerSystem` that could never be
@@ -19,6 +21,7 @@ public class DeviceIntent(
     private val bindings: InputBindings,
     private val keyboard: KeyboardState = KeyboardState.NONE,
     private val gamepad: GamepadState = GamepadState.NONE,
+    private val pointer: PointerState = PointerState.NONE,
 ) : IntentSource {
 
     override fun sample(into: Intent) {
@@ -31,6 +34,7 @@ public class DeviceIntent(
         // press. Spending it inside the loop would give it to whichever id sorted first.
         keyboard.endSample()
         gamepad.endSample()
+        pointer.endSample()
     }
 
     private fun sampleActions(into: Intent) {
@@ -48,6 +52,10 @@ public class DeviceIntent(
                     if (gamepad.isButtonDown(button)) held = true
                     presses += gamepad.pressesSince(button)
                 }
+            }
+            for (button in binding.pointerButtons) {
+                if (pointer.isButtonDown(button)) held = true
+                presses += pointer.pressesSince(button)
             }
             val id = ActionId(index)
             into.setPressed(id, held)

@@ -55,6 +55,45 @@ public interface KeyboardState {
 }
 
 /**
+ * The mouse and every finger, as the sampler needs them: which pointer buttons are down, and how
+ * many times each went down since the last tick.
+ *
+ * The same shape as [KeyboardState] - a level plus a counted edge that [endSample] spends - for the
+ * same reason: a click pressed and released between two ticks is still exactly one press.
+ *
+ * A button is the backend's own index, as a key is the backend's own code: on Kool `0` is the left
+ * button, `1` the right, `2` the middle, `3` back and `4` forward (`PointerInput.LEFT_BUTTON` and
+ * its neighbours), and a finger on a touch screen presses `0`. Every pointer is folded together: a
+ * button is down when any pointer holds it, and two fingers landing are two presses.
+ *
+ * ## Threading
+ *
+ * [KeyboardState]'s rule exactly: recorded on the render thread, read by the tick on that same
+ * thread, and so deliberately not synchronised.
+ */
+public interface PointerState {
+
+    /** Whether any pointer holds [button] down, as far as the game is concerned. */
+    public fun isButtonDown(button: Int): Boolean
+
+    /** How many times [button] went down since [endSample] was last called. */
+    public fun pressesSince(button: Int): Int
+
+    /** Spends the counted presses. See [KeyboardState.endSample]. */
+    public fun endSample()
+
+    public companion object {
+        /** No mouse and no touch screen. */
+        public val NONE: PointerState = object : PointerState {
+            override fun isButtonDown(button: Int): Boolean = false
+            override fun pressesSince(button: Int): Int = 0
+            override fun endSample(): Unit = Unit
+            override fun toString(): String = "PointerState.NONE"
+        }
+    }
+}
+
+/**
  * One gamepad's sticks and buttons.
  *
  * ## Stated plainly: nothing implements this against real hardware yet

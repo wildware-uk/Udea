@@ -11,9 +11,13 @@ import dev.wildware.composegl.ui.input.KeyEventType
 import dev.wildware.composegl.ui.input.Modifiers
 import dev.wildware.composegl.ui.input.TextEvent
 import dev.wildware.composegl.ui.layout.ScalePolicy
+import dev.wildware.udea.render.input.InputFrame
 import dev.wildware.udea.render.input.KeyPhase
 import dev.wildware.udea.render.input.KeyStroke
+import dev.wildware.udea.render.input.PointerId
+import dev.wildware.udea.render.input.PointerReportListener
 import dev.wildware.udea.render.input.UiInput
+import dev.wildware.udea.render.input.UiPointers
 import dev.wildware.composegl.kool.KoolBackend as ComposeGlBackend
 
 /**
@@ -67,6 +71,9 @@ public class UiLayer(
     /** The toolkit's side, which exists only while attached. Render thread only. */
     private var mounted: Mounted? = null
 
+    /** Where the scene's pointer verdicts go. Render thread only. */
+    private var pointerReports: PointerReportListener? = null
+
     /** Shows [screen], or nothing when it is `null`. Safe from any thread. */
     public fun show(screen: UiScreen?) {
         this.screen = screen
@@ -103,6 +110,24 @@ public class UiLayer(
     }
 
     /**
+     * The interface's verdict on each pointer in each frame: the [UiPointers] half of `KoolPointer`'s
+     * ordering, as [onKey] is the [UiInput] half of `KoolKeyboard`'s.
+     *
+     * It reports from [attach] to [detachAndClose]. While it does, a pointer waits for its verdict;
+     * before the scene exists and after it has gone there is nothing to wait for. Showing no screen
+     * does not stop it: the scene still reports, and reports nothing used. The verdicts come straight
+     * from ComposeGL's `onPointerUsed`, which fires on the render thread at the start of the scene's
+     * render, with the Kool frame the scene's own listener read the pointer in.
+     */
+    internal val pointers: UiPointers = object : UiPointers {
+        override val isReporting: Boolean get() = mounted != null
+
+        override fun reportTo(listener: PointerReportListener?) {
+            pointerReports = listener
+        }
+    }
+
+    /**
      * Builds the screen's scene and puts it on [ctx], over the scenes already there.
      *
      * Render thread only, and built here rather than in the constructor for that reason: a
@@ -113,6 +138,10 @@ public class UiLayer(
         val backend = ComposeGlBackend(fonts.atlas)
         val scene = ComposeGlScene(backend, design, policy)
         scene.setContent { screen?.content() }
+        // Read at each report rather than captured here, so a listener set after attaching still hears.
+        scene.onPointerUsed = { use ->
+            pointerReports?.onReport(PointerId(use.pointer), InputFrame(use.frame), use.used)
+        }
         ctx.addScene(scene.scene)
         mounted = Mounted(ctx, backend, scene)
     }

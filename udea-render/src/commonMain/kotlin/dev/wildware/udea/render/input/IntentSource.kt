@@ -3,8 +3,8 @@ package dev.wildware.udea.render.input
 /**
  * Whatever produces one tick's [Intent]. **The seam an agent, a replay and a test all use.**
  *
- * There are exactly three shipped implementations and they are interchangeable by construction:
- * [DeviceIntent] reads a keyboard and a gamepad, [InjectedIntent] is written by the agent's
+ * The shipped implementations are interchangeable by construction: [DeviceIntent] reads a
+ * keyboard, a gamepad and a pointer, [InjectedIntent] is written by the agent's
  * `input.*` tools, and [NONE] is what a dedicated server has. The simulation cannot tell which
  * one it is running against, which is the property that makes an agent's synthesised input
  * indistinguishable from a human's - the whole point of issue #124's note.

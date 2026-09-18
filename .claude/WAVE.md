@@ -220,10 +220,13 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   empirically from its running `GlKoolInputTest` and to say WHICH FIELD it matches (universal vs local -
   they agree on GLFW, may not elsewhere) and whether its test would pass with the other number.
   Lesson: the lead should have questioned a lowercase-ASCII *key code* before relaying it.
-- **SETTLED: W is 87.** dev-224 measured it and retracted its own number without softening. Source of the
-  119: Kool's `UniversalKeyCode` has a convenience constructor
-  `constructor(codeChar: Char) : this(codeChar.lowercaseChar().code)` - a helper for callers that GLFW never
-  goes through. Reading it as a description of the table is the mistake.
+- **SETTLED: W is 87.** dev-224 measured it and retracted its own number without softening.
+  **CORRECTED LATER (dev-230, lead-verified):** the explanation of the 119 below was itself wrong.
+  `UniversalKeyCode(Char)` is `Character.toUpperCase` in **Kool 0.19.0** (our dependency, `javap -c`) and
+  `lowercaseChar()` only in **Kool `main`** (`KeyCode.kt:16` in the #225 spike clone, which is what dev-224
+  read). **The helper's case FLIPS between Kool versions.** So KeyTable was CORRECT on 0.19.0 and #230's
+  premise was false today - but it is TRUE after the Kool upgrade that would unshelve web. Never key a table
+  through `UniversalKeyCode(Char)`; key on raw ints. The "W is 87" measurement itself was never in doubt.
   **Second fact, and it matters more:** printable keys are raw GLFW ints, but SPECIAL keys go through
   `KEY_CODE_MAP` and become **Kool's own NEGATIVE codes** - `GLFW_KEY_ESCAPE` is 256 but Kool's `KEY_ESC` is
   **-9**. Map covers ctrl/shift/alt/super/escape/menu/enter/numpad/backspace/tab/delete/insert/home/end/
@@ -314,6 +317,21 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   #227/#221/#228 are all `udea-render` (dev-230's), and everything else needs #212. Slot 4 opens when
   #212 merges (frees moba; unblocks #213/#188/#192/#194) or #230 merges (frees udea-render for #227).
 - Xvfb at merge time: one server, 49s old, a live developer's - left alone.
+
+- **#230 REFRAMED, not abandoned.** dev-230 measured three ways (javap on desktop jar + Android aar;
+  all-26-letters real-GLFW test PASSES on merged code; lowercase mutation reds exactly A-Z): the constructor
+  UPPERCASES on 0.19.0, so KeyTable was right. The lead found why everyone believed otherwise: Kool `main`
+  lowercases. Now lands: (1) key the table on RAW INTS, never via the Char helper, so the upgrade cannot
+  break it; line-86 punctuation same check; (2) the 26-letter real-GLFW test as the UPGRADE GUARD, failure
+  message naming the constructor and the version flip; (3) corrected KDocs; (4) **the real player-visible
+  defect, different cause:** ComposeGL `TextField` does not take a bare letter key-down
+  (`KeyboardEditor.onKey` returns null for plain letters; typing arrives as TEXT), so typing "w" into it
+  still sends W to the game - #230's AC1. dev-230 wanted to file it as a new issue; told NO (owner rule, and
+  it is AC1 in its own module). Fix: judge the key event and its text event together; an unfocused letter
+  must still reach the game; a focused BUTTON must not swallow W. Corrections posted on #230 and #228.
+- **Lesson for the lead:** I "confirmed" #230 by reading line 29 and trusting the relayed claim about what
+  the constructor does, not by reading the constructor in the version we ship. That is confirming a claim
+  from the sentence that made it. Check the dependency version before trusting a source read.
 
 ## Wave 10 plan
 

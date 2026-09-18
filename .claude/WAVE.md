@@ -117,6 +117,24 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   fixed; unmasked side-by-side collages still go to the gallery - the owner comparing scenes is the primary
   evidence, the threshold is secondary. Relayed to dev-212 and commented on #212.
 
+- **#224 blocker found and routed (2026-09-18):** `composegl-kool` 0.7.0-SNAPSHOT honours the `InputSink`
+  contract for keys/pads but NOT pointers. `ComposeGlScene` installs its own private `InputStack` pointer
+  listener in `init`, calls `KoolPointerInput.onFrame(...)` a frame later on the render thread and
+  **discards the `used` boolean**, and never calls `Pointer.consume()`. So `isConsumed()` is always false
+  and Udea cannot learn whether the UI took a click; asking `scene.player` ourselves double-delivers.
+  Asked composegl-ef for the upstream 3-line fix (`if (used) pointer.consume()`) + a fresh snapshot.
+  Fallback if it does not land: Udea writes the engine-side translator composegl's wiki documents and
+  removes the scene's handler from `InputStack` by its public name `"composegl"` - accepted only with a
+  fail-fast on a missing handler and a test that reddens when the name stops matching. Commented on #224.
+- **Repository defect found by dev-224:** `composegl-kool:0.7.0-SNAPSHOT` resolves from
+  `https://central.sonatype.com/repository/maven-snapshots/`; **both Sonatype hosts `build.gradle.kts`
+  declares today 404.** Fix is in #224's branch.
+- **#212 plan change, approved:** dev-212 ports `MobaHudSystem` off scene2d onto `udea-render`'s existing
+  `BitmapFont2D` rather than deleting the HUD, so parity compares a HUD against a HUD. Not scope creep -
+  `MobaHud.kt:370` cannot resolve `Scene2dUiScreen` since #211, so moba cannot compile until scene2d goes.
+  Interim only; #188 now replaces `BitmapFont2D` drawing rather than scene2d (commented on #188).
+  `HudState` stays untouched. Reference PNGs captured from `origin/master` `409c044`, 9 frames, in gallery.
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).

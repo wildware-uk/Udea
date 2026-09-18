@@ -235,6 +235,18 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   about the table. Now driving Kool's real GLFW key callback with raw `GLFW_KEY_W`, asserting
   `isKeyDown(GLFW_KEY_W)` true AND `isKeyDown('w'.code)` false, so the wrong belief cannot come back green.
   dev-212 asked whether its own per-key test has the same hole (supplying the code it asserts).
+- **MEASURED, settled for good.** dev-224 drove Kool's installed GLFW key callback with raw `GLFW_KEY_W`
+  (retrieved via `glfwSetKeyCallback(glfwGetCurrentContext(), null)` on the render thread and restored
+  straight after - GLFW has no getter) and observed the code where `UiLayer` is offered it. Negative control
+  bound `'w'.code`: `"W never became an intent. ... The interface saw [87]"`. **THE TABLE:**
+  letters/digits/space = raw GLFW constant, ASCII UPPERCASE (W 87, A 65, S 83, D 68, Q 81, E 69, R 82,
+  space 32); the 41 SPECIAL keys = Kool's own NEGATIVE codes via `KEY_CODE_MAP` (**Escape is `-9`, NOT
+  GLFW's 256**) and must be written `KeyboardInput.KEY_*.code`. `KoolKeyboard` reads the UNIVERSAL code.
+  lwjgl on this box is **3.4.3**. All relayed to dev-212, which is auditing moba's asset for non-letter
+  bindings.
+- **TEST-DESIGN LESSON, applies beyond this wave:** a binding test that SYNTHESISES the event it then binds
+  against passes for any number - it proves the path and asserts nothing about the table. The fix is the
+  negative: assert the WRONG code produces no intent. Both developers now carry it; recorded on #228.
 - **Filed #228** (udea-render owns the key table; games stop writing backend key codes). Cleared the bar:
   it compiles, validates, gates green, and the game responds to the WRONG KEYS - invisible to screenshots.
   `InputBindings.keys`' KDoc still claims "com.badlogic.gdx.Input.Keys codes", which is false and is what

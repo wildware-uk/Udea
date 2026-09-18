@@ -98,6 +98,14 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - Dispatched: dev-212 (branch `issue-212-moba-split`), dev-224 (branch `issue-224-kool-input-ui-host`).
   Box at dispatch: 24 cores, load 1.4, 19G free / 24G available. Two developers only.
 - Epic #199 gained 8b (#226); row 8 reworded to drop web.
+- **Owner ruling on #212 parity (dashboard, 2026-09-18):** "Yes but the UI would look slightly different
+  because of compose gl so account for that." So: the pixel threshold covers WORLD content only; UI regions
+  are masked before the diff and the brief names which and why; inflating one whole-frame threshold until the
+  UI difference fits under it is explicitly rejected (it would hide a world regression behind a cosmetic one);
+  a UI difference is not a parity failure, a world difference is; a missing/partial HUD in the Kool shots is
+  EXPECTED at this SHA (#224 brings the UI host, #188 ports MobaHud and is undispatched) and is named, not
+  fixed; unmasked side-by-side collages still go to the gallery - the owner comparing scenes is the primary
+  evidence, the threshold is secondary. Relayed to dev-212 and commented on #212.
 
 ## Wave 10 plan
 

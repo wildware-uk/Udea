@@ -333,6 +333,22 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   the constructor does, not by reading the constructor in the version we ship. That is confirming a claim
   from the sentence that made it. Check the dependency version before trusting a source read.
 
+- **#229 done, under review** (`review-229-r1`, SHA `c7c9d7a`; change `a3dfb1a`). Push arm now names
+  `refs/heads/kmp`; comment block explains GitHub runs `schedule` only on the default branch, and that #214
+  needs no edit (the arm stops matching, the cron covers the ported master). **One forced change outside
+  `.github/`:** `ReplayEqualityProofTest` (udea-replay) asserted the `if:` CONTAINS `refs/heads/example` - a
+  test pinning the defect - so the ci.yml fix alone turned `:udea-replay:jvmTest` red; it now checks against
+  the clean-build job's branch list (`kmp master`) both ways. CI proof: before - scheduled `35323890628`
+  green on master (old engine), push `35397674705` on kmp SKIPPED the nightly; probe `35400527981` started
+  all 3 legs; controls `35400489693`/`35401417595` skipped; dispatch `35401442677` ran all 3 legs on
+  `a3dfb1a`, each stopping at `:moba:compileKotlin` (D9 red) - failure is the true answer about kmp today.
+  **Lead asked the reviewer to rule on over-firing:** every push to kmp (incl. WAVE.md bookkeeping) now runs
+  three 36000-tick legs.
+- **Owner decision pending, not an issue:** the `example` branch is still on origin at `409c0442` (same
+  commit as master); nothing in `.github/` names it now. dev-229 thinks it can be deleted. Remote branch
+  deletion is irreversible and outward-facing - the owner's call, raise in the wave report.
+- dev-230 build finished 22:36:31 (only baseline red); it had stopped mid-build and was nudged.
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).

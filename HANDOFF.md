@@ -38,7 +38,7 @@ carries a known-red proof (below) and an unmet phase exit criterion.
   structurally *cannot* see. Read the audit before trusting the scan.
 - **A CI workflow** (`.github/workflows/ci.yml`), 13 jobs, two OSes, and for the determinism job
   two JVM vendors.
-- **The lane pays gold.** Waves, tower aggro, last-hit gold, `:moba:runLaneShot` rendering
+- **The lane pays gold.** Waves, tower aggro, last-hit gold, `:moba:desktop:runLaneShot` rendering
   wave/farm/clash PNGs on a real GL context.
 
 Two integrator fixes worth knowing, because both were silent: `udea-codegen/net-protocol.lock`
@@ -61,8 +61,8 @@ yourself before believing it.
 Three gates are deliberately outside `check` and are run by name:
 
 ```
-./gradlew :moba:runUdpProof     # three OS processes, real UDP. CURRENTLY RED, see below
-./gradlew :moba:runLaneShot     # lane PNGs, needs a real GL context
+./gradlew :moba:desktop:runUdpProof     # three OS processes, real UDP. CURRENTLY RED, see below
+./gradlew :moba:desktop:runLaneShot     # lane PNGs, needs a real GL context
 ./gradlew udeaVerifyModuleGraph udeaVerifyNoLegacyDependencies udeaVerifyAgentsMd
 ```
 
@@ -76,7 +76,7 @@ JVMs, or a GL driver that CI may not have. Do not "fix" that by wiring them in.
 Three items. None is a surprise; all three are documented at the site, and this file exists so
 they are not rediscovered.
 
-**1. `:moba:runUdpProof` fails under loss, 5/5.** The 28-unit roster count agrees on both sides
+**1. `:moba:desktop:runUdpProof` fails under loss, 5/5.** The 28-unit roster count agrees on both sides
 5/5 and the perfect link matches 10/10, but under 5% loss the client sits 2-10 entities behind on
 creep and projectile *creates* at the sampled tick, so the whole-roster hash differs. This is the
 most useful thing to pick up next. Note the retraction that came with it: the earlier
@@ -104,8 +104,8 @@ the defect that mattered: that world routes its trigonometry through `StrictMath
 six green legs reported the health of their own fixture. Both jobs now replay `moba` —
 `moba-3600.udearep` on every push and `moba-36000.udearep` nightly — and `DriftWorld` stays as the
 gate's self-test, because it is the only place a divergence of exactly one ulp on exactly one
-field at exactly one tick can be arranged. Regeneration is `:moba:udeaWriteReplayFixture` or
-`:moba:test -Dupdate.replay.fixtures=true`; `determinism-audit.md` §0 is the written version.
+field at exactly one tick can be arranged. Regeneration is `:moba:desktop:udeaWriteReplayFixture` or
+`:moba:desktop:test -Dupdate.replay.fixtures=true`; `determinism-audit.md` §0 is the written version.
 
 ---
 

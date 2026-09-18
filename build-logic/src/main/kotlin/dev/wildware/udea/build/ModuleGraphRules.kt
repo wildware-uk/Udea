@@ -60,6 +60,19 @@ public object ModuleGraphRules {
     public val GL_ALLOWED_PROJECTS: Set<String> = setOf(":udea-render", ":udea-agent-host")
 
     /**
+     * The game, as every path it has had or is planned to have.
+     *
+     * `:moba:game` is the library, and `:moba:desktop` and `:moba:android` are the launchers that
+     * ship it (issue #212); a rule about what the shipped game carries has to read all three,
+     * because each launcher's classpath is the game's plus its own. `:moba` stays in although that
+     * project no longer exists, so re-creating a flat `moba` cannot re-open a rule, and `:moba:web`
+     * is there ahead of issue #226. `ModuleGraphRulesTest` fails a rule that governs only paths
+     * `settings.gradle.kts` does not include, which is what a flat `:moba` alone would now be.
+     */
+    internal val MOBA_PROJECTS: Set<String> =
+        setOf(":moba", ":moba:game", ":moba:desktop", ":moba:android", ":moba:web")
+
+    /**
      * Every module that must stay free of GL: the whole `udea-*` tree except
      * [GL_ALLOWED_PROJECTS].
      *
@@ -245,8 +258,9 @@ public object ModuleGraphRules {
     )
 
     /**
-     * Passes trivially while `moba` is empty. That is the point: it is placed before Phase 2
-     * has a reason to reach for `kotlin-scripting-jvm-host`.
+     * Placed before Phase 2 had a reason to reach for `kotlin-scripting-jvm-host`, as a ratchet.
+     * It governs [MOBA_PROJECTS]: scoped to the flat `:moba` alone, it scanned nothing once issue
+     * #212 split that project up.
      */
     public val NO_SCRIPTING_OR_REFLECTION_IN_THE_GAME: DependencyRule = DependencyRule(
         id = RuleId("UDEA-MG-005"),
@@ -256,7 +270,7 @@ public object ModuleGraphRules {
             "reflection-on-hot-paths smell the rewrite exists to kill. Asset scripts are compiled " +
             "at build time; discovery is a generated registry, not classpath scanning.",
         specSection = "6 (Phase 2 exit), 3.6",
-        projects = setOf(":moba"),
+        projects = MOBA_PROJECTS,
         configurations = setOf("runtimeClasspath"),
         banned = listOf(
             CoordinatePattern("org.jetbrains.kotlin:kotlin-scripting-*"),
@@ -354,7 +368,7 @@ public object ModuleGraphRules {
             "arrangement spec D9 rejected - and it is how the Box2D world spec D4 retires would " +
             "come back. The rule covers every target classpath each nested project has.",
         specSection = "kool port 3, 4, D4, D9, D12",
-        projects = setOf(":moba", ":moba:game", ":moba:desktop", ":moba:android", ":moba:web"),
+        projects = MOBA_PROJECTS,
         configurations = setOf("compileClasspath", "runtimeClasspath"),
         banned = listOf(
             CoordinatePattern("com.badlogicgames.gdx:*"),

@@ -60,7 +60,7 @@ The **art and audio are not**. Third-party sprite art from a paid asset pack is 
 [`docs/art-assets.md`](docs/art-assets.md) records what is there, the options and the decision
 taken. If you fork this repository, bring your own art.
 
-`moba`'s copy of that art is **not** committed. There is no step to run: `./gradlew :moba:build`
+`moba`'s copy of that art is **not** committed. There is no step to run: `./gradlew :moba:game:build`
 stages it out of the copy this repository already holds, and leaves your checkout clean. Why the
 pixels are gitignored rather than committed is in [`docs/art-assets.md`](docs/art-assets.md).
 

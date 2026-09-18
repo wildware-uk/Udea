@@ -504,6 +504,32 @@ class ModuleGraphRulesTest {
     }
 
     @Test
+    fun `every rule governs at least one project settings_gradle_kts includes`() {
+        // A rule scoped only to projects that do not exist scans nothing and passes for ever,
+        // and nothing about it looks wrong: `udeaVerifyModuleGraph` is green because there is no
+        // classpath to fail. Issue #212 split `:moba` into nested projects, and UDEA-MG-005 - the
+        // ban on a scripting host and a classpath scanner in the shipped game - was still scoped
+        // to the flat `:moba` that no longer exists. A rule may still name a path that is gone
+        // (MG-009 keeps `:moba` so re-creating it cannot re-open the hole); it may not name
+        // *only* such paths.
+        val settings = File("../settings.gradle.kts").canonicalFile
+        assertTrue(settings.isFile, "settings.gradle.kts not found at ${settings.absolutePath}")
+        val included = Regex("""^include\("([a-z0-9:-]+)"\)""", RegexOption.MULTILINE)
+            .findAll(settings.readText())
+            .map { ":" + it.groupValues[1] }
+            .toSet()
+        assertTrue(
+            ":moba:game" in included && ":udea-core" in included,
+            "the settings scan found only $included - the regex has stopped matching, so this " +
+                "test would pass against nothing",
+        )
+        val scanningNothing = ModuleGraphRules.ALL
+            .filter { it.projects.isNotEmpty() && it.projects.none { project -> project in included } }
+            .map { "${it.id.value} governs only ${it.projects.sorted()}" }
+        assertEquals(emptyList(), scanningNothing, "rules that govern no project in settings.gradle.kts")
+    }
+
+    @Test
     fun `every rule id is unique`() {
         val ids = ModuleGraphRules.ALL.map { it.id }
         assertEquals(ids.size, ids.toSet().size, "duplicate rule id in ModuleGraphRules.ALL: $ids")

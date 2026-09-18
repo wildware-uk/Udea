@@ -17,10 +17,10 @@ copy reviewed.
 | Plugin | For | What it gives you |
 |---|---|---|
 | `udea.kotlin-base` | applied by the Kotlin conventions below, never on its own | JDK 21 toolchain, `explicitApi()`, the `kotlin-stdlib` pin with `udeaVerifyKotlinPin`, the K2 compiler plugin with `udeaVerifyCompilerPlugin` |
-| `udea.kotlin-library` | every JVM runtime module and `moba` | Kotlin JVM plus `udea.kotlin-base`, kotlin.test on JUnit 5. **No GL.** |
+| `udea.kotlin-library` | every JVM runtime module and `moba:desktop` | Kotlin JVM plus `udea.kotlin-base`, kotlin.test on JUnit 5. **No GL.** |
 | `udea.kotlin-multiplatform` | runtime modules ported to KMP (issue #201) | Kotlin Multiplatform on `jvm`, `android` (AGP's KMP library plugin), `wasmJs` (Node), `iosArm64`, `iosSimulatorArm64`, plus `udea.kotlin-base`; kotlin.test in `commonTest`, JUnit 5 on `jvmTest` |
 | `udea.kotlin-multiplatform-no-ios` | a runtime module that cannot have an iOS target yet, whose build script names why: `udea-net`, whose `webSocketEngine` has no native `actual` (issue #209); `udea-agent`, whose `enumConstantsOf` and `heapFigures` have none (issue #208). `udea-core` left it when Fleks was vendored (issue #215) | `udea.kotlin-multiplatform` without the iOS targets; switching back to `udea.kotlin-multiplatform` re-enables them |
-| `udea.kotlin-multiplatform-render` | `udea-render`, once it is on Kool (spec D2) | `udea.kotlin-multiplatform-no-ios`, applied rather than copied |
+| `udea.kotlin-multiplatform-render` | `udea-render` (spec D2, issue #211) and `moba:game`, which builds for every target `udea-render` has (issue #212) | `udea.kotlin-multiplatform-no-ios`, applied rather than copied |
 | `udea.jvm-test-fixtures` | a KMP module with JVM test fixtures | a `jvmTestFixtures` source set published under the `-test-fixtures` capability, so `testFixtures(project(...))` works from a JVM consumer |
 | `udea.kotlin-library-gl` | `udea-render` only | `udea.kotlin-library` plus gdx and the LWJGL3 backend, as `implementation` so GL cannot leak downstream |
 | `udea.kotlin-build-tool` | `udea-codegen`, `udea-compiler-plugin`, `udea-assets-compiler` | `udea.kotlin-library` plus the exact-Kotlin-version pin (spec §7), checked at configuration time |
@@ -48,7 +48,9 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 | `udea-agent` | `udea.kotlin-multiplatform-no-ios` | MCP surface + test harness — same code path; common on `jvm`, `android` and `wasmJs`, with the `assets.*` toolset in `jvmMain` (issue #208) | FruitGameKTX's `DebugBridge` pattern, generalised | `udea-core` (api) | `udea-agent-host` |
 | `udea-agent-host` | `udea.kotlin-library` | HTTP server, plus the toolsets that need a render context (spec §4: render, input, ui). Debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` | `udea-agent` (api); `udea-render` + gdx + `udea-net` (`implementation` — see below) | *(nothing — deliberately not `moba`)* |
 | `udea-gradle` | `udea.gradle-plugin` | Tasks, verifiers, `gamebridge.json` emission | old `gradle-plugin` (which leaked `gradleApi` onto the game runtime) | `udea-assets-compiler`, `udea-diagnostics`, `gradleApi()` (`compileOnly`) | *(nothing — applied as a plugin, never depended on)* |
-| `moba` | `udea.kotlin-library` | The example game | `example` | `udea-core`, `udea-gas`, `udea-net`, `udea-assets`, `udea-render` (all `implementation`) | — |
+| `moba:game` | `udea.kotlin-multiplatform-render` | The example game as a library: components, systems, assets and what it draws, with no entry point (issue #212) | `example` | `udea-core`, `udea-render` (`api`); `udea-annotations`, `udea-gas`, `udea-net`, `udea-assets`, `udea-audio` (`implementation`) | `moba:desktop`, `moba:android` |
+| `moba:desktop` | `udea.kotlin-library` | The desktop launcher: the client, the server, the shot mains, the proofs and the agent surface | `moba`'s entry points | `moba:game`, `udea-replay` (`api`); `udea-core`, `udea-render`, `udea-net`, `udea-gas`, `udea-audio`, `udea-assets` (`implementation`); the agent source set's `udea-agent-host` comes from `dev.wildware.udea.agent` and is kept out of release by `UDEA-REL-002` | — |
+| `moba:android` | `udea.android-application` | The Android launcher, one activity | — | `moba:game` | — |
 
 ## Arrows that must never appear
 
@@ -61,9 +63,10 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 - `udea-assets-compiler` → any Gradle type. The daemon and CI must run identical code.
 - `udea-audio` → gdx, in any form. It is a designated headless module, so `UDEA-MG-002` bans
   the backend on its classpath and `UDEA-MG-002-BYTECODE` bans `com/badlogic/gdx/Gdx` by
-  exact name. The class that turns a path into a noise is `moba`'s
-  `dev.wildware.moba.audio.GdxAudioDevice`, behind this module's `AudioDevice` interface —
-  the same shape as `Presentation`, which `udea-core` holds without owning a renderer.
+  exact name. A device that makes a noise sits behind this module's `AudioDevice` interface —
+  the same shape as `Presentation`, which `udea-core` holds without owning a renderer. `moba`'s
+  was `GdxAudioDevice`, and it went with LibGDX (issue #212): every `moba` process plays through
+  `AudioDevice.Silent` until a Kool-era device exists.
 - Any game module → `udea-gradle`. The old `gradle-plugin` put the Gradle API on the game's
   runtime classpath through `implementation(gradleApi())`; here `gradleApi()` is
   `compileOnly` and nothing depends on the project.
@@ -108,9 +111,9 @@ joined up by search.
 
 | Task | Registered on | Reads | Runs from |
 |---|---|---|---|
-| `udeaVerifyNoLegacyDependencies` | every `:udea-*` project and `:moba` | the resolved dependency graph | that project's `check`, plus the root aggregate |
-| `udeaVerifyModuleGraph` | every `:udea-*` project and `:moba` | the resolved dependency graph | that project's `check`, plus the root aggregate |
-| `udeaVerifyRelease` | `:moba` | the **packaged artifact**, plus the release runtime classpath | `finalizedBy` on `:moba:assemble`, release builds only |
+| `udeaVerifyNoLegacyDependencies` | every `:udea-*` and `:moba:*` project | the resolved dependency graph | that project's `check`, plus the root aggregate |
+| `udeaVerifyModuleGraph` | every `:udea-*` and `:moba:*` project | the resolved dependency graph | that project's `check`, plus the root aggregate |
+| `udeaVerifyRelease` | `:moba:desktop` | the **packaged artifact**, plus the release runtime classpath | `finalizedBy` on `:moba:desktop:assemble`, release builds only |
 
 All three read the **resolved** graph rather than declared dependencies, because the arrow
 that matters is the one nobody declared: a module two hops away from `common` has nothing in
@@ -283,12 +286,17 @@ closes the other half of the same hole.
 
 ## `UDEA-MG-005` — no scripting host and no classpath scanner in the game
 
-**Spec §6 (Phase 2 exit), §3.6.** Banned on `:moba`'s `runtimeClasspath`:
+**Spec §6 (Phase 2 exit), §3.6.** Banned on the `runtimeClasspath` of every `moba` project -
+`:moba:game`, `:moba:desktop`, `:moba:android`, plus `:moba` and `:moba:web` for the reasons
+`UDEA-MG-009` gives:
 `org.jetbrains.kotlin:kotlin-scripting-*`, `org.jetbrains.kotlin:kotlin-reflect`,
 `org.reflections:reflections`.
 
-This passes trivially while `moba` is empty, which is the point: it is a ratchet placed
-*before* Phase 2 has a reason to reach for `kotlin-scripting-jvm-host`. `common` pulls in five
+It was placed as a ratchet *before* Phase 2 had a reason to reach for
+`kotlin-scripting-jvm-host`. Until issue #212 it named the flat `:moba` alone, which after the
+split is a project with no classpath at all, so for a while it scanned nothing and passed;
+`ModuleGraphRulesTest` now fails any rule that governs only paths `settings.gradle.kts` does not
+include. `common` pulls in five
 `kotlin-scripting-*` artifacts and `org.reflections:reflections` today, which is both a
 startup cost and the mechanism behind the reflection-on-hot-paths smell the rewrite exists to
 kill. Asset scripts are compiled at build time; discovery is a generated registry.
@@ -350,7 +358,7 @@ catches:
 - `dev/wildware/udea/agent/`
 - `dev/wildware/udea/agenthost/`
 
-Scanned: every zip entry of every archive `:moba` produces — the jar today,
+Scanned: every zip entry of every archive `:moba:desktop` produces — the jar today,
 `distZip`/`distTar` the day a distribution is added. Selected by task type rather than by name
 so the gate cannot silently narrow when the packaging changes.
 
@@ -366,7 +374,7 @@ Finding no archive at all fails too. A release gate with no input passes forever
 
 ## `UDEA-REL-002` — no agent module on the release runtime classpath
 
-**Spec §4, §6 (Phase 1 exit).** Banned on `:moba`'s `runtimeClasspath` in a release build:
+**Spec §4, §6 (Phase 1 exit).** Banned on `:moba:desktop`'s `runtimeClasspath` in a release build:
 `:udea-agent`, `:udea-agent-host`.
 
 Belt to `UDEA-REL-001`'s braces, and not redundant: the model check says *which dependency* to

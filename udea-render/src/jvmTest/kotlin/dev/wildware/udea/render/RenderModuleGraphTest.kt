@@ -77,7 +77,11 @@ class RenderModuleGraphTest {
         // a plain JVM module's build script would - the source-set scoping is what makes it
         // test-only, not the function name. So the check is that the dependency appears inside
         // that block and nowhere in `commonMain`'s, rather than a literal "testImplementation".
-        val commonMain = script.substringAfter("commonMain {").substringBefore("jvmTest {")
+        // Sliced to `commonMain`'s own block, which now ends at `jvmMain {` rather than at
+        // `jvmTest {` (issue #224 added a jvmMain block between them). A slice that ran on to
+        // `jvmTest {` would call a jvmMain dependency a shipped one - true today, and exactly the
+        // kind of helper that quietly decides what an assertion is allowed to see.
+        val commonMain = script.substringAfter("commonMain {").substringBefore("jvmMain {")
         assertTrue(
             ":udea-diagnostics" !in commonMain,
             "udea-diagnostics must not be a commonMain (shipped) dependency:\n$commonMain",
@@ -86,5 +90,46 @@ class RenderModuleGraphTest {
             "implementation(project(\":udea-diagnostics\"))" in script,
             "udea-diagnostics must not reach udea-render's runtime classpath",
         )
+    }
+
+    @Test
+    fun `no ComposeGL frontend is on a consumer's compile classpath`() {
+        // UDEA-MG-002 keeps every ComposeGL frontend out of every other module, and
+        // `udeaVerifyModuleGraph` fails when one resolves onto a headless module. This is the half
+        // that rule cannot see: a frontend declared `api` here would arrive on a game's compile
+        // classpath as a *transitive* dependency of an allowed one, and the gate would still pass,
+        // because the game never declared it. So the scopes are the assertion.
+        //
+        // `composegl-ui` is the other way round on purpose. A game writes its own `UiScreen`, whose
+        // `content()` is `@Composable`, so the toolkit has to be on its compile classpath. That is
+        // the whole of the rule in one line: toolkit yes, renderer no.
+        // Comments stripped before anything is searched for. That build script explains each of
+        // these dependencies in prose that names the scope it is *not*, so a raw search would find
+        // `api(libs.composegl.kool)` in a sentence saying why it must never be written - a fence
+        // that fails on prose is as wrong as one that passes on a real breach.
+        val script = RepoLayout.moduleDir("udea-render").resolve("build.gradle.kts")
+            .readLines()
+            .filterNot { line ->
+                val trimmed = line.trimStart()
+                trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")
+            }
+            .joinToString("\n")
+
+        assertTrue(
+            "api(libs.composegl.ui)" in script,
+            "a game cannot write a UiScreen without the toolkit on its compile classpath:\n$script",
+        )
+        for (frontend in listOf("libs.composegl.kool", "libs.composegl.lwjgl3")) {
+            assertTrue(
+                "implementation($frontend)" in script,
+                "$frontend must be `implementation`: as `api` it would reach every game that " +
+                    "depends on udea-render, which is what UDEA-MG-002 exists to prevent",
+            )
+            assertTrue(
+                "api($frontend)" !in script,
+                "$frontend is declared `api`, so every consumer of udea-render compiles against a " +
+                    "ComposeGL frontend",
+            )
+        }
     }
 }

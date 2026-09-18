@@ -75,10 +75,14 @@ kotlinxSerialization = "1.11.0"
 agp = "8.13.2"
 # The Android API levels every multiplatform runtime module compiles against and runs on.
 # `androidCompileSdk` is the newest platform installed in the development box's SDK.
-# `androidMinSdk` 24 (Android 7.0) is a floor chosen in issue #201 rather than one a dependency
-# forces; raise it here, once, when a dependency does.
+# `androidMinSdk` 26 (Android 8.0) is forced by a dependency: `composegl-kool-android`, which
+# `udea-render` takes for its interface host (issue #224), declares minSdk 26 in its manifest, and
+# the first Android *application* to resolve it - `:moba:android`, issue #212 - fails its manifest
+# merge below that. It was 24, a floor issue #201 chose with nothing forcing it. Raised here, once,
+# for every module rather than for the app alone, because every module that ships on Android
+# ships inside an app that resolves `udea-render`.
 androidCompileSdk = "36"
-androidMinSdk = "24"
+androidMinSdk = "26"
 # atomicfu: the multiplatform lock `udea-core` guards the one queue other threads write to, the
 # `SimBarrier` inbox (issue #203, spec section 6: "`java.util.concurrent` is replaced by coroutines,
 # and by `atomicfu` where state is genuinely shared"). Only its `locks` API is used, which is an

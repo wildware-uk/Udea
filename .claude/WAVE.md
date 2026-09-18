@@ -414,6 +414,17 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 
 ## Standing rulings and traps
 
+- **OWNER RULE (dashboard, 2026-09-18): "STOP CREATING ISSUES, if things need fixing, just do it, stop
+  creating new issues."** Overrides the dev-team skill wherever it says `gh issue create`. A defect found in a
+  ticket's own module is fixed ON THAT BRANCH. A defect elsewhere is folded into the next existing ticket in
+  that module, or dispatched directly - no new issue. A round-3 split keeps its remainder on the SAME issue as
+  a comment. Commenting on existing issues is still required for decisions. Triggered by wave 10 filing five
+  issues (#226-#230) while closing one. Saved to memory as `owner-no-new-issues`.
+- **The scratchpad is SESSION-WIDE** - every developer and reviewer resolves it to the same path. Each agent
+  writes only under `scratchpad/issue<N>/` and never cites a file it did not write. Put this in EVERY
+  dispatch. (Wave 10: dev-212 found dev-229's generic `build.log`/`final/`/`ev/`/`mutations/` in "its"
+  scratchpad; nothing clobbered, all three told.)
+
 - New runtime module must call `udeaModule("Name")` in its build script, or codegen errors (#202 ruling).
 - Modules depending on udea-core cannot have iOS until #215 (Fleks); use `udea.kotlin-multiplatform-no-ios` (#203 ruling).
 - #207 (audio) needs #203 and #205 too, not only #201: it `api`-depends on core and uses assets.

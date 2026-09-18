@@ -123,12 +123,44 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   **discards the `used` boolean**, and never calls `Pointer.consume()`. So `isConsumed()` is always false
   and Udea cannot learn whether the UI took a click; asking `scene.player` ourselves double-delivers.
   Asked composegl-ef for the upstream 3-line fix (`if (used) pointer.consume()`) + a fresh snapshot.
-  Fallback if it does not land: Udea writes the engine-side translator composegl's wiki documents and
-  removes the scene's handler from `InputStack` by its public name `"composegl"` - accepted only with a
-  fail-fast on a missing handler and a test that reddens when the name stops matching. Commented on #224.
+  **BOTH OF THOSE WERE WRONG and are withdrawn.** composegl-ef checked the code: the listener
+  (`ComposeGlScene.kt:134`) runs on Kool's UPDATE thread and only samples; the toolkit handles pointers at
+  the start of the next RENDER (`:169`), where `used` first exists - a frame later, another thread. So
+  `consume()` cannot go in the listener. And the fallback was a DATA RACE, not merely fragile: `scene.player`
+  goes straight to `KeyRouter`/`KeyNavigator`/`GamepadNavigator`, which read and move `FocusManager` and the
+  node tree, none thread-safe, none marshalling. Rule: **every `scene.player` call must be on the render
+  thread**, keys and pads included. The KDoc never said so; composegl is fixing that KDoc and `Input.md`.
+- **#224 input DECIDED - composegl-ef's option 2, one seam.** After `onFrame`, on the render thread, the
+  scene reports per pointer whether the UI took it; plus a **render-thread hook just before each frame** in
+  which a consumer drains queued key/pad events, calls `player` and gets `used` immediately. Being built
+  with tests, then a snapshot. **Rejected option 1** (thread-safe prediction published each frame so Kool's
+  own `isConsumed()` is right same-frame): needs new public hit-query API on composegl-ui plus an owner gate,
+  and buys a same-frame `isConsumed()` nothing in Udea reads. **Accepted cost:** Udea's pointer translation
+  moves to the render thread after the report, so pointer intents land ONE FRAME LATER. Fine - 60Hz fixed
+  sim, decoupled render, inputs stamped in `Tick`; determinism rests on the stamped tick, not wall-clock.
+- **#224 threading, CORRECTED by dev-224 from Kool's source:** Udea's key path is NOT racy and never was.
+  `udea-render`'s `KoolThread.config()` passes **`asyncSceneUpdate = false`** (so sprite batches are not read
+  while a renderer writes them). With it off, Kool 0.19.0's `Lwjgl3Context.renderFrame()` never sets
+  `nextFrameData`, so `render()` - holding `Input.poll(this)` and the `onRender` callbacks - runs INLINE on
+  the same thread that then calls `backend.renderFrame(...)` where `ComposeGlScene.render()` touches the
+  toolkit. One thread, `udea-kool`. Udea's input callback IS the render thread: it satisfies the rule.
+  Android: both are the `GLSurfaceView` thread. So the key/pad half proceeds as written and does NOT migrate
+  onto the new hook (churn for a property already held). Guarded by a GL test recording
+  `Thread.currentThread()` at the Kool input callback and inside the scene's render, failing if they differ -
+  which reddens the day somebody flips `asyncSceneUpdate` back on. The KDoc names that test and names the
+  hook as the migration path. **"One thread" does NOT buy a same-frame verdict:** frame ordering is
+  poll -> Udea's tick -> ComposeGL's `onFrame`, so the verdict on frame N exists only after N has ticked.
+  One frame late for an ORDERING reason, not a threading one. All commented on #224.
+- **Kool fork NOT approved.** The owner dismissed the question rather than answering; composegl-ef correctly
+  read that as a no. Nothing published, no publish path in composegl. It has since come back round: the owner
+  asked on the dashboard what the browser needs, and the lead put it to him plainly (no released Kool has a
+  wasmJs artifact; the only route is publishing the patched pinned build ourselves; his yes or no), with the
+  release trap attached. Owner also ruled: **the browser frontend is Udea (`:moba:web`), not a Kool app** -
+  Kool is the renderer only. That is already the design (module-graph gate).
 - **Repository defect found by dev-224:** `composegl-kool:0.7.0-SNAPSHOT` resolves from
   `https://central.sonatype.com/repository/maven-snapshots/`; **both Sonatype hosts `build.gradle.kts`
-  declares today 404.** Fix is in #224's branch.
+  declares today 404.** Fix is in #224's branch. One-sided: composegl's wiki (`Kool.md:22`) already names
+  the right host, so this is Udea's build file being stale, not composegl documenting the wrong one.
 - **#212 plan change, approved:** dev-212 ports `MobaHudSystem` off scene2d onto `udea-render`'s existing
   `BitmapFont2D` rather than deleting the HUD, so parity compares a HUD against a HUD. Not scope creep -
   `MobaHud.kt:370` cannot resolve `Scene2dUiScreen` since #211, so moba cannot compile until scene2d goes.

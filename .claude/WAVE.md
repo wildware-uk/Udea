@@ -219,6 +219,22 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   empirically from its running `GlKoolInputTest` and to say WHICH FIELD it matches (universal vs local -
   they agree on GLFW, may not elsewhere) and whether its test would pass with the other number.
   Lesson: the lead should have questioned a lowercase-ASCII *key code* before relaying it.
+- **SETTLED: W is 87.** dev-224 measured it and retracted its own number without softening. Source of the
+  119: Kool's `UniversalKeyCode` has a convenience constructor
+  `constructor(codeChar: Char) : this(codeChar.lowercaseChar().code)` - a helper for callers that GLFW never
+  goes through. Reading it as a description of the table is the mistake.
+  **Second fact, and it matters more:** printable keys are raw GLFW ints, but SPECIAL keys go through
+  `KEY_CODE_MAP` and become **Kool's own NEGATIVE codes** - `GLFW_KEY_ESCAPE` is 256 but Kool's `KEY_ESC` is
+  **-9**. Map covers ctrl/shift/alt/super/escape/menu/enter/numpad/backspace/tab/delete/insert/home/end/
+  pageup/pagedown/cursors/F1-F12. So ONE integer field holds two incompatible schemes with nothing saying
+  which - an independent second reason for #228. dev-212 told to check moba's asset for any non-letter
+  binding. `KoolKeyboard` reads the UNIVERSAL code (`event.keyCode.code`), the physical key - correct half.
+  lwjgl on this box is **3.4.3**, not 3.3.6; constants agree.
+- **dev-224 found its own evidence hole and is fixing it rather than writing it up:** `GlKoolInputTest` built
+  the `KeyEvent` itself and bound the same code, so it passed for ANY number - it proved the path and nothing
+  about the table. Now driving Kool's real GLFW key callback with raw `GLFW_KEY_W`, asserting
+  `isKeyDown(GLFW_KEY_W)` true AND `isKeyDown('w'.code)` false, so the wrong belief cannot come back green.
+  dev-212 asked whether its own per-key test has the same hole (supplying the code it asserts).
 - **Filed #228** (udea-render owns the key table; games stop writing backend key codes). Cleared the bar:
   it compiles, validates, gates green, and the game responds to the WRONG KEYS - invisible to screenshots.
   `InputBindings.keys`' KDoc still claims "com.badlogic.gdx.Input.Keys codes", which is false and is what

@@ -1558,7 +1558,7 @@ jobs:
 
       # `-Pudea.replay.out` is workspace-relative, and that is only safe because
       # `:moba:desktop:udeaReplayDigest` hands `MobaDigestMain` a `--workspace` naming the repository
-      # root - a `JavaExec` on its own would resolve this against `moba/`, which is issue #169
+      # root - a `JavaExec` on its own would resolve this against `moba/desktop/`, which is issue #169
       # and is why no join step ever ran. `MobaReplayEqualityTest` drives the entry point with
       # this exact string and checks the answer against the upload glob below.
       #

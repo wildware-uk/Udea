@@ -40,13 +40,22 @@ internal class RenderToolsHarness(
     mode: RenderMode = RenderMode.Headless,
     control: RenderControl? = null,
     val artifacts: AgentArtifacts? = null,
+    /**
+     * How long a capture is given before it is reported as a dead render loop.
+     *
+     * Production-sized (500ms) by default. A test simulating a render loop that never settles a
+     * capture shrinks this and sleeps past it explicitly, rather than pumping fast enough that
+     * the real deadline is never reached - see
+     * `RenderToolsetTest`'s "a frame that is never drawn" test.
+     */
+    captureGraceMillis: Long = 500L,
 ) {
 
     val bridge = AgentBridge()
 
     val host = GameHost(mode, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()))
 
-    val toolset = RenderToolset(mode, control, artifacts)
+    val toolset = RenderToolset(mode, control, artifacts, captureGraceMillis)
 
     private val tools = ToolIndex.builder()
         .module(AgentHostTools)

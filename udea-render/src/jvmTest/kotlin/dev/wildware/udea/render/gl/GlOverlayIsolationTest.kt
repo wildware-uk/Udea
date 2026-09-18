@@ -56,6 +56,15 @@ import kotlin.test.assertTrue
  * two blank images agreeing. [BlueSceneSystem] fills the frame, so the captures agree on
  * *content*, and the assertion that the capture's centre pixel is blue rather than red is the
  * one that would fail if overlay pixels reached the framebuffer.
+ *
+ * ## One boot, not two
+ *
+ * This used to boot a fresh `KoolBackend` for `overlay = false` and a second one for
+ * `overlay = true`. Kool allows exactly one `KoolContext` per JVM for the life of the JVM
+ * (`KoolThread`'s KDoc), so the second boot failed with `GlContextException` regardless of
+ * `forkEvery = 1` — that setting gives this *class* one JVM, and this class was still asking for
+ * two contexts inside it. [RedOverlaySystem] now has a mutable [RedOverlaySystem.enabled] flag,
+ * toggled between two captures of one boot, in place of a second boot.
  */
 class GlOverlayIsolationTest {
 
@@ -63,8 +72,7 @@ class GlOverlayIsolationTest {
     fun `an overlay reaches the window and never the capture`() {
         GlAvailability.require()
 
-        val without = runOnce(overlay = false)
-        val with = runOnce(overlay = true)
+        val (without, with) = runBoth()
 
         // 1. The overlay drew. Without this the rest is a statement about a no-op.
         assertEquals(
@@ -101,17 +109,17 @@ class GlOverlayIsolationTest {
 
     // --- fixture -------------------------------------------------------------------------
 
-    /** One boot, one capture, and one readback of the window the frame was presented to. */
+    /** One capture, and one readback of the window the frame was presented to. */
     private class Run(val png: ByteArray, val captureCentre: Int, val windowCentre: Int)
 
-    private fun runOnce(overlay: Boolean): Run {
+    /** Both halves of the comparison, taken from one boot: overlay off, then overlay on. */
+    private fun runBoth(): Pair<Run, Run> {
         val registry = RenderRegistry()
         registry.register(RenderPhase.World, { resources -> BlueSceneSystem(resources) })
-        if (overlay) {
-            registry.overlay({ resources -> RedOverlaySystem(resources) })
-        }
-        // Always last, and always registered: the probe is how the window is read, and reading
-        // it has to happen at the same point in the frame in both runs.
+        lateinit var overlay: RedOverlaySystem
+        registry.overlay({ resources -> RedOverlaySystem(resources).also { overlay = it } })
+        // Always registered, always last: the probe is how the window is read, and reading it
+        // has to happen at the same point in the frame both times.
         val probe = BackbufferProbe()
         registry.overlay({ probe })
 
@@ -131,23 +139,32 @@ class GlOverlayIsolationTest {
             backend.drive(host)
             val slot = backend.pipeline!!.capture!!
 
-            val result = slot.capture(CaptureRequest())
+            val without = captureOnce(slot, probe)
 
-            // The capture is served mid-frame, before the overlays of that frame have run. Wait
-            // for two whole frames to complete after it, so the pixel read below is one the
-            // overlay has definitely drawn on.
-            awaitFrames(probe, probe.frames.get() + 2)
+            overlay.enabled = true
+            val with = captureOnce(slot, probe)
 
-            val image = ImageIO.read(ByteArrayInputStream(result.bytes))
-                ?: error("the captured bytes are not a decodable image")
-            return Run(
-                png = result.bytes,
-                captureCentre = image.getRGB(image.width / 2, image.height / 2) and 0xFFFFFF,
-                windowCentre = probe.centre.get(),
-            )
+            return without to with
         } finally {
             backend.close()
         }
+    }
+
+    private fun captureOnce(slot: dev.wildware.udea.render.capture.FrameCaptureSlot, probe: BackbufferProbe): Run {
+        val result = slot.capture(CaptureRequest())
+
+        // The capture is served mid-frame, before the overlays of that frame have run. Wait for
+        // two whole frames to complete after it, so the pixel read below is one the overlay has
+        // definitely drawn on (or not, per its current `enabled` flag).
+        awaitFrames(probe, probe.frames.get() + 2)
+
+        val image = ImageIO.read(ByteArrayInputStream(result.bytes))
+            ?: error("the captured bytes are not a decodable image")
+        return Run(
+            png = result.bytes,
+            captureCentre = image.getRGB(image.width / 2, image.height / 2) and 0xFFFFFF,
+            windowCentre = probe.centre.get(),
+        )
     }
 
     private fun awaitFrames(probe: BackbufferProbe, target: Int) {
@@ -170,14 +187,21 @@ class GlOverlayIsolationTest {
     }
 
     /**
-     * Fills the **window** with opaque red, after the capture point.
+     * Fills the **window** with opaque red, after the capture point, while [enabled].
      *
      * Takes [OverlayResources] and not `RenderResources` — that is the spec 3.7 split, and there
-     * is deliberately no expression here that could reach the offscreen target.
+     * is deliberately no expression here that could reach the offscreen target. [enabled] is
+     * mutable so one boot can serve both halves of the comparison: toggled between two captures
+     * rather than deciding whether to register this system at all, since a second boot is not
+     * available (see the class KDoc).
      */
     private class RedOverlaySystem(private val resources: OverlayResources) : OverlaySystem {
 
+        @Volatile
+        var enabled: Boolean = false
+
         override fun render(target: ScreenTarget, dtSeconds: Float) {
+            if (!enabled) return
             val batch = resources.batch
             batch.beginPixels()
             batch.fill(0f, 0f, target.width.toFloat(), target.height.toFloat(), Rgba.of(1f, 0f, 0f, 1f))

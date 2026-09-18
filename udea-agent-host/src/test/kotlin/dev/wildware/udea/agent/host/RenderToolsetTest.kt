@@ -1,5 +1,8 @@
 package dev.wildware.udea.agent.host
 
+import dev.wildware.udea.agent.AgentCommand
+import dev.wildware.udea.agent.AgentResult
+import dev.wildware.udea.agent.AgentSubmission
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
 import org.junit.jupiter.api.io.TempDir
@@ -142,15 +145,39 @@ class RenderToolsetTest {
      * A render loop that has died is the realistic way to get here, and the important half of the
      * assertion is the second one: the command completes, so a caller polling
      * `completedCommandId` is released rather than reporting a healthy host as frozen.
+     *
+     * ## Why this drives the bridge by hand, and sleeps
+     *
+     * The grace period is real wall-clock time - it has to be, since it is standing in for "a
+     * few real frames from a driver that might be slow but is not dead" - and `harness.pump()`
+     * runs in memory with nothing between one pump and the next. `RenderToolsHarness.call`'s
+     * usual four quick pumps would never let even a millisecond of real time pass, so the
+     * capture would still read as "not ready yet" on every one of them and the harness would
+     * report a stuck command instead of the failure this test wants. A tiny grace, pumped once
+     * to queue and once more after sleeping past it, makes the deadline real without waiting out
+     * the production-sized one.
      */
     @Test
     fun `a frame that is never drawn fails the command instead of stalling the loop`() {
         val control = FakeRenderControl().apply { settleImmediately = false }
-        val harness = harness(control)
+        val harness = RenderToolsHarness(
+            mode = RenderMode.Offscreen,
+            control = control,
+            artifacts = AgentArtifacts(temp),
+            captureGraceMillis = 5,
+        )
 
-        val message = harness.refusal("render.screenshot", kind = "capture_failed")
+        val submission = harness.bridge.submit(AgentCommand("render.screenshot", emptyMap()))
+        val accepted = submission as? AgentSubmission.Accepted
+        assertNotNull(accepted, "the bridge refused render.screenshot: $submission")
+        harness.pump() // queues the capture and polls it once - too soon to have failed yet
+        Thread.sleep(20) // real time the render loop draws nothing, past the 5ms grace
+        harness.pump() // polls again, now past the deadline
 
-        assertContains(message, "render loop has stopped drawing")
+        val result = harness.bridge.commandResults().last { it.id == accepted.commandId }.result
+        assertTrue(result is AgentResult.Failed, "render.screenshot was expected to fail, got $result")
+        assertEquals("capture_failed", result.error.kind.id)
+        assertContains(result.error.message, "render loop has stopped drawing")
         assertTrue(bridgeAdvanced(harness), "completedCommandId did not advance for a failed capture")
     }
 

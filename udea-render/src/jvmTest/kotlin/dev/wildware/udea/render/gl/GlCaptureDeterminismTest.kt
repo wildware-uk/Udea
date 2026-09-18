@@ -11,6 +11,7 @@ import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
+import dev.wildware.udea.render.capture.CaptureRegion
 import dev.wildware.udea.render.capture.CaptureRequest
 import dev.wildware.udea.render.capture.capture
 import dev.wildware.udea.render.draw.Rgba
@@ -47,17 +48,25 @@ import kotlin.test.assertFalse
  *
  * Twenty repeats, as issue #77 asks for, because a once-in-fifty non-determinism is exactly the
  * kind that survives a single-shot test and then ruins an agent's afternoon.
+ *
+ * ## Why all four claims are one `@Test` method
+ *
+ * Kool allows exactly one `KoolContext` per JVM for the life of the JVM (`KoolThread`'s KDoc),
+ * and `forkEvery = 1` gives this class one JVM, not one per method. Four methods each starting
+ * their own `KoolBackend` raced for that one context; only the first ever won. One context,
+ * shared by all four claims in sequence, is what the fork setting actually buys.
  */
 class GlCaptureDeterminismTest {
 
     @Test
-    fun `twenty captures of one paused tick are byte-identical`() {
+    fun `twenty-repeat determinism, change tracking, tick readback and region stability`() {
         GlAvailability.require()
         withPausedHost { backend, _, scene ->
-            scene.step = 3
             val slot = backend.pipeline!!.capture!!
-            val first = slot.capture(CaptureRequest()).bytes
 
+            // 1. Twenty captures of one paused tick are byte-identical.
+            scene.step = 3
+            val first = slot.capture(CaptureRequest()).bytes
             repeat(19) { attempt ->
                 val again = slot.capture(CaptureRequest()).bytes
                 assertContentEquals(
@@ -66,81 +75,44 @@ class GlCaptureDeterminismTest {
                     "capture ${attempt + 2} of a paused, unchanged scene differs from the first",
                 )
             }
-        }
-    }
 
-    /**
-     * The other half, and the half that makes the first one worth having.
-     *
-     * A capture path that returned a constant would pass the test above perfectly. This asserts
-     * that the bytes track the world: move the scene by one step and the picture changes.
-     */
-    @Test
-    fun `a capture changes when the scene does`() {
-        GlAvailability.require()
-        withPausedHost { backend, _, scene ->
-            val slot = backend.pipeline!!.capture!!
+            // 2. The other half, and the half that makes the first one worth having: a capture
+            // path that returned a constant would pass claim 1 perfectly. This asserts that the
+            // bytes track the world.
             scene.step = 3
             val before = slot.capture(CaptureRequest()).bytes
-
             scene.step = 9
             val after = slot.capture(CaptureRequest()).bytes
-
             assertFalse(
                 before.contentEquals(after),
                 "the capture did not change when the drawn scene did, so it is not reading the frame",
             )
-        }
-    }
 
-    /**
-     * The tick a capture is stamped with is readable *out of the image*, not just off the result.
-     *
-     * Issue #77 asks for a tick counter rendered into the frame and read back from the decoded
-     * PNG. A drawn digit would need a font and an asset pipeline; a bar whose width is the value
-     * carries the same information and is read exactly rather than by OCR. This is what rules out
-     * the whole class of "the capture came back, but it was the previous frame" defect.
-     */
-    @Test
-    fun `the decoded image carries the value the scene was drawn with`() {
-        GlAvailability.require()
-        withPausedHost { backend, _, scene ->
-            val slot = backend.pipeline!!.capture!!
+            // 3. The tick a capture is stamped with is readable out of the image itself, not just
+            // off the result. A bar whose width is the value carries the value exactly, rather
+            // than by OCR on a drawn digit.
             for (value in listOf(1, 7, 16, 31)) {
                 scene.step = value
-
                 val image = ImageIO.read(ByteArrayInputStream(slot.capture(CaptureRequest()).bytes))
-
                 var lit = 0
                 for (x in 0 until image.width) {
                     if ((image.getRGB(x, image.height / 2) and 0x00FF0000) != 0) lit++
                 }
                 assertEquals(value, lit, "the frame was drawn with a bar of a different width")
             }
-        }
-    }
 
-    /**
-     * A region capture of a paused frame is stable too, and is a strict crop of the full frame.
-     *
-     * Worth its own assertion because the region path takes a different read-back rectangle, and
-     * an off-by-one in the origin would still produce a plausible, stable image.
-     */
-    @Test
-    fun `a region capture is the same crop every time`() {
-        GlAvailability.require()
-        withPausedHost { backend, _, scene ->
+            // 4. A region capture of a paused frame is stable too, and is a strict crop of the
+            // full frame. Worth its own assertion because the region path takes a different
+            // read-back rectangle, and an off-by-one in the origin would still produce a
+            // plausible, stable image.
             scene.step = 5
-            val slot = backend.pipeline!!.capture!!
-            val region = dev.wildware.udea.render.capture.CaptureRegion(0, 0, 16, 8)
-
-            val first = slot.capture(CaptureRequest(region = region)).bytes
-            val again = slot.capture(CaptureRequest(region = region)).bytes
-
-            assertContentEquals(first, again)
-            val image = ImageIO.read(ByteArrayInputStream(first))
-            assertEquals(16, image.width)
-            assertEquals(8, image.height)
+            val region = CaptureRegion(0, 0, 16, 8)
+            val regionFirst = slot.capture(CaptureRequest(region = region)).bytes
+            val regionAgain = slot.capture(CaptureRequest(region = region)).bytes
+            assertContentEquals(regionFirst, regionAgain)
+            val regionImage = ImageIO.read(ByteArrayInputStream(regionFirst))
+            assertEquals(16, regionImage.width)
+            assertEquals(8, regionImage.height)
         }
     }
 

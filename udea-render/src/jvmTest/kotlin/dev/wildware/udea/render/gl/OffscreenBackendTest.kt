@@ -1,11 +1,11 @@
 package dev.wildware.udea.render.gl
 
 import de.fabmax.kool.KoolSystem
-import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.core.host.CaptureOutcome
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
@@ -13,71 +13,53 @@ import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.capture.CaptureRequest
-import dev.wildware.udea.core.Tick
-import dev.wildware.udea.render.capture.CaptureStalledException
 import dev.wildware.udea.render.capture.capture
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
- * The `Offscreen` backend, against a real Kool context on OpenGL.
+ * The `Offscreen` backend's ordinary path, against a real Kool context on OpenGL: that a context
+ * exists, is hidden, drives frames, and hands back pixels through both the direct capture path
+ * and `GameHost.screenshot()`. `Headless` being refused rides along here too, because it creates
+ * no context and is free to share a JVM with whatever else is in this file.
  *
- * Everything here needs a context, which is exactly why the rest of this module's tests do not:
- * ordering, timing, interpolation and the capture queue are all checked in a plain JVM, and
- * what is left for a real window is the small set of claims that genuinely are about the window
- * — that it exists, that it is hidden, that a frame reaches the pixels, and that shutting it
- * down releases the caller.
+ * This class's four other lifecycle claims — a second `create` refused, a renderer's exception
+ * releasing waiters, and `close()` stopping the render thread — each need their *own* fresh
+ * `KoolBackend`, and Kool allows only one `KoolContext` per JVM ever. `forkEvery = 1` gives one
+ * fresh JVM per test *class*, so each of those claims now has its own file:
+ * [OffscreenBackendSecondCreateTest], [OffscreenBackendExplodingCaptureTest],
+ * [OffscreenBackendShutdownTest].
  */
 class OffscreenBackendTest {
 
     @Test
-    fun `an Offscreen host gets a real context behind a window nobody can see`() {
+    fun `an Offscreen host boots, drives frames, and hands back pixels through both paths`() {
         GlAvailability.require()
-        withBackend { backend, host ->
+        val drawn = AtomicInteger()
+        withBackend(counting = drawn) { backend, host ->
+            // 1. A real context behind a window nobody can see.
             val report = backend.pipeline
             assertNotNull(report, "the pipeline was never built")
-
             val state = backend.probeContext()
             assertTrue(state.hasGl, "the render backend was not OpenGL")
             assertTrue(state.width > 0 && state.height > 0, "backbuffer was ${state.width}x${state.height}")
             assertTrue(!state.visible, "an Offscreen window must not be visible")
             assertEquals(RenderMode.Offscreen, host.mode)
-        }
-    }
 
-    @Test
-    fun `sixty driven frames reach the renderers`() {
-        GlAvailability.require()
-        val drawn = AtomicInteger()
-        withBackend(counting = drawn) { backend, host ->
+            // 2. Sixty driven frames reach the renderers.
             backend.drive(host)
-
             awaitAtLeast(drawn, 60)
-
             assertTrue(drawn.get() >= 60, "only ${drawn.get()} frames were drawn")
             assertTrue(host.totalTicks > 0, "the loop never ticked")
-        }
-    }
 
-    @Test
-    fun `a capture comes back as PNG bytes stamped with the tick`() {
-        GlAvailability.require()
-        withBackend { backend, host ->
-            backend.drive(host)
+            // 3. A capture comes back as PNG bytes stamped with the tick.
             val slot = backend.pipeline!!.capture!!
-
             val result = slot.capture(CaptureRequest())
-
             assertEquals(RENDER_WIDTH, result.width)
             assertEquals(RENDER_HEIGHT, result.height)
             assertTrue(result.bytes.size > 8, "no image came back")
@@ -86,17 +68,9 @@ class OffscreenBackendTest {
                 result.bytes.take(4),
                 "the bytes are not a PNG",
             )
-        }
-    }
 
-    @Test
-    fun `GameHost screenshot goes through the same pixel path`() {
-        GlAvailability.require()
-        withBackend { backend, host ->
-            backend.drive(host)
-
+            // 4. GameHost.screenshot() goes through the same pixel path.
             val outcome = host.screenshot()
-
             val captured = outcome as? CaptureOutcome.Captured
             assertNotNull(captured, "screenshot returned $outcome")
             assertTrue(captured.image.isNotEmpty())
@@ -108,112 +82,6 @@ class OffscreenBackendTest {
         assertFailsWith<IllegalArgumentException> {
             KoolBackend.start(RenderMode.Headless, WindowConfig(), RenderRegistry())
         }
-    }
-
-    @Test
-    fun `a second create is refused before it allocates anything`() {
-        GlAvailability.require()
-        // The bug: `create` allocated the batches and the pass and a whole pipeline inside
-        // `kool.submit { ... }` and only then called `built.compareAndSet(null, pipeline)`. A
-        // second call therefore made a second pipeline and leaked it, and ran
-        // `registry.build` again -- which re-invokes `onBind(world, ctx)` on the *same retained
-        // system instances*, replacing the live pipeline's bound Families -- on its way to
-        // throwing. `OffscreenBackendTest` appeared to cover this and did not: it called
-        // `create` after `close()`, so it failed at `KoolThread.submit`'s `check(isRunning)` and
-        // the guard itself was never reached.
-        val builds = AtomicInteger()
-        val registry = RenderRegistry()
-        registry.register(RenderPhase.World, { CountingBuildSystem(builds) })
-        val backend = startBackend(registry)
-        try {
-            val first = backend.create(definition().build())
-            assertEquals(1, builds.get(), "the first create did not build the pipeline")
-
-            assertFailsWith<IllegalStateException> { backend.create(definition().build()) }
-
-            // The factory runs *after* the pass and the batches inside the same submitted
-            // block, so one invocation is one pipeline: had the refused call reached the
-            // submit, this would read 2 and two render objects would have leaked.
-            assertEquals(1, builds.get(), "a second pipeline was built and then thrown away")
-            assertSame<Any?>(
-                first.presentation,
-                backend.pipeline,
-                "the live pipeline was replaced by the refused call",
-            )
-        } finally {
-            backend.close()
-        }
-    }
-
-    @Test
-    fun `a renderer that throws releases every waiting capture instead of stranding it`() {
-        GlAvailability.require()
-        // The failure: `KoolThread.run` records the exception and exits, and nothing closed the
-        // capture slot. Every thread blocked in `capture()` then burned its full 10s deadline
-        // and reported "the render thread drew no frame that satisfied it" -- a timeout message
-        // for what was a renderer exception seconds earlier.
-        val explode = AtomicBoolean(false)
-        val registry = RenderRegistry()
-        registry.register(RenderPhase.World, { ExplodingRenderSystem(explode) })
-        val backend = startBackend(registry)
-        try {
-            val host = GameHost(RenderMode.Offscreen, definition(), backend)
-            backend.drive(host)
-            val slot = backend.pipeline!!.capture!!
-
-            val failure = AtomicReference<Throwable?>(null)
-            val done = CountDownLatch(1)
-            val worker = Thread {
-                try {
-                    // A tick far enough out that no ordinary frame will ever serve it, so the
-                    // only two ways this returns are the deadline and the pipeline closing.
-                    slot.capture(CaptureRequest(afterTick = Tick(9_000_000)), timeoutMillis = 30_000)
-                } catch (t: Throwable) {
-                    failure.set(t)
-                } finally {
-                    done.countDown()
-                }
-            }
-            worker.isDaemon = true
-            worker.start()
-            assertTrue(awaitQueued(slot, count = 1, timeoutMillis = 5_000), "the request never queued")
-
-            explode.set(true)
-
-            assertTrue(
-                done.await(15, TimeUnit.SECONDS),
-                "the waiter was left on a render loop that had already died",
-            )
-            val thrown = failure.get()
-            assertTrue(thrown is CaptureStalledException, "was $thrown")
-            assertTrue(
-                "closed" in thrown.message.orEmpty(),
-                "the waiter was told it timed out rather than that the pipeline had gone: " +
-                    thrown.message,
-            )
-        } finally {
-            backend.close()
-        }
-    }
-
-    @Test
-    fun `closing the backend stops the render thread`() {
-        GlAvailability.require()
-        val backend = startBackend(RenderRegistry())
-        backend.close()
-
-        // `close` does not return until the loop has signalled that it exited or its shutdown
-        // budget has run out, so this asks about something that has already happened either
-        // way. There is no deadline in this test to lose a race against -- which is the whole
-        // of issue #178: the assertion below used to be the only one here, and it was reading
-        // `Thread.isAlive` through `KoolThread.submit`, so on a loaded runner it saw a live
-        // thread running a loop that was over and got a `GlContextException` instead.
-        assertFalse(backend.renderLoopRunning, "the render loop was still running after close()")
-
-        // And having exited it stays exited: `awaitExit` returns instead of parking, and a
-        // `create` is refused for the stated reason rather than by whatever the queue does next.
-        backend.awaitExit()
-        assertFailsWith<IllegalStateException> { backend.create(definition().build()) }
     }
 
     // --- fixture -------------------------------------------------------------------------
@@ -252,32 +120,9 @@ class OffscreenBackendTest {
         while (counter.get() < target && System.nanoTime() < deadline) Thread.onSpinWait()
     }
 
-    /** Waits until [count] requests are queued on [slot], up to [timeoutMillis]. */
-    private fun awaitQueued(slot: dev.wildware.udea.render.capture.FrameCaptureSlot, count: Int, timeoutMillis: Long): Boolean {
-        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
-        while (slot.queuedRequests.value < count && System.nanoTime() < deadline) Thread.onSpinWait()
-        return slot.queuedRequests.value >= count
-    }
-
     private class CountingRenderSystem(private val frames: AtomicInteger) : RenderSystem {
         override fun render(target: OffscreenTarget, alpha: Float) {
             frames.incrementAndGet()
-        }
-    }
-
-    /** Counts how many times the registry built it, which is how many times `create` allocated. */
-    private class CountingBuildSystem(builds: AtomicInteger) : RenderSystem {
-        init {
-            builds.incrementAndGet()
-        }
-
-        override fun render(target: OffscreenTarget, alpha: Float): Unit = Unit
-    }
-
-    /** Throws out of a frame, standing in for any renderer that hits a bad asset or a null. */
-    private class ExplodingRenderSystem(private val armed: AtomicBoolean) : RenderSystem {
-        override fun render(target: OffscreenTarget, alpha: Float) {
-            if (armed.get()) error("a renderer threw in the middle of a frame")
         }
     }
 

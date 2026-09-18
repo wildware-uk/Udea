@@ -1,52 +1,47 @@
 package dev.wildware.udea.render.gl
 
-import dev.wildware.udea.core.host.RenderMode
-import dev.wildware.udea.render.RenderRegistry
-import dev.wildware.udea.render.backend.KoolBackend
-import dev.wildware.udea.render.backend.WindowConfig
 import org.junit.jupiter.api.Assumptions
 
 /**
  * Whether this JVM can actually create a Kool context, decided once and cached.
  *
- * ## Why a skip is allowed here, and only here
+ * ## Why this reads an environment variable rather than actually creating a context
  *
- * A test that silently skips is normally worse than no test: it is green and it checked
- * nothing. The exception is a test whose subject *is* the display — an `Offscreen` backend
- * boots a real hidden window with a real driver behind it, and a container, a headless CI
- * agent or a machine with no GPU cannot provide one. On such a box the honest answer is "this
- * cannot be checked here", not a red build that says the code is broken.
+ * It used to: a throwaway 1x1 `KoolBackend` created and immediately closed, on the reasoning
+ * that a probe should exercise the exact path it is answering for. That reasoning turned out to
+ * be a defect rather than a strength. Kool 0.19.0 allows **one `KoolContext` per JVM for the
+ * life of the JVM** and refuses a second `createContext` even after the first has closed (see
+ * `KoolThread`'s KDoc) — so a probe that creates and closes one has *spent the process's one
+ * allowance on the probe itself*, and the real backend a test goes on to create is the one that
+ * fails. Every GL test in this suite called `GlAvailability.require()` as its first line, so
+ * every single one of them was failing this way — `udeaGlTest` under xvfb reported
+ * `GlContextException` from `KoolSystem`'s own "context already created" guard on every test,
+ * which is a different failure from "no display" and was being reported as one.
  *
- * So it is a skip **with a stated reason**, and it can be turned into a hard failure with
- * `-Dudea.render.requireGl=true` — which is what a CI job with a display should set, so that a
- * backend which quietly stops booting cannot hide behind a skip forever.
+ * `$DISPLAY` is the signal this file's own build script already reasons about (see the "GL
+ * trap" note wherever `udea.render.requireGl` is discussed): a machine with no display has no
+ * X server and cannot create a context regardless of Kool's per-process limit, and that is
+ * exactly the case this existed to detect. It is weaker than a real probe — a display could be
+ * present and still fail to give up a context, for a driver reason this cannot see - but a real
+ * probe is not available at this cost, and the tests that actually create a context still fail
+ * loudly, under their own name, if the display turns out not to work.
  */
 internal object GlAvailability {
 
-    /** `-Dudea.render.requireGl=true` turns an unavailable context into a failure. */
+    /** `-Dudea.render.requireGl=true` turns an unavailable display into a failure. */
     const val REQUIRE_PROPERTY: String = "udea.render.requireGl"
 
-    /** Why the context could not be created, or `null` when one can be. */
-    val failure: String? by lazy { probe() }
+    /** Why there is no display, or `null` when one is advertised. */
+    val failure: String? by lazy {
+        if (System.getenv("DISPLAY").orEmpty().isNotBlank()) null else "no DISPLAY is set"
+    }
 
-    /** Skips the calling test when there is no context, unless [REQUIRE_PROPERTY] is set. */
+    /** Skips the calling test when there is no display, unless [REQUIRE_PROPERTY] is set. */
     fun require() {
         val reason = failure ?: return
         check(System.getProperty(REQUIRE_PROPERTY) != "true") {
-            "$REQUIRE_PROPERTY=true but no Kool context could be created: $reason"
+            "$REQUIRE_PROPERTY=true but $reason"
         }
         Assumptions.abort<Unit>("no Kool context on this machine: $reason")
-    }
-
-    private fun probe(): String? = try {
-        // A 1x1 hidden window: the cheapest thing that still exercises GLFW, the driver and the
-        // Kool natives, which are the three things that fail on a machine with no display.
-        KoolBackend.start(
-            RenderMode.Offscreen,
-            WindowConfig(title = "udea-gl-probe", windowWidth = 1, windowHeight = 1),
-            RenderRegistry(),
-        ).use { null }
-    } catch (failure: Throwable) {
-        "${failure::class.java.name}: ${failure.message}"
     }
 }

@@ -73,224 +73,195 @@ import kotlin.test.assertTrue
  * human to drive over HTTP, so a green run here means that demo works, and the transcript and the
  * test cannot drift apart.
  *
- * Everything runs on the render thread via [KoolBackend.onRenderThread]: on an `Offscreen` host
- * that thread is the simulation thread, so pumping the loop from the test thread would be a
- * different, easier arrangement than the one that ships.
+ * The render thread runs [AgentGameLoop.pump] on its own, via [KoolBackend.drive] — the same
+ * wiring `Phase1OffscreenDemo` uses for a live host — and this thread only submits a command and
+ * polls for it, exactly as an HTTP handler does. Pumping from the test thread directly would be a
+ * different, easier arrangement than the one that ships, and it is precisely the arrangement
+ * this class had before issue #211's Kool port dropped the `drive` wiring that used to come from
+ * `Lwjgl3Application`'s own render callback for free: nothing then ever advanced a Kool frame,
+ * and every capture timed out waiting for one.
+ *
+ * ## Why seven claims share one `@Test` method
+ *
+ * Kool allows exactly one `KoolContext` per JVM for the life of the JVM (`KoolThread`'s KDoc),
+ * and `forkEvery = 1` gives this class one JVM, not one per method. Seven methods each starting
+ * their own `KoolBackend` raced for that one context; only the first ever won. One context,
+ * shared by every claim in sequence below, is what the fork setting actually buys. The claims
+ * that touch the camera or spawn entities are ordered so each either resets what it changed or
+ * does not depend on what came before it: `set_camera` and `follow_entity` come after every claim
+ * that assumes an untouched camera, and `follow_entity`'s own claim resets the camera to the
+ * origin first rather than trusting wherever `set_camera`'s claim left it.
  */
 class OffscreenRenderToolsTest {
 
     @TempDir
     lateinit var temp: Path
 
-    /**
-     * The Phase 1 demo, as an assertion: screenshot, move, screenshot, diff, rewind, screenshot.
-     *
-     * The two diffs are the whole claim. A *before* and an *after* must differ in the way the
-     * world differs, and the frame drawn after a rewind must match the one drawn before the write
-     * — byte for byte, because the loop is paused and the scene is a function of the simulated
-     * state alone (see `GlCaptureDeterminismTest` for why that is the honest form of the
-     * determinism claim).
-     */
     @Test
-    fun `screenshot rewind screenshot shows the world going back`() {
-        GlAvailabilityHere.require()
-        withHost { fixture ->
-            fixture.ok("time.pause")
-            val spawn = fixture.ok("world.spawn_blueprint", "blueprint" to "box", "x" to "0", "y" to "0")
-            val netId = Regex(""""id":(-?\d+)""").find(spawn)?.groupValues?.get(1)
-            assertNotNull(netId, "spawn_blueprint reported no NetId: $spawn")
-            // Enough ticks for the snapshot ring to hold history: `time.rewind` restores from a
-            // recorded tick, and a world three ticks old has nothing to go back to.
-            fixture.ok("time.step", "ticks" to "30")
-
-            val before = fixture.capture()
-
-            fixture.ok(
-                "world.set_component_field",
-                "id" to netId,
-                "component" to "PhysicsBody",
-                "field" to "x",
-                "value" to "9.0",
-            )
-            fixture.ok("time.step", "ticks" to "1")
-            val moved = fixture.capture()
-
-            val movedDiff = fixture.ok("render.compare_artifacts", "a" to before.id, "b" to moved.id)
-            assertContains(movedDiff, """"identical":false""")
-            assertFalse(
-                before.bytes.contentEquals(moved.bytes),
-                "the box moved nine world units and the capture did not change",
-            )
-
-            fixture.ok("time.rewind", "ticks" to "2")
-            val rewound = fixture.capture()
-
-            val rewoundDiff = fixture.ok("render.compare_artifacts", "a" to before.id, "b" to rewound.id)
-            assertContains(
-                rewoundDiff,
-                """"identical":true""",
-                message = "the frame after a rewind differs from the frame before the write it undid",
-            )
-            assertContentEquals(before.bytes, rewound.bytes)
-        }
-    }
-
-    /**
-     * The bytes filed under an artifact id are the bytes the renderer produced, and they are a PNG.
-     *
-     * The path through the store is where a capture could plausibly be truncated or re-encoded,
-     * and an agent fetching `GET /artifact` gets exactly this file.
-     */
-    @Test
-    fun `a capture is filed as a PNG whose size matches the framebuffer`() {
+    fun `the render toolset against a real driver, end to end`() {
         GlAvailabilityHere.require()
         withHost { fixture ->
             fixture.ok("time.pause")
 
-            val shot = fixture.capture()
+            // 1. The bytes filed under an artifact id are the bytes the renderer produced, and
+            // they are a PNG. The path through the store is where a capture could plausibly be
+            // truncated or re-encoded, and an agent fetching GET /artifact gets exactly this file.
+            run {
+                val shot = fixture.capture()
+                assertContains(shot.json, """"w":$RENDER_WIDTH""")
+                assertContains(shot.json, """"h":$RENDER_HEIGHT""")
+                assertTrue(shot.bytes.size > PNG_SIGNATURE.size)
+                assertContentEquals(PNG_SIGNATURE, shot.bytes.copyOf(PNG_SIGNATURE.size))
+                val decoded = javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(shot.bytes))
+                assertNotNull(decoded, "the filed artifact is not a decodable image")
+                assertEquals(RENDER_WIDTH, decoded.width)
+                assertEquals(RENDER_HEIGHT, decoded.height)
+            }
 
-            assertContains(shot.json, """"w":$RENDER_WIDTH""")
-            assertContains(shot.json, """"h":$RENDER_HEIGHT""")
-            assertTrue(shot.bytes.size > PNG_SIGNATURE.size)
-            assertContentEquals(PNG_SIGNATURE, shot.bytes.copyOf(PNG_SIGNATURE.size))
-            val decoded = javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(shot.bytes))
-            assertNotNull(decoded, "the filed artifact is not a decodable image")
-            assertEquals(RENDER_WIDTH, decoded.width)
-            assertEquals(RENDER_HEIGHT, decoded.height)
-        }
-    }
+            // 2. toggle_debug_draw changes the picture, not just the answer. A tool that returned
+            // debugDraw:true while every subsequent capture looked identical would be reporting a
+            // field rather than a behaviour. Ends with debug draw off again, restoring the state
+            // the next claim assumes.
+            run {
+                val off = fixture.capture()
+                assertContains(fixture.ok("render.toggle_debug_draw"), """"debugDraw":true""")
+                val on = fixture.capture()
+                assertFalse(
+                    off.bytes.contentEquals(on.bytes),
+                    "the debug grid was switched on and the frame did not change",
+                )
+                assertContains(fixture.ok("render.toggle_debug_draw"), """"debugDraw":false""")
+                assertContentEquals(
+                    off.bytes,
+                    fixture.capture().bytes,
+                    "switching the overlay back off did not restore the frame",
+                )
+            }
 
-    /**
-     * `toggle_debug_draw` changes the picture, not just the answer.
-     *
-     * A tool that returned `{"debugDraw":true}` while every subsequent capture looked identical
-     * would be reporting a field rather than a behaviour, and an agent that turned the overlay on
-     * to look at collision shapes would see none and conclude the game had none.
-     */
-    @Test
-    fun `toggling debug draw changes what a capture contains`() {
-        GlAvailabilityHere.require()
-        withHost { fixture ->
-            fixture.ok("time.pause")
-            val off = fixture.capture()
+            // 3. An id nothing resolves to is refused by name rather than accepted and forgotten.
+            // Through the real adapter and the real rig: RenderToolset -> OffscreenRenderControl
+            // -> PresentationControl -> CameraRig -> NetIdIndex, and back with a reason.
+            run {
+                val refusal = fixture.call("render.follow_entity", "netId" to "$UNALLOCATED_NET_ID")
+                assertTrue(refusal is AgentResult.Failed, "an unallocated id was accepted: $refusal")
+                assertEquals("no_such_entity", refusal.error.kind.id)
+            }
 
-            assertContains(fixture.ok("render.toggle_debug_draw"), """"debugDraw":true""")
-            val on = fixture.capture()
+            // 4. A region capture crops the framebuffer, and an impossible region is refused by
+            // name. Neither depends on what is drawn, so it runs before anything moves the camera.
+            run {
+                val json = fixture.ok(
+                    "render.screenshot_region",
+                    "x" to "0", "y" to "0", "w" to "16", "h" to "8",
+                )
+                val id = requireNotNull(Regex(""""artifactId":"([^"]+)"""").find(json)).groupValues[1]
+                val decoded = javax.imageio.ImageIO.read(
+                    java.io.ByteArrayInputStream(fixture.artifactBytes(id)),
+                )
+                assertEquals(16, decoded.width)
+                assertEquals(8, decoded.height)
 
-            assertFalse(
-                off.bytes.contentEquals(on.bytes),
-                "the debug grid was switched on and the frame did not change",
-            )
+                val refusal = fixture.call(
+                    "render.screenshot_region",
+                    "x" to "0", "y" to "0", "w" to "9000", "h" to "9000",
+                )
+                assertTrue(refusal is AgentResult.Failed)
+                assertEquals("bad_argument", refusal.error.kind.id)
+                assertContains(refusal.error.message, "(0, 0, $RENDER_WIDTH, $RENDER_HEIGHT)")
+            }
 
-            assertContains(fixture.ok("render.toggle_debug_draw"), """"debugDraw":false""")
-            assertContentEquals(
-                off.bytes,
-                fixture.capture().bytes,
-                "switching the overlay back off did not restore the frame",
-            )
-        }
-    }
+            // 5. set_camera moves the view, which is only observable in a capture.
+            run {
+                fixture.ok("world.spawn_blueprint", "blueprint" to "box", "x" to "0", "y" to "0")
+                fixture.ok("time.step", "ticks" to "1")
+                val centred = fixture.capture()
 
-    /** `set_camera` moves the view, which is only observable in a capture. */
-    @Test
-    fun `set_camera changes the framing of the next capture`() {
-        GlAvailabilityHere.require()
-        withHost { fixture ->
-            fixture.ok("time.pause")
-            fixture.ok("world.spawn_blueprint", "blueprint" to "box", "x" to "0", "y" to "0")
-            fixture.ok("time.step", "ticks" to "1")
-            val centred = fixture.capture()
+                fixture.ok("render.set_camera", "x" to "12", "y" to "0", "zoom" to "1")
+                val panned = fixture.capture()
 
-            fixture.ok("render.set_camera", "x" to "12", "y" to "0", "zoom" to "1")
-            val panned = fixture.capture()
+                assertFalse(
+                    centred.bytes.contentEquals(panned.bytes),
+                    "the camera was moved twelve world units and the frame did not change",
+                )
+            }
 
-            assertFalse(
-                centred.bytes.contentEquals(panned.bytes),
-                "the camera was moved twelve world units and the frame did not change",
-            )
-        }
-    }
+            // 6. follow_entity against the real stack: accepted for an entity it can track, and
+            // the camera demonstrably moves because of it. The camera is put back at the origin
+            // first, deliberately, rather than trusting wherever claim 5 left it - the whole point
+            // of the check PresentationControl.follow makes is that APPLIED is a promise about the
+            // *next frames*, so the assertion has to be about frames, and it needs a known start.
+            run {
+                fixture.ok("render.set_camera", "x" to "0", "y" to "0", "zoom" to "1")
+                val spawned = fixture.ok(
+                    "world.spawn_blueprint",
+                    "blueprint" to "box", "x" to "12", "y" to "0",
+                )
+                val netId = requireNotNull(Regex(""""id":(-?\d+)""").find(spawned)).groupValues[1]
+                fixture.ok("time.step", "ticks" to "1")
 
-    /**
-     * `follow_entity` against the real stack: accepted for an entity it can track, and the camera
-     * demonstrably moves because of it.
-     *
-     * The whole point of the check `PresentationControl.follow` now makes is that `APPLIED` is a
-     * promise about the *next frames*, so the assertion has to be about frames. The camera starts
-     * at the origin, the box is spawned twelve units away, and the rig eases toward it - so two
-     * captures a few frames apart differ, and they differ for no other reason: the simulation is
-     * paused throughout, so nothing in the world is moving.
-     */
-    @Test
-    fun `follow_entity accepts a trackable entity and the camera moves onto it`() {
-        GlAvailabilityHere.require()
-        withHost { fixture ->
-            fixture.ok("time.pause")
-            val spawned = fixture.ok(
-                "world.spawn_blueprint",
-                "blueprint" to "box", "x" to "12", "y" to "0",
-            )
-            val netId = requireNotNull(Regex(""""id":(-?\d+)""").find(spawned)).groupValues[1]
-            fixture.ok("time.step", "ticks" to "1")
+                val before = fixture.capture()
+                assertContains(fixture.ok("render.follow_entity", "netId" to netId), """"following":""")
+                repeat(FOLLOW_FRAMES) { fixture.ok("render.toggle_debug_draw", "enabled" to "false") }
+                val after = fixture.capture()
 
-            val before = fixture.capture()
-            assertContains(fixture.ok("render.follow_entity", "netId" to netId), """"following":""")
-            repeat(FOLLOW_FRAMES) { fixture.ok("render.toggle_debug_draw", "enabled" to "false") }
-            val after = fixture.capture()
+                assertFalse(
+                    before.bytes.contentEquals(after.bytes),
+                    "render.follow_entity answered ok and the camera never moved, which is " +
+                        "exactly the silent success this surface is not allowed to have",
+                )
+            }
 
-            assertFalse(
-                before.bytes.contentEquals(after.bytes),
-                "render.follow_entity answered ok and the camera never moved, which is exactly " +
-                    "the silent success this surface is not allowed to have",
-            )
-        }
-    }
+            // 7. The Phase 1 demo, as an assertion: screenshot, move, screenshot, diff, rewind,
+            // screenshot. The two diffs are the whole claim - self-contained, since it spawns its
+            // own entity and only ever compares captures of it against each other. `set_camera`
+            // first, and deliberately: claim 6 left the camera *following*, and follow easing
+            // runs on real elapsed time (`KoolBackend.drive` now pumps with the frame's real
+            // delta, not zero, since the fix that let a capture settle on a later real frame
+            // rather than the one that queued it - see `AgentContext.answerWhenReady`). A camera
+            // still easing toward claim 6's target would drift a pixel or two between this
+            // claim's own "before" and "rewound" captures for a reason that has nothing to do
+            // with the rewind, and did exactly that the first time this ran merged.
+            // `set_camera` also stops following (`CameraOutcome`'s own contract), which is what
+            // actually pins it.
+            run {
+                fixture.ok("render.set_camera", "x" to "0", "y" to "0", "zoom" to "1")
+                val spawn = fixture.ok("world.spawn_blueprint", "blueprint" to "box", "x" to "0", "y" to "0")
+                val netId = Regex(""""id":(-?\d+)""").find(spawn)?.groupValues?.get(1)
+                assertNotNull(netId, "spawn_blueprint reported no NetId: $spawn")
+                // Enough ticks for the snapshot ring to hold history: time.rewind restores from a
+                // recorded tick, and a world three ticks old has nothing to go back to.
+                fixture.ok("time.step", "ticks" to "30")
 
-    /**
-     * An id nothing resolves to is refused by name rather than accepted and forgotten.
-     *
-     * Through the real adapter and the real rig, so what is being checked is the whole path:
-     * `RenderToolset` -> `OffscreenRenderControl` -> `PresentationControl` -> `CameraRig` ->
-     * `NetIdIndex`, and back with a reason.
-     */
-    @Test
-    fun `follow_entity refuses an id that resolves to nothing`() {
-        GlAvailabilityHere.require()
-        withHost { fixture ->
-            fixture.ok("time.pause")
+                val before = fixture.capture()
 
-            val refusal = fixture.call("render.follow_entity", "netId" to "$UNALLOCATED_NET_ID")
+                fixture.ok(
+                    "world.set_component_field",
+                    "id" to netId,
+                    "component" to "PhysicsBody",
+                    "field" to "x",
+                    "value" to "9.0",
+                )
+                fixture.ok("time.step", "ticks" to "1")
+                val moved = fixture.capture()
 
-            assertTrue(refusal is AgentResult.Failed, "an unallocated id was accepted: $refusal")
-            assertEquals("no_such_entity", refusal.error.kind.id)
-        }
-    }
+                val movedDiff = fixture.ok("render.compare_artifacts", "a" to before.id, "b" to moved.id)
+                assertContains(movedDiff, """"identical":false""")
+                assertFalse(
+                    before.bytes.contentEquals(moved.bytes),
+                    "the box moved nine world units and the capture did not change",
+                )
 
-    /** A region capture crops the framebuffer, and an impossible region is refused by name. */
-    @Test
-    fun `screenshot_region crops, and an out-of-bounds region is refused`() {
-        GlAvailabilityHere.require()
-        withHost { fixture ->
-            fixture.ok("time.pause")
+                fixture.ok("time.rewind", "ticks" to "2")
+                val rewound = fixture.capture()
 
-            val json = fixture.ok(
-                "render.screenshot_region",
-                "x" to "0", "y" to "0", "w" to "16", "h" to "8",
-            )
-            val id = requireNotNull(Regex(""""artifactId":"([^"]+)"""").find(json)).groupValues[1]
-            val decoded = javax.imageio.ImageIO.read(
-                java.io.ByteArrayInputStream(fixture.artifactBytes(id)),
-            )
-            assertEquals(16, decoded.width)
-            assertEquals(8, decoded.height)
-
-            val refusal = fixture.call(
-                "render.screenshot_region",
-                "x" to "0", "y" to "0", "w" to "9000", "h" to "9000",
-            )
-            assertTrue(refusal is AgentResult.Failed)
-            assertEquals("bad_argument", refusal.error.kind.id)
-            assertContains(refusal.error.message, "(0, 0, $RENDER_WIDTH, $RENDER_HEIGHT)")
+                val rewoundDiff = fixture.ok("render.compare_artifacts", "a" to before.id, "b" to rewound.id)
+                assertContains(
+                    rewoundDiff,
+                    """"identical":true""",
+                    message = "the frame after a rewind differs from the frame before the write it undid",
+                )
+                assertContentEquals(before.bytes, rewound.bytes)
+            }
         }
     }
 
@@ -358,33 +329,37 @@ class OffscreenRenderToolsTest {
                 host,
                 AgentRuntime(bridge, tools, host.world, host.ctx, digest),
             )
-            block(Fixture(backend, bridge, loop, artifacts))
+            // The free-running driver: exactly what `Phase1OffscreenDemo` wires for a live host.
+            // Without it nothing ever calls `loop.pump`, and a queued capture waits for a frame
+            // that never comes - `FrameCaptureSlot` reports "the render loop has stopped
+            // drawing", which is a true description of a loop that never started. This was the
+            // one thing missing here: production drives the same way and was never affected.
+            backend.drive(loop::pump)
+            block(Fixture(bridge, artifacts))
         } finally {
             backend.close()
         }
     }
 
-    /** One command at a time, pumped on the render thread, exactly as a live host runs. */
+    /**
+     * One command at a time, submitted from this thread and polled for completion, exactly as
+     * an HTTP handler over a driven host does — the render thread runs [AgentGameLoop.pump] on
+     * its own via [KoolBackend.drive], installed in [withHost].
+     */
     private class Fixture(
-        private val backend: KoolBackend,
         private val bridge: AgentBridge,
-        private val loop: AgentGameLoop,
         private val artifacts: AgentArtifacts,
     ) {
 
         fun call(name: String, vararg args: Pair<String, String>): AgentResult {
             val accepted = bridge.submit(AgentCommand(name, args.toMap())) as? AgentSubmission.Accepted
                 ?: error("the bridge refused $name")
-            repeat(MAX_PUMPS) {
-                // On the render thread, which is where a driven host pumps from. Anything that
-                // only works when the pump and the render are on different threads is not a
-                // property this engine has.
-                backend.onRenderThread { loop.pump(0f) }
-                if (bridge.completedCommandId() >= accepted.commandId) {
-                    return bridge.commandResults().last { it.id == accepted.commandId }.result
-                }
+            val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(COMMAND_TIMEOUT_SECONDS)
+            while (bridge.completedCommandId() < accepted.commandId && System.nanoTime() < deadline) {
+                Thread.onSpinWait()
             }
-            error("$name did not complete within $MAX_PUMPS iterations")
+            return bridge.commandResults().lastOrNull { it.id == accepted.commandId }?.result
+                ?: error("$name did not complete within ${COMMAND_TIMEOUT_SECONDS}s")
         }
 
         fun ok(name: String, vararg args: Pair<String, String>): String {
@@ -405,7 +380,7 @@ class OffscreenRenderToolsTest {
         }
 
         companion object {
-            const val MAX_PUMPS = 8
+            const val COMMAND_TIMEOUT_SECONDS = 20L
         }
     }
 
@@ -422,7 +397,7 @@ class OffscreenRenderToolsTest {
         const val RENDER_HEIGHT = 64
 
         /**
-         * Frames driven between the two captures of the follow test.
+         * Frames driven between the two captures of the follow claim.
          *
          * Enough for a 0.1s half-life to close most of twelve world units, and driven with a
          * harmless tool call because every command this fixture sends pumps exactly one frame.

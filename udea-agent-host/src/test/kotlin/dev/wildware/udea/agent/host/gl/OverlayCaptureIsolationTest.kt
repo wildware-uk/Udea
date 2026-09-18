@@ -88,6 +88,14 @@ import kotlin.test.assertTrue
  *
  * The overlay exists only in [RenderMode.Windowed] - spec 3.7's other rule - so running this in
  * `Offscreen` would be asserting the isolation of something that had already switched itself off.
+ *
+ * ## One boot, not two
+ *
+ * This used to boot a fresh `KoolBackend` for `overlay = false` and a second one for
+ * `overlay = true`. Kool allows exactly one `KoolContext` per JVM for the life of the JVM
+ * (`KoolThread`'s KDoc), so the second boot failed with `GlContextException`. The overlay system
+ * is now always registered, gated by a mutable [ToggleableOverlay.enabled] flag, toggled between
+ * two capture passes of one boot in place of a second boot.
  */
 class OverlayCaptureIsolationTest {
 
@@ -108,8 +116,7 @@ class OverlayCaptureIsolationTest {
                 "about nothing.",
         )
 
-        val without = runOnce(overlay = false, routes = routes)
-        val with = runOnce(overlay = true, routes = routes)
+        val (without, with) = runBoth(routes)
 
         // 1. The overlay reached the window. Without this the rest is a statement about a no-op.
         assertEquals(
@@ -175,7 +182,8 @@ class OverlayCaptureIsolationTest {
 
     private class Run(val captures: Map<String, ByteArray>, val windowSample: Int)
 
-    private fun runOnce(overlay: Boolean, routes: List<Route>): Run {
+    /** Both halves of the comparison, taken from one boot: overlay off, then overlay on. */
+    private fun runBoth(routes: List<Route>): Pair<Run, Run> {
         val bridge = AgentBridge()
         val sessions = AgentSessions()
         // Real overlay content, so "the captures matched" is not two blank panels agreeing.
@@ -189,14 +197,16 @@ class OverlayCaptureIsolationTest {
             mode = RenderMode.Windowed,
             initialVerbosity = OverlayVerbosity.VERBOSE,
         )
-        if (overlay) {
-            registry.overlay({ resources ->
-                AgentOverlaySystem(resources, OverlayContent { canvas, dt, projector, locator ->
-                    view.render(canvas, dt, projector, locator)
-                })
-            })
-        }
-        // Registered in both runs, so the window is sampled at the same point in the frame.
+        lateinit var overlay: ToggleableOverlay
+        registry.overlay({ resources ->
+            ToggleableOverlay(
+                AgentOverlaySystem(
+                    resources,
+                    OverlayContent { canvas, dt, projector, locator -> view.render(canvas, dt, projector, locator) },
+                ),
+            ).also { overlay = it }
+        })
+        // Registered in both rounds, so the window is sampled at the same point in the frame.
         val probe = WindowProbe()
         registry.overlay({ probe })
 
@@ -215,7 +225,7 @@ class OverlayCaptureIsolationTest {
             val host = GameHost(RenderMode.Windowed, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()), backend)
             val pipeline = checkNotNull(backend.pipeline) { "the backend built no pipeline" }
 
-            val artifacts = AgentArtifacts(artifactRoot.resolve(if (overlay) "with" else "without"))
+            val artifacts = AgentArtifacts(artifactRoot)
             // The *real* adapter, the one `Phase1OffscreenDemo` wires. A route proven against a
             // control invented by this test would prove nothing about the route an agent drives.
             val control = OffscreenRenderControl(PresentationControl(pipeline))
@@ -231,19 +241,39 @@ class OverlayCaptureIsolationTest {
             // driving with `host::frame` would leave every submitted command in the queue for ever.
             backend.drive { dtSeconds -> loop.pump(dtSeconds) }
 
-            // Several frames of overlay before anything is captured, so a capture that *did* read
-            // the window would certainly contain overlay pixels.
+            // Several frames before anything is captured, so a capture that *did* read the window
+            // would certainly contain overlay pixels once the overlay is switched on below.
             awaitFrames(probe, probe.frames.get() + SETTLE_FRAMES)
 
-            val captured = LinkedHashMap<String, ByteArray>()
-            for (route in routes) {
-                captured[route.name] = bytesOf(route, bridge, artifacts)
-            }
-
+            val withoutCaptures = LinkedHashMap<String, ByteArray>()
+            for (route in routes) withoutCaptures[route.name] = bytesOf(route, bridge, artifacts)
             awaitFrames(probe, probe.frames.get() + 2)
-            return Run(captured, probe.sample.get())
+            val without = Run(withoutCaptures, probe.sample.get())
+
+            overlay.enabled = true
+            awaitFrames(probe, probe.frames.get() + SETTLE_FRAMES)
+
+            val withCaptures = LinkedHashMap<String, ByteArray>()
+            for (route in routes) withCaptures[route.name] = bytesOf(route, bridge, artifacts)
+            awaitFrames(probe, probe.frames.get() + 2)
+            val with = Run(withCaptures, probe.sample.get())
+
+            return without to with
         } finally {
             backend.close()
+        }
+    }
+
+    /**
+     * Gates a real [OverlaySystem] behind a mutable flag, so one boot can serve both halves of
+     * the comparison — see the class KDoc's "one boot, not two".
+     */
+    private class ToggleableOverlay(private val delegate: OverlaySystem) : OverlaySystem {
+        @Volatile
+        var enabled: Boolean = false
+
+        override fun render(target: ScreenTarget, dtSeconds: Float) {
+            if (enabled) delegate.render(target, dtSeconds)
         }
     }
 

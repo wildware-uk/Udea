@@ -167,6 +167,13 @@ val udeaAgentGlTest = tasks.register<Test>("udeaAgentGlTest") {
     useJUnitPlatform()
     filter { includeTestsMatching("$agentGlTestPackage.*") }
 
+    // Kool allows exactly one KoolContext per JVM for the life of the JVM (see udea-render's
+    // udeaGlTest, which states the same rule): a test class that starts a backend owns its JVM.
+    // This task ran every GL test class in one shared JVM until issue #211 found it — the second
+    // class to start a backend failed with GlContextException, reported as a test failure that
+    // looked like it belonged to whatever that class was actually testing.
+    forkEvery = 1
+
     // Set on any CI job that has a display, so a render toolset which quietly stops working
     // cannot hide behind a skip forever. Same property `udea-render`'s GL tests read.
     systemProperty(

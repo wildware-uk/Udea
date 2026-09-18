@@ -63,15 +63,20 @@ internal object UdeaMultiplatform {
      * @param ios whether to add `iosArm64` and `iosSimulatorArm64`. `false` only for the render
      *   variant: Kool has no iOS backend (spec D2), so the module that draws cannot target iOS
      *   until it has one. Every other runtime module builds and tests for iOS.
+     * @param wasm whether to add `wasmJs`. `false` only for the render variant, because Kool
+     *   0.19.0 publishes no wasmJs artifact (issue #223): a `wasmJs` target on the module that
+     *   draws with Kool fails resolution before it compiles anything.
      */
-    fun configure(project: Project, ios: Boolean) {
+    fun configure(project: Project, ios: Boolean, wasm: Boolean = true) {
         val kotlin = project.extensions.getByType<KotlinMultiplatformExtension>()
 
         kotlin.jvm()
 
-        // Node rather than a browser: logic tests run on Node (spec section 7's table). A module
-        // that needs a browser for its tests adds `browser()` itself.
-        kotlin.wasmJs { nodejs() }
+        if (wasm) {
+            // Node rather than a browser: logic tests run on Node (spec section 7's table). A
+            // module that needs a browser for its tests adds `browser()` itself.
+            kotlin.wasmJs { nodejs() }
+        }
 
         if (ios) {
             // No `iosX64`: spec section 3 names the two ARM targets.

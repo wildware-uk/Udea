@@ -13,7 +13,6 @@ import dev.wildware.udea.core.identity.NetId
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 import kotlin.reflect.KClass
 
 /**
@@ -35,15 +34,17 @@ import kotlin.reflect.KClass
  * ## Why capture hands back a `Future` and does not just return the bytes
  *
  * A tool runs inside a `SimBarrier` drain, and on an `Offscreen` or `Windowed` host the thread
- * running that drain **is** the render thread: `Lwjgl3Backend` hands the frame callback to the GL
- * thread, and `GameLoop.frame` ticks and then renders on it. A `capture()` that blocked until the
- * next frame would be waiting for the thread it is running on. `ToolRegistry` states the rule in
- * as many words - *it must not block, sleep or wait on another thread*.
+ * running that drain **is** the render thread: `KoolBackend.drive` hands the frame callback to
+ * the render thread, and `GameLoop.frame` ticks and then renders on it. A `capture()` that
+ * blocked until a frame settled it would be waiting for the thread it is running on.
+ * `ToolRegistry` states the rule in as many words - *it must not block, sleep or wait on another
+ * thread*.
  *
- * So the implementation queues the request and returns; the frame drawn later in the same
- * `GameHost.frame` call settles the future; and the tool collects it from
- * [AgentContext.answerLater], which runs after the tick and before the state document is
- * published. One frame, no blocking, and the command still completes with a real answer rather
+ * So the implementation queues the request and returns; a frame drawn later settles the future -
+ * on Kool that is the *next* frame after the one that queued it, since a request is claimed at
+ * one frame's capture point and only read at the top of the next - and the tool collects it from
+ * [AgentContext.answerWhenReady], polled once per host iteration until the future is settled or a
+ * grace period runs out. No blocking, and the command still completes with a real answer rather
  * than a promise.
  */
 public interface RenderControl {
@@ -60,23 +61,21 @@ public interface RenderControl {
      * ## Why there is no `afterTick` here any more
      *
      * The renderer can hold a request until a named tick has finished - `FrameCaptureSlot` does
-     * exactly that, and `GameHost.screenshot` uses it. This port cannot expose that, and the
-     * reason is the dispatcher rather than the pixel path. A capture tool queues the request,
-     * returns, and assembles its answer in `AgentContext.answerLater`, which runs **once**, at
-     * the end of the same host iteration. A request for a tick that has not been simulated yet
-     * cannot be served by that iteration's frame, and there is no second callback to answer
-     * from: the only way to wait would be to block the thread that draws the frames, which on an
-     * `Offscreen` or `Windowed` host is this one.
+     * exactly that, and `GameHost.screenshot` uses it. This port does not expose that, and the
+     * reason was the dispatcher rather than the pixel path: a capture tool queues the request and
+     * assembles its answer in `AgentContext.answerLater`, which used to run **once**, so a request
+     * for a tick not yet simulated had no callback left to be served from.
      *
-     * A request for a tick that *has* already finished is served by the next frame - which is
-     * what a request with no tick at all is served by. So every value the toolset could have
-     * accepted selected the identical frame, and the argument was inert while reading, in the
-     * schema, as though a screenshot could be aimed at a moment. It is gone from the surface
-     * rather than left there answering `ok`; [CaptureFrame.tick] is what an agent actually needs
-     * and is the tick the renderer stamped, not one this module assumed.
-     *
-     * It comes back the day `AgentContext` can complete a command from a later frame, and that
-     * is a change in `udea-agent`, not here.
+     * `AgentContext.answerWhenReady` (issue #211) removed that specific constraint - a tool's
+     * answer can now be polled across as many host iterations as it needs - so the reasoning
+     * above no longer forces this argument's absence by itself. It stays gone anyway: every value
+     * the toolset could have accepted selected the identical frame regardless (the next one this
+     * renderer draws), so the argument was inert while reading, in the schema, as though a
+     * screenshot could be aimed at a moment. [CaptureFrame.tick] is what an agent actually needs
+     * and is the tick the renderer stamped, not one this module assumed. Bringing back an
+     * `afterTick` that genuinely waits for a *named future* tick is a design change with its own
+     * questions - what a still-paused host should answer, chiefly - and belongs to whichever
+     * ticket wants that feature, not to this correction.
      *
      * @param region `null` for the whole framebuffer. Already validated against the framebuffer
      *   by the caller, so an implementation may read it as given.
@@ -199,10 +198,10 @@ public class PixelRegion(
  * ## How a screenshot completes
  *
  * `screenshot` and `screenshot_region` are [ContextualToolDef]s: they queue the capture, hand the
- * future to [AgentContext.answerLater], and the answer is assembled after the tick that queued it
- * - by which point the frame that serves it has been drawn, because `GameLoop.frame` renders
- * after it ticks. The command completes with the artifact id, so `completedCommandId` still means
- * "the picture exists", not "the picture was asked for".
+ * future to [AgentContext.answerWhenReady], and the answer is assembled once a frame has actually
+ * settled it - on Kool that is the frame *after* the one that queued it, so it is polled for
+ * rather than assumed after a single tick. The command completes with the artifact id, so
+ * `completedCommandId` still means "the picture exists", not "the picture was asked for".
  *
  * A capture is always of the **next frame drawn**, and the answer reports the tick the renderer
  * stamped that frame with. There is no way to aim one at a chosen tick from here, and the tools
@@ -216,6 +215,15 @@ public class RenderToolset(
     private val control: RenderControl? = null,
     /** Where captures are filed. */
     private val artifacts: AgentArtifacts? = null,
+    /**
+     * How long [poll] keeps rechecking a capture before reporting a dead render loop.
+     *
+     * A constructor parameter rather than the [CAPTURE_GRACE_MILLIS] constant directly, so a
+     * test can shrink it: real production code should wait out a few real frames on a slow
+     * driver, but a test simulating a render loop that never settles a capture should not have
+     * to sleep out that same real budget to observe it.
+     */
+    private val captureGraceMillis: Long = CAPTURE_GRACE_MILLIS,
 ) {
 
     /**
@@ -314,11 +322,18 @@ public class RenderToolset(
     }
 
     /**
-     * Queues the capture now and answers for it after the tick.
+     * Queues the capture now and answers for it once a frame has settled it.
      *
-     * The two halves are deliberately split across [AgentContext.answerLater]: the request has to
-     * be queued *before* the frame is drawn, and the answer can only be assembled *after* it. Both
-     * happen on the simulation thread, one tick apart, with the render in between.
+     * The two halves are deliberately split across [AgentContext.answerWhenReady]: the request
+     * has to be queued *before* a frame is drawn, and the answer can only be assembled once one
+     * has actually read the pixels back - which, on Kool, is not the same frame: a request is
+     * claimed at one frame's capture point and only read at the top of the next
+     * (`RenderPipeline`'s "Kool draws after this returns"). [AgentContext.answerLater] runs its
+     * work exactly once, one tick after this call, which is one frame too early on a host whose
+     * dispatch and render share a thread - every `Offscreen` and `Windowed` host driven by
+     * `KoolBackend.drive` - because that thread cannot draw the second frame while it is blocked
+     * waiting for it. [poll] is checked again on the next tick, and the next, until the frame
+     * that settles it has actually happened.
      */
     private fun capture(region: PixelRegion?, context: AgentContext): AgentResult? {
         val renderer = live() ?: return unavailable()
@@ -334,36 +349,51 @@ public class RenderToolset(
             )
         }
 
-        context.answerLater { file(pending, store, region) }
-        // The `answerLater` idiom, the same one `TimeToolset.step` uses: the dispatcher skips its
-        // own completion when a tool has deferred its answer, so returning anything here would be
-        // a second answer under one command id.
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(captureGraceMillis)
+        context.answerWhenReady { poll(pending, store, region, deadlineNanos) }
+        // The `answerWhenReady` idiom: the dispatcher skips its own completion when a tool has
+        // deferred its answer, so returning anything here would be a second answer under one
+        // command id.
         return null
     }
 
     /**
-     * Collects a settled capture and files it. Runs after the tick that queued it.
+     * Checks whether [pending] has settled, without blocking for it.
      *
-     * The wait is bounded and short. On a host whose renderer and simulation share a thread - every
-     * `Offscreen` and `Windowed` host - the future is already complete by the time this runs, so
-     * the deadline is never approached; it exists for a host that pumps its agent loop on a
-     * separate thread, and for the case where the render loop has died, where waiting forever
-     * would wedge the game loop instead of reporting.
+     * Returns `null` - "not ready, ask again next tick" - until either the frame that serves
+     * [pending] has actually been drawn, or [deadlineNanos] has passed. The grace period is
+     * bounded for the same two reasons it always was: a host whose render loop has died must
+     * report that rather than wedge the caller forever, and a host pumped on a separate thread
+     * from its render loop should not wait indefinitely for a frame that a slow driver is simply
+     * still getting to.
      */
+    private fun poll(
+        pending: Future<CaptureFrame>,
+        store: AgentArtifacts,
+        region: PixelRegion?,
+        deadlineNanos: Long,
+    ): AgentResult? {
+        if (!pending.isDone) {
+            if (System.nanoTime() < deadlineNanos) return null
+            pending.cancel(false)
+            return AgentResult.failed(
+                AgentHostErrors.CAPTURE_FAILED,
+                "no frame was drawn for this capture within ${captureGraceMillis}ms; the " +
+                    "render loop has stopped drawing",
+            )
+        }
+        return file(pending, store, region)
+    }
+
+    /** Reads a [pending] already known to be settled, and files it. */
     private fun file(
         pending: Future<CaptureFrame>,
         store: AgentArtifacts,
         region: PixelRegion?,
     ): AgentResult {
         val frame = try {
-            pending.get(CAPTURE_GRACE_MILLIS, TimeUnit.MILLISECONDS)
-        } catch (_: TimeoutException) {
-            pending.cancel(false)
-            return AgentResult.failed(
-                AgentHostErrors.CAPTURE_FAILED,
-                "no frame was drawn for this capture within ${CAPTURE_GRACE_MILLIS}ms; the " +
-                    "render loop has stopped drawing",
-            )
+            // Already known done by the caller (`poll`): this reads the value, it does not wait.
+            pending.get()
         } catch (failed: ExecutionException) {
             val cause = failed.cause ?: failed
             return AgentResult.failed(

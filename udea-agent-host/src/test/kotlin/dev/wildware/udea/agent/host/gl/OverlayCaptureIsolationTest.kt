@@ -1,13 +1,5 @@
 package dev.wildware.udea.agent.host.gl
 
-import com.badlogic.gdx.Gdx
-import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.graphics.GL20
-import com.badlogic.gdx.graphics.Pixmap
-import com.badlogic.gdx.graphics.Texture
-import com.badlogic.gdx.graphics.g2d.TextureRegion
-import com.badlogic.gdx.math.Matrix4
-import com.badlogic.gdx.utils.BufferUtils
 import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.AgentCommand
 import dev.wildware.udea.agent.AgentResult
@@ -24,7 +16,6 @@ import dev.wildware.udea.agent.host.ArtifactId
 import dev.wildware.udea.agent.host.ArtifactToolset
 import dev.wildware.udea.agent.host.RenderToolset
 import dev.wildware.udea.agent.host.render.OffscreenRenderControl
-import dev.wildware.udea.agent.host.overlay.AgentOverlaySystem
 import dev.wildware.udea.agent.host.overlay.AgentOverlayView
 import dev.wildware.udea.agent.host.overlay.OverlayVerbosity
 import dev.wildware.udea.agent.state.DigestSources
@@ -40,10 +31,15 @@ import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.ScreenTarget
-import dev.wildware.udea.render.backend.Lwjgl3Backend
+import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.control.PresentationControl
+import dev.wildware.udea.render.draw.Rgba
+import dev.wildware.udea.render.overlay.AgentOverlaySystem
+import dev.wildware.udea.render.overlay.OverlayContent
 import org.junit.jupiter.api.io.TempDir
+import org.lwjgl.opengl.GL11
+import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
@@ -66,11 +62,6 @@ import kotlin.test.assertTrue
  * driven through the real [ToolIndex], the real [AgentRuntime] dispatch path, the real
  * [RenderToolset] and the real artifact store.
  *
- * (It used to key off an `afterTick` argument, which was the only thing the two capture tools had
- * in common. That argument is gone - it selected the same frame whatever it was set to - and the
- * type is a better marker anyway: a new capture route cannot be added without extending the class
- * that queues captures, while it could very easily be added without copying an argument.)
- *
  * A hand-written list of two tool names would pass for ever after somebody added a third route,
  * and the failure mode of that is not a red test: it is every visual diff an agent does through
  * the new route silently carrying the agent's own narration. So [captureRoutes] fails loudly if
@@ -88,11 +79,23 @@ import kotlin.test.assertTrue
  * `GlOverlayIsolationTest` in `udea-render` asserts this shape for a synthetic overlay and a
  * direct `FrameCaptureSlot`. This one asserts it for the **real** [AgentOverlayView] reached
  * through the **real** tool surface, which is the combination that would be wrong in production.
+ * Since issue #211 moved the drawing half - [AgentOverlaySystem] - into `udea-render`, this test
+ * joins the two through [OverlayContent], exactly as a real composition root would: `udea-render`
+ * cannot name [AgentOverlayView] (the module arrow runs the other way), so the view's own
+ * `render` is wrapped in an `OverlayContent { }` lambda at the point of registration.
  *
  * ## Windowed, deliberately
  *
  * The overlay exists only in [RenderMode.Windowed] - spec 3.7's other rule - so running this in
  * `Offscreen` would be asserting the isolation of something that had already switched itself off.
+ *
+ * ## One boot, not two
+ *
+ * This used to boot a fresh `KoolBackend` for `overlay = false` and a second one for
+ * `overlay = true`. Kool allows exactly one `KoolContext` per JVM for the life of the JVM
+ * (`KoolThread`'s KDoc), so the second boot failed with `GlContextException`. The overlay system
+ * is now always registered, gated by a mutable [ToggleableOverlay.enabled] flag, toggled between
+ * two capture passes of one boot in place of a second boot.
  */
 class OverlayCaptureIsolationTest {
 
@@ -113,8 +116,7 @@ class OverlayCaptureIsolationTest {
                 "about nothing.",
         )
 
-        val without = runOnce(overlay = false, routes = routes)
-        val with = runOnce(overlay = true, routes = routes)
+        val (without, with) = runBoth(routes)
 
         // 1. The overlay reached the window. Without this the rest is a statement about a no-op.
         assertEquals(
@@ -180,7 +182,8 @@ class OverlayCaptureIsolationTest {
 
     private class Run(val captures: Map<String, ByteArray>, val windowSample: Int)
 
-    private fun runOnce(overlay: Boolean, routes: List<Route>): Run {
+    /** Both halves of the comparison, taken from one boot: overlay off, then overlay on. */
+    private fun runBoth(routes: List<Route>): Pair<Run, Run> {
         val bridge = AgentBridge()
         val sessions = AgentSessions()
         // Real overlay content, so "the captures matched" is not two blank panels agreeing.
@@ -194,14 +197,20 @@ class OverlayCaptureIsolationTest {
             mode = RenderMode.Windowed,
             initialVerbosity = OverlayVerbosity.VERBOSE,
         )
-        if (overlay) {
-            registry.overlay({ resources -> AgentOverlaySystem(resources, view) })
-        }
-        // Registered in both runs, so the window is sampled at the same point in the frame.
+        lateinit var overlay: ToggleableOverlay
+        registry.overlay({ resources ->
+            ToggleableOverlay(
+                AgentOverlaySystem(
+                    resources,
+                    OverlayContent { canvas, dt, projector, locator -> view.render(canvas, dt, projector, locator) },
+                ),
+            ).also { overlay = it }
+        })
+        // Registered in both rounds, so the window is sampled at the same point in the frame.
         val probe = WindowProbe()
         registry.overlay({ probe })
 
-        val backend = Lwjgl3Backend.start(
+        val backend = KoolBackend.start(
             RenderMode.Windowed,
             WindowConfig(
                 title = "udea-agent-overlay-isolation",
@@ -216,7 +225,7 @@ class OverlayCaptureIsolationTest {
             val host = GameHost(RenderMode.Windowed, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()), backend)
             val pipeline = checkNotNull(backend.pipeline) { "the backend built no pipeline" }
 
-            val artifacts = AgentArtifacts(artifactRoot.resolve(if (overlay) "with" else "without"))
+            val artifacts = AgentArtifacts(artifactRoot)
             // The *real* adapter, the one `Phase1OffscreenDemo` wires. A route proven against a
             // control invented by this test would prove nothing about the route an agent drives.
             val control = OffscreenRenderControl(PresentationControl(pipeline))
@@ -232,19 +241,39 @@ class OverlayCaptureIsolationTest {
             // driving with `host::frame` would leave every submitted command in the queue for ever.
             backend.drive { dtSeconds -> loop.pump(dtSeconds) }
 
-            // Several frames of overlay before anything is captured, so a capture that *did* read
-            // the window would certainly contain overlay pixels.
+            // Several frames before anything is captured, so a capture that *did* read the window
+            // would certainly contain overlay pixels once the overlay is switched on below.
             awaitFrames(probe, probe.frames.get() + SETTLE_FRAMES)
 
-            val captured = LinkedHashMap<String, ByteArray>()
-            for (route in routes) {
-                captured[route.name] = bytesOf(route, bridge, artifacts)
-            }
-
+            val withoutCaptures = LinkedHashMap<String, ByteArray>()
+            for (route in routes) withoutCaptures[route.name] = bytesOf(route, bridge, artifacts)
             awaitFrames(probe, probe.frames.get() + 2)
-            return Run(captured, probe.sample.get())
+            val without = Run(withoutCaptures, probe.sample.get())
+
+            overlay.enabled = true
+            awaitFrames(probe, probe.frames.get() + SETTLE_FRAMES)
+
+            val withCaptures = LinkedHashMap<String, ByteArray>()
+            for (route in routes) withCaptures[route.name] = bytesOf(route, bridge, artifacts)
+            awaitFrames(probe, probe.frames.get() + 2)
+            val with = Run(withCaptures, probe.sample.get())
+
+            return without to with
         } finally {
             backend.close()
+        }
+    }
+
+    /**
+     * Gates a real [OverlaySystem] behind a mutable flag, so one boot can serve both halves of
+     * the comparison — see the class KDoc's "one boot, not two".
+     */
+    private class ToggleableOverlay(private val delegate: OverlaySystem) : OverlaySystem {
+        @Volatile
+        var enabled: Boolean = false
+
+        override fun render(target: ScreenTarget, dtSeconds: Float) {
+            if (enabled) delegate.render(target, dtSeconds)
         }
     }
 
@@ -284,18 +313,11 @@ class OverlayCaptureIsolationTest {
     /** Fills the capturable target, so the two captures agree on real content and not on black. */
     private class SceneSystem(private val resources: RenderResources) : RenderSystem {
 
-        private val projection = Matrix4()
-        private val pixel = TextureRegion(resources.own(whitePixel()))
-
         override fun render(target: OffscreenTarget, alpha: Float) {
-            projection.setToOrtho2D(0f, 0f, target.width.toFloat(), target.height.toFloat())
             val batch = resources.batch
-            batch.projectionMatrix = projection
-            batch.color = Color.BLUE
-            batch.begin()
-            batch.draw(pixel, 0f, 0f, target.width.toFloat(), target.height.toFloat())
+            batch.beginPixels()
+            batch.fill(0f, 0f, target.width.toFloat(), target.height.toFloat(), Rgba.of(0f, 0f, 1f, 1f))
             batch.end()
-            batch.color = Color.WHITE
         }
     }
 
@@ -303,25 +325,25 @@ class OverlayCaptureIsolationTest {
      * Reads one pixel of whatever is bound once the overlays have run - the window.
      *
      * Registered last, so it runs after the agent overlay. `glReadPixels` reads the *bound*
-     * framebuffer, and by this point the offscreen one has been unbound and the frame blitted, so
-     * this is the human's picture and not the agent's.
+     * framebuffer, and by this point the offscreen pass has been unbound and its texture
+     * presented, so this is the human's picture and not the agent's.
      */
     private class WindowProbe : OverlaySystem {
 
         val frames = AtomicInteger()
         val sample = AtomicInteger()
 
-        private val buffer = BufferUtils.newByteBuffer(4)
+        private val buffer: ByteBuffer = ByteBuffer.allocateDirect(4)
 
         override fun render(target: ScreenTarget, dtSeconds: Float) {
             buffer.clear()
-            Gdx.gl.glReadPixels(
+            GL11.glReadPixels(
                 PROBE_INSET,
                 target.height - PROBE_INSET,
                 1,
                 1,
-                GL20.GL_RGBA,
-                GL20.GL_UNSIGNED_BYTE,
+                GL11.GL_RGBA,
+                GL11.GL_UNSIGNED_BYTE,
                 buffer,
             )
             val r = buffer.get(0).toInt() and 0xFF
@@ -376,8 +398,6 @@ class OverlayCaptureIsolationTest {
         /** What `SceneSystem` fills the capturable target with. */
         const val SCENE = 0x0000FF
 
-        /** The declared argument that marks a tool as a capture route. */
-
         const val CAPTION = "verifying the overlay never reaches a capture"
 
         /** Frames of overlay drawn before any capture is taken. */
@@ -387,12 +407,5 @@ class OverlayCaptureIsolationTest {
         const val COMMAND_TIMEOUT_SECONDS = 20L
 
         val ARTIFACT_ID = Regex("\"artifactId\"\\s*:\\s*\"([^\"]+)\"")
-
-        fun whitePixel(): Texture = Texture(
-            Pixmap(1, 1, Pixmap.Format.RGBA8888).apply {
-                setColor(Color.WHITE)
-                fill()
-            },
-        )
     }
 }

@@ -1,10 +1,5 @@
 package dev.wildware.udea.agent.host.demo
 
-import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.graphics.Pixmap
-import com.badlogic.gdx.graphics.Texture
-import com.badlogic.gdx.graphics.g2d.TextureRegion
-import com.badlogic.gdx.math.Matrix4
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.EntityCreateContext
 import com.github.quillraven.fleks.Family
@@ -41,6 +36,9 @@ import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.camera.CameraRig
 import dev.wildware.udea.render.draw.DebugDraw
+import dev.wildware.udea.render.draw.Rgba
+import dev.wildware.udea.render.draw.SpriteRegion
+import dev.wildware.udea.render.draw.SpriteTexture
 import dev.wildware.udea.render.interp.PoseHistory
 
 /**
@@ -229,14 +227,9 @@ internal class BodyQuadRenderSystem(
 
     private var world: World? = null
 
-    private val pixel: TextureRegion = resources.own(
-        Texture(
-            Pixmap(1, 1, Pixmap.Format.RGBA8888).apply {
-                setColor(Color.WHITE)
-                fill()
-            },
-        ),
-    ).let(::TextureRegion)
+    private val pixel = SpriteRegion(
+        resources.own(SpriteTexture.fromRgba(1, 1, byteArrayOf(-1, -1, -1, -1), "demo-body")),
+    )
 
     override fun onBind(world: World, ctx: GameContext) {
         this.world = world
@@ -247,14 +240,12 @@ internal class BodyQuadRenderSystem(
         val world = this.world ?: return
         val bodies = this.bodies ?: return
         val batch = resources.batch
-        batch.projectionMatrix = camera.camera.combined
-        batch.color = Color.WHITE
-        batch.begin()
+        batch.begin(camera.projection)
         try {
             with(world) {
                 bodies.forEach { entity ->
                     val body = entity[PhysicsBody]
-                    batch.draw(pixel, body.x - HALF_SIZE, body.y - HALF_SIZE, SIZE, SIZE)
+                    batch.draw(pixel, body.x - HALF_SIZE, body.y - HALF_SIZE, SIZE, SIZE, Rgba.WHITE)
                 }
             }
         } finally {
@@ -283,46 +274,34 @@ internal class DebugGridRenderSystem(
     private val debug: DebugDraw,
 ) : RenderSystem {
 
-    private val projection = Matrix4()
-
-    private val pixel: TextureRegion = resources.own(
-        Texture(
-            Pixmap(1, 1, Pixmap.Format.RGBA8888).apply {
-                setColor(Color.WHITE)
-                fill()
-            },
-        ),
-    ).let(::TextureRegion)
+    private val pixel = SpriteRegion(
+        resources.own(SpriteTexture.fromRgba(1, 1, byteArrayOf(-1, -1, -1, -1), "demo-grid")),
+    )
 
     override fun render(target: OffscreenTarget, alpha: Float) {
         if (!debug.enabled) return
-        projection.setToOrtho2D(0f, 0f, target.width.toFloat(), target.height.toFloat())
         val batch = resources.batch
-        batch.projectionMatrix = projection
-        batch.color = GRID_COLOUR
-        batch.begin()
+        batch.beginPixels()
         try {
             var x = 0
             while (x < target.width) {
-                batch.draw(pixel, x.toFloat(), 0f, 1f, target.height.toFloat())
+                batch.draw(pixel, x.toFloat(), 0f, 1f, target.height.toFloat(), GRID_COLOUR)
                 x += SPACING
             }
             var y = 0
             while (y < target.height) {
-                batch.draw(pixel, 0f, y.toFloat(), target.width.toFloat(), 1f)
+                batch.draw(pixel, 0f, y.toFloat(), target.width.toFloat(), 1f, GRID_COLOUR)
                 y += SPACING
             }
         } finally {
             batch.end()
-            batch.color = Color.WHITE
-            // The camera's projection is restored by the next frame's rig, but the batch colour
-            // is not: leaving it tinted would dim everything drawn after this in the same frame,
-            // which would make "debug draw off" and "debug draw on" differ in more than the grid.
+            // Every draw here carries its own tint, unlike the LibGDX-era `Batch.color`, so
+            // there is no shared colour state left to restore for the frame's later systems.
         }
     }
 
     private companion object {
         const val SPACING: Int = 16
-        val GRID_COLOUR: Color = Color(0f, 1f, 0f, 1f)
+        val GRID_COLOUR: Rgba = Rgba.of(0f, 1f, 0f, 1f)
     }
 }

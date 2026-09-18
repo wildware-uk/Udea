@@ -1,0 +1,134 @@
+package dev.wildware.udea.render.support
+
+import java.io.File
+
+/**
+ * Finds the repository, its modules and their compiled classes.
+ *
+ * Two rules in this module are about *compiled output* rather than about types a test can
+ * name: "no headless module references a GL type" and "no `RenderSystem` resolves a `Family`
+ * inside `render`". Both are checked by reading `.class` files, and this is how those files
+ * are found -- from the working directory up, so the same test passes under Gradle, under
+ * an IDE runner and from the repository root.
+ */
+internal object RepoLayout {
+
+    /** The `udea-render` project directory. */
+    val moduleDir: File = locateModuleDir()
+
+    /** The repository root. */
+    val repoRoot: File = moduleDir.parentFile
+
+    /** The project directory of [module], e.g. `udea-core`. */
+    fun moduleDir(module: String): File {
+        val dir = repoRoot.resolve(module)
+        check(dir.resolve("build.gradle.kts").isFile) {
+            "$module is not a module of this repository (no build.gradle.kts in $dir)"
+        }
+        return dir
+    }
+
+    /**
+     * The Kotlin multiplatform targets whose output is JVM bytecode, which a multiplatform module
+     * compiles to `build/classes/<language>/<target>/<sourceSet>` (issue #201).
+     *
+     * Wasm and iOS output is a klib rather than class files, so there is nothing there for a
+     * bytecode scan to read.
+     */
+    private val BYTECODE_TARGETS = listOf("jvm", "android")
+
+    /**
+     * Every `.class` file [module] compiled for [sourceSet], across every language directory
+     * (`build/classes/kotlin/main`, `build/classes/java/main`, ...) - or, for a multiplatform
+     * module, across every target that compiles to bytecode (`build/classes/kotlin/jvm/main`,
+     * `build/classes/kotlin/android/main`).
+     *
+     * One layout or the other, chosen from the module's sources rather than from what happens to
+     * be under `build/`: a module converted to multiplatform keeps its old
+     * `build/classes/kotlin/main` until somebody cleans, and reading both would scan stale
+     * bytecode beside the real bytecode - and pass on the stale copy if the real one went missing.
+     *
+     * Deliberately not filtered to Kotlin: a `.java` file added to a headless module would be
+     * exactly as able to name a GL type, and a gate that only looked at Kotlin output would
+     * pass while it did.
+     */
+    fun classFiles(module: String, sourceSet: String = "main"): List<File> {
+        val classesRoot = moduleDir(module).resolve("build/classes")
+        val languageDirs = classesRoot.listFiles()?.filter { it.isDirectory }.orEmpty()
+        val multiplatform = isMultiplatform(module)
+        return languageDirs
+            .flatMap { language ->
+                if (multiplatform) {
+                    BYTECODE_TARGETS.map { language.resolve("$it/$sourceSet") }
+                } else {
+                    listOf(language.resolve(sourceSet))
+                }
+            }
+            .filter { it.isDirectory }
+            .flatMap { root -> root.walkTopDown().filter { it.isFile && it.extension == "class" } }
+            .sortedBy { it.invariantSeparatorsPath }
+    }
+
+    /**
+     * True when [module] keeps its sources in multiplatform source sets (`src/commonMain`,
+     * `src/jvmMain`, ...) rather than in `src/main`.
+     */
+    private fun isMultiplatform(module: String): Boolean =
+        moduleDir(module).resolve("src").listFiles().orEmpty()
+            .any { it.isDirectory && it.name != "main" && it.name.endsWith("Main") }
+
+    /** Path relative to the repository root, `/`-separated, for readable failures and spans. */
+    fun relativePath(file: File): String = file.relativeTo(repoRoot).invariantSeparatorsPath
+
+    /**
+     * The source file a class was compiled from, if it can be found on disk.
+     *
+     * The class file records only the simple file name (`Transform.kt`); the package supplies
+     * the directory. Returns `null` rather than guessing when the file is not there -- a
+     * generated class has no source to point at, and a diagnostic with a made-up location is
+     * worse than one with none.
+     */
+    fun sourceFileOf(module: String, className: String, sourceFileName: String?): File? {
+        if (sourceFileName == null) return null
+        val packagePath = className.substringBeforeLast('.', "").replace('.', '/')
+        // Test and fixture roots are searched too: the gate's own fixtures are compiled from
+        // `src/test/kotlin`, and a diagnostic about a fixture should point at the fixture.
+        val roots = listOf(
+            "src/main/kotlin",
+            "src/main/java",
+            "src/test/kotlin",
+            "src/testFixtures/kotlin",
+            // A multiplatform module's JVM and Android bytecode is compiled from these (issue #201).
+            "src/commonMain/kotlin",
+            "src/jvmMain/kotlin",
+            "src/androidMain/kotlin",
+            // Both targets' shared source set, where a module keeps one (issue #203).
+            "src/jvmAndAndroidMain/kotlin",
+            // A multiplatform module's own test source set (issue #211: udea-render's fixtures
+            // moved from src/test/kotlin here when the module went multiplatform).
+            "src/jvmTest/kotlin",
+            "src/commonTest/kotlin",
+        )
+        return roots.asSequence()
+            .map { root -> moduleDir(module).resolve("$root/$packagePath/$sourceFileName") }
+            .firstOrNull { it.isFile }
+    }
+
+    private fun locateModuleDir(): File {
+        var candidate: File? = File(System.getProperty("user.dir")).absoluteFile
+        while (candidate != null) {
+            if (candidate.name == MODULE && candidate.resolve("build.gradle.kts").isFile) {
+                return candidate
+            }
+            val nested = candidate.resolve(MODULE)
+            if (nested.resolve("build.gradle.kts").isFile) return nested
+            candidate = candidate.parentFile
+        }
+        error(
+            "Could not locate the $MODULE module directory from working dir " +
+                System.getProperty("user.dir"),
+        )
+    }
+
+    private const val MODULE = "udea-render"
+}

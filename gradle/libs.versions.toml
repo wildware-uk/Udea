@@ -90,6 +90,12 @@ kotlinxCoroutines = "1.11.0"
 # Android, rather than the library's default-provider lookup, which on the JVM is a `ServiceLoader`.
 cryptography = "0.6.0"
 
+# Kool: the renderer `udea-render` draws with (spec section 4, issue #211). 0.19.0 is the release the
+# #200 spike proved under xvfb on llvmpipe and the one `composegl-kool` builds against. It has no
+# wasmJs artifact (issue #223), so `udea-render` builds for `jvm` and `android` only until one
+# exists. `udea-render` only: UDEA-MG-002 bans `de.fabmax.kool:*` from every headless module.
+kool = "0.19.0"
+
 # kotlinx-io: how `udea-assets` reads a `.udeapak` from a file on every target (issue #205, spec
 # section 6: "kotlinx-io everywhere; on Wasm, a 'file' is an HTTP fetch or an in-memory buffer").
 kotlinxIo = "0.9.1"
@@ -143,6 +149,9 @@ composegl-ui = { module = "dev.wildware.composegl:composegl-ui", version.ref = "
 # The libGDX backend: it draws a ComposeGL tree through a gdx `Batch`, so it names GL types and
 # may only ever be a dependency of `udea-render`.
 composegl-gdx = { module = "dev.wildware.composegl:composegl-gdx", version.ref = "composegl" }
+# Kool's multiplatform core. Gradle's variant matching picks `kool-core-desktop` for the JVM
+# target and `kool-core-android` for the Android one.
+kool-core = { module = "de.fabmax.kool:kool-core", version.ref = "kool" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerialization" }
 kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "atomicfu" }
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }

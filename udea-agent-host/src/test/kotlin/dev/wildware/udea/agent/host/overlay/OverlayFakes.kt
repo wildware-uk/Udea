@@ -1,5 +1,10 @@
 package dev.wildware.udea.agent.host.overlay
 
+import dev.wildware.udea.render.overlay.EntityLocator
+import dev.wildware.udea.render.overlay.HardwareKeyState
+import dev.wildware.udea.render.overlay.OverlayCanvas
+import dev.wildware.udea.render.overlay.WorldProjector
+
 /**
  * An [OverlayCanvas] that records what was drawn instead of drawing it.
  *

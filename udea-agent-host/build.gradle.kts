@@ -9,30 +9,27 @@ dependencies {
     //
     // Spec 4 gives this module "the toolsets that need a render context or live input: render,
     // input, ui". It owns `RenderToolset` and `RenderControl`, and it owns `AgentOverlayView`,
-    // which spec 3.7 says is drawn on the human's screen. Both of those need the other half of a
-    // pair that lives here: `RenderControl` needs `PresentationControl`, and the overlay needs an
-    // `OverlaySystem` over a `Batch`.
+    // which spec 3.7 says is drawn on the human's screen. `RenderControl` needs
+    // `PresentationControl`, the other half of `OffscreenRenderControl`'s pair.
     //
     // This line used to be `testImplementation`, because this module was in
     // `ModuleGraphRules.HEADLESS_PROJECTS`. The result was not a headless agent host; it was
-    // `OffscreenRenderControl` and the GL overlay adapter sitting in *test* sources with no
-    // shipped path able to reach either - so `render.screenshot` answered `no_render_context` on
-    // every real run and the overlay was drawn only by tests. A module that owns the render
-    // toolset and may not name a render type is a contradiction, and the ruling resolved it here
-    // rather than by writing the adapter out a third time in each game.
+    // `OffscreenRenderControl` sitting in *test* sources with no shipped path able to reach it -
+    // so `render.screenshot` answered `no_render_context` on every real run. A module that owns
+    // the render toolset and may not name a render type is a contradiction, and the ruling
+    // resolved it here rather than by writing the adapter out a third time in each game.
     //
     // What still holds: the module is debug-only, and `ReleaseRules.CLASSPATH_RULE`
     // (`UDEA-REL-002`) fails any release build whose runtime classpath resolves it. That is the
     // gate the exemption leans on, it is enforced by `udeaVerifyRelease`, and it is asserted by
     // `ModuleGraphRulesTest` alongside the exemption itself. `:udea-core` - the headless
     // guarantee that matters - is untouched and still cannot name a `udea.render` type.
+    //
+    // No `libs.gdx` line here any more (issue #211): the one class that named LibGDX types in
+    // this module, `AgentOverlaySystem`, moved into `udea-render` and now draws with
+    // `SpriteBatch2D`/`BitmapFont2D` instead. `AgentOverlayView` names no render backend type
+    // either way - it draws through `dev.wildware.udea.render.overlay.OverlayCanvas`.
     implementation(project(":udea-render"))
-
-    // gdx types this module's own code names: `Batch`, `BitmapFont`, `Texture` and `Color` in
-    // `AgentOverlaySystem`. `udea-render` declares gdx as `implementation` so GL cannot leak onto
-    // a consumer's *compile* classpath by default - which is the rule working as intended: a
-    // module that writes a renderer opts in, visibly, on this line.
-    implementation(libs.gdx)
 
     /*
      * The wire, and why this line is no longer `testImplementation`.
@@ -63,6 +60,12 @@ dependencies {
     // adds the fixture and nothing else to a module `udeaVerifyRelease` already keeps out of
     // every shipped artifact.
     testImplementation(testFixtures(project(":udea-diagnostics")))
+
+    // Test-only. `udea-render` declares Kool as `implementation`, so it does not reach this
+    // module's classpath transitively even though this module is GL-allowed; the GL tests here
+    // (`OverlayCaptureIsolationTest`, and any that read the window's own framebuffer) name
+    // `org.lwjgl.opengl.GL11` directly, the same way `udea-render`'s own GL tests do.
+    testImplementation(libs.kool.core)
 }
 
 // --- the Phase 1 exit demo -------------------------------------------------------------------
@@ -98,7 +101,7 @@ val udeaPhase1Demo = tasks.register<JavaExec>("udeaPhase1Demo") {
 // --- the Phase 1 exit demo, offscreen half -----------------------------------------------------
 //
 // `./gradlew :udea-agent-host:udeaPhase1OffscreenDemo -Pudea.agent.port=7821` boots the same
-// surface behind a real LWJGL3 context with a hidden window, so `render.screenshot` returns PNG
+// surface behind a real Kool context with a hidden window, so `render.screenshot` returns PNG
 // bytes instead of `no_render_context`. Same reasons as `udeaPhase1Demo` for being a `JavaExec`
 // over the test runtime classpath: the game is a fixture, and the adapter that joins the render
 // toolset's port to `udea-render` cannot live in the main sources of either module.
@@ -115,6 +118,27 @@ val udeaPhase1OffscreenDemo = tasks.register<JavaExec>("udeaPhase1OffscreenDemo"
     // `udeaPhase1Demo` until this one was run. Still read lazily: the port arrives on *this*
     // invocation's command line, so baking the value in at configuration time would hand every
     // later run whichever value the cache was stored with.
+    val port = providers.gradleProperty("udea.agent.port")
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            val value = port.orNull
+            if (value == null) emptyList() else listOf("-Dudea.agent.port=$value")
+        },
+    )
+}
+
+// --- the Phase 1 exit demo, windowed half (issue #211) -------------------------------------
+//
+// `./gradlew :udea-agent-host:udeaPhase1WindowedDemo -Pudea.agent.port=7822` boots the same
+// surface again, this time with `RenderMode.Windowed` and a *visible* window - the third of
+// the three render modes issue #211 asks `/health` to report from a real boot. Same reasons as
+// the other two Phase 1 tasks for being a `JavaExec` over the test runtime classpath.
+val udeaPhase1WindowedDemo = tasks.register<JavaExec>("udeaPhase1WindowedDemo") {
+    group = "udea"
+    description = "Boots a Windowed game with the agent surface bound, and blocks. " +
+        "-Pudea.agent.port=N"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.wildware.udea.agent.host.demo.Phase1WindowedDemo")
     val port = providers.gradleProperty("udea.agent.port")
     jvmArgumentProviders.add(
         CommandLineArgumentProvider {
@@ -142,6 +166,13 @@ val udeaAgentGlTest = tasks.register<Test>("udeaAgentGlTest") {
     classpath = testSourceSet.runtimeClasspath
     useJUnitPlatform()
     filter { includeTestsMatching("$agentGlTestPackage.*") }
+
+    // Kool allows exactly one KoolContext per JVM for the life of the JVM (see udea-render's
+    // udeaGlTest, which states the same rule): a test class that starts a backend owns its JVM.
+    // This task ran every GL test class in one shared JVM until issue #211 found it — the second
+    // class to start a backend failed with GlContextException, reported as a test failure that
+    // looked like it belonged to whatever that class was actually testing.
+    forkEvery = 1
 
     // Set on any CI job that has a display, so a render toolset which quietly stops working
     // cannot hide behind a skip forever. Same property `udea-render`'s GL tests read.

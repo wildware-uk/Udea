@@ -11,6 +11,9 @@ import dev.wildware.udea.agent.activity.AgentSessions
 import dev.wildware.udea.agent.activity.AnchorRule
 import dev.wildware.udea.agent.host.AllocationProbe
 import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.render.overlay.EntityLocator
+import dev.wildware.udea.render.overlay.OverlayCanvas
+import dev.wildware.udea.render.overlay.WorldProjector
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

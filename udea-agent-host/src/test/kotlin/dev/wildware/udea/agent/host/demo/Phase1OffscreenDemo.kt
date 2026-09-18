@@ -36,7 +36,7 @@ import dev.wildware.udea.core.snapshot.snapshotTimeTravel
 import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
-import dev.wildware.udea.render.backend.Lwjgl3Backend
+import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.camera.CameraRig
 import dev.wildware.udea.render.control.PresentationControl
@@ -60,9 +60,9 @@ import java.nio.file.Path
  *
  * ## What is real here
  *
- * Everything except the game. A genuine `Lwjgl3Backend` with a hidden window and a real driver; a
- * real `FrameBuffer` the frame is drawn into and the capture is read out of; the shipped
- * `RenderPipeline`, `CameraRig`, `FrameCaptureSlot` and `GlPixelSource`; the shipped command path
+ * Everything except the game. A genuine `KoolBackend` with a hidden window and a real driver; a
+ * real offscreen pass the frame is drawn into and the capture is read out of; the shipped
+ * `RenderPipeline`, `CameraRig`, `FrameCaptureSlot` and `KoolPixelSource`; the shipped command path
  * — HTTP handler, bridge queue, barrier drain, dispatcher, `answerLater`. The game is one
  * component, one blueprint and two render systems, because a demo that needed a real game would
  * be testing the game.
@@ -70,7 +70,7 @@ import java.nio.file.Path
  * ## The frame, and why the loop is driven from the render thread
  *
  * ```
- * GL thread: AgentGameLoop.pump(dt)
+ * render thread: AgentGameLoop.pump(dt)
  *              AgentRuntime.beforeFrame()      queue -> barrier
  *              GameHost.frame(dt)              ticks; the barrier drain runs `render.screenshot`,
  *                                              which QUEUES a capture and returns
@@ -80,7 +80,7 @@ import java.nio.file.Path
  *                                              completes with its id
  * ```
  *
- * One thread, one frame, no blocking anywhere. That is why `Lwjgl3Backend.drive` is handed
+ * One thread, one frame, no blocking anywhere. That is why `KoolBackend.drive` is handed
  * `loop::pump` and not `host::frame`: driving with the latter would leave nothing to move
  * commands from the bridge queue onto the barrier, and every tool call would sit unexecuted with
  * `/health` reporting a cheerful, frozen instance.
@@ -131,7 +131,7 @@ public object Phase1OffscreenDemo {
             DebugGridRenderSystem(resources, camera, debugDraw)
         })
 
-        val backend = Lwjgl3Backend.start(
+        val backend = KoolBackend.start(
             RenderMode.Offscreen,
             WindowConfig(
                 title = "udea-phase1-offscreen-demo",
@@ -233,13 +233,14 @@ public object Phase1OffscreenDemo {
             .onClose("frame-loop") { loop.stop() }
             .onClose("agent-host") { agentHost.stop() }
             // Last, and on a thread of its own. `close` runs on the simulation thread, which in
-            // Offscreen **is** the GL thread: `Lwjgl3Backend.close` submits the pipeline dispose
-            // to that thread and then waits for the loop to finish, so calling it from inside a
-            // frame is a self-join. Handing it to a daemon thread lets the frame return, drain
-            // the submitted task and exit - which is the whole point of a clean close.
+            // Offscreen **is** the render thread: `KoolBackend.close` submits the pipeline
+            // dispose to that thread and then waits for the loop to finish, so calling it from
+            // inside a frame is a self-join. Handing it to a daemon thread lets the frame
+            // return, drain the submitted task and exit - which is the whole point of a clean
+            // close.
             .onClose("render-loop") { offThread("phase1-offscreen-exit") { backend.close() } }
         Runtime.getRuntime().addShutdownHook(Thread { shutdown.shutdown("jvm shutdown hook") })
-        // The GL thread becomes the simulation thread from here. See the class KDoc.
+        // The render thread becomes the simulation thread from here. See the class KDoc.
         backend.drive(loop::pump)
         backend.awaitExit()
         backend.close()

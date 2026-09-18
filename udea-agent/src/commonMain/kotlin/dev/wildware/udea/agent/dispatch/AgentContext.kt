@@ -109,6 +109,69 @@ public class AgentContext internal constructor(
             bridge.complete(id, answer)
         }
     }
+
+    /**
+     * Like [answerLater], for an answer that may not be ready after *one* tick.
+     *
+     * [poll] runs after this tick and, if it returns `null`, after every tick after that, until
+     * it returns an [AgentResult] - which then completes the command. Each retry is one more
+     * pass through [DeferredQueue.runAll], i.e. one more host iteration; nothing spins or sleeps
+     * between them.
+     *
+     * ## The tool this exists for
+     *
+     * [answerLater]'s own KDoc and `RenderControl.capture`'s both used to say the queued future
+     * "is already complete by the time this runs" on a host whose render and its own dispatch
+     * share a thread. That was true of a renderer that drew and read pixels back in one call.
+     * It stopped being true when `udea-render`'s capture became two-phase - a request is claimed
+     * at one frame's capture point and only *read* at the top of the next (issue #211,
+     * `RenderPipeline`'s "Kool draws after this returns") - because [answerLater]'s work always
+     * runs exactly once, on the same tick it was queued, before that next frame has happened.
+     * Blocking inside it for the second frame would block the thread that has to draw it, on
+     * every `Offscreen` or `Windowed` host, which is exactly the property [ToolRegistry] forbids
+     * a tool from doing directly and that a queued `Future` cannot smuggle back in.
+     *
+     * A tool whose answer really is ready after one tick pays nothing extra: [poll] returning
+     * non-`null` the first time behaves exactly like [answerLater].
+     *
+     * @throws IllegalStateException if called twice for one command, or together with
+     *   [answerLater], for the same reason as [answerLater]'s: one command has one answer.
+     */
+    public fun answerWhenReady(poll: () -> AgentResult?) {
+        check(!answersLater) {
+            "${command.name} already deferred its answer; one command has one answer"
+        }
+        answersLater = true
+        val id = command.id
+        val name = command.name
+        val retry = object : DeferredWork {
+            override fun run() {
+                val answer = try {
+                    poll()
+                } catch (failure: Exception) {
+                    bridge.complete(
+                        id,
+                        AgentResult.failed(
+                            AgentErrorKind.TOOL_THREW,
+                            "$name threw ${failure::class.simpleName} after the tick: " +
+                                (failure.message ?: "no message"),
+                        ),
+                    )
+                    return
+                }
+                if (answer != null) {
+                    bridge.complete(id, answer)
+                } else {
+                    // Not ready. `DeferredQueue.runAll` captures its count before running, so an
+                    // addition made from inside a running item queues for the *next* drain
+                    // rather than spinning inside this one - the same guarantee a tool that
+                    // defers a tool that defers already relies on.
+                    deferred.add(name, this)
+                }
+            }
+        }
+        deferred.add(name, retry)
+    }
 }
 
 /** A piece of work registered with [AgentContext.defer]. */

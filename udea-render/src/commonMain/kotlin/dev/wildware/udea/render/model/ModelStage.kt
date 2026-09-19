@@ -6,6 +6,8 @@ import de.fabmax.kool.math.Vec2i
 import de.fabmax.kool.math.Vec3f
 import de.fabmax.kool.math.deg
 import de.fabmax.kool.math.rad
+import de.fabmax.kool.modules.gltf.GltfLoadConfig
+import de.fabmax.kool.modules.gltf.GltfMaterialConfig
 import de.fabmax.kool.modules.ksl.KslPbrShader
 import de.fabmax.kool.pipeline.AttachmentConfig
 import de.fabmax.kool.pipeline.ClearColorFill
@@ -28,15 +30,17 @@ import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteRegion
 import dev.wildware.udea.render.draw.SpriteTexture
 import dev.wildware.udea.render.kool.ScenePasses
+import de.fabmax.kool.scene.Model as KoolModel
 
 /**
  * The Kool half of [ModelRenderSystem]: a 3D pass with a depth buffer, a perspective camera, a
- * directional light with a shadow map, and one instanced mesh per mesh-and-material pair drawn
- * with Kool's PBR shader.
+ * directional light with a shadow map, one instanced mesh per mesh-and-material pair drawn
+ * with Kool's PBR shader, and one Kool scene node per entity drawing an [ImportedModel].
  *
  * Everything here is Kool's own - the mesh builders, `KslPbrShader`, `Lighting`,
- * `SimpleShadowMap` - and this class only fills them in from Udea's Kool-free types once per
- * frame. It is `internal` so that no Kool type reaches a game (UDEA-MG-002).
+ * `SimpleShadowMap`, the glTF reader's `makeModel` - and this class only fills them in from
+ * Udea's Kool-free types once per frame. It is `internal` so that no Kool type reaches a game
+ * (UDEA-MG-002).
  *
  * ## Per frame, without per-entity garbage
  *
@@ -46,6 +50,19 @@ import dev.wildware.udea.render.kool.ScenePasses
  * frame. The matrix, the vectors and the colours are fields reused every frame, and the instance
  * writer is one lambda made once, so a frame allocates only when a mesh-and-material pair is seen
  * for the first time.
+ *
+ * ## Imported models
+ *
+ * An [ImportedModel] is not instanced the way a built-in shape is. Each entity drawing one gets a
+ * scene node of its own, made by Kool's glTF reader with the file's materials on Kool's PBR shader
+ * and kept for the life of the stage: a frame with three foxes shows the first three nodes made
+ * for that model and hides the rest. A node per entity rather than an instance per entity because
+ * a skinned model animates per entity (issues #241, #242), and one instance list cannot hold two
+ * poses. The nodes share the file's textures, which Kool caches on the parsed file.
+ *
+ * Kool decodes a glTF texture on its loader threads after the node is made, and until it has, Kool
+ * itself does not draw the mesh: its GL backend refuses a draw whose texture has no pixels yet
+ * (`MappedUniformTex.checkLoadingState` in 0.19.0), so an untextured model never reaches a capture.
  */
 internal class ModelStage(
     private val passes: ScenePasses,
@@ -95,6 +112,10 @@ internal class ModelStage(
     private val runs = HashMap<ModelMesh, HashMap<ModelMaterial, Run>>()
     private val allRuns = ArrayList<Run>()
 
+    /** Every imported model seen so far, with the scene nodes made for it. */
+    private val imports = HashMap<ImportedModel, Imports>()
+    private val allImports = ArrayList<Imports>()
+
     private val eye = MutableVec3f()
     private val target = MutableVec3f()
     private val direction = MutableVec3f()
@@ -113,6 +134,7 @@ internal class ModelStage(
             run.instances.clear()
             run.mesh.isVisible = false
         }
+        for (index in allImports.indices) allImports[index].hideAll()
 
         eye.set(view.eyeX, view.eyeY, view.eyeZ)
         target.set(view.targetX, view.targetY, view.targetZ)
@@ -133,17 +155,16 @@ internal class ModelStage(
 
         ambient.set(light.ambient)
         for (index in allRuns.indices) allRuns[index].shader.ambientFactor = ambient
+        for (index in allImports.indices) allImports[index].setAmbient()
     }
 
-    /** Draws [mesh] in [material] with the given transform this frame. Render thread only. */
+    /** Draws [source] with the given transform this frame. Render thread only. */
     fun add(
-        mesh: ModelMesh,
-        material: ModelMaterial,
+        source: ModelSource,
         x: Float, y: Float, z: Float,
         rotationX: Float, rotationY: Float, rotationZ: Float,
         scaleX: Float, scaleY: Float, scaleZ: Float,
     ) {
-        val run = runFor(mesh, material)
         // Translate, then turn about Z, Y, X - so X is applied to the model first - then scale.
         matrix.setIdentity()
             .translate(x, y, z)
@@ -151,8 +172,15 @@ internal class ModelStage(
             .rotate(rotationY.rad, Vec3f.Y_AXIS)
             .rotate(rotationX.rad, Vec3f.X_AXIS)
             .scale(axisScale.set(scaleX, scaleY, scaleZ))
-        run.instances.addInstance(writeMatrix)
-        run.mesh.isVisible = true
+        when (source) {
+            is MeshModel -> {
+                val run = runFor(source.mesh, source.material)
+                run.instances.addInstance(writeMatrix)
+                run.mesh.isVisible = true
+            }
+            // The file is Y-up: turned onto the world's Z-up before anything else is applied.
+            is ImportedModel -> importsFor(source).show(matrix.rotate(Y_UP_TO_Z_UP, Vec3f.X_AXIS))
+        }
     }
 
     private fun runFor(mesh: ModelMesh, material: ModelMaterial): Run {
@@ -164,6 +192,10 @@ internal class ModelStage(
         allRuns += run
         drawNode.addNode(run.mesh)
         return run
+    }
+
+    private fun importsFor(model: ImportedModel): Imports = imports.getOrPut(model) {
+        Imports(model).also { allImports += it }
     }
 
     /** One mesh-and-material pair: Kool's geometry, its instances and its PBR shader. */
@@ -192,6 +224,64 @@ internal class ModelStage(
         }
     }
 
+    /** The scene nodes made so far for one [ImportedModel], and how many this frame has shown. */
+    private inner class Imports(private val model: ImportedModel) {
+
+        private val config = GltfLoadConfig(
+            // The reader computes normals for a file that has none - the Fox has none - and the
+            // lighting needs them.
+            generateNormals = true,
+            applyMaterials = true,
+            materialConfig = GltfMaterialConfig(shadowMaps = listOf(shadow)),
+            // The bind pose (issue #240). Skins and clips are issues #241 and #242.
+            loadAnimations = false,
+            applySkins = false,
+            applyMorphTargets = false,
+            assetLoader = model.loader,
+            // The file's material, with the same uniform ambient light the built-in shapes get;
+            // its strength is set every frame from the `ModelLight`.
+            pbrBlock = { _ -> lighting { uniformAmbientLight(Color.WHITE) } },
+        )
+
+        private val nodes = ArrayList<Placed>()
+        private var shown = 0
+
+        fun hideAll() {
+            for (index in nodes.indices) nodes[index].node.isVisible = false
+            shown = 0
+        }
+
+        fun setAmbient() {
+            for (index in nodes.indices) nodes[index].setAmbient()
+        }
+
+        /** Shows the next free node at [transform], making one if every node is in use. */
+        fun show(transform: MutableMat4f) {
+            val placed = if (shown < nodes.size) nodes[shown] else make()
+            shown++
+            placed.node.transform.setMatrix(transform)
+            placed.node.isVisible = true
+        }
+
+        private fun make(): Placed = Placed(model.gltf.makeModel(config)).also { placed ->
+            placed.setAmbient()
+            nodes += placed
+            drawNode.addNode(placed.node)
+        }
+    }
+
+    /**
+     * One scene node made from a glTF file, with its shaders listed once so that a frame sets
+     * their ambient light without walking Kool's maps.
+     */
+    private inner class Placed(val node: KoolModel) {
+        private val shaders = node.meshes.values.mapNotNull { it.shader as? KslPbrShader }
+
+        fun setAmbient() {
+            for (index in shaders.indices) shaders[index].ambientFactor = ambient
+        }
+    }
+
     /** Takes both passes off the scene and releases them, meshes and shaders with the draw node. */
     override fun release() {
         passes.remove(pass)
@@ -206,6 +296,9 @@ internal class ModelStage(
 
         /** Samples per pixel: smooth model edges, where one sample leaves them stair-stepped. */
         const val MSAA_SAMPLES = 4
+
+        /** A quarter turn about X takes a glTF file's +Y, its up, to the world's +Z. */
+        val Y_UP_TO_Z_UP = 90f.deg
     }
 }
 

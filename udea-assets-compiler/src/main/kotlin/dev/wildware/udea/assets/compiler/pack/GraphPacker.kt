@@ -12,6 +12,7 @@ import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
+import dev.wildware.udea.assets.Model
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpawnRecipe
 import dev.wildware.udea.assets.Binding
@@ -120,6 +121,7 @@ public object GraphPacker {
     private val SCHEMAS: Map<String, Schema> = mapOf(
         "spriteSheet" to Schema { it.spriteSheet() },
         "soundCue" to Schema { it.soundCue() },
+        "model" to Schema { it.model() },
         "spriteAnimation" to Schema { it.spriteAnimation() },
         "spriteAnimationSet" to Schema { it.spriteAnimationSet() },
         "blueprint" to Schema { it.blueprint() },
@@ -143,6 +145,7 @@ public object GraphPacker {
     public val MAPPED_TYPES: Map<String, String> = mapOf(
         "spriteSheet" to fqn(SpriteSheet::class.qualifiedName),
         "soundCue" to fqn(SoundCue::class.qualifiedName),
+        "model" to fqn(Model::class.qualifiedName),
         "spriteAnimation" to fqn(SpriteAnimation::class.qualifiedName),
         "spriteAnimationSet" to fqn(SpriteAnimationSet::class.qualifiedName),
         "blueprint" to fqn(Blueprint::class.qualifiedName),
@@ -189,6 +192,10 @@ public object GraphPacker {
             put("sounds", PackValue.Items(paths("sounds").map { PackValue.Path(it) }))
             float("pitchVariance", default = 0F)
             float("volume", default = 1F)
+        }
+
+        fun model(): Map<String, PackValue> = buildMap {
+            path("file", "file")
         }
 
         fun spriteAnimation(): Map<String, PackValue> = buildMap {

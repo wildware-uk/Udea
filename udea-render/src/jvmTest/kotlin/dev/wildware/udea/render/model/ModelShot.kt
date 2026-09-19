@@ -17,7 +17,11 @@ import dev.wildware.udea.render.capture.CaptureRequest
 import dev.wildware.udea.render.capture.capture
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteTexture
+import dev.wildware.udea.assets.AssetId
+import dev.wildware.udea.assets.Model
+import dev.wildware.udea.assets.ResPath
 import java.io.File
+import java.nio.file.Path
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -30,10 +34,13 @@ import kotlin.math.sin
  * screenshot reads. A sky gradient is drawn by a plain 2D system in [RenderPhase.PreRender], so the
  * pictures also show the 3D pass sitting on top of 2D drawing.
  *
- * Every texture is generated here from bytes: no art file, nothing to license.
+ * Every texture but the fox's is generated here from bytes. The fox is the committed
+ * `example-assets/models/fox/Fox.glb`, CC BY 4.0, credited in its `NOTICE.md`.
  *
- * Writes `model-textured-lit.png` (the hero shot) and `model-turn-<n>.png` (the crate turning a
- * quarter turn in four steps, the light fixed) into `-Dudea.modelshot.dir`.
+ * Writes `model-textured-lit.png` (the hero shot), `model-turn-<n>.png` (the crate turning a
+ * quarter turn in four steps, the light fixed), `model-fox.png` (the same scene with the Khronos
+ * Fox imported from its `.glb`, issue #240) and `model-fox-turn-<n>.png` (the fox turning a
+ * quarter turn a step) into `-Dudea.modelshot.dir`.
  *
  * In the test source set, run by name and never by `check`: it needs a GL driver, and a missing
  * driver in `check` would be a skip, which hides exactly the failure it exists to show.
@@ -111,6 +118,38 @@ object ModelShot {
                 }
                 File(out, "model-turn-$step.png").writeBytes(slot.capture(CaptureRequest()).bytes)
             }
+
+            // The imported Khronos Fox (issue #240), on the same ground, under the same sun, with
+            // the crate turned back. Drawn from its own `.glb`: its mesh, its material, its texture.
+            val fox = loadModel(exampleAssets(), Model(AssetId("models/fox"), ResPath("models/fox/Fox.glb")))
+            backend.onRenderThread { with(world) { crate[Transform3D].rotationZ = 0.5f } }
+            val withoutFox = slot.capture(CaptureRequest()).bytes
+            lateinit var foxEntity: Entity
+            backend.onRenderThread {
+                foxEntity = world.entity {
+                    it += Transform3D(x = 1.2f, y = -2.6f, rotationZ = FOX_HEADING, scaleX = FOX_SCALE, scaleY = FOX_SCALE, scaleZ = FOX_SCALE)
+                    it += ModelRenderer(model = fox)
+                }
+            }
+            // Kool draws the fox once its texture has decoded on Kool's loader threads, and not on
+            // the first frame its shader program is used (see GlImportedModelRenderTest). So frames
+            // are taken until one shows something new and the next one is the same picture.
+            var previous = withoutFox
+            var current = slot.capture(CaptureRequest()).bytes
+            var waited = 1
+            while ((current.contentEquals(withoutFox) || !current.contentEquals(previous)) && waited < FOX_FRAME_BUDGET) {
+                previous = current
+                current = slot.capture(CaptureRequest()).bytes
+                waited++
+            }
+            check(!current.contentEquals(withoutFox)) { "the fox was not drawn in $waited frames" }
+            File(out, "model-fox.png").writeBytes(current)
+            for (step in 0 until TURN_STEPS) {
+                backend.onRenderThread {
+                    with(world) { foxEntity[Transform3D].rotationZ = FOX_HEADING + step * (PI / 2).toFloat() }
+                }
+                File(out, "model-fox-turn-$step.png").writeBytes(slot.capture(CaptureRequest()).bytes)
+            }
             println("model shots written to ${out.absolutePath}")
         } finally {
             backend.close()
@@ -118,6 +157,18 @@ object ModelShot {
     }
 
     private const val TURN_STEPS = 4
+
+    /** The fox's file is in centimetre-like units, about 80 tall: this makes it 1.3 tall. */
+    private const val FOX_SCALE = 0.016f
+
+    /** Facing down and to the left of the picture, three-quarters on to the camera. */
+    private const val FOX_HEADING = -0.9f
+
+    private const val FOX_FRAME_BUDGET = 240
+
+    private fun exampleAssets(): Path = Path.of(
+        System.getProperty("udea.render.exampleAssets") ?: error("-Dudea.render.exampleAssets is not set"),
+    )
 
     /** A sky: a vertical gradient, drawn in 2D beneath the 3D pass. */
     private class SkySystem(private val resources: RenderResources) : RenderSystem {

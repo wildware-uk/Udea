@@ -50,11 +50,30 @@ internal object ValidationFixture {
     fun withArt(name: String, vararg scripts: Pair<String, String>): ValidationContext =
         built.computeIfAbsent(name) { build(it, art = true, scripts = scripts) }
 
+    /**
+     * A tree of scripts with the committed Khronos Fox copied to `models/fox/Fox.glb`.
+     *
+     * The real file, not bytes a test wrote: a check that a model file is glTF 2.0 is then a
+     * check against the file a game would ship (issue #240).
+     */
+    fun withFox(
+        name: String,
+        vararg scripts: Pair<String, String>,
+        prepare: (assets: Path) -> Unit = {},
+    ): ValidationContext =
+        built.computeIfAbsent(name) { build(it, art = false, scripts = scripts, fox = true, prepare = prepare) }
+
     /** The pipeline's verdict on a fixture. */
     fun report(context: ValidationContext) = AssetValidatorPipeline().validate(context)
 
     @OptIn(ExperimentalPathApi::class)
-    private fun build(name: String, art: Boolean, scripts: Array<out Pair<String, String>>): ValidationContext {
+    private fun build(
+        name: String,
+        art: Boolean,
+        scripts: Array<out Pair<String, String>>,
+        fox: Boolean = false,
+        prepare: (assets: Path) -> Unit = {},
+    ): ValidationContext {
         val scratch = TestPaths.scratch("validate/$name")
         val assets = scratch.resolve("assets")
         assets.createDirectories()
@@ -65,6 +84,15 @@ internal object ValidationFixture {
             target.createDirectories()
             source.copyToRecursively(target, followLinks = false, overwrite = true)
         }
+
+        if (fox) {
+            val source = TestPaths.exampleAssets.resolve("models").resolve("fox")
+            val target = assets.resolve("models").resolve("fox")
+            target.createDirectories()
+            source.copyToRecursively(target, followLinks = false, overwrite = true)
+        }
+
+        prepare(assets)
 
         for ((relative, text) in scripts) {
             val file = assets.resolve(relative)

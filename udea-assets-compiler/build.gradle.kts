@@ -43,6 +43,10 @@ dependencies {
     // `@AssetDsl`, the asset DSL's once-only lambda promise the plugin's loop checker trusts.
     implementation(project(":udea-annotations"))
 
+    // The JSON half of a glTF model, read by `ModelFileValidator` to check that a `model(...)`
+    // names a glTF 2.0 file whose buffers and images are present (issue #240).
+    implementation(libs.kotlinx.serialization.json)
+
     implementation(libs.kotlin.compiler.embeddable)
     implementation(libs.kotlin.scripting.common)
     implementation(libs.kotlin.scripting.jvm)

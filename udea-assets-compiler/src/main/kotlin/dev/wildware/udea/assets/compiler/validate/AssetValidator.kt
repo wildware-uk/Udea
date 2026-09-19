@@ -92,6 +92,7 @@ public class AssetValidatorPipeline(
             ItemRecipeValidator,
             MissingFileValidator,
             SpriteSheetGeometryValidator,
+            ModelFileValidator,
             AnimationNotifyValidator,
             DeterminismValidator,
         )

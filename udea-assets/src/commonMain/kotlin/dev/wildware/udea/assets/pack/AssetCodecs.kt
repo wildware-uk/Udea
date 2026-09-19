@@ -26,6 +26,7 @@ import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.GameplayTagName
 import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
+import dev.wildware.udea.assets.Model
 import dev.wildware.udea.assets.LightingConfig
 import dev.wildware.udea.assets.ModifierKind
 import dev.wildware.udea.assets.MovementType
@@ -131,6 +132,7 @@ public class AssetCodecs private constructor(
                         volume = fields.float("volume", 1.0F),
                     )
                 }
+                put(Model::class) { fields -> Model(id = fields.id, file = fields.path("file")) }
                 put(Blueprint::class) { fields ->
                     Blueprint(
                         id = fields.id,

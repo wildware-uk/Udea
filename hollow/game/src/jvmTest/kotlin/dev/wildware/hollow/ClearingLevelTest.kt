@@ -94,10 +94,15 @@ class ClearingLevelTest {
     fun `a level saved mid-game resumes at the tick it was saved on`() {
         // The bundled clearing is saved at tick 0, where a fresh clock already stands; a level saved
         // later - from the editor, mid-play - is the case where seeding must restore the clock, not
-        // only the entities.
-        host.run(SAVED_AFTER_TICKS)
-        val savedAt = host.tick
-        val resumed = HollowGame.host(RenderMode.Headless, level = host.game.levels.saveNow()).also(HollowGame::seed)
+        // only the entities. The game that saves it is empty: since #246 `RenderModule` gives every
+        // `Transform3D` a render-only `Interp3D` at its first tick end, which no level can hold, so
+        // a clearing that has run a tick cannot be saved as it stands.
+        val playing = HollowGame.host(RenderMode.Headless, level = ByteArray(0))
+        playing.run(SAVED_AFTER_TICKS)
+        val savedAt = playing.tick
+        val saved = playing.game.levels.saveNow()
+        playing.stop()
+        val resumed = HollowGame.host(RenderMode.Headless, level = saved).also(HollowGame::seed)
         // `seed` runs one tick to apply what it queued.
         assertEquals(savedAt + 1L, resumed.tick)
         resumed.stop()

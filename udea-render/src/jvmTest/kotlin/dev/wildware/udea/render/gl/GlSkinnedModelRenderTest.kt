@@ -65,6 +65,23 @@ import kotlin.test.assertTrue
  * - An editor's Scene view, which draws the same nodes through a pass of its own (issue #234),
  *   sees the pose change too.
  *
+ * ## The shadow
+ *
+ * The shadow map is a pass of its own, and it must skin each model with that model's own pose
+ * (#242, reopened). Kool's shadow pass shares one depth shader, and so one set of bone matrices,
+ * between every mesh it has no depth shader for; so a skinned model's shadow took the pose of
+ * whichever skinned model was drawn after it - a running fox beside a standing one cast a standing
+ * shadow. A fox on its own was never wrong, so the last part draws two.
+ *
+ * It puts a blue floor under the fox, turns the camera to look down on it from one side and lets a
+ * light from the other side throw the fox's side-on silhouette across the floor towards the camera,
+ * then stands a second fox in its bind pose behind it, made after it so it is drawn after it. The
+ * measure is the floor's shadow: a pixel is floor when it is blue, which no part of either fox is,
+ * and in shadow when its blue is dark. The first fox in its bind pose and the same fox mid-stride in
+ * Run must throw different shadows on the pixels that are floor in both frames - so a leg moving
+ * in front of the floor is not counted as its shadow moving. The second fox is the same in both
+ * frames, so nothing it draws is counted.
+ *
  * The host is paused before the first frame, so the interpolation alpha is zero throughout and a
  * tick is moved on only by `host.run` on the render thread: every frame here is a known tick.
  *
@@ -141,6 +158,40 @@ class GlSkinnedModelRenderTest {
                 pixels(stepB.capture), pixels(again.capture),
                 "the fox at the same clip time, reached from another tick, drew a different frame",
             )
+
+            // 4. The shadow, with a second fox in the frame: in the bind pose and mid-stride in Run.
+            backend.onRenderThread {
+                camera.lookAt(0f, 7f, 6f, 0f, 0.8f, 0f)
+                light.directionX = 0f
+                light.directionY = 1f
+                light.directionZ = -SHADOW_SLOPE
+                host.world.entity {
+                    it += Transform3D()
+                    it += ModelRenderer(ModelMesh.plane(FLOOR_SIZE, FLOOR_SIZE), ModelMaterial(floor()))
+                }
+                // No Animator: the bind pose, in every frame.
+                host.world.entity {
+                    it += Transform3D(y = SECOND_FOX_Y, rotationZ = (PI / 2).toFloat(), scaleX = SCALE, scaleY = SCALE, scaleZ = SCALE)
+                    it += ModelRenderer(model = fox)
+                }
+                with(host.world) { entity.configure { it -= Animator } }
+            }
+            val bindPose = frame(backend, slot, scene).capture
+            backend.onRenderThread {
+                with(host.world) { entity.configure { it += Animator().apply { play(FoxClips.Run, host.tick) } } }
+                host.run(RUN_MID_STRIDE)
+            }
+            val running = frame(backend, slot, scene).capture
+            save(bindPose, "skinned-fox-shadow-bind-pose.png")
+            save(running, "skinned-fox-shadow-run.png")
+            val shadow = shadowed(bindPose)
+            val shadowMoved = shadowMoved(bindPose, running)
+            println("GlSkinnedModelRenderTest: bind-pose shadows $shadow px; $shadowMoved floor px changed shadow in Run")
+            assertTrue(shadow >= MIN_SHADOW_PIXELS, "the foxes cast no shadow on the floor: $shadow pixels")
+            assertTrue(
+                shadowMoved >= MIN_MOVED_PIXELS,
+                "the fox's shadow mid-stride in Run is its bind-pose shadow: only $shadowMoved floor pixels changed",
+            )
         }
     }
 
@@ -148,12 +199,14 @@ class GlSkinnedModelRenderTest {
 
     private class Frame(val capture: BufferedImage, val scene: BufferedImage)
 
+    // Side-on and a little above, framing a fox about 1.6 tall and 3.1 long. Both are read by the
+    // system every frame, so the shadow part moves them on the render thread.
+    private val camera = ModelCamera().apply { lookAt(0f, -5.5f, 1.6f, 0f, 0f, 0.8f) }
+    private val light = ModelLight(directionX = -0.4f, directionY = 0.7f, directionZ = -1f)
+
     private fun withPausedHost(block: (KoolBackend, GameHost, ModelRenderSystem) -> Unit) {
         val registry = RenderRegistry()
         lateinit var system: ModelRenderSystem
-        // Side-on and a little above, framing a fox about 1.6 tall and 3.1 long.
-        val camera = ModelCamera().apply { lookAt(0f, -5.5f, 1.6f, 0f, 0f, 0.8f) }
-        val light = ModelLight(directionX = -0.4f, directionY = 0.7f, directionZ = -1f)
         registry.register(RenderPhase.World, { resources ->
             ModelRenderSystem(resources, camera, light).also { system = it }
         })
@@ -202,16 +255,38 @@ class GlSkinnedModelRenderTest {
     private fun isFox(pixel: Int): Boolean =
         ((pixel ushr 16) and 0xFF) > BACKGROUND || ((pixel ushr 8) and 0xFF) > BACKGROUND || (pixel and 0xFF) > BACKGROUND
 
-    private fun silhouette(image: BufferedImage): Int {
+    private fun silhouette(image: BufferedImage): Int = count(image, ::isFox)
+
+    /** Pixels that are fox in one image and not in the other. */
+    private fun moved(a: BufferedImage, b: BufferedImage): Int = count(a, b) { pa, pb -> isFox(pa) != isFox(pb) }
+
+    /** The floor is blue, and no part of the fox is: a lit floor, or one in shadow. */
+    private fun isFloor(pixel: Int): Boolean {
+        val r = (pixel ushr 16) and 0xFF
+        val g = (pixel ushr 8) and 0xFF
+        val b = pixel and 0xFF
+        return b > r + FLOOR_MARGIN && b > g + FLOOR_MARGIN
+    }
+
+    private fun isShadow(pixel: Int): Boolean = isFloor(pixel) && (pixel and 0xFF) < SHADOW_BLUE
+
+    private fun shadowed(image: BufferedImage): Int = count(image, ::isShadow)
+
+    /** Pixels that are floor in both images, in shadow in one and lit in the other. */
+    private fun shadowMoved(a: BufferedImage, b: BufferedImage): Int =
+        count(a, b) { pa, pb -> isFloor(pa) && isFloor(pb) && isShadow(pa) != isShadow(pb) }
+
+    /** Pixels of [image] that pass [test]. */
+    private fun count(image: BufferedImage, test: (Int) -> Boolean): Int {
         var n = 0
-        for (y in 0 until image.height) for (x in 0 until image.width) if (isFox(image.getRGB(x, y))) n++
+        for (y in 0 until image.height) for (x in 0 until image.width) if (test(image.getRGB(x, y))) n++
         return n
     }
 
-    /** Pixels that are fox in one image and not in the other. */
-    private fun moved(a: BufferedImage, b: BufferedImage): Int {
+    /** Pixels at which [a] and [b], the same size, pass [test] together. */
+    private fun count(a: BufferedImage, b: BufferedImage, test: (Int, Int) -> Boolean): Int {
         var n = 0
-        for (y in 0 until a.height) for (x in 0 until a.width) if (isFox(a.getRGB(x, y)) != isFox(b.getRGB(x, y))) n++
+        for (y in 0 until a.height) for (x in 0 until a.width) if (test(a.getRGB(x, y), b.getRGB(x, y))) n++
         return n
     }
 
@@ -219,6 +294,10 @@ class GlSkinnedModelRenderTest {
 
     private fun decode(png: ByteArray): BufferedImage = ImageIO.read(ByteArrayInputStream(png))
         ?: error("the captured bytes are not a decodable image")
+
+    private fun floor(): SpriteTexture = SpriteTexture.fromRgba(
+        4, 4, ByteArray(4 * 4 * 4) { i -> FLOOR_RGBA[i % 4] }, "skinned-test-floor",
+    )
 
     private fun white(): SpriteTexture = SpriteTexture.fromRgba(4, 4, ByteArray(4 * 4 * 4) { -1 }, "skinned-test-white")
 
@@ -256,5 +335,28 @@ class GlSkinnedModelRenderTest {
         const val FRAME_BUDGET = 240
 
         const val CAPTURE_TIMEOUT_MILLIS = 10_000L
+
+        /** The light falls this much for each unit it travels along +Y. */
+        const val SHADOW_SLOPE = 1.1f
+
+        /** Run's clip time, in ticks: legs stretched fore and aft, the tail lifted clear of the body. */
+        const val RUN_MID_STRIDE = 28
+
+        /** Where the second fox stands: behind the first, its shadow clear of the first's. */
+        const val SECOND_FOX_Y = -3f
+
+        const val FLOOR_SIZE = 30f
+
+        /** The floor's albedo: blue, which no part of the Fox is. */
+        val FLOOR_RGBA = byteArrayOf(40, 90, 230.toByte(), -1)
+
+        /** A floor pixel's blue must beat its red and its green by this much. */
+        const val FLOOR_MARGIN = 30
+
+        /** Floor darker in blue than this is in shadow: shadowed floor is about 150, lit about 210. */
+        const val SHADOW_BLUE = 180
+
+        /** A fox's shadow smaller than this is not a fox's shadow. */
+        const val MIN_SHADOW_PIXELS = 2_000
     }
 }

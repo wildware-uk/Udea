@@ -31,7 +31,7 @@ public object ModuleGraphRules {
     )
 
     /**
-     * The two modules that are allowed to see GL, and the whole of the exception list.
+     * The modules that are allowed to see GL, and the whole of the exception list.
      *
      * - **`:udea-render`** is spec 4's "the only module that touches GL" — it owns the
      *   backend, the targets, the pipeline and the capture. `RenderModuleGraphTest` asserts
@@ -50,6 +50,13 @@ public object ModuleGraphRules {
      * It is on the plain JVM convention: it takes `:udea-render` as an `implementation`
      * dependency, so its GL surface is exactly what that module chooses to expose.
      *
+     * - **`:udea-editor`** joined in issue #194, for the same shape of reason. The editor window
+     *   is a ComposeGL screen whose viewport shows the world Kool draws, so its runtime classpath
+     *   carries Kool through `:udea-render` and cannot not. What it may *compile against* is
+     *   narrower: [EDITOR_NAMES_NO_RENDERER] (`UDEA-MG-011`) bans Kool and every ComposeGL frontend
+     *   from its compile classpath, so it binds both only through `:udea-render`, and
+     *   [NO_EDITOR_ON_A_SHIPPED_CLASSPATH] (`UDEA-MG-010`) keeps it off every shipped one.
+     *
      * ## What is not weakened by this
      *
      * The headless guarantee that matters is `:udea-core` — the simulation kernel must run in
@@ -60,7 +67,7 @@ public object ModuleGraphRules {
      * every shipped runtime classpath — so a GL dependency here reaches no release artifact
      * by a rule that is independently enforced and independently tested.
      */
-    public val GL_ALLOWED_PROJECTS: Set<String> = setOf(":udea-render", ":udea-agent-host")
+    public val GL_ALLOWED_PROJECTS: Set<String> = setOf(":udea-render", ":udea-agent-host", ":udea-editor")
 
     /**
      * The game, as every path it has had or is planned to have.
@@ -167,9 +174,19 @@ public object ModuleGraphRules {
     )
 
     /**
-     * The headless-kernel rule: no renderer, no GL binding and no native loader outside the two
-     * modules that own them. LibGDX is not named here; [NO_LIBGDX] bans it from every project.
+     * The headless-kernel rule: no renderer, no GL binding and no native loader outside the
+     * modules in [GL_ALLOWED_PROJECTS]. LibGDX is not named here; [NO_LIBGDX] bans it from every project.
      */
+    /** Kool, every ComposeGL frontend and LWJGL: what [NO_GL_OUTSIDE_RENDER] and [EDITOR_NAMES_NO_RENDERER] ban. */
+    private val RENDERER_ARTIFACTS: List<CoordinatePattern> = listOf(
+        CoordinatePattern("de.fabmax.kool:*"),
+        CoordinatePattern("dev.wildware.composegl:composegl-kool*"),
+        CoordinatePattern("dev.wildware.composegl:composegl-lwjgl3*"),
+        CoordinatePattern("dev.wildware.composegl:composegl-webgl*"),
+        CoordinatePattern("dev.wildware.composegl:composegl-android*"),
+        CoordinatePattern("org.lwjgl:*"),
+    )
+
     public val NO_GL_OUTSIDE_RENDER: DependencyRule = DependencyRule(
         id = RuleId("UDEA-MG-002"),
         summary = "only udea-render may see Kool, a ComposeGL backend, a GL backend or a native platform artifact",
@@ -178,20 +195,13 @@ public object ModuleGraphRules {
             "on the compile classpath, a static initialiser or a context reference gets written and " +
             "the headless path is gone. Kool and the ComposeGL backends are the renderer after the " +
             "port (spec section 3: no Kool and no ComposeGL backend outside udea-render); " +
-            "composegl-ui, the toolkit with no backend in it, stays legal. udea-render and " +
-            "udea-agent-host are the two exempt modules; see ModuleGraphRules.GL_ALLOWED_PROJECTS " +
-            "for why the debug HTTP host is one of them and why udea-core's guarantee is untouched by it.",
+            "composegl-ui, the toolkit with no backend in it, stays legal. The exempt modules are " +
+            "ModuleGraphRules.GL_ALLOWED_PROJECTS, whose KDoc says why each one is there and why " +
+            "udea-core's guarantee is untouched by them.",
         specSection = "4, 3.5; kool port 3",
         projects = HEADLESS_PROJECTS,
         configurations = setOf("compileClasspath", "runtimeClasspath"),
-        banned = listOf(
-            CoordinatePattern("de.fabmax.kool:*"),
-            CoordinatePattern("dev.wildware.composegl:composegl-kool*"),
-            CoordinatePattern("dev.wildware.composegl:composegl-lwjgl3*"),
-            CoordinatePattern("dev.wildware.composegl:composegl-webgl*"),
-            CoordinatePattern("dev.wildware.composegl:composegl-android*"),
-            CoordinatePattern("org.lwjgl:*"),
-        ),
+        banned = RENDERER_ARTIFACTS,
     )
 
     /**
@@ -357,6 +367,52 @@ public object ModuleGraphRules {
         ),
     )
 
+    /**
+     * The editor is a debug tool, and a debug tool reaches a player's machine only by mistake.
+     *
+     * Issue #194: `udea-editor` is the editor window, and the only thing that may depend on it is a
+     * game's `editor` source set (`:moba:desktop`'s), whose classpaths are `editor*Classpath` and so
+     * not among [CONFIGURATIONS]. So the rule can be as blunt as "no scanned classpath of any
+     * project resolves it": on `:moba:desktop` that is the release runtime classpath, and on an
+     * engine module it is an arrow pointing up the module table. Epic #231's gizmo gate (G2) is
+     * meant to extend this rule rather than add a parallel one.
+     */
+    public val NO_EDITOR_ON_A_SHIPPED_CLASSPATH: DependencyRule = DependencyRule(
+        id = RuleId("UDEA-MG-010"),
+        summary = "no compile or runtime classpath resolves udea-editor; only a game's editor source set may",
+        rationale = "The editor window writes any field of any entity through the editor.* tools, " +
+            "which ignore agentWritable because authoring a level needs every field. It exists for " +
+            "a person at a desk and never for a player. A game reaches it only through its editor " +
+            "source set - :moba:desktop's runEditor - whose classpaths are not scanned here, so " +
+            "udea-editor on a scanned classpath is either the shipped game carrying the editor or " +
+            "an engine module depending upward on it.",
+        specSection = "4; issue #194",
+        configurations = setOf("compileClasspath", "runtimeClasspath"),
+        banned = listOf(CoordinatePattern(":udea-editor")),
+    )
+
+    /**
+     * The editor is GL-allowed at run time and not at compile time.
+     *
+     * It needs Kool on its runtime classpath to show the world at all, which is why it is in
+     * [GL_ALLOWED_PROJECTS]. But spec section 3 keeps Kool and every ComposeGL frontend inside
+     * `udea-render`, and issue #194 says the editor binds both only through it. This is that
+     * sentence as a gate: the patterns are [NO_GL_OUTSIDE_RENDER]'s, on `compileClasspath` alone.
+     */
+    public val EDITOR_NAMES_NO_RENDERER: DependencyRule = DependencyRule(
+        id = RuleId("UDEA-MG-011"),
+        summary = "udea-editor compiles against no Kool, no ComposeGL frontend and no GL binding",
+        rationale = "The editor draws its panels with composegl-ui, the toolkit with no backend in " +
+            "it, and shows the world through udea-render, which owns Kool and the ComposeGL Kool " +
+            "frontend (kool port spec section 3). Its runtime classpath carries Kool through " +
+            "udea-render; its compile classpath carrying it would let an editor panel name a Kool " +
+            "type, which is the second renderer binding the spec rules out.",
+        specSection = "kool port 3; issue #194",
+        projects = setOf(":udea-editor"),
+        configurations = setOf("compileClasspath"),
+        banned = RENDERER_ARTIFACTS,
+    )
+
     /** Every rule, in id order. */
     public val ALL: List<DependencyRule> = listOf(
         ANNOTATIONS_ARE_A_LEAF,
@@ -367,6 +423,8 @@ public object ModuleGraphRules {
         ASSETS_MODEL_IS_A_LEAF,
         VENDORED_FLEKS_IS_A_LEAF,
         NO_LIBGDX,
+        NO_EDITOR_ON_A_SHIPPED_CLASSPATH,
+        EDITOR_NAMES_NO_RENDERER,
     )
 
     /**

@@ -10,6 +10,7 @@ import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.capture.BlockingFrameCapture
 import dev.wildware.udea.render.kool.KoolSurface
 import dev.wildware.udea.render.ui.UiLayer
+import dev.wildware.udea.render.ui.WorldView
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -70,6 +71,20 @@ public class KoolBackend private constructor(
     /** The pipeline, once [create] has run. `null` before that. */
     public val pipeline: RenderPipeline? get() = built.get()
 
+    /** The surface [create] built, which [worldView] shows. `null` before [create]. */
+    private val surface = AtomicReference<KoolSurface?>(null)
+
+    /**
+     * The world this backend draws, as something a ComposeGL `SceneView` can show (issue #194).
+     *
+     * The editor's viewport is the caller this exists for: a screen shown through [show] puts the
+     * world in a panel with `WorldView.drawInto`, and never names the Kool pass it is copied from.
+     *
+     * @throws IllegalStateException before [create] has built the surface.
+     */
+    public fun worldView(): WorldView =
+        checkNotNull(surface.get()) { "$this has not built a surface yet; a GameHost builds it" }.worldView
+
     /**
      * Builds the pipeline and its Kool scene **on the render thread**, and puts the scene on the
      * context.
@@ -89,6 +104,7 @@ public class KoolBackend private constructor(
             )
             val pipeline = registry.build(game.world, game.ctx, surface.targets())
             surface.attach(kool.ctx)
+            this.surface.set(surface)
             pipeline
         }
         built.set(pipeline)

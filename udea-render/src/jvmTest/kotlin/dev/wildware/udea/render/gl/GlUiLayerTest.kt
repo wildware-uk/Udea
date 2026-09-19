@@ -414,6 +414,19 @@ internal class BackbufferProbe : OverlaySystem {
         frames.incrementAndGet()
     }
 
+    /**
+     * One pixel of the last window read back, as `0xRRGGBB`, with [y] counted down from the top as
+     * a layout is - GL's rows count up from the bottom, which is turned round here.
+     */
+    fun pixelAt(x: Int, y: Int): Int {
+        val bytes = checkNotNull(lastWindow) { "no window has been read back yet" }
+        require(x in 0 until width && y in 0 until height) { "($x, $y) is outside the ${width}x$height window" }
+        val i = ((height - 1 - y) * width + x) * 4
+        return ((bytes[i].toInt() and 0xFF) shl 16) or
+            ((bytes[i + 1].toInt() and 0xFF) shl 8) or
+            (bytes[i + 2].toInt() and 0xFF)
+    }
+
     /** The last window read back, as a PNG with GL's bottom-first rows turned the right way up. */
     fun window(): ByteArray? {
         val bytes = lastWindow ?: return null

@@ -41,6 +41,11 @@ include("udea-audio")
 include("udea-agent")
 include("udea-agent-host")
 
+// The editor window (issue #194): docked ComposeGL panels over the `editor.*` tools, with the world in
+// a `SceneView`. Debug-only - `UDEA-MG-010` keeps it off every shipped classpath, and only a game's
+// `editor` source set may depend on it.
+include("udea-editor")
+
 // Phase 7's retrofit (issues #147-#149): the `.udearep` recording, the deterministic headless
 // replay, and the bisect tools. Headless like every other module here - it names `udea-core` and
 // `udea-agent` and nothing that has ever seen a device.

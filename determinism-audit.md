@@ -210,7 +210,12 @@ over their `src/main` returns nothing, and `javap -p -c` over their compiled cla
 `PhysicsWorld.kt` and `NoOpPhysicsWorld.kt`. The kernel talks to physics through its own
 `PhysicsWorld` interface, and the Box2D implementation lived in `:moba`
 (`dev.wildware.moba.physics.Box2DPhysicsWorld`). **Deleted in issue #212**; `NoOpPhysicsWorld` is
-now the only implementation in the tree, and it is what the shipped game always resolved.
+what the shipped game always resolved.
+
+> **2026-09-19 (epic #199): Box2D is back, in its own module and not through LibGDX.**
+> `:udea-physics2d` implements `PhysicsWorld` over `box2d-jni` (Box2D 3.1.1), is a declared
+> simulation scope, and `DET005` now also matches `box2d.` and `box2dandroid.`. The two rows in
+> section 3.2 that name those packages are the audit of it.
 
 The rows below are therefore an audit of what simulation **would** be exposed to the moment
 somebody reaches for the obvious LibGDX helper — which is why they carry rules and replacements
@@ -308,6 +313,8 @@ bit on a different machine.
 | `Pool.obtain` / `free` / `freeAll` | deterministic-if-used-thus | replacement: never let pooled identity or residual field values reach state | `javap -p Pool` shows `freeObjects: Array<T>` — a LIFO stack, so reuse order is a pure function of the obtain/free history and is reproducible. The risk is not the order: it is that `obtain()` returns an object whose fields hold the previous user's values unless `reset()` clears every one of them. That is a correctness bug that *looks* like nondeterminism. |
 | `com.badlogic.gdx.physics.box2d.*` from **predicted** code | banned | DET005 | The solver accumulates state across steps and is not re-enterable from an arbitrary rewind point, so re-running a predicted tick against it does not reproduce the server's answer. The server owns the solver; prediction re-runs `CharacterMover`, which is closed-form. |
 | `com.badlogic.gdx.physics.box2d.*` from **authoritative** code | deterministic-if-used-thus | replacement: `PhysicsWorld`, stepped exactly once per tick from `PhysicsStepSystem` | Box2D is deterministic for an identical sequence of identical steps in the same process, and *not* across platforms — it is C++ float code compiled per platform in `gdx-platform` natives. `:moba`'s `Box2DPhysicsWorld` was the only implementation and it was reached only through the `PhysicsWorld` interface. **Both are gone (issue #212):** the class is deleted and no `moba` project resolves gdx at all, so this row describes a risk the tree no longer carries. |
+| `box2d.*` / `box2dandroid.*` (`box2d-jni`) from **predicted** code | banned | DET005 | The same reasoning as the LibGDX row above, for the Box2D 3.1.1 that `:udea-physics2d` binds to: the solver keeps warm-start impulses, contact manifolds and sleep timers across steps, none of which is in a snapshot, so a predicted tick re-run against it from a rewind point does not reproduce the server's answer. `box2d.` is the desktop jar and `box2dandroid.` the Android AAR; both are the one solver, so `DET005` names both. |
+| `box2d.*` / `box2dandroid.*` (`box2d-jni`) from **authoritative** code | deterministic-if-used-thus | replacement: `PhysicsWorld`, stepped exactly once per tick from `PhysicsStepSystem` | `:udea-physics2d` is a declared simulation scope and the only caller. Box2D 3 is deterministic for an identical sequence of identical steps with an identical body-creation order, which is why the module creates bodies in ascending `NetId` and opens its world with no task system (one worker) and fixed sub-steps; `Box2DDeterminismTest` hashes two runs tick by tick. It is **not** claimed across platforms: the natives are C compiled per platform. And a rebuilt world is not the world it replaced - it starts without the warm-start and contact state - which `Box2DPhysicsWorld`'s KDoc names and `Box2DRewindTest` measures. |
 | `Gdx.graphics` / `Gdx.input` / `Gdx.files` / `Gdx.app` | banned | DET006 | The device. `Gdx.graphics.getDeltaTime()` is a frame duration in seconds, which is a presentation unit; input must arrive as a replicated `InputCommand`; files must come from the compiled asset registry. This is the exact defect `common/.../UIScreen.kt:16` shipped. |
 
 ---

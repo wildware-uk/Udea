@@ -298,6 +298,64 @@ class DeterminismScannerTest {
     }
 
     @Test
+    fun `DET005 fires on the box2d-jni bindings, desktop and Android, only inside a predicted package`() {
+        // `udea-physics2d` reaches Box2D through `box2d.*` on the desktop and `box2dandroid.*` in
+        // the AAR - the same solver under two package names, so the rule has to know both.
+        val compiled = FixtureCompiler.compile(
+            tempDir,
+            mapOf(
+                "box2d/B2_World.java" to """
+                    package box2d;
+                    public class B2_World { public static void step(long world, float dt, int subSteps) {} }
+                """.trimIndent(),
+                "box2dandroid/B2_World.java" to """
+                    package box2dandroid;
+                    public class B2_World { public static void step(long world, float dt, int subSteps) {} }
+                """.trimIndent(),
+                "dev/wildware/udea/net/prediction/Desktop.java" to """
+                    package dev.wildware.udea.net.prediction;
+                    public class Desktop {
+                        public void step(long world) {
+                            box2d.B2_World.step(world, 1F / 60F, 4);
+                        }
+                    }
+                """.trimIndent(),
+                "dev/wildware/udea/net/prediction/Android.java" to """
+                    package dev.wildware.udea.net.prediction;
+                    public class Android {
+                        public void step(long world) {
+                            box2dandroid.B2_World.step(world, 1F / 60F, 4);
+                        }
+                    }
+                """.trimIndent(),
+                "dev/wildware/udea/net/transport/Authoritative.java" to """
+                    package dev.wildware.udea.net.transport;
+                    public class Authoritative {
+                        public void step(long world) {
+                            box2d.B2_World.step(world, 1F / 60F, 4);
+                        }
+                    }
+                """.trimIndent(),
+            ),
+        )
+        val result = DeterminismScan.run(
+            inputs = listOf(
+                FixtureCompiler.scopeInput(compiled, packagePrefixes = listOf("dev.wildware.udea.net")),
+            ),
+            allowlist = Allowlist.parse(""),
+            repoRoot = compiled.sourceDir,
+        )
+        assertEquals(
+            listOf(
+                "DET005 dev.wildware.udea.net.prediction.Android",
+                "DET005 dev.wildware.udea.net.prediction.Desktop",
+            ),
+            result.findings.map { "${it.ruleId} ${it.className}" }.sorted(),
+            result.findings.joinToString("\n") { it.render() },
+        )
+    }
+
+    @Test
     fun `DET005 fires on Box2D only inside a predicted package`() {
         val compiled = FixtureCompiler.compile(
             tempDir,

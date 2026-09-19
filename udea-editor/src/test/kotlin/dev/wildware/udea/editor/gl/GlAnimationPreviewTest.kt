@@ -311,7 +311,8 @@ class GlAnimationPreviewTest {
     /**
      * A few editor frames on the render thread, answering the editor's calls between them as the
      * simulation would: `editor.selection` with [selected] as the editor's, the Inspector's
-     * `editor.common_fields` with no shared field, and everything else with an empty answer. Enough for a read to be sent, answered and delivered.
+     * `editor.common_fields` with no shared field, `editor.play_edits` with no play, and everything
+     * else with an empty answer. Enough for a read to be sent, answered and delivered.
      */
     private fun editorFrames(backend: KoolBackend, session: EditorSession, bridge: AgentBridge, selected: NetId) {
         repeat(EDITOR_FRAMES) {
@@ -324,6 +325,7 @@ class GlAnimationPreviewTest {
                         "editor.selection" -> """{"you":"editor","authors":[{"author":"editor","ids":[${selected.raw}]}]}"""
                         "editor.history" -> """{"author":"editor","size":0,"edits":[]}"""
                         "editor.common_fields" -> """{"fields":[]}"""
+                        "editor.play_edits" -> """{"playing":false,"edits":[]}"""
                         else -> "{}"
                     }
                     bridge.complete(command.id, AgentResult.Ok(answer))

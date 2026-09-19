@@ -83,6 +83,7 @@ class AnimationPanelStateTest {
                     AgentResult.Ok("""{"you":"editor","authors":[{"author":"editor","ids":[${selected.joinToString(",") { it.raw.toString() }}]}]}""")
                 "editor.history" -> AgentResult.Ok("""{"author":"editor","size":0,"edits":[]}""")
                 "editor.common_fields" -> AgentResult.Ok("""{"fields":[]}""")
+                "editor.play_edits" -> AgentResult.Ok("""{"playing":false,"edits":[]}""")
                 else -> answers(command)
             }
             bridge.complete(command.id, answer)
@@ -245,6 +246,6 @@ class AnimationPanelStateTest {
         const val IDLE_FRAMES = 5
 
         /** The window's own reads, sent beside whatever the panel sends. */
-        val READS = setOf("editor.history", "editor.selection", "editor.common_fields")
+        val READS = setOf("editor.history", "editor.selection", "editor.common_fields", "editor.play_edits")
     }
 }

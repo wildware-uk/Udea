@@ -20,23 +20,28 @@ import dev.wildware.composegl.ui.widget.TextField
  * leaving the box keeps it as one undoable edit ([EditorInspector.edit]).
  */
 @Composable
-internal fun InspectorPanel(inspector: EditorInspector) {
+internal fun InspectorPanel(
+    inspector: EditorInspector,
+    /** Drawn under a field's name, keyed by `Component.field`: its Keep pin during Play (issue #238). */
+    pin: @Composable (key: String) -> Unit = {},
+) {
     Column(Modifier.fillMaxWidth()) {
         Text(heading(inspector.count), Modifier.fillMaxWidth().testTag(InspectorTags.HEADING))
         // A plain column, not a `ScrollArea`: in ComposeGL 0.7.0 a press on a text field inside one
         // focuses the window around it rather than the field, so no value could be typed.
         Column(Modifier.fillMaxWidth().padding(vertical = GAP).testTag(InspectorTags.FIELDS)) {
-            for (field in inspector.fields) FieldRow(inspector, field)
+            for (field in inspector.fields) FieldRow(inspector, field, pin)
         }
         Text(inspector.message, Modifier.fillMaxWidth().testTag(InspectorTags.MESSAGE))
     }
 }
 
 @Composable
-private fun FieldRow(inspector: EditorInspector, field: InspectorField) {
+private fun FieldRow(inspector: EditorInspector, field: InspectorField, pin: @Composable (key: String) -> Unit) {
     // The name on a line of its own: a docked panel is narrow, and `GameUnit.targetRaw` beside a box
     // wraps mid-word.
     Text(field.key, Modifier.fillMaxWidth())
+    pin(field.key)
     val box = Modifier.fillMaxWidth().padding(bottom = GAP / 2f).testTag(InspectorTags.field(field.key))
     if (field.readOnly) {
         Text(field.value.orEmpty(), box)

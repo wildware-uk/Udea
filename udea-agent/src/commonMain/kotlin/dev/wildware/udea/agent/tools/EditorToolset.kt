@@ -104,9 +104,18 @@ public class EditorLevelStore(
  *
  * [play] encodes the whole world as level bytes and sets it running; [stop] pauses it and decodes
  * those bytes back through the level load path, so the world after Stop is the world before Play
- * (issue #196). Every edit is allowed while playing, and every edit made while playing is thrown
- * away at Stop together with its undo entry: each author's history goes back to what it was at
- * Play. While a play is under way an edit from before it cannot be undone (`undo_before_play`):
+ * (issue #196). Every edit is allowed while playing - applied between ticks like any other, so the
+ * running game sees it on the next tick - and every edit made while playing is thrown away at Stop
+ * together with its undo entry: each author's history goes back to what it was at Play.
+ *
+ * Except the kept ones (issue #238). [playEdits] lists the edits made since Play, and [keep] marks
+ * one to keep. After the world and the histories are back, Stop makes each kept edit again, oldest
+ * first: the **values** it left, not the change it made, recorded as a normal edit in its author's
+ * history, so it is undoable and a Save writes it. Only an edit whose entities were all live at Play
+ * can be kept, because only those are in the world Stop puts back; a spawn, a delete and an edit to
+ * a unit spawned during Play are listed as not keepable, and Stop drops them like any unkept edit.
+ *
+ * While a play is under way an edit from before it cannot be undone (`undo_before_play`):
  * Stop brings the world back with that edit in it, and it is undoable again from there. Edit
  * sessions are closed at both ends, the same way every time: Play commits every open
  * one, so a drag begun before Play is kept as an edit to the world Stop comes back to; Stop cancels
@@ -692,8 +701,9 @@ public class EditorToolset(
     @AgentTool(
         name = "editor.play",
         description = "Save the whole world in memory and set the simulation running, so the " +
-            "level can be tried out. Edits made while playing are allowed and thrown away by " +
-            "editor.stop, which puts back the world as it was here. While already playing, " +
+            "level can be tried out. Edits made while playing are allowed, reach the game on its " +
+            "next tick, and are thrown away by editor.stop, which puts back the world as it was " +
+            "here, unless editor.keep kept them. While already playing, " +
             "resumes a paused play and keeps the world first saved.",
     )
     public fun play(context: AgentContext): AgentResult = journaled(context) {
@@ -715,7 +725,9 @@ public class EditorToolset(
         }
         // After the save, so a refused Play leaves every session open exactly as it was.
         forEachOpenEdit(::commit)
-        val session = PlaySession(level, clock.tick, history.mark())
+        val existing = HashSet<NetId>()
+        netIds.forEachLive { netId, _ -> existing.add(netId) }
+        val session = PlaySession(level, clock.tick, history.mark(), existing)
         playing = session
         play.time.resume()
         bridge.event("editor_play:${session.tick.value}", clock.tick.value)
@@ -730,8 +742,10 @@ public class EditorToolset(
     @AgentTool(
         name = "editor.stop",
         description = "End a play started by editor.play: pause, and put back the world, the tick " +
-            "and every author's undo history exactly as they were when Play was pressed. Edits " +
-            "made while playing are thrown away, and any open edit session is cancelled.",
+            "and every author's undo history exactly as they were when Play was pressed. Then each " +
+            "edit editor.keep kept is made again, as a normal undoable edit in its author's " +
+            "history, and the other edits made while playing are thrown away. Any open edit " +
+            "session is cancelled.",
     )
     public fun stop(context: AgentContext): AgentResult = journaled(context) {
         val play = requirePlay(STOP)
@@ -754,23 +768,160 @@ public class EditorToolset(
         play.levels.loadNow(level)
         for (delete in running.history.deletes()) netIds.reclaim(delete.netId)
         playing = null
-        // 2. What becomes of the edits made while playing.
-        val discarded = afterRestore(running)
+        // 2. Every author's undo history goes back to Play's, and the edits made while playing are
+        // answered. 3. Each kept one is made again, as a normal edit; the rest are gone.
+        val made = history.restore(running.history)
+        val kept = ArrayList<Pair<EditorEdit, EditorEdit.Fields?>>()
+        for (edit in made) {
+            if (PlayEditId(edit.sequence) !in running.kept || edit !is EditorEdit.Fields) continue
+            if (whyNotKeepable(edit, running) != null) continue
+            kept.add(edit to reapply(edit))
+        }
 
         bridge.event("editor_stop:${running.tick.value}", clock.tick.value)
         AgentResult.ok {
             put("playing", false)
             put("tick", clock.tick.value)
-            put("discardedEdits", discarded.size)
+            put("discardedEdits", made.size - kept.size)
+            arr("kept") {
+                for ((edit, again) in kept) {
+                    element {
+                        put("editId", edit.sequence)
+                        // Null when the world Stop put back already held every value it kept.
+                        if (again != null) put("sequence", again.sequence) else put("sequence", null as String?)
+                    }
+                }
+            }
+        }
+    }
+
+    // --- play edits ------------------------------------------------------------------------
+
+    @AgentTool(
+        name = "editor.play_edits",
+        description = "List the edits made since editor.play, every author's, oldest first: each " +
+            "one's editId, author, tool, the values it left, whether it can be kept and whether it " +
+            "is. editor.stop throws them all away except the kept ones, which it makes again as " +
+            "normal undoable edits. Answers playing=false and no edits while nothing is playing.",
+    )
+    public fun playEdits(): AgentResult {
+        val running = playing
+        val edits = if (running == null) emptyList() else history.since(running.history)
+        return AgentResult.ok {
+            put("playing", running != null)
+            arr("edits") {
+                for (edit in edits) {
+                    val reason = whyNotKeepable(edit, checkNotNull(running))
+                    element {
+                        put("editId", edit.sequence)
+                        put("author", label(edit.author))
+                        put("tool", edit.tool)
+                        put("id", edit.netId.raw)
+                        put("keepable", reason == null)
+                        put("kept", PlayEditId(edit.sequence) in running.kept)
+                        if (reason != null) put("reason", reason)
+                        if (edit is EditorEdit.Fields) {
+                            arr("values") {
+                                for (change in edit.changes) {
+                                    element {
+                                        put("id", change.netId.raw)
+                                        put("component", change.component.name)
+                                        put("field", change.fieldName)
+                                        field("value", change.after)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @AgentTool(
+        name = "editor.keep",
+        description = "Keep one edit made while playing, so editor.stop makes it again on the world " +
+            "it puts back: the values the edit left, not the change it made, as a normal edit in " +
+            "its author's undo history. Only an edit to entities that existed at editor.play can " +
+            "be kept; editor.play_edits says which. Anyone may keep anyone's edit.",
+    )
+    public fun keep(
+        context: AgentContext,
+        @Arg(description = "The edit's editId, as editor.play_edits lists it.")
+        editId: Long,
+    ): AgentResult = journaled(context) { markKept(KEEP, editId, keep = true) }
+
+    @AgentTool(
+        name = "editor.unkeep",
+        description = "Stop keeping an edit made while playing, so editor.stop throws it away like " +
+            "the rest. An edit not kept is left as it is.",
+    )
+    public fun unkeep(
+        context: AgentContext,
+        @Arg(description = "The edit's editId, as editor.play_edits lists it.")
+        editId: Long,
+    ): AgentResult = journaled(context) { markKept(UNKEEP, editId, keep = false) }
+
+    private fun markKept(tool: String, editId: Long, keep: Boolean): AgentResult {
+        val running = playing ?: return AgentResult.failed(
+            NOT_PLAYING,
+            "$tool: nothing is playing, so there are no play edits; an edit made while editing is " +
+                "kept already",
+        )
+        val edit = history.since(running.history).firstOrNull { it.sequence == editId } ?: return AgentResult.failed(
+            NO_SUCH_PLAY_EDIT,
+            "$tool: $editId is not an edit made during this play; it was made before editor.play " +
+                "(and editor.stop keeps those anyway), or undone since. editor.play_edits lists them",
+        )
+        val reason = whyNotKeepable(edit, running)
+        if (keep && reason != null) {
+            return AgentResult.failed(NOT_KEEPABLE, "$tool: ${label(edit.author)}'s ${edit.tool} (#$editId) cannot be kept: $reason")
+        }
+        val id = PlayEditId(editId)
+        if (keep) running.kept.add(id) else running.kept.remove(id)
+        bridge.event("editor_${if (keep) "keep" else "unkeep"}:$editId", clock.tick.value)
+        return AgentResult.ok {
+            put("editId", editId)
+            put("kept", keep)
         }
     }
 
     /**
-     * Stop's second step, after the world is back: every author's undo history goes back to Play's,
-     * and the edits made while playing are answered. Thrown away today; the one place a "keep these"
-     * step (epic #231's Keep) would re-apply them to the world just put back.
+     * Why [edit], made during [running], cannot be kept, or `null` when it can.
+     *
+     * A kept edit is made again on the world Stop puts back, so every entity it wrote must be one
+     * that world holds: live when Play was pressed. A spawn or a delete writes no value to keep.
      */
-    private fun afterRestore(ended: PlaySession): List<EditorEdit> = history.restore(ended.history)
+    private fun whyNotKeepable(edit: EditorEdit, running: PlaySession): String? = when (edit) {
+        is EditorEdit.Spawn ->
+            "${describe(edit.netId)} was spawned during Play, and Stop puts back the world from before it"
+        is EditorEdit.Delete ->
+            "a delete leaves no value to keep; delete ${describe(edit.netId)} again after editor.stop"
+        is EditorEdit.Fields -> edit.netIds.firstOrNull { it !in running.existing }?.let { spawned ->
+            "${describe(spawned)} was spawned during Play, so the world editor.stop puts back does not hold it"
+        }
+    }
+
+    /**
+     * Makes kept play edit [edit] again on the world Stop just put back: each value it left, written
+     * where it was written, recorded as one normal edit in its author's history whose undo puts back
+     * what the restored world held. A field whose component the entity no longer carries, or that
+     * already holds the value, is left out; answers `null` when that leaves nothing.
+     */
+    private fun reapply(edit: EditorEdit.Fields): EditorEdit.Fields? {
+        val changes = ArrayList<FieldChange>()
+        for (change in edit.changes) {
+            val entity = liveWithOrNull(change.netId, change.component) ?: continue
+            val before = change.component.read(world, entity, change.fieldIndex)
+            change.component.write(world, entity, change.fieldIndex, change.after)
+            val after = change.component.read(world, entity, change.fieldIndex)
+            if (after != before) changes.add(FieldChange(change.netId, change.component, change.fieldIndex, before, after))
+        }
+        if (changes.isEmpty()) return null
+        val again = EditorEdit.Fields(history.nextSequence(), edit.author, edit.tool, changes)
+        record(again)
+        return again
+    }
 
     private fun requirePlay(tool: String): EditorPlay = play ?: throw AgentToolException(
         NO_PLAY,
@@ -1159,6 +1310,12 @@ public class EditorToolset(
         /** `editor.stop` could not decode the world `editor.play` saved. Names why. */
         internal val LEVEL_NOT_LOADABLE: AgentErrorKind = AgentErrorKind("level_not_loadable")
 
+        /** `editor.keep` or `editor.unkeep` naming an edit that is not one made during the play under way. */
+        internal val NO_SUCH_PLAY_EDIT: AgentErrorKind = AgentErrorKind("no_such_play_edit")
+
+        /** `editor.keep` of a play edit Stop could not make again: a spawn, a delete, or one to a unit spawned during Play. */
+        internal val NOT_KEEPABLE: AgentErrorKind = AgentErrorKind("not_keepable")
+
         /** A session call naming a session that is not open: committed, cancelled or timed out. */
         internal val NO_SUCH_EDIT: AgentErrorKind = AgentErrorKind("no_such_edit")
 
@@ -1180,6 +1337,8 @@ public class EditorToolset(
         private const val COMMON_FIELDS = "editor.common_fields"
         private const val PLAY = "editor.play"
         private const val STOP = "editor.stop"
+        private const val KEEP = "editor.keep"
+        private const val UNKEEP = "editor.unkeep"
 
         /** `cancel_edit`'s argument, as the idle sweep sends it. */
         private const val SESSION_ID = "sessionId"

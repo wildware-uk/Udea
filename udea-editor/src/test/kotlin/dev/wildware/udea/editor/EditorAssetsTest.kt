@@ -41,9 +41,10 @@ class EditorAssetsTest {
 
     /**
      * Everything the window sent, minus the reads it makes by itself - the History panel's, which are
-     * `EditorSessionTest`'s, and the selection's, which are `ScenePickingTest`'s.
+     * `EditorSessionTest`'s, the selection's, which are `ScenePickingTest`'s, and the play edits', which
+     * are `MobaPlayKeepPanelTest`'s.
      */
-    private fun sent(): List<AgentCommand> = drain().filter { it.name != "editor.history" && it.name != "editor.selection" }
+    private fun sent(): List<AgentCommand> = drain().filter { it.name !in WINDOW_READS }
 
     private fun answer(command: AgentCommand, result: AgentResult, ui: UiTest) {
         bridge.complete(command.id, result)
@@ -193,6 +194,9 @@ class EditorAssetsTest {
     }
 
     private companion object {
+        /** The reads the window makes by itself, which [sent] leaves out. */
+        val WINDOW_READS = setOf("editor.history", "editor.selection", "editor.play_edits")
+
         /** `assets.fields`' answer for a sheet with one value set by a constant, as the tool renders it. */
         const val FIELDS = """{"id":"character/soldier_idle_sheet","kind":"spriteSheet","file":"moba/game/assets/character/soldier.udea.kts","total":3,"fields":[""" +
             """{"name":"name","line":56,"editable":false,"reason":"the asset's name, which is its id, on line 56","reasonLine":56},""" +

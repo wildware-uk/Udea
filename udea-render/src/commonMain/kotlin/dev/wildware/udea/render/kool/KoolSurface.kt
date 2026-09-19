@@ -7,8 +7,10 @@ import de.fabmax.kool.pipeline.AttachmentConfig
 import de.fabmax.kool.pipeline.ClearColorFill
 import de.fabmax.kool.pipeline.OffscreenPass
 import de.fabmax.kool.pipeline.OffscreenPass2d
+import de.fabmax.kool.pipeline.RenderPass
 import de.fabmax.kool.pipeline.TexFormat
 import de.fabmax.kool.scene.Camera
+import de.fabmax.kool.scene.Node
 import de.fabmax.kool.scene.OrthographicCamera
 import de.fabmax.kool.scene.Scene
 import de.fabmax.kool.util.Color
@@ -33,6 +35,7 @@ import dev.wildware.udea.render.ui.WorldView
  *      |
  *      v  (their colour textures, drawn through the offscreen batch)
  * OffscreenPass2d  <- offscreen batch: every RenderSystem       <- the ONLY thing a capture reads
+ *                  <- then its views added by addOnTop: a CapturedUi, the game's HUD
  *      |
  *      v  (its colour texture)
  * Scene main pass  <- present batch: that texture, letterboxed to the window
@@ -149,6 +152,17 @@ internal class KoolSurface(
 
     override fun remove(pass: OffscreenPass) {
         scene.removeOffscreenPass(pass)
+    }
+
+    override fun addOnTop(name: String, draw: () -> Unit): RenderPass.View =
+        pass.createView(name, pixelCamera()).apply {
+            drawNode = Node(name)
+            onSetupView(draw)
+        }
+
+    override fun removeOnTop(view: RenderPass.View) {
+        pass.removeView(view)
+        view.drawNode.release()
     }
 
     override fun begin() {

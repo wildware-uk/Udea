@@ -2,6 +2,8 @@ package dev.wildware.udea.render
 
 import dev.wildware.udea.render.draw.SpriteBatch2D
 import dev.wildware.udea.render.kool.ScenePasses
+import dev.wildware.udea.render.ui.CapturedUi
+import dev.wildware.udea.render.ui.UiFonts
 
 /**
  * What a [RenderSystem]'s constructor is handed: the capturable batch, the surface it draws on, and
@@ -67,6 +69,25 @@ public class RenderResources internal constructor(
         extra += resource
         return resource
     }
+
+    /**
+     * A ComposeGL screen drawn into the capturable frame, over everything every [RenderSystem]
+     * draws, owned by the pipeline: a heads-up display, which an agent's screenshot must show.
+     *
+     * See [CapturedUi] for why this and `UiLayer` are two things. [fonts] must outlive the pipeline's
+     * release of what this returns; handing them to [own] first does that.
+     *
+     * @throws IllegalStateException when there is no Kool surface behind this pipeline - the
+     *   ordering tests, which draw nothing.
+     */
+    public fun capturedUi(fonts: UiFonts): CapturedUi = own(
+        CapturedUi(
+            checkNotNull(passes) { "a captured interface needs a Kool surface to draw into; this pipeline has none" },
+            fonts,
+            offscreen.width,
+            offscreen.height,
+        ),
+    )
 
     /** Everything registered through [own], in construction order. */
     internal fun owned(): List<RenderResource> = extra.toList()

@@ -29,6 +29,7 @@ import dev.wildware.udea.render.draw.DebugDraw
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteBatch2D
 import dev.wildware.udea.render.draw.SpriteRegion
+import dev.wildware.udea.render.ui.UiFonts
 
 /**
  * What `moba` draws, and the control surface an agent steers it through.
@@ -150,8 +151,14 @@ public class MobaScene private constructor(
          * index, and that is reachable off the definition's core module before any host exists -
          * which matters, since the backend must be constructed before the host and the registry
          * must be complete before the backend.
+         *
+         * @param hudFonts makes the fonts the HUD's text is drawn in, registered at
+         *   [HUD_FONT_SIZES] in the toolkit's default family. Called once, on the render thread, when
+         *   the pipeline is built; the HUD owns what it returns. A function and not the fonts
+         *   themselves because this module is common code and a rasteriser is a platform's: the
+         *   desktop's is `DesktopFonts`.
          */
-        public fun build(definition: UdeaGameDef): MobaScene {
+        public fun build(definition: UdeaGameDef, hudFonts: () -> UiFonts): MobaScene {
             // Off the definition's own module list, so the attribute ids the bars read are the
             // ones the world's units were actually built with. See `HealthbarRenderSystem`.
             val combat = definition.modules.filterIsInstance<MobaModule>().singleOrNull()?.combat
@@ -210,10 +217,10 @@ public class MobaScene private constructor(
                 RenderPhase.World,
                 { resources -> HealthbarRenderSystem(resources, camera, combat.attributes) },
             ) { after(characters) }
-            // The player's own HUD: health, mana, and the two ability slots with their cooldowns.
+            // The player's own HUD: health, mana, and the ability slots with their cooldowns.
             // `RenderPhase.UI` and not `World`, because it is screen space and because the phase
-            // is what puts it above every world pass without a constraint against each one. It is
-            // still before the capture point on purpose - see `MobaHudSystem`.
+            // is what samples it after every world pass. It draws into the capture on purpose -
+            // see `MobaHudSystem`.
             registry.register(
                 RenderPhase.UI,
                 { resources ->
@@ -222,6 +229,7 @@ public class MobaScene private constructor(
                         attributeIds = combat.attributes,
                         abilityTable = combat.abilities.table,
                         activation = combat.gas.activation,
+                        fonts = hudFonts(),
                     )
                 },
             )

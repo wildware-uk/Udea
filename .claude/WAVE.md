@@ -444,7 +444,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
-## Wave 12 (2026-09-19): in flight
+## Wave 12 (2026-09-19): done
 
 - Baseline `9d6629f`: FULLY GREEN, 917 tasks.
 - Dispatched: dev-194 (#194 editor window: new udea-editor, settings, AGENTS.md, :moba:desktop editor source set,
@@ -463,6 +463,14 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   one place. UDEA0038 (not glTF 2.0) new; UDEA0032 missing file; UDEA0004 misspelled id. Fox CC BY 4.0 credited. Empty
   first frame = first shader-program compile (not pinned inside Kool). Gap noted: misspelled-id test never shown red
   alone. Worktree kept `.claude/worktrees/agent-ac2178956ad64e85f`.
+- **#194 MERGED `4ac81b7`**, round 1 PASS, no findings. New `udea-editor` (composegl-debug panels: Create, History +
+  Undo, Edit menu); `:moba:desktop:runEditor` (editor source set) opens paused; udea-render `WorldView` blits the
+  capturable pass into SceneView raw{} (HostState.Restore), stateless, reusable by #234. **UDEA-MG-010** (udea-editor
+  on any compileClasspath/runtimeClasspath fails), **UDEA-MG-011** (renderers off udea-editor compile classpath).
+  Build 928 tasks. Cards: translucent panels (#231 layout); a non-main, non-editor source set could take udea-editor
+  without MG-010 firing (harden in #233); two stale KDocs. UdpTwoProcessTest rateLimited flake at load 25.
+  Worktree kept `.claude/worktrees/agent-a92ca41c5832fb62e`.
+- **WAVE 12 DONE: #232, #240, #194 merged.** Baseline now `4ac81b7`, 928 tasks.
 - Held: udea-physics2d (settings/AGENTS.md collide with #194), #188 HUD (udea-render UI beside #194), #195/#196 (need
   #194), gizmo G2/G3 (need #194), A2 (needs #240).
 - Contracts refreshed for wave 12: `scratchpad/lead/dev-contract.md`, `rev-contract-w11.md` (addenda updated).

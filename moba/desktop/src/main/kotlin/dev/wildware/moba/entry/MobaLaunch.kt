@@ -19,6 +19,8 @@ import dev.wildware.udea.render.input.IntentState
 import dev.wildware.udea.render.input.KeyboardState
 import dev.wildware.udea.render.input.UiInput
 import dev.wildware.udea.render.kool.KoolKeyboard
+import dev.wildware.udea.render.ui.UiLayer
+import dev.wildware.udea.render.ui.WorldView
 
 /**
  * The desktop half of what was `MobaEntry`: the mode, the window, the backend and the boot order.
@@ -130,12 +132,15 @@ public object MobaLaunch {
      *
      * The render thread because `KoolKeyboard` pushes itself onto Kool's `InputStack` as it is
      * built, and that stack is polled on the render thread - `udea-render`'s own `GlKoolInputTest`
-     * builds it the same way. Nothing takes keys ahead of the game ([UiInput.NONE]): `MobaHud`
-     * draws text and has no widget a key could land in.
+     * builds it the same way.
+     *
+     * @param ui what takes keys ahead of the game. Nothing, by default: `MobaHud` draws text and has
+     *   no widget a key could land in. The editor passes its `UiLayer`, so Ctrl+Z reaches Edit >
+     *   Undo rather than becoming an intent.
      */
-    public fun keyboard(rendering: Rendering): KoolKeyboard {
+    public fun keyboard(rendering: Rendering, ui: UiInput = UiInput.NONE): KoolKeyboard {
         var built: KoolKeyboard? = null
-        rendering.onRenderThread { built = KoolKeyboard(UiInput.NONE) }
+        rendering.onRenderThread { built = KoolKeyboard(ui) }
         return checkNotNull(built) { "KoolKeyboard was not built on the render thread" }
     }
 
@@ -201,6 +206,8 @@ public object MobaLaunch {
                     pipeline,
                     requestExit = { requestExit(backend) },
                     onRenderThread = { block -> backend.onRenderThread(block) },
+                    show = backend::show,
+                    world = backend::worldView,
                 ),
             )
             attachment = attached
@@ -251,6 +258,19 @@ public object MobaLaunch {
          * The default runs inline, for a `Rendering` a test builds with no backend behind it.
          */
         public val onRenderThread: (() -> Unit) -> Unit = { it() },
+        /**
+         * Puts an interface over the world, and hands its ownership to the backend, which closes it.
+         * `KoolBackend.show`, one layer per backend. The editor's window is the caller.
+         *
+         * The default refuses, for a `Rendering` a test builds with no backend behind it.
+         */
+        public val show: (UiLayer) -> Unit = { error("this Rendering has no backend to show $it on") },
+        /**
+         * The world this backend draws, for a `SceneView` to show (`KoolBackend.worldView`).
+         *
+         * The default refuses, for the same reason as [show].
+         */
+        public val world: () -> WorldView = { error("this Rendering has no backend to draw a world") },
     ) {
         /** The control surface, for a caller that has an agent toolset to wire to it. */
         public fun presentation(): PresentationControl = scene.presentation(pipeline)

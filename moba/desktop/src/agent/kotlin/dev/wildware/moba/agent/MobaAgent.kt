@@ -67,6 +67,8 @@ import dev.wildware.udea.render.OverlayResources
 import dev.wildware.udea.render.OverlaySystem
 import dev.wildware.udea.render.input.InjectedIntent
 import dev.wildware.udea.render.input.IntentState
+import dev.wildware.udea.render.input.UiInput
+import dev.wildware.udea.render.ui.UiLayer
 import dev.wildware.udea.replay.tools.ReplayToolModules
 import dev.wildware.udea.replay.tools.ReplayToolset
 import java.nio.file.Path
@@ -137,52 +139,107 @@ public object MobaAgent {
     @JvmStatic
     public fun main(args: Array<String>) {
         val mode = MobaLaunch.modeFromProperties(fallback = RenderMode.Offscreen)
-        // The bridge and the session table are built *here*, before anything renders, because the
-        // overlay has to be registered into the `RenderRegistry` before `Lwjgl3Backend.start`
-        // builds a pipeline out of it - and the overlay narrates this bridge and colours by this
-        // table. Two `AgentSessions` would be the quiet version of the bug: the panel would name
-        // no session at all while the host interned every caller into a table nothing drew.
-        // `resultSpill` and not the default: an answer larger than the digest's result ceiling is
-        // otherwise dropped from `/state` outright and the agent that asked for it never learns
-        // what it said. See `AgentBridge.complete`. The store is process-wide here for the same
-        // reason the bridge is - both are built before anything renders.
-        val bridge = AgentBridge(resultSpill = ARTIFACTS.textSpill())
-        val sessions = AgentSessions()
-        // The agent's hands, built once per process. It is an ordinary `IntentSource`, so the
-        // simulation cannot tell it from a keyboard - which is the whole of issue #124's claim
-        // that synthesised input is indistinguishable from a human's, made structural rather than
-        // argued. In `Headless` it is the *only* source there is, which is the mode the old
-        // `Gdx.input.inputProcessor` injection could not serve at all.
-        val injected = InjectedIntent(MobaControls.BINDINGS.catalog)
-        // The cue mirror is appended to the game's own module list rather than replacing
-        // anything in it: it decorates `GameContext.cues`, and a module `context` hook is the one
-        // place a decorator can see the value it decorates. See `MobaCueMirrorModule`.
-        val extraModules = listOf(MobaCueMirrorModule(bridge))
+        // Built *here*, before anything renders: see [Wiring].
+        val wiring = Wiring()
         if (mode == RenderMode.Headless) {
-            val host = MobaGame.host(RenderMode.Headless, extraModules = extraModules, level = MobaLaunchLevel.bytes())
-            host.ctx[IntentState.KEY].source = injected
+            val host = MobaGame.host(RenderMode.Headless, extraModules = wiring.extraModules, level = MobaLaunchLevel.bytes())
+            host.ctx[IntentState.KEY].source = wiring.injected
             // No GL context in Headless, so no capture surface exists and `null` is the
             // honest answer: every `render.*` tool then answers `no_render_context`.
-            val session = attach(host, RenderMode.Headless, null, bridge, sessions, injected)
+            val session = attach(host, RenderMode.Headless, null, wiring, EditorMode.resolve())
             Runtime.getRuntime().addShutdownHook(Thread { session.close("jvm shutdown hook") })
             session.loop.run()
             session.close("the frame loop ended")
             return
         }
+        runWithGl(mode, wiring, editor = EditorMode.resolve(), screen = null)
+    }
+
+    /**
+     * What one agent process builds before anything renders, once.
+     *
+     * The bridge and the session table are built before the GL backend, because the overlay has to
+     * be registered into the `RenderRegistry` before `KoolBackend.start` builds a pipeline out of
+     * it - and the overlay narrates this bridge and colours by this table. Two `AgentSessions` would
+     * be the quiet version of the bug: the panel would name no session at all while the host
+     * interned every caller into a table nothing drew.
+     */
+    internal class Wiring {
+        /**
+         * `resultSpill` and not the default: an answer larger than the digest's result ceiling is
+         * otherwise dropped from `/state` outright and the agent that asked for it never learns what
+         * it said. See `AgentBridge.complete`. The store is process-wide for the same reason the
+         * bridge is - both are built before anything renders.
+         */
+        val bridge: AgentBridge = AgentBridge(resultSpill = ARTIFACTS.textSpill())
+
+        val sessions: AgentSessions = AgentSessions()
+
+        /**
+         * The agent's hands, built once per process. It is an ordinary `IntentSource`, so the
+         * simulation cannot tell it from a keyboard - which is the whole of issue #124's claim that
+         * synthesised input is indistinguishable from a human's, made structural rather than
+         * argued. In `Headless` it is the *only* source there is.
+         */
+        val injected: InjectedIntent = InjectedIntent(MobaControls.BINDINGS.catalog)
+
+        /**
+         * The cue mirror is appended to the game's own module list rather than replacing anything
+         * in it: it decorates `GameContext.cues`, and a module `context` hook is the one place a
+         * decorator can see the value it decorates. See `MobaCueMirrorModule`.
+         */
+        val extraModules: List<dev.wildware.udea.core.module.UdeaModule> = listOf(MobaCueMirrorModule(bridge))
+    }
+
+    /**
+     * An interface shown over an agent instance's world - the editor's window is the one there is -
+     * and what it adds to each frame.
+     */
+    internal class Screen(
+        /** The layer shown, which takes keys ahead of the game. The backend owns and closes it. */
+        val layer: UiLayer,
+        /** Called on the render thread each frame, after the loop has pumped. */
+        val frame: () -> Unit,
+        /** Called once the render loop has exited and the backend has closed the layer. */
+        val afterExit: () -> Unit,
+    )
+
+    /**
+     * The GL half of [main], and of `MobaEditor.main`: boots a Kool backend in [mode], wires every
+     * toolset, and blocks until the window closes.
+     *
+     * @param editor register the `editor.*` tools and report `"editor":true` on `/health`.
+     * @param screen builds an interface over the running session before the first frame, or `null`
+     *   for an instance that shows none.
+     */
+    internal fun runWithGl(
+        mode: RenderMode,
+        wiring: Wiring,
+        editor: Boolean,
+        screen: ((GameHost, MobaLaunch.Rendering, Session) -> Screen)?,
+    ) {
+        var shown: Screen? = null
         MobaLaunch.runWithGl(
             mode,
-            overlay = overlayFor(mode, bridge, sessions),
-            extraModules = extraModules,
+            overlay = overlayFor(mode, wiring.bridge, wiring.sessions),
+            extraModules = wiring.extraModules,
         ) { host, rendering ->
             // The engine's own adapter, out of `udea-agent-host`'s `src/main`. `moba` used to
             // carry a copy of it in this source set, because a headless agent host could not name
             // `PresentationControl`; the copy is gone with the rule that forced it.
             val control = OffscreenRenderControl(rendering.presentation())
+            val session = attach(host, mode, control, wiring, editor)
+            val screenShown = screen?.invoke(host, rendering, session)
+            shown = screenShown
             // Keyboard *and* agent, combined rather than one replacing the other: a human
             // watching a Windowed agent instance can still play. See `CompositeIntent` for why
-            // there is deliberately no priority rule between the two.
-            MobaLaunch.wireInput(host, MobaLaunch.keyboard(rendering), extra = injected)
-            val session = attach(host, mode, control, bridge, sessions, injected)
+            // there is deliberately no priority rule between the two. An interface, when there is
+            // one, takes its keys first.
+            MobaLaunch.wireInput(
+                host,
+                MobaLaunch.keyboard(rendering, screenShown?.layer ?: UiInput.NONE),
+                extra = wiring.injected,
+            )
             // The camera goes on the unit the agent drives, so a screenshot after an `input.*`
             // call shows the thing that moved. Real now: `CameraRig` follows a game-supplied
             // `PoseSource` rather than only a `PhysicsBody`, which is what `moba` never had.
@@ -205,6 +262,7 @@ public object MobaAgent {
                 frame = { delta ->
                     session.loop.pump(delta)
                     audio.frame()
+                    screenShown?.frame?.invoke()
                 },
                 close = {
                     audio.close()
@@ -212,6 +270,7 @@ public object MobaAgent {
                 },
             )
         }
+        shown?.afterExit?.invoke()
     }
 
     /**
@@ -257,15 +316,20 @@ public object MobaAgent {
      * `/state` that beats the loop reads a document rather than an empty string. The registry
      * entry is written by [AgentHost] itself, after the port is bound - never before, because an
      * entry naming a port nobody claimed is worse than no entry.
+     *
+     * @param editor wire the `editor.*` tools and report `"editor":true` on `/health`: an instance
+     *   started with `-Peditor=true`, or `MobaEditor`'s.
      */
-    private fun attach(
+    internal fun attach(
         host: GameHost,
         mode: RenderMode,
         control: RenderControl?,
-        bridge: AgentBridge,
-        sessions: AgentSessions,
-        injected: InjectedIntent,
+        wiring: Wiring,
+        editor: Boolean,
     ): Session {
+        val bridge = wiring.bridge
+        val sessions = wiring.sessions
+        val injected = wiring.injected
         val timings = AgentTimings()
         val census = MobaCensus(host.world)
         val digest = StateDigest(
@@ -298,10 +362,9 @@ public object MobaAgent {
             // handle comes back as `resultRef` for one `GET /artifact`.
             spill = artifacts.textSpill(),
         )
-        // `editor.*` only when this process was started as an editor (`-Peditor=true`), because
-        // its tools write fields `world.set_component_field` refuses. A normal run's `/tools`
-        // does not list them, and `/health` says which this is.
-        val editor = EditorMode.resolve()
+        // `editor.*` only when this process was started as an editor - `-Peditor=true`, or
+        // `runEditor` - because its tools write fields `world.set_component_field` refuses. A
+        // normal run's `/tools` does not list them, and `/health` says which this is.
         val editorTools = if (editor) {
             EditorToolset(
                 world = host.world,
@@ -412,7 +475,7 @@ public object MobaAgent {
         shutdown
             .onClose("frame-loop") { loop.stop() }
             .onClose("agent-host") { agentHost?.stop() }
-        return Session(loop = loop, shutdown = shutdown, player = player)
+        return Session(loop = loop, shutdown = shutdown, player = player, wiring = wiring)
     }
 
     /** [Position], with x and y writable and `hp` not - so `field_not_writable` is reachable. */
@@ -491,11 +554,13 @@ public object MobaAgent {
      * shutdown hook the same teardown rather than two that have to be kept in step - and
      * `HostShutdown` runs once whichever gets there first.
      */
-    private class Session(
+    internal class Session(
         val loop: AgentGameLoop,
         val shutdown: HostShutdown,
         /** The unit an agent's `input.*` calls steer, and the one the camera follows. */
         val player: dev.wildware.udea.core.identity.NetId,
+        /** The bridge and session table the toolsets were wired over. */
+        val wiring: Wiring,
     ) {
         fun close(reason: String) {
             shutdown.shutdown(reason)

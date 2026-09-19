@@ -316,6 +316,24 @@ public object UdeaRules {
         description = "a model's clips are asked for a clip the model's file does not have",
     )
 
+    /**
+     * A gizmo handle annotation (issue #233) that names a field the component cannot be dragged
+     * through: a field it does not have, one that is a `val`, or one that is not a `Float` - or an
+     * annotation on a class that is not a Fleks component with a `ComponentType` companion.
+     *
+     * `@PositionHandle`, `@SizeHandle` and `@RotationHandle` name their fields as strings, because a
+     * Kotlin annotation cannot hold a property reference, so a misspelling is invisible to the
+     * compiler. `udea-codegen`'s KSP processor checks every name and reports this at the annotation,
+     * with the did-you-mean spec section 5 makes mandatory; unchecked, the generated gizmo would
+     * fail to compile in another module, far from the typo.
+     */
+    public val GIZMO_HANDLE_FIELD: UdeaRule = UdeaRule(
+        id = "UDEA0017",
+        defaultSeverity = Severity.Error,
+        description = "a gizmo handle annotation names a field that is not a mutable Float " +
+            "property of a Fleks component",
+    )
+
     /** Every registered rule, in id order. */
     public val all: List<UdeaRule> = listOf(
         NET_ON_VAL,
@@ -334,6 +352,7 @@ public object UdeaRules {
         ASSET_INDEX_FORMAT,
         LOOP_IN_ASSET,
         UNRESOLVED_ANIMATION_CLIP,
+        GIZMO_HANDLE_FIELD,
     ).sortedBy { it.id }
 
     private val byId: Map<String, UdeaRule> = all.associateBy { it.id }

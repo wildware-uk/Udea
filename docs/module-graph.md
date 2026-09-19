@@ -28,7 +28,7 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 
 | Module | Convention | Purpose | Replaces | Depends on | Depended on by |
 |---|---|---|---|---|---|
-| `udea-annotations` | `udea.kotlin-multiplatform` | Zero-dependency leaf: `@Net`, `@Sim`, `@Q`, `@Replicated`, `@AgentTool`, `@Arg` | Two conflicting `UdeaNetworked` declarations on one classpath | *(Kotlin stdlib only)* | `udea-codegen`, `udea-compiler-plugin`, `udea-core`, `udea-assets`, `udea-assets-compiler` (`@AssetDsl`, issue #192) |
+| `udea-annotations` | `udea.kotlin-multiplatform` | Zero-dependency leaf: `@Net`, `@Sim`, `@Q`, `@Replicated`, `@AgentTool`, `@Arg`, the gizmo handles `@PositionHandle`, `@SizeHandle`, `@RotationHandle`, `@RadiusHandle`, `@RangeHandle`, and `@HandleIndex`, which only `udea-codegen` writes (issue #233) | Two conflicting `UdeaNetworked` declarations on one classpath | *(Kotlin stdlib only)* | `udea-codegen`, `udea-compiler-plugin`, `udea-core`, `udea-assets`, `udea-assets-compiler` (`@AssetDsl`, issue #192) |
 | `udea-diagnostics` | `udea.kotlin-multiplatform` | Zero-dependency leaf: the one `UdeaDiagnostic` — severity, stable rule id, `SourceSpan`, `assetId`, optional `Fix` (spec §5) | new — the shared vocabulary the K2 checkers and the asset validator both emit | *(Kotlin stdlib only)* | `udea-compiler-plugin`, `udea-assets`, `udea-assets-compiler`, `udea-gradle`; and, on `testImplementation(testFixtures(...))` only, `udea-core`, `udea-agent` and `udea-agent-host` for `LatencyBudget` (issue #175) |
 | `udea-codegen` | `udea.kotlin-build-tool` | KSP2 processor + KotlinPoet emitters; owns id assignment and `net-protocol.lock` | `NetworkGenerator`, `UdeaDslProcessor`, `@CreateDsl` | `udea-annotations`, `symbol-processing-api`, KotlinPoet | build-time only (`ksp(...)` from consumers) |
 | `udea-compiler-plugin` | `udea.kotlin-build-tool` | K2 FIR/IR plugin: checkers, KDoc propagation, gated declaration synthesis | new (D8) | `udea-annotations`, `udea-diagnostics`, `kotlin-compiler-embeddable` (`compileOnly`) | build-time only; `udea-assets-compiler` on `runtimeOnly`, so the scripting host finds it as a service and every asset script compiles with it (issue #192), while no production source names a plugin type |
@@ -58,7 +58,8 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
   `ModuleGraphRules.GL_ALLOWED_PROJECTS`, and adding one means editing that set and the test
   that pins it. `udea-editor` is exempt at run time only: `UDEA-MG-011` keeps every renderer
   artifact off what it compiles against.
-- Anything → `udea-editor`, except a game's `editor` source set (`UDEA-MG-010`).
+- Anything → `udea-editor`, except a game's `editor` source set (`UDEA-MG-010`). And no class of
+  its, and no `Gizmo`, on a release classpath however it got there (`UDEA-MG-012`).
 - `udea-assets-compiler` → any Gradle type. The daemon and CI must run identical code.
 - `udea-audio` → Kool or LibGDX. It is a designated headless module, so `UDEA-MG-002` bans
   `de.fabmax.kool:*` on its classpath, `UDEA-MG-009` bans LibGDX there as everywhere, and
@@ -112,6 +113,7 @@ rule has a stable id so a failure message and this document can be joined up by 
 |---|---|---|---|
 | `udeaVerifyModuleGraph` | every `:udea-*` and `:moba:*` project | the resolved dependency graph | that project's `check`, plus the root aggregate |
 | `udeaVerifyRelease` | `:moba:desktop` | the **packaged artifact**, plus the release runtime classpath | `finalizedBy` on `:moba:desktop:assemble`, release builds only |
+| `udeaVerifyEditorAbsent` | every `:udea-*` and `:moba:*` project with a JVM release classpath, except `:udea-editor` | the **classes** on the release runtime classpath and in the project's jar | that project's `check` |
 
 Both read the **resolved** graph rather than declared dependencies, because the arrow
 that matters is the one nobody declared: a module two hops away from a banned artifact has
@@ -249,8 +251,37 @@ never for a player. A game reaches it through an `editor` source set of its desk
 the rule can be blunt: `:udea-editor` on a scanned classpath is either the shipped game carrying
 the editor (`:moba:desktop`'s `runtimeClasspath` is its release classpath) or an engine module
 depending upward on it. The project's own classpath never violates it, and test classpaths are not
-scanned by it. The gizmo epic (#231, ticket G2) extends this rule to gizmo classes rather than
-adding a parallel one.
+scanned by it. What a dependency rule cannot see - a class with no coordinate - is `UDEA-MG-012`'s.
+
+## `UDEA-MG-012` — no release classpath carries a `udea-editor` class or a `Gizmo`
+
+**Issue #233.** Read by `udeaVerifyEditorAbsent`, on every `udea-*` and `moba` project with a JVM
+release classpath (`runtimeClasspath`, or `jvmRuntimeClasspath` on a multiplatform project) except
+`:udea-editor` itself, from that project's `check`. It reads every class on that classpath and in
+the project's own jar, and fails on one that is `udea-editor`'s (`dev/wildware/udea/editor/`), that
+is a `Gizmo`, or that extends or implements anything of `udea-editor`'s, directly or through
+supertypes on the same classpath.
+
+`UDEA-MG-010` fails `:udea-editor` as a *dependency*. A gizmo can reach a release classpath with no
+dependency edge at all: an `editor` source set's output added with `runtimeOnly(...)`, a directory
+named by `files(...)`, a class packed into the jar. Each of those carries no coordinate for a graph
+rule to match, so this rule reads the classes. It reads **supertypes**, which is what a class *is*:
+a class that only spells an editor type in a string constant passes, and `EditorReleaseRulesTest`
+holds that control. It is a task of its own rather than a part of `udeaVerifyModuleGraph` because it
+needs the classes built, and `udeaVerifyModuleGraph` deliberately runs before anything compiles.
+
+JVM classpaths only: `udea-editor` publishes no Android or Wasm variant, so no other target can
+resolve it, and a class implementing `Gizmo` cannot compile for a target that cannot see `Gizmo`.
+Classes newer than the build's ASM (LWJGL 3.4.3 ships Java 27 ones) are read too, because only the
+header is read - the constant pool, the class, its superclass and its interfaces - and a class
+whose header this ASM cannot parse fails the task, naming the class, rather than being skipped. A
+scan that read no class at all fails rather than passing.
+
+The handle annotations (`@PositionHandle`, `@SizeHandle`, `@RotationHandle`, `@RadiusHandle`,
+`@RangeHandle`) are compile-time markers in `udea-annotations` and never make a release classpath
+carry editor code: the game's KSP run checks them (`UDEA0017`) and lists the components on its
+module registry's BINARY-retained `@HandleIndex`, and the gizmos are generated in the game's
+`editor` source set.
 
 ## `UDEA-MG-011` — `udea-editor` compiles against no renderer
 

@@ -71,7 +71,8 @@ class UdeaRulesTest {
         assertEquals("UDEA0014", UdeaRules.ASSET_INDEX_FORMAT.id)
         assertEquals("UDEA0015", UdeaRules.LOOP_IN_ASSET.id)
         assertEquals("UDEA0016", UdeaRules.UNRESOLVED_ANIMATION_CLIP.id)
-        assertEquals(16, UdeaRules.all.size)
+        assertEquals("UDEA0017", UdeaRules.GIZMO_HANDLE_FIELD.id)
+        assertEquals(17, UdeaRules.all.size)
         assertTrue(UdeaRules.all.all { it.defaultSeverity == Severity.Error })
     }
 

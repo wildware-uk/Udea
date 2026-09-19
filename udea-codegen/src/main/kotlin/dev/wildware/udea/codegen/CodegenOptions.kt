@@ -45,6 +45,11 @@ package dev.wildware.udea.codegen
  *   in a platform source set would get every common declaration generated twice. Set, the run
  *   processes only declarations under `src/<sourceSet>/` and writes none of the module-level
  *   files - registries, lock, manifest - which belong to the common run (issue #208).
+ * @param gizmoRegistry the game whose `<Game>GizmoRegistry` this run writes (issue #233), which makes
+ *   it an **editor** run: it generates a gizmo for every handle annotation in its own sources and on
+ *   the `@HandleIndex` of each module registry in [registryModules], and lists them with every
+ *   hand-written `Gizmo` in its sources. Set only on a game's `editor` source set, because what it
+ *   generates implements `udea-editor` types and must never reach a release classpath.
  */
 internal data class CodegenOptions(
     val moduleName: String?,
@@ -54,6 +59,7 @@ internal data class CodegenOptions(
     val stateModuleService: String?,
     val registryModules: List<String>? = null,
     val sourceSet: String? = null,
+    val gizmoRegistry: String? = null,
 ) {
     companion object {
         const val MODULE_NAME: String = "udea.moduleName"
@@ -78,6 +84,9 @@ internal data class CodegenOptions(
 
         /** See [sourceSet]. */
         const val SOURCE_SET: String = "udea.sourceSet"
+
+        /** See [gizmoRegistry]. */
+        const val GIZMO_REGISTRY: String = "udea.gizmoRegistry"
 
         /** A Gradle source set name: `jvmMain`, `androidMain`. Never a path. */
         val SOURCE_SET_FORMAT: Regex = Regex("[a-z][A-Za-z0-9]*")
@@ -108,6 +117,7 @@ internal data class CodegenOptions(
                 ?.map(String::trim)
                 ?.filter(String::isNotEmpty),
             sourceSet = options[SOURCE_SET]?.takeIf(String::isNotBlank),
+            gizmoRegistry = options[GIZMO_REGISTRY]?.takeIf(String::isNotBlank),
         )
     }
 }

@@ -41,6 +41,12 @@ public object UdeaModuleRegistry {
     /** Mirrors `CodegenOptions.REGISTRY_MODULES`. */
     public const val REGISTRY_MODULES_OPTION: String = "udea.registryModules"
 
+    /**
+     * Mirrors `CodegenOptions.GIZMO_REGISTRY` (issue #233): set on a game's `editor` source set, it
+     * names the game whose `<Game>GizmoRegistry` that run generates.
+     */
+    public const val GIZMO_REGISTRY_OPTION: String = "udea.gizmoRegistry"
+
     /** How [REGISTRY_MODULES_OPTION] separates names; a module name is letters and digits only. */
     internal const val SEPARATOR: Char = ','
 

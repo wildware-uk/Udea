@@ -36,6 +36,16 @@ class AnnotationVocabularyTest {
         "dev.wildware.udea.annotations.AgentState" to setOf(AnnotationTarget.PROPERTY),
         // Issue #192: the asset DSL's once-only lambda promise, read by the K2 loop checker.
         "dev.wildware.udea.annotations.AssetDsl" to setOf(AnnotationTarget.FUNCTION),
+        // Issue #233: the editor's gizmo handles. A handle driving several fields marks the class
+        // and names them; a handle driving one marks that field.
+        "dev.wildware.udea.annotations.PositionHandle" to setOf(AnnotationTarget.CLASS),
+        "dev.wildware.udea.annotations.SizeHandle" to setOf(AnnotationTarget.CLASS),
+        "dev.wildware.udea.annotations.RotationHandle" to setOf(AnnotationTarget.CLASS),
+        "dev.wildware.udea.annotations.RadiusHandle" to setOf(AnnotationTarget.PROPERTY),
+        "dev.wildware.udea.annotations.RangeHandle" to setOf(AnnotationTarget.PROPERTY),
+        // Written by `udea-codegen` on a module registry, never by hand: which of the module's
+        // components carry a handle, for the editor's KSP run in another module to read.
+        "dev.wildware.udea.annotations.HandleIndex" to setOf(AnnotationTarget.CLASS),
     )
 
     private val expectedEnums = setOf("Authority", "Lifetime", "Visibility")
@@ -132,6 +142,23 @@ class AnnotationVocabularyTest {
         assertNull(q.getMethod("min").defaultValue, "@Q.min must have no default (issue-19)")
         assertNull(q.getMethod("max").defaultValue, "@Q.max must have no default (issue-19)")
         assertNull(q.getMethod("bits").defaultValue, "@Q.bits must have no default")
+    }
+
+    /**
+     * The defaults are the spec's (issue #233): a 2D position is `x`/`y` with no `z`, a size is
+     * `width`/`height` with no `depth`, and a rotation is `rotation`. An empty string is "no such
+     * axis", which is what makes one annotation mean 2D or 3D.
+     */
+    @Test
+    fun `the multi-field handles name their fields as strings, with the spec's defaults`() {
+        fun defaults(type: Class<*>): Map<String, Any?> =
+            type.declaredMethods.associate { it.name to it.defaultValue }
+
+        assertEquals(mapOf("x" to "x", "y" to "y", "z" to ""), defaults(PositionHandle::class.java))
+        assertEquals(mapOf("width" to "width", "height" to "height", "depth" to ""), defaults(SizeHandle::class.java))
+        assertEquals(mapOf("rotation" to "rotation"), defaults(RotationHandle::class.java))
+        assertEquals(emptyMap(), defaults(RadiusHandle::class.java), "a one-field handle names nothing: it marks its field")
+        assertEquals(emptyMap(), defaults(RangeHandle::class.java), "a one-field handle names nothing: it marks its field")
     }
 
     private companion object {

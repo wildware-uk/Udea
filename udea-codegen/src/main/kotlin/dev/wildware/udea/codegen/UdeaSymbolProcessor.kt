@@ -16,6 +16,8 @@ import dev.wildware.udea.codegen.agent.AgentPass
 import dev.wildware.udea.codegen.agent.AgentStateModel
 import dev.wildware.udea.codegen.agent.ToolManifest
 import dev.wildware.udea.codegen.agent.ToolModel
+import dev.wildware.udea.codegen.gizmo.GizmoEmitter
+import dev.wildware.udea.codegen.gizmo.GizmoPass
 import dev.wildware.udea.codegen.level.LevelComponentScanner
 import dev.wildware.udea.codegen.protocol.LockedComponent
 import dev.wildware.udea.codegen.protocol.LockedField
@@ -79,6 +81,10 @@ internal class UdeaSymbolProcessor(
     private val agent = AgentPass(logger, scope)
     private val rpcs = RpcModelBuilder(logger)
     private val levelComponents = LevelComponentScanner(logger)
+    private val gizmos = GizmoPass(logger, scope)
+
+    /** So the gizmos and the gizmo registry are written by the first round and no later one. */
+    private var emittedGizmoFiles = false
 
     /**
      * KSP calls `process` once per round. Nothing here defers a symbol, so the module-level
@@ -95,6 +101,12 @@ internal class UdeaSymbolProcessor(
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         if (!checkSourceSet()) return emptyList()
+        // The gizmo pass comes first and shares the round with nothing else: a module may declare
+        // handles and no replicated component, and an editor source set declares neither and still
+        // has a gizmo registry to write. Its failures are the build's, like every other pass's.
+        val handles = gizmos.own(resolver) ?: return emptyList()
+        if (!checkHandleOwner(handles)) return emptyList()
+        if (!writeGizmoFiles(resolver, handles)) return emptyList()
         val components = resolver.getSymbolsWithAnnotation(AnnotationNames.REPLICATED)
             .filter(scope::admits)
             .filterIsInstance<KSClassDeclaration>()
@@ -122,7 +134,8 @@ internal class UdeaSymbolProcessor(
         // A named module with nothing in it still gets its registry, once: a launcher whose
         // classpath holds the module names that registry, and a reference to a class nobody
         // wrote is a compile error that is only meant to happen when the module is absent.
-        val nothingToDo = components.isEmpty() && agentIsEmpty && rpcFunctions.isEmpty() && saveable.isEmpty()
+        val nothingToDo = components.isEmpty() && agentIsEmpty && rpcFunctions.isEmpty() &&
+            saveable.isEmpty() && handles.isEmpty()
         if (nothingToDo && (options.moduleName == null || emittedModuleFiles)) return emptyList()
         // Validated once, here, and not at each writer. `udea.moduleName` gates the lock, the
         // protoHash, both registries and the tool manifest, and a module whose name
@@ -142,9 +155,10 @@ internal class UdeaSymbolProcessor(
             val agentResult = agent.run(resolver)
             writeAgentFiles(agentResult)
             val moduleName = options.moduleName ?: return emptyList()
-            val sources = agentSourceFiles(agentResult) + saveable.map(LevelComponentScanner.Found::containingFile)
+            val sources = agentSourceFiles(agentResult) + saveable.map(LevelComponentScanner.Found::containingFile) +
+                handles.mapNotNull(GizmoPass.Handled::file)
             writeManifest(moduleName, agentResult, aggregating(sources))
-            writeRegistries(resolver, moduleName, agentFacets(agentResult) + levelFacets(saveable), sources)
+            writeRegistries(resolver, moduleName, agentFacets(agentResult) + levelFacets(saveable), sources, handles)
             emittedModuleFiles = true
             return emptyList()
         }
@@ -233,6 +247,7 @@ internal class UdeaSymbolProcessor(
         val moduleName = options.moduleName
         if (moduleName != null && !emittedModuleFiles) {
             sourceFiles += saveable.map(LevelComponentScanner.Found::containingFile)
+            sourceFiles += handles.mapNotNull(GizmoPass.Handled::file)
             val dependencies = aggregating(sourceFiles)
             writeProtocolFiles(moduleName, emitted, dependencies)
             writeManifest(moduleName, agentResult, dependencies)
@@ -241,6 +256,7 @@ internal class UdeaSymbolProcessor(
                 moduleName,
                 netFacets(emitted) + agentFacets(agentResult) + levelFacets(saveable),
                 sourceFiles,
+                handles,
             )
             emittedModuleFiles = true
         }
@@ -264,6 +280,72 @@ internal class UdeaSymbolProcessor(
                 "this module's ksp { } block.",
         )
         return false
+    }
+
+    /**
+     * False, having reported it, when this round has handle components and nowhere to put them.
+     *
+     * A handle is used by exactly one of two routes: the module name lists it on the module registry
+     * for a game's editor source set to generate from, or the gizmo registry option generates it
+     * here. With neither, the annotation would compile and do nothing - a handle nobody ever sees,
+     * with no build error saying why.
+     */
+    private fun checkHandleOwner(handles: List<GizmoPass.Handled>): Boolean {
+        if (handles.isEmpty() || options.moduleName != null || options.gizmoRegistry != null) return true
+        logger.error(
+            "this module declares gizmo handles on ${handles.joinToString { it.component.canonicalName }} " +
+                "but the build set neither ${CodegenOptions.MODULE_NAME}, which lists them on the module " +
+                "registry for a game's editor source set to generate gizmos from, nor " +
+                "${CodegenOptions.GIZMO_REGISTRY}, which generates them in this run. Declare the module " +
+                "with udeaModule, or move the handles to one that is.",
+        )
+        return false
+    }
+
+    /**
+     * An editor run's output (issue #233): a gizmo per handle annotation, and `<Game>GizmoRegistry`
+     * listing those and every hand-written gizmo in this run's sources. Nothing unless
+     * [CodegenOptions.gizmoRegistry] is set; false, having reported it, when anything it reads is wrong.
+     *
+     * A gizmo generated from this run's own component is isolating on that component's file, like a
+     * `Replicator`. One generated from another module's component, and the registry, depend on the
+     * classpath and on every file here, so they go through the one aggregating declaration.
+     */
+    private fun writeGizmoFiles(resolver: Resolver, own: List<GizmoPass.Handled>): Boolean {
+        val game = options.gizmoRegistry ?: return true
+        if (emittedGizmoFiles) return true
+        if (!CodegenOptions.MODULE_NAME_FORMAT.matches(game)) {
+            logger.error(
+                "${CodegenOptions.GIZMO_REGISTRY} is '$game', which cannot be part of a generated object " +
+                    "name. It must match ${CodegenOptions.MODULE_NAME_FORMAT.pattern}, like a module name.",
+            )
+            return false
+        }
+        val ownNames = own.map { it.component }.toSet()
+        val others = options.registryModules.orEmpty().filter { it != options.moduleName }
+        val indexed = gizmos.indexed(resolver, others)?.filterNot { it.component in ownNames } ?: return false
+        val handWritten = gizmos.handWritten(resolver) ?: return false
+        emittedGizmoFiles = true
+
+        val runSources = own.mapNotNull(GizmoPass.Handled::file) + handWritten.map(GizmoPass.HandWritten::file)
+        for (handled in own) {
+            val file = checkNotNull(handled.file) { "${handled.component} was found in this run's sources" }
+            for (model in handled.handles) writeIsolating(GizmoEmitter.emit(model), file)
+        }
+        for (handled in indexed) {
+            for (model in handled.handles) writeAggregating(GizmoEmitter.emit(model), aggregating(runSources))
+        }
+        val listed = (own + indexed).flatMap { it.handles }.map { it.gizmo to CodeBlock.of("%T", it.gizmo) } +
+            handWritten.map { it.className to it.expression }
+        writeAggregating(
+            GizmoEmitter.registry(
+                GeneratedNames.gizmoRegistry(game),
+                game,
+                listed.sortedBy { it.first.canonicalName }.map { it.second },
+            ),
+            aggregating(runSources),
+        )
+        return true
     }
 
     /**
@@ -434,9 +516,13 @@ internal class UdeaSymbolProcessor(
         moduleName: String,
         facets: List<RegistryEmitter.Facet>,
         sourceFiles: List<KSFile>,
+        handles: List<GizmoPass.Handled>,
     ) {
         val self = GeneratedNames.moduleRegistry(moduleName)
-        writeAggregating(RegistryEmitter.module(self, moduleName, facets), aggregating(sourceFiles))
+        writeAggregating(
+            RegistryEmitter.module(self, moduleName, facets, handles.map(GizmoPass.Handled::component)),
+            aggregating(sourceFiles),
+        )
 
         val listed = options.registryModules
         if (listed == null) {

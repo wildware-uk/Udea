@@ -44,6 +44,18 @@ internal object AnnotationNames {
      * property owning one of them without the others cannot exist there.
      */
     const val AGENT_STATE: String = "$PACKAGE.AgentState"
+
+    /** The gizmo handles (issue #233): three that mark a class and name its fields... */
+    const val POSITION_HANDLE: String = "$PACKAGE.PositionHandle"
+    const val SIZE_HANDLE: String = "$PACKAGE.SizeHandle"
+    const val ROTATION_HANDLE: String = "$PACKAGE.RotationHandle"
+
+    /** ...two that mark the one field they drive... */
+    const val RADIUS_HANDLE: String = "$PACKAGE.RadiusHandle"
+    const val RANGE_HANDLE: String = "$PACKAGE.RangeHandle"
+
+    /** ...and the index a module's registry carries of the components that have any of them. */
+    const val HANDLE_INDEX: String = "$PACKAGE.HandleIndex"
 }
 
 /**
@@ -169,4 +181,7 @@ internal object GeneratedNames {
 
     /** `Moba` becomes `MobaUdeaRegistry`: every module registry on this module's runtime classpath. */
     fun udeaRegistry(moduleName: String): ClassName = ClassName(PACKAGE, "${moduleName}UdeaRegistry")
+
+    /** `Moba` becomes `MobaGizmoRegistry`: every gizmo the game's editor offers (issue #233). */
+    fun gizmoRegistry(game: String): ClassName = ClassName(PACKAGE, "${game}GizmoRegistry")
 }

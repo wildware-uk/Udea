@@ -52,7 +52,7 @@ internal class HandlePart(val handle: Handle<*>, val shift: WorldPoint)
 internal fun WorldPoint.shifted(by: WorldPoint): WorldPoint = WorldPoint(x + by.x, y + by.y, z + by.z)
 
 /** Both ends of this drag moved by [by]. */
-internal fun Drag.shifted(by: WorldPoint): Drag = Drag(start.shifted(by), at.shifted(by))
+internal fun Drag.shifted(by: WorldPoint): Drag = Drag(start.shifted(by), at.shifted(by), unitsPerPixel)
 
 /**
  * This shape drawn somewhere else, moved by [by]: the one shape with a world point in it, a
@@ -60,7 +60,8 @@ internal fun Drag.shifted(by: WorldPoint): Drag = Drag(start.shifted(by), at.shi
  */
 internal fun HandleShape.shifted(by: WorldPoint): HandleShape = when (this) {
     is HandleShape.Line -> HandleShape.Line(to.shifted(by))
-    HandleShape.Point, HandleShape.BoxCorner, HandleShape.Sphere,
-    is HandleShape.Arrow, is HandleShape.PlaneSquare, is HandleShape.Ring, is HandleShape.BoxEdge, is HandleShape.Circle,
+    HandleShape.Point, HandleShape.BoxCorner, HandleShape.Sphere, HandleShape.UniformBox,
+    is HandleShape.Arrow, is HandleShape.PlaneSquare, is HandleShape.PlaneTab, is HandleShape.Ring, is HandleShape.BoxEdge,
+    is HandleShape.ScaleBox, is HandleShape.Circle,
     -> this
 }

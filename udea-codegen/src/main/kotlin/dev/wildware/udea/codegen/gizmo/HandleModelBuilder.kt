@@ -67,7 +67,20 @@ internal class HandleModelBuilder(private val logger: KSPLogger) {
             }
         }
         annotation(declaration, AnnotationNames.ROTATION_HANDLE)?.let { rotation ->
-            check.required(rotation, "rotation")?.let { handles += HandleModel.Rotation(component, it) }
+            val about = check.required(rotation, "rotation")
+            val aboutX = check.optional(rotation, "aboutX")
+            val aboutY = check.optional(rotation, "aboutY")
+            if (check.both(rotation, "aboutX", "aboutY") && check.distinct(rotation, listOfNotNull(aboutX, aboutY, about)) && about != null) {
+                handles += HandleModel.Rotation(component, about, aboutX, aboutY)
+            }
+        }
+        annotation(declaration, AnnotationNames.SCALE_HANDLE)?.let { scale ->
+            val x = check.required(scale, "x")
+            val y = check.required(scale, "y")
+            val z = check.required(scale, "z")
+            if (check.distinct(scale, listOfNotNull(x, y, z)) && x != null && y != null && z != null) {
+                handles += HandleModel.Scale(component, x, y, z)
+            }
         }
         for (property in properties.values.sortedBy { it.simpleName.asString() }) {
             for (kind in ReachKind.entries) {
@@ -135,6 +148,22 @@ internal class HandleModelBuilder(private val logger: KSPLogger) {
             val field = argument(annotation, parameter)
             if (field.isEmpty()) return null
             return field.takeIf { named(annotation, parameter, it) }
+        }
+
+        /**
+         * True unless [annotation] names one of [first] and [second] and leaves the other empty: two
+         * parameters that make a handle 3D together, and mean nothing apart.
+         */
+        fun both(annotation: KSAnnotation, first: String, second: String): Boolean {
+            val named = listOf(first, second).filter { argument(annotation, it).isNotEmpty() }
+            if (named.size != 1) return true
+            val missing = if (named.single() == first) second else first
+            report(
+                annotation,
+                "@${annotation.shortName.asString()} on $owner names ${named.single()} but not $missing; a turn " +
+                    "about all three axes names both, and a turn about the up axis alone names neither",
+            )
+            return false
         }
 
         /** True unless [fields] names one field twice, which would write it twice per drag. */

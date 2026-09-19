@@ -75,6 +75,27 @@ class HandleLayerTest {
         assertEquals(0, under.presses, "the handle's press went on to the layer underneath")
     }
 
+    @Test
+    fun `a ring gives way to a handle it crosses, even one declared before it, and takes a press anywhere else on its rim`() {
+        // A ring about X, seen from above in 2D, is drawn edge-on: a line through the point handle,
+        // the way a tilted 3D ring cuts across the arrows inside it (issue #237).
+        val entity = NetId.of(index = 1, generation = 0)
+        fun handle(shape: HandleShape) =
+            Handle(WorldPoint(0f, 0f), shape, DragConstraint.Across(Plane.XY), AxisFrame.WORLD, entity, PhysicsBody) {}
+        val point = handle(HandleShape.Point)
+        val ring = handle(HandleShape.Ring(Axis.X))
+        val layer = HandleLayer { GizmoFrame.of(listOf(point, ring)) }
+        scene.gizmos = layer
+        val origin = ViewPoint().also { camera.project(0f, 0f, 0f, it) }
+
+        assertTrue(scene.pressGizmo(origin.x, origin.y))
+        assertSame(point, layer.pressed?.parts?.single()?.handle, "the ring took a press on the handle it crosses")
+
+        // Along the ring's line, clear of the point: the ring's.
+        assertTrue(scene.pressGizmo(origin.x, origin.y + HandlePainter.RING_RADIUS / 2f))
+        assertSame(ring, layer.pressed?.parts?.single()?.handle, "the ring gave way where nothing else is")
+    }
+
     private companion object {
         const val WIDTH = 200
         const val HEIGHT = 100

@@ -31,6 +31,9 @@ internal class HandlePainter {
     private val to = ViewPoint()
     private val step = ViewPoint()
 
+    /** A plane square's four corners in view pixels, x then y, as [tab] last set them. */
+    private val quad = FloatArray(2 * CORNERS)
+
     // --- drawing -------------------------------------------------------------------------------
 
     /**
@@ -46,8 +49,9 @@ internal class HandlePainter {
             is HandleShape.Circle -> ring(canvas, mark.at, AxisFrame.WORLD, shape.normal, shape.radius) { x0, y0, x1, y1 ->
                 markLine(canvas, x0, y0, x1, y1)
             }
-            HandleShape.Point, HandleShape.BoxCorner, HandleShape.Sphere,
-            is HandleShape.Arrow, is HandleShape.PlaneSquare, is HandleShape.Ring, is HandleShape.BoxEdge,
+            HandleShape.Point, HandleShape.BoxCorner, HandleShape.Sphere, HandleShape.UniformBox,
+            is HandleShape.Arrow, is HandleShape.PlaneSquare, is HandleShape.PlaneTab, is HandleShape.Ring,
+            is HandleShape.BoxEdge, is HandleShape.ScaleBox,
             -> if (canvas.project(mark.at, from)) {
                 val outer = MARK_DOT + 2f * MARK_EDGE
                 canvas.fill(from.x - outer / 2f, from.y - outer / 2f, outer, outer, MARK_OUTLINE)
@@ -93,6 +97,23 @@ internal class HandlePainter {
                 canvas.fill(x - half, y - half, SQUARE, SQUARE, if (lit) LIT_FILL else PLANE_FILL)
                 outline(canvas, x, y, half, if (lit) LIT else PLANE)
             }
+            is HandleShape.PlaneTab -> if (tab(canvas, at, axes, shape.plane)) {
+                val colour = colourOf(normalOf(shape.plane))
+                fillQuad(canvas, if (lit) LIT_FILL else colour.faded())
+                for (corner in 0 until CORNERS) {
+                    val next = (corner + 1) % CORNERS
+                    stroke(canvas, quad[2 * corner], quad[2 * corner + 1], quad[2 * next], quad[2 * next + 1], if (lit) LIT else colour)
+                }
+            }
+            is HandleShape.ScaleBox -> {
+                if (!onScreen(canvas, at, axes.direction(shape.axis))) return
+                val colour = if (lit) LIT else colourOf(shape.axis)
+                val boxX = x + step.x * SCALE_REACH
+                val boxY = y + step.y * SCALE_REACH
+                canvas.line(x + step.x * SCALE_STALK, y + step.y * SCALE_STALK, boxX, boxY, STALK, colour)
+                grip(canvas, boxX, boxY, SCALE_BOX, colour)
+            }
+            HandleShape.UniformBox -> grip(canvas, x, y, UNIFORM_BOX, if (lit) LIT else BOX)
             is HandleShape.Ring -> {
                 val colour = if (lit) LIT else colourOf(shape.normal)
                 ring(canvas, at, axes, shape.normal, radius = null) { x0, y0, x1, y1 -> stroke(canvas, x0, y0, x1, y1, colour) }
@@ -123,6 +144,10 @@ internal class HandlePainter {
             is HandleShape.Arrow -> onScreen(canvas, at, axes.direction(shape.axis)) &&
                 distanceToSegment(x, y, cx + step.x * ARROW_START, cy + step.y * ARROW_START, cx + step.x * ARROW_LENGTH, cy + step.y * ARROW_LENGTH) <= GRAB
             is HandleShape.PlaneSquare -> within(x, y, cx, cy, SQUARE / 2f + GRAB_MARGIN)
+            is HandleShape.PlaneTab -> tab(canvas, at, axes, shape.plane) && insideQuad(x, y)
+            is HandleShape.ScaleBox -> onScreen(canvas, at, axes.direction(shape.axis)) &&
+                within(x, y, cx + step.x * SCALE_REACH, cy + step.y * SCALE_REACH, SCALE_BOX / 2f + GRAB_MARGIN)
+            HandleShape.UniformBox -> within(x, y, cx, cy, UNIFORM_BOX / 2f + GRAB_MARGIN)
             is HandleShape.Ring -> onRim(canvas, at, axes, shape.normal, radius = null, x, y)
             is HandleShape.Circle -> onRim(canvas, at, axes, shape.normal, shape.radius, x, y)
             HandleShape.Sphere -> within(x, y, cx, cy, SPHERE / 2f + GRAB_MARGIN)
@@ -175,12 +200,8 @@ internal class HandlePainter {
         val u = axes.direction(first)
         val v = axes.direction(second)
         val worldRadius = radius ?: run {
-            // How many pixels one world unit along the plane's first axis is, here.
-            if (!onScreen(canvas, centre, u)) return
-            val probe = WorldPoint(centre.x + u.x, centre.y + u.y, centre.z + u.z)
-            canvas.project(centre, from)
-            canvas.project(probe, to)
-            val pixelsPerUnit = sqrt((to.x - from.x) * (to.x - from.x) + (to.y - from.y) * (to.y - from.y))
+            val pixelsPerUnit = pixelsPerUnit(canvas, centre, axes)
+            if (pixelsPerUnit < DEGENERATE) return
             RING_RADIUS / pixelsPerUnit
         }
         var hasLast = false
@@ -199,6 +220,87 @@ internal class HandlePainter {
             lastX = to.x
             lastY = to.y
             hasLast = true
+        }
+    }
+
+    /**
+     * How many view pixels one world unit is at [at]: the longest any of [axes] is drawn there. An axis
+     * pointing at the eye is drawn short, and of three square to each other at least one is drawn
+     * nearly full length, so a handle sized by this keeps its size on screen whichever way it faces -
+     * in 2D, where Z is drawn as nothing, it is exactly the zoom.
+     */
+    private fun pixelsPerUnit(canvas: GizmoCanvas, at: WorldPoint, axes: AxisFrame): Float {
+        if (!canvas.project(at, from)) return 0f
+        var longest = 0f
+        for (axis in Axis.entries) {
+            val direction = axes.direction(axis)
+            if (!canvas.project(WorldPoint(at.x + direction.x, at.y + direction.y, at.z + direction.z), to)) continue
+            longest = maxOf(longest, sqrt((to.x - from.x) * (to.x - from.x) + (to.y - from.y) * (to.y - from.y)))
+        }
+        return longest
+    }
+
+    /**
+     * Sets [quad] to the view pixels of a [HandleShape.PlaneTab]'s four corners, in order round it, and
+     * says whether it is drawn: [TAB_NEAR] to [TAB_FAR] pixels out from [at] along each of [plane]'s
+     * two axes of [axes], in perspective.
+     */
+    private fun tab(canvas: GizmoCanvas, at: WorldPoint, axes: AxisFrame, plane: Plane): Boolean {
+        val pixelsPerUnit = pixelsPerUnit(canvas, at, axes)
+        if (pixelsPerUnit < DEGENERATE) return false
+        val (first, second) = inPlane(normalOf(plane))
+        val u = axes.direction(first)
+        val v = axes.direction(second)
+        val near = TAB_NEAR / pixelsPerUnit
+        val far = TAB_FAR / pixelsPerUnit
+        for (corner in 0 until CORNERS) {
+            val alongU = if (corner == 1 || corner == 2) far else near
+            val alongV = if (corner >= 2) far else near
+            val point = WorldPoint(
+                at.x + u.x * alongU + v.x * alongV,
+                at.y + u.y * alongU + v.y * alongV,
+                at.z + u.z * alongU + v.z * alongV,
+            )
+            if (!canvas.project(point, to)) return false
+            quad[2 * corner] = to.x
+            quad[2 * corner + 1] = to.y
+        }
+        return true
+    }
+
+    /** Fills [quad] with [colour]: strokes across it from one side to the other, each as wide as the gap between them. */
+    private fun fillQuad(canvas: GizmoCanvas, colour: Rgba) {
+        // From the side 0-3 to the side 1-2, in strips along it.
+        val length = sqrt((quad[6] - quad[0]) * (quad[6] - quad[0]) + (quad[7] - quad[1]) * (quad[7] - quad[1]))
+        val strips = maxOf(1, (length / FILL_STRIP).toInt())
+        val width = length / strips
+        for (strip in 0 until strips) {
+            val t = (strip + 0.5f) / strips
+            canvas.line(
+                quad[0] + (quad[6] - quad[0]) * t, quad[1] + (quad[7] - quad[1]) * t,
+                quad[2] + (quad[4] - quad[2]) * t, quad[3] + (quad[5] - quad[3]) * t,
+                width, colour,
+            )
+        }
+    }
+
+    /** Whether ([x], [y]) is inside [quad], or within [GRAB_MARGIN] of its edge. */
+    private fun insideQuad(x: Float, y: Float): Boolean {
+        var positive = false
+        var negative = false
+        for (corner in 0 until CORNERS) {
+            val next = (corner + 1) % CORNERS
+            val x0 = quad[2 * corner]
+            val y0 = quad[2 * corner + 1]
+            val cross = (quad[2 * next] - x0) * (y - y0) - (quad[2 * next + 1] - y0) * (x - x0)
+            if (cross > 0f) positive = true
+            if (cross < 0f) negative = true
+        }
+        // Inside a convex quad, the point is on the same side of every edge.
+        if (!(positive && negative)) return true
+        return (0 until CORNERS).any { corner ->
+            val next = (corner + 1) % CORNERS
+            distanceToSegment(x, y, quad[2 * corner], quad[2 * corner + 1], quad[2 * next], quad[2 * next + 1]) <= GRAB_MARGIN
         }
     }
 
@@ -252,6 +354,34 @@ internal class HandlePainter {
         /** A 3D ball's side, in view pixels. */
         const val SPHERE: Float = 12f
 
+        /** How far out a plane square starts along each of its plane's axes, in view pixels: clear of the middle box. */
+        const val TAB_NEAR: Float = 16f
+
+        /** How far out a plane square ends along each of its plane's axes, in view pixels: inside the arrows. */
+        const val TAB_FAR: Float = 32f
+
+        /** How far out an axis scale box stands, in view pixels: beyond the rings, so the two never cross. */
+        const val SCALE_REACH: Float = 100f
+
+        /** Where a scale box's stalk starts, in view pixels out: past the arrow's tip. */
+        const val SCALE_STALK: Float = ARROW_LENGTH + 4f
+
+        /** An axis scale box's side, in view pixels. */
+        const val SCALE_BOX: Float = 10f
+
+        /** The middle scale box's side, in view pixels. */
+        const val UNIFORM_BOX: Float = 12f
+
+        /** A scale box's stalk, in view pixels: thinner than a handle's stroke, since it is not grabbed. */
+        const val STALK: Float = 1.5f
+
+        /** The widest strip a plane square is filled with, in view pixels. */
+        const val FILL_STRIP: Float = 2f
+
+        private const val CORNERS: Int = 4
+
+        private const val TAB_ALPHA: Float = 0.35f
+
         /** A mark drawn as a dot - a joint - in view pixels. */
         const val MARK_DOT: Float = 7f
 
@@ -300,6 +430,16 @@ internal class HandlePainter {
             Axis.Y -> Y_AXIS
             Axis.Z -> Z_AXIS
         }
+
+        /** The axis square to [plane]. */
+        fun normalOf(plane: Plane): Axis = when (plane) {
+            Plane.XY -> Axis.Z
+            Plane.YZ -> Axis.X
+            Plane.XZ -> Axis.Y
+        }
+
+        /** This colour, see-through: a plane square's fill. */
+        fun Rgba.faded(): Rgba = Rgba.of(r, g, b, TAB_ALPHA)
 
         /** The two axes a plane square to [normal] is spanned by, in right-handed order. */
         fun inPlane(normal: Axis): Pair<Axis, Axis> = when (normal) {

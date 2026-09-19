@@ -3,6 +3,10 @@ package dev.wildware.moba.editor
 import dev.wildware.moba.Position
 import dev.wildware.moba.PositionPositionGizmo
 import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.core.spatial.Transform3D
+import dev.wildware.udea.core.spatial.Transform3DPositionGizmo
+import dev.wildware.udea.core.spatial.Transform3DRotationGizmo
+import dev.wildware.udea.core.spatial.Transform3DScaleGizmo
 import dev.wildware.udea.editor.gizmo.Axis
 import dev.wildware.udea.editor.gizmo.Drag
 import dev.wildware.udea.editor.gizmo.FieldName
@@ -29,9 +33,31 @@ import kotlin.test.assertEquals
 class MobaGizmoRegistryTest {
 
     @Test
-    fun `the editor's registry lists the move gizmo generated from Position's handle, and the tower's range ring`() {
-        // Sorted by name: the generated gizmo sits beside `Position`, the hand-written one in the editor's package.
-        assertEquals(listOf<Any>(PositionPositionGizmo, TowerRangeGizmo), MobaGizmoRegistry.gizmos)
+    fun `the editor's registry lists the move gizmo generated from Position's handle, the tower's range ring, and Transform3D's`() {
+        // Sorted by name: the generated gizmo sits beside `Position`, the hand-written one in the
+        // editor's package, and `Transform3D`'s three (issue #237) beside it in `udea-core`'s package -
+        // generated here from the handles `udea-core`'s own registry indexes, a module this game only uses.
+        assertEquals(
+            listOf<Any>(PositionPositionGizmo, TowerRangeGizmo, Transform3DPositionGizmo, Transform3DRotationGizmo, Transform3DScaleGizmo),
+            MobaGizmoRegistry.gizmos,
+        )
+    }
+
+    @Test
+    fun `Transform3D's generated gizmos are the 3D built-ins on its own fields`() {
+        val fox = NetId.of(index = 30, generation = 0)
+        val transform = Transform3D(x = 1f, y = 2f, z = 3f, rotationZ = 0.5f, scaleX = 2f)
+        val target = GizmoTarget(fox, transform, WorldPoint(1f, 2f, 3f))
+
+        assertEquals(6, Transform3DPositionGizmo.handles(target).size, "three arrows and three plane squares")
+        val rings = Transform3DRotationGizmo.handles(target)
+        assertEquals(listOf("rotationX", "rotationY", "rotationZ"), rings.map { it.drag(Drag(it.at, it.at)).single().field.value })
+        val scale = Transform3DScaleGizmo.handles(target)
+        // Pulled from 1 out along X to 3: three times as wide.
+        assertEquals(
+            listOf(FieldWrite(fox, Transform3D, FieldName("scaleX"), 6f)),
+            scale.first().drag(Drag(WorldPoint(2f, 2f, 3f), WorldPoint(4f, 2f, 3f))),
+        )
     }
 
     @Test

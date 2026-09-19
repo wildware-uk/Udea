@@ -4,6 +4,9 @@ import com.github.quillraven.fleks.Entity
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.core.Tick
+import dev.wildware.udea.core.Ticks
+import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.core.spatial.Transform3D
 import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.OffscreenTarget
@@ -14,6 +17,7 @@ import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.capture.CaptureRequest
+import dev.wildware.udea.render.capture.FrameCaptureSlot
 import dev.wildware.udea.render.capture.capture
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteTexture
@@ -39,8 +43,9 @@ import kotlin.math.sin
  *
  * Writes `model-textured-lit.png` (the hero shot), `model-turn-<n>.png` (the crate turning a
  * quarter turn in four steps, the light fixed), `model-fox.png` (the same scene with the Khronos
- * Fox imported from its `.glb`, issue #240) and `model-fox-turn-<n>.png` (the fox turning a
- * quarter turn a step) into `-Dudea.modelshot.dir`.
+ * Fox imported from its `.glb`, issue #240), `model-fox-turn-<n>.png` (the fox turning a quarter
+ * turn a step) and `model-fox-anim-<nn>-*.png` (the fox animated by an `Animator`: Survey, Walk, and
+ * a crossfade to Run, each at a known tick, issue #242) into `-Dudea.modelshot.dir`.
  *
  * In the test source set, run by name and never by `check`: it needs a GL driver, and a missing
  * driver in `check` would be a skip, which hides exactly the failure it exists to show.
@@ -82,6 +87,10 @@ object ModelShot {
                 UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()),
                 backend,
             )
+            // Paused before the first frame: nothing here needs the clock to run by itself, and the
+            // animated fox is photographed at ticks this main chooses, with the interpolation alpha
+            // at zero, so every picture of it is a known tick (issue #242).
+            host.loop.paused = true
             backend.drive(host)
             val slot = checkNotNull(backend.pipeline?.capture) { "the pipeline has no capture slot" }
             val world = host.world
@@ -150,11 +159,56 @@ object ModelShot {
                 }
                 File(out, "model-fox-turn-$step.png").writeBytes(slot.capture(CaptureRequest()).bytes)
             }
+            animate(backend, host, camera, foxEntity, slot, out)
             println("model shots written to ${out.absolutePath}")
         } finally {
             backend.close()
         }
     }
+
+    /**
+     * The fox animated by an `Animator`, the way a game directs one (issue #242): Survey, a crossfade
+     * to Walk, then a crossfade to Run photographed at every third of the way. Each picture is
+     * `model-fox-anim-<nn>-<what>-t<tick>.png`, the tick counted from the first, and the tick is
+     * moved on only by `host.run` on the render thread, so a picture is named by its tick exactly.
+     */
+    private fun animate(backend: KoolBackend, host: GameHost, camera: ModelCamera, fox: Entity, slot: FrameCaptureSlot, out: File) {
+        val world = host.world
+        val start = backend.onRenderThread { host.tick }
+        backend.onRenderThread {
+            // Closer, low and side-on to the fox, so its legs are the size of the picture.
+            camera.lookAt(3.2f, -5.1f, 1.2f, 1.2f, -2.6f, 0.55f)
+            with(world) {
+                fox[Transform3D].rotationZ = FOX_HEADING
+                fox.configure { it += Animator().apply { play(FoxClips.Survey, start) } }
+            }
+        }
+        var shot = 0
+        fun at(tick: Long, what: String, direct: (Animator, Tick) -> Unit = { _, _ -> }) {
+            backend.onRenderThread {
+                host.run((tick - host.tick.ticksSince(start)).toInt())
+                with(world) { direct(fox[Animator], host.tick) }
+            }
+            shot++
+            val name = "model-fox-anim-%02d-%s-t%03d.png".format(shot, what, tick)
+            File(out, name).writeBytes(slot.capture(CaptureRequest()).bytes)
+        }
+        at(0, "survey")
+        at(60, "survey")
+        at(120, "survey")
+        at(150, "survey-to-walk") { animator, now -> animator.crossfade(FoxClips.Walk, now, over = Ticks(FADE)) }
+        at(170, "walk")
+        at(181, "walk")
+        at(192, "walk")
+        at(200, "walk-to-run-0") { animator, now -> animator.crossfade(FoxClips.Run, now, over = Ticks(FADE)) }
+        at(200 + FADE / 3, "walk-to-run-33")
+        at(200 + FADE * 2 / 3, "walk-to-run-67")
+        at(200 + FADE, "run")
+        at(230, "run")
+    }
+
+    /** How long each crossfade takes: a fifth of a second. */
+    private const val FADE = 12L
 
     private const val TURN_STEPS = 4
 

@@ -207,6 +207,9 @@ The pieces a newcomer meets first, each with the issue that made it so.
   `Transform3D` (`udea-core`) places an entity in 3D - Z is up, a 2D position is the point on
   the ground plane, it is saved in levels and never replicated - and `ModelRenderer`
   (`udea-render`) draws a built-in mesh or a glTF/GLB model imported as a typed asset (#240).
+  A skinned model is posed from its entity's `Animator` - clip, time and crossfade, read at the
+  tick plus the interpolation alpha - and skinned on the GPU; the pose is the renderer's alone,
+  and a clip's time becomes seconds only there (#242).
   Everything that touches the scene or the ComposeGL toolkit runs on the Kool render thread
   (#224); `docs/engineering-standards.md` section 2 states the rule.
 - **Interface is ComposeGL, in two places that answer opposite questions.** A `UiLayer` is a

@@ -39,10 +39,10 @@ public class ClipPlayback(
     public fun isEmpty(): Boolean = clip == NO_CLIP
 
     /** True when this is playing [clip], compared by the clip's identity, its index. */
-    public fun holds(clip: AnimationClip): Boolean = this.clip == clip.index
+    internal fun holds(clip: AnimationClip): Boolean = this.clip == clip.index
 
     /** How far into the clip [now] is. See [Animator.clipTime]. */
-    public fun clipTime(now: Tick): Ticks {
+    internal fun clipTime(now: Tick): Ticks {
         if (isEmpty() || length == 0L) return Ticks(0L)
         val scaled = scaledElapsed(now)
         return Ticks(
@@ -54,7 +54,7 @@ public class ClipPlayback(
     }
 
     /** Whether a [Loop.Once] clip has reached its end by [now]. See [Animator.isFinished]. */
-    public fun isFinished(now: Tick): Boolean =
+    internal fun isFinished(now: Tick): Boolean =
         !isEmpty() && loop == Loop.Once && (length == 0L || scaledElapsed(now) >= length)
 
     /**

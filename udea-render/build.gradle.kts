@@ -196,6 +196,10 @@ tasks.named<Test>("jvmTest") {
     // HeadlessScanTest reads the same designated list, so it needs the same hand-off.
     systemProperty(headlessModulesProperty, headlessModules.joinToString(","))
 
+    // `SkinnedPoseTest` poses the committed Khronos Fox's skin without a GL context (issue #242).
+    systemProperty("udea.render.exampleAssets", exampleAssets.asFile.absolutePath)
+    inputs.dir(exampleModels).withPropertyName("exampleModels").withPathSensitivity(PathSensitivity.RELATIVE)
+
     // HeadlessScanTest and RenderModuleGraphTest read the compiled output and the build scripts
     // of modules this one does not depend on.
     dependsOn(headlessModules.map { ":$it:${ModuleGraphRules.MAIN_BYTECODE_TASK}" })

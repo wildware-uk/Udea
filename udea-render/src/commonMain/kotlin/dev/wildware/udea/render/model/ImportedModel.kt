@@ -14,7 +14,8 @@ import dev.wildware.udea.assets.Model
  * [ModelRenderSystem] on the render thread, so one `ImportedModel` can be shared by any number of
  * entities, and each is drawn with its own transform.
  *
- * Drawn in its **bind pose**: bones and animation clips in the file are not read yet.
+ * A file with a skin and clips is posed from the entity's `Animator` and skinned on the GPU (issue
+ * #242); with no `Animator` it is drawn in its bind pose.
  *
  * glTF is Y-up and the world is Z-up (see `Transform3D`), so the file's +Y is drawn along the
  * world's +Z and the file's +Z - the way a glTF model faces - along the world's -Y. A model at the

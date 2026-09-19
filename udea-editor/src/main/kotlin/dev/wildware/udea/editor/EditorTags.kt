@@ -24,6 +24,15 @@ public object EditorTags {
     /** The Game tab's toggle that draws gizmos over the game, read-only. */
     internal const val GAME_GIZMOS: String = "editor:game-gizmos"
 
+    /** The Create panel: its docked window's id, which the dock layout is keyed by. */
+    internal const val CREATE_PANEL: String = "editor-create"
+
+    /** The Asset panel's docked window id. */
+    internal const val ASSET_PANEL: String = "editor-asset"
+
+    /** The History panel's docked window id. */
+    internal const val HISTORY_PANEL: String = "editor-history"
+
     /** The Create panel's spawn button. */
     public const val SPAWN: String = "editor:spawn"
 

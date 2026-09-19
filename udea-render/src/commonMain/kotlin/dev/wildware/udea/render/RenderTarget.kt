@@ -82,8 +82,7 @@ public class ScreenTarget internal constructor(
  * because it is the only thing that knows a render context exists.
  */
 public class RenderTargets internal constructor(
-    /** Where the game is drawn, and the only thing a capture may read. */
-    public val offscreen: OffscreenTarget,
+    offscreen: OffscreenTarget,
     /** Where the human's window is drawn, after the capture. Never read by a capture. */
     public val screen: ScreenTarget,
     /** The batch every [RenderSystem] draws with. Reaches the capturable pass and nothing else. */
@@ -108,6 +107,16 @@ public class RenderTargets internal constructor(
     /** Where a system adds a pass of its own, or `null` when there is no Kool scene behind this. */
     internal val passes: ScenePasses? = null,
 ) {
+
+    /**
+     * Where the game is drawn, and the only thing a capture may read.
+     *
+     * Its size is fixed for the life of a game, with one exception: an editor's Game tab asks for
+     * the frame to be the size of the tab (issue #234), and the pipeline replaces this at the top of
+     * a frame, before anything draws. A window being dragged never changes it.
+     */
+    public var offscreen: OffscreenTarget = offscreen
+        internal set
 
     override fun toString(): String = "RenderTargets(offscreen=$offscreen, screen=$screen, " +
         "surface=$surface, capturable=${pixels != null}, owned=${owned.size})"

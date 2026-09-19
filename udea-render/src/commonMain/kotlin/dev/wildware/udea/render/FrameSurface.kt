@@ -35,6 +35,13 @@ public interface FrameSurface {
      */
     public fun endAndPresent(screen: ScreenTarget)
 
+    /**
+     * Makes the capturable frame [width] x [height] pixels from this frame on. Called by the pipeline
+     * between frames, before [begin], and only when an editor's Game tab has asked for its own size
+     * (issue #234).
+     */
+    public fun resize(width: Int, height: Int)
+
     public companion object {
 
         /**
@@ -46,6 +53,7 @@ public interface FrameSurface {
         public val None: FrameSurface = object : FrameSurface {
             override fun begin(): Unit = Unit
             override fun endAndPresent(screen: ScreenTarget): Unit = Unit
+            override fun resize(width: Int, height: Int): Unit = Unit
             override fun toString(): String = "FrameSurface.None"
         }
     }

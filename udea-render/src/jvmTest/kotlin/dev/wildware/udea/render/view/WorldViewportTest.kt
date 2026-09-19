@@ -41,12 +41,18 @@ class WorldViewportTest {
     private val world: World = configureWorld { injectables { gameContext(ctx) } }
     private val capturable = SpriteBatch2D(SpriteTexture.whitePixel("test-offscreen-white"))
 
+    /** Every size the surface was told to take, in order. */
+    private val resized = ArrayList<String>()
+
     /** Clears the capturable batch at the top of each frame, as `KoolSurface.begin` does. */
     private val targets: RenderTargets = testTargets(
         batch = capturable,
         surface = object : FrameSurface {
             override fun begin() = capturable.clear()
             override fun endAndPresent(screen: ScreenTarget) = Unit
+            override fun resize(width: Int, height: Int) {
+                resized += "${width}x$height"
+            }
         },
         width = WIDTH,
         height = HEIGHT,
@@ -167,6 +173,59 @@ class WorldViewportTest {
         assertTrue(!scene.toView(5f, 20f, WIDTH * 2, HEIGHT, at), "a point on the bar was called the view")
     }
 
+    @Test
+    fun `a Game view resizes the capturable frame to its own size before the next frame draws`() {
+        val gameView = view(null)
+        pipeline.open(gameView)
+        pipeline.render(0.5f)
+
+        gameView.resizeTo(TALL_WIDTH, TALL_HEIGHT)
+        assertEquals(WIDTH, pipeline.offscreen.width, "the frame was resized before a frame asked for it")
+        pipeline.render(0.5f)
+
+        assertEquals(listOf("${TALL_WIDTH}x$TALL_HEIGHT"), resized, "the surface was not resized to the Game view's size")
+        assertEquals(TALL_WIDTH, pipeline.offscreen.width, "the capturable frame is not the Game view's width")
+        assertEquals(TALL_HEIGHT, pipeline.offscreen.height, "the capturable frame is not the Game view's height")
+        assertEquals(TALL_WIDTH, gameView.width)
+        assertEquals(TALL_HEIGHT, gameView.height)
+        // The game's camera fitted the new shape rather than being squeezed into it: the marker, a
+        // one-unit square, is still square, and still all the world the game shows across.
+        val tall = targets.batch.home.fills(MARKER).single()
+        assertNear(tall.width, tall.height, "the marker is not square: the game's camera was squeezed into the new shape")
+        assertNear(TALL_WIDTH / WORLD_WIDTH, tall.width, "the game no longer shows its whole width across the frame")
+
+        pipeline.render(0.5f)
+        assertEquals(1, resized.size, "the frame was resized again with no new size asked for")
+    }
+
+    @Test
+    fun `a Scene view resizes only itself, and its camera fits the new shape`() {
+        val scene = view(EditorCamera())
+        pipeline.open(scene)
+        pipeline.render(0.5f)
+
+        scene.resizeTo(TALL_WIDTH, TALL_HEIGHT)
+        pipeline.render(0.5f)
+
+        assertEquals(emptyList(), resized, "a Scene view resized the capturable frame")
+        assertEquals(WIDTH, pipeline.offscreen.width)
+        assertEquals(TALL_WIDTH, scene.width)
+        assertEquals(TALL_HEIGHT, scene.height)
+        val after = scene.record.fills(MARKER).single()
+        assertNear(after.width, after.height, "the marker is not square: the Scene view's camera was squeezed into the new shape")
+    }
+
+    @Test
+    fun `a size of nothing is no size`() {
+        val gameView = view(null)
+        pipeline.open(gameView)
+        gameView.resizeTo(0, TALL_HEIGHT)
+        gameView.resizeTo(TALL_WIDTH, -1)
+        pipeline.render(0.5f)
+        assertEquals(emptyList(), resized, "a zero or negative size resized the frame")
+        assertEquals(WIDTH, gameView.width)
+    }
+
     // --- fixture -------------------------------------------------------------------------
 
     private fun view(camera: EditorCamera?): WorldViewport {
@@ -182,13 +241,13 @@ class WorldViewportTest {
         )
     }
 
-    /** One fill as the record holds it: pixel position and tint. */
-    private class Fill(val x: Float, val y: Float, val tint: Int)
+    /** One fill as the record holds it: pixel position, size and tint. */
+    private class Fill(val x: Float, val y: Float, val width: Float, val height: Float, val tint: Int)
 
     private fun SpriteRecord.fills(tint: Rgba): List<Fill> = (0 until instanceCount)
         .map { index ->
             val at = index * SpriteBatch2D.FLOATS_PER_INSTANCE
-            Fill(floats[at + SpriteBatch2D.X], floats[at + SpriteBatch2D.Y], tints[index])
+            Fill(floats[at + SpriteBatch2D.X], floats[at + SpriteBatch2D.Y], floats[at + SpriteBatch2D.WIDTH], floats[at + SpriteBatch2D.HEIGHT], tints[index])
         }
         .filter { it.tint == tint.packed }
 
@@ -242,6 +301,10 @@ class WorldViewportTest {
         const val HEIGHT = 360
         const val WORLD_WIDTH = 32f
         const val WORLD_HEIGHT = 18f
+
+        /** A view taller than it is wide: the shape a gap between two side panels usually has. */
+        const val TALL_WIDTH = 300
+        const val TALL_HEIGHT = 360
 
         const val PAN_X = 100f
         const val PAN_Y = -40f

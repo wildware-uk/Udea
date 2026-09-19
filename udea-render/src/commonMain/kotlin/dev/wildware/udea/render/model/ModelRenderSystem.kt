@@ -97,6 +97,7 @@ public class ModelRenderSystem(
             stage.imageFor(view, camera)
         } else {
             drawnCount = 0
+            stage.fit(target.width, target.height)
             stage.begin(camera, light)
             val now = bound.clock.tick
             with(bound.world) {

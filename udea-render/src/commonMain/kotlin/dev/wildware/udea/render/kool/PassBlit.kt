@@ -3,7 +3,6 @@ package dev.wildware.udea.render.kool
 import de.fabmax.kool.pipeline.OffscreenPass2d
 import de.fabmax.kool.pipeline.backend.gl.GlApi
 import de.fabmax.kool.pipeline.backend.gl.GlFramebuffer
-import de.fabmax.kool.pipeline.backend.gl.GlTexture
 import de.fabmax.kool.pipeline.backend.gl.LoadedTextureGl
 
 /**
@@ -21,7 +20,10 @@ import de.fabmax.kool.pipeline.backend.gl.LoadedTextureGl
  * returning rather than left to anyone else.
  *
  * The pass's colour texture is attached to a framebuffer of this class's own, made once on the render
- * thread and re-attached only if Kool replaces the texture.
+ * thread and re-attached only if Kool replaces the texture. Replaced is decided by the texture
+ * *object* Kool holds, not by its GL name: a pass resized for an editor view (issue #234) gets a new
+ * texture that GL is free to give the name the old one just released, and a framebuffer still
+ * pointing at the released texture would copy nothing.
  *
  * Render thread only, like everything that touches the context.
  */
@@ -32,7 +34,7 @@ internal class PassBlit(
 
     private var framebuffer: GlFramebuffer? = null
 
-    private var attached: GlTexture? = null
+    private var attached: LoadedTextureGl? = null
 
     /**
      * Copies the pass into the bound draw framebuffer, letterboxed into [width] x [height].
@@ -47,10 +49,9 @@ internal class PassBlit(
         val read = framebuffer ?: gl.createFramebuffer().also { framebuffer = it }
         val previousRead = gl.getInteger(READ_FRAMEBUFFER_BINDING)
         gl.bindFramebuffer(gl.READ_FRAMEBUFFER, read)
-        val texture = colour.glTexture
-        if (attached != texture) {
-            gl.framebufferTexture2D(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0)
-            attached = texture
+        if (attached !== colour) {
+            gl.framebufferTexture2D(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colour.glTexture, 0)
+            attached = colour
         }
         val fit = Letterbox.fit(colour.width, colour.height, width, height)
         gl.blitFramebuffer(

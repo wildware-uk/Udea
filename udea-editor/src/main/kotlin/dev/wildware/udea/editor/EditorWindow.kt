@@ -21,8 +21,11 @@ import dev.wildware.composegl.ui.modifier.background
 import dev.wildware.composegl.ui.modifier.fillMaxSize
 import dev.wildware.composegl.ui.modifier.fillMaxWidth
 import dev.wildware.composegl.ui.modifier.height
+import dev.wildware.composegl.ui.modifier.offset
+import dev.wildware.composegl.ui.modifier.onPlaced
 import dev.wildware.composegl.ui.modifier.onSizeChanged
 import dev.wildware.composegl.ui.modifier.padding
+import dev.wildware.composegl.ui.modifier.size
 import dev.wildware.composegl.ui.modifier.testTag
 import dev.wildware.composegl.ui.modifier.weight
 import dev.wildware.composegl.ui.widget.Button
@@ -34,8 +37,8 @@ import dev.wildware.composegl.ui.widget.Text
 import dev.wildware.udea.render.view.ViewDimension
 
 /**
- * The editor window's layout: a menu bar, the toolbar, the Scene and Game headings, the showing tab
- * with the Create, Asset and History panels docked over its edges, and a status line.
+ * The editor window's layout: a menu bar, the toolbar, the Scene and Game headings, the Create, Asset
+ * and History panels docked round the showing tab, and a status line.
  *
  * The panels are ComposeGL's own docked windows (`DebugWindowHost`, from `composegl-debug`): they can
  * be dragged off, tabbed together and re-docked, and the dividers between them resized. Their layout
@@ -64,24 +67,33 @@ internal fun EditorWindow(session: EditorSession) {
     }
 }
 
-/** The Scene and Game tabs, and the panels docked over their edges. */
+/**
+ * The docked panels, and the showing tab in the gap between them ([ViewArea]): the world is drawn only
+ * there, so no panel lies over it and it shows behind none of them.
+ */
 @Composable
 private fun Panels(session: EditorSession) {
     val windows = rememberDebugWindowsState(remember { MemoryDebugWindowStore() })
     remember(windows) {
-        windows.dockToScreen(CREATE, DockSide.Left)
-        windows.dockToScreen(HISTORY, DockSide.Right)
-        windows.dockToScreen(ASSET, DockSide.Right)
+        windows.dockToScreen(EditorTags.CREATE_PANEL, DockSide.Left)
+        windows.dockToScreen(EditorTags.HISTORY_PANEL, DockSide.Right)
+        windows.dockToScreen(EditorTags.ASSET_PANEL, DockSide.Right)
     }
-    DebugWindowHost(Modifier.fillMaxSize(), state = windows) {
-        ViewPage(session)
-        DebugWindow("Create", id = CREATE) {
+    val area = remember { ViewArea() }
+    DebugWindowHost(Modifier.fillMaxSize().onPlaced(area.host), state = windows) {
+        // The view in the gap the docked panels leave, never under them: it draws only there, and a
+        // pointer over a panel or a divider is the panel's, never the view's.
+        val free = area.free(windows::isDocked)
+        Box(Modifier.offset(free.left, free.top).size(free.width, free.height)) {
+            ViewPage(session)
+        }
+        DebugWindow("Create", id = EditorTags.CREATE_PANEL, modifier = Modifier.onPlaced(area.pane(EditorTags.CREATE_PANEL))) {
             Button(session.spawnLabel, onClick = { session.spawn() }, modifier = Modifier.fillMaxWidth().testTag(EditorTags.SPAWN))
         }
-        DebugWindow("Asset", id = ASSET) {
+        DebugWindow("Asset", id = EditorTags.ASSET_PANEL, modifier = Modifier.onPlaced(area.pane(EditorTags.ASSET_PANEL))) {
             AssetPanel(session.assets)
         }
-        DebugWindow("History", id = HISTORY) {
+        DebugWindow("History", id = EditorTags.HISTORY_PANEL, modifier = Modifier.onPlaced(area.pane(EditorTags.HISTORY_PANEL))) {
             Column(Modifier.fillMaxWidth()) {
                 Button("Undo", onClick = { session.undo() }, modifier = Modifier.fillMaxWidth().testTag(EditorTags.UNDO))
                 Column(Modifier.fillMaxWidth().padding(top = GAP).testTag(EditorTags.HISTORY)) {
@@ -101,8 +113,8 @@ private fun Panels(session: EditorSession) {
  * The Scene and Game tabs' headings (issue #234), and the showing tab's own switch: the 2D / 3D camera
  * in the Scene tab, the gizmo overlay in the Game tab.
  *
- * A row of its own under the toolbar, rather than over the page: the docked panels lie over the page's
- * edges, and a heading under one could not be clicked. Not ComposeGL's `Tabs`, whose headings carry no
+ * A row of its own under the toolbar, above the docked panels, so a panel docked along the top can
+ * never cover a heading. Not ComposeGL's `Tabs`, whose headings carry no
  * test tag a test or an agent's UI driver could find.
  */
 @Composable
@@ -175,7 +187,7 @@ private fun TabHeading(title: String, tab: EditorTab, session: EditorSession, ta
     )
 }
 
-/** The window's backdrop, and the letterbox bars around the world. */
+/** The window's backdrop, and what a tab shows around the world for the one frame before its view takes the tab's size. */
 private val Background: Colour = Colour.rgb(0x1B1F27)
 
 /** The Scene and Game headings' row, in design units: a button and its padding. */
@@ -183,8 +195,3 @@ private const val TAB_ROW_HEIGHT: Float = 44f
 
 /** The space between a panel's parts, in design units. */
 private const val GAP: Float = 8f
-
-/** The docked windows' ids, which the dock layout is keyed by. */
-private const val CREATE: String = "editor-create"
-private const val HISTORY: String = "editor-history"
-private const val ASSET: String = "editor-asset"

@@ -130,6 +130,22 @@ internal class ModelStage(
     private val writeMatrix: (MutableStructBufferView<InstanceLayouts.ModelMat>, InstanceLayouts.ModelMat) -> Unit =
         { view, layout -> view.set(layout.modelMat, matrix) }
 
+    /** The size the models' pass was last made. */
+    private var width = width
+    private var height = height
+
+    /**
+     * Makes the models' pass [width] x [height] pixels, the capturable frame's size, if it is not
+     * already: an editor's Game tab can resize the frame (issue #234), and a pass of another shape
+     * would come out stretched when drawn into it. Render thread only.
+     */
+    fun fit(width: Int, height: Int) {
+        if (width == this.width && height == this.height) return
+        pass.setSize(width, height)
+        this.width = width
+        this.height = height
+    }
+
     /** Forgets the last frame's models and takes this frame's camera and light. Render thread only. */
     fun begin(view: ModelCamera, light: ModelLight) {
         for (index in allRuns.indices) {
@@ -169,6 +185,7 @@ internal class ModelStage(
         val editor = checkNotNull(view.camera) { "$view is the Game tab, which shows the capturable frame" }
         editor.adopt(game)
         val seen = views.getOrPut(view) { ViewPass(view) }
+        seen.fit(view.width, view.height)
         editor.writeOrbit(orbit)
         aim(seen.camera, orbit)
         return seen.image
@@ -325,6 +342,9 @@ internal class ModelStage(
 
         private var released = false
 
+        private var width = view.width
+        private var height = view.height
+
         init {
             pass.dependsOn(shadow)
             passes.addBeside(pass)
@@ -333,6 +353,14 @@ internal class ModelStage(
                 views.remove(view)
                 release()
             }
+        }
+
+        /** Makes the pass [width] x [height], the view's size, if it is not already. */
+        fun fit(width: Int, height: Int) {
+            if (width == this.width && height == this.height) return
+            pass.setSize(width, height)
+            this.width = width
+            this.height = height
         }
 
         fun release() {

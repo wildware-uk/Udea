@@ -51,8 +51,7 @@ import kotlinx.coroutines.Deferred
 public class WorldViewport internal constructor(
     /** The Scene tab's camera, or `null` for the Game tab, which is seen through the game's own. */
     public val camera: EditorCamera?,
-    /** The picture's size. The same as the capturable frame's, so both tabs frame alike. */
-    internal val target: OffscreenTarget,
+    target: OffscreenTarget,
     /** What this view's pass draws: the world (Scene) or the frame (Game), then the gizmos. */
     internal val record: SpriteRecord,
     /** Draws into [record]: the Game tab's copy of the frame, and every gizmo. */
@@ -64,6 +63,20 @@ public class WorldViewport internal constructor(
     /** The Kool half: the pass, the blit, the release. `null` for a view built with no GL. */
     private val kool: ViewportPass?,
 ) {
+
+    /**
+     * The picture's size. It opens at the capturable frame's, and follows the `SceneView` it is
+     * shown in from then on ([resizeTo]); a Game tab takes the frame with it.
+     */
+    internal var target: OffscreenTarget = target
+        private set
+
+    /** The size [resizeTo] last asked for, applied by the pipeline at the top of a frame. 0 for none. */
+    internal var wantedWidth: Int = 0
+        private set
+
+    internal var wantedHeight: Int = 0
+        private set
 
     /** What is drawn over the world. `null` draws none. Render thread. */
     public var gizmos: GizmoLayer? = null
@@ -87,14 +100,41 @@ public class WorldViewport internal constructor(
     private var closed = false
 
     /**
-     * Copies this view into the picture [scene] is drawing, letterboxed. Call it inside a `SceneView`'s
-     * draw block, like `WorldView.drawInto`.
+     * Copies this view into the picture [scene] is drawing, and asks for this view to be drawn at
+     * that picture's size from the next frame on ([resizeTo]), so it fills the picture with no bars.
+     * Until it is, the copy is letterboxed. Call it inside a `SceneView`'s draw block, like
+     * `WorldView.drawInto`.
      */
     public fun drawInto(scene: SceneDrawScope) {
-        val pass = kool ?: return
         val width = scene.width
         val height = scene.height
+        resizeTo(width, height)
+        val pass = kool ?: return
         scene.raw { pass.blitInto(width, height) }
+    }
+
+    /**
+     * Asks for the picture to be [width] x [height] pixels from the next frame on (issue #234): the
+     * view's shape is the rectangle it is shown in, not the game's launch size. The Scene tab's camera
+     * fits whatever size it is. A Game tab resizes the capturable frame with it, because the Game tab
+     * is that frame: the game is drawn at the size of the tab, `render.screenshot` included. Render
+     * thread. A size of zero or less is no size, and is ignored.
+     */
+    public fun resizeTo(width: Int, height: Int) {
+        if (width <= 0 || height <= 0) return
+        wantedWidth = width
+        wantedHeight = height
+    }
+
+    /** True when [resizeTo] has asked for a size the picture is not yet. */
+    internal val wantsResize: Boolean
+        get() = wantedWidth > 0 && (wantedWidth != target.width || wantedHeight != target.height)
+
+    /** Makes the picture the size [resizeTo] asked for. The pipeline's, at the top of a frame. */
+    internal fun applySize() {
+        if (!wantsResize) return
+        kool?.resize(wantedWidth, wantedHeight)
+        target = OffscreenTarget(wantedWidth, wantedHeight)
     }
 
     /**

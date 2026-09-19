@@ -113,6 +113,12 @@ public class EditorSession(
     /** Frames the Scene tab is still drawn again for after its camera moved: see [SCENE_MOVED_FRAMES]. */
     private var sceneMoved = 0
 
+    /** The views' sizes when [frame] last looked, so a resize draws the tabs again. */
+    private var seenSceneWidth = 0
+    private var seenSceneHeight = 0
+    private var seenGameWidth = 0
+    private var seenGameHeight = 0
+
     /** The window: menus, docked panels, the viewport and the status line. Show it on a `UiLayer`. */
     public val window: UiScreen = object : UiScreen {
         @Composable
@@ -137,12 +143,31 @@ public class EditorSession(
             seenCompleted = completed
         }
         if (historyStale && !historyPending) readHistory()
-        val due = redraw.due(tick(), completed)
+        // Both asked every frame: each keeps what it last saw.
+        val resized = resized()
+        val due = redraw.due(tick(), completed) || resized
         if (navigation.consumeMoved()) sceneMoved = SCENE_MOVED_FRAMES
         if (due || sceneMoved > 0) sceneState.invalidate()
         if (due) gameState.invalidate()
         if (sceneMoved > 0) sceneMoved--
         status = statusLine()
+    }
+
+    /**
+     * True when either view has taken a new size since the last frame (issue #234). A view is drawn at
+     * the size of the tab a frame after the tab asks for it, and a paused world asks the tab to draw
+     * nothing new, so without this the tab would keep the picture it had at the old size.
+     */
+    private fun resized(): Boolean {
+        val scene = views.scene
+        val game = views.game
+        val changed = scene.width != seenSceneWidth || scene.height != seenSceneHeight ||
+            game.width != seenGameWidth || game.height != seenGameHeight
+        seenSceneWidth = scene.width
+        seenSceneHeight = scene.height
+        seenGameWidth = game.width
+        seenGameHeight = game.height
+        return changed
     }
 
     /** The Scene tab's `SceneView` size, in layout units: see [scenePointer]. */
@@ -200,8 +225,16 @@ public class EditorSession(
 
     internal val spawnLabel: String get() = spawn.label
 
-    /** Copies [tab]'s view into the picture [scope] is drawing. */
+    /**
+     * Copies [tab]'s view into the picture [scope] is drawing.
+     *
+     * Both views are sized to the picture, not only the one showing: the two tabs share one
+     * rectangle, and the Game view's size is the game's own frame (issue #234), which an agent's
+     * `render.screenshot` reads whichever tab a person is looking at.
+     */
     internal fun drawView(tab: EditorTab, scope: SceneDrawScope) {
+        views.scene.resizeTo(scope.width, scope.height)
+        views.game.resizeTo(scope.width, scope.height)
         when (tab) {
             EditorTab.Scene -> views.scene.drawInto(scope)
             EditorTab.Game -> views.game.drawInto(scope)

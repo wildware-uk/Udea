@@ -9,7 +9,7 @@ plugins {
 // `GameContext.cues` through the same code. The one JVM-only source set is `jvmTest`, which holds
 // the allocation budget - it reads HotSpot's per-thread allocation counter, which no other target
 // has. A device that actually makes a noise is not here on any target: spec section 3 keeps Kool
-// in `udea-render`, and the Kool-backed device is issue #221.
+// in `udea-render`, which is where the Kool-backed device is (`KoolAudioDevice`, issue #221).
 kotlin {
     sourceSets {
         commonMain {

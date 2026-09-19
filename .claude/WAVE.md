@@ -2,15 +2,15 @@
 
 ## kmp baseline
 
-**SHA `30731e4`** (kmp after #227 merge; merged tree differs from the trial tree ONLY in `.claude/WAVE.md`,
-so the trial build IS the merged build), refreshed 2026-09-18 with
+**SHA `08ca441`** (kmp after #221 merge; merged tree differs from the trial tree ONLY in `.claude/WAVE.md`,
+so the trial build IS the merged build), refreshed 2026-09-19 with
 `ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **Failing tasks: `:moba:compileKotlin` ONLY** - and every moba task downstream of it does not run.
 That is the authorised D9 red: moba still draws with LibGDX until #212 ports it. Nothing else fails.
 A reviewer or trial merge sees exactly that one red and treats any other as the branch's.
 
-Earlier: `26333d5` (after #230), `7ac6559` (after #229), `18bb13f` (after #224), `87d8b7c` (after #211), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
+Earlier: `30731e4` (after #227), `26333d5` (after #230), `7ac6559` (after #229), `18bb13f` (after #224), `87d8b7c` (after #211), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
 **BUILD SUCCESSFUL. Failing tasks: none.**
@@ -399,6 +399,35 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   fails `:udea-render:compileAndroidMain` with `Unresolved reference onPointerUsed` - run
   `--refresh-dependencies` once (done on this box 23:07). Trial: only baseline red; GL green.
   Worktree kept: `.claude/worktrees/agent-ab22c07454e2b1eaa`. `udea-render` free -> #221 next.
+
+- **ComposeGL re-entry phantom click: CONFIRMED and FIXED upstream** in composegl-kool `0.7.0-SNAPSHOT` from
+  **`9cf8a04c`**. Their real-GLFW demo test counted 2 clicks where 1 was right before the fix. Fix: a
+  newly-seen pointer is read by current button levels only (mask ignored); a known pointer still uses the
+  mask, so a one-frame click still registers. No Udea change needed (#227 reads levels itself). Routed as a
+  direct report, not an issue, per owner rule - it worked.
+- **#221 dispatched** (dev-221, branch `issue-221-kool-audio-device`, udea-render). Browser half shelved;
+  ACs = desktop transcript + udea-audio free of Kool. Box has ALSA cards (HDA NVidia, HD-Audio Generic, snd_hda
+  loaded) but NO aplay / PulseAudio / PipeWire and nobody to listen - evidence proves the PATH (device opened,
+  clip loaded, playback started, from Kool's own state) and must go red with `Silent` swapped in; never claim
+  audible. Told to read the Kool 0.19.0 JAR, not the `main` spike clone. A device that cannot open must not
+  be a swallowed exception.
+- **In flight: 2** (dev-212 moba, dev-221 udea-render).
+
+- **#221 MERGED `08ca441`**, round 1 PASS, no findings. `KoolAudioDevice` (udea-render commonMain,
+  internal) over Kool `AudioClip`; public entry `jvmMain koolAudioDevice(assetRoot: Path): AudioDevice`.
+  **Kool 0.19.0's own .ogg loader crashes the JVM** (SIGSEGV in libjemalloc: frees stb_vorbis's buffer via
+  LWJGL `memFree`); reproduced standalone on LWJGL 3.3.6 and 3.4.3, not with the system allocator. Fix:
+  `OggToWav` decodes .ogg itself and hands Kool a WAV; regression test crashes the JVM 3/3 with the fix
+  reverted. Pitch/pan NOT honoured - Kool 0.19.0 `AudioClip` is volume-only (reviewer javap-verified; KDocs
+  say so; a test pins they do not change gain). Box has ZERO Java Sound mixers (build user not in `audio`
+  group), so a jvmTest-only `MixerProvider` sits BELOW Kool; assertions read Kool's own `isEnded`/
+  `currentTime`. No output -> `AudioLoadException`, never swallowed, no fallback inside the device.
+  **LEDGER CONDITION (reviewer):** `koolAudioDevice` stays public ONLY because moba is its caller - moba must
+  call it or it goes internal. **It is #212's own AC:** moba's sound is `GdxAudioDevice` (LibGDX), picked at
+  `MobaAudio.kt:150`; #212 must remove LibGDX, so it replaces that line with `koolAudioDevice`, catching
+  `AudioLoadException` -> `AudioDevice.Silent`. Relayed to dev-212. Not reported upstream to Kool (outward
+  third-party filing is the owner's call). Trial: only baseline red; module-graph/no-legacy/AgentsMd green;
+  GL green. Worktree kept: `.claude/worktrees/agent-a86393fdc904896ad`.
 
 ## Wave 10 plan
 

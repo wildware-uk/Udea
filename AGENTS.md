@@ -69,8 +69,8 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `udea-assets-compiler` | Build-time only. **Zero Gradle types** |
 | `udea-gas` | Abilities, attributes, effects — tick-denominated |
 | `udea-net` | Transports, baselines, relevancy, prediction, RPC |
-| `udea-render` | **The only module that touches GL** |
-| `udea-audio` | Drains `GameContext.cues` and plays sound. No GL and no `Gdx`: playback is an `AudioDevice` SPI, and `AudioDevice.Silent` is what Headless uses |
+| `udea-render` | **The only module that touches GL**. Kool stays inside it (spec section 3), and so does the Kool-backed `AudioDevice` (`koolAudioDevice`, desktop) |
+| `udea-audio` | Drains `GameContext.cues` and plays sound. No GL, no `Gdx` and no Kool: playback is an `AudioDevice` SPI, `AudioDevice.Silent` is what Headless uses, and the device that makes a noise is `udea-render`'s |
 | `udea-agent` | MCP tool surface and test harness — the same code path |
 | `udea-agent-host` | HTTP server. Debug-only, verified absent from release |
 | `udea-replay` | `.udearep` input recording, deterministic headless replay, and the bisect tools |
@@ -108,7 +108,8 @@ too. `udea-net` (issue #209) and `udea-agent` (issue #208) are on
 no native `actual` yet, and each build script names it. `udea-net`'s UDP transport runs on `jvm`
 and `android` through a shared `socketMain` source set, and `wasmJs` has the WebSocket client only. In `udea-audio` the
 `AudioDevice` SPI, `AudioDevice.Silent` and the cue drain are `commonMain`, and a device that makes
-a noise is not in it on any target. In `udea-agent` the tools and dispatcher are common, the
+a noise is not in it on any target: that is `udea-render`'s `KoolAudioDevice` (issue #221), common
+code over Kool's `AudioClip`, with a clip loader on `jvm` only so far. In `udea-agent` the tools and dispatcher are common, the
 `assets.*` toolset is `jvmMain` because the asset daemon is, and `udea-agent-host` stays JVM.
 `moba` is three projects (spec D12, issue #212): `moba:game` is on `udea.kotlin-multiplatform-render`, so it builds for every target `udea-render` has, and each launcher is a single-platform project whose targets are the platform's. Two things do not cross that line yet, and both are a module's gap rather than the game's: `udea-replay` generates its registry on its JVM target alone, so `MobaReplay` lives in `moba:desktop`; and `:moba:game` runs KSP through `kspJvm` rather than `kspCommonMainMetadata`, because the Kotlin plugin creates no `commonMain` metadata compilation for a project whose targets are all JVM-family - `moba/game/build.gradle.kts` writes that out at length. Build-time modules stay on `udea.kotlin-library`. The module-graph gates govern each target's
 classpath as the JVM classpath it stands for. `sh gradlew :<module>:allTests` skips iOS off

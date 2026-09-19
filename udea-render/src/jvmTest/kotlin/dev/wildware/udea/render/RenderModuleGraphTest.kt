@@ -71,7 +71,8 @@ class RenderModuleGraphTest {
 
         // udea-diagnostics is test-only: the bytecode gate reports through UdeaDiagnostic, and
         // a rule that invented its own report shape would drift from every other producer.
-        assertEquals(listOf(":udea-assets", ":udea-core", ":udea-diagnostics"), declared)
+        // udea-audio is the `AudioDevice` SPI the Kool-backed device implements (issue #221).
+        assertEquals(listOf(":udea-assets", ":udea-audio", ":udea-core", ":udea-diagnostics"), declared)
         // A multiplatform module's `jvmTest { dependencies { ... } }` block uses the bare
         // `implementation(...)` DSL function, not the flat `testImplementation(...)` bucket name
         // a plain JVM module's build script would - the source-set scoping is what makes it

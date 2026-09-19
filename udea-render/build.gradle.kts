@@ -22,6 +22,12 @@ kotlin {
                 api(project(":udea-core"))
                 implementation(project(":udea-assets"))
 
+                // The `AudioDevice` SPI `KoolAudioDevice` implements (issue #221). `udea-audio`
+                // owns the drain, the routing and the SPI and names no Kool type (UDEA-MG-002 bans
+                // it there); this module owns the Kool half. `api`, because `koolAudioDevice`
+                // returns an `AudioDevice`, so a caller needs the SPI on its own classpath.
+                api(project(":udea-audio"))
+
                 // Kool draws, and nothing else in the engine may name it: UDEA-MG-002 bans
                 // `de.fabmax.kool:*` from every headless module, and UDEA-MG-008 bans LibGDX from
                 // this one. `implementation`, so a consumer's compile classpath carries no Kool

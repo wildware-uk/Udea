@@ -43,8 +43,8 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 | `udea-assets-compiler` | `udea.kotlin-build-tool` | The five-pass asset compiler. **Zero Gradle types** — one implementation behind both the Gradle task and the dev daemon | `scriptHost.kt`, `AssetScanner`, `GameAssetLoader` | `udea-assets` (api), `udea-diagnostics` | `udea-gradle` |
 | `udea-gas` | `udea.kotlin-multiplatform` | Abilities, attributes, effects — tick-denominated | `common/ability/*`, `AbilitySystem`, `AttributeSystem` | `udea-core` (api) | `udea-agent-host`, `moba` |
 | `udea-net` | `udea.kotlin-multiplatform-no-ios` | Transports, baselines, relevancy, prediction, RPC | `common/network/*`, both `Network*System`s, KryoNet | `udea-core` (api); Ktor sockets and WebSocket client, cryptography-kotlin for the connect token; the Ktor WebSocket server on `jvm` only, without `kotlin-reflect` (issue #209) | `moba` |
-| `udea-render` | `udea.kotlin-library-gl` | The only module that touches GL | `SpriteBatchSystem` et al., `GameScreen`'s rendering half | `udea-core` (api), `udea-assets`, gdx + gdx-backend-lwjgl3 | `moba` |
-| `udea-audio` | `udea.kotlin-multiplatform` | Cue-driven sound: the drain that empties `GameContext.cues`, the cue-to-`SoundCue` routing table, distance attenuation, stereo pan, pitch variance and a per-frame voice cap. **No GL and no `Gdx`** — playback is an `AudioDevice` SPI, and `AudioDevice.Silent` is a shipped implementation, so a headless process drains the queue and makes no noise | `common/.../ecs/system/SoundSystem.kt`, which read `gameScreen.camera` off a file-level global inside a Fleks system and called `play` on a `Sound` held by an asset value | `udea-core` (api), `udea-assets` | `moba` |
+| `udea-render` | `udea.kotlin-multiplatform-render` | The only module that touches GL. Kool stays inside it (port spec section 3): the renderer, the ComposeGL frontend, and the Kool-backed `AudioDevice` (issue #221) | `SpriteBatchSystem` et al., `GameScreen`'s rendering half | `udea-core` (api), `udea-audio` (api), `udea-assets`, Kool, `composegl-ui` (api), `composegl-kool`; `composegl-lwjgl3` on `jvm` | `moba` |
+| `udea-audio` | `udea.kotlin-multiplatform` | Cue-driven sound: the drain that empties `GameContext.cues`, the cue-to-`SoundCue` routing table, distance attenuation, stereo pan, pitch variance and a per-frame voice cap. **No GL and no `Gdx`** — playback is an `AudioDevice` SPI, and `AudioDevice.Silent` is a shipped implementation, so a headless process drains the queue and makes no noise | `common/.../ecs/system/SoundSystem.kt`, which read `gameScreen.camera` off a file-level global inside a Fleks system and called `play` on a `Sound` held by an asset value | `udea-core` (api), `udea-assets` | `udea-render`, `moba` |
 | `udea-agent` | `udea.kotlin-multiplatform-no-ios` | MCP surface + test harness — same code path; common on `jvm`, `android` and `wasmJs`, with the `assets.*` toolset in `jvmMain` (issue #208) | FruitGameKTX's `DebugBridge` pattern, generalised | `udea-core` (api) | `udea-agent-host` |
 | `udea-agent-host` | `udea.kotlin-library` | HTTP server, plus the toolsets that need a render context (spec §4: render, input, ui). Debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` | `udea-agent` (api); `udea-render` + gdx + `udea-net` (`implementation` — see below) | *(nothing — deliberately not `moba`)* |
 | `udea-gradle` | `udea.gradle-plugin` | Tasks, verifiers, `gamebridge.json` emission | old `gradle-plugin` (which leaked `gradleApi` onto the game runtime) | `udea-assets-compiler`, `udea-diagnostics`, `gradleApi()` (`compileOnly`) | *(nothing — applied as a plugin, never depended on)* |
@@ -63,10 +63,11 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 - `udea-assets-compiler` → any Gradle type. The daemon and CI must run identical code.
 - `udea-audio` → gdx, in any form. It is a designated headless module, so `UDEA-MG-002` bans
   the backend on its classpath and `UDEA-MG-002-BYTECODE` bans `com/badlogic/gdx/Gdx` by
-  exact name. A device that makes a noise sits behind this module's `AudioDevice` interface —
-  the same shape as `Presentation`, which `udea-core` holds without owning a renderer. `moba`'s
-  was `GdxAudioDevice`, and it went with LibGDX (issue #212): every `moba` process plays through
-  `AudioDevice.Silent` until a Kool-era device exists.
+  exact name, and the same rule bans `de.fabmax.kool:*`. The class that turns a path into a
+  noise is `udea-render`'s `KoolAudioDevice` (issue #221), behind this module's `AudioDevice`
+  interface: the same shape as `Presentation`, which `udea-core` holds without owning a renderer.
+  `moba`'s own `GdxAudioDevice` went with LibGDX in issue #212, and `moba` now plays through
+  `koolAudioDevice`.
 - Any game module → `udea-gradle`. The old `gradle-plugin` put the Gradle API on the game's
   runtime classpath through `implementation(gradleApi())`; here `gradleApi()` is
   `compileOnly` and nothing depends on the project.

@@ -344,6 +344,12 @@ class WallClockBudgetCensusTest {
                 "a deadline: the socket read timeout in the UDP proof server",
             "udea-net/src/jvmTest/kotlin/dev/wildware/udea/net/proof/UdpTwoProcessTest.kt" to
                 "a deadline: how long to wait for a line from a forked process",
+            "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/audio/CaptureMixer.kt" to
+                "a deadline: the stand-in sound card's line ends, and reports its position, as " +
+                "real time passes from start(), as a hardware line does; nothing is asserted here",
+            "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/audio/KoolAudioDeviceTest.kt" to
+                "a deadline: how long to wait for Kool to report a clip ended. Its one position " +
+                "check is a lower bound after a sleep, which a slower machine passes more easily",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/capture/CaptureOrderingTest.kt" to
                 "a deadline: how long to wait for a captured frame",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlKoolInputTest.kt" to

@@ -100,9 +100,10 @@ public object ModuleGraphRules {
         ":udea-assets-compiler",
         // Audio is presentation, and presentation is where seconds and wall-clock randomness are
         // allowed (spec 5) - but none of that is GL. The module holds the cue-to-sound routing and
-        // a device SPI with no gdx type in it; the device that actually opens a `Sound` lives in
-        // the game, which is not a designated headless module. So this stays on the headless side
-        // and `AudioDevice.Silent` is what a `RenderMode.Headless` process gets.
+        // a device SPI with no gdx or Kool type in it; the device that makes a noise is
+        // `udea-render`'s `KoolAudioDevice` (issue #221), and `udea-render` is not a designated
+        // headless module. So this stays on the headless side and `AudioDevice.Silent` is what a
+        // `RenderMode.Headless` process gets.
         ":udea-audio",
         ":udea-codegen",
         ":udea-compiler-plugin",

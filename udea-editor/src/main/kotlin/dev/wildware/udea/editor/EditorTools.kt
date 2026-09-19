@@ -32,7 +32,7 @@ import dev.wildware.udea.agent.activity.AgentSessionId
 public class EditorTools(
     private val bridge: AgentBridge,
     /** Who the editor's calls are filed under. */
-    public val author: AgentSessionId,
+    private val author: AgentSessionId,
 ) {
 
     /** Answers still owed, by command id, oldest first. */

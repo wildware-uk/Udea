@@ -21,8 +21,8 @@ plugins {
 }
 
 dependencies {
-    // `api`: `EditorSession.window` is a `UiScreen`, its viewport block is a `SceneDrawScope`, and a
-    // launcher hands it a `WorldView` - all `udea-render` types, and `composegl-ui` comes with it. The
+    // `api`: `EditorSession.window` is a `UiScreen` and its viewport block draws into a
+    // `SceneDrawScope` - a launcher's is `WorldView.drawInto` - so `composegl-ui` comes with it. The
     // Kool frontend and the world draw stay inside `udea-render` (spec section 3); `UDEA-MG-011` keeps
     // every renderer artifact off this module's compile classpath.
     api(project(":udea-render"))

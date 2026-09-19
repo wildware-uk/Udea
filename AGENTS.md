@@ -74,6 +74,7 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `udea-agent` | MCP tool surface and test harness — the same code path |
 | `udea-agent-host` | HTTP server. Debug-only, verified absent from release |
 | `udea-replay` | `.udearep` input recording, deterministic headless replay, and the bisect tools |
+| `udea-editor` | The editor window: docked ComposeGL panels, the world in a `SceneView`, buttons that call `editor.*` tools. Debug-only and JVM; only a game's `editor` source set may depend on it (`UDEA-MG-010`) |
 | `udea-gradle` | Tasks, verifiers, `gamebridge.json` emission |
 | `moba:game` | The example game: a 5v5 three-lane MOBA. A library - components, systems, assets and what it draws - with no entry point in it |
 | `moba:desktop` | The desktop launcher: `run`, `runServer`, `runClient`, the shot mains, the proofs and the agent surface. JVM |
@@ -190,8 +191,11 @@ it diffs. That exclusion is structural, not a flag somebody remembers to clear.
 
 ## Driving a running game
 
-Every Udea game exposes an MCP tool surface automatically. There is no level editor and no IDE
-plugin: **the tool surface is the editor.**
+Every Udea game exposes an MCP tool surface automatically, and there is no IDE plugin. The editor
+is a screen over that tool surface, not a second implementation of it: `udea-editor`'s window
+(`sh gradlew :moba:desktop:runEditor`, issue #194) turns each button into an `editor.*` call filed
+under the author `editor`, so an agent calling with `session=editor` sees and undoes the same edits.
+**The tool surface is the editor.**
 
 | Endpoint | Answers |
 |---|---|

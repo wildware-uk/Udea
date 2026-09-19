@@ -7,7 +7,7 @@ package dev.wildware.udea.editor
 public object EditorTags {
 
     /** The world, in its `SceneView`. */
-    public const val VIEWPORT: String = "editor:viewport"
+    internal const val VIEWPORT: String = "editor:viewport"
 
     /** The Create panel's spawn button. */
     public const val SPAWN: String = "editor:spawn"

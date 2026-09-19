@@ -15,10 +15,10 @@ import dev.wildware.udea.render.view.WorldViewport
  *
  * Written against the public gizmo API and nothing else, as every built-in gizmo is (epic #231's
  * second rule): it is offered on entities with an [Animator], declares [GizmoScope.mark]s, and reads
- * the joints from a [SkeletonSource] a game could build as easily as the editor does. It is
- * read-only: it declares no handle, so there is nothing in it to grab.
+ * the joints from a [SkeletonSource]. It is read-only: it declares no handle, so there is nothing
+ * in it to grab.
  */
-public class BoneOverlayGizmo(private val skeletons: SkeletonSource) : Gizmo<Animator> {
+internal class BoneOverlayGizmo(private val skeletons: SkeletonSource) : Gizmo<Animator> {
 
     override val component: ComponentType<Animator> = Animator
 
@@ -34,13 +34,13 @@ public class BoneOverlayGizmo(private val skeletons: SkeletonSource) : Gizmo<Ani
 }
 
 /** Where an entity's joints are, for a [BoneOverlayGizmo]. */
-public fun interface SkeletonSource {
+internal fun interface SkeletonSource {
 
     /**
      * The joints of [entity]'s skinned model as they are drawn now, each naming the joint it hangs
      * from by its place in the list; empty when [entity] has no skinned model. Render thread.
      */
-    public fun skeletonOf(entity: NetId): List<SkeletonJoint>
+    fun skeletonOf(entity: NetId): List<SkeletonJoint>
 }
 
 /**
@@ -48,10 +48,10 @@ public fun interface SkeletonSource {
  *
  * @property parent the index of that joint in the same list, or [ROOT].
  */
-public data class SkeletonJoint(val at: WorldPoint, val parent: Int) {
-    public companion object {
+internal data class SkeletonJoint(val at: WorldPoint, val parent: Int) {
+    companion object {
         /** [parent] of a joint that hangs from no other. */
-        public const val ROOT: Int = ModelSkeleton.ROOT
+        const val ROOT: Int = ModelSkeleton.ROOT
     }
 }
 
@@ -64,7 +64,7 @@ public data class SkeletonJoint(val at: WorldPoint, val parent: Int) {
  * either dimension, but places a gizmo through its 2D camera in 2D, so a joint would be drawn where
  * its model is not.
  */
-public fun modelSkeletons(models: ModelRenderSystem, view: WorldViewport?): SkeletonSource = ModelSkeletons(models, view)
+internal fun modelSkeletons(models: ModelRenderSystem, view: WorldViewport?): SkeletonSource = ModelSkeletons(models, view)
 
 private class ModelSkeletons(private val models: ModelRenderSystem, private val view: WorldViewport?) : SkeletonSource {
 

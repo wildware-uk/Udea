@@ -25,7 +25,7 @@ import dev.wildware.udea.render.view.ViewPoint
  * @param selection the entities to draw for, read once a frame: the editor author's selection.
  * @param gizmos every gizmo on offer; each is drawn for a selected entity that carries its component.
  */
-public class GizmoMarkLayer(
+internal class GizmoMarkLayer(
     private val world: World,
     private val netIds: NetIdIndex,
     private val selection: () -> List<NetId>,

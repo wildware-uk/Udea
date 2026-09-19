@@ -94,23 +94,23 @@ public object AnimationTags {
     public const val PREVIEW: String = "editor:animation-preview"
 
     /** Play and Pause. */
-    public const val PLAY: String = "editor:animation-play"
+    internal const val PLAY: String = "editor:animation-play"
 
     /** The scrubber. */
     public const val SCRUBBER: String = "editor:animation-scrubber"
 
     /** Which clip the preview shows, and where in it. */
-    public const val TIME: String = "editor:animation-time"
+    internal const val TIME: String = "editor:animation-time"
 
     /** Why the last control was refused. */
-    public const val PROBLEM: String = "editor:animation-problem"
+    internal const val PROBLEM: String = "editor:animation-problem"
 
     /** The button that chooses clip [name] for the entity: an edit. */
     public fun clip(name: String): String = "editor:animation-clip:$name"
 
     /** The button that previews clip [name], without an edit. */
-    public fun previewClip(name: String): String = "editor:animation-preview-clip:$name"
+    internal fun previewClip(name: String): String = "editor:animation-preview-clip:$name"
 
     /** The button that shows model [id] on its own. */
-    public fun model(id: String): String = "editor:animation-model:$id"
+    internal fun model(id: String): String = "editor:animation-model:$id"
 }

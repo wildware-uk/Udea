@@ -4,6 +4,7 @@ import dev.wildware.udea.core.Tick
 import dev.wildware.udea.replay.ReplayRecording
 import dev.wildware.udea.replay.ReplayWorld
 import dev.wildware.udea.replay.ReplayWorldFactory
+import dev.wildware.udea.replay.feed
 import dev.wildware.udea.core.snapshot.ComponentRegistry
 import java.nio.file.Path
 
@@ -114,8 +115,7 @@ public object ReplayDigestRecorder {
                 val slots = recording.newSampleSlots()
                 for (index in 0 until recording.tickCount) {
                     val tick = recording.firstTick + index.toLong()
-                    recording.samplesInto(tick, slots)
-                    world.applyInput(slots)
+                    world.feed(recording, tick, slots)
                     world.step()
                     val hash = world.hash()
                     if (hash != recording.hashAt(tick)) {

@@ -3,8 +3,11 @@ package dev.wildware.udea.agent.tools
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.agent.AgentBridge
+import dev.wildware.udea.agent.AgentClock
+import dev.wildware.udea.agent.AgentCommand
 import dev.wildware.udea.agent.AgentErrorKind
 import dev.wildware.udea.agent.AgentResult
+import dev.wildware.udea.agent.AgentSubmission
 import dev.wildware.udea.agent.AgentToolException
 import dev.wildware.udea.agent.Json
 import dev.wildware.udea.agent.activity.AgentSessionId
@@ -12,6 +15,7 @@ import dev.wildware.udea.agent.activity.AgentSessions
 import dev.wildware.udea.agent.dispatch.AgentContext
 import dev.wildware.udea.agent.query.AgentComponentIndex
 import dev.wildware.udea.agent.query.AgentComponentType
+import dev.wildware.udea.agent.query.FieldRef
 import dev.wildware.udea.agent.query.FieldValues
 import dev.wildware.udea.agent.query.PositionRef
 import dev.wildware.udea.annotations.AgentTool
@@ -47,7 +51,7 @@ public class EditorLevelStore(
 }
 
 /**
- * `editor.*`: the level editor's actions, as agent tools (issue #193).
+ * `editor.*`: the level editor's actions, as agent tools (issues #193 and #232).
  *
  * ## The editor is a screen over this surface
  *
@@ -73,8 +77,32 @@ public class EditorLevelStore(
  * history keeps its newest [HISTORY_CAPACITY] edits. Saving does not clear it.
  *
  * Every edit answers with the value it left behind and its `reverse`: the call that puts things
- * back, arguments as text, ready to send. A drag is one edit - the window calls [move] once, on
- * release, with where the drag began.
+ * back, arguments as text, ready to send.
+ *
+ * ## Edit sessions: a drag is live, and still one undo entry
+ *
+ * [beginEdit] records what some fields hold on some entities; [updateEdit] writes new values as
+ * often as a drag moves, with no undo entry; [commitEdit] closes the session as **one** undo entry
+ * whose reverse is the starting values, and [cancelEdit] puts the starting values back and records
+ * nothing. An author has at most one session open, and beginning another commits the first.
+ * Another author may write a session's field meanwhile - the last write wins - and the committed
+ * entry still records the session's starting values, so an undo is refused over that write just
+ * as it is over any other.
+ *
+ * A session nobody updates for [IDLE_TIMEOUT_SECONDS] is cancelled, and so is one whose author
+ * calls [leave]. HTTP gives the host no connection to watch close, so an agent that goes away
+ * without leaving is an idle one. The idle time is measured on [idleClock] - the agent host's wall
+ * clock, as `AgentClock`'s KDoc sets out - and never on the simulation's, and it is read only by
+ * the sweep, which runs at the start of each `AgentBridge.drain`, between ticks, and never inside
+ * a tool call. The sweep ends a session by submitting the same
+ * `editor.cancel_edit` its author could have sent. So the wall clock decides only *when* a cancel
+ * is asked for, and the cancel itself is an ordinary call, applied between ticks and kept in the
+ * [journal] like any other.
+ *
+ * ## The journal: what a replay of an editing session needs
+ *
+ * Every call that changed the world or an edit session is kept in [journal] with the tick it was
+ * applied on, so a replay can make the same calls before the same ticks. See [EditorJournal].
  *
  * ## An undo refuses rather than clobbers
  *
@@ -91,7 +119,7 @@ public class EditorToolset(
     /** The host's session table, so a refusal can name an author. The same one `AgentHost` interns into. */
     private val sessions: AgentSessions,
     private val bridge: AgentBridge,
-    /** Stamps the audit entries. */
+    /** Stamps the audit entries and the journal. */
     private val clock: SimClock,
     /**
      * The two fields [move] writes. The component index's lowered `position.x`/`position.y` by
@@ -104,49 +132,74 @@ public class EditorToolset(
     private val spawner: BlueprintSpawner? = null,
     /** Where [save] writes, or `null` when this host has none; [save] then refuses. */
     private val levels: EditorLevelStore? = null,
+    /** What an edit session's idle time is measured on. The platform clock unless a test moves its own. */
+    private val idleClock: AgentClock = AgentClock.System,
 ) {
 
     private val history = EditorHistory(sessions.capacity, HISTORY_CAPACITY, ::release)
+
+    private val openEdits = EditSessionTable(sessions.capacity)
+
+    private val selections = Selections(sessions.capacity)
+
+    /** Every call that changed the world or an edit session, in order. */
+    public val journal: EditorJournal = EditorJournal()
+
+    init {
+        bridge.beforeEachDrain(::sweepIdle)
+    }
 
     // --- edits ---------------------------------------------------------------------------
 
     @AgentTool(
         name = "editor.set_field",
-        description = "Set any field of any component on one entity while authoring a level, " +
-            "ignoring agentWritable. Answers the value left behind and the reverse call. " +
-            "Recorded in your own undo history; send session=<your name> to keep it yours.",
+        description = "Set any field of any component on one entity, or on several at once, while " +
+            "authoring a level, ignoring agentWritable. Several entities are one write and one " +
+            "undo entry. Answers the value left behind and the reverse call. Recorded in your own " +
+            "undo history; send session=<your name> to keep it yours.",
     )
     public fun setField(
         context: AgentContext,
-        @Arg(description = WorldToolset.ID_DESCRIPTION)
-        id: NetId,
+        @Arg(description = "The entity, or several comma separated, as NetId packed words (world.query_entities reports them).")
+        id: List<NetId>,
         @Arg(description = "Component name, as world.list_components spells it.")
         component: String,
         @Arg(description = "Field name within that component.")
         field: String,
         @Arg(description = "The new value as text; it is coerced to the field's declared type.")
         value: String,
-    ): AgentResult {
-        val entity = netIds.requireLive(id)
+    ): AgentResult = journaled(context) {
+        requireDistinct(SET_FIELD, "id", id)
         val type = components.requireByName(component)
         val fieldIndex = type.requireFieldIndex(field)
-        requirePresent(type, entity, id)
-        val before = type.read(world, entity, fieldIndex)
-        type.write(world, entity, fieldIndex, parseFieldText(SET_FIELD, type, fieldIndex, before, value))
-        val change = FieldChange(type, fieldIndex, before, type.read(world, entity, fieldIndex))
-        record(EditorEdit.Fields(history.nextSequence(), context.command.session, SET_FIELD, id, listOf(change)))
+        val entities = id.map { netId -> netIds.requireLive(netId).also { requirePresent(type, it, netId) } }
+        // Every value is coerced before any is written, so a refusal leaves no entity half-set.
+        val parsed = entities.map { parseFieldText(SET_FIELD, type, fieldIndex, type.read(world, it, fieldIndex), value) }
+        val changes = entities.mapIndexed { index, entity ->
+            val before = type.read(world, entity, fieldIndex)
+            type.write(world, entity, fieldIndex, parsed[index])
+            FieldChange(id[index], type, fieldIndex, before, type.read(world, entity, fieldIndex))
+        }
+        record(EditorEdit.Fields(history.nextSequence(), context.command.session, SET_FIELD, changes))
 
-        return AgentResult.ok {
-            put("id", id.raw)
+        val befores = changes.map { FieldValues.textOf(it.before) }.distinct()
+        AgentResult.ok {
+            put("id", id[0].raw)
+            if (id.size > 1) ids("ids", id)
             put("component", type.name)
-            put("field", change.fieldName)
+            put("field", changes[0].fieldName)
             key("value")
-            FieldValues.renderInto(this, change.after)
-            reverse(SET_FIELD) {
-                put("id", id.raw.toString())
-                put("component", type.name)
-                put("field", change.fieldName)
-                put("value", FieldValues.textOf(before))
+            FieldValues.renderInto(this, changes[0].after)
+            if (befores.size == 1) {
+                reverse(SET_FIELD) {
+                    put("id", id.joinToString(",") { it.raw.toString() })
+                    put("component", type.name)
+                    put("field", changes[0].fieldName)
+                    put("value", befores[0])
+                }
+            } else {
+                // No one set_field puts back several different values.
+                reverse(UNDO) {}
             }
         }
     }
@@ -173,7 +226,7 @@ public class EditorToolset(
         fromX: Float?,
         @Arg(description = "Where a drag began, y.", required = false)
         fromY: Float?,
-    ): AgentResult {
+    ): AgentResult = journaled(context) {
         if ((fromX == null) != (fromY == null)) {
             throw AgentToolException(
                 AgentErrorKind.BAD_ARGUMENT,
@@ -188,12 +241,12 @@ public class EditorToolset(
         val entity = netIds.requireLive(id)
         requirePresent(position.component, entity, id)
         val changes = listOf(
-            moveField(entity, position, position.xIndex, x, fromX),
-            moveField(entity, position, position.yIndex, y, fromY),
+            moveField(id, entity, position, position.xIndex, x, fromX),
+            moveField(id, entity, position, position.yIndex, y, fromY),
         )
-        record(EditorEdit.Fields(history.nextSequence(), context.command.session, MOVE, id, changes))
+        record(EditorEdit.Fields(history.nextSequence(), context.command.session, MOVE, changes))
 
-        return AgentResult.ok {
+        AgentResult.ok {
             put("id", id.raw)
             obj("value") {
                 field("x", changes[0].after)
@@ -224,10 +277,10 @@ public class EditorToolset(
         x: Float?,
         @Arg(description = "World y to place it at.", required = false)
         y: Float?,
-    ): AgentResult {
+    ): AgentResult = journaled(context) {
         val netId = catalog.spawnNow(world, spawner, blueprint, x, y)
         record(EditorEdit.Spawn(history.nextSequence(), context.command.session, netId))
-        return AgentResult.ok {
+        AgentResult.ok {
             put("id", netId.raw)
             put("blueprint", blueprint)
             put("value", netId.raw)
@@ -245,7 +298,7 @@ public class EditorToolset(
         context: AgentContext,
         @Arg(description = WorldToolset.ID_DESCRIPTION)
         id: NetId,
-    ): AgentResult {
+    ): AgentResult = journaled(context) {
         val entity = netIds.requireLive(id)
         val removed = world.snapshotOf(entity)
         // Detached rather than freed: the id stays held, unresolvable, so an undo can put the
@@ -253,10 +306,254 @@ public class EditorToolset(
         netIds.detach(id)
         world -= entity
         record(EditorEdit.Delete(history.nextSequence(), context.command.session, id, removed))
-        return AgentResult.ok {
+        AgentResult.ok {
             put("id", id.raw)
             put("value", null as String?)
             reverse(UNDO) {}
+        }
+    }
+
+    // --- edit sessions -------------------------------------------------------------------
+
+    @AgentTool(
+        name = "editor.begin_edit",
+        description = "Open a live edit of some fields on some entities - a drag, or a value " +
+            "being scrubbed - recording what each holds now, and answer its sessionId. " +
+            "editor.update_edit then writes values with no undo entry, editor.commit_edit closes " +
+            "it as one undo entry and editor.cancel_edit puts every starting value back. You " +
+            "have one session at a time: beginning another commits the first. A session with no " +
+            "update for 30 seconds is cancelled.",
+    )
+    public fun beginEdit(
+        context: AgentContext,
+        @Arg(description = "The entities to edit, comma separated NetId packed words.")
+        entities: List<NetId>,
+        @Arg(
+            description = "The fields to edit on every one of those entities, each written " +
+                "Component.field as world.list_components spells it, e.g. Position.x.",
+        )
+        fields: List<String>,
+    ): AgentResult = journaled(context) {
+        val author = context.command.session
+        requireDistinct(BEGIN_EDIT, "entities", entities)
+        val refs = fields.map { path ->
+            if (path.isBlank()) {
+                throw AgentToolException(AgentErrorKind.BAD_ARGUMENT, "$BEGIN_EDIT got an empty field name in fields=${fields.joinToString(",")}")
+            }
+            components.resolveField(path.trim(), emptyList())
+        }
+        if (refs.distinctBy { it.toString() }.size != refs.size) {
+            throw AgentToolException(AgentErrorKind.BAD_ARGUMENT, "$BEGIN_EDIT names one field twice in fields=${fields.joinToString(",")}")
+        }
+        val live = entities.map { netId ->
+            netIds.requireLive(netId).also { entity -> for (ref in refs) requirePresent(ref.component, entity, netId) }
+        }
+        // Everything is checked before the earlier session is committed, so a refused begin
+        // leaves that session open exactly as it was.
+        val committed = openEdits.of(author)?.let { earlier -> earlier.id.also { commit(earlier) } }
+        val start = Array(live.size * refs.size) { slot ->
+            val ref = refs[slot % refs.size]
+            ref.component.read(world, live[slot / refs.size], ref.fieldIndex)
+        }
+        val session = EditSession(openEdits.nextId(), author, entities, refs, start)
+        openEdits.open(session)
+        bridge.event("editor_begin_edit:${session.id.raw}:${label(author)}", clock.tick.value)
+
+        AgentResult.ok {
+            put("sessionId", session.id.raw)
+            if (committed != null) put("committed", committed.raw)
+            arr("start") {
+                for (entity in entities.indices) {
+                    for (field in refs.indices) {
+                        element {
+                            put("id", entities[entity].raw)
+                            put("component", refs[field].component.name)
+                            put("field", refs[field].name)
+                            field("value", session.startOf(entity, field))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @AgentTool(
+        name = "editor.update_edit",
+        description = "Write new values into your open edit session, live, with no undo entry. " +
+            "Each value is Component.field=value for every entity in the session, or " +
+            "<id>:Component.field=value for one of them. Only fields the session opened can be " +
+            "written. Every update restarts the session's 30 second idle count.",
+    )
+    public fun updateEdit(
+        context: AgentContext,
+        @Arg(description = "The sessionId editor.begin_edit answered.")
+        sessionId: Int,
+        @Arg(
+            description = "Comma separated Component.field=value or <id>:Component.field=value " +
+                "entries, each value exact and as text, coerced to the field's type.",
+        )
+        values: List<String>,
+    ): AgentResult = journaled(context) {
+        val session = requireOwnSession(context, sessionId, UPDATE_EDIT)
+        val writes = values.map { parseSessionValue(session, it) }
+        // Resolve and coerce everything before writing anything, so a refusal writes nothing.
+        val gone = ArrayList<NetId>()
+        val planned = ArrayList<PlannedWrite>()
+        for (write in writes) {
+            val targets = if (write.entity >= 0) listOf(write.entity) else session.entities.indices.toList()
+            for (entityIndex in targets) {
+                val netId = session.entities[entityIndex]
+                val ref = session.fields[write.field]
+                val entity = liveWithOrNull(netId, ref.component)
+                if (entity == null) {
+                    if (netId !in gone) gone.add(netId)
+                    continue
+                }
+                val current = ref.component.read(world, entity, ref.fieldIndex)
+                planned.add(PlannedWrite(entity, ref, parseFieldText(UPDATE_EDIT, ref.component, ref.fieldIndex, current, write.text)))
+            }
+        }
+        for (write in planned) write.ref.component.write(world, write.entity, write.ref.fieldIndex, write.value)
+        session.touched = true
+
+        AgentResult.ok {
+            put("sessionId", session.id.raw)
+            put("written", planned.size)
+            if (gone.isNotEmpty()) ids("gone", gone)
+        }
+    }
+
+    @AgentTool(
+        name = "editor.commit_edit",
+        description = "Close your open edit session as one undo entry whose reverse is the " +
+            "values it started from. A session that changed nothing closes with no entry. " +
+            "Answers whether an entry was recorded.",
+    )
+    public fun commitEdit(
+        context: AgentContext,
+        @Arg(description = "The sessionId editor.begin_edit answered.")
+        sessionId: Int,
+    ): AgentResult = journaled(context) {
+        val session = requireOwnSession(context, sessionId, COMMIT_EDIT)
+        val recorded = commit(session)
+        AgentResult.ok {
+            put("sessionId", session.id.raw)
+            put("recorded", recorded != null)
+            if (recorded != null) put("fields", recorded.changes.size)
+        }
+    }
+
+    @AgentTool(
+        name = "editor.cancel_edit",
+        description = "Close your open edit session and put back every value it started from, " +
+            "exactly, whoever changed it since. Records no undo entry. What Escape does during " +
+            "a drag.",
+    )
+    public fun cancelEdit(
+        context: AgentContext,
+        @Arg(description = "The sessionId editor.begin_edit answered.")
+        sessionId: Int,
+    ): AgentResult = journaled(context) {
+        val session = requireOwnSession(context, sessionId, CANCEL_EDIT)
+        val gone = cancel(session)
+        AgentResult.ok {
+            put("sessionId", session.id.raw)
+            if (gone.isNotEmpty()) ids("gone", gone)
+        }
+    }
+
+    @AgentTool(
+        name = "editor.leave",
+        description = "Say you are done editing: your open edit session, if any, is cancelled " +
+            "with its starting values put back, and your selection is cleared. Call it before " +
+            "disconnecting; a session left open is cancelled anyway after 30 seconds idle.",
+    )
+    public fun leave(context: AgentContext): AgentResult = journaled(context) {
+        val author = context.command.session
+        val open = openEdits.of(author)
+        if (open != null) cancel(open)
+        selections.clear(author)
+        AgentResult.ok {
+            put("author", label(author))
+            if (open != null) put("cancelled", open.id.raw)
+        }
+    }
+
+    // --- selection and inspection ----------------------------------------------------------
+
+    @AgentTool(
+        name = "editor.select",
+        description = "Change your selection: replace it with these entities, add them to it, or " +
+            "remove them from it. Each author has one selection, and every author can read every " +
+            "selection with editor.selection. Replace with no entities clears it.",
+    )
+    public fun select(
+        context: AgentContext,
+        @Arg(description = "Comma separated NetId packed words. Omit to clear with mode=replace.", required = false)
+        entities: List<NetId>?,
+        @Arg(description = "replace, add or remove.", required = false, default = "replace")
+        mode: SelectMode,
+    ): AgentResult {
+        val author = context.command.session
+        val ids = entities.orEmpty()
+        requireDistinct(SELECT, "entities", ids)
+        if (mode != SelectMode.remove) for (id in ids) netIds.requireLive(id)
+        selections.select(author, ids, mode)
+        return AgentResult.ok {
+            put("author", label(author))
+            ids("ids", liveOnly(selections.of(author)))
+        }
+    }
+
+    @AgentTool(
+        name = "editor.selection",
+        description = "Every author's current selection, yours included, as NetIds. An entity " +
+            "that has since been removed is not listed.",
+    )
+    public fun selection(context: AgentContext): AgentResult = AgentResult.ok {
+        put("you", label(context.command.session))
+        arr("authors") {
+            selections.forEachAuthor { author, selected ->
+                val live = liveOnly(selected)
+                if (live.isNotEmpty()) {
+                    element {
+                        put("author", label(author))
+                        ids("ids", live)
+                    }
+                }
+            }
+        }
+    }
+
+    @AgentTool(
+        name = "editor.common_fields",
+        description = "The fields several entities share, for an inspector showing a " +
+            "multi-selection: every field of every component all of them carry, with its value " +
+            "when they agree, or mixed=true when they differ.",
+    )
+    public fun commonFields(
+        @Arg(description = "Comma separated NetId packed words.")
+        entities: List<NetId>,
+    ): AgentResult {
+        requireDistinct(COMMON_FIELDS, "entities", entities)
+        val live = entities.map { netIds.requireLive(it) }
+        return AgentResult.ok {
+            put("entities", entities.size)
+            arr("fields") {
+                for (type in components.all()) {
+                    if (live.any { !type.isPresent(world, it) }) continue
+                    for (fieldIndex in type.fieldNames.indices) {
+                        val first = type.read(world, live[0], fieldIndex)
+                        val mixed = live.any { type.read(world, it, fieldIndex) != first }
+                        element {
+                            put("component", type.name)
+                            put("field", type.fieldNames[fieldIndex])
+                            put("mixed", mixed)
+                            if (!mixed) field("value", first)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -277,14 +574,14 @@ public class EditorToolset(
             default = "false",
         )
         overwrite: Boolean,
-    ): AgentResult {
+    ): AgentResult = journaled(context) {
         val author = context.command.session
-        val edit = history.newest(author) ?: return AgentResult.failed(
-            NOTHING_TO_UNDO,
-            "${label(author)} has nothing to undo; editor.history lists what an author can undo, " +
-                "and each author undoes only their own edits",
-        )
-        return when (edit) {
+        when (val edit = history.newest(author)) {
+            null -> AgentResult.failed(
+                NOTHING_TO_UNDO,
+                "${label(author)} has nothing to undo; editor.history lists what an author can undo, " +
+                    "and each author undoes only their own edits",
+            )
             is EditorEdit.Fields -> undoFields(edit, overwrite)
             is EditorEdit.Spawn -> undoSpawn(edit, overwrite)
             is EditorEdit.Delete -> undoDelete(edit, overwrite)
@@ -312,6 +609,7 @@ public class EditorToolset(
                         put("sequence", edit.sequence)
                         put("tool", edit.tool)
                         put("id", edit.netId.raw)
+                        if (edit is EditorEdit.Fields && edit.netIds.size > 1) ids("ids", edit.netIds)
                     }
                 }
             }
@@ -358,37 +656,57 @@ public class EditorToolset(
     // --- undo ----------------------------------------------------------------------------
 
     private fun undoFields(edit: EditorEdit.Fields, overwrite: Boolean): AgentResult {
-        val entity = netIds.resolveOrNull(edit.netId)
-        if (entity == null || edit.changes.any { !it.component.isPresent(world, entity) }) {
-            return gone(edit, overwrite)
+        val entities = ArrayList<Entity>(edit.changes.size)
+        for (change in edit.changes) {
+            entities.add(liveWithOrNull(change.netId, change.component) ?: return gone(edit, overwrite))
         }
-        val conflict = edit.changes.firstOrNull { it.component.read(world, entity, it.fieldIndex) != it.after }
-        if (conflict != null && !overwrite) {
-            val current = conflict.component.read(world, entity, conflict.fieldIndex)
-            val changer = history.latestByOthers(edit) { it.touches(edit.netId, conflict.component, conflict.fieldIndex) }
+        val conflictAt = edit.changes.indices.firstOrNull { index ->
+            val change = edit.changes[index]
+            change.component.read(world, entities[index], change.fieldIndex) != change.after
+        }
+        if (conflictAt != null && !overwrite) {
+            val conflict = edit.changes[conflictAt]
+            val current = conflict.component.read(world, entities[conflictAt], conflict.fieldIndex)
+            val changer = history.latestByOthers(edit) { it.touches(conflict.netId, conflict.component, conflict.fieldIndex) }
             return AgentResult.failed(
                 EDIT_CONFLICT,
-                "refused to undo your ${edit.tool} on ${describe(edit.netId)}: " +
+                "refused to undo your ${edit.tool} on ${describe(conflict.netId)}: " +
                     "${conflict.component.name}.${conflict.fieldName} now holds " +
                     "${FieldValues.textOf(current)}, not the ${FieldValues.textOf(conflict.after)} " +
                     "your edit left, because ${changedBy(changer)}. Call editor.undo with " +
                     "overwrite=true to put back ${FieldValues.textOf(conflict.before)} anyway.",
             )
         }
-        for (change in edit.changes) change.component.write(world, entity, change.fieldIndex, change.before)
+        for ((index, change) in edit.changes.withIndex()) {
+            change.component.write(world, entities[index], change.fieldIndex, change.before)
+        }
         history.pop(edit.author)
         audit(edit, "undo")
         return AgentResult.ok {
             put("undone", edit.tool)
             put("id", edit.netId.raw)
-            put("overwrote", conflict != null)
-            obj("value") { for (change in edit.changes) field(change.fieldName, change.before) }
+            put("overwrote", conflictAt != null)
+            if (edit.netIds.size == 1) {
+                obj("value") { for (change in edit.changes) field(change.fieldName, change.before) }
+            } else {
+                ids("ids", edit.netIds)
+                arr("values") {
+                    for (change in edit.changes) {
+                        element {
+                            put("id", change.netId.raw)
+                            put("component", change.component.name)
+                            put("field", change.fieldName)
+                            field("value", change.before)
+                        }
+                    }
+                }
+            }
         }
     }
 
     private fun undoSpawn(edit: EditorEdit.Spawn, overwrite: Boolean): AgentResult {
         val entity = netIds.resolveOrNull(edit.netId) ?: return gone(edit, overwrite)
-        val later = history.latestByOthers(edit) { it.netId == edit.netId }
+        val later = history.latestByOthers(edit) { it.touchesEntity(edit.netId) }
         if (later != null && !overwrite) {
             return AgentResult.failed(
                 EDIT_CONFLICT,
@@ -448,14 +766,157 @@ public class EditorToolset(
         }
     }
 
+    // --- sessions ------------------------------------------------------------------------
+
+    /**
+     * Closes [session], recording what it changed as one undo entry.
+     *
+     * Each field's entry runs from its starting value to what it holds now, whoever wrote that
+     * last. A field back where it started, or on an entity that has gone, is left out; a session
+     * that changed nothing records nothing and answers `null`.
+     */
+    private fun commit(session: EditSession): EditorEdit.Fields? {
+        val changes = ArrayList<FieldChange>()
+        for ((entityIndex, netId) in session.entities.withIndex()) {
+            for ((fieldIndex, ref) in session.fields.withIndex()) {
+                val entity = liveWithOrNull(netId, ref.component) ?: continue
+                val before = session.startOf(entityIndex, fieldIndex)
+                val after = ref.component.read(world, entity, ref.fieldIndex)
+                if (after != before) changes.add(FieldChange(netId, ref.component, ref.fieldIndex, before, after))
+            }
+        }
+        openEdits.close(session)
+        if (changes.isEmpty()) {
+            bridge.event("editor_commit_edit:${session.id.raw}:${label(session.author)}:unchanged", clock.tick.value)
+            return null
+        }
+        val edit = EditorEdit.Fields(history.nextSequence(), session.author, COMMIT_EDIT, changes)
+        record(edit)
+        return edit
+    }
+
+    /** Closes [session], putting every starting value back. Answers the entities no longer there to restore. */
+    private fun cancel(session: EditSession): List<NetId> {
+        val gone = ArrayList<NetId>()
+        for ((entityIndex, netId) in session.entities.withIndex()) {
+            for ((fieldIndex, ref) in session.fields.withIndex()) {
+                val entity = liveWithOrNull(netId, ref.component)
+                if (entity == null) {
+                    if (netId !in gone) gone.add(netId)
+                    continue
+                }
+                ref.component.write(world, entity, ref.fieldIndex, session.startOf(entityIndex, fieldIndex))
+            }
+        }
+        openEdits.close(session)
+        bridge.event("editor_cancel_edit:${session.id.raw}:${label(session.author)}", clock.tick.value)
+        return gone
+    }
+
+    /**
+     * Asks for every session idle past [IDLE_TIMEOUT_SECONDS] to be cancelled.
+     *
+     * Runs at the start of each `AgentBridge.drain`, on the simulation thread and between ticks,
+     * never inside a tool call, and it is the only place the idle clock is read: a begin or an
+     * update only sets [EditSession.touched], and this stamps it with the time it next runs - one
+     * host iteration later, a sixtieth of a second on a running host. It does not cancel anything
+     * itself: it submits the
+     * `editor.cancel_edit` the session's author could have sent, so the cancel crosses the same
+     * queue and barrier, is answered in the same ring and is journaled like any other.
+     */
+    private fun sweepIdle() {
+        val now = idleClock.nowNanos()
+        for (raw in 0 until sessions.capacity) {
+            val session = openEdits.of(AgentSessionId(raw)) ?: continue
+            if (session.touched) {
+                session.touched = false
+                session.touchedNanos = now
+                continue
+            }
+            if (session.expiring || now - session.touchedNanos < IDLE_TIMEOUT_NANOS) continue
+            val cancel = AgentCommand(CANCEL_EDIT, mapOf(SESSION_ID to session.id.raw.toString()), session = session.author)
+            // Refused only by a full queue; the next drain tries again.
+            if (bridge.submit(cancel) is AgentSubmission.Accepted) {
+                session.expiring = true
+                bridge.event("editor_expired:${session.id.raw}:${label(session.author)}", clock.tick.value)
+            }
+        }
+    }
+
+    private fun requireOwnSession(context: AgentContext, raw: Int, tool: String): EditSession {
+        val session = openEdits.find(EditSessionId(raw)) ?: throw AgentToolException(
+            NO_SUCH_EDIT,
+            "$tool: there is no open edit session $raw; it was committed, cancelled, replaced by " +
+                "a later editor.begin_edit, or cancelled after $IDLE_TIMEOUT_SECONDS seconds with no update",
+        )
+        if (session.author != context.command.session) {
+            throw AgentToolException(
+                NOT_YOUR_EDIT,
+                "$tool: edit session $raw belongs to ${label(session.author)}, and only its author " +
+                    "can update, commit or cancel it; send the same session= it was begun with",
+            )
+        }
+        return session
+    }
+
+    /** One `update_edit` entry: which session field, on which entity (-1 for all), and the text. */
+    private class SessionValue(val entity: Int, val field: Int, val text: String)
+
+    /** One write `update_edit` has checked and will make. */
+    private class PlannedWrite(val entity: Entity, val ref: FieldRef, val value: Any)
+
+    private fun parseSessionValue(session: EditSession, entry: String): SessionValue {
+        val equals = entry.indexOf('=')
+        if (equals <= 0) {
+            throw AgentToolException(
+                AgentErrorKind.BAD_ARGUMENT,
+                "$UPDATE_EDIT got '$entry'; each value is Component.field=value or <id>:Component.field=value",
+            )
+        }
+        var target = entry.substring(0, equals).trim()
+        var entity = -1
+        val colon = target.indexOf(':')
+        if (colon >= 0) {
+            val raw = target.substring(0, colon).trim().toIntOrNull() ?: throw AgentToolException(
+                AgentErrorKind.BAD_ARGUMENT,
+                "$UPDATE_EDIT got '$entry'; the part before ':' must be a NetId packed word",
+            )
+            val netId = try {
+                NetId.ofRaw(raw)
+            } catch (reserved: IllegalArgumentException) {
+                // Adapted, not swallowed: the agent is told which entry and why.
+                throw AgentToolException(AgentErrorKind.BAD_ARGUMENT, "$UPDATE_EDIT got '$entry': ${reserved.message}")
+            }
+            entity = session.entities.indexOf(netId)
+            if (entity < 0) {
+                throw AgentToolException(
+                    NOT_IN_EDIT,
+                    "$UPDATE_EDIT got '$entry', but ${describe(netId)} is not in edit session " +
+                        "${session.id.raw}; it holds ${session.entities.joinToString { it.raw.toString() }}",
+                )
+            }
+            target = target.substring(colon + 1).trim()
+        }
+        val ref = components.resolveField(target, session.fields.map { it.component }.distinct())
+        val field = session.fieldIndexOf(ref)
+        if (field < 0) {
+            throw AgentToolException(
+                NOT_IN_EDIT,
+                "$UPDATE_EDIT got '$entry', but $ref is not a field edit session ${session.id.raw} " +
+                    "opened; it opened ${session.fields.joinToString()}. Begin a new session to edit it",
+            )
+        }
+        return SessionValue(entity, field, entry.substring(equals + 1).trim())
+    }
+
     // --- shared --------------------------------------------------------------------------
 
-    private fun moveField(entity: Entity, position: PositionRef, fieldIndex: Int, to: Float, from: Float?): FieldChange {
+    private fun moveField(id: NetId, entity: Entity, position: PositionRef, fieldIndex: Int, to: Float, from: Float?): FieldChange {
         val type = position.component
         val current = type.read(world, entity, fieldIndex)
         val before = if (from == null) current else parseFieldText(MOVE, type, fieldIndex, current, from.toString())
         type.write(world, entity, fieldIndex, parseFieldText(MOVE, type, fieldIndex, current, to.toString()))
-        return FieldChange(type, fieldIndex, before, type.read(world, entity, fieldIndex))
+        return FieldChange(id, type, fieldIndex, before, type.read(world, entity, fieldIndex))
     }
 
     private fun requirePresent(type: AgentComponentType, entity: Entity, id: NetId) {
@@ -466,6 +927,32 @@ public class EditorToolset(
                     "components it does carry",
             )
         }
+    }
+
+    private fun requireDistinct(tool: String, argument: String, ids: List<NetId>) {
+        val repeated = ids.groupBy { it }.entries.firstOrNull { it.value.size > 1 } ?: return
+        throw AgentToolException(
+            AgentErrorKind.BAD_ARGUMENT,
+            "$tool names ${describe(repeated.key)} more than once in $argument",
+        )
+    }
+
+    /** The entity behind [netId] when it is live and still carries [component], else `null`. */
+    private fun liveWithOrNull(netId: NetId, component: AgentComponentType): Entity? {
+        val entity = netIds.resolveOrNull(netId) ?: return null
+        return if (component.isPresent(world, entity)) entity else null
+    }
+
+    private fun liveOnly(ids: List<NetId>): List<NetId> = ids.filter { netIds.resolveOrNull(it) != null }
+
+    /** [body], journaled when it succeeded. A refused or throwing call changed nothing, so nothing is kept. */
+    private inline fun journaled(context: AgentContext, body: () -> AgentResult): AgentResult {
+        val result = body()
+        if (result is AgentResult.Ok) {
+            val command = context.command
+            journal.record(EditorJournalEntry(clock.tick, label(command.session), command.name, command.args))
+        }
+        return result
     }
 
     private fun record(edit: EditorEdit) {
@@ -502,6 +989,11 @@ public class EditorToolset(
         /** Edits each author's history keeps. The oldest is dropped past this. */
         internal const val HISTORY_CAPACITY: Int = 1000
 
+        /** How long an edit session may go without an update before it is cancelled. */
+        internal const val IDLE_TIMEOUT_SECONDS: Long = 30
+
+        private const val IDLE_TIMEOUT_NANOS: Long = IDLE_TIMEOUT_SECONDS * 1_000_000_000L
+
         /** An undo refused because another author, or the game, changed what the edit wrote. */
         internal val EDIT_CONFLICT: AgentErrorKind = AgentErrorKind("edit_conflict")
 
@@ -523,10 +1015,28 @@ public class EditorToolset(
         /** A save refused because the world holds something a level cannot carry. Names it. */
         internal val LEVEL_NOT_SAVEABLE: AgentErrorKind = AgentErrorKind("level_not_saveable")
 
+        /** A session call naming a session that is not open: committed, cancelled or timed out. */
+        internal val NO_SUCH_EDIT: AgentErrorKind = AgentErrorKind("no_such_edit")
+
+        /** A session call from an author the session does not belong to. */
+        internal val NOT_YOUR_EDIT: AgentErrorKind = AgentErrorKind("not_your_edit")
+
+        /** An update naming an entity or a field its session did not open. */
+        internal val NOT_IN_EDIT: AgentErrorKind = AgentErrorKind("not_in_edit")
+
         private const val SET_FIELD = "editor.set_field"
         private const val MOVE = "editor.move"
         private const val DELETE = "editor.delete"
         private const val UNDO = "editor.undo"
+        private const val BEGIN_EDIT = "editor.begin_edit"
+        private const val UPDATE_EDIT = "editor.update_edit"
+        private const val COMMIT_EDIT = "editor.commit_edit"
+        private const val CANCEL_EDIT = "editor.cancel_edit"
+        private const val SELECT = "editor.select"
+        private const val COMMON_FIELDS = "editor.common_fields"
+
+        /** `cancel_edit`'s argument, as the idle sweep sends it. */
+        private const val SESSION_ID = "sessionId"
 
         private val LEVEL_NAME = Regex("[A-Za-z0-9_-]{1,64}")
 
@@ -540,6 +1050,13 @@ public class EditorToolset(
         private fun Json.field(name: String, value: Any?) {
             key(name)
             FieldValues.renderInto(this, value)
+        }
+
+        private fun Json.ids(name: String, ids: List<NetId>) {
+            key(name)
+            beginArray()
+            for (id in ids) value(id.raw)
+            endArray()
         }
     }
 }

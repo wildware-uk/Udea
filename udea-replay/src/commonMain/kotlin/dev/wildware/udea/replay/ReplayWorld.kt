@@ -38,6 +38,22 @@ public interface ReplayWorld {
      */
     public fun applyInput(samples: Array<InputSample>)
 
+    /**
+     * Makes this tick's recorded edits again, in order, before its input and before [step].
+     *
+     * Each is a call an agent or the editor window made between ticks (see [ReplayEdit]); a game
+     * whose replay world can serve the editor's tools submits each one through them. The default
+     * applies none and refuses a tick that has any: a world that quietly skipped them would
+     * diverge on the first edited tick with nothing saying why.
+     */
+    public fun applyEdits(edits: List<ReplayEdit>) {
+        check(edits.isEmpty()) {
+            "this recording has ${edits.size} edit(s) made between ticks on ${edits.first().tick}, " +
+                "starting with ${edits.first().tool}, and $this cannot apply edits; replay it in " +
+                "a world that serves the editor's tools"
+        }
+    }
+
     /** Runs exactly one simulation tick. Not a frame, not "about one". */
     public fun step()
 
@@ -63,6 +79,18 @@ public interface ReplayWorld {
 
     /** Frees anything the world holds. A session that rebuilds calls this on the old one. */
     public fun close() {}
+}
+
+/**
+ * Puts [tick]'s recorded edits and input into this world, ready for [ReplayWorld.step].
+ *
+ * The edits first: they were applied at the top of the tick, where the barrier drains. The one
+ * place the replay drivers do this, so none of them can feed a tick's input and forget its edits.
+ */
+internal fun ReplayWorld.feed(recording: ReplayRecording, tick: Tick, slots: Array<InputSample>) {
+    applyEdits(recording.editsAt(tick))
+    recording.samplesInto(tick, slots)
+    applyInput(slots)
 }
 
 /**

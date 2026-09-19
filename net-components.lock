@@ -68,10 +68,11 @@
 # so adding them moved no existing id. `Chain` is not here - an array cannot be lowered - and is
 # static level geometry instead; `udea-physics2d` refuses a chain that changes at runtime.
 #
-# `dev.wildware.udea.core.spatial.Transform3D` (issue #237) is `@Sim` in every field too, so no
-# delta packet carries it. It is here because the editor's 3D gizmos write it through `editor.*`
-# edit sessions, and the tools reach a component's fields through its generated `Replicator` alone.
-# It sorts after every earlier name, so adding it moved no existing id.
+# `dev.wildware.udea.core.spatial.Transform3D` (issue #237) is here because the editor's 3D gizmos
+# write it through `editor.*` edit sessions, and the tools reach a component's fields through its
+# generated `Replicator` alone. It sorts after every earlier name, so adding it moved no existing id.
+# Issue #246 made every one of its fields `@Net`, so a client sees a 3D entity move; that changed
+# no id and no field order here, only which fields a delta may carry.
 #
 dev.wildware.moba.CharacterView
 dev.wildware.moba.Player

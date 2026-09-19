@@ -4,13 +4,14 @@ import dev.wildware.udea.core.module.SimPhase
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.physics.TeleportSystem
 import dev.wildware.udea.generated.CoreUdeaRegistry
+import dev.wildware.udea.render.interp.Interp3DSnapshotSystem
 import dev.wildware.udea.render.interp.InterpSnapshotSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The one system this module puts inside the tick, and where it has to sit.
+ * The systems this module puts inside the tick, and where each has to sit.
  */
 class RenderModuleTest {
 
@@ -41,11 +42,24 @@ class RenderModuleTest {
     }
 
     @Test
+    fun `the 3D pose record runs in Cleanup, after everything that moves an entity`() {
+        val game = UdeaGameDef(registry = CoreUdeaRegistry, modules = listOf(RenderModule())).build()
+
+        val entries = game.manifest.entries
+        val record = entries.indexOfFirst { it.name == Interp3DSnapshotSystem::class.java.name }
+
+        assertTrue(record >= 0, "Interp3DSnapshotSystem was not registered: ${entries.map { it.name }}")
+        assertEquals(SimPhase.Cleanup, entries[record].phase)
+    }
+
+    @Test
     fun `a game that leaves the module out gets no presentation system at all`() {
         val game = UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()).build()
 
         assertTrue(
-            game.manifest.entries.none { it.name == InterpSnapshotSystem::class.java.name },
+            game.manifest.entries.none {
+                it.name == InterpSnapshotSystem::class.java.name || it.name == Interp3DSnapshotSystem::class.java.name
+            },
             "the interpolation system arrived without anybody asking for it",
         )
     }

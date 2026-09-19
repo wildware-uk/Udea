@@ -2,11 +2,15 @@ package dev.wildware.udea.core.spatial
 
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
+import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.PositionHandle
 import dev.wildware.udea.annotations.Replicated
 import dev.wildware.udea.annotations.RotationHandle
 import dev.wildware.udea.annotations.ScaleHandle
-import dev.wildware.udea.annotations.Sim
+import dev.wildware.udea.core.snapshot.ComponentSchema
+import dev.wildware.udea.core.snapshot.FieldKind
+import dev.wildware.udea.core.snapshot.ReplicatedComponentType
+import dev.wildware.udea.core.snapshot.fleksComponentType
 import kotlinx.serialization.Serializable
 
 /**
@@ -26,14 +30,20 @@ import kotlinx.serialization.Serializable
  * read, and it would have to be a renderer's vector type to be useful to one - which is exactly
  * the type `udea-core` must not name.
  *
- * ## Replicated, and never on the wire
+ * ## Replicated, every field on the wire
  *
- * `@Replicated` with every field `@Sim` (issue #237), the way `PhysicsBody` is: that generates the
- * `Replicator` the agent and editor tools read and write a component's fields through, so the
- * editor's gizmos can move, turn and scale a model through `editor.*` edit sessions like any other
- * edit. A delta write considers only the `@Net` fields, and there are none, so nothing of it is ever
- * sent to a client: the wire carries no picture. It does take a component id in `udea-core`'s
- * `net-protocol.lock`. `@Serializable`, so a level file saves it the way it saves `PhysicsBody`.
+ * `@Replicated` (issue #237), which generates the `Replicator` the agent and editor tools read and
+ * write a component's fields through, so the editor's gizmos can move, turn and scale a model
+ * through `editor.*` edit sessions like any other edit. A game puts [snapshotType] in its
+ * `ComponentRegistry` to have it captured, rewound and replicated.
+ *
+ * Every field is `@Net` (issue #246), so a client sees a 3D entity move. Position and heading are
+ * what change tick to tick. Pitch, roll and scale are on the wire as well because a client applies
+ * a component through its `allMask`: a field that never reached it is written from a column it
+ * never filled, and a `@Sim` scale arrives as `0` - a model drawn at no size at all. A delta carries
+ * only the fields that changed, so a scale that never changes costs its bits once, in the create.
+ *
+ * `@Serializable`, so a level file saves it the way it saves `PhysicsBody`.
  *
  * ## Its gizmos
  *
@@ -50,19 +60,19 @@ import kotlinx.serialization.Serializable
 @RotationHandle(rotation = "rotationZ", aboutX = "rotationX", aboutY = "rotationY")
 @ScaleHandle(x = "scaleX", y = "scaleY", z = "scaleZ")
 public class Transform3D(
-    @Sim public var x: Float = 0f,
-    @Sim public var y: Float = 0f,
+    @Net public var x: Float = 0f,
+    @Net public var y: Float = 0f,
     /** Height above the ground plane. */
-    @Sim public var z: Float = 0f,
+    @Net public var z: Float = 0f,
     /** Radians about X, applied first. */
-    @Sim public var rotationX: Float = 0f,
+    @Net public var rotationX: Float = 0f,
     /** Radians about Y, applied second. */
-    @Sim public var rotationY: Float = 0f,
+    @Net public var rotationY: Float = 0f,
     /** Radians about Z (the heading), applied last. */
-    @Sim public var rotationZ: Float = 0f,
-    @Sim public var scaleX: Float = 1f,
-    @Sim public var scaleY: Float = 1f,
-    @Sim public var scaleZ: Float = 1f,
+    @Net public var rotationZ: Float = 0f,
+    @Net public var scaleX: Float = 1f,
+    @Net public var scaleY: Float = 1f,
+    @Net public var scaleZ: Float = 1f,
 ) : Component<Transform3D> {
 
     override fun type(): ComponentType<Transform3D> = Transform3D
@@ -70,5 +80,23 @@ public class Transform3D(
     override fun toString(): String =
         "Transform3D(($x, $y, $z) rot=($rotationX, $rotationY, $rotationZ) scale=($scaleX, $scaleY, $scaleZ))"
 
-    public companion object : ComponentType<Transform3D>()
+    public companion object : ComponentType<Transform3D>() {
+
+        /**
+         * The snapshot registration for a game's `ComponentRegistry`, which is what makes a
+         * snapshot, a rewind, a replay hash and replication see a [Transform3D] at all: capture
+         * walks the registry, and a component left out of it is invisible rather than partly
+         * captured. Built fresh per call, like `Animator.snapshotType()`.
+         *
+         * Nine floats, in the generated replicator's order - the names sorted: `rotationX`,
+         * `rotationY`, `rotationZ`, `scaleX`, `scaleY`, `scaleZ`, `x`, `y`, `z`.
+         */
+        public fun snapshotType(): ReplicatedComponentType<Transform3D> = fleksComponentType(
+            Transform3DReplicator,
+            ComponentSchema.of(Transform3DReplicator, "Transform3D", List(FIELD_COUNT) { FieldKind.Float }),
+            Transform3D,
+        ) { Transform3D() }
+
+        private const val FIELD_COUNT: Int = 9
+    }
 }

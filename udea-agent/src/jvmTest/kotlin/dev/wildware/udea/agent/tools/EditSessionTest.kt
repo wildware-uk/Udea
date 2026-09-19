@@ -20,7 +20,8 @@ import kotlin.test.assertTrue
  *
  * Every call crosses the bridge and runs inside a `SimBarrier` drain, so what is asserted here is
  * what an HTTP caller gets. The idle timeout reads [ManualClock], which only a test moves, so a
- * session expires on the pump after the clock passes 30 seconds and at no other time.
+ * session expires on the pump after the clock passes 30 seconds and at no other time. A running
+ * host pumps every frame; a test pumps with `step(0)` where a frame would have gone by.
  */
 class EditSessionTest {
 
@@ -77,12 +78,15 @@ class EditSessionTest {
         val designer = harness.author("designer")
         val session = begin(designer, listOf(a), "Transform.position.x")
         edit(designer, "editor.update_edit", "sessionId" to "$session", "values" to "Transform.position.x=50")
+        // A host pumps every frame; the sweep stamps the update on the next pump, here.
+        harness.sim.step(0)
 
         clock.advanceSeconds(29)
         harness.sim.step(0)
         assertEquals(50f, position(a).first, "the session was cancelled before its 30 seconds were up")
         // An update restarts the idle count.
         edit(designer, "editor.update_edit", "sessionId" to "$session", "values" to "Transform.position.x=60")
+        harness.sim.step(0)
         clock.advanceSeconds(29)
         harness.sim.step(0)
         assertEquals(60f, position(a).first, "an update did not restart the idle count")

@@ -33,9 +33,19 @@ internal class EditSession(
     val fields: List<FieldRef>,
     /** Each field's starting value, entity-major: entity `e`'s field `f` is at `e * fields.size + f`. */
     private val start: Array<Any?>,
-    /** When the session was begun or last updated, on the editor's idle clock. */
-    var touchedNanos: Long,
 ) {
+
+    /**
+     * True when the session was begun or updated since the idle sweep last looked.
+     *
+     * A flag rather than a time, so a tool call - which runs inside a barrier drain, and so possibly
+     * inside `Simulation.step()` - never reads a clock. The sweep, which runs between ticks, turns
+     * the flag into [touchedNanos].
+     */
+    var touched: Boolean = true
+
+    /** When the sweep last found [touched] set, on the editor's idle clock. Meaningless while [touched] is. */
+    var touchedNanos: Long = 0L
 
     /**
      * True once the idle sweep has submitted the cancel that ends this session.

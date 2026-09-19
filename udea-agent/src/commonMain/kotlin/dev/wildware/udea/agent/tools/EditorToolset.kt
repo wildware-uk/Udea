@@ -92,8 +92,9 @@ public class EditorLevelStore(
  * A session nobody updates for [IDLE_TIMEOUT_SECONDS] is cancelled, and so is one whose author
  * calls [leave]. HTTP gives the host no connection to watch close, so an agent that goes away
  * without leaving is an idle one. The idle time is measured on [idleClock] - the agent host's wall
- * clock, as `AgentClock`'s KDoc sets out - and never on the simulation's: the sweep runs at the
- * start of each `AgentBridge.drain`, between ticks, and ends a session by submitting the same
+ * clock, as `AgentClock`'s KDoc sets out - and never on the simulation's, and it is read only by
+ * the sweep, which runs at the start of each `AgentBridge.drain`, between ticks, and never inside
+ * a tool call. The sweep ends a session by submitting the same
  * `editor.cancel_edit` its author could have sent. So the wall clock decides only *when* a cancel
  * is asked for, and the cancel itself is an ordinary call, applied between ticks and kept in the
  * [journal] like any other.
@@ -354,7 +355,7 @@ public class EditorToolset(
             val ref = refs[slot % refs.size]
             ref.component.read(world, live[slot / refs.size], ref.fieldIndex)
         }
-        val session = EditSession(openEdits.nextId(), author, entities, refs, start, idleClock.nowNanos())
+        val session = EditSession(openEdits.nextId(), author, entities, refs, start)
         openEdits.open(session)
         bridge.event("editor_begin_edit:${session.id.raw}:${label(author)}", clock.tick.value)
 
@@ -413,7 +414,7 @@ public class EditorToolset(
             }
         }
         for (write in planned) write.ref.component.write(world, write.entity, write.ref.fieldIndex, write.value)
-        session.touchedNanos = idleClock.nowNanos()
+        session.touched = true
 
         AgentResult.ok {
             put("sessionId", session.id.raw)
@@ -816,7 +817,10 @@ public class EditorToolset(
      * Asks for every session idle past [IDLE_TIMEOUT_SECONDS] to be cancelled.
      *
      * Runs at the start of each `AgentBridge.drain`, on the simulation thread and between ticks,
-     * never inside a tool call. It does not cancel anything itself: it submits the
+     * never inside a tool call, and it is the only place the idle clock is read: a begin or an
+     * update only sets [EditSession.touched], and this stamps it with the time it next runs - one
+     * host iteration later, a sixtieth of a second on a running host. It does not cancel anything
+     * itself: it submits the
      * `editor.cancel_edit` the session's author could have sent, so the cancel crosses the same
      * queue and barrier, is answered in the same ring and is journaled like any other.
      */
@@ -824,6 +828,11 @@ public class EditorToolset(
         val now = idleClock.nowNanos()
         for (raw in 0 until sessions.capacity) {
             val session = openEdits.of(AgentSessionId(raw)) ?: continue
+            if (session.touched) {
+                session.touched = false
+                session.touchedNanos = now
+                continue
+            }
             if (session.expiring || now - session.touchedNanos < IDLE_TIMEOUT_NANOS) continue
             val cancel = AgentCommand(CANCEL_EDIT, mapOf(SESSION_ID to session.id.raw.toString()), session = session.author)
             // Refused only by a full queue; the next drain tries again.

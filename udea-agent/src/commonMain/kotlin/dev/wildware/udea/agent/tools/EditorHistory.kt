@@ -138,6 +138,17 @@ internal class EditorHistory(
         return since
     }
 
+    /**
+     * Every edit in a history now that was made after [mark] was taken, whoever made it, oldest
+     * first: the edits a play has made so far, less any since undone. What `editor.play_edits` lists.
+     */
+    fun since(mark: HistoryMark): List<EditorEdit> {
+        val since = ArrayList<EditorEdit>()
+        for (stack in stacks) stack?.filterTo(since) { !mark.predates(it) }
+        since.sortBy(EditorEdit::sequence)
+        return since
+    }
+
     /** [author]'s newest edit, or `null` when there is nothing to undo. */
     fun newest(author: AgentSessionId): EditorEdit? = stackOf(author)?.lastOrNull()
 

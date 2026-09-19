@@ -1,8 +1,10 @@
 package dev.wildware.udea.agent.tools
 
 import dev.wildware.udea.core.Tick
+import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.level.LevelService
 import dev.wildware.udea.core.loop.TimeControl
+import kotlin.jvm.JvmInline
 
 /**
  * What `editor.play` and `editor.stop` need (issue #196): the game's [LevelService], which encodes
@@ -35,6 +37,26 @@ internal class PlaySession(
     val tick: Tick,
     /** Every author's undo history when Play was pressed. */
     val history: HistoryMark,
+    /**
+     * Every entity live when Play was pressed, by `NetId`: the ones Stop brings back, and so the only
+     * ones a play edit can be kept on. An entity spawned during Play has an id outside this set - a
+     * reused index comes back with a new generation - however it got there.
+     */
+    val existing: Set<NetId>,
 ) {
-    override fun toString(): String = "PlaySession(tick=${tick.value}, ${level.size} bytes)"
+
+    /** The play edits `editor.keep` has marked, which Stop re-applies. */
+    val kept: MutableSet<PlayEditId> = LinkedHashSet()
+
+    override fun toString(): String = "PlaySession(tick=${tick.value}, ${level.size} bytes, ${kept.size} kept)"
+}
+
+/**
+ * Which play edit `editor.keep` and `editor.unkeep` mean: the edit's place in the order every
+ * author's edits were made in ([EditorEdit.sequence]), the number `editor.history` lists it under
+ * too, so an agent can name a play edit it read in either.
+ */
+@JvmInline
+internal value class PlayEditId(val sequence: Long) {
+    override fun toString(): String = "play edit #$sequence"
 }

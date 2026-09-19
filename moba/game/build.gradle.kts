@@ -40,6 +40,11 @@ plugins {
     // KSP run lists them on the generated `MobaModuleRegistry`.
     alias(libs.plugins.kotlinSerialization)
 
+    // The HUD is a ComposeGL screen (issue #188): `MobaHudScreen.content` is `@Composable`, so this
+    // module compiles composables. The toolkit itself comes through `udea-render`'s `api` on
+    // `composegl-ui`; no ComposeGL frontend does, which is what UDEA-MG-002 asks of a game.
+    alias(libs.plugins.composeCompiler)
+
     // The build-time asset pipeline of spec 3.6. It travels with the assets, which are the game's
     // and not a launcher's: an Android build and a desktop build load the same `.udeapak`.
     id("dev.wildware.udea.assets")

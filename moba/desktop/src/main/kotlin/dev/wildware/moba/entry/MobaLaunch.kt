@@ -188,7 +188,7 @@ public object MobaLaunch {
         // are here rather than inside `MobaBench` for the reason that gate exists: a benchmark that
         // instruments a *copy* of the boot sequence measures the copy.
         val definition = StartupTrace.world { MobaGame.definition(extraModules, MobaLaunchLevel.bytes()) }
-        val scene = StartupTrace.world { MobaEntry.scene(definition) }
+        val scene = StartupTrace.world { MobaEntry.scene(definition, ::mobaHudFonts) }
         // Registered before `start`, because `KoolBackend.start` builds the pipeline out of the
         // registry and a registration after that point reaches nothing.
         if (overlay != null) scene.registry.overlay(overlay)

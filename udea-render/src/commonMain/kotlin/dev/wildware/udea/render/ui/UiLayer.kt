@@ -43,6 +43,8 @@ import dev.wildware.composegl.kool.KoolBackend as ComposeGlBackend
  * screenshot" is a fact about two render targets rather than an ordering rule somebody maintains,
  * exactly as the agent overlay's exclusion is. `GlUiLayerTest` pins it in pixels.
  *
+ * A screen that must be in the capture - a heads-up display - is a [CapturedUi] instead (issue #188).
+ *
  * ## The render thread
  *
  * The toolkit is touched on one thread only. Everything that composes, lays out or draws happens

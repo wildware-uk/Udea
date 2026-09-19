@@ -30,6 +30,7 @@ Think of a Udea game as a board game played by a very strict referee.
 - [Getting Started](Getting-Started): what to install, how to build, how to run the examples.
 - [Tutorial: Make a Game](Tutorial-Make-a-Game): a small game from nothing, step by step.
 - [Example Games](Example-Games): `moba` (2D) and Hollow (3D, in progress).
+- [Building Hollow in the Editor](Building-Hollow-in-the-Editor): how the 3D example game is put together in the editor, as it was done.
 
 **How the engine works**
 

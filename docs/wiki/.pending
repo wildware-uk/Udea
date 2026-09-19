@@ -1,4 +1,5 @@
-# Wiki pages another branch is still writing (the wiki-tools half).
+# Wiki pages another branch is still writing: the wiki-tools half, and the Hollow editor walkthrough
+# written with the Hollow work (#255).
 #
 # udeaVerifyWiki lets Home.md and _Sidebar.md link to these before they exist. It fails when a
 # listed page is present, so the branch that merges last deletes the entry, and then this file.
@@ -14,3 +15,4 @@ Gizmos.md
 Agent-Tool-Surface.md
 Tutorial-Make-a-Game.md
 Example-Games.md
+Building-Hollow-in-the-Editor.md

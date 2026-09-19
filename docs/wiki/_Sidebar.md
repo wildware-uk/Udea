@@ -4,6 +4,7 @@
 - [Getting Started](Getting-Started)
 - [Tutorial: Make a Game](Tutorial-Make-a-Game)
 - [Example Games](Example-Games)
+- [Building Hollow in the Editor](Building-Hollow-in-the-Editor)
 
 **How the engine works**
 - [Architecture](Architecture)

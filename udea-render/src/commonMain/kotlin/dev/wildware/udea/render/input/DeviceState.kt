@@ -62,8 +62,9 @@ public interface KeyboardState {
  * same reason: a click pressed and released between two ticks is still exactly one press.
  *
  * A button is the backend's own index: on Kool `0` is the left button, `1` the right, `2` the
- * middle, `3` back and `4` forward (`PointerInput.LEFT_BUTTON` and its neighbours), and a finger on a touch screen presses `0`. Every pointer is folded together: a
- * button is down when any pointer holds it, and two fingers landing are two presses.
+ * middle, `3` back and `4` forward (`PointerInput.LEFT_BUTTON` and its neighbours), and a finger on
+ * a touch screen presses `0`. Every pointer is folded together: a button is down when any pointer
+ * holds it, and two fingers landing are two presses.
  *
  * ## Threading
  *

@@ -58,6 +58,9 @@ internal class AnimationPanelState(
 
     private val selection = EditorSelection(tools)
 
+    /** The selection the Scene tab last drew the bone overlay for. */
+    private var drawnSelection: List<NetId> = emptyList()
+
     /** The selected entity the panel shows: the first one drawn with an animated model. */
     var target: NetId? by mutableStateOf(null)
         private set
@@ -110,6 +113,12 @@ internal class AnimationPanelState(
     /** Once per frame, after [EditorTools.frame]. */
     fun frame() {
         selection.frame()
+        // The Scene tab draws only when something says its picture changed, and the bone overlay
+        // draws the selection: a new one is a new picture.
+        if (selection.ids != drawnSelection) {
+            drawnSelection = selection.ids
+            sceneChanged()
+        }
         follow()
         if (playing) {
             val clip = previewClip

@@ -117,6 +117,41 @@ class AnimationPanelStateTest {
     }
 
     @Test
+    fun `a new selection redraws the Scene tab, whose bone overlay draws the selection, and an idle one does not`() {
+        // The panel on its own, so the Scene redraws it asks for can be counted.
+        val own = AgentBridge()
+        val tools = EditorTools(own, AgentSessions().intern("editor"))
+        var redraws = 0
+        val state = AnimationPanelState(
+            EditorAnimation(world, netIds, listOf(AnimatedModel(fox, listOf(survey, walk, run))), renderer = null),
+            tools,
+            EditorViews.detached(),
+            sceneChanged = { redraws++ },
+        )
+        fun step(selected: List<NetId>) {
+            tools.frame()
+            state.frame()
+            for (command in ArrayList<AgentCommand>().also { own.drain(it) }) {
+                own.complete(command.id, AgentResult.Ok("""{"you":"editor","authors":[{"author":"editor","ids":[${selected.joinToString(",") { it.raw.toString() }}]}]}"""))
+            }
+        }
+        repeat(SETTLE_FRAMES) { step(listOf(modelless)) }
+        val before = redraws
+
+        val select = AgentCommand("editor.select", mapOf("entities" to "${animated.raw}"), session = AgentSessions().intern("editor"))
+        own.submit(select)
+        own.drain(ArrayList())
+        own.complete(select.id, AgentResult.Ok("{}"))
+        repeat(SETTLE_FRAMES) { step(listOf(animated)) }
+        assertEquals(animated, state.target)
+        assertTrue(redraws > before, "selecting the fox did not redraw the Scene tab, so its bones did not appear")
+
+        val settled = redraws
+        repeat(IDLE_FRAMES) { step(listOf(animated)) }
+        assertEquals(settled, redraws, "an unchanged selection kept redrawing the Scene tab")
+    }
+
+    @Test
     fun `an idle window sends nothing, with the panel's selection read beside the history's`() {
         // The two reads must not wake each other: each re-reads after a command completes, and a
         // read is a command.

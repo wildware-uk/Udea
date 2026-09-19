@@ -65,6 +65,11 @@ class GlModelRenderTest {
             val slot = backend.pipeline!!.capture!!
             val world = host.world
 
+            // Read on the render thread, between frames. From this thread the count can be read
+            // mid-frame, after `render` has reset it and before it has counted. Two runs of one
+            // mutation read 2 and then 0 before this helper existed.
+            fun drawn(): Int = backend.onRenderThread { system.drawnCount }
+
             lateinit var cube: com.github.quillraven.fleks.Entity
             lateinit var smallCube: com.github.quillraven.fleks.Entity
             backend.onRenderThread {
@@ -91,7 +96,7 @@ class GlModelRenderTest {
             // 1. Texture, lighting and selection, from one frame.
             val first = decode(slot.capture(CaptureRequest()).bytes)
             save(first, "model-textured-lit.png")
-            assertEquals(2, system.drawnCount, "two entities have a ModelRenderer")
+            assertEquals(2, drawn(), "two entities have a ModelRenderer")
 
             val lit = window(first, first.width / 2 - FACE_OFFSET)
             val shaded = window(first, first.width / 2 + FACE_OFFSET)
@@ -114,7 +119,7 @@ class GlModelRenderTest {
             // 2. Taking the model away takes the drawing away, on the next frame.
             backend.onRenderThread { with(world) { smallCube.configure { it -= ModelRenderer } } }
             val second = decode(slot.capture(CaptureRequest()).bytes)
-            assertEquals(1, system.drawnCount, "one entity still has a ModelRenderer")
+            assertEquals(1, drawn(), "one entity still has a ModelRenderer")
             val gone = window(second, second.width / 2 + SMALL_CUBE_PIXEL_OFFSET)
             assertEquals(1f, gone.background, "a removed ModelRenderer is still drawn: $gone")
 
@@ -129,7 +134,7 @@ class GlModelRenderTest {
             }
             val lifted = decode(slot.capture(CaptureRequest()).bytes)
             save(lifted, "model-lifted-from-2d.png")
-            assertEquals(1, system.drawnCount, "the lifted cube is drawn")
+            assertEquals(1, drawn(), "the lifted cube is drawn")
             val liftedLit = window(lifted, lifted.width / 2 - FACE_OFFSET)
             val liftedShaded = window(lifted, lifted.width / 2 + FACE_OFFSET)
             assertTrue(

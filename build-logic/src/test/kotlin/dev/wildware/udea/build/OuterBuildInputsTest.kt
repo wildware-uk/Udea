@@ -211,6 +211,11 @@ class OuterBuildInputsTest {
                 "lay out a multiplatform module, and asserts DeterminismLayout.scopeInput returns " +
                 "it; the real udea-core directory of the same name is never read"
 
+        /** Why `WikiCheckTest`'s fixture repository paths are excused. */
+        const val WIKI_FIXTURE =
+            "WikiCheckTest writes it under its own @TempDir repository, so a page can name a " +
+                "path that exists there; the real file of the same name is never read"
+
         /**
          * Paths the scan finds that no test reads out of the repository.
          *
@@ -230,6 +235,9 @@ class OuterBuildInputsTest {
             "udea-core/src/jvmAndAndroidMain/kotlin" to DETERMINISM_LAYOUT_FIXTURE,
             "udea-core/src/wasmJsMain/kotlin" to DETERMINISM_LAYOUT_FIXTURE,
             "udea-core/src/jvmTest/kotlin" to DETERMINISM_LAYOUT_FIXTURE,
+            "udea-core/src/commonMain/kotlin/dev/wildware/udea" to WIKI_FIXTURE,
+            "moba/game/levels" to WIKI_FIXTURE,
+            "moba/game/levels/test_level.udealevel" to WIKI_FIXTURE,
         )
     }
 }

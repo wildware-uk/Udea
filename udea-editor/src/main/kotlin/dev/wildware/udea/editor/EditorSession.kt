@@ -53,6 +53,9 @@ public class EditorSession(
     internal var history: List<HistoryEntry> by mutableStateOf(emptyList())
         private set
 
+    /** The Asset panel: an asset's values, and File > Save (issue #195). */
+    internal val assets: EditorAssets = EditorAssets(tools)
+
     /** The status line. */
     internal var status: String by mutableStateOf("")
         private set

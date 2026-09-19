@@ -25,18 +25,21 @@ import dev.wildware.udea.agent.dispatch.ToolIndex
  */
 public object AssetToolModule {
 
-    /** `assets.*`: list, get, search, graph, resolve_reference, validate, write, patch. */
+    /** `assets.*`: the asset graph through the warm daemon, every tool [AssetsToolset] declares. */
     public val Assets: ToolModule = object : ToolModule {
         override val moduleName: String = "UdeaAgentAssets"
 
         override val tools: List<AgentToolDef<*>> = listOf(
             AssetsToolsetChangedSinceTool,
+            AssetsToolsetCreateTool,
+            AssetsToolsetFieldsTool,
             AssetsToolsetGetTool,
             AssetsToolsetGraphTool,
             AssetsToolsetListTool,
             AssetsToolsetPatchTool,
             AssetsToolsetResolveReferenceTool,
             AssetsToolsetSearchTool,
+            AssetsToolsetSetTool,
             AssetsToolsetValidateTool,
             AssetsToolsetWriteTool,
         ).sortedBy { it.name }

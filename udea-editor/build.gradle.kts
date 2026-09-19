@@ -30,7 +30,8 @@ dependencies {
     // `api`: an `EditorTools` is built over an `AgentBridge` and an `AgentSessionId`.
     //
     // Issue #194 also names `udea-assets`. It arrives through `udea-render`'s `api`, and nothing here
-    // names an asset type yet; the asset panels (issue #195) add the direct arrow with the first use.
+    // names an asset type: the Asset panel (issue #195) reads and saves assets through `assets.*` tool
+    // answers, so a direct arrow is added with the first type this module actually names.
     api(project(":udea-agent"))
 
     // Docked windows, the dividers between them and the tab strips: ComposeGL's `DebugWindowHost`.

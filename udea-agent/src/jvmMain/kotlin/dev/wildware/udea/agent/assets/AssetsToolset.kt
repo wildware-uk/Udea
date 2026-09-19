@@ -1,5 +1,6 @@
 package dev.wildware.udea.agent.assets
 
+import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.AgentErrorKind
 import dev.wildware.udea.agent.AgentResult
 import dev.wildware.udea.agent.Json
@@ -10,6 +11,10 @@ import dev.wildware.udea.assets.compiler.Ref
 import dev.wildware.udea.assets.compiler.daemon.AssetDaemon
 import dev.wildware.udea.assets.compiler.daemon.ReloadOutcome
 import dev.wildware.udea.assets.compiler.daemon.ValidationReport
+import dev.wildware.udea.assets.compiler.edit.AssetSource
+import dev.wildware.udea.assets.compiler.edit.CreateResult
+import dev.wildware.udea.assets.compiler.edit.Editability
+import dev.wildware.udea.assets.compiler.edit.SetResult
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.diagnostics.DidYouMean
 import dev.wildware.udea.diagnostics.Severity
@@ -17,6 +22,7 @@ import dev.wildware.udea.diagnostics.UdeaDiagnostic
 import dev.wildware.udea.diagnostics.UdeaRules
 import java.io.File
 import java.nio.file.Path
+import kotlin.io.path.deleteExisting
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
@@ -244,6 +250,141 @@ public class AssetsToolset(
     }
 
     @AgentTool(
+        name = "assets.fields",
+        description = "The values one asset's script writes, with each one's line and whether " +
+            "assets.set can save a new one there. A plain literal comes with its exact text, type " +
+            "and value; a value the file computes - a named constant, a mapOf(...), arithmetic - is " +
+            "read-only, with the reason and the line to change instead. Paged to fit one answer: " +
+            "call again with from = next while the answer has a next.",
+    )
+    public fun fields(
+        @Arg(description = "Asset id, exactly as assets.list spells it.")
+        id: String,
+        @Arg(description = "The first field to list, counting from 0.", required = false, default = "0")
+        from: Int = 0,
+    ): AgentResult {
+        val source = daemon.sources.read(id) ?: return miss(id)
+        val start = from.coerceIn(0, source.fields.size)
+        // As many fields as fit in an answer the bridge delivers inline, and never none. An answer
+        // over `MAX_DELIVERABLE_RESULT_CHARS` reaches its caller as a handle to a file, which the
+        // editor's panel - reading answers in-process - cannot follow. One field longer than that
+        // on its own still goes out, as a handle: refusing it would hide the field altogether.
+        var end = start + 1
+        var page = fieldsPage(source, start, end.coerceAtMost(source.fields.size))
+        while (end < source.fields.size) {
+            val wider = fieldsPage(source, start, end + 1)
+            if (wider.length > AgentBridge.MAX_DELIVERABLE_RESULT_CHARS) break
+            page = wider
+            end++
+        }
+        return AgentResult.Ok(page)
+    }
+
+    /** `assets.fields`' answer listing [source]'s fields from [start] up to [end], exclusive. */
+    private fun fieldsPage(source: AssetSource, start: Int, end: Int): String = Json.render {
+        put("id", source.id)
+        put("kind", source.kind)
+        put("file", source.path)
+        put("total", source.fields.size)
+        if (end < source.fields.size) put("next", end)
+        arr("fields") {
+            for (field in source.fields.subList(start, end)) {
+                element {
+                    put("name", field.name)
+                    put("line", field.span.startLine)
+                    when (val editability = field.editability) {
+                        is Editability.Editable -> {
+                            put("editable", true)
+                            put("text", field.text)
+                            put("type", editability.value.type.name)
+                            put("value", editability.value.display)
+                        }
+
+                        // No `text`: a computed value's text can be a whole `mapOf(...)`, and the
+                        // reason already quotes what builds it.
+                        is Editability.ReadOnly -> {
+                            put("editable", false)
+                            put("reason", editability.reason.message)
+                            put("reasonLine", editability.reason.line)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @AgentTool(
+        name = "assets.set",
+        description = "Save one value into an asset's .udea.kts by replacing exactly that value's " +
+            "text: comments, blank lines and formatting are kept, so the file's diff is the one " +
+            "value. Plain literals only - numbers, strings, booleans, reference(\"...\"); a computed " +
+            "value is refused with the reason and its line (assets.fields lists which is which). " +
+            "Validated first and restored byte for byte on failure, then hot-reloaded.",
+    )
+    public fun set(
+        @Arg(description = "Asset id, exactly as assets.list spells it.")
+        id: String,
+        @Arg(description = "The field to change, as assets.fields names it, e.g. \"columns\".")
+        field: String,
+        @Arg(
+            description = "The new value as you would read it: 7, 1.6, true, some text, or the id a " +
+                "reference names. It is written as the literal type the file already has there.",
+        )
+        value: String,
+        @Arg(
+            description = "Push the change into the running game when it validates.",
+            required = false,
+            default = "true",
+        )
+        apply: Boolean = true,
+    ): AgentResult {
+        val source = daemon.sources.read(id) ?: return miss(id)
+        return when (val result = source.set(field, value)) {
+            is SetResult.Changed -> edit(source.file, source.path, apply) { result.text }
+            is SetResult.ReadOnly -> AgentResult.failed(READ_ONLY_FIELD, "${result.message}. Change it there, in ${source.path}.")
+            is SetResult.NoSuchField -> AgentResult.failed(NO_SUCH_FIELD, "`${source.id}` ${result.message}")
+            is SetResult.NotParseable -> AgentResult.failed(AgentErrorKind.BAD_ARGUMENT, result.message)
+        }
+    }
+
+    @AgentTool(
+        name = "assets.create",
+        description = "Write a new asset script beside an existing asset: the same kind and plain " +
+            "values under a new name, generated rather than pasted. Validated like any edit and " +
+            "removed again if the compiler has anything to say. A new asset reaches the running " +
+            "game on its next launch; use assets.set on the new id to change its values.",
+    )
+    public fun create(
+        @Arg(description = "The id of the asset to copy, exactly as assets.list spells it.")
+        from: String,
+        @Arg(description = "The new asset's name: letters, digits, _ and - only. Its id is the " +
+            "template's directory plus this name.")
+        name: String,
+    ): AgentResult {
+        if (daemon.sources.fileOf(from) == null) return miss(from)
+        val created = when (val result = daemon.sources.create(from, name)) {
+            is CreateResult.Refused -> return AgentResult.failed(CANNOT_CREATE, result.message)
+            is CreateResult.Created -> result
+        }
+        created.file.writeText(created.text)
+        val report = daemon.validate(listOf(created.file))
+        if (!report.ok) {
+            created.file.deleteExisting()
+            return AgentResult.ok {
+                put("id", created.id)
+                put("path", created.path)
+                put("created", false)
+                put("rolledBack", true)
+                validation(report)
+            }
+        }
+        return applyReload(created.path, created.file) {
+            put("id", created.id)
+            put("created", true)
+        }
+    }
+
+    @AgentTool(
         name = "assets.changed_since",
         description = "Which asset ids have hot-reloaded since a tick. Call it after a rewind " +
             "that reports assetGraphChangedSince to see exactly what is different now.",
@@ -281,6 +422,10 @@ public class AssetsToolset(
             "no script the daemon is watching matches '$path'; assets.list names the file of " +
                 "every asset",
         )
+        return edit(file, path, apply, transform)
+    }
+
+    private fun edit(file: Path, path: String, apply: Boolean, transform: (String) -> String): AgentResult {
         val original = file.readText()
         val updated = try {
             transform(original)
@@ -320,13 +465,15 @@ public class AssetsToolset(
         return applyReload(path, file)
     }
 
-    private fun applyReload(path: String, file: Path): AgentResult = when (
+    /** Reloads [file] into the running game and reports how it went, after whatever [head] writes. */
+    private fun applyReload(path: String, file: Path, head: Json.() -> Unit = {}): AgentResult = when (
         val outcome = daemon.reload(listOf(file))
     ) {
         is ReloadOutcome.Applied -> {
             hotReload?.push(outcome.delta)
             daemon.commit()
             AgentResult.ok {
+                head()
                 put("path", path)
                 put("changed", true)
                 put("applied", true)
@@ -340,6 +487,7 @@ public class AssetsToolset(
         }
 
         is ReloadOutcome.NoChange -> AgentResult.ok {
+            head()
             put("path", path)
             put("changed", true)
             put("applied", false)
@@ -347,6 +495,7 @@ public class AssetsToolset(
         }
 
         is ReloadOutcome.RequiresRestart -> AgentResult.ok {
+            head()
             put("path", path)
             put("changed", true)
             put("applied", false)
@@ -366,6 +515,7 @@ public class AssetsToolset(
         // author's and is not wrong, so it stays on disk; what is reported is that the running
         // game did not take it.
         is ReloadOutcome.Rejected -> AgentResult.ok {
+            head()
             put("path", path)
             put("changed", true)
             put("applied", false)
@@ -501,6 +651,15 @@ public class AssetsToolset(
          * in the tree edits one file to add a failure mode.
          */
         public val NO_SUCH_ASSET: AgentErrorKind = AgentErrorKind("no_such_asset")
+
+        /** `assets.set` on a value the file computes rather than writes as a literal (issue #195). */
+        internal val READ_ONLY_FIELD: AgentErrorKind = AgentErrorKind("read_only_field")
+
+        /** `assets.set` on a field the asset's declaring call does not write. */
+        internal val NO_SUCH_FIELD: AgentErrorKind = AgentErrorKind("no_such_field")
+
+        /** `assets.create` refused before writing anything: a taken name, or a value it cannot copy. */
+        internal val CANNOT_CREATE: AgentErrorKind = AgentErrorKind("cannot_create")
 
         /** The most rows any listing returns. Spec 5 caps a tool result; this is that cap. */
         private const val MAX_ROWS = 500

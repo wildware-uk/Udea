@@ -1,6 +1,7 @@
 # BRIEF-264.md — deterministic pathfinding for many ground units
 
-8433d6f
+9944efa — the last commit of code and tests. The branch head is the commit that adds this
+brief, one on top of it, and carries no code.
 
 ## 1. The evidence command
 
@@ -24,7 +25,7 @@ for as long as that scratchpad lives; the diffs are reproducible from the source
 
 #### M1 — Separation off: units are never pushed apart after a step.
 
-The crowd still walks and still arrives; it arrives as one pile.
+It fails at `NavCrowdTest.kt:75`, the in-transit fence, which is measured on every tick: the crowd folds into itself at the squeeze between the two buildings long before it gets anywhere.
 
 ```diff
 diff --git a/udea-nav/src/commonMain/kotlin/dev/wildware/udea/nav/NavMoveSystem.kt b/udea-nav/src/commonMain/kotlin/dev/wildware/udea/nav/NavMoveSystem.kt
@@ -51,6 +52,89 @@ Fails (1):
 A unit walks through the diagonal join of two buildings, which is a gap of zero width. Note the second failure: the flow field and A* share the rule, and the test that they agree about cost catches it too.
 
 ```diff
+diff --git a/BRIEF-264.md b/BRIEF-264.md
+index 933ec01..5ac7066 100644
+--- a/BRIEF-264.md
++++ b/BRIEF-264.md
+@@ -1,6 +1,6 @@
+ # BRIEF-264.md — deterministic pathfinding for many ground units
+ 
+-8433d6f
++9944efa
+ 
+ ## 1. The evidence command
+ 
+@@ -244,7 +244,7 @@ Each of these is also a comment on issue #264, so it is reviewable next to the c
+    after it.** Refusing all penetration deadlocked the crowd: 99 of 100 still walking after the
+    1200-tick budget. Measured alternatives are in `NavMoveSystem`'s KDoc.
+ 5. **`NavAgent` and `NavObstacle` are `@Replicated`**, so `net-components.lock` gains two lines.
+-   They sort after every existing entry, so no id moved (section 7).
++   They sort after every existing entry, so no id moved (section 6).
+ 
+ ### Things the reviewer should know I touched outside the module
+ 
+@@ -276,9 +276,51 @@ Each of these is also a comment on issue #264, so it is reviewable next to the c
+ ## 3. `sh gradlew build`
+ 
+ ```
+-(not yet run)
++ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem \
++  sh gradlew build --continue
++```
++
++Green, no exclusions. Spliced from the saved log,
++`scratchpad/issue264/full-build-raw.txt` (1923 lines); every elision is marked and each segment is
++a consecutive run of that file.
++
++```
++> Task :udeaVerifyAgentsMd
++[... 1596 lines elided ...]
++> Task :udeaVerifyDeterminism
++udeaVerifyDeterminism
++  scanned :udea-core: 624 class files
++  scanned :udea-gas: 272 class files
++  scanned :udea-net: 421 class files
++  scanned :udea-physics2d: 68 class files
++  scanned :udea-nav: 88 class files
++  scanned :moba:game: 706 class files
++  allowlist entries used: 0
++  findings: 0
++[... 177 lines elided ...]
++BUILD SUCCESSFUL in 3m 2s
++1058 actionable tasks: 809 executed, 13 from cache, 236 up-to-date
+ ```
+ 
++`:udea-nav:jvmTest` reads `UP-TO-DATE` in that log because the evidence command had already run at
++this SHA. Its own run, `sh gradlew :udea-nav:jvmTest --rerun-tasks -i`, is the transcript in
++section 5.
++
++**The first full build of this branch failed, and both failures were mine.** They are fixed in
++`9944efa` and are worth reading because neither could have been caught by the module's own tests:
++
++- `:udea-render:udeaVerifyHeadless` — *"udea-render's build script and
++  ModuleGraphRules.HEADLESS_PROJECTS must between them designate every udea-* module except
++  [udea-render, udea-agent-host, udea-editor]"*, and the expected-minus-actual was exactly
++  `udea-nav`. A new module is not designated until it is added to the set.
++- `:udea-nav:compileTestKotlinIosArm64` and `…IosSimulatorArm64` — *"Name contains illegal
++  characters: "*""* and *"Name contains illegal characters: ",""*. Kotlin/Native refuses a
++  backticked test name holding `*` or `,`; the JVM target compiles both. Two test names were
++  reworded.
++
++`:udea-assets-compiler:udeaDaemonBudget` passed inside this build, on a box whose one-minute load
++average was 14.9 when the build started, so no solo re-run was needed.
++
+ ## 4. The images
+ 
+ All in `/srv/ssd1/workspace/Udea/build/debug-screenshots/`, from
+@@ -305,7 +347,7 @@ tick** rather than at the end. Its own printed output, from the run of
+ ```
+     NavCrowdTest: 100 units arrived at tick 773 of 1200; worst compression in transit 0.13775164m of a 0.6m contact distance, at tick 242, NetId(#9@0) at (0.9942008, -0.1420665) and NetId(#17@0) at (0.5944242, -0.37412727)
+     NavCrowdTest: settled overlap 0.0035638213m at tick 773, NetId(#25@0) at (9.925581, 1.55114) and NetId(#61@0) at (10.239827, 1.0442026)
+-BUILD SUCCESSFUL in 31s
++BUILD SUCCESSFUL in 44s
+ ```
+ 
+ So: arrival at tick 773 of 1200; worst in-transit compression 0.138m against a 0.6m contact
 diff --git a/udea-nav/src/commonMain/kotlin/dev/wildware/udea/nav/NavPathfinder.kt b/udea-nav/src/commonMain/kotlin/dev/wildware/udea/nav/NavPathfinder.kt
 index 90a977d..dc945c2 100644
 --- a/udea-nav/src/commonMain/kotlin/dev/wildware/udea/nav/NavPathfinder.kt
@@ -74,7 +158,7 @@ index 90a977d..dc945c2 100644
 
 Fails (2):
 
-- `NavFlowFieldTest[jvm] > the field agrees with A* about what a route costs()[jvm] FAILED`
+- `NavFlowFieldTest[jvm] > the field agrees with the A star search about what a route costs()[jvm] FAILED`
 - `NavPathfinderTest[jvm] > a diagonal may not cut the corner of a blocked cell()[jvm] FAILED`
 
 #### M3 — Clearance ignores the unit's size: every unit is treated as one cell wide.
@@ -132,10 +216,10 @@ A route found on ground that has since been built on is handed out again. **This
 
 ```diff
 diff --git a/udea-nav/src/commonMain/kotlin/dev/wildware/udea/nav/Navigation.kt b/udea-nav/src/commonMain/kotlin/dev/wildware/udea/nav/Navigation.kt
-index 6eecdea..2b2e870 100644
+index 688aa8d..ae9d03d 100644
 --- a/udea-nav/src/commonMain/kotlin/dev/wildware/udea/nav/Navigation.kt
 +++ b/udea-nav/src/commonMain/kotlin/dev/wildware/udea/nav/Navigation.kt
-@@ -64,10 +64,6 @@ public class Navigation internal constructor(grid: NavGrid) {
+@@ -70,10 +70,6 @@ public class Navigation internal constructor(grid: NavGrid) {
      internal fun rebuild(grid: NavGrid) {
          this.grid = grid
          pathfinder = NavPathfinder(grid)
@@ -152,7 +236,7 @@ Fails (3):
 
 - `NavigationCacheTest[jvm] > a flow field swept before a wall went up is not handed out after it()[jvm] FAILED`
 - `NavigationCacheTest[jvm] > a hop asked for before a wall went up is not answered from the cache after it()[jvm] FAILED`
-- `NavigationCacheTest[jvm] > a rebuild that changes nothing still drops the caches, because it is the grid that owns them()[jvm] FAILED`
+- `NavigationCacheTest[jvm] > a rebuild that changes nothing still drops the caches - it is the grid that owns them()[jvm] FAILED`
 
 #### M6 — Units remember the hop they are walking to, in a map in the system rather than in their components.
 
@@ -244,7 +328,7 @@ Each of these is also a comment on issue #264, so it is reviewable next to the c
    after it.** Refusing all penetration deadlocked the crowd: 99 of 100 still walking after the
    1200-tick budget. Measured alternatives are in `NavMoveSystem`'s KDoc.
 5. **`NavAgent` and `NavObstacle` are `@Replicated`**, so `net-components.lock` gains two lines.
-   They sort after every existing entry, so no id moved (section 7).
+   They sort after every existing entry, so no id moved (section 6).
 
 ### Things the reviewer should know I touched outside the module
 
@@ -276,8 +360,50 @@ Each of these is also a comment on issue #264, so it is reviewable next to the c
 ## 3. `sh gradlew build`
 
 ```
-(not yet run)
+ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem \
+  sh gradlew build --continue
 ```
+
+Green, no exclusions. Spliced from the saved log,
+`scratchpad/issue264/full-build-raw.txt` (1923 lines); every elision is marked and each segment is
+a consecutive run of that file.
+
+```
+> Task :udeaVerifyAgentsMd
+[... 1596 lines elided ...]
+> Task :udeaVerifyDeterminism
+udeaVerifyDeterminism
+  scanned :udea-core: 624 class files
+  scanned :udea-gas: 272 class files
+  scanned :udea-net: 421 class files
+  scanned :udea-physics2d: 68 class files
+  scanned :udea-nav: 88 class files
+  scanned :moba:game: 706 class files
+  allowlist entries used: 0
+  findings: 0
+[... 177 lines elided ...]
+BUILD SUCCESSFUL in 3m 2s
+1058 actionable tasks: 809 executed, 13 from cache, 236 up-to-date
+```
+
+`:udea-nav:jvmTest` reads `UP-TO-DATE` in that log because the same task had already run against
+this tree, in the check that preceded the commit. Its own forced run,
+`sh gradlew :udea-nav:jvmTest --rerun-tasks -i`, is the transcript in section 5.
+
+**The first full build of this branch failed, and both failures were mine.** They are fixed in
+`9944efa` and are worth reading because neither could have been caught by the module's own tests:
+
+- `:udea-render:udeaVerifyHeadless` — *"udea-render's build script and
+  ModuleGraphRules.HEADLESS_PROJECTS must between them designate every udea-* module except
+  [udea-render, udea-agent-host, udea-editor]"*, and the expected-minus-actual was exactly
+  `udea-nav`. A new module is not designated until it is added to the set.
+- `:udea-nav:compileTestKotlinIosArm64` and `…IosSimulatorArm64` — *"Name contains illegal
+  characters: "*""* and *"Name contains illegal characters: ",""*. Kotlin/Native refuses a
+  backticked test name holding `*` or `,`; the JVM target compiles both. Two test names were
+  reworded.
+
+`:udea-assets-compiler:udeaDaemonBudget` passed inside this build, on a box whose one-minute load
+average was 14.9 when the build started, so no solo re-run was needed.
 
 ## 4. The images
 
@@ -305,7 +431,7 @@ tick** rather than at the end. Its own printed output, from the run of
 ```
     NavCrowdTest: 100 units arrived at tick 773 of 1200; worst compression in transit 0.13775164m of a 0.6m contact distance, at tick 242, NetId(#9@0) at (0.9942008, -0.1420665) and NetId(#17@0) at (0.5944242, -0.37412727)
     NavCrowdTest: settled overlap 0.0035638213m at tick 773, NetId(#25@0) at (9.925581, 1.55114) and NetId(#61@0) at (10.239827, 1.0442026)
-BUILD SUCCESSFUL in 31s
+BUILD SUCCESSFUL in 44s
 ```
 
 So: arrival at tick 773 of 1200; worst in-transit compression 0.138m against a 0.6m contact
@@ -355,7 +481,8 @@ search run twice returns the same route, and that a reused `NavPath` holds only 
 
 **"Flow field for group move orders to one point."**
 
-`NavFlowFieldTest` (5), including `the field agrees with A* about what a route costs` — the two
+`NavFlowFieldTest` (5), including `the field agrees with the A star search about what a route
+costs` — the two
 planners cannot drift apart about the same ground. `NavMoveSystem` switches to it at two units
 sharing a goal cell. Picture: `issue264-flow-field.png`.
 

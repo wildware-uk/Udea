@@ -8,7 +8,7 @@
 [![Trello](https://img.shields.io/badge/check_progress-trello-blue)](https://trello.com/b/3JqieuNR/udea)
     
 
-A Kotlin+LibGDX+Fleks game engine for 2D games.
+A Kotlin+Kool+Fleks game engine for 2D games.
 
 ## 📖 Documentation
 
@@ -23,21 +23,18 @@ Check out the [Udea Engine Documentation](docs/home.md) to get started!
 
 ## Modules
 
-Udea is mid-rewrite. The `udea-*` tree is the engine being built; the modules below it are the
-old tree, kept only until their replacements land. `AGENTS.md` has the full module table and the
-dependency rules; `docs/migration/ledger.md` has the retirement order.
+`AGENTS.md` has the full module table and the dependency rules.
 
-- **`udea-*`** - The rewrite. See `AGENTS.md`.
+- **`udea-*`** - The engine. See `AGENTS.md`.
 - **`moba`** - The 5v5 MOBA the engine is built against.
-- **`common`** - Old engine core. Replaced module by module; deleted in Phase 6.
-- **`gradle-plugin`** - Old codegen plugin. Replaced by `udea-gradle` + `udea-codegen` in Phase 6.
-- **`example`** - Old example game. Replaced by `moba` in Phase 3. Dropping it from
-  `settings.gradle.kts` is safe; **deleting its files is not**, because `:moba`'s build stages
-  its character art out of `example/src/main/resources/assets/sprites/` and that is the only copy
-  in the tree.
+- **`example-assets/`** - Not a module: the asset tree of the retired `example` game. `:moba`'s
+  build stages its character art out of `example-assets/sprites/`, which is the only copy in the
+  tree, and `udea-assets-compiler`'s tests read its asset scripts.
 
-The level editor, the IDEA plugin and `compose-ui` were deleted in Phase 0: the tool surface is
-the editor, so there is nothing to replace them with.
+The previous engine - `common`, `gradle-plugin` and the `example` game - was deleted in issue
+#213, once `moba` and the `udea-*` modules had replaced it. The level editor, the IDEA plugin and
+`compose-ui` went earlier: the tool surface is the editor, so there is nothing to replace them
+with.
 
 ## Contributing
 
@@ -56,7 +53,7 @@ Contributions are welcome! Please follow these steps:
 The **code** is MIT. See [`LICENSE`](LICENSE).
 
 The **art and audio are not**. Third-party sprite art from a paid asset pack is committed under
-`example/src/main/resources/assets/sprites/`; `LICENSE` names it and excludes it explicitly, and
+`example-assets/sprites/`; `LICENSE` names it and excludes it explicitly, and
 [`docs/art-assets.md`](docs/art-assets.md) records what is there, the options and the decision
 taken. If you fork this repository, bring your own art.
 

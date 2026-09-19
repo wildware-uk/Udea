@@ -24,7 +24,7 @@ import kotlin.test.assertEquals
  *
  * ### The art is the fixture
  *
- * [withArt] copies the committed orc sheets out of `example/src/main/resources/assets` into the
+ * [withArt] copies the committed orc sheets out of `example-assets` into the
  * scratch asset root. They are genuine third-party art: `Orc-Idle.png` really is 600x100 and
  * really does hold six 100x100 frames, so a geometry assertion against it is an assertion about
  * an image and not about a number a test wrote down. `docs/art-assets.md` is the manifest that

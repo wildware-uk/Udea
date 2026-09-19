@@ -10,10 +10,8 @@ import org.gradle.api.tasks.TaskProvider
  * Registers a task that resolves this project's classpaths and fails on any [DependencyRule]
  * they break.
  *
- * Shared by `udea.legacy-dependency-check` and `udea.module-graph-check` so the two gates
- * differ only in their rule set and their message — which is the whole reason the rules are
- * data. The tasks stay separate on purpose: a failure that could mean either "you brought
- * back the old tree" or "you put GL on the kernel" is a worse message than two that cannot.
+ * Used by `udea.module-graph-check`, whose rules are data so that this function is the only
+ * thing that resolves a classpath and decides what on it is a violation.
  *
  * @param taskName the registered task name, quoted in the failure heading.
  * @param description shown by `gradlew tasks`.

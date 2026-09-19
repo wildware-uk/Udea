@@ -1,6 +1,6 @@
 # Udea — agent brief
 
-A Kotlin/LibGDX/Fleks engine built so agents can do most of the work of making a game with it.
+A Kotlin/Kool/Fleks engine built so agents can do most of the work of making a game with it.
 Package root `dev.wildware.udea`. Kotlin 2.4.20, KSP 2.3.12, Gradle 8.13, JDK 21.
 
 Three of those four moved in issue #186, and two of the moves change a shape rather than a
@@ -45,8 +45,8 @@ the build when one of them moves — see "Frozen contracts" below for the delibe
   forbidden inside `Simulation.step()`. Time is `SimClock`, denominated in `Tick`.
 - **No unseeded randomness in simulation.** `Math.random` and `Random.Default` are forbidden.
   Use `RngService` and its named stream.
-- **No new module depending on `common`.** A Gradle rule fails the build; it is not a
-  convention. See "The old tree" below.
+- **No LibGDX.** It left the tree in issue #213, and `UDEA-MG-009` fails the build if any
+  project resolves a `com.badlogicgames` artifact again. Rendering is Kool, inside `udea-render`.
 - **No reflection on a per-tick path**, no `TODO()` on a reachable path, no swallowed
   exception, no generated code built by string concatenation, no bare `Int`/`Long`/`String`
   for a domain concept.
@@ -78,10 +78,6 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `moba:game` | The example game: a 5v5 three-lane MOBA. A library - components, systems, assets and what it draws - with no entry point in it |
 | `moba:desktop` | The desktop launcher: `run`, `runServer`, `runClient`, the shot mains, the proofs and the agent surface. JVM |
 | `moba:android` | The Android launcher. One activity, and it boots the simulation headless because `udea-render` has no Android Kool backend yet |
-| `common` | **Old tree.** Replaced module by module, deleted in Phase 6 |
-| `gradle-plugin` | **Old tree.** Replaced by `udea-codegen` + `udea-gradle` |
-| `example` | **Old tree.** Replaced by `moba` |
-| `example:assets` | **Old tree.** Goes with `example` |
 
 Three rules that are cheap to break and expensive to find:
 
@@ -89,11 +85,11 @@ Three rules that are cheap to break and expensive to find:
 - **Presentation systems are not Fleks systems.** They implement `RenderSystem` (or
   `OverlaySystem`) and live in `udea-render`, so `world.update(dt)` is pure simulation *by
   construction* rather than by convention.
-- **Nothing new depends on `common`.** `udeaVerifyNoLegacyDependencies` enforces it, applied
-  automatically to every `udea-*` project and to `moba`.
+- **No LibGDX anywhere.** `UDEA-MG-009` bans every `com.badlogicgames` artifact from every
+  project, the two GL-allowed ones included.
 
-Enforced by `./gradlew udeaVerifyModuleGraph udeaVerifyNoLegacyDependencies`. Rule ids and
-rationale: `docs/module-graph.md`.
+Enforced by `./gradlew udeaVerifyModuleGraph`, applied automatically to every `udea-*` project
+and every `moba` project. Rule ids and rationale: `docs/module-graph.md`.
 
 **Multiplatform (the Kool/KMP port, issue #201).** A runtime module moves to KMP by applying
 `udea.kotlin-multiplatform` (`jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64`);
@@ -210,17 +206,16 @@ asserts it against a vendored copy of the bridge's TS client.
 
 ---
 
-## The old tree
+## The old tree is gone
 
-`common`, `gradle-plugin` and `example` are the previous engine. They are deleted **as they are
-replaced**, not left "for reference".
+`common`, `gradle-plugin` and `example` were the previous engine. Issue #213 deleted them, with
+the migration ledger and the three gates that policed them (`udeaVerifyNoLegacyDependencies`,
+`udeaLegacyReport`, `udeaVerifyMigration`). `level-editor`, `idea-plugin` and `compose-ui` went
+earlier (D6). None of them is coming back; `git log` has them if you need to read one.
 
-- Every old file has a row in **`docs/migration/ledger.md`** with a disposition, a destination
-  and a phase. `./gradlew udeaLegacyReport` fails if one does not.
-- Anything needed from the old tree is copied forward **file by file, with the copy reviewed**.
-  `./gradlew udeaVerifyMigration` fails on an unreviewed copy, and on a copy whose source has
-  changed since the review.
-- `level-editor`, `idea-plugin` and `compose-ui` are gone (D6). They are not coming back.
+`example-assets/` is not a module. It is the retired game's asset tree, kept for two readers:
+`:moba:game:udeaStageCharacterArt` copies the licensed character art out of its `sprites/`, and
+`udea-assets-compiler`'s tests use its `.udea.kts` files as their pre-migration corpus.
 
 ---
 

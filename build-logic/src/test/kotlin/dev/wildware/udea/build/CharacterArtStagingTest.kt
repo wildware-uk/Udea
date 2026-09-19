@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  * `moba/game/assets/sprites/` is gitignored - it is paid-pack art this public repository has no right
  * to sublicense - so a clone carries none of it and `:moba:udeaValidateAssets` refused the
  * manifest with a `UDEA0032` per sheet. The fix is for the build to stage the sheets out of
- * `example/src/main/resources/assets/sprites/`, where this repository already holds them.
+ * `example-assets/sprites/`, where this repository already holds them.
  *
  * ## What each test can catch
  *
@@ -105,6 +105,24 @@ class CharacterArtStagingTest {
             "the plan copies from ${CharacterArtStaging.SOURCE_TREE}, and these are not there. " +
                 "A plan naming a file no clone has stages nothing and fails the build on a " +
                 "machine that has never had the art.",
+        )
+    }
+
+    @Test
+    fun `the art is copied out of a tree no Gradle project owns`() {
+        // Issue #213. The sheets used to live inside the `example` module, so deleting that
+        // module's files would have deleted the only copy of the art. A source
+        // tree outside every project cannot go with a module, and cannot be packaged into one.
+        val settings = File(repoRoot, "settings.gradle.kts").readText()
+        val owners = AgentsMd.declaredModules(settings)
+            .map { it.replace(':', '/') }
+            .filter { CharacterArtStaging.SOURCE_TREE == it || CharacterArtStaging.SOURCE_TREE.startsWith("$it/") }
+
+        assertEquals(
+            emptyList(),
+            owners,
+            "${CharacterArtStaging.SOURCE_TREE} is inside a project settings.gradle.kts includes. " +
+                "Art a module owns is deleted with the module and shipped in its artefacts.",
         )
     }
 

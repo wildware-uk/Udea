@@ -37,7 +37,10 @@
 # edit to that source moves the digest and fails this pin the way a release bump would.
 
 @version fleks 2.14+sha256:220b74bf865c68a5e99f9f340855148d9a078b7a1e158eaba82d35f7230441bf
-@version gdx 1.14.2
+#
+# LibGDX had a pin here (`@version gdx 1.14.2`) until issue #213 removed every LibGDX coordinate
+# from the catalog. No project resolves it, so the audit's LibGDX section describes code the
+# build no longer contains, and a pin against a version nothing resolves is ALLOW005 by design.
 
 #
 # THE ENTRIES

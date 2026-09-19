@@ -80,13 +80,9 @@ public object ContractFreeze {
      * checks out with `core.autocrlf=true`, so these documents arrive CRLF there. A digest of
      * the raw bytes would be red on a **perfect** tree on Windows, and a gate that cannot tell
      * its own subject apart is a gate somebody switches off. Normalising costs nothing in
-     * strictness: every content byte still reaches the digest.
-     *
-     * Deliberately **not** [MigrationLedger.contentHash], which is the other SHA-256 in this
-     * package: that one hashes `normalise`d lines — trimmed, trivia dropped — because it exists
-     * to recognise a *copied* source file through reformatting. A frozen contract has to be
-     * byte-faithful, so a hash that can miss an edit is the wrong tool, however similar the four
-     * lines look.
+     * strictness: every content byte still reaches the digest, and nothing is trimmed or dropped,
+     * because a frozen contract has to be byte-faithful and a hash that can miss an edit is the
+     * wrong tool.
      */
     public fun digest(text: String): String {
         val normalised = text.replace("\r\n", "\n").replace("\r", "\n")
@@ -156,7 +152,7 @@ public object ContractFreeze {
      * Sorted so two runs over the same disagreement print the same thing, which is what lets a
      * failure be pasted into an issue and compared against the next run's.
      */
-    public fun findings(locked: Map<String, String>, actual: Map<String, String>): List<MigrationFinding> {
+    public fun findings(locked: Map<String, String>, actual: Map<String, String>): List<GateFinding> {
         val changed = actual.filter { (path, hash) -> locked[path] != null && locked[path] != hash }
             .map { (path, _) ->
                 finding(
@@ -192,7 +188,7 @@ public object ContractFreeze {
      * order. Both halves are load-bearing: a message that only says "stop" leaves a developer
      * with an agreed change and no way to land it, and that developer deletes the gate.
      */
-    public fun report(findings: List<MigrationFinding>): String? =
+    public fun report(findings: List<GateFinding>): String? =
         findings.takeIf { it.isNotEmpty() }?.let {
             buildString {
                 appendLine("$VERIFY_TASK found ${it.size} change(s) to the frozen contracts:")
@@ -208,6 +204,6 @@ public object ContractFreeze {
             }
         }
 
-    private fun finding(rule: RuleId, path: String, message: String): MigrationFinding =
-        MigrationFinding(rule = rule, path = path, line = 1, message = message)
+    private fun finding(rule: RuleId, path: String, message: String): GateFinding =
+        GateFinding(rule = rule, path = path, line = 1, message = message)
 }

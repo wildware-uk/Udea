@@ -9,15 +9,14 @@ plugins {
     // `KotlinCompile` type below resolvable for the `allprojects` jvmTarget rule.
     kotlin("jvm") version "2.4.20" apply false
 
-    // Phase 0 build gates from the `build-logic` included build. Applied to the rewrite
-    // subprojects below, never to the root or to the old tree.
-    id("udea.legacy-dependency-check") apply false
+    // Phase 0 build gates from the `build-logic` included build. Applied to the subprojects
+    // below, never to the root.
     id("udea.module-graph-check") apply false
     id("udea.release-check") apply false
 
-    // The exception: the migration gates ask about the whole tree at once, so they are the one
-    // pair that belongs on the root. See `docs/migration/ledger.md`.
-    id("udea.migration-check")
+    // The exception: `AGENTS.md` and the Trello map are documents about the whole tree, so the
+    // gates that hold them to it belong on the root.
+    id("udea.docs-check")
 
     // The same exception, for the same reason (issue #150): `udeaVerifyDeterminism` asks about
     // a *set* of source sets spanning four modules, declared in
@@ -59,8 +58,7 @@ allprojects {
 
     // Configured wherever a module has the `java` plugin, and no longer applied to every project
     // to get there (issue #201). The Kotlin multiplatform plugin refuses to share a project with
-    // `java`, and every JVM module gets `java` from `kotlin("jvm")` already; the one project that
-    // had it from here alone is `example:assets`, which has no build script and no sources.
+    // `java`, and every JVM module gets `java` from `kotlin("jvm")` already.
     plugins.withType<JavaPlugin> {
         extensions.configure<JavaPluginExtension> {
             sourceCompatibility = JavaVersion.VERSION_21
@@ -84,11 +82,10 @@ allprojects {
 //
 // Wired here rather than in each module's build script for two reasons: a gate a module opts
 // into is a gate a new module forgets, and these files are owned by whoever owns the module,
-// which is the wrong person to be able to switch off the rule that stops the old tree leaking
-// into the new one.
+// which is the wrong person to be able to switch off the rule that governs the module.
 
 /**
- * Gradle paths of the rewrite tree: everything the Phase 0 gates apply to.
+ * Gradle paths of the engine and the game: everything the Phase 0 gates apply to.
  *
  * `buildFile.exists()` is not a nicety. `:moba` is a container since issue #212 - it holds
  * `:moba:game`, `:moba:desktop` and `:moba:android` and has no build script, no plugins and no
@@ -103,7 +100,6 @@ val rewriteProjects = subprojects.filter {
 
 subprojects {
     if (this in rewriteProjects) {
-        apply(plugin = "udea.legacy-dependency-check")
         apply(plugin = "udea.module-graph-check")
     }
     // The release gate lives on the project that actually ships a runnable process. That is the
@@ -119,12 +115,6 @@ subprojects {
  * per-project task by path; the per-project tasks are also on their own `check`, so a plain
  * `./gradlew build` cannot pass while a rule is broken.
  */
-val udeaVerifyNoLegacyDependencies by tasks.registering {
-    group = "verification"
-    description = "Runs udeaVerifyNoLegacyDependencies on every udea-* project and every moba project."
-    dependsOn(rewriteProjects.map { "${it.path}:udeaVerifyNoLegacyDependencies" })
-}
-
 val udeaVerifyModuleGraph by tasks.registering {
     group = "verification"
     description = "Runs udeaVerifyModuleGraph on every udea-* project and every moba project."
@@ -138,17 +128,16 @@ val udeaVerifyRelease by tasks.registering {
 }
 
 /**
- * `assemble` for the rewrite tree only.
+ * `assemble` for the engine and the game.
  *
- * The clean-build budget (spec 6, Phase 0 exit: <90s) is measured against this. Budgeting
- * `assemble` instead would measure `common` and `example` resolving KryoNet, Box2D natives and
- * five `kotlin-scripting-*` artifacts, which would dominate the number and make the gate
- * meaningless - and it is a number the rewrite cannot move, because it belongs to code that is
- * on its way out.
+ * The clean-build budget (spec 6, Phase 0 exit: <90s) is measured against this. It was
+ * introduced so the budget would not measure the old tree - `common` and `example` resolving
+ * KryoNet, Box2D natives and five `kotlin-scripting-*` artifacts - and it stays after issue #213
+ * deleted that tree, because the clean-build-budget CI job names this task.
  */
 val udeaAssemble by tasks.registering {
     group = "build"
-    description = "Assembles every udea-* project and moba, and nothing from the old tree."
+    description = "Assembles every udea-* project and every moba project."
     dependsOn(rewriteProjects.map { "${it.path}:assemble" })
 }
 
@@ -269,5 +258,5 @@ subprojects {
 }
 
 tasks.named("check") {
-    dependsOn(udeaVerifyNoLegacyDependencies, udeaVerifyModuleGraph)
+    dependsOn(udeaVerifyModuleGraph)
 }

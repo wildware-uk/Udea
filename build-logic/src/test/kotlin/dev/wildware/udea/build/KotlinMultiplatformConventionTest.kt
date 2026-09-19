@@ -93,7 +93,6 @@ class KotlinMultiplatformConventionTest {
             plugins {
                 id("udea.kotlin-multiplatform")
                 id("udea.module-graph-check")
-                id("udea.legacy-dependency-check")
             }
             ${fixture.repositoryBlock()}
             $dependencies
@@ -107,7 +106,6 @@ class KotlinMultiplatformConventionTest {
         // of, and the stdlib pin listed every target's classpath as unclassified.
         val output = gatedAnnotations(GradleFixture(root), "").build(
             ":udea-annotations:udeaVerifyModuleGraph",
-            ":udea-annotations:udeaVerifyNoLegacyDependencies",
             ":udea-annotations:udeaVerifyKotlinPin",
         ).output
 

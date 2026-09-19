@@ -56,7 +56,7 @@ dependencies {
  */
 val repoRoot: String = rootProject.layout.projectDirectory.asFile.absolutePath
 val exampleAssets: String =
-    rootProject.layout.projectDirectory.dir("example/src/main/resources/assets").asFile.absolutePath
+    rootProject.layout.projectDirectory.dir("example-assets").asFile.absolutePath
 
 tasks.withType<Test>().configureEach {
     val runtime = sourceSets.test.map { it.runtimeClasspath }
@@ -77,7 +77,7 @@ tasks.withType<Test>().configureEach {
     inputs.dir(rootProject.layout.projectDirectory.dir("moba/game/assets"))
         .withPropertyName("migratedAssetCorpus")
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.dir(rootProject.layout.projectDirectory.dir("example/src/main/resources/assets"))
+    inputs.dir(rootProject.layout.projectDirectory.dir("example-assets"))
         .withPropertyName("exampleAssetCorpus")
         .withPathSensitivity(PathSensitivity.RELATIVE)
 
@@ -89,7 +89,7 @@ tasks.withType<Test>().configureEach {
     //
     // Naming a task of `:moba:game` from an engine module is worth a sentence, because it looks like
     // an arrow pointing the wrong way and is not one. This is not a classpath edge -
-    // `UDEA-MG-*` and `UDEA-LEGACY-001` read resolved configurations, and this module resolves
+    // the `UDEA-MG-*` rules read resolved configurations, and this module resolves
     // nothing of `:moba:game` - it is build ordering for a corpus these tests already read by path,
     // deliberately, and have since `MigratedCorpusCompilesTest` was written. The alternative is
     // an undeclared read of a file another task writes, which is the flake Gradle is describing.
@@ -179,11 +179,11 @@ tasks.register<Test>("udeaScanBudget") {
 // KDoc describes as making a later script compile fail for no visible reason.
 //
 //   ./gradlew :udea-assets-compiler:udeaMigrateAssets \
-//       -Pudea.migrate.from=example/src/main/resources/assets \
+//       -Pudea.migrate.from=example-assets \
 //       -Pudea.migrate.to=moba/game/assets
 
 val migrateFrom: String = providers.gradleProperty("udea.migrate.from")
-    .getOrElse("example/src/main/resources/assets")
+    .getOrElse("example-assets")
 val migrateTo: String = providers.gradleProperty("udea.migrate.to")
     .getOrElse("moba/game/assets")
 val migrateDryRun: Boolean = providers.gradleProperty("udea.migrate.dryRun").isPresent

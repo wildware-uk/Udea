@@ -58,7 +58,7 @@ class NavFlowFieldTest {
     }
 
     @Test
-    fun `the field agrees with A* about what a route costs`() {
+    fun `the field agrees with the A star search about what a route costs`() {
         val grid = walled()
         val goal = grid.cellOf(11, 11)
         val field = NavFlowField(grid, goal, clearanceCells = 1)

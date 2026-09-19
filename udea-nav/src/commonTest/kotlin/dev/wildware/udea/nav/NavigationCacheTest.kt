@@ -74,7 +74,7 @@ class NavigationCacheTest {
     }
 
     @Test
-    fun `a rebuild that changes nothing still drops the caches, because it is the grid that owns them`() {
+    fun `a rebuild that changes nothing still drops the caches - it is the grid that owns them`() {
         // Not an optimisation to be tempted by: `NavGridSystem` decides *whether* to rebuild by
         // comparing footprints, so a `rebuild` call means the grid really has been replaced, and
         // `Navigation` holding entries across one would be holding them against a different object.

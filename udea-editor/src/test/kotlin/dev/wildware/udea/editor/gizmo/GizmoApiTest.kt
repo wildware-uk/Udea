@@ -149,12 +149,25 @@ class GizmoApiTest {
     @Test
     fun `a turn is measured the short way round, so crossing the back of the ring does not jump a whole turn`() {
         val centre = WorldPoint(0f, 0f)
-        // Just above -X to just below it: a small clockwise-looking step across the atan2 seam.
+        // Just above -X to just below it: a small anticlockwise step across the atan2 seam, where
+        // atan2 jumps by -2pi.
         val drag = Drag(start = WorldPoint(-1f, 0.01f), at = WorldPoint(-1f, -0.01f))
 
         val turn = drag.turnAbout(centre)
 
         assertTrue(kotlin.math.abs(turn) < 0.1f, "a step across the seam turned $turn radians")
+        assertEquals(2f * kotlin.math.atan2(0.01f, 1f), turn, 1e-5f)
+    }
+
+    @Test
+    fun `the seam is crossed the short way in the other direction too`() {
+        val centre = WorldPoint(0f, 0f)
+        // Just below -X to just above it: clockwise across the seam, where atan2 jumps by +2pi.
+        val drag = Drag(start = WorldPoint(-1f, -0.01f), at = WorldPoint(-1f, 0.01f))
+
+        val turn = drag.turnAbout(centre)
+
+        assertEquals(-2f * kotlin.math.atan2(0.01f, 1f), turn, 1e-5f)
     }
 
     @Test

@@ -130,6 +130,15 @@ public object UdeaStdlibPin {
         // it is here for the same reason: `udeaVerifyKotlinPin` failed `:udea-agent-host` the
         // moment the configuration appeared, which is the rule doing its job.
         ASSET_DAEMON_RUNTIME,
+        // A game's `editor` source set, which holds the editor window's entry point, and
+        // `editorTest`, which holds its tests (issue #194, `:moba:desktop` today). They are the one
+        // place `udea-editor` may be resolved (`UDEA-MG-010`), and a JVM compiles and runs against
+        // each of them - `runEditor` and the `editorTest` task - so they are pinned like the agent
+        // source set's pair above. `udeaVerifyKotlinPin` failed `:moba:desktop` until they were here.
+        "editorCompileClasspath",
+        "editorRuntimeClasspath",
+        "editorTestCompileClasspath",
+        "editorTestRuntimeClasspath",
     )
 
     /**

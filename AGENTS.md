@@ -87,7 +87,7 @@ Three rules that are cheap to break and expensive to find:
   `OverlaySystem`) and live in `udea-render`, so `world.update(dt)` is pure simulation *by
   construction* rather than by convention.
 - **No LibGDX anywhere.** `UDEA-MG-009` bans every `com.badlogicgames` artifact from every
-  project, the two GL-allowed ones included.
+  project, the GL-allowed ones included.
 
 Enforced by `./gradlew udeaVerifyModuleGraph`, applied automatically to every `udea-*` project
 and every `moba` project. Rule ids and rationale: `docs/module-graph.md`.

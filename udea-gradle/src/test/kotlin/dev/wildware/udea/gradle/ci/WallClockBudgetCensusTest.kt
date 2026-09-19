@@ -360,6 +360,8 @@ class WallClockBudgetCensusTest {
                 "a deadline: how long to wait for the render thread to reach a frame",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlUiLayerTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",
+            "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlWorldViewTest.kt" to
+                "a deadline: how long to wait for the render thread to reach a frame",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/OffscreenBackendTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/OffscreenBackendExplodingCaptureTest.kt" to

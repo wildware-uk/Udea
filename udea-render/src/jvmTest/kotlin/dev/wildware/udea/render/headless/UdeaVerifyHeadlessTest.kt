@@ -47,7 +47,7 @@ class UdeaVerifyHeadlessTest {
     }
 
     @Test
-    fun `the designated list is every udea module except the two allowed GL`() {
+    fun `the designated list is every udea module except the GL-allowed ones`() {
         // A module quietly dropped from the list is indistinguishable from a module that
         // passes, so the list itself is asserted -- and asserted against a source neither
         // `HeadlessScan` nor the build script derives from, or this would only be checking
@@ -91,7 +91,12 @@ class UdeaVerifyHeadlessTest {
          * in test sources -- so no shipped path could build a `RenderControl` at all and every
          * `render.*` tool answered `no_render_context` on a real run. It stays off every release
          * classpath through `UDEA-REL-002`, which is a separate gate with its own test.
+         *
+         * `udea-editor` (issue #194) resolves Kool at run time through `udea-render`'s `api`, which
+         * is why it is GL-allowed at all; its bytecode cannot name a renderer type, because
+         * `UDEA-MG-011` keeps every renderer artifact off its compile classpath. It stays off every
+         * shipped classpath through `UDEA-MG-010`.
          */
-        val GL_ALLOWED: Set<String> = setOf("udea-render", "udea-agent-host")
+        val GL_ALLOWED: Set<String> = setOf("udea-render", "udea-agent-host", "udea-editor")
     }
 }

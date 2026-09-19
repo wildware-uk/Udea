@@ -191,8 +191,15 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
     )
 
     /** Scans one file, reusing a cached result when its bytes are unchanged. */
-    public fun scanFile(file: Path): FileScan {
-        val bytes = file.readBytes()
+    public fun scanFile(file: Path): FileScan = scanSource(file, file.readBytes())
+
+    /**
+     * Scans [bytes] as though they were [file]'s contents, which they need not be on disk yet.
+     *
+     * The editor's save (issue #195) finds the declaration it is about to rewrite in the text it
+     * is about to rewrite, not in whatever the file held a moment earlier.
+     */
+    internal fun scanSource(file: Path, bytes: ByteArray): FileScan {
         val hash = sha256Hex(bytes)
         val path = relative(file.toAbsolutePath().normalize())
         cache["$path@$hash"]?.let {

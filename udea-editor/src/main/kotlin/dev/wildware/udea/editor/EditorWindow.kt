@@ -40,6 +40,9 @@ internal fun EditorWindow(session: EditorSession) {
     PopupHost {
         Column(Modifier.fillMaxSize().background(Background)) {
             MenuBar(Modifier.fillMaxWidth()) {
+                Menu("&File") {
+                    Item("&Save", shortcut = KeyShortcut(Key.S, Modifiers(Modifiers.CONTROL))) { session.assets.save() }
+                }
                 Menu("&Edit") {
                     Item("&Undo", shortcut = KeyShortcut(Key.Z, Modifiers(Modifiers.CONTROL))) { session.undo() }
                 }
@@ -59,6 +62,7 @@ private fun Panels(session: EditorSession) {
     remember(windows) {
         windows.dockToScreen(CREATE, DockSide.Left)
         windows.dockToScreen(HISTORY, DockSide.Right)
+        windows.dockToScreen(ASSET, DockSide.Right)
     }
     DebugWindowHost(Modifier.fillMaxSize(), state = windows) {
         SceneView(session.viewportState, Modifier.fillMaxSize().testTag(EditorTags.VIEWPORT)) {
@@ -67,6 +71,9 @@ private fun Panels(session: EditorSession) {
         }
         DebugWindow("Create", id = CREATE) {
             Button(session.spawnLabel, onClick = { session.spawn() }, modifier = Modifier.fillMaxWidth().testTag(EditorTags.SPAWN))
+        }
+        DebugWindow("Asset", id = ASSET) {
+            AssetPanel(session.assets)
         }
         DebugWindow("History", id = HISTORY) {
             Column(Modifier.fillMaxWidth()) {
@@ -93,3 +100,4 @@ private const val GAP: Float = 8f
 /** The docked windows' ids, which the dock layout is keyed by. */
 private const val CREATE: String = "editor-create"
 private const val HISTORY: String = "editor-history"
+private const val ASSET: String = "editor-asset"

@@ -10,6 +10,7 @@ import dev.wildware.udea.assets.compiler.AssetCompiler
 import dev.wildware.udea.assets.compiler.AssetGraph
 import dev.wildware.udea.assets.compiler.DeclaredAsset
 import dev.wildware.udea.assets.compiler.pack.PackedValues
+import dev.wildware.udea.assets.compiler.edit.AssetSources
 import dev.wildware.udea.assets.compiler.scan.UdeaDeclarationScanner
 import dev.wildware.udea.assets.compiler.validate.UnresolvedReferenceValidator
 import dev.wildware.udea.assets.compiler.validate.ValidationContext
@@ -90,6 +91,12 @@ public class AssetDaemon(
     private val compiler = AssetCompiler(repoRoot, assetRoot, resolvedClasspath, cacheDirectory)
 
     private val scanner = UdeaDeclarationScanner(repoRoot, assetRoot)
+
+    /**
+     * The scripts read for editing (issue #195): which value each field is written as, and where.
+     * Over this daemon's own scanner, so a save and a reload agree on every id.
+     */
+    public val sources: AssetSources = AssetSources(repoRoot, assetRoot, scanner)
 
     /** Per-file pass-2 output, so a reload recompiles one file and re-merges rather than all. */
     private val byFile = LinkedHashMap<Path, List<DeclaredAsset>>()

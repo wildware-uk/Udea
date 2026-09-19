@@ -36,12 +36,15 @@ class AssetsToolsetTest {
         assertEquals(
             listOf(
                 "assets.changed_since",
+                "assets.create",
+                "assets.fields",
                 "assets.get",
                 "assets.graph",
                 "assets.list",
                 "assets.patch",
                 "assets.resolve_reference",
                 "assets.search",
+                "assets.set",
                 "assets.validate",
                 "assets.write",
             ),

@@ -247,6 +247,18 @@ val editorTest = tasks.register<Test>("editorTest") {
     description = "The editor window's buttons against the real editor tools, headless."
     testClassesDirs = editorTestSources.output.classesDirs
     classpath = editorTestSources.runtimeClasspath
+
+    // `MobaEditorSaveTest` (issue #195) saves into a copy of the game's asset scripts through the
+    // real asset daemon, so it needs the tree to copy and the classpath the daemon compiles against -
+    // the same one `run` and `runEditor` hand theirs. The tree is an input, so an edited script reruns it.
+    systemProperty("udea.moba.gameAssets", gameAssetRoot.asFile.absolutePath)
+    inputs.dir(gameAssetRoot).withPropertyName("gameAssets").withPathSensitivity(PathSensitivity.RELATIVE)
+    val scriptClasspath: FileCollection = files(udeaAssetScript)
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            listOf("-Dudea.assetsCompiler.classpath=" + scriptClasspath.asPath)
+        },
+    )
 }
 
 tasks.named("check") { dependsOn(editorTest) }

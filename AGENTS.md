@@ -254,7 +254,9 @@ under the author `editor`, so an agent calling with `session=editor` sees and un
 **The tool surface is the editor.** The window shows the world in a Scene tab, through the editor's
 own camera, and a Game tab, the game's own picture (issue #234); `editor.screenshot` with
 `view=scene` or `view=game` captures either, gizmos included, while `render.screenshot` never holds
-a gizmo - the same structural exclusion as the agent overlay's.
+a gizmo - the same structural exclusion as the agent overlay's. Both tabs sit in the gap the docked
+panels leave and fill it at its own shape, and in an editor the game's frame is the Game tab's size,
+so `render.screenshot` is too: it follows a divider drag (#234).
 
 | Endpoint | Answers |
 |---|---|

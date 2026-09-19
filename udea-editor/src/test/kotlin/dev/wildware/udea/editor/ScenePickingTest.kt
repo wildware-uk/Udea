@@ -15,6 +15,7 @@ import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.editor.gizmo.DragConstraint
 import dev.wildware.udea.editor.gizmo.Gizmo
+import dev.wildware.udea.editor.gizmo.GizmoFrame
 import dev.wildware.udea.editor.gizmo.GizmoScope
 import dev.wildware.udea.editor.gizmo.GizmoTarget
 import dev.wildware.udea.editor.gizmo.HandleLayer
@@ -172,7 +173,7 @@ class ScenePickingTest {
     fun `a gizmo handle is hit before the entity under it, and the entity is picked beside it`() {
         // A test gizmo on the public API: one handle at the left square's centre.
         val marker = Marker()
-        val handles = HandleLayer { MarkerGizmo.handles(GizmoTarget(left, marker, WorldPoint(worldX(-SPREAD), worldY(0f)))) }
+        val handles = HandleLayer { GizmoFrame.of(MarkerGizmo.handles(GizmoTarget(left, marker, WorldPoint(worldX(-SPREAD), worldY(0f))))) }
         val session = session(apart(), handles = handles)
         open(session).use { ui ->
             click(ui, session, at(-SPREAD, 0f))

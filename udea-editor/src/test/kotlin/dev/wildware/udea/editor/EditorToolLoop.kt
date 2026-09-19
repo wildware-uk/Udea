@@ -8,6 +8,7 @@ import dev.wildware.udea.agent.activity.AgentSessions
 import dev.wildware.udea.agent.dispatch.AgentRuntime
 import dev.wildware.udea.agent.dispatch.ToolIndex
 import dev.wildware.udea.agent.query.AgentComponentIndex
+import dev.wildware.udea.agent.query.AgentComponentType
 import dev.wildware.udea.agent.query.agentComponent
 import dev.wildware.udea.agent.tools.EditorToolset
 import dev.wildware.udea.agent.tools.EngineToolModules
@@ -32,11 +33,18 @@ import kotlinx.serialization.json.jsonPrimitive
  * `editor` author - and not the window's copy of it, so the window's `editor.select` calls go through
  * the same `EditorToolset` an agent's HTTP call reaches, and [selection] asks it the way an agent does.
  */
-internal class EditorToolLoop(val host: GameHost) {
+internal class EditorToolLoop(
+    val host: GameHost,
+    /** What the tools can address. One by default, because an index of none refuses to exist; selecting reads none. */
+    components: List<AgentComponentType> = listOf(agentComponent("PhysicsBody", PhysicsBodyReplicator, PhysicsBody)),
+) {
 
     val bridge: AgentBridge = AgentBridge()
 
     val sessions: AgentSessions = AgentSessions()
+
+    /** The components the tools address, by name: what the editor's gizmos are given to name theirs. */
+    val components: AgentComponentIndex = AgentComponentIndex(components)
 
     /** The author the editor window files under. */
     val author: AgentSessionId = sessions.intern(AUTHOR)
@@ -47,8 +55,7 @@ internal class EditorToolLoop(val host: GameHost) {
             ToolIndex.builder(),
             EditorToolset(
                 world = host.world,
-                // One component, because an index of none refuses to exist; selecting reads none.
-                components = AgentComponentIndex(listOf(agentComponent("PhysicsBody", PhysicsBodyReplicator, PhysicsBody))),
+                components = this.components,
                 netIds = host.ctx[CoreModule.NET_IDS],
                 sessions = sessions,
                 bridge = bridge,
@@ -71,15 +78,31 @@ internal class EditorToolLoop(val host: GameHost) {
 
     /** The `editor` author's selection, as an agent calling `editor.selection` with `session=editor` reads it. */
     fun selection(): List<NetId> {
-        val command = AgentCommand("editor.selection", emptyMap(), session = author)
+        val answer = call("editor.selection")
+        // Read here rather than through the window's own parser, so a fault in that cannot agree with itself.
+        val authors = Json.parseToJsonElement(answer).jsonObject.getValue("authors").jsonArray.map { it.jsonObject }
+        val own = authors.singleOrNull { it.getValue("author").jsonPrimitive.content == AUTHOR } ?: return emptyList()
+        return own.getValue("ids").jsonArray.map { NetId.ofRaw(it.jsonPrimitive.int) }
+    }
+
+    /** Selects [entities] for the `editor` author, as an agent calling `editor.select` with `session=editor` does. */
+    fun select(entities: List<NetId>) {
+        call("editor.select", mapOf("entities" to entities.joinToString(",") { it.raw.toString() }, "mode" to "replace"))
+    }
+
+    /** The tools of the `editor` author's undo history, newest first, as `editor.history` lists them. */
+    fun history(): List<String> =
+        Json.parseToJsonElement(call("editor.history")).jsonObject.getValue("edits").jsonArray
+            .map { it.jsonObject.getValue("tool").jsonPrimitive.content }
+
+    /** Runs [tool] as the `editor` author, now, and answers its JSON; fails the test if the tool refused. */
+    private fun call(tool: String, args: Map<String, String> = emptyMap()): String {
+        val command = AgentCommand(tool, args, session = author)
         bridge.submit(command)
         pump()
         val answer = bridge.commandResults().single { it.id == command.id }.result
-        check(answer is AgentResult.Ok) { "editor.selection failed: $answer" }
-        // Read here rather than through the window's own parser, so a fault in that cannot agree with itself.
-        val authors = Json.parseToJsonElement(answer.json).jsonObject.getValue("authors").jsonArray.map { it.jsonObject }
-        val own = authors.singleOrNull { it.getValue("author").jsonPrimitive.content == AUTHOR } ?: return emptyList()
-        return own.getValue("ids").jsonArray.map { NetId.ofRaw(it.jsonPrimitive.int) }
+        check(answer is AgentResult.Ok) { "$tool failed: $answer" }
+        return answer.json
     }
 
     override fun toString(): String = "EditorToolLoop($host)"

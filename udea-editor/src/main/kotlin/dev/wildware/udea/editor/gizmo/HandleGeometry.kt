@@ -72,6 +72,9 @@ public sealed interface HandleShape {
     /** A box corner: resizes. */
     public data object BoxCorner : HandleShape
 
+    /** The middle of a box's side that faces along [axis]: resizes along that axis alone. */
+    public data class BoxEdge(val axis: Axis) : HandleShape
+
     /** A line from the handle to [to], a world point: a radius spoke, a tether. */
     public data class Line(val to: WorldPoint) : HandleShape
 
@@ -106,12 +109,18 @@ public data class Drag(
     /** How much further from [centre] the drag is now than when it began: a radius's change. */
     public fun stretchFrom(centre: WorldPoint): Float = at.distanceTo(centre) - start.distanceTo(centre)
 
+    /** How far the drag has moved along [direction], a unit direction such as [AxisFrame.direction]. */
+    public fun along(direction: WorldPoint): Float = dx * direction.x + dy * direction.y + dz * direction.z
+
     /**
-     * How much a box centred on [centre] grows along [axis] when its corner follows this drag: twice
-     * the change in the corner's distance from the centre on that axis, because both faces move.
+     * How much a box centred on [centre] grows along [axis] of [axes] when its corner follows this
+     * drag: twice the change in the corner's distance from the centre along that axis, because both
+     * faces move. [axes] is the box's own frame; the world's by default.
      */
-    public fun spread(axis: Axis, centre: WorldPoint): Float =
-        2f * (abs(on(axis, at) - on(axis, centre)) - abs(on(axis, start) - on(axis, centre)))
+    public fun spread(axis: Axis, centre: WorldPoint, axes: AxisFrame = AxisFrame.WORLD): Float {
+        val direction = axes.direction(axis)
+        return 2f * (abs(offset(at, centre, direction)) - abs(offset(start, centre, direction)))
+    }
 
     /**
      * The angle in radians the drag has turned about the up axis through [centre], anticlockwise
@@ -129,11 +138,9 @@ public data class Drag(
         }
     }
 
-    private fun on(axis: Axis, point: WorldPoint): Float = when (axis) {
-        Axis.X -> point.x
-        Axis.Y -> point.y
-        Axis.Z -> point.z
-    }
+    /** How far [point] is from [centre] along [direction]. */
+    private fun offset(point: WorldPoint, centre: WorldPoint, direction: WorldPoint): Float =
+        (point.x - centre.x) * direction.x + (point.y - centre.y) * direction.y + (point.z - centre.z) * direction.z
 
     private companion object {
         const val PI_F: Float = PI.toFloat()

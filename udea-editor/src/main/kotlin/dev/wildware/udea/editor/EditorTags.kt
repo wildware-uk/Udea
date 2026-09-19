@@ -24,6 +24,17 @@ public object EditorTags {
     /** The Game tab's toggle that draws gizmos over the game, read-only. */
     internal const val GAME_GIZMOS: String = "editor:game-gizmos"
 
+    /** The Scene tab's grid snapping toggle and its step (issue #236). */
+    internal const val GRID_SNAP: String = "editor:grid-snap"
+    internal const val GRID_STEP: String = "editor:grid-step"
+
+    /** The Scene tab's angle snapping toggle and its step, in degrees. */
+    internal const val ANGLE_SNAP: String = "editor:angle-snap"
+    internal const val ANGLE_STEP: String = "editor:angle-step"
+
+    /** The Scene tab's world/local axes switch. */
+    internal const val AXES: String = "editor:axes"
+
     /** The Create panel: its docked window's id, which the dock layout is keyed by. */
     internal const val CREATE_PANEL: String = "editor-create"
 

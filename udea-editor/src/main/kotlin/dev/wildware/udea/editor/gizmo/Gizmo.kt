@@ -47,10 +47,16 @@ public interface Gizmo<C : Component<C>> {
  * check its gizmo headless, as `udea-codegen`'s tests check a generated gizmo against a hand-written
  * one. It never touches the world.
  */
-public fun <C : Component<C>> Gizmo<C>.handles(target: GizmoTarget<C>): List<Handle<C>> {
+public fun <C : Component<C>> Gizmo<C>.handles(target: GizmoTarget<C>): List<Handle<C>> = built(target).handles
+
+/** What one run of a gizmo's [Gizmo.build] declared: its handles and its guides, each in order. */
+internal class Built<C : Component<C>>(val handles: List<Handle<C>>, val guides: List<Guide>)
+
+/** Runs [this] gizmo once for [target]: the one place [Gizmo.build] is called. */
+internal fun <C : Component<C>> Gizmo<C>.built(target: GizmoTarget<C>): Built<C> {
     val scope = GizmoScope(target.entity, component)
     with(this) { scope.build(target) }
-    return scope.declared()
+    return Built(scope.declared(), scope.guides())
 }
 
 /**
@@ -61,11 +67,15 @@ public fun <C : Component<C>> Gizmo<C>.handles(target: GizmoTarget<C>): List<Han
  *   [DragScope.write], and nothing else may change it.
  * @property origin the entity's position in the world, from whatever places it. A gizmo whose
  *   component is not itself a position - a radius, a range, a size - draws around this point.
+ * @property axes the axes the editor wants handles aligned to (issue #236): the world's, or the
+ *   entity's own when the editor's axes switch is on local. A gizmo hands it to
+ *   [GizmoScope.handle]; one that does not is aligned to the world whatever the switch says.
  */
 public class GizmoTarget<C : Component<C>>(
     public val entity: NetId,
     public val component: C,
     public val origin: WorldPoint,
+    public val axes: AxisFrame = AxisFrame.WORLD,
 ) {
     override fun toString(): String = "GizmoTarget($entity at $origin)"
 }

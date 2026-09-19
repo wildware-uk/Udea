@@ -18,12 +18,17 @@ public class GizmoScope<C : Component<C>> internal constructor(
 
     private val declared = ArrayList<Handle<C>>()
 
+    private val guides = ArrayList<Guide>()
+
     /**
      * Declares one handle.
      *
      * @param at where the handle sits, in world space.
      * @param shape what the editor draws there. Every shape keeps its size on screen.
      * @param constraint the line or plane the editor holds the handle to while it is dragged.
+     * @param axes the frame [shape] and [constraint] name their axes in: an [HandleShape.Arrow] along
+     *   [Axis.X] points along `axes.x`, and a drag [DragConstraint.Along] it is held to that line. The
+     *   world's by default; pass [GizmoTarget.axes] to follow the editor's world/local switch.
      * @param respond turns a [Drag] into field writes, through [DragScope.write]. The editor keeps
      *   the handle it pressed for the whole drag and calls this with every move, while the drag
      *   itself changes the component live - so compute from what this frame of [Gizmo.build] read,
@@ -33,12 +38,20 @@ public class GizmoScope<C : Component<C>> internal constructor(
         at: WorldPoint,
         shape: HandleShape,
         constraint: DragConstraint,
+        axes: AxisFrame = AxisFrame.WORLD,
         respond: DragScope<C>.(Drag) -> Unit,
     ) {
-        declared += Handle(at, shape, constraint, entity, component, respond)
+        declared += Handle(at, shape, constraint, axes, entity, component, respond)
+    }
+
+    /** Declares a [Guide]: drawn in world space under the handles, and never grabbed. */
+    public fun guide(guide: Guide) {
+        guides += guide
     }
 
     internal fun declared(): List<Handle<C>> = declared
+
+    internal fun guides(): List<Guide> = guides
 }
 
 /**
@@ -55,6 +68,8 @@ public class Handle<C : Component<C>> internal constructor(
     public val shape: HandleShape,
     /** The line or plane a drag holds the handle to. */
     public val constraint: DragConstraint,
+    /** The frame [shape] and [constraint] name their axes in. */
+    public val axes: AxisFrame,
     private val entity: NetId,
     private val component: ComponentType<C>,
     private val respond: DragScope<C>.(Drag) -> Unit,
@@ -95,19 +110,23 @@ public class DragScope<C : Component<C>> internal constructor(
      * A property reference, so a hand-written gizmo names a field the compiler has checked, exactly
      * as a generated one does. Only its name is read - a callable reference carries it, with no
      * reflection library involved - and it is never used to set anything.
+     *
+     * @param snap what kind of value this is, so the editor can round it to the person's grid or
+     *   angle step (issue #236). The gizmo never rounds: the steps are preferences, not gizmo code.
      */
-    public fun write(field: KMutableProperty1<C, Float>, value: Float) {
+    public fun write(field: KMutableProperty1<C, Float>, value: Float, snap: Snap = Snap.None) {
         val name = FieldName(field.name)
         require(value.isFinite()) { "a drag wrote $value to '${name.value}', which is not a finite number" }
         require(writes.none { it.field == name }) { "a drag wrote '${name.value}' twice; each field is written once per drag" }
-        writes += FieldWrite(entity, component, name, value)
+        writes += FieldWrite(entity, component, name, value, snap)
     }
 
     internal fun written(): List<FieldWrite> = writes
 }
 
 /**
- * One field a drag changes: on which entity, in which component, which field, to what.
+ * One field a drag changes: on which entity, in which component, which field, to what - and how the
+ * editor may round it ([snap]).
  *
  * What the editor turns into an edit session's `Component.field=value`, so a drag reaches the world
  * through the same `editor.*` tools an agent calls.
@@ -117,6 +136,7 @@ public data class FieldWrite(
     val component: ComponentType<*>,
     val field: FieldName,
     val value: Float,
+    val snap: Snap = Snap.None,
 )
 
 /** A component field's declared name, as the component's own property is called. */

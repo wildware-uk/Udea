@@ -23,6 +23,7 @@ import dev.wildware.udea.render.draw.SpriteTexture
 import dev.wildware.udea.render.support.ManualFrameClock
 import dev.wildware.udea.render.support.testTargets
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -123,6 +124,34 @@ class WorldViewportTest {
         assertNear(marker.x, inGame.x + Square.SIZE / 2f, "the Game view's gizmo is not on the game's (0, 0)")
         assertNear(marker.x + PAN_X, inScene.x + Square.SIZE / 2f, "the Scene view's gizmo is not on its (0, 0)")
         assertEquals(emptyList(), targets.batch.home.fills(GIZMO), "a gizmo reached the capturable record")
+    }
+
+    @Test
+    fun `a gizmo line is one strip from its first end to its second, as thick as asked, turned to face along it`() {
+        val scene = view(EditorCamera())
+        scene.gizmos = object : GizmoLayer {
+            override fun draw(canvas: GizmoCanvas) {
+                // Three across and four up from (10, 20): five long, at atan(4 / 3) from the x axis.
+                canvas.line(10f, 20f, 40f, 60f, 2f, GIZMO)
+            }
+        }
+        pipeline.open(scene)
+        pipeline.render(0.5f)
+
+        assertEquals(1, scene.record.fills(GIZMO).size, "a line is one strip")
+        // The world's marker is drawn into the view first; the strip is the instance in the gizmo's colour.
+        val strip = (0 until scene.record.instanceCount).single { scene.record.tints[it] == GIZMO.packed }
+        val floats = scene.record.floats.copyOfRange(strip * SpriteBatch2D.FLOATS_PER_INSTANCE, (strip + 1) * SpriteBatch2D.FLOATS_PER_INSTANCE)
+        // The unturned strip starts at the first end and is centred on the line across its thickness...
+        assertNear(10f, floats[SpriteBatch2D.X], "the strip does not start at the line's first end")
+        assertNear(19f, floats[SpriteBatch2D.Y], "the strip is not centred on the line")
+        assertNear(50f, floats[SpriteBatch2D.WIDTH], "the strip is not as long as the line")
+        assertNear(2f, floats[SpriteBatch2D.HEIGHT], "the strip is not as thick as asked")
+        // ...and turns about the first end, so its far end lands on the second.
+        assertNear(0f, floats[SpriteBatch2D.ORIGIN_X], "the strip does not turn about the line's first end")
+        assertNear(1f, floats[SpriteBatch2D.ORIGIN_Y], "the strip does not turn about the line's first end")
+        assertNear(Math.toDegrees(atan2(40.0, 30.0)).toFloat(), floats[SpriteBatch2D.ROTATION], "the strip does not face along the line")
+        assertEquals(emptyList(), targets.batch.home.fills(GIZMO), "a gizmo line reached the capturable record")
     }
 
     @Test

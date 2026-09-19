@@ -22,11 +22,13 @@ import dev.wildware.udea.editor.gizmo.Gizmo
 import dev.wildware.udea.editor.gizmo.GizmoTarget
 import dev.wildware.udea.editor.gizmo.HandleShape
 import dev.wildware.udea.editor.gizmo.Plane
+import dev.wildware.udea.editor.gizmo.Snap
 import dev.wildware.udea.editor.gizmo.WorldPoint
 import dev.wildware.udea.editor.gizmo.handles
 import dev.wildware.udea.generated.CodegenFixturesGizmoRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * The gizmos `kspTest` generated from the handle annotations in `fixtures/Gizmos.kt`, run headless
@@ -89,25 +91,30 @@ class GeneratedGizmoTest {
         val target = GizmoTarget(entity, Beacon(reach = 2.5f), origin = WorldPoint(0f, 0f))
         val writes = BeaconReachRadiusGizmo.handles(target).single().drag(dragFrom(WorldPoint(2.5f, 0f), 1f, 0f))
 
-        assertEquals(listOf(FieldWrite(entity, Beacon, FieldName("reach"), 3.5f)), writes)
+        assertEquals(listOf(FieldWrite(entity, Beacon, FieldName("reach"), 3.5f, Snap.Grid)), writes)
     }
 
     // --- what each annotation does ---------------------------------------------------------------
 
     @Test
-    fun `a 2D position handle sits on the entity, on the ground plane, and moves it by the drag`() {
+    fun `a 2D position is the built-in move, on the entity, on the ground plane, moving it by the drag`() {
         val beacon = Beacon(x = 4f, y = -2f)
-        val handle = BeaconPositionGizmo.handles(GizmoTarget(entity, beacon, WorldPoint(4f, -2f))).single()
+        val handles = BeaconPositionGizmo.handles(GizmoTarget(entity, beacon, WorldPoint(4f, -2f)))
 
-        assertEquals(WorldPoint(4f, -2f, 0f), handle.at)
-        assertEquals(HandleShape.PlaneSquare(Plane.XY), handle.shape)
-        assertEquals(DragConstraint.Across(Plane.XY), handle.constraint)
+        // Two axis arrows and the free square (issue #236), all on the entity.
+        assertEquals(
+            listOf(HandleShape.Arrow(Axis.X), HandleShape.Arrow(Axis.Y), HandleShape.PlaneSquare(Plane.XY)),
+            handles.map { it.shape },
+        )
+        assertTrue(handles.all { it.at == WorldPoint(4f, -2f, 0f) }, "a move handle is not on the entity")
+        val free = handles.last()
+        assertEquals(DragConstraint.Across(Plane.XY), free.constraint)
         // Grabbed off-centre, at (5, -1): the offset cancels, and the beacon moves by the drag.
-        val writes = handle.drag(Drag(WorldPoint(5f, -1f), WorldPoint(8f, 3f)))
+        val writes = free.drag(Drag(WorldPoint(5f, -1f), WorldPoint(8f, 3f)))
         assertEquals(
             listOf(
-                FieldWrite(entity, Beacon, FieldName("x"), 7f),
-                FieldWrite(entity, Beacon, FieldName("y"), 2f),
+                FieldWrite(entity, Beacon, FieldName("x"), 7f, Snap.Grid),
+                FieldWrite(entity, Beacon, FieldName("y"), 2f, Snap.Grid),
             ),
             writes,
         )

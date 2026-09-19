@@ -1,7 +1,11 @@
 package dev.wildware.udea.render
 
 import dev.wildware.udea.core.loop.Presentation
+import dev.wildware.udea.render.camera.CameraRig
 import dev.wildware.udea.render.capture.FrameCaptureSlot
+import dev.wildware.udea.render.view.EditorCamera
+import dev.wildware.udea.render.view.ViewCursor
+import dev.wildware.udea.render.view.WorldViewport
 
 /**
  * One frame, in order: everything capturable, then the capture point, then the overlay.
@@ -71,7 +75,24 @@ public class RenderPipeline internal constructor(
      * [dispose].
      */
     private val owned: List<RenderResource>,
+    /**
+     * The systems an editor's Scene view draws again through its own camera: every capturable
+     * system except the [RenderPhase.UI] phase's, in the same order. The HUD is the game's screen,
+     * not its world, so the Scene tab does not show it (issue #234).
+     */
+    private val viewSystems: List<RenderSystem> = emptyList(),
+    /** Which view the systems are drawing for, shared with every system's [RenderResources]. */
+    private val cursor: ViewCursor = ViewCursor(),
 ) : Presentation {
+
+    /** The editor views open on this pipeline, drawn after the capture point in opening order. */
+    private val viewports = ArrayList<WorldViewport>()
+
+    /**
+     * The game's cameras, which a Scene view swaps its own projection into. Resolved once, like
+     * [resizables]: a `filterIsInstance` per frame is a per-frame scan.
+     */
+    private val rigs: List<CameraRig> = systems.filterIsInstance<CameraRig>()
 
     private var disposed: Boolean = false
 
@@ -100,6 +121,7 @@ public class RenderPipeline internal constructor(
         // Before anything records: the pass still holds the pixels of the frame that claimed a
         // capture at its capture point, and nothing below has been drawn yet.
         capture?.collect()
+        for (index in viewports.indices) viewports[index].captures?.collect()
 
         targets.surface.begin()
 
@@ -120,6 +142,11 @@ public class RenderPipeline internal constructor(
             // ---- capture point (spec 3.7) ----
             // Claims the requests this frame satisfies. The read is `collect`'s, next frame.
             capture?.drain(targets.offscreen)
+
+            // ---- editor views (issue #234) ----
+            // After the capture point, so nothing a view draws is in the frame a capture claimed;
+            // and into passes of their own, which no capture reads. See `WorldViewport`.
+            for (index in viewports.indices) renderView(viewports[index], alpha)
         } finally {
             targets.surface.endAndPresent(targets.screen)
         }
@@ -141,12 +168,75 @@ public class RenderPipeline internal constructor(
     public fun dispose() {
         if (disposed) return
         disposed = true
+        // Views first: each holds a pass on the scene the owned resources below release.
+        for (index in viewports.indices.reversed()) viewports[index].close()
         // Waiters first: a caller awaiting a capture must be told the pipeline has gone before its
         // resources are released, or it waits out its whole deadline on a pipeline that can no
         // longer draw the frame it is waiting for.
         capture?.close()
         for (index in owned.indices.reversed()) {
             owned[index].release()
+        }
+    }
+
+    /**
+     * Starts drawing [view] every frame, after the capture point, until it is closed.
+     *
+     * Internal: a view is made on the render thread by the backend that owns its Kool pass
+     * (`KoolBackend.openGameView`, `openSceneView`), which then hands it here.
+     */
+    internal fun open(view: WorldViewport) {
+        check(!disposed) { "RenderPipeline has been disposed and cannot open $view" }
+        viewports += view
+        view.onClose { viewports.remove(view) }
+    }
+
+    /**
+     * Fails every capture still waiting on this pipeline or on one of its views: the render loop
+     * has gone, so no frame will ever read them. On the render thread, as its loop exits.
+     */
+    internal fun closeCaptures() {
+        capture?.close()
+        for (index in viewports.indices) viewports[index].captures?.close()
+    }
+
+    /**
+     * Draws one editor view: the capturable frame again for the Game tab, the world again through
+     * the editor camera for the Scene tab; then the view's gizmos; then its capture point.
+     */
+    private fun renderView(view: WorldViewport, alpha: Float) {
+        view.begin()
+        val rig = if (rigs.isEmpty()) null else rigs[0]
+        val camera = view.camera
+        if (camera == null) {
+            view.drawFrame()
+            view.drawGizmos(rig?.projection)
+        } else {
+            if (rig != null) camera.adopt(rig.camera, rig.viewport)
+            camera.fit(view.width, view.height)
+            drawWorld(view, camera, alpha)
+            view.drawGizmos(null)
+        }
+        view.captures?.drain(view.target)
+    }
+
+    /**
+     * Runs [viewSystems] into [view]'s record, with every rig's projection swapped for [camera]'s.
+     *
+     * The systems draw with the batch they were built with; [RenderTargets.batch] is pointed at the
+     * view's record for the length of the run, and back at its own in a `finally`, so a system that
+     * throws cannot leave the capturable frame's draws going into an editor view.
+     */
+    private fun drawWorld(view: WorldViewport, camera: EditorCamera, alpha: Float) {
+        targets.batch.recordInto(view.record)
+        cursor.current = view
+        for (index in rigs.indices) rigs[index].enterView(camera.projection)
+        try {
+            for (index in viewSystems.indices) viewSystems[index].render(view.target, alpha)
+        } finally {
+            for (index in rigs.indices) rigs[index].leaveView()
+            cursor.current = null
+            targets.batch.recordInto(null)
         }
     }
 

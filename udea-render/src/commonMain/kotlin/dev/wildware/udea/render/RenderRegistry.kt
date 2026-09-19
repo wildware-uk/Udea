@@ -4,6 +4,7 @@ import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.render.capture.FrameCaptureSlot
+import dev.wildware.udea.render.view.ViewCursor
 
 /**
  * Where a game declares what it draws, and in what order.
@@ -121,7 +122,8 @@ public class RenderRegistry(
         ctx: GameContext,
         targets: RenderTargets,
     ): RenderPipeline {
-        val resources = RenderResources(targets.batch, targets.offscreen, targets.passes)
+        val cursor = ViewCursor()
+        val resources = RenderResources(targets.batch, targets.offscreen, targets.passes, cursor)
         // A second, deliberately poorer set for the overlay side: the screen batch and the window,
         // and no capturable target or capturable batch anywhere on it (spec 3.7).
         val overlayResources = OverlayResources(targets.screenBatch, targets.screen)
@@ -134,12 +136,17 @@ public class RenderRegistry(
         }
 
         val systems = ArrayList<RenderSystem>(entries.size)
+        val viewSystems = ArrayList<RenderSystem>(entries.size)
         val overlays = ArrayList<OverlaySystem>()
 
         for (phase in RenderPhase.entries) {
             for (index in orderWithin(phase, instances)) {
                 when (val instance = instances[index]) {
-                    is Bound.Scene -> systems += instance.system
+                    is Bound.Scene -> {
+                        systems += instance.system
+                        // An editor's Scene view shows the world, not the game's screen (issue #234).
+                        if (phase != RenderPhase.UI) viewSystems += instance.system
+                    }
                     is Bound.Overlay -> overlays += instance.system
                 }
             }
@@ -156,6 +163,8 @@ public class RenderRegistry(
             timer,
             capture,
             targets.owned + resources.owned() + overlayResources.owned(),
+            viewSystems,
+            cursor,
         )
     }
 

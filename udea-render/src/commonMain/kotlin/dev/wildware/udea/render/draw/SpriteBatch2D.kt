@@ -37,25 +37,27 @@ package dev.wildware.udea.render.draw
 public class SpriteBatch2D internal constructor(
     /** The one white texel [fill] stretches and tints. */
     private val whitePixel: SpriteTexture,
+    /** Where this batch's draws go when nothing has redirected them: see [recordInto]. */
+    internal val home: SpriteRecord = SpriteRecord(),
 ) {
 
-    /** Pixel-space instance data, [FLOATS_PER_INSTANCE] per draw. */
-    internal var floats: FloatArray = FloatArray(INITIAL_INSTANCES * FLOATS_PER_INSTANCE)
-        private set
+    /**
+     * The record draws land in: [home], except while [recordInto] has pointed them at another.
+     *
+     * The redirect exists for one caller, an editor's Scene view (issue #234): it runs the world's
+     * render systems a second time through its own camera, and their draws - made with the batch
+     * they were built with - have to land in the view's record rather than the capturable one.
+     */
+    private var record: SpriteRecord = home
 
-    /** One packed tint per draw. */
-    internal var tints: IntArray = IntArray(INITIAL_INSTANCES)
-        private set
+    /** Pixel-space instance data of the current record, [FLOATS_PER_INSTANCE] per draw. */
+    internal val floats: FloatArray get() = record.floats
 
-    /** Draws recorded since the last [clear]. */
-    internal var instanceCount: Int = 0
-        private set
+    /** One packed tint per draw, of the current record. */
+    internal val tints: IntArray get() = record.tints
 
-    /** The texture of each run. */
-    private val runTextures = ArrayList<SpriteTexture>()
-
-    /** Index of the first instance of each run; the run ends where the next begins. */
-    private var runStarts: IntArray = IntArray(INITIAL_RUNS)
+    /** Draws recorded into the current record since it was last cleared. */
+    internal val instanceCount: Int get() = record.instanceCount
 
     private val projection = Projection2D()
 
@@ -63,17 +65,17 @@ public class SpriteBatch2D internal constructor(
     public var isDrawing: Boolean = false
         private set
 
-    /** How many runs - and so how many draw calls - the recorded frame needs. */
-    internal val runCount: Int get() = runTextures.size
+    /** How many runs - and so how many draw calls - the current record needs. */
+    internal val runCount: Int get() = record.runCount
 
     /** The texture every draw in run [run] samples. */
-    internal fun runTexture(run: Int): SpriteTexture = runTextures[run]
+    internal fun runTexture(run: Int): SpriteTexture = record.runTexture(run)
 
     /** First instance index of run [run]. */
-    internal fun runStart(run: Int): Int = runStarts[run]
+    internal fun runStart(run: Int): Int = record.runStart(run)
 
     /** One past the last instance index of run [run]. */
-    internal fun runEnd(run: Int): Int = if (run + 1 < runTextures.size) runStarts[run + 1] else instanceCount
+    internal fun runEnd(run: Int): Int = record.runEnd(run)
 
     /**
      * Starts a pass of draws in the units [projection] maps to pixels.
@@ -175,9 +177,26 @@ public class SpriteBatch2D internal constructor(
      * never by a renderer: a renderer that cleared the batch would erase every renderer before it.
      */
     internal fun clear() {
-        instanceCount = 0
-        runTextures.clear()
+        home.clear()
         isDrawing = false
+    }
+
+    /**
+     * Sends every draw from now on into [target], or back to [home] when it is `null`.
+     *
+     * Redirecting is refused mid-pass: a renderer between [begin] and [end] would have half its
+     * sprites in one record and half in the other. Coming home is not, because it is also the way
+     * out of a renderer that threw with a pass open; that pass is abandoned, and the next frame
+     * starts clean either way.
+     */
+    internal fun recordInto(target: SpriteRecord?) {
+        if (target == null) {
+            isDrawing = false
+            record = home
+            return
+        }
+        check(!isDrawing) { "SpriteBatch2D redirected between begin and end" }
+        record = target
     }
 
     /** The release hook for the white texel this batch owns. */
@@ -192,37 +211,7 @@ public class SpriteBatch2D internal constructor(
         u0: Float, v0: Float, du: Float, dv: Float,
         tint: Rgba,
     ) {
-        if (runTextures.isEmpty() || runTextures[runTextures.size - 1] !== texture) startRun(texture)
-        ensureInstanceCapacity(instanceCount + 1)
-        var at = instanceCount * FLOATS_PER_INSTANCE
-        val data = floats
-        data[at++] = px
-        data[at++] = py
-        data[at++] = pw
-        data[at++] = ph
-        data[at++] = ox
-        data[at++] = oy
-        data[at++] = rotation
-        data[at++] = u0
-        data[at++] = v0
-        data[at++] = du
-        data[at] = dv
-        tints[instanceCount] = tint.packed
-        instanceCount++
-    }
-
-    private fun startRun(texture: SpriteTexture) {
-        val run = runTextures.size
-        if (run == runStarts.size) runStarts = runStarts.copyOf(run * 2)
-        runStarts[run] = instanceCount
-        runTextures += texture
-    }
-
-    private fun ensureInstanceCapacity(instances: Int) {
-        if (instances <= tints.size) return
-        val grown = tints.size * 2
-        floats = floats.copyOf(grown * FLOATS_PER_INSTANCE)
-        tints = tints.copyOf(grown)
+        record.add(texture, px, py, pw, ph, ox, oy, rotation, u0, v0, du, dv, tint)
     }
 
     override fun toString(): String = "SpriteBatch2D($instanceCount instances in $runCount runs)"
@@ -244,8 +233,6 @@ public class SpriteBatch2D internal constructor(
         const val DU: Int = 9
         const val DV: Int = 10
 
-        private const val INITIAL_INSTANCES = 256
-        private const val INITIAL_RUNS = 16
     }
 }
 

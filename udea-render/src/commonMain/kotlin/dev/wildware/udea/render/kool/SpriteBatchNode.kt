@@ -25,10 +25,11 @@ import de.fabmax.kool.util.MemoryLayout
 import de.fabmax.kool.util.Struct
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteBatch2D
+import dev.wildware.udea.render.draw.SpriteRecord
 
 /**
- * Turns what a [SpriteBatch2D] recorded into Kool meshes: one instanced quad per run of draws that
- * share a texture, in the order the runs were drawn.
+ * Turns a [SpriteRecord] - what a [SpriteBatch2D] recorded - into Kool meshes: one instanced quad
+ * per run of draws that share a texture, in the order the runs were drawn.
  *
  * It syncs in its own `onUpdate`, which Kool runs while it collects the frame - after the render
  * pipeline has finished recording and before anything is drawn - so the meshes always show the
@@ -39,7 +40,7 @@ import dev.wildware.udea.render.draw.SpriteBatch2D
  * the difference.
  */
 internal class SpriteBatchNode(
-    private val batch: SpriteBatch2D,
+    private val record: SpriteRecord,
     name: String,
 ) : Node(name) {
 
@@ -52,9 +53,9 @@ internal class SpriteBatchNode(
         onUpdate += { sync() }
     }
 
-    /** Copies the batch's recorded runs into the pooled meshes. Render thread only. */
+    /** Copies the record's runs into the pooled meshes. Render thread only. */
     fun sync() {
-        val runs = batch.runCount
+        val runs = record.runCount
         while (meshes.size < runs) {
             val mesh = RunMesh(meshes.size)
             meshes += mesh
@@ -68,15 +69,15 @@ internal class SpriteBatchNode(
                 continue
             }
             mesh.mesh.isVisible = true
-            mesh.shader.colorMap = batch.runTexture(run).kool()
-            fill(mesh.instances, batch.runStart(run), batch.runEnd(run))
+            mesh.shader.colorMap = record.runTexture(run).kool()
+            fill(mesh.instances, record.runStart(run), record.runEnd(run))
         }
     }
 
     private fun fill(instances: MeshInstanceList<SpriteInstanceLayout>, start: Int, end: Int) {
         instances.clear()
-        val floats = batch.floats
-        val tints = batch.tints
+        val floats = record.floats
+        val tints = record.tints
         instances.addInstances(end - start) { buffer ->
             for (index in start until end) {
                 val at = index * SpriteBatch2D.FLOATS_PER_INSTANCE

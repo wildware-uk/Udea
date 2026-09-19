@@ -62,6 +62,9 @@ import dev.wildware.udea.render.view.WorldViewport
  * on one and never reads one, so the gizmos drawn into them cannot reach a capture either. A Game
  * tab's pass reads the capturable pass's picture; the other direction does not exist.
  *
+ * While a view is open the capturable pass is not presented to the window at all: the window is the
+ * editor's, and the world is in its views. Captures are untouched - they read the pass, not the window.
+ *
  * ## Why the capture's size never moves
  *
  * The pass is created at [width] x [height] and never resized. A human dragging the window changes
@@ -160,6 +163,9 @@ internal class KoolSurface(
     /** How many views [openView] has made, so each pass has a name of its own. */
     private var views = 0
 
+    /** How many of those are still open: while any is, the frame is not presented ([endAndPresent]). */
+    private var openViews = 0
+
     /**
      * An editor view of the world (issue #234): the Game tab when [camera] is `null`, the Scene tab
      * otherwise. Its pass is on this scene and is not a dependency of the capturable pass; the Game
@@ -183,6 +189,8 @@ internal class KoolSurface(
             kool = kool,
         )
         view.onClose { batch.releaseOwned() }
+        openViews++
+        view.onClose { openViews-- }
         return view
     }
 
@@ -217,6 +225,9 @@ internal class KoolSurface(
     override fun endAndPresent(screen: ScreenTarget) {
         screenBatch.clear()
         presentBatch.clear()
+        // An editor shows the world in its views and nowhere else (issue #234): a frame presented
+        // under its window as well would show through wherever the window's panels are not opaque.
+        if (openViews > 0) return
 
         // Letterboxed rather than stretched: a window of another aspect ratio shows the frame the
         // agent captures, at the same shape, with bars.

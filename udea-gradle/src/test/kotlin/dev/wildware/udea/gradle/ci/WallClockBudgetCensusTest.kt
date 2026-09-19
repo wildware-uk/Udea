@@ -338,6 +338,8 @@ class WallClockBudgetCensusTest {
                 "a deadline: how long to wait for the host loop to reach a tick",
             "udea-core/src/jvmTest/kotlin/dev/wildware/udea/core/identity/NetIdIndexTest.kt" to
                 "a ratio: resolution at 64 000 ids over resolution at 64, which is an O(1) claim",
+            "udea-editor/src/test/kotlin/dev/wildware/udea/editor/gl/GlEditorFixture.kt" to
+                "a deadline: how long to wait for the render thread to reach a frame",
             "udea-net/src/jvmTest/kotlin/dev/wildware/udea/net/proof/UdpProofClient.kt" to
                 "a deadline: the socket read timeout in the UDP proof client",
             "udea-net/src/jvmTest/kotlin/dev/wildware/udea/net/proof/UdpProofServer.kt" to
@@ -359,6 +361,10 @@ class WallClockBudgetCensusTest {
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlOverlayIsolationTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlUiLayerTest.kt" to
+                "a deadline: how long to wait for the render thread to reach a frame",
+            "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlViewPresentTest.kt" to
+                "a deadline: how long to wait for the render thread to reach a frame",
+            "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlViewResizeTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlWorldViewTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",

@@ -4,7 +4,6 @@ import com.github.quillraven.fleks.World
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
-import dev.wildware.udea.core.spatial.Transform3D
 import dev.wildware.udea.render.FrameTime
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderResources
@@ -12,6 +11,7 @@ import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.input.PointerMotion
 import dev.wildware.udea.render.input.PointerState
 import dev.wildware.udea.render.model.ModelCamera
+import dev.wildware.udea.render.model.ModelPlacer
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -53,9 +53,10 @@ import kotlin.math.sin
  * after the target with [followHalfLife]; the turn does not ease, because a view that lags the hand
  * turning it reads as a slow mouse.
  *
- * Where the target is: its `Transform3D`, as it stands - the same place `ModelRenderSystem` draws it
- * at, so the model and the middle of the picture cannot drift apart. [targetPosition] is the one
- * place that reads it.
+ * Where the target is: its `Transform3D` between where the last two ticks left it, at the render
+ * alpha (issue #246), read through the same `ModelPlacer` `ModelRenderSystem` draws with, so the
+ * model and the middle of the picture cannot drift apart. [targetPosition] is the one place that
+ * reads it.
  *
  * ## Facing, for camera-relative movement
  *
@@ -194,8 +195,15 @@ public class ThirdPersonRig(
     private var atY = 0f
     private var atZ = 0f
 
+    /**
+     * Where the target is drawn: `ModelRenderSystem`'s own placer, with no 2D lift, so a target is
+     * followed exactly where its model is drawn - interpolated when the world records poses.
+     */
+    private val placer = ModelPlacer(lift = null)
+
     override fun onBind(world: World, ctx: GameContext) {
         this.world = world
+        placer.bind(world, ctx.clock)
     }
 
     override fun render(target: OffscreenTarget, alpha: Float) {
@@ -204,7 +212,7 @@ public class ThirdPersonRig(
         // capturable frame; doing them again would ease twice as fast while an editor is open.
         if (resources.viewing.current != null) return
         turn()
-        follow()
+        follow(alpha)
         place()
     }
 
@@ -226,9 +234,9 @@ public class ThirdPersonRig(
     }
 
     /** Moves the focus towards the target, or onto it when the target is new. */
-    private fun follow() {
+    private fun follow(alpha: Float) {
         val id = target
-        if (id == null || !targetPosition(id)) {
+        if (id == null || !targetPosition(id, alpha)) {
             if (id == null) framed = null
             return
         }
@@ -247,20 +255,18 @@ public class ThirdPersonRig(
     }
 
     /**
-     * Writes where the entity [id] names stands into [atX], [atY] and [atZ]: its `Transform3D`.
-     *
-     * The one place the rig reads a target, so that when `Transform3D` gains a render-side interpolated
-     * pose (issue #246), following it is a change here alone.
+     * Writes where the entity [id] names is drawn this frame, at [alpha], into [atX], [atY] and [atZ]:
+     * its `Transform3D`, interpolated between the last two ticks as `ModelRenderSystem` draws it.
      *
      * @return false when [id] names no live entity, or one with no `Transform3D`.
      */
-    private fun targetPosition(id: NetId): Boolean {
+    private fun targetPosition(id: NetId, alpha: Float): Boolean {
         val world = world ?: return false
         val entity = netIds.resolveOrNull(id) ?: return false
-        val transform = with(world) { entity.getOrNull(Transform3D) } ?: return false
-        atX = transform.x
-        atY = transform.y
-        atZ = transform.z
+        if (!placer.place(world, entity, alpha)) return false
+        atX = placer.placed.x
+        atY = placer.placed.y
+        atZ = placer.placed.z
         return true
     }
 

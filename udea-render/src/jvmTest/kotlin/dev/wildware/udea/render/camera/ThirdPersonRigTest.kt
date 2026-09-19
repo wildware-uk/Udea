@@ -26,6 +26,7 @@ import dev.wildware.udea.render.draw.SpriteBatch2D
 import dev.wildware.udea.render.draw.SpriteRecord
 import dev.wildware.udea.render.draw.SpriteTexture
 import dev.wildware.udea.render.input.PointerMotion
+import dev.wildware.udea.render.interp.Interp3DSnapshotSystem
 import dev.wildware.udea.render.input.PointerState
 import dev.wildware.udea.render.model.ModelCamera
 import dev.wildware.udea.render.view.WorldViewport
@@ -228,6 +229,28 @@ class ThirdPersonRigTest {
         assertNear(10f, slow.rig.camera.targetX, "the camera never arrived on a target that stopped")
     }
 
+    /**
+     * The rig follows the target where its model is drawn: between the last two ticks at the render
+     * alpha (issue #246), not where the last tick left it. Following the raw transform would put the
+     * model a fraction of a tick off the middle of the picture on every frame between two ticks.
+     */
+    @Test
+    fun `the camera follows the interpolated pose the model is drawn at`() {
+        val fixture = Fixture(interpolated = true)
+        fixture.rig.followHalfLife = 0f
+        fixture.rig.focusHeight = 0f
+        val entity = fixture.spawnFollowed(x = 0f, y = 0f, z = 0f, moving = true)
+        fixture.sim.step()
+        val before = with(fixture.world) { entity[Transform3D].x }
+        fixture.sim.step()
+        val after = with(fixture.world) { entity[Transform3D].x }
+        assertTrue(after > before, "the target must have moved between the two ticks: $before to $after")
+
+        fixture.frame(alpha = 0.5f)
+
+        assertNear((before + after) / 2f, fixture.rig.camera.targetX, "the camera is not on the pose drawn at alpha 0.5")
+    }
+
     @Test
     fun `a new target is framed at once rather than eased to from the old one`() {
         val fixture = Fixture()
@@ -301,14 +324,18 @@ class ThirdPersonRigTest {
 
     // --- fixture -------------------------------------------------------------------------
 
-    private class Fixture(frameSeconds: Float = 1f / 60f) {
+    private class Fixture(frameSeconds: Float = 1f / 60f, interpolated: Boolean = false) {
 
         // A capturable random service: the snapshot the hash is taken over carries its streams.
         val ctx: GameContext = testGameContext(seed = SEED) { rng = DefaultRngService(SEED) }
 
         val world: World = configureWorld {
             injectables { gameContext(ctx) }
-            systems { add(WalkSystem()) }
+            systems {
+                add(WalkSystem())
+                // Last, as `RenderModule` registers it: it records the pose the whole tick produced.
+                if (interpolated) add(Interp3DSnapshotSystem())
+            }
         }
 
         val sim = WorldSimulation(ctx, world)
@@ -336,7 +363,7 @@ class ThirdPersonRigTest {
             if (moving) it += Walker()
         }.also { entity -> rig.target = netIds.allocate(entity) }
 
-        fun frame() = rig.render(target, alpha = 1f)
+        fun frame(alpha: Float = 1f) = rig.render(target, alpha)
 
         fun hash(): Long = WorldHasher.hash(snapshots.capture())
     }

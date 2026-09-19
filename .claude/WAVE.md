@@ -447,7 +447,8 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 ## Wave 16 (2026-09-19): in flight
 
 - #235: merged, round 1 PASS (no findings). Merged tree == reviewed tree. Left button selects (gizmo first), right button orbits/pans; public PickBounds in udea-render (sprites, models, moba units by body); EditorInspector with Mixed, no Set button (owner): G1 edit session per field, commit on Enter/focus loss, cancel on refused value. Cards: AnimationRenderSystem not pickable; G1 30s idle cancel reverts an un-entered value; inspector text boxes only; selection outline re-queries pick sources per redraw.
-- #243 animation panel (dev-243) in flight.
+- #243: merged, round 1 PASS (no findings). Merged tree == reviewed tree. Animation panel follows selection; clip choice is one edit session (undoable); scrub preview is WorldViewport.modelPreview via ModelStage per-view drawFilter, capture filters preview nodes, world hash unchanged; bone overlay public-API only (added GizmoScope.mark, Mark, Gizmo.marks, GizmoCanvas.line); joint parents from glTF node tree. Cards: GizmoMarkLayer draw line untested alone; selection outline stays on hidden fox during model preview. dev-243 once killed an unread Xvfb pid (disclosed).
+- #236 built-in 2D gizmos (dev-236) in flight; must fold its GizmoCanvas.line with #243's.
 
 ## Wave 15 (2026-09-19): in flight, WIP 5 (owner)
 

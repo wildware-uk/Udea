@@ -60,7 +60,7 @@ class ModuleGraphRulesTest {
     fun `UDEA-MG-009 fails every LibGDX artifact on every project, gdx-math included`() {
         // Issue #213 deleted LibGDX from the tree. `com.badlogicgames.gdx:gdx` used to be legal on
         // a headless module for `Vector2`; nothing needs it now, and a ban scoped to the modules
-        // that last had it would let it back in through any other one. The two exempt from
+        // that last had it would let it back in through any other one. The modules exempt from
         // UDEA-MG-002 are here on purpose: being allowed GL is not being allowed LibGDX.
         val libgdx = listOf(
             "com.badlogicgames.box2dlights:box2dlights",
@@ -130,6 +130,76 @@ class ModuleGraphRulesTest {
                 ":moba:desktop",
                 "runtimeClasspath",
                 graph(":moba:desktop", "de.fabmax.kool:kool-core", ":udea-render"),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
+    fun `UDEA-MG-010 fails the editor on the shipped desktop game's classpaths`() {
+        // Issue #194's second criterion. `:moba:desktop`'s `runtimeClasspath` is what its release
+        // jar runs on; the editor reaches that process only through the `editor` source set, whose
+        // `editorRuntimeClasspath` is not one of the scanned configurations.
+        listOf("runtimeClasspath", "compileClasspath").forEach { configuration ->
+            val violations = violate(
+                ":moba:desktop",
+                configuration,
+                graph(":moba:desktop", ":udea-render", ":udea-editor"),
+            )
+            assertEquals(listOf(":udea-editor"), violations.map { it.coordinate }, configuration)
+            assertEquals(RuleId("UDEA-MG-010"), violations.single().ruleId, configuration)
+        }
+    }
+
+    @Test
+    fun `UDEA-MG-010 fails the editor on every engine module, whose arrows point below it`() {
+        // Nothing depends on the editor but a game's editor source set: an engine module that
+        // resolved it would be an arrow pointing up the table, and would carry it into the game.
+        listOf(":udea-render", ":udea-agent", ":udea-agent-host", ":moba:game").forEach { project ->
+            val violations = violate(project, "runtimeClasspath", graph(project, ":udea-editor"))
+            assertEquals(RuleId("UDEA-MG-010"), violations.single().ruleId, project)
+        }
+    }
+
+    @Test
+    fun `UDEA-MG-010 leaves the editor's own classpath and a test classpath alone`() {
+        // The root never violates a rule about itself, and a test source set is not a release.
+        assertTrue(violate(":udea-editor", "runtimeClasspath", graph(":udea-editor", ":udea-render")).isEmpty())
+        assertTrue(
+            violate(":moba:desktop", "testRuntimeClasspath", graph(":moba:desktop", ":udea-editor")).isEmpty(),
+        )
+    }
+
+    @Test
+    fun `UDEA-MG-011 fails Kool and a ComposeGL frontend on the editor's compile classpath`() {
+        // The editor composes with `composegl-ui` and binds the world draw and the Kool frontend
+        // only through `udea-render` (issue #194). Its *runtime* classpath carries Kool through
+        // `udea-render`, which is why it is GL-allowed; what it may *name* is this rule's business.
+        val violations = violate(
+            ":udea-editor",
+            "compileClasspath",
+            graph(
+                ":udea-editor",
+                ":udea-render",
+                "dev.wildware.composegl:composegl-ui",
+                "de.fabmax.kool:kool-core-desktop",
+                "dev.wildware.composegl:composegl-kool",
+                "org.lwjgl:lwjgl-opengl",
+            ),
+        )
+        assertEquals(
+            listOf("de.fabmax.kool:kool-core-desktop", "dev.wildware.composegl:composegl-kool", "org.lwjgl:lwjgl-opengl"),
+            violations.map { it.coordinate },
+        )
+        assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-011") }, "$violations")
+    }
+
+    @Test
+    fun `UDEA-MG-011 does not govern the editor's runtime classpath, where Kool arrives through udea-render`() {
+        assertTrue(
+            violate(
+                ":udea-editor",
+                "runtimeClasspath",
+                graph(":udea-editor", ":udea-render", "de.fabmax.kool:kool-core-desktop", "org.lwjgl:lwjgl-opengl"),
             ).isEmpty(),
         )
     }
@@ -390,7 +460,7 @@ class ModuleGraphRulesTest {
     }
 
     @Test
-    fun `the headless set is every udea module in settings_gradle_kts except the GL-allowed two`() {
+    fun `the headless set is every udea module in settings_gradle_kts except the GL-allowed ones`() {
         // The gap this closes: `HEADLESS_PROJECTS` used to be a hand-written subset, and a
         // module added to `settings.gradle.kts` joined neither the dependency rule nor the
         // bytecode scan. Deriving the expectation from the settings file makes including a
@@ -420,13 +490,15 @@ class ModuleGraphRulesTest {
     }
 
     @Test
-    fun `the GL-allowed set is exactly udea-render and the debug agent host`() {
+    fun `the GL-allowed set is exactly udea-render, the debug agent host and the editor`() {
         // Stated as its own assertion so that widening the exemption is a deliberate edit to
         // a test, not a side effect of editing a list. Every module here is a module
         // `udeaVerifyHeadless` no longer scans, so the set is the whole of what the headless
-        // guarantee costs.
+        // guarantee costs. The editor joined in issue #194: it runs on Kool through udea-render,
+        // UDEA-MG-011 keeps Kool off what it compiles against, and UDEA-MG-010 keeps it off every
+        // shipped classpath.
         assertEquals(
-            listOf(":udea-agent-host", ":udea-render"),
+            listOf(":udea-agent-host", ":udea-editor", ":udea-render"),
             ModuleGraphRules.GL_ALLOWED_PROJECTS.sorted(),
         )
     }

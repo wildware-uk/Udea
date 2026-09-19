@@ -118,6 +118,12 @@ composegl-ui = { module = "dev.wildware.composegl:composegl-ui", version.ref = "
 # The Kool backend: it draws a ComposeGL tree inside Kool's frame, through Kool's own GL context,
 # so like every other frontend it may only ever be a dependency of `udea-render` (UDEA-MG-002).
 composegl-kool = { module = "dev.wildware.composegl:composegl-kool", version.ref = "composegl" }
+# Docked windows, tab strips and the dividers between panes: `DebugWindowHost` (issue #194). The
+# toolkit with no backend in it, like `composegl-ui`, and published with it at the same version. Only
+# `udea-editor` takes it, and `UDEA-MG-010` keeps that module off every shipped classpath - which is
+# the arrangement ComposeGL's own docs ask for ("a module of its own so a shipped game does not carry
+# it").
+composegl-debug = { module = "dev.wildware.composegl:composegl-debug", version.ref = "composegl" }
 # Desktop glyph rasterisation (stb_truetype, through LWJGL). A frontend artifact, `udea-render`-only
 # and JVM-only: Android rasterises with its own `Typeface`, inside `composegl-kool`.
 composegl-lwjgl3 = { module = "dev.wildware.composegl:composegl-lwjgl3", version.ref = "composegl" }

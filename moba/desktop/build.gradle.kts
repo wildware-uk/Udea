@@ -1,6 +1,7 @@
 import dev.wildware.udea.build.ReleaseRules
 import dev.wildware.udea.build.UdeaVerifyReleaseTask
 import dev.wildware.udea.gradle.UdeaAgentPlugin
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
 /**
  * The desktop launchers: the server, the player's client, the agent's instance, and every task
@@ -130,7 +131,7 @@ udeaAgent {
  * simulation ships and every rule in the default list is still satisfied.
  */
 tasks.named<UdeaVerifyReleaseTask>("udeaVerifyRelease") {
-    bannedPrefixes.set(ReleaseRules.DEFAULT_BANNED_PREFIXES + "dev/wildware/moba/agent/")
+    bannedPrefixes.set(ReleaseRules.DEFAULT_BANNED_PREFIXES + "dev/wildware/moba/agent/" + "dev/wildware/moba/editor/")
 }
 
 /** The three entry points of spec 4, over the one `MobaGame.definition()`. */
@@ -175,6 +176,108 @@ tasks.register<JavaExec>("run") {
     jvmArgumentProviders.add(
         CommandLineArgumentProvider {
             listOf("-Dudea.assetsCompiler.classpath=" + scriptClasspath.asPath)
+        },
+    )
+}
+
+// --- the editor (issue #194) ---------------------------------------------------------------------
+//
+// `runEditor` opens `moba` in the editor window: docked panels, and the world drawn by Kool in a
+// ComposeGL `SceneView`, paused. Its entry point lives in a source set of its own, over the agent
+// source set, so the editor reaches this project through `editorRuntimeClasspath` and nothing else:
+// `runtimeClasspath` - what the release jar runs on - never resolves `udea-editor`, and `UDEA-MG-010`
+// fails the build the day it does. `jar` packages `main` alone, so no editor class is in the artifact
+// either, and `udeaVerifyRelease` bans the package besides (below).
+
+/** `src/editor`: `MobaEditor`, compiled against the agent source set it opens a window over. */
+val editorSources: SourceSet = sourceSets.create("editor") {
+    compileClasspath += agentSources.output + agentSources.compileClasspath
+    runtimeClasspath += agentSources.output + agentSources.runtimeClasspath
+}
+
+dependencies {
+    // The window, and nothing else in this project names it: see `UDEA-MG-010`.
+    "editorImplementation"(project(":udea-editor"))
+}
+
+// The editor calls `MobaAgent.runWithGl`, which is `internal`: one Kotlin module for the two
+// source sets, as `test` is with `main`, rather than a public entry point nobody outside this
+// project may use.
+the<KotlinJvmProjectExtension>().target.compilations.named("editor") {
+    associateWith(the<KotlinJvmProjectExtension>().target.compilations.getByName(UdeaAgentPlugin.DEFAULT_SOURCE_SET))
+}
+
+/**
+ * `src/editorTest`: the editor's buttons against the real `EditorToolset` in a real `moba` world.
+ *
+ * A source set of its own rather than a corner of `test`, because `test`'s runtime classpath is
+ * what the replay-equality entry points run on (see `replayEqualityClasspath` below), and a window
+ * that never ships has no business there either.
+ */
+val editorTestSources: SourceSet = sourceSets.create("editorTest") {
+    compileClasspath += editorSources.output + editorSources.compileClasspath
+    runtimeClasspath += editorSources.output + editorSources.runtimeClasspath
+}
+
+dependencies {
+    // `kotlin-test` alone resolves no annotations outside `test`: the Kotlin plugin picks the JUnit 5
+    // variant for the source set named `test` only.
+    "editorTestImplementation"(kotlin("test-junit5"))
+    "editorTestImplementation"(libs.junit5.jupiter)
+    // The test reads `editor.history`'s answer the way an agent does: as JSON.
+    "editorTestImplementation"(libs.kotlinx.serialization.json)
+    "editorTestRuntimeOnly"(libs.junit5.platform.launcher)
+
+    // The Compose compiler for this one compilation. The test hosts the window in ComposeGL's
+    // `uiTest`, whose content is `@Composable`; compiled without the plugin, that lambda is a
+    // `Function0` and the call fails at run time with `NoSuchMethodError` on `uiTest$default`.
+    // Not the `composeCompiler` plugin on the whole project: that would stamp `$stable` into every
+    // class `main` ships, for a project with no composable in it.
+    "kotlinCompilerPluginClasspathEditorTest"("org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:${libs.versions.kotlin.get()}")
+}
+
+// `MobaEditor.session` and `MobaAgent.attach` are `internal`, as `main`'s are to `test`.
+the<KotlinJvmProjectExtension>().target.compilations.named("editorTest") {
+    associateWith(the<KotlinJvmProjectExtension>().target.compilations.getByName("editor"))
+    associateWith(the<KotlinJvmProjectExtension>().target.compilations.getByName(UdeaAgentPlugin.DEFAULT_SOURCE_SET))
+}
+
+val editorTest = tasks.register<Test>("editorTest") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "The editor window's buttons against the real editor tools, headless."
+    testClassesDirs = editorTestSources.output.classesDirs
+    classpath = editorTestSources.runtimeClasspath
+}
+
+tasks.named("check") { dependsOn(editorTest) }
+
+tasks.register<JavaExec>("runEditor") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba in the editor window: Windowed by default, paused, with the agent HTTP surface on -PdebugPort=N."
+    mainClass.set("dev.wildware.moba.editor.MobaEditor")
+    classpath = editorSources.runtimeClasspath
+
+    // The same asset daemon and repository root `run` hands its instance: the editor is that
+    // instance with a window over it, so `assets.*` answers the same way in both.
+    systemProperty("udea.assets.root", gameAssetRoot.asFile.absolutePath)
+    systemProperty("udea.repoRoot", rootProject.layout.projectDirectory.asFile.absolutePath)
+    val scriptClasspath: FileCollection = files(udeaAssetScript)
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            listOf("-Dudea.assetsCompiler.classpath=" + scriptClasspath.asPath)
+        },
+    )
+    // `JavaExec` forks, so the agent port and a render mode have to be forwarded by hand;
+    // `UdeaAgentPlugin` wires them into the task named `run` alone. Windowed unless
+    // `-Pudea.render.mode=Offscreen` says otherwise: the editor is a window a person looks at.
+    val port = providers.gradleProperty("debugPort")
+    val mode = providers.gradleProperty("udea.render.mode")
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+            listOfNotNull(
+                port.orNull?.let { "-Dudea.agent.port=$it" },
+                mode.orNull?.let { "-Dudea.render.mode=$it" },
+            )
         },
     )
 }

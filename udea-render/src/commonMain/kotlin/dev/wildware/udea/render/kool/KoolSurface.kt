@@ -21,6 +21,7 @@ import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteBatch2D
 import dev.wildware.udea.render.draw.SpriteRegion
 import dev.wildware.udea.render.draw.SpriteTexture
+import dev.wildware.udea.render.ui.WorldView
 
 /**
  * The Kool scene a render pipeline draws into, and the reason an overlay cannot reach a capture.
@@ -92,6 +93,11 @@ internal class KoolSurface(
         addNode(SpriteBatchNode(screenBatch, "udea-overlay-sprites"))
     }
 
+    private val blit = PassBlit(pass)
+
+    /** The capturable pass, as something a `SceneView` can show. See [WorldView]. */
+    val worldView: WorldView = WorldView(blit)
+
     private val presented = SpriteRegion(
         SpriteTexture.ofPassColour(
             checkNotNull(pass.colorTexture) { "the offscreen pass has no colour attachment" },
@@ -130,6 +136,7 @@ internal class KoolSurface(
 
     /** Takes the scene off the context before releasing it: a released scene still listed is drawn. */
     private fun detachAndRelease() {
+        blit.release()
         attachedTo?.removeScene(scene)
         attachedTo = null
         scene.release()
@@ -154,18 +161,9 @@ internal class KoolSurface(
 
         // Letterboxed rather than stretched: a window of another aspect ratio shows the frame the
         // agent captures, at the same shape, with bars.
-        val scale = minOf(screen.width.toFloat() / width, screen.height.toFloat() / height)
-        val drawnWidth = width * scale
-        val drawnHeight = height * scale
+        val fit = Letterbox.fit(width, height, screen.width, screen.height)
         presentBatch.beginPixels()
-        presentBatch.draw(
-            presented,
-            (screen.width - drawnWidth) / 2f,
-            (screen.height - drawnHeight) / 2f,
-            drawnWidth,
-            drawnHeight,
-            Rgba.WHITE,
-        )
+        presentBatch.draw(presented, fit.x, fit.y, fit.width, fit.height, Rgba.WHITE)
         presentBatch.end()
     }
 

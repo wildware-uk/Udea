@@ -41,6 +41,7 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 | `udea-audio` | `udea.kotlin-multiplatform` | Cue-driven sound: the drain that empties `GameContext.cues`, the cue-to-`SoundCue` routing table, distance attenuation, stereo pan, pitch variance and a per-frame voice cap. **No GL and no `Gdx`** — playback is an `AudioDevice` SPI, and `AudioDevice.Silent` is a shipped implementation, so a headless process drains the queue and makes no noise | `common/.../ecs/system/SoundSystem.kt`, which read `gameScreen.camera` off a file-level global inside a Fleks system and called `play` on a `Sound` held by an asset value | `udea-core` (api), `udea-assets` | `udea-render`, `moba` |
 | `udea-agent` | `udea.kotlin-multiplatform-no-ios` | MCP surface + test harness — same code path; common on `jvm`, `android` and `wasmJs`, with the `assets.*` toolset in `jvmMain` (issue #208) | FruitGameKTX's `DebugBridge` pattern, generalised | `udea-core` (api) | `udea-agent-host` |
 | `udea-agent-host` | `udea.kotlin-library` | HTTP server, plus the toolsets that need a render context (spec §4: render, input, ui). Debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` | `udea-agent` (api); `udea-render` + `udea-net` (`implementation` — see below) | *(nothing — deliberately not `moba`)* |
+| `udea-editor` | `udea.kotlin-library` | The editor window (issue #194): docked ComposeGL panels, the world in a `SceneView`, and buttons that call `editor.*` tools in-process. Debug-only, JVM | `level-editor` (D6), as a screen over the tool surface rather than a second implementation of it | `udea-render`, `udea-agent` (`api`), and `udea-assets` through `udea-render` until the asset panels (issue #195) name it directly; kotlinx-serialization-json to read tool answers | `moba:desktop`'s `editor` source set, and nothing else (`UDEA-MG-010`) |
 | `udea-gradle` | `udea.gradle-plugin` | Tasks, verifiers, `gamebridge.json` emission | old `gradle-plugin` (which leaked `gradleApi` onto the game runtime) | `udea-assets-compiler`, `udea-diagnostics`, `gradleApi()` (`compileOnly`) | *(nothing — applied as a plugin, never depended on)* |
 | `moba:game` | `udea.kotlin-multiplatform-render` | The example game as a library: components, systems, assets and what it draws, with no entry point (issue #212) | `example` | `udea-core`, `udea-render` (`api`); `udea-annotations`, `udea-gas`, `udea-net`, `udea-assets`, `udea-audio` (`implementation`) | `moba:desktop`, `moba:android` |
 | `moba:desktop` | `udea.kotlin-library` | The desktop launcher: the client, the server, the shot mains, the proofs and the agent surface | `moba`'s entry points | `moba:game`, `udea-replay` (`api`); `udea-core`, `udea-render`, `udea-net`, `udea-gas`, `udea-audio`, `udea-assets` (`implementation`); the agent source set's `udea-agent-host` comes from `dev.wildware.udea.agent` and is kept out of release by `UDEA-REL-002` | — |
@@ -49,11 +50,13 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 ## Arrows that must never appear
 
 - Anything → LibGDX, in any form (`UDEA-MG-009`). It left the tree in issue #213.
-- Anything except `udea-render` and `udea-agent-host` → Kool / LWJGL3 / GL. `udea-core` in
-  particular is the headless kernel; physics reaches it behind its own `PhysicsWorld`
-  interface, never as a backend dependency. The two exempt modules are
-  `ModuleGraphRules.GL_ALLOWED_PROJECTS`, and adding a third means editing that set and the
-  test that pins it.
+- Anything except `udea-render`, `udea-agent-host` and `udea-editor` → Kool / LWJGL3 / GL.
+  `udea-core` in particular is the headless kernel; physics reaches it behind its own
+  `PhysicsWorld` interface, never as a backend dependency. The exempt modules are
+  `ModuleGraphRules.GL_ALLOWED_PROJECTS`, and adding one means editing that set and the test
+  that pins it. `udea-editor` is exempt at run time only: `UDEA-MG-011` keeps every renderer
+  artifact off what it compiles against.
+- Anything → `udea-editor`, except a game's `editor` source set (`UDEA-MG-010`).
 - `udea-assets-compiler` → any Gradle type. The daemon and CI must run identical code.
 - `udea-audio` → Kool or LibGDX. It is a designated headless module, so `UDEA-MG-002` bans
   `de.fabmax.kool:*` on its classpath, `UDEA-MG-009` bans LibGDX there as everywhere, and
@@ -147,7 +150,7 @@ that task is gone and its one unique branch is the vacuity guard above.
 ## `UDEA-MG-002` — only the GL-allowed modules may see Kool, a ComposeGL backend, a GL backend or a native
 
 **Spec §4, §3.5; Kool port spec §3.** Banned on `compileClasspath` and `runtimeClasspath` of
-**every `udea-*` module except `udea-render` and `udea-agent-host`**: `de.fabmax.kool:*`, the
+**every `udea-*` module except the GL-allowed ones** (`udea-render`, `udea-agent-host`, `udea-editor`): `de.fabmax.kool:*`, the
 ComposeGL backends `dev.wildware.composegl:composegl-kool*`,
 `composegl-lwjgl3*`, `composegl-webgl*` and `composegl-android*`, and `org.lwjgl:*`.
 
@@ -160,7 +163,7 @@ from every project.
 
 The module set is not written out here, or anywhere twice. It is
 `ModuleGraphRules.HEADLESS_PROJECTS` in `build-logic`, and `ModuleGraphRulesTest` derives the
-same set from `settings.gradle.kts` — minus `ModuleGraphRules.GL_ALLOWED_PROJECTS`, the two
+same set from `settings.gradle.kts` — minus `ModuleGraphRules.GL_ALLOWED_PROJECTS`, the
 modules above — and fails if the two have drifted. So including a new `udea-*` module puts it
 under this rule automatically instead of leaving a gap somebody has to notice, and exempting one
 means adding it to a *named* set rather than deleting it from a list. It used to be two
@@ -211,7 +214,7 @@ allowlist: the fix is always to move the code to `udea-render`.
 ## `UDEA-MG-009` — no project resolves LibGDX
 
 **Kool port spec §3, §4, D4, D9, D12.** Banned on `compileClasspath` and `runtimeClasspath` of
-**every** `udea-*` and `moba` project, on every target, the two GL-allowed modules included:
+**every** `udea-*` and `moba` project, on every target, the GL-allowed modules included:
 `com.badlogicgames.*:*` (LibGDX, and the extensions published beside it such as
 `com.badlogicgames.box2dlights`) and `dev.wildware.composegl:composegl-gdx*`, ComposeGL's LibGDX
 backend, which drags gdx in without a build script naming it.
@@ -230,6 +233,33 @@ took the first reason away — the game draws through `udea-render`, which draws
 spec D4 takes the second: Box2D leaves with LibGDX, and `MobaPhysicsModule` was never installed.
 Issue #212 removes both and this is what keeps them removed.
 
+
+## `UDEA-MG-010` — no compile or runtime classpath resolves `udea-editor`
+
+**Issue #194.** Banned on `compileClasspath` and `runtimeClasspath` of every `udea-*` and `moba`
+project: `:udea-editor`.
+
+The editor window writes any field of any entity through the `editor.*` tools, which ignore
+`agentWritable` because authoring a level needs every field. It is a tool for a person at a desk,
+never for a player. A game reaches it through an `editor` source set of its desktop launcher -
+`:moba:desktop`'s, which holds `runEditor` - and that source set's classpaths
+(`editorCompileClasspath`, `editorRuntimeClasspath`) are not among the scanned configurations. So
+the rule can be blunt: `:udea-editor` on a scanned classpath is either the shipped game carrying
+the editor (`:moba:desktop`'s `runtimeClasspath` is its release classpath) or an engine module
+depending upward on it. The project's own classpath never violates it, and test classpaths are not
+scanned by it. The gizmo epic (#231, ticket G2) extends this rule to gizmo classes rather than
+adding a parallel one.
+
+## `UDEA-MG-011` — `udea-editor` compiles against no renderer
+
+**Kool port spec §3; issue #194.** Banned on `udea-editor`'s `compileClasspath`: the same patterns
+as `UDEA-MG-002` — `de.fabmax.kool:*`, the ComposeGL frontends, `org.lwjgl:*`.
+
+The editor is in `GL_ALLOWED_PROJECTS` because its runtime classpath carries Kool through
+`udea-render`, and cannot not: the viewport shows the world Kool draws. What it may *name* is
+narrower. Its panels are `composegl-ui` widgets, the toolkit with no backend in it, and the world
+reaches its `SceneView` through `udea-render`'s `WorldView`, so the Kool frontend and the world
+draw stay inside `udea-render` as spec §3 requires. This rule is that sentence as a gate.
 
 ## `UDEA-MG-003` — `udea-assets-compiler` holds zero Gradle types
 

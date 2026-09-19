@@ -12,6 +12,7 @@ import dev.wildware.udea.assets.EffectDuration
 import dev.wildware.udea.assets.EffectMagnitude
 import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.GameplayEffect
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.assets.ModifierKind
 import dev.wildware.udea.assets.SpriteAnimation
 import dev.wildware.udea.assets.SpriteAnimationSet
@@ -102,14 +103,13 @@ class MigratedCorpusBundleTest {
             )
             assertTrue(declaredAssets > 0, "an empty corpus would satisfy the line above")
 
-            // A binding: the nested `key(' '.code)` record became the flat pair the codec reads.
-            // 32 and not 62, since issue #212: the corpus writes Kool's key codes, where the
-            // space bar is GLFW's `GLFW_KEY_SPACE`. 62 was `com.badlogic.gdx.Input.Keys.SPACE`,
-            // and under Kool it is `>`. `MobaKeyBindingTest` is what asserts the eight codes
-            // reach the eight actions; this line is about the codec carrying whatever is written.
+            // A binding: the nested `key(InputKey.Space)` record became the flat pair the codec
+            // reads, and the key arrives by name - no backend's number is in the bundle at all
+            // (issue #228). `MobaKeyBindingTest` is what asserts the eight keys reach the eight
+            // actions; this line is about the codec carrying whatever is written.
             val binding = bundle.registry[reference<Binding>("control/attack_binding")]
             assertEquals(AssetId("control/attack"), binding.control.id)
-            assertEquals(BindingInput.Key(' '.code), binding.input)
+            assertEquals(BindingInput.Key(InputKey.Space), binding.input)
 
             val move = bundle.registry[reference<Axis2DBinding>("control/move_left")]
             assertEquals(AssetId("control/move"), move.axis.id)

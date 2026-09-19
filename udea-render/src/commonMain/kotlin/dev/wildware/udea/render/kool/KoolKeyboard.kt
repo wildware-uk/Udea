@@ -2,6 +2,7 @@ package dev.wildware.udea.render.kool
 
 import de.fabmax.kool.input.InputStack
 import de.fabmax.kool.input.KeyEvent
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.render.input.KeyPhase
 import dev.wildware.udea.render.input.KeyStroke
 import dev.wildware.udea.render.input.KeyboardState
@@ -63,11 +64,17 @@ public class KoolKeyboard(
     private val ui: UiInput = UiInput.NONE,
 ) : KeyboardState, AutoCloseable {
 
-    /** Key codes held right now, in Kool's universal code table. */
-    private val down = HashSet<Int>()
+    /**
+     * Kool's key codes to names, for the backend this build draws with (issue #228). Every event
+     * goes through it, the interface's included, so a key reaches a binding and a menu by one name.
+     */
+    private val table: KoolKeyTable = platformKeyTable
 
-    /** Presses counted since [endSample], by key code. */
-    private val presses = HashMap<Int, Int>()
+    /** Keys held right now, by [InputKey.ordinal]. */
+    private val down = BooleanArray(InputKey.entries.size)
+
+    /** Presses counted since [endSample], by [InputKey.ordinal]. */
+    private val presses = IntArray(InputKey.entries.size)
 
     private val listener = InputStack.KeyboardListener { events, _ -> onKeyEvents(events) }
 
@@ -82,19 +89,19 @@ public class KoolKeyboard(
         InputStack.pushBottom(handler)
     }
 
-    override fun isKeyDown(keycode: Int): Boolean = keycode in down
+    override fun isKeyDown(key: InputKey): Boolean = down[key.ordinal]
 
-    override fun pressesSince(keycode: Int): Int = presses[keycode] ?: 0
+    override fun pressesSince(key: InputKey): Int = presses[key.ordinal]
 
     override fun endSample() {
-        presses.clear()
+        presses.fill(0)
     }
 
     /** Stops listening. After this, no key reaches the game through this keyboard. */
     override fun close() {
         InputStack.remove(handler)
-        down.clear()
-        presses.clear()
+        down.fill(false)
+        presses.fill(0)
     }
 
     /**
@@ -129,21 +136,22 @@ public class KoolKeyboard(
         // report a key with a code no binding means and, for a capital, a code that is not even the
         // one the same physical key reports when pressed.
         if (event.isCharTyped) return
-        val code = event.keyCode.code
+        // A key the table does not name is one no binding can hold, so there is nothing to record.
+        val key = table.keyOf(event.keyCode.code) ?: return
         when {
             event.isPressed -> {
-                down += code
+                down[key.ordinal] = true
                 // Repeats do not count: a held key is one press and then a level, and counting the
                 // platform's auto-repeat would fire an ability once per repeat interval.
-                if (!event.isRepeated) presses[code] = (presses[code] ?: 0) + 1
+                if (!event.isRepeated) presses[key.ordinal]++
             }
 
-            event.isReleased -> down -= code
+            event.isReleased -> down[key.ordinal] = false
         }
     }
 
     private fun strokeOf(event: KeyEvent): KeyStroke = KeyStroke(
-        keycode = event.keyCode.code,
+        key = if (event.isCharTyped) null else table.keyOf(event.keyCode.code),
         phase = when {
             event.isCharTyped -> KeyPhase.Character
             event.isRepeated && event.isPressed -> KeyPhase.Repeat

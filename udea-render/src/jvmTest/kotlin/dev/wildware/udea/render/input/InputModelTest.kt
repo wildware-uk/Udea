@@ -1,5 +1,6 @@
 package dev.wildware.udea.render.input
 
+import dev.wildware.udea.assets.InputKey
 import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlin.test.Test
@@ -210,8 +211,8 @@ class InputModelTest {
     fun `two actions bound to one key both receive the edge`() {
         val bindings = InputBindings(
             actions = listOf(
-                ActionBinding("g/a", keys = intArrayOf(KEY_FIRE)),
-                ActionBinding("g/b", keys = intArrayOf(KEY_FIRE)),
+                ActionBinding("g/a", keys = listOf(KEY_FIRE)),
+                ActionBinding("g/b", keys = listOf(KEY_FIRE)),
             ),
             axes = emptyList(),
         )
@@ -312,14 +313,14 @@ class InputModelTest {
 
     private companion object {
 
-        const val KEY_LEFT: Int = 29
-        const val KEY_RIGHT: Int = 32
-        const val KEY_UP: Int = 51
-        const val KEY_DOWN: Int = 47
-        const val KEY_FIRE: Int = 62
+        val KEY_LEFT: InputKey = InputKey.A
+        val KEY_RIGHT: InputKey = InputKey.D
+        val KEY_UP: InputKey = InputKey.W
+        val KEY_DOWN: InputKey = InputKey.S
+        val KEY_FIRE: InputKey = InputKey.Space
 
         val BINDINGS: InputBindings = InputBindings(
-            actions = listOf(ActionBinding("g/fire", keys = intArrayOf(KEY_FIRE))),
+            actions = listOf(ActionBinding("g/fire", keys = listOf(KEY_FIRE))),
             axes = listOf(
                 Axis2DBinding(
                     name = "g/move",
@@ -346,32 +347,32 @@ class InputModelTest {
  */
 internal class FakeKeyboard : KeyboardState {
 
-    private val down = HashSet<Int>()
-    private val presses = HashMap<Int, Int>()
+    private val down = HashSet<InputKey>()
+    private val presses = HashMap<InputKey, Int>()
 
     /** Holds a key down, recording the edge. */
-    fun press(keycode: Int) {
-        down += keycode
-        presses[keycode] = (presses[keycode] ?: 0) + 1
+    fun press(key: InputKey) {
+        down += key
+        presses[key] = (presses[key] ?: 0) + 1
     }
 
     /** Holds a key down with no edge, for a key already held when the test started. */
-    fun hold(keycode: Int) {
-        down += keycode
+    fun hold(key: InputKey) {
+        down += key
     }
 
     /** Down and up again before anything sampled: the edge exists, the level never did. */
-    fun tap(keycode: Int) {
-        presses[keycode] = (presses[keycode] ?: 0) + 1
+    fun tap(key: InputKey) {
+        presses[key] = (presses[key] ?: 0) + 1
     }
 
-    fun release(keycode: Int) {
-        down -= keycode
+    fun release(key: InputKey) {
+        down -= key
     }
 
-    override fun isKeyDown(keycode: Int): Boolean = keycode in down
+    override fun isKeyDown(key: InputKey): Boolean = key in down
 
-    override fun pressesSince(keycode: Int): Int = presses[keycode] ?: 0
+    override fun pressesSince(key: InputKey): Int = presses[key] ?: 0
 
     override fun endSample() {
         presses.clear()

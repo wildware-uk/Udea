@@ -2,6 +2,7 @@ package dev.wildware.moba
 
 import dev.wildware.moba.entry.MobaEntry
 import dev.wildware.moba.entry.MobaLaunch
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
@@ -38,7 +39,7 @@ class MobaInputTest {
         val fixture = Fixture()
         val before = fixture.playerPosition()
 
-        fixture.keys.hold(MobaControls.Keys.D)
+        fixture.keys.hold(InputKey.D)
         fixture.host.run(TICKS)
 
         val after = fixture.playerPosition()
@@ -55,7 +56,7 @@ class MobaInputTest {
         val fixture = Fixture()
         val before = fixture.playerPosition()
 
-        fixture.keys.hold(MobaControls.Keys.W)
+        fixture.keys.hold(InputKey.W)
         fixture.host.run(TICKS)
 
         assertTrue(fixture.playerPosition().y > before.y + 1f, "W did not walk up")
@@ -67,8 +68,8 @@ class MobaInputTest {
         val fixture = Fixture()
         val before = fixture.playerPosition()
 
-        fixture.keys.hold(MobaControls.Keys.A)
-        fixture.keys.hold(MobaControls.Keys.D)
+        fixture.keys.hold(InputKey.A)
+        fixture.keys.hold(InputKey.D)
         fixture.host.run(TICKS)
 
         val after = fixture.playerPosition()
@@ -79,9 +80,9 @@ class MobaInputTest {
     @Test
     fun `releasing the key stops the player`() {
         val fixture = Fixture()
-        fixture.keys.hold(MobaControls.Keys.D)
+        fixture.keys.hold(InputKey.D)
         fixture.host.run(TICKS)
-        fixture.keys.release(MobaControls.Keys.D)
+        fixture.keys.release(InputKey.D)
         fixture.host.run(1)
 
         val settled = fixture.playerPosition().x
@@ -102,8 +103,8 @@ class MobaInputTest {
     fun `an agent driving the injected source moves the player exactly as a keyboard does`() {
         val byKeyboard = Fixture()
         val start = byKeyboard.playerPosition()
-        byKeyboard.keys.hold(MobaControls.Keys.D)
-        byKeyboard.keys.hold(MobaControls.Keys.W)
+        byKeyboard.keys.hold(InputKey.D)
+        byKeyboard.keys.hold(InputKey.W)
         byKeyboard.host.run(TICKS)
 
         val byAgent = Fixture()
@@ -193,7 +194,7 @@ class MobaInputTest {
             host.run(1)
             val before = positionOf(host, player)
 
-            keys.hold(MobaControls.Keys.D)
+            keys.hold(InputKey.D)
             host.run(TICKS)
 
             val after = positionOf(host, player)
@@ -234,21 +235,21 @@ class MobaInputTest {
      */
     private class FakeKeys : KeyboardState {
 
-        private val down = HashSet<Int>()
-        private val presses = HashMap<Int, Int>()
+        private val down = HashSet<InputKey>()
+        private val presses = HashMap<InputKey, Int>()
 
-        fun hold(keycode: Int) {
-            down += keycode
-            presses[keycode] = (presses[keycode] ?: 0) + 1
+        fun hold(key: InputKey) {
+            down += key
+            presses[key] = (presses[key] ?: 0) + 1
         }
 
-        fun release(keycode: Int) {
-            down -= keycode
+        fun release(key: InputKey) {
+            down -= key
         }
 
-        override fun isKeyDown(keycode: Int): Boolean = keycode in down
+        override fun isKeyDown(key: InputKey): Boolean = key in down
 
-        override fun pressesSince(keycode: Int): Int = presses[keycode] ?: 0
+        override fun pressesSince(key: InputKey): Int = presses[key] ?: 0
 
         override fun endSample() {
             presses.clear()

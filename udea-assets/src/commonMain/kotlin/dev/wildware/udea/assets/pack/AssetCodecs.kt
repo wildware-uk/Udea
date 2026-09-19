@@ -11,6 +11,7 @@ import dev.wildware.udea.assets.Axis2D
 import dev.wildware.udea.assets.Axis2DBinding
 import dev.wildware.udea.assets.Binding
 import dev.wildware.udea.assets.BindingInput
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.assets.Blueprint
 import dev.wildware.udea.assets.Character
 import dev.wildware.udea.assets.ComponentSpec
@@ -396,7 +397,8 @@ public class AssetCodecs private constructor(
         )
 
         /**
-         * `key(42)` / `mouse(0)` as one struct-free pair of fields.
+         * `key(InputKey.W)` / `mouse(0)` as one struct-free pair of fields: `inputKind` beside
+         * `inputKey` for a key, beside `inputCode` for a mouse button.
          *
          * A nested struct would have been the tidier encoding and is deliberately not used:
          * `BindingInput` is a two-case sealed interface, and a `kind` discriminator next to a
@@ -405,16 +407,29 @@ public class AssetCodecs private constructor(
          * nested record".
          */
         private fun AssetFields.bindingInput(): BindingInput {
-            val kind = text("inputKind")
-            val code = int("inputCode")
-            return when (kind) {
-                KEY -> BindingInput.Key(code)
-                MOUSE -> BindingInput.MouseButton(code)
+            return when (val kind = text("inputKind")) {
+                KEY -> BindingInput.Key(inputKey())
+                MOUSE -> BindingInput.MouseButton(int("inputCode"))
                 else -> throw AssetDecodeException(
                     id.value,
                     "unknown binding input kind '$kind'; this build knows '$KEY' and '$MOUSE'",
                 )
             }
+        }
+
+        /**
+         * A key binding's `inputKey`: an [InputKey] by name (issue #228).
+         *
+         * By name and not by ordinal, so adding a key to [InputKey] cannot silently re-point every
+         * binding a bundle already holds; a name this build does not know is refused by name.
+         */
+        private fun AssetFields.inputKey(): InputKey {
+            val name = text("inputKey")
+            return InputKey.entries.firstOrNull { it.name == name }
+                ?: throw AssetDecodeException(
+                    id.value,
+                    "unknown key '$name'; this build knows " + InputKey.entries.joinToString { it.name },
+                )
         }
 
         /** The `inputKind` discriminator for [BindingInput.Key]. Shared with the writer. */

@@ -1,5 +1,7 @@
 package dev.wildware.udea.render.input
 
+import dev.wildware.udea.assets.InputKey
+
 /**
  * One action and the physical inputs that trigger it.
  *
@@ -15,26 +17,25 @@ public class ActionBinding(
     /** Namespaced, e.g. `moba/attack`. See [InputCatalog] for why the namespace matters. */
     public val name: String,
     /**
-     * Key codes, any of which triggers it, in the backend's own table.
+     * Keys, any of which triggers it, by name (issue #228).
      *
-     * Kool's universal key codes since issue #224 - the same ints `KeyboardState.isKeyDown` reads -
-     * where they used to be `com.badlogic.gdx.Input.Keys`. A build draws with one renderer, so there
-     * is one table; the asset that declares a binding stores whichever one that build speaks, which
-     * is what `BindingInput.Key`'s own KDoc means by "what every backend speaks".
+     * Never a backend's number. `KoolKeyTable` in this module turns what the backend reports into an
+     * [InputKey], per backend, so a binding means the same physical key on the desktop and on
+     * Android and a game has no number to get wrong.
      */
-    public val keys: IntArray = IntArray(0),
+    public val keys: List<InputKey> = emptyList(),
     /** Gamepad button indices, any of which triggers it. */
     public val buttons: IntArray = IntArray(0),
     /**
      * Pointer button indices, any of which triggers it: the mouse's buttons, and a finger. The
-     * backend's own table, as [keys] is - see `PointerState` for Kool's.
+     * backend's own table - see `PointerState` for Kool's.
      *
      * Only a press the interface did not use reaches it (issue #227): a click on a button is the
      * button's, and never also fires the binding underneath.
      */
     public val pointerButtons: IntArray = IntArray(0),
 ) {
-    override fun toString(): String = "ActionBinding($name, ${keys.size} key(s))"
+    override fun toString(): String = "ActionBinding($name, keys=$keys)"
 }
 
 /**
@@ -59,14 +60,14 @@ public class ActionBinding(
 public class Axis2DBinding(
     /** Namespaced, e.g. `moba/move`. */
     public val name: String,
-    /** Key driving -x. */
-    public val negativeX: Int = UNBOUND,
-    /** Key driving +x. */
-    public val positiveX: Int = UNBOUND,
-    /** Key driving -y. */
-    public val negativeY: Int = UNBOUND,
-    /** Key driving +y. */
-    public val positiveY: Int = UNBOUND,
+    /** Key driving -x, or `null` for none. */
+    public val negativeX: InputKey? = null,
+    /** Key driving +x, or `null` for none. */
+    public val positiveX: InputKey? = null,
+    /** Key driving -y, or `null` for none. */
+    public val negativeY: InputKey? = null,
+    /** Key driving +y, or `null` for none. */
+    public val positiveY: InputKey? = null,
     /** Gamepad axis index for x, or [UNBOUND]. */
     public val gamepadAxisX: Int = UNBOUND,
     /** Gamepad axis index for y, or [UNBOUND]. */
@@ -88,7 +89,7 @@ public class Axis2DBinding(
     override fun toString(): String = "Axis2DBinding($name, deadzone=$deadzone)"
 
     public companion object {
-        /** "No key or axis here." Not `0`, which is a real keycode (`Keys.ANY_KEY`). */
+        /** "No gamepad axis here." Not `0`, which is a real axis index: the left stick's x. */
         public const val UNBOUND: Int = -1
 
         /** A quarter deflection. Wide enough for a worn stick, narrow enough to feel direct. */

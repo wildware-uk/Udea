@@ -162,7 +162,7 @@ public class UiLayer(
 
     /** [event] as the toolkit's own key event, with the modifiers it was held with. */
     private fun toolkitEvent(event: KeyStroke, type: KeyEventType, repeat: Boolean) = KeyEvent(
-        key = KeyTable.toolkitKey(event.keycode),
+        key = toolkitKey(event.key),
         type = type,
         modifiers = Modifiers(
             (if (event.shift) Modifiers.SHIFT else 0) or

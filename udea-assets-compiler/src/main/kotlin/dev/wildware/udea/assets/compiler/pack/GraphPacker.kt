@@ -241,7 +241,8 @@ public object GraphPacker {
         }
 
         /**
-         * `key(62)` becomes the flat `inputKind`/`inputCode` pair `AssetCodecs` reads.
+         * `key(InputKey.W)` becomes the flat `inputKind`/`inputKey` pair `AssetCodecs` reads, and
+         * `mouse(0)` the `inputKind`/`inputCode` pair.
          *
          * The discriminator strings come from `AssetCodecs` rather than being spelled here: the
          * reader throws `unknown binding input kind` on a mismatch, and a writer holding its own
@@ -249,13 +250,18 @@ public object GraphPacker {
          */
         private fun MutableMap<String, PackValue>.bindingInput() {
             val input = asset.fields["input"] as? Map<*, *> ?: return
-            val kind = input["kind"] as? String ?: return
-            val code = input["code"] as? Int ?: return
-            put(
-                "inputKind",
-                PackValue.Text(if (kind == "mouseButton") AssetCodecs.MOUSE else AssetCodecs.KEY),
-            )
-            put("inputCode", PackValue.I32(code))
+            when (input["kind"]) {
+                "mouseButton" -> {
+                    val code = input["code"] as? Int ?: return
+                    put("inputKind", PackValue.Text(AssetCodecs.MOUSE))
+                    put("inputCode", PackValue.I32(code))
+                }
+                "key" -> {
+                    val key = input["key"] as? String ?: return
+                    put("inputKind", PackValue.Text(AssetCodecs.KEY))
+                    put("inputKey", PackValue.Text(key))
+                }
+            }
         }
 
         fun binding(): Map<String, PackValue> = buildMap {

@@ -1,9 +1,10 @@
 package dev.wildware.moba
 
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.render.input.InputBindings
 
 /**
- * What this game binds, and the only place a key code appears in it.
+ * What this game binds, and the names it binds them by. No key code appears in it (issue #228).
  *
  * ## The bindings are authored, and this is the names they are addressed by
  *
@@ -106,67 +107,12 @@ public object MobaControls {
         listOf(ATTACK_ACTION, ATTACK_2_ACTION, ITEM_1_ACTION, ITEM_2_ACTION)
 
     /**
-     * The key codes this game binds, written out as the characters they are.
+     * What the HUD prints on the box for [key]: its name, in capitals.
      *
-     * ## Why these numbers changed with the renderer, and why that was nearly silent
-     *
-     * They were `com.badlogic.gdx.Input.Keys` values, and LibGDX's numbering is its own: gdx's
-     * `W` is 51. Kool's desktop backend puts the raw GLFW key in the event for any key outside
-     * its special-key map, and `GLFW_KEY_3` is 51 - so every one of these bindings would have
-     * gone on compiling, gone on validating, and started answering to a different key. Nothing
-     * in the build catches a binding that is merely *wrong*, and a wrong binding does not show
-     * up in a screenshot, which is why `MobaKeyBindingTest` drives all eight of them through the
-     * real `IntentSource` seam and asserts what each one produces.
-     *
-     * ## Why `'W'.code` and not `87`
-     *
-     * GLFW's letter keys are ASCII uppercase and its space is 32, so every code here *is* the
-     * character. Written as the character a reader checks the table by looking at it; written as
-     * an integer a reader has to trust it - and trusting it is how gdx's numbers came to be here
-     * in the first place. `moba/game/assets/control/controls.udea.kts` writes the same eight the
-     * same way for its own reason (an asset script compiles against the asset model alone and
-     * must not drag a renderer in), and `MobaFieldTest` compares the two sides.
-     *
-     * ## These are the *backend's* numbers, and that is a gap rather than a design
-     *
-     * A key code is a renderer's vocabulary, not a game's, and nothing in the engine offers a
-     * table to bind against - so each game writes the codes of whatever backend it happens to run
-     * on. Swap the desktop backend, or add one whose codes differ, and this object is wrong again
-     * in exactly the same silent way. The special keys are worse: Kool gives them its own negative
-     * codes (Escape is -9, where GLFW's is 256), so one integer field holds two schemes. Closing it
-     * is a `udea-render` change and issue #228's; when an engine-owned table exists this object
-     * becomes an alias for it.
+     * The keys are named in the asset since issue #228 - `key(InputKey.Space)` - so the label is the
+     * name the asset wrote, and there is no number left to translate back into a letter. This object
+     * used to carry the eight backend codes as `Keys.W = 'W'.code` and a `when` from each back to a
+     * label; a key code is a renderer's vocabulary, and the renderer owns it now.
      */
-    public object Keys {
-
-        public val Q: Int = 'Q'.code
-        public val W: Int = 'W'.code
-        public val A: Int = 'A'.code
-        public val S: Int = 'S'.code
-        public val D: Int = 'D'.code
-        public val E: Int = 'E'.code
-        public val R: Int = 'R'.code
-        public val SPACE: Int = ' '.code
-    }
-
-    /**
-     * What the HUD prints on the box for [code].
-     *
-     * `Input.Keys.toString` was this, and it is gone with LibGDX. A `when` over the keys this game
-     * actually binds rather than a table of a hundred and thirty: a code outside the set prints its
-     * number, which is legible, honest and impossible to mistake for a letter - and the set is
-     * pinned by `MobaFieldTest`, so a binding added without a name here shows up as a digit on a
-     * box in the very next capture.
-     */
-    public fun keyName(code: Int): String = when (code) {
-        Keys.Q -> "Q"
-        Keys.W -> "W"
-        Keys.A -> "A"
-        Keys.S -> "S"
-        Keys.D -> "D"
-        Keys.E -> "E"
-        Keys.R -> "R"
-        Keys.SPACE -> "SPACE"
-        else -> code.toString()
-    }
+    public fun keyName(key: InputKey): String = key.name.uppercase()
 }

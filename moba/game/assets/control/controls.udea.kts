@@ -34,41 +34,16 @@
 // so in as many words rather than quietly dropping it. Closing that is a `BindingInput` case and
 // a codec discriminator, and it is not a level's or a game's to add.
 //
-// ## The key codes are Kool's, and they are written as characters
+// ## The keys are named, and the numbers are the renderer's
 //
-// They used to be libGDX's `com.badlogic.gdx.Input.Keys` values, and those numbers do not survive
-// the port: gdx's `W` is 51, and 51 under Kool is the digit `3`. Every binding in this file would
-// have kept compiling, kept validating and kept answering to the wrong key - which is a defect
-// that reaches a player rather than a reviewer, because a wrong binding is invisible in a
-// screenshot.
+// `key(InputKey.W)`, never `key(87)` (issue #228). This file used to carry integers: first
+// libGDX's, where W was 51 - which under Kool is the digit 3 - and then Kool's desktop codes, which
+// are GLFW's constant for a letter and a negative code of Kool's own for a special key, and which
+// Kool's Android backend numbers differently again. Every one of those compiled, validated and ran,
+// answering to whatever key the number happened to mean on that backend.
 //
-// Kool's desktop backend resolves a key as `KEY_CODE_MAP[key] ?: UniversalKeyCode(key)`, and
-// GLFW's letter keys are ASCII **uppercase** (`GLFW_KEY_W == 87` in lwjgl 3.4.3, the version that
-// resolves here). So for a letter or the space bar the code is the character, and writing the
-// character is what makes that checkable by eye rather than a number to be trusted.
-//
-// **Every key below is a letter or the space bar, and that is load-bearing.** `KEY_CODE_MAP`
-// renames 41 *special* keys - the modifiers, escape, enter, tab, backspace, delete, insert, home,
-// end, page up and down, the cursor keys, the numpad and F1-F12 - to Kool's own codes, which are
-// **negative**: escape is -9, not GLFW's 256. So a binding on one of those is neither its
-// character nor its GLFW constant, and nothing in this file, in `udeaValidateAssets` or in the
-// codec would tell you. Binding a special key means writing `KeyboardInput.KEY_*.code`, and
-// `MobaKeyBindingTest` is what would catch getting it wrong.
-//
-// Still written here rather than imported: the asset compile classpath is the asset model and not
-// the whole application (`AssetCompiler.scriptClasspath`), so a control script does not drag the
-// renderer into the graph pass 2 has to compile against. `MobaControls.Keys` spells the same
-// eight, and `MobaFieldTest` compares the two sides - so a drift between this file and the game's
-// constants is a red test rather than a key that quietly stops firing.
-
-val KeyQ = 'Q'.code
-val KeyW = 'W'.code
-val KeyA = 'A'.code
-val KeyS = 'S'.code
-val KeyD = 'D'.code
-val KeyE = 'E'.code
-val KeyR = 'R'.code
-val KeySpace = ' '.code
+// A name has one meaning: the physical key. `udea-render`'s `KoolKeyTable` owns the number per
+// backend, and `MobaKeyBindingTest` presses each of the eight below through the real input seam.
 
 control(name = "attack")
 
@@ -90,51 +65,51 @@ axis2D(name = "move")
 binding(
     name = "attack_binding",
     control = reference("control/attack"),
-    input = key(KeySpace),
+    input = key(InputKey.Space),
 )
 
 binding(
     name = "attack_2_binding",
     control = reference("control/attack_2"),
-    input = key(KeyQ),
+    input = key(InputKey.Q),
 )
 
 binding(
     name = "item_1_binding",
     control = reference("control/item_1"),
-    input = key(KeyE),
+    input = key(InputKey.E),
 )
 
 binding(
     name = "item_2_binding",
     control = reference("control/item_2"),
-    input = key(KeyR),
+    input = key(InputKey.R),
 )
 
 axis2DBinding(
     name = "move_left",
     axis = reference("control/move"),
-    input = key(KeyA),
+    input = key(InputKey.A),
     direction = vec(-1.0F, 0.0F),
 )
 
 axis2DBinding(
     name = "move_right",
     axis = reference("control/move"),
-    input = key(KeyD),
+    input = key(InputKey.D),
     direction = vec(1.0F, 0.0F),
 )
 
 axis2DBinding(
     name = "move_up",
     axis = reference("control/move"),
-    input = key(KeyW),
+    input = key(InputKey.W),
     direction = vec(0.0F, 1.0F),
 )
 
 axis2DBinding(
     name = "move_down",
     axis = reference("control/move"),
-    input = key(KeyS),
+    input = key(InputKey.S),
     direction = vec(0.0F, -1.0F),
 )

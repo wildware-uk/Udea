@@ -5,6 +5,7 @@ import dev.wildware.moba.entry.MobaEntry
 import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.MobaBlueprints
 import dev.wildware.moba.level.UnitKind
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.gas.Abilities
@@ -114,7 +115,7 @@ class MobaFieldTest {
     /**
      * The keys the game runs on are the ones `assets/control/controls.udea.kts` authored.
      *
-     * Pinned to the literal key codes in [MobaControls.Keys] rather than compared against the same assets the
+     * Pinned to the literal key names here rather than compared against the same assets the
      * loader read, and that is the whole point: comparing the two sides of one graph read would
      * agree even if [MobaControlAssets] silently fell back to a hard-coded table. Change
      * `move_left`'s key in the asset and this goes red without a line of Kotlin being touched,
@@ -124,27 +125,27 @@ class MobaFieldTest {
     fun `the bindings come from the packed control graph`() {
         val bindings = MobaControls.BINDINGS
         val attack = bindings.binding(MobaControls.ATTACK_ACTION)
-        assertEquals(listOf(MobaControls.Keys.SPACE), attack.keys.toList(), "attack is Space")
+        assertEquals(listOf(InputKey.Space), attack.keys.toList(), "attack is Space")
         val second = bindings.binding(MobaControls.ATTACK_2_ACTION)
-        assertEquals(listOf(MobaControls.Keys.Q), second.keys.toList(), "attack_2 is Q")
+        assertEquals(listOf(InputKey.Q), second.keys.toList(), "attack_2 is Q")
         // The item bar, added by issue #166. A slot with no key bound to it is an active a human
         // cannot cast, which from the player's side of the window is the same as an active that
         // was never granted.
         assertEquals(
-            listOf(MobaControls.Keys.E),
+            listOf(InputKey.E),
             bindings.binding(MobaControls.ITEM_1_ACTION).keys.toList(),
             "item_1 is E",
         )
         assertEquals(
-            listOf(MobaControls.Keys.R),
+            listOf(InputKey.R),
             bindings.binding(MobaControls.ITEM_2_ACTION).keys.toList(),
             "item_2 is R",
         )
         val move = bindings.binding(MobaControls.MOVE_AXIS)
-        assertEquals(MobaControls.Keys.A, move.negativeX, "move_left")
-        assertEquals(MobaControls.Keys.D, move.positiveX, "move_right")
-        assertEquals(MobaControls.Keys.S, move.negativeY, "move_down")
-        assertEquals(MobaControls.Keys.W, move.positiveY, "move_up")
+        assertEquals(InputKey.A, move.negativeX, "move_left")
+        assertEquals(InputKey.D, move.positiveX, "move_right")
+        assertEquals(InputKey.S, move.negativeY, "move_down")
+        assertEquals(InputKey.W, move.positiveY, "move_up")
     }
 
     /**

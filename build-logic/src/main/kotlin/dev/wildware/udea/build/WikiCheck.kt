@@ -7,8 +7,8 @@ import java.io.File
  *
  * A path may elide a run of directories with a `...` segment - `udea-core/src/.../Tick.kt` - which
  * matches when some file under the part before the elision ends with the part after it. The walk
- * behind an elision skips [SKIPPED_DIRECTORIES], so a generated copy of a file never stands in for
- * the source one a page means.
+ * behind an elision skips Gradle output folders and [SKIPPED_DIRECTORIES], so a generated copy of a
+ * file never stands in for the source one a page means.
  */
 public class RepoFiles(private val root: File) {
 
@@ -30,15 +30,23 @@ public class RepoFiles(private val root: File) {
         return child.exists() && matches(child, rest, wantsDirectory)
     }
 
-    /** [dir] itself and every directory below it, [SKIPPED_DIRECTORIES] excluded. */
+    /** [dir] itself and every directory below it, [SKIPPED_DIRECTORIES] and Gradle outputs excluded. */
     private fun descendantDirectories(dir: File): Sequence<File> =
         dir.walkTopDown()
-            .onEnter { it == dir || it.name !in SKIPPED_DIRECTORIES }
+            .onEnter { it == dir || (it.name !in SKIPPED_DIRECTORIES && !isGradleOutput(it)) }
             .filter { it.isDirectory }
+
+    /**
+     * A `build` folder beside a Gradle build script. A folder merely *named* `build` - such as
+     * `build-logic`'s package `dev.wildware.udea.build` - is source and is walked.
+     */
+    private fun isGradleOutput(dir: File): Boolean =
+        dir.name == "build" && GRADLE_SCRIPTS.any { File(dir.parentFile, it).isFile }
 
     private companion object {
         const val ELISION = "..."
-        val SKIPPED_DIRECTORIES = setOf("build", ".gradle", ".git", ".kotlin", "node_modules")
+        val SKIPPED_DIRECTORIES = setOf(".gradle", ".git", ".kotlin", "node_modules")
+        val GRADLE_SCRIPTS = listOf("build.gradle.kts", "settings.gradle.kts", "build.gradle")
     }
 }
 
@@ -53,7 +61,7 @@ public class RepoFiles(private val root: File) {
  *   `[text](Page-Name)`, names a page that is not in `docs/wiki/`; or a relative link with a
  *   slash in it does not resolve from `docs/wiki/`.
  * - [MISSING_PATH]: a backticked repository path does not exist. What counts as a path is
- *   decided by [repoPathOrNull], which reads its KDoc for the cases it deliberately passes over.
+ *   decided by [repoPathOrNull], whose KDoc lists the cases it deliberately passes over.
  * - [UNKNOWN_PROJECT]: a Gradle task path such as `:moba:desktop:runEditor` names a project
  *   that `settings.gradle.kts` does not create. The task name itself is not checked: tasks are
  *   registered by plugins at configuration time, and a document gate cannot see them.
@@ -230,16 +238,29 @@ public object WikiCheck {
      *
      * - anything with characters a path here never has: `*` globs, `<placeholders>`, URLs, spaces;
      * - `/health`-style absolute paths, which in this wiki are HTTP endpoints;
-     * - anything under a `build/` directory, which is output a clean checkout does not have;
+     * - anything in a Gradle output folder (a `build` before any `src`), which a clean checkout
+     *   does not have;
      * - slashed prose such as `jvm/android` or `@Net/@Sim`, which matches neither clause.
      */
     internal fun repoPathOrNull(code: String, repo: RepoFiles): String? {
         if (!PATH_SHAPE.matches(code)) return null
         val names = code.trimEnd('/').split('/')
-        if ("build" in names) return null
+        if (isGradleOutput(names)) return null
         val rooted = names.first() != "..." && repo.exists(names.first())
         val fileNamed = FILE_NAME.matches(names.last())
         return code.takeIf { rooted || fileNamed }
+    }
+
+    /**
+     * True when [names] runs through a Gradle output folder: a `build` before any `src`.
+     *
+     * Not simply "has a `build` in it", because `build-logic`'s own package is
+     * `dev.wildware.udea.build`, so a real source path can pass through a folder of that name.
+     */
+    private fun isGradleOutput(names: List<String>): Boolean {
+        val build = names.indexOf("build")
+        val src = names.indexOf("src")
+        return build >= 0 && (src < 0 || build < src)
     }
 
     /** The failure message for [findings] from the gate [taskName], or null when there are none. */

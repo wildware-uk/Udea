@@ -196,6 +196,36 @@ class WikiCheckTest {
         assertEquals(emptyList(), findings)
     }
 
+    /**
+     * `build-logic`'s own package is `dev.wildware.udea.build`, so a real source path can have a
+     * folder called `build` in it. Only a Gradle output folder - a `build` that comes before any
+     * `src` - is passed over.
+     */
+    @Test
+    fun `a source path through a package folder named build is still checked`(@TempDir root: File) {
+        repo(root)
+        File(root, "build-logic/build.gradle.kts").also { it.parentFile.mkdirs() }.writeText("")
+        File(root, "build-logic/src/main/kotlin/dev/build").mkdirs()
+        File(root, "build-logic/src/main/kotlin/dev/build/WikiCheck.kt").writeText("")
+        File(root, "build-logic/build/classes").mkdirs()
+        File(root, "build-logic/build/classes/WikiCheck.kt").writeText("")
+
+        val typo = check(root, mapOf("Home.md" to "`build-logic/src/main/kotlin/dev/build/WikiChek.kt`\n"))
+        val real = check(
+            root,
+            mapOf(
+                "Home.md" to "`build-logic/src/main/kotlin/dev/build/WikiCheck.kt` and " +
+                    "`build-logic/src/.../build/WikiCheck.kt`\n",
+            ),
+        )
+        // The elision must find the source file, not the copy in the output folder.
+        val outputOnly = check(root, mapOf("Home.md" to "`build-logic/.../classes/WikiCheck.kt`\n"))
+
+        assertEquals(WikiCheck.MISSING_PATH, typo.single().rule)
+        assertEquals(emptyList(), real)
+        assertEquals(WikiCheck.MISSING_PATH, outputOnly.single().rule)
+    }
+
     // (c) Gradle task paths
 
     @Test

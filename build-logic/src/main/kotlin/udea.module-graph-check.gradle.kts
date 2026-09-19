@@ -1,5 +1,6 @@
 import dev.wildware.udea.build.ModuleGraphRules
 import dev.wildware.udea.build.registerDependencyVerification
+import dev.wildware.udea.build.registerEditorReleaseCheck
 
 /**
  * Registers `udeaVerifyModuleGraph` and wires it into `check`.
@@ -20,3 +21,8 @@ registerDependencyVerification(
     rules = ModuleGraphRules.ALL,
     reportFileName = "module-graph.txt",
 )
+
+// `UDEA-MG-012` (issue #233): the class half of `UDEA-MG-010`. A separate task, because it reads the
+// classes a release classpath resolves to - so it has to wait for them to be built - where
+// `udeaVerifyModuleGraph` reads the graph alone and runs before anything compiles.
+registerEditorReleaseCheck()

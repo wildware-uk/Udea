@@ -25,7 +25,15 @@ class GeneratedSourceShapeTest {
         assertEquals(
             listOf(
                 "dev/wildware/udea/codegen/fixtures/AiBlackboardReplicator.kt",
+                // The gizmos (issue #233): one object per handle annotation, because this run is
+                // also an editor run. Isolating on the component's file, like a Replicator.
+                "dev/wildware/udea/codegen/fixtures/BeaconPositionGizmo.kt",
+                "dev/wildware/udea/codegen/fixtures/BeaconReachRadiusGizmo.kt",
+                "dev/wildware/udea/codegen/fixtures/BeaconSightRangeGizmo.kt",
                 "dev/wildware/udea/codegen/fixtures/CombatReplicator.kt",
+                "dev/wildware/udea/codegen/fixtures/CratePositionGizmo.kt",
+                "dev/wildware/udea/codegen/fixtures/CrateRotationGizmo.kt",
+                "dev/wildware/udea/codegen/fixtures/CrateSizeGizmo.kt",
                 "dev/wildware/udea/codegen/fixtures/HealthAgentState.kt",
                 "dev/wildware/udea/codegen/fixtures/HealthReplicator.kt",
                 "dev/wildware/udea/codegen/fixtures/MatchClockAgentState.kt",
@@ -44,7 +52,9 @@ class GeneratedSourceShapeTest {
                 "dev/wildware/udea/codegen/fixtures/TimelineDescribeTool.kt",
                 // The module-level outputs, one aggregating group per module: the module's
                 // registry, the protocol constant a packet header carries, and the launcher
-                // registry naming every module registry on this module's test classpath.
+                // registry naming every module registry on this module's test classpath. And the
+                // editor run's gizmo registry, which lists every gizmo above and the hand-written ones.
+                "dev/wildware/udea/generated/CodegenFixturesGizmoRegistry.kt",
                 "dev/wildware/udea/generated/CodegenFixturesModuleRegistry.kt",
                 "dev/wildware/udea/generated/CodegenFixturesNetProtocol.kt",
                 "dev/wildware/udea/generated/CodegenFixturesUdeaRegistry.kt",
@@ -113,6 +123,18 @@ class GeneratedSourceShapeTest {
     }
 
     @Test
+    fun `a generated gizmo reads each field directly and writes it through a property reference`() {
+        // The positive counterpart for the gizmos (issue #233): no field is looked up by name at run
+        // time. It is read off the component and named, for the write, by a reference the compiler
+        // checked - the same two things a hand-written gizmo does.
+        val size = GeneratedSources.files.single { it.name == "CrateSizeGizmo.kt" }.readText()
+        for (field in listOf("sizeX", "sizeY", "sizeZ")) {
+            assertTrue("target.component.$field" in size, "CrateSizeGizmo never reads target.component.$field")
+            assertTrue("write(Crate::$field," in size, "CrateSizeGizmo never writes Crate::$field")
+        }
+    }
+
+    @Test
     fun `the ban would actually fire`() {
         // A scanner that matches nothing passes vacuously forever. This pins the patterns to
         // text that must trip them.
@@ -152,7 +174,7 @@ class GeneratedSourceShapeTest {
     }
 
     @Test
-    fun `the reflection exemption is one property on the agent surface and nothing else`() {
+    fun `the reflection exemption is one property on the agent surface and the handle index, and nothing else`() {
         // The exemption below is the only hole in the ban, so its size is asserted rather than
         // trusted. A `Replicator` must never take it - the whole rationale for banning `::class`
         // (R8, and a per-tick field access that is a direct property read) is exact there - and
@@ -166,6 +188,7 @@ class GeneratedSourceShapeTest {
 
         assertEquals(
             listOf(
+                "CodegenFixturesModuleRegistry.kt" to "@HandleIndex(components = [Beacon::class, Crate::class])",
                 "HealthAgentState.kt" to "import kotlin.reflect.KClass",
                 "HealthAgentState.kt" to "override val owner: KClass<*> = Health::class",
                 "MatchClockAgentState.kt" to "import kotlin.reflect.KClass",
@@ -209,13 +232,18 @@ class GeneratedSourceShapeTest {
          * a class *name* is a string R8 cannot follow, and discovering the receiver reflectively
          * is the thing being banned.
          *
+         * The second narrowing is the module registry's `@HandleIndex` (issue #233), whose class
+         * literals are not a reference at run time at all: the annotation is BINARY-retained, so it
+         * is read by KSP in a game's editor source set and by nothing that runs.
+         *
          * The patterns are anchored to whole lines so nothing else slips through, and
-         * `the reflection exemption is one property on the agent surface and nothing else` pins
-         * the exact set of lines they cover.
+         * `the reflection exemption is one property on the agent surface and the handle index, and
+         * nothing else` pins the exact set of lines they cover.
          */
         val EXEMPT: List<Regex> = listOf(
             Regex("""import kotlin\.reflect\.KClass"""),
             Regex("""\s*override val owner: KClass<\*> = [A-Za-z_][A-Za-z0-9_.]*::class"""),
+            Regex("""@HandleIndex\(components = \[[A-Za-z_][A-Za-z0-9_.]*::class(, [A-Za-z_][A-Za-z0-9_.]*::class)*]\)"""),
         )
 
         /** A `java.` or `javax.` package reference: unresolvable in a `commonMain` source set. */

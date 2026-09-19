@@ -42,6 +42,17 @@ public data class MemberRef(
     public val target: String get() = if (kind == RefKind.TYPE) owner else "$owner.$member"
 }
 
+/**
+ * A class's name and its direct supertypes, in internal form (`dev/wildware/udea/editor/Foo`).
+ *
+ * @property superName `null` only for `java/lang/Object` and `module-info`.
+ */
+public data class ClassHeader(
+    public val name: String,
+    public val superName: String?,
+    public val interfaces: List<String>,
+)
+
 /** How a [MemberRef] was made — a rule may care (a `NEW HashMap` is not a `HashMap.entrySet`). */
 public enum class RefKind { METHOD, FIELD, TYPE }
 
@@ -72,6 +83,47 @@ public object ClassScanner {
         ClassReader(bytes).accept(CollectingClassVisitor(refs), ClassReader.SKIP_FRAMES)
         return refs
     }
+
+    /**
+     * What [bytes]' class is and what it directly extends and implements, read from the class
+     * header alone - no method is visited.
+     *
+     * For a gate about *what a class is* rather than what it calls: `UDEA-MG-012` (issue #233) asks
+     * whether a class is a `Gizmo`, which is its supertypes, and a string constant that merely spells
+     * a gizmo's name is not an answer to that.
+     */
+    public fun header(bytes: ByteArray): ClassHeader {
+        val reader = ClassReader(withReadableVersion(bytes))
+        return ClassHeader(reader.className, reader.superName, reader.interfaces.toList())
+    }
+
+    /**
+     * [bytes], or a copy stamped with a class-file version this ASM reads, when the class is newer.
+     *
+     * A release classpath carries classes newer than any ASM this build has: LWJGL 3.4.3 ships
+     * `META-INF/versions/27/` classes for Java 27's FFM API. ASM refuses a newer major version because
+     * it cannot promise to read the *methods* - new attributes, new instructions - and [header] reads
+     * no method: only the constant pool, `this_class`, `super_class` and `interfaces`. A constant-pool
+     * entry this ASM does not know still throws, so a header it cannot read fails the caller rather
+     * than being guessed at. Skipping those classes instead would leave a hole a gizmo could sit in.
+     */
+    private fun withReadableVersion(bytes: ByteArray): ByteArray {
+        if (bytes.size < HEADER_END) return bytes
+        val major = ((bytes[MAJOR_OFFSET].toInt() and BYTE) shl Byte.SIZE_BITS) or (bytes[MAJOR_OFFSET + 1].toInt() and BYTE)
+        if (major <= NEWEST_READABLE_MAJOR) return bytes
+        return bytes.copyOf().also {
+            it[MAJOR_OFFSET] = (NEWEST_READABLE_MAJOR shr Byte.SIZE_BITS).toByte()
+            it[MAJOR_OFFSET + 1] = NEWEST_READABLE_MAJOR.toByte()
+        }
+    }
+
+    /** Where a class file's major version sits: after the 4-byte magic and the 2-byte minor. */
+    private const val MAJOR_OFFSET = 6
+    private const val HEADER_END = MAJOR_OFFSET + 2
+    private const val BYTE = 0xFF
+
+    /** Java 21's class-file major version, which the catalog's ASM reads. */
+    private const val NEWEST_READABLE_MAJOR = Opcodes.V21
 
     /** Every reference made by every `.class` file under [roots]. */
     public fun scanAll(roots: Iterable<File>): List<MemberRef> =

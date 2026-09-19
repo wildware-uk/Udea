@@ -3,6 +3,7 @@ package dev.wildware.moba
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.annotations.Net
+import dev.wildware.udea.annotations.PositionHandle
 import dev.wildware.udea.annotations.Replicated
 import kotlinx.serialization.Serializable
 import dev.wildware.udea.annotations.Sim
@@ -15,9 +16,14 @@ import dev.wildware.udea.annotations.Sim
  * something to write, and for a rewind to be observable from outside the process. It is not a
  * design for a MOBA; it is the smallest component that makes the engine's own claims checkable
  * from a running game rather than from a test.
+ *
+ * `@PositionHandle` gives it a move handle in the editor (issue #233): `x` and `y` are the
+ * annotation's defaults, so it names nothing. The gizmo is generated in `:moba:desktop`'s `editor`
+ * source set, never here, so the shipped game carries no editor code for it.
  */
 @Serializable
 @Replicated
+@PositionHandle
 public class Position(
     /** World x. Agent-writable. */
     @Net(agentWritable = true) public var x: Float = 0f,

@@ -64,7 +64,18 @@ public object AccessorGenerator {
      * so moving a declaration within its file regenerates byte-identical source and nothing
      * downstream recompiles.
      */
-    public fun generate(declarations: List<Declaration>): List<GeneratedFile> {
+    public fun generate(declarations: List<Declaration>): List<GeneratedFile> = generate(declarations, emptyMap())
+
+    /**
+     * [generate], plus one object per animated model holding its typed clips (issue #241):
+     * `Fox.Clips.Run`. [clips] maps a model's asset id to what [ModelClipSource] read from its
+     * file; a model with no clips gets no object, so a game with no animated model compiles
+     * nothing that names `udea-core`.
+     *
+     * Still a pure function of its arguments: the clips were read before this is called, so two
+     * runs over the same scan and the same files emit the same bytes.
+     */
+    internal fun generate(declarations: List<Declaration>, clips: Map<String, List<GltfClip>>): List<GeneratedFile> {
         val typed = declarations
             .filter { DslKinds[it.kind] != null }
             .distinctBy { it.id }
@@ -72,8 +83,87 @@ public object AccessorGenerator {
 
         val groups = typed.groupBy { groupOf(it.id) }.toSortedMap()
         val files = groups.map { (group, members) -> groupFile(group, members) }
-        return files + rootFile(groups.keys.toList())
+        val taken = groups.keys.mapTo(mutableSetOf(ROOT), ::objectNameOf)
+        val models = typed.mapNotNull { model ->
+            clips[model.id]?.takeIf { it.isNotEmpty() }?.let { modelFile(model, it, taken) }
+        }
+        return files + rootFile(groups.keys.toList()) + models
     }
+
+    /**
+     * `object Fox { object Clips { val Run: AnimationClip = ... } }` for one model.
+     *
+     * The object is named for the id's last segment (`models/fox` is `Fox`), and made unique
+     * against every group object, [ROOT] and the other models in [taken], which it adds itself
+     * to. Each clip is a property named for the file's own name for it; see [clipMemberName].
+     */
+    private fun modelFile(model: Declaration, clips: List<GltfClip>, taken: MutableSet<String>): GeneratedFile {
+        val objectName = unique(pascalCase(model.id.substringAfterLast('/')).ifEmpty { "Model" }, taken)
+        val clipsType = TypeSpec.objectBuilder(CLIPS_OBJECT)
+            .addKdoc(
+                "The animations in `%L`, in the file's order, each with its length in ticks at " +
+                    "60Hz.\n\nGenerated from the file at build time; a name that is not here is " +
+                    "not in the file.\n",
+                model.fileArgument.orEmpty(),
+            )
+        val used = mutableSetOf<String>()
+        for (clip in clips) {
+            val member = clipMemberName(clip, used)
+            clipsType.addProperty(
+                PropertySpec.builder(member, ANIMATION_CLIP)
+                    .addKdoc("Animation %L of the file, %L ticks long.\n", clip.index, clip.ticks)
+                    .initializer(
+                        "%T(index = %L, name = %S, length = %T(%LL))",
+                        ANIMATION_CLIP,
+                        clip.index,
+                        clip.name ?: member,
+                        TICKS,
+                        clip.ticks,
+                    )
+                    .build(),
+            )
+        }
+        val type = TypeSpec.objectBuilder(objectName)
+            .addKdoc(
+                "The model `%L`, declared by `model(...)`: its animation clips, typed.\n\n" +
+                    "The model itself is `%L.%L.%L`.\n",
+                model.id,
+                ROOT,
+                memberName(groupOf(model.id)),
+                memberName(model.id.substringAfterLast('/')),
+            )
+            .addType(clipsType.build())
+            .build()
+        return fileOf(objectName, type)
+    }
+
+    /**
+     * A clip's property name: the file's name for it in `PascalCase` - `open-slowly` and
+     * `Open Slowly` are both `OpenSlowly` - or `Clip<index>` for an unnamed clip. A name that
+     * cannot start an identifier is prefixed `Clip`, and a clash is numbered from 2, in file
+     * order, so two builds of one file always agree on which clip got which name.
+     */
+    private fun clipMemberName(clip: GltfClip, used: MutableSet<String>): String {
+        val words = pascalCase(clip.name.orEmpty())
+        val base = when {
+            words.isEmpty() -> "Clip${clip.index}"
+            !words.first().isLetter() -> "Clip$words"
+            else -> words
+        }
+        return unique(base, used)
+    }
+
+    /** [base], or [base] numbered from 2 until it is not in [used]; the result is added to it. */
+    private fun unique(base: String, used: MutableSet<String>): String {
+        if (used.add(base)) return base
+        var at = 2
+        while (!used.add("$base$at")) at++
+        return "$base$at"
+    }
+
+    /** `orc_elite`, `open-slowly` and `Open Slowly` as `OrcElite`, `OpenSlowly`, `OpenSlowly`. */
+    private fun pascalCase(name: String): String =
+        name.split(NON_IDENTIFIER).filter { it.isNotEmpty() }.joinToString("") { it.replaceFirstChar(Char::uppercase) }
 
     /**
      * The top-level folder of an id, or [ROOT_GROUP] for an id at the asset root.
@@ -156,8 +246,7 @@ public object AccessorGenerator {
         )
     }
 
-    private fun objectNameOf(group: String): String =
-        group.split('_', '-').joinToString("") { it.replaceFirstChar(Char::uppercase) } + "Assets"
+    private fun objectNameOf(group: String): String = pascalCase(group) + "Assets"
 
     /** `orc_elite` -> `orcElite`. An id that cannot start an identifier gets a leading `_`. */
     public fun memberName(name: String): String {
@@ -183,4 +272,16 @@ public object AccessorGenerator {
     }
 
     private val REFERENCE = MemberName("dev.wildware.udea.assets", "reference")
+
+    /**
+     * `udea-core`'s clip handle and duration, by name: this build-time module does not depend on
+     * the kernel, and the game module compiling the generated source does.
+     */
+    private val ANIMATION_CLIP = ClassName("dev.wildware.udea.core.spatial", "AnimationClip")
+    private val TICKS = ClassName("dev.wildware.udea.core", "Ticks")
+
+    /** The object inside a model's object that holds its clips: `Fox.Clips`. */
+    private const val CLIPS_OBJECT = "Clips"
+
+    private val NON_IDENTIFIER = Regex("[^A-Za-z0-9]+")
 }

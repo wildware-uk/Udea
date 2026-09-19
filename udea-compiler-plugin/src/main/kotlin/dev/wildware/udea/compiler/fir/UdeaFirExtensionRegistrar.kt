@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
 import org.jetbrains.kotlin.fir.expressions.FirLoop
+import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
 
 /**
@@ -81,6 +82,10 @@ internal class UdeaFirAdditionalCheckers(
     override val expressionCheckers: ExpressionCheckers = object : ExpressionCheckers() {
         override val functionCallCheckers: Set<FirExpressionChecker<FirFunctionCall>> =
             setOf(UdeaAssetReferenceChecker(catalog), UdeaAssetLoopChecker.Calls)
+
+        /** Issue #241: `Fox.Clips.Rnu` gets a did-you-mean. Silent on every name that is not a clip. */
+        override val propertyAccessExpressionCheckers: Set<FirExpressionChecker<FirPropertyAccessExpression>> =
+            setOf(UdeaAnimationClipChecker)
 
         /** Issue #192: loops in a `.udea.kts`. [UdeaAssetLoopChecker] is silent in any other file. */
         override val loopExpressionCheckers: Set<FirExpressionChecker<FirLoop>> =

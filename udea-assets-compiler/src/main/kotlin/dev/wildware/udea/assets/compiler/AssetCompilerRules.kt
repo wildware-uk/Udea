@@ -135,6 +135,23 @@ public object AssetCompilerRules {
             "it as written, marked with a TODO(udea-migrate)",
     )
 
+    /**
+     * A `model(...)`'s animation clips cannot be read, so its typed clips (`Fox.Clips.Run`,
+     * issue #241) cannot be generated.
+     *
+     * Raised by `udeaGenerateAccessors`, which runs before any game code compiles: the file is
+     * absent (with a did-you-mean), is not glTF 2.0, has an animation whose length the file does
+     * not state, or is named by something other than a string literal - pass 1 is syntactic, and
+     * a computed path is one it cannot follow. An error, because the alternative is generating no
+     * clips and letting every use of one fail to compile with nothing saying why.
+     */
+    public val MODEL_CLIPS: UdeaRule = UdeaRule(
+        id = "UDEA0027",
+        defaultSeverity = Severity.Error,
+        description = "a model's animation clips cannot be read from its file, so no typed clips " +
+            "can be generated for it",
+    )
+
     /** Every rule this module raises that `UdeaRules` does not already own, in id order. */
     public val all: List<UdeaRule> = listOf(
         NON_LITERAL_ID,
@@ -144,5 +161,6 @@ public object AssetCompilerRules {
         UNPACKABLE_VALUE,
         UNPACKABLE_KIND,
         MIGRATION_UNDECIDED,
+        MODEL_CLIPS,
     ).sortedBy { it.id }
 }

@@ -23,3 +23,7 @@
 # other than a checkout - an archive, an editor, a working tree that predates this file - fails
 # by name instead of failing as an equality diff of two identical-looking blocks.
 src/test/resources/golden/*.json -text
+
+# `ModelClipAccessorsTest` compares the generated `Fox.kt` against this golden as text, for the
+# same reason and through the same `GoldenResource` fence as the scan golden above (issue #241).
+src/test/resources/golden/*.kt.txt -text

@@ -74,7 +74,8 @@ the MIT licence above:
     CC BY 4.0). Licensed as a whole under Creative Commons Attribution 4.0
     International, https://creativecommons.org/licenses/by/4.0/legalcode.
     example-assets/models/fox/NOTICE.md next to the file has the source, the
-    links and the checksum.
+    links and the checksum. moba/game/assets/models/fox/Fox.glb is the same
+    file, byte for byte, under the same licence, with the same NOTICE.md.
 
 If you fork, vendor or redistribute this repository, you must supply your own
 art and audio. See docs/art-assets.md for the current status of these files and

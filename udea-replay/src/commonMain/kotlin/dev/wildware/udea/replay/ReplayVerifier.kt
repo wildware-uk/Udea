@@ -139,8 +139,7 @@ public object ReplayVerifier {
             var compared = 0
             for (index in 0 until recording.tickCount) {
                 val tick = recording.firstTick + index.toLong()
-                recording.samplesInto(tick, slots)
-                world.applyInput(slots)
+                world.feed(recording, tick, slots)
                 world.step()
                 compared++
                 val replayed = world.hash()

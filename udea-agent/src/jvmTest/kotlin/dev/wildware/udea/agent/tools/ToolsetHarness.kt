@@ -4,6 +4,7 @@ import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.EntityCreateContext
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.agent.AgentBridge
+import dev.wildware.udea.agent.AgentClock
 import dev.wildware.udea.agent.AgentError
 import dev.wildware.udea.agent.AgentResult
 import dev.wildware.udea.agent.AgentTimings
@@ -68,6 +69,8 @@ internal class ToolsetHarness(
     withEditor: Boolean = false,
     /** Where `editor.save` writes. `null` wires no level store, so a save is refused. */
     levelDirectory: Path? = null,
+    /** What the editor's idle timeout reads. The platform clock unless a test moves its own. */
+    editorClock: AgentClock = AgentClock.System,
 ) {
 
     val bridge: AgentBridge = AgentBridge()
@@ -176,6 +179,7 @@ internal class ToolsetHarness(
                 catalog = BlueprintCatalog.of(listOf(GruntBlueprint, ChampionBlueprint)),
                 spawner = spawner,
                 levels = levelDirectory?.let { EditorLevelStore(host.game.levels, it) },
+                idleClock = editorClock,
             )
         } else {
             null

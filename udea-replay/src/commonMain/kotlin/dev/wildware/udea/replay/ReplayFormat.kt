@@ -45,9 +45,26 @@ package dev.wildware.udea.replay
  * tickCount * peerCount samples, tick-major, peers ascending. See InputSample.
  * --- hashes ----------------------------------------------------------------------
  * tickCount * i64  WorldHasher.hash(snapshot) at the END of each recorded tick
+ * --- edits (format 2 only) --------------------------------------------------------
+ * editCount      i32   calls made between ticks, in the order they were applied
+ * each edit      tick i64, author string, tool string, argCount u16, then argCount
+ *                pairs of name string and value text, names ascending. See ReplayEdit.
  * --- trailer ---------------------------------------------------------------------
- * crc32          i32 over every byte from MAGIC to the last hash
+ * crc32          i32 over every byte from MAGIC to the last hash, or the last edit
  * ```
+ *
+ * A `string` is a u16 length and at most [MAX_STRING_BYTES] of UTF-8; a `text` is an i32 length
+ * and at most [MAX_EDIT_TEXT_BYTES], for an argument value that can be long - an `update_edit`
+ * writing every entity in a big selection.
+ *
+ * ## Two versions, and which one a file is
+ *
+ * Format 2 is format 1 with the edits section (issue #232). A recording with **no** edits is
+ * written as format 1, byte for byte what every earlier build wrote: a match recording is not
+ * changed by this, and a build from before format 2 still reads it. A recording with edits is
+ * written as format 2, which such a build refuses by its version number rather than misreading -
+ * correctly, because replaying it without its edits would diverge on the first edited tick.
+ * This build reads both.
  *
  * Little-endian throughout, because a format that mixed the two would be read wrong exactly
  * once, in the field.
@@ -67,7 +84,14 @@ public object ReplayFormat {
      * mismatch report a garbage value - "seed 7318349312 does not match 0" is a worse message
      * than "this file is format 2 and this build reads 1".
      */
-    public const val FORMAT_VERSION: Int = 1
+    public const val FORMAT_VERSION: Int = 2
+
+    /**
+     * The version a recording with no edits is written as, and the oldest this build reads.
+     *
+     * See "Two versions" in the class KDoc: format 2 without its edits section is format 1.
+     */
+    public const val EDITLESS_FORMAT_VERSION: Int = 1
 
     /** The extension. One place, so a tool and a test cannot disagree about it. */
     public const val EXTENSION: String = ".udearep"
@@ -83,6 +107,15 @@ public object ReplayFormat {
 
     /** Most named axes or actions one schema may carry. */
     public const val MAX_NAMES: Int = 4096
+
+    /** Most edits one recording may carry: more than an hour of a drag updating every frame at 60Hz. */
+    public const val MAX_EDITS: Int = 1 shl 18
+
+    /** Most arguments one recorded edit may carry. */
+    public const val MAX_EDIT_ARGS: Int = 64
+
+    /** Longest argument value a recorded edit may carry, in UTF-8 bytes. */
+    public const val MAX_EDIT_TEXT_BYTES: Int = 64 * 1024
 
     /** Most peers one recording may carry. A `.udearep` is one match, not a season. */
     public const val MAX_PEERS: Int = 256
@@ -205,6 +238,17 @@ public class ByteSink(initialCapacity: Int = DEFAULT_CAPACITY) {
         raw(encoded)
     }
 
+    /** An i32-length-prefixed UTF-8 text, refused past [ReplayFormat.MAX_EDIT_TEXT_BYTES]. */
+    public fun text(value: String) {
+        val encoded = value.encodeToByteArray()
+        require(encoded.size <= ReplayFormat.MAX_EDIT_TEXT_BYTES) {
+            "a ${encoded.size}-byte value is past the ${ReplayFormat.MAX_EDIT_TEXT_BYTES} bytes a " +
+                ".udearep edit argument may carry"
+        }
+        i32(encoded.size)
+        raw(encoded)
+    }
+
     /** Overwrites the `i32` at [offset]. Used once, for the header's own length. */
     public fun patchI32(offset: Int, value: Int) {
         require(offset >= 0 && offset + 4 <= size) { "cannot patch 4 bytes at $offset of $size" }
@@ -283,6 +327,18 @@ public class ByteSource(private val bytes: ByteArray, private var at: Int = 0) {
             throw ReplayFormatException(
                 "a string declares $length bytes, past the ${ReplayFormat.MAX_STRING_BYTES}-byte " +
                     "cap; this file is corrupt or is not a .udearep",
+            )
+        }
+        return raw(length).decodeToString()
+    }
+
+    /** An i32-length-prefixed UTF-8 text. */
+    public fun text(): String {
+        val length = i32()
+        if (length < 0 || length > ReplayFormat.MAX_EDIT_TEXT_BYTES) {
+            throw ReplayFormatException(
+                "a text declares $length bytes, outside 0..${ReplayFormat.MAX_EDIT_TEXT_BYTES}; " +
+                    "this file is corrupt or is not a .udearep",
             )
         }
         return raw(length).decodeToString()

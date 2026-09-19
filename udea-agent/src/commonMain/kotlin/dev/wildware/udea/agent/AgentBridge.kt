@@ -252,13 +252,32 @@ public class AgentBridge(
     // --- the simulation-thread half ------------------------------------------------------
 
     /**
+     * Run at the start of every [drain], on the simulation thread, between ticks.
+     *
+     * For a toolset that owns something which lapses with nobody calling it - `editor.*`'s idle
+     * edit sessions - so it can [submit] the call that ends it and have that call travel the same
+     * queue, barrier and dispatcher as any other. Registered while the host is being wired, before
+     * the loop drains anything, and never removed.
+     */
+    private val drainHooks = ArrayList<() -> Unit>(0)
+
+    /** Registers [hook] to run at the start of every [drain]. See [drainHooks]. */
+    internal fun beforeEachDrain(hook: () -> Unit) {
+        drainHooks.add(hook)
+    }
+
+    /**
      * Moves every queued command into [into] and returns how many.
      *
      * Takes the destination rather than returning a list so a caller that drains every tick
      * can reuse one buffer; the reference implementation allocated an `ArrayList` per frame.
      * Draining is bounded by the queue depth at entry, not by what arrives during the drain.
+     *
+     * Every [beforeEachDrain] hook runs first, so a command a hook submits is drained in this
+     * same call.
      */
     public fun drain(into: MutableList<AgentCommand>): Int {
+        for (index in drainHooks.indices) drainHooks[index]()
         var drained = 0
         var remaining = queued.load()
         while (remaining > 0) {

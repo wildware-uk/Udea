@@ -226,13 +226,6 @@ class OuterBuildInputsTest {
         val NOT_READ_FROM_THE_REPOSITORY: Map<String, String> = mapOf(
             "gradle.properties" to
                 "GradleFixture writes one into its own TestKit root; the repository's is never read",
-            "docs/migration/ledger.md" to
-                "MigrationVerifyTest and MigrationLedgerTest use it as the ledger path inside a " +
-                "fixture tree, and assert on it as a finding's `path`. The real ledger is read by " +
-                "udeaLegacyReport, which is a task with its own declared inputs",
-            "common/src/main/kotlin/dev/wildware/udea/ecs/system/TransformSystem.kt" to
-                "MigrationVerifyTest's `legacyPath`: a plausible legacy path written into a " +
-                "fixture, which happens to name a file the old tree really still has",
             "udea-core/src/commonMain/kotlin" to DETERMINISM_LAYOUT_FIXTURE,
             "udea-core/src/jvmAndAndroidMain/kotlin" to DETERMINISM_LAYOUT_FIXTURE,
             "udea-core/src/wasmJsMain/kotlin" to DETERMINISM_LAYOUT_FIXTURE,

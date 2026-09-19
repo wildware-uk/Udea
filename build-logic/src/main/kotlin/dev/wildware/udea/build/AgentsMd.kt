@@ -89,12 +89,12 @@ public object AgentsMd {
         agentsMd: String,
         settingsScript: String,
         agentsMdPath: String = "AGENTS.md",
-    ): List<MigrationFinding> {
+    ): List<GateFinding> {
         val declared = declaredModules(settingsScript).toSet()
         val documented = documentedModules(agentsMd).toSet()
 
         val undocumented = (declared - documented).sorted().map {
-            MigrationFinding(
+            GateFinding(
                 rule = MODULE_TABLE_DRIFT,
                 path = agentsMdPath,
                 line = 1,
@@ -103,7 +103,7 @@ public object AgentsMd {
             )
         }
         val phantom = (documented - declared).sorted().map {
-            MigrationFinding(
+            GateFinding(
                 rule = MODULE_TABLE_DRIFT,
                 path = agentsMdPath,
                 line = 1,
@@ -112,7 +112,7 @@ public object AgentsMd {
             )
         }
         val missingContracts = CONTRACTS.filterNot { agentsMd.contains(it) }.map {
-            MigrationFinding(
+            GateFinding(
                 rule = MISSING_CONTRACT,
                 path = agentsMdPath,
                 line = 1,
@@ -122,4 +122,14 @@ public object AgentsMd {
         }
         return undocumented + phantom + missingContracts
     }
+
+    /** The failure message for [findings] from the gate [taskName], or null when there are none. */
+    public fun report(taskName: String, findings: List<GateFinding>): String? =
+        gateFailureReport(
+            taskName,
+            findings,
+            "AGENTS.md's module table (under '$MODULE_SECTION') must list exactly the projects " +
+                "settings.gradle.kts includes, and the file must name every spec section 5 " +
+                "contract. Edit AGENTS.md in the same change as the module or contract it describes.",
+        )
 }

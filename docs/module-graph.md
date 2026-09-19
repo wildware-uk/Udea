@@ -1,16 +1,11 @@
 # Module graph
 
-The rewrite tree (spec §4), the convention plugin each module is on, the old code it
-replaces, and its arrows. The old modules that remain (`common`, `example`, `gradle-plugin`)
-stay in `settings.gradle.kts` until the Phase 6 exit; nothing below may depend on them.
-`level-editor`, `idea-plugin` and `compose-ui` were deleted in Phase 0 under D6 — they had no
-replacement to wait for. They stay on the banned list below regardless: a coordinate that
-cannot match costs nothing, and it is what stops one being quietly re-added.
-`docs/migration/ledger.md` carries the retirement order.
-
-**Rule, enforced from Phase 0:** no `udea-*` or `moba` project may have `common` on its
-compile classpath. Anything needed is copied forward deliberately, file by file, with the
-copy reviewed.
+The module tree (spec §4), the convention plugin each module is on, the old code it
+replaced, and its arrows. The old tree - `common`, `gradle-plugin`, `example` and
+`example:assets` - was deleted in issue #213, with LibGDX and the gates that policed the old
+tree (`UDEA-LEGACY-001` and the migration ledger's `UDEA-MIG-*`). `level-editor`, `idea-plugin`
+and `compose-ui` went earlier, in Phase 0 under D6. The "Replaces" column below names what each
+module took over from that tree, as history.
 
 ## Convention plugins (`build-logic`)
 
@@ -22,7 +17,6 @@ copy reviewed.
 | `udea.kotlin-multiplatform-no-ios` | a runtime module that cannot have an iOS target yet, whose build script names why: `udea-net`, whose `webSocketEngine` has no native `actual` (issue #209); `udea-agent`, whose `enumConstantsOf` and `heapFigures` have none (issue #208). `udea-core` left it when Fleks was vendored (issue #215) | `udea.kotlin-multiplatform` without the iOS targets; switching back to `udea.kotlin-multiplatform` re-enables them |
 | `udea.kotlin-multiplatform-render` | `udea-render` (spec D2, issue #211) and `moba:game`, which builds for every target `udea-render` has (issue #212) | `udea.kotlin-multiplatform-no-ios`, applied rather than copied |
 | `udea.jvm-test-fixtures` | a KMP module with JVM test fixtures | a `jvmTestFixtures` source set published under the `-test-fixtures` capability, so `testFixtures(project(...))` works from a JVM consumer |
-| `udea.kotlin-library-gl` | `udea-render` only | `udea.kotlin-library` plus gdx and the LWJGL3 backend, as `implementation` so GL cannot leak downstream |
 | `udea.kotlin-build-tool` | `udea-codegen`, `udea-compiler-plugin`, `udea-assets-compiler` | `udea.kotlin-library` plus the exact-Kotlin-version pin (spec §7), checked at configuration time |
 | `udea.gradle-plugin` | `udea-gradle` | `udea.kotlin-library` plus `compileOnly(gradleApi())` and TestKit for tests |
 
@@ -46,7 +40,7 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 | `udea-render` | `udea.kotlin-multiplatform-render` | The only module that touches GL. Kool stays inside it (port spec section 3): the renderer, the ComposeGL frontend, and the Kool-backed `AudioDevice` (issue #221) | `SpriteBatchSystem` et al., `GameScreen`'s rendering half | `udea-core` (api), `udea-audio` (api), `udea-assets`, Kool, `composegl-ui` (api), `composegl-kool`; `composegl-lwjgl3` on `jvm` | `moba` |
 | `udea-audio` | `udea.kotlin-multiplatform` | Cue-driven sound: the drain that empties `GameContext.cues`, the cue-to-`SoundCue` routing table, distance attenuation, stereo pan, pitch variance and a per-frame voice cap. **No GL and no `Gdx`** — playback is an `AudioDevice` SPI, and `AudioDevice.Silent` is a shipped implementation, so a headless process drains the queue and makes no noise | `common/.../ecs/system/SoundSystem.kt`, which read `gameScreen.camera` off a file-level global inside a Fleks system and called `play` on a `Sound` held by an asset value | `udea-core` (api), `udea-assets` | `udea-render`, `moba` |
 | `udea-agent` | `udea.kotlin-multiplatform-no-ios` | MCP surface + test harness — same code path; common on `jvm`, `android` and `wasmJs`, with the `assets.*` toolset in `jvmMain` (issue #208) | FruitGameKTX's `DebugBridge` pattern, generalised | `udea-core` (api) | `udea-agent-host` |
-| `udea-agent-host` | `udea.kotlin-library` | HTTP server, plus the toolsets that need a render context (spec §4: render, input, ui). Debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` | `udea-agent` (api); `udea-render` + gdx + `udea-net` (`implementation` — see below) | *(nothing — deliberately not `moba`)* |
+| `udea-agent-host` | `udea.kotlin-library` | HTTP server, plus the toolsets that need a render context (spec §4: render, input, ui). Debug-only, verified absent from release | `level-editor`, `idea-plugin`, `compose-ui` | `udea-agent` (api); `udea-render` + `udea-net` (`implementation` — see below) | *(nothing — deliberately not `moba`)* |
 | `udea-gradle` | `udea.gradle-plugin` | Tasks, verifiers, `gamebridge.json` emission | old `gradle-plugin` (which leaked `gradleApi` onto the game runtime) | `udea-assets-compiler`, `udea-diagnostics`, `gradleApi()` (`compileOnly`) | *(nothing — applied as a plugin, never depended on)* |
 | `moba:game` | `udea.kotlin-multiplatform-render` | The example game as a library: components, systems, assets and what it draws, with no entry point (issue #212) | `example` | `udea-core`, `udea-render` (`api`); `udea-annotations`, `udea-gas`, `udea-net`, `udea-assets`, `udea-audio` (`implementation`) | `moba:desktop`, `moba:android` |
 | `moba:desktop` | `udea.kotlin-library` | The desktop launcher: the client, the server, the shot mains, the proofs and the agent surface | `moba`'s entry points | `moba:game`, `udea-replay` (`api`); `udea-core`, `udea-render`, `udea-net`, `udea-gas`, `udea-audio`, `udea-assets` (`implementation`); the agent source set's `udea-agent-host` comes from `dev.wildware.udea.agent` and is kept out of release by `UDEA-REL-002` | — |
@@ -54,16 +48,16 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 
 ## Arrows that must never appear
 
-- Anything → `common`. That is the whole point of the rewrite tree.
-- Anything except `udea-render` and `udea-agent-host` → gdx / LWJGL3 / GL. `udea-core` in
-  particular is the headless kernel; Box2D and gdx-math arrive later behind a
-  `PhysicsWorld`-style interface, never as a backend dependency. The two exempt modules are
+- Anything → LibGDX, in any form (`UDEA-MG-009`). It left the tree in issue #213.
+- Anything except `udea-render` and `udea-agent-host` → Kool / LWJGL3 / GL. `udea-core` in
+  particular is the headless kernel; physics reaches it behind its own `PhysicsWorld`
+  interface, never as a backend dependency. The two exempt modules are
   `ModuleGraphRules.GL_ALLOWED_PROJECTS`, and adding a third means editing that set and the
   test that pins it.
 - `udea-assets-compiler` → any Gradle type. The daemon and CI must run identical code.
-- `udea-audio` → gdx, in any form. It is a designated headless module, so `UDEA-MG-002` bans
-  the backend on its classpath and `UDEA-MG-002-BYTECODE` bans `com/badlogic/gdx/Gdx` by
-  exact name, and the same rule bans `de.fabmax.kool:*`. The class that turns a path into a
+- `udea-audio` → Kool or LibGDX. It is a designated headless module, so `UDEA-MG-002` bans
+  `de.fabmax.kool:*` on its classpath, `UDEA-MG-009` bans LibGDX there as everywhere, and
+  `UDEA-MG-002-BYTECODE` bans the `com/badlogic/` namespace in its classes. The class that turns a path into a
   noise is `udea-render`'s `KoolAudioDevice` (issue #221), behind this module's `AudioDevice`
   interface: the same shape as `Presentation`, which `udea-core` holds without owning a renderer.
   `moba`'s own `GdxAudioDevice` went with LibGDX in issue #212, and `moba` now plays through
@@ -98,27 +92,25 @@ JVM, a dedicated server and an agent harness with no display, is still headless 
 enforcement levels, and `RenderModuleGraphTest` still fails if it names a `udea.render` type. And
 `udea-agent-host` is the *debug* HTTP host: `UDEA-REL-001` and `UDEA-REL-002` keep it out of every
 shipped artifact and off every shipped runtime classpath, independently enforced by
-`udeaVerifyRelease` and independently tested. It does **not** apply `udea.kotlin-library-gl`;
-`udea-render` is still the only module on that convention, and `RenderModuleGraphTest` asserts
-it.
+`udeaVerifyRelease` and independently tested. It is on the plain JVM convention;
+`udea-render` is still the only engine module on the render convention, and
+`RenderModuleGraphTest` asserts it.
 
 ---
 
 # Build gates
 
-The arrows above are enforced by the build, not by discipline. Three tasks do it, they run
-from `check`, and each has a stable rule id so a failure message and this document can be
-joined up by search.
+The arrows above are enforced by the build, not by discipline. The tasks below do it, and each
+rule has a stable id so a failure message and this document can be joined up by search.
 
 | Task | Registered on | Reads | Runs from |
 |---|---|---|---|
-| `udeaVerifyNoLegacyDependencies` | every `:udea-*` and `:moba:*` project | the resolved dependency graph | that project's `check`, plus the root aggregate |
 | `udeaVerifyModuleGraph` | every `:udea-*` and `:moba:*` project | the resolved dependency graph | that project's `check`, plus the root aggregate |
 | `udeaVerifyRelease` | `:moba:desktop` | the **packaged artifact**, plus the release runtime classpath | `finalizedBy` on `:moba:desktop:assemble`, release builds only |
 
-All three read the **resolved** graph rather than declared dependencies, because the arrow
-that matters is the one nobody declared: a module two hops away from `common` has nothing in
-its own build file to grep for. Failure messages therefore print the resolution path from the
+Both read the **resolved** graph rather than declared dependencies, because the arrow
+that matters is the one nobody declared: a module two hops away from a banned artifact has
+nothing in its own build file to grep for. Failure messages therefore print the resolution path from the
 root, not just the offending coordinate.
 
 Coordinates are normalised before matching: `group:module` for an external module (the
@@ -126,23 +118,6 @@ version is dropped — no rule here is version-sensitive), the Gradle path for a
 `file:<display name>` for a file dependency. That last one is not a detail: `gradleApi()`
 reaches a classpath as loose jars under the single name `Gradle API` and is invisible to a
 scan that reads only the component graph.
-
-## `UDEA-LEGACY-001` — no old-tree project on a rewrite classpath
-
-**Spec §4.** Banned: `:common`, `:gradle-plugin`, `:level-editor`, `:idea-plugin`,
-`:compose-ui`, `:example`, `:example:*`. Scanned on `compileClasspath`, `runtimeClasspath`,
-`testCompileClasspath`, `testRuntimeClasspath`, `testFixturesCompileClasspath`,
-`testFixturesRuntimeClasspath`.
-
-The old tree is replaced module by module and deleted at the Phase 6 exit. Spec §7 rates two
-coexisting module trees on one classpath as the top structural risk and says why: the
-duplicate declarations and revived globals it produces surface far from the module that added
-the edge. Anything needed from the old tree is copied forward file by file, with the copy
-reviewed. `:example` is banned for a second reason as well — it depends on `:gradle-plugin`,
-whose `implementation(gradleApi())` puts the whole Gradle API downstream.
-
-This rule is run by its own task rather than folded into `udeaVerifyModuleGraph`, so a
-failure cannot mean either "you brought back the old tree" or "you put GL on the kernel".
 
 ## `UDEA-MG-001` — `udea-annotations` resolves the Kotlin stdlib and nothing else
 
@@ -173,16 +148,15 @@ that task is gone and its one unique branch is the vacuity guard above.
 
 **Spec §4, §3.5; Kool port spec §3.** Banned on `compileClasspath` and `runtimeClasspath` of
 **every `udea-*` module except `udea-render` and `udea-agent-host`**: `de.fabmax.kool:*`, the
-ComposeGL backends `dev.wildware.composegl:composegl-kool*`, `composegl-gdx*`,
-`composegl-lwjgl3*`, `composegl-webgl*` and `composegl-android*`, and
-`com.badlogicgames.gdx:gdx-backend-lwjgl3`, `org.lwjgl:*`, `com.badlogicgames.gdx:*-platform`.
+ComposeGL backends `dev.wildware.composegl:composegl-kool*`,
+`composegl-lwjgl3*`, `composegl-webgl*` and `composegl-android*`, and `org.lwjgl:*`.
 
 The port to Kool (issue #211) turned "no GL outside `udea-render`" into "no Kool and no ComposeGL
 backend outside `udea-render`". `dev.wildware.composegl:composegl-ui` is the toolkit with no
 backend in it — a tree can be composed and asserted on with no window — so it is not on the list.
-The LibGDX coordinates stay until the old tree and `moba`'s LibGDX launcher are gone (issues #212
-and the old-tree deletion): a coordinate nothing resolves costs nothing, and it is what stops one
-being quietly re-added.
+The LibGDX coordinates this rule used to carry (`gdx-backend-lwjgl3`, the `*-platform` natives,
+`composegl-gdx*`) left it in issue #213, when `UDEA-MG-009` began banning every LibGDX artifact
+from every project.
 
 The module set is not written out here, or anywhere twice. It is
 `ModuleGraphRules.HEADLESS_PROJECTS` in `build-logic`, and `ModuleGraphRulesTest` derives the
@@ -200,12 +174,9 @@ document called them the same rule.
 above. The short version: it owns the render toolset, and `UDEA-REL-002` rather than
 `UDEA-MG-002` is what keeps it off a shipped classpath.
 
-`com.badlogicgames.gdx:gdx` is deliberately **not** banned — `Vector2` and the rest of
-gdx-math are headless. The ban is on GL and on native loaders, not on maths.
-
 `udea-core` is the headless kernel: the simulation has to run in a test JVM, in a dedicated
 server and inside an agent harness with no display. Once a GL backend is on the compile
-classpath, a `Gdx.gl` reference or a static initialiser gets written and the headless path is
+classpath, a context reference or a static initialiser gets written and the headless path is
 gone.
 
 ### `UDEA-MG-002-BYTECODE` — the same rule, one level down
@@ -223,47 +194,42 @@ one number.
 
 It exists because a configuration check structurally cannot see two cases:
 
-- a GL type arriving **transitively** through a dependency that is itself allowed —
-  `com.badlogicgames.gdx:gdx` is legal for `Vector2` and carries
+- a GL type arriving **transitively** through a dependency that is itself allowed — until
+  issue #213, `com.badlogicgames.gdx:gdx` was legal for `Vector2` and carried
   `com/badlogic/gdx/graphics/Texture` in the same jar;
 - a type named in source while the dependency providing it is `compileOnly`, so it never
   reaches a classpath this rule inspects.
 
 The second case is how the old tree lost the property: `SpriteRenderer.kt` imported
 `com.badlogic.gdx.graphics.Texture` into a component the world tick touched, and nothing
-failed. `UDEA-MG-002` is checked first, because "you added `gdx-backend-lwjgl3` to
-`udea-core`" is a better message than forty class-level ones. There is no per-module
+failed. `UDEA-MG-002` is checked first, because "you added `lwjgl-opengl` to `udea-core`" is
+a better message than forty class-level ones. The banned namespaces are `org/lwjgl/`,
+`com/badlogic/` and `box2dLight/`; the LibGDX carve-outs this table used to need (gdx-math and
+the `utils` collections legal, `graphics/`, `backends/` and viewports banned) went with LibGDX. There is no per-module
 allowlist: the fix is always to move the code to `udea-render`.
 
-## `UDEA-MG-008` — `udea-render` resolves no LibGDX
-
-**Kool port spec §4, D9.** Banned on `:udea-render`'s `compileClasspath` and `runtimeClasspath`,
-on every target: `com.badlogicgames.gdx:*` and `dev.wildware.composegl:composegl-gdx*`.
-
-`udea-render` draws with Kool from issue #211 on. LibGDX back on its classpath would be a second
-renderer in the one module that owns rendering — the parallel-renderers migration spec D9
-rejected — and `composegl-gdx` would bring gdx in transitively without the build script naming it.
-This is the rule behind the ticket's first acceptance criterion ("`udea-render` builds for JVM and
-Android with no LibGDX dependency"), kept as a rule so the criterion stays true after the ticket.
-
-## `UDEA-MG-009` — no `moba` project resolves LibGDX
+## `UDEA-MG-009` — no project resolves LibGDX
 
 **Kool port spec §3, §4, D4, D9, D12.** Banned on `compileClasspath` and `runtimeClasspath` of
-`:moba`, `:moba:game`, `:moba:desktop`, `:moba:android` and `:moba:web`, on every target:
-`com.badlogicgames.gdx:*` and `dev.wildware.composegl:composegl-gdx*`.
+**every** `udea-*` and `moba` project, on every target, the two GL-allowed modules included:
+`com.badlogicgames.*:*` (LibGDX, and the extensions published beside it such as
+`com.badlogicgames.box2dlights`) and `dev.wildware.composegl:composegl-gdx*`, ComposeGL's LibGDX
+backend, which drags gdx in without a build script naming it.
 
-`UDEA-MG-008` is the same ban one module along. `moba` was the last project in the rewrite tree
-that legitimately named gdx: it took `libs.gdx` so a `RenderSystem` could name `Batch` and
+LibGDX left in three steps, and until the last one this rule was scoped to whichever project had
+just been cleaned. `udea-render` moved to Kool in issue #211, under `UDEA-MG-008`, a ban on that
+module alone. `moba` followed in issue #212, and this id was added for the `moba` projects. Issue
+#213 deleted the old tree and every `com.badlogicgames` coordinate from the version catalog, and
+widened this rule to every project: a ban scoped to the modules that last had LibGDX lets it back
+in through any other one, and being allowed GL is not being allowed a second renderer.
+`UDEA-MG-008` was folded in here and its id is not reused.
+
+`moba` was the last project that legitimately named gdx: it took `libs.gdx` so a `RenderSystem` could name `Batch` and
 `TextureRegion`, and `libs.gdx.box2d` plus the desktop natives for `Box2DPhysicsWorld`. Issue #211
 took the first reason away — the game draws through `udea-render`, which draws with Kool — and
 spec D4 takes the second: Box2D leaves with LibGDX, and `MobaPhysicsModule` was never installed.
 Issue #212 removes both and this is what keeps them removed.
 
-Every `:moba:*` project rather than the one that used to name it, because `:moba:desktop` and
-`:moba:android` both resolve `:moba:game`: a gdx artifact put back on any of them reaches the
-shipped game. `:moba` itself stays listed although the project no longer exists, so that
-re-creating a flat `moba` module does not re-open the hole, and `:moba:web` is listed for the same
-reason ahead of issue #226.
 
 ## `UDEA-MG-003` — `udea-assets-compiler` holds zero Gradle types
 
@@ -288,8 +254,8 @@ closes the other half of the same hole.
 ## `UDEA-MG-005` — no scripting host and no classpath scanner in the game
 
 **Spec §6 (Phase 2 exit), §3.6.** Banned on the `runtimeClasspath` of every `moba` project -
-`:moba:game`, `:moba:desktop`, `:moba:android`, plus `:moba` and `:moba:web` for the reasons
-`UDEA-MG-009` gives:
+`:moba:game`, `:moba:desktop`, `:moba:android`, plus `:moba`, so that re-creating a flat `moba`
+module does not re-open the hole, and `:moba:web` for the same reason ahead of issue #226:
 `org.jetbrains.kotlin:kotlin-scripting-*`, `org.jetbrains.kotlin:kotlin-reflect`,
 `org.reflections:reflections`.
 
@@ -297,8 +263,8 @@ It was placed as a ratchet *before* Phase 2 had a reason to reach for
 `kotlin-scripting-jvm-host`. Until issue #212 it named the flat `:moba` alone, which after the
 split is a project with no classpath at all, so for a while it scanned nothing and passed;
 `ModuleGraphRulesTest` now fails any rule that governs only paths `settings.gradle.kts` does not
-include. `common` pulls in five
-`kotlin-scripting-*` artifacts and `org.reflections:reflections` today, which is both a
+include. The old `common` module pulled in five
+`kotlin-scripting-*` artifacts and `org.reflections:reflections`, which is both a
 startup cost and the mechanism behind the reflection-on-hot-paths smell the rewrite exists to
 kill. Asset scripts are compiled at build time; discovery is a generated registry.
 

@@ -16,27 +16,27 @@ import kotlin.test.assertTrue
  *
  * The gate itself ([UdeaVerifyHeadlessTest]) asserts an *absence*, and an absence is exactly
  * what a broken scanner also reports. So the detection half is proven here against fixtures
- * whose compiled form is known: [TextureNamingFixture] must be caught, [MathNamingFixture]
+ * whose compiled form is known: [GlNamingFixture] must be caught, [ValueNamingFixture]
  * must not, and an empty scan must fail rather than pass.
  */
 class HeadlessScanTest {
 
     @Test
     fun `a class naming a GL type is reported with its class, its member and the banned owner`() {
-        val violations = HeadlessScan.violations(MODULE, fixtureClasses("TextureNamingFixture"))
+        val violations = HeadlessScan.violations(MODULE, fixtureClasses("GlNamingFixture"))
 
-        val diagnostic = violations.firstOrNull { "widthOf" in it.message }
-        assertNotNull(diagnostic, "the scan found no reference to Texture at all: $violations")
+        val diagnostic = violations.firstOrNull { "maxTextureSize" in it.message }
+        assertNotNull(diagnostic, "the scan found no reference to GL11 at all: $violations")
         val message = diagnostic.message
-        assertTrue(TextureNamingFixture::class.java.name in message, message)
-        assertTrue("com/badlogic/gdx/graphics/Texture" in message, message)
+        assertTrue(GlNamingFixture::class.java.name in message, message)
+        assertTrue("org/lwjgl/opengl/GL11" in message, message)
         assertEquals(Severity.Error, diagnostic.severity)
         assertEquals(HeadlessScan.RULE_ID, diagnostic.ruleId)
     }
 
     @Test
     fun `the message says it extends UDEA-MG-002 rather than restating it`() {
-        val diagnostic = HeadlessScan.violations(MODULE, fixtureClasses("TextureNamingFixture")).first()
+        val diagnostic = HeadlessScan.violations(MODULE, fixtureClasses("GlNamingFixture")).first()
 
         // Ownership (issue #117): the configuration-level rule belongs to
         // udeaVerifyModuleGraph. This gate is its bytecode extension and says so, so that a
@@ -50,7 +50,7 @@ class HeadlessScanTest {
     fun `the violation carries a repo-relative source span pointing at the offending line`() {
         // The instruction-level reference, which is the one that carries a line number; a
         // reference that only appears in a signature has no instruction to point at.
-        val diagnostic = HeadlessScan.violations(MODULE, fixtureClasses("TextureNamingFixture"))
+        val diagnostic = HeadlessScan.violations(MODULE, fixtureClasses("GlNamingFixture"))
             .first { (it.span?.startLine ?: 0) > 0 }
 
         val span = diagnostic.span
@@ -60,12 +60,12 @@ class HeadlessScanTest {
 
         // The span must actually point at the offending source, not merely at the file.
         val line = RepoLayout.repoRoot.resolve(span.path).readLines()[span.startLine - 1]
-        assertTrue("widthOf" in line, "span pointed at: $line")
+        assertTrue("maxTextureSize" in line, "span pointed at: $line")
     }
 
     @Test
-    fun `gdx math is not banned, because the ban is on GL and natives rather than on maths`() {
-        val violations = HeadlessScan.violations(MODULE, fixtureClasses("MathNamingFixture"))
+    fun `a class naming only engine value types is not reported`() {
+        val violations = HeadlessScan.violations(MODULE, fixtureClasses("ValueNamingFixture"))
 
         assertEquals(emptyList(), violations.map { it.message })
     }
@@ -80,7 +80,7 @@ class HeadlessScanTest {
 
         assertEquals(
             emptyList(),
-            report.diagnostics.filter { TextureNamingFixture::class.java.name in it.message },
+            report.diagnostics.filter { GlNamingFixture::class.java.name in it.message },
         )
     }
 
@@ -98,16 +98,9 @@ class HeadlessScanTest {
         // Guards against an entry that can never fire -- a typo in a pattern, or a package
         // that moved. Each entry is checked against a name it must match.
         val samples = mapOf(
-            "com/badlogic/gdx/graphics/" to "com/badlogic/gdx/graphics/Texture",
-            "com/badlogic/gdx/scenes/" to "com/badlogic/gdx/scenes/scene2d/Stage",
-            "com/badlogic/gdx/Gdx" to "com/badlogic/gdx/Gdx",
-            "box2dLight/" to "box2dLight/RayHandler",
             "org/lwjgl/" to "org/lwjgl/glfw/GLFW",
-            "com/badlogic/gdx/utils/viewport/" to "com/badlogic/gdx/utils/viewport/ExtendViewport",
-            "com/badlogic/gdx/backends/" to
-                "com/badlogic/gdx/backends/lwjgl3/Lwjgl3Application",
-            "com/badlogic/gdx/utils/GdxNativesLoader" to
-                "com/badlogic/gdx/utils/GdxNativesLoader",
+            "com/badlogic/" to "com/badlogic/gdx/graphics/Texture",
+            "box2dLight/" to "box2dLight/RayHandler",
         )
 
         assertEquals(samples.keys.sorted(), GL_BANNED_OWNERS.map { it.pattern }.sorted())
@@ -118,38 +111,16 @@ class HeadlessScanTest {
     }
 
     @Test
-    fun `a class naming a Viewport is caught, though the jar it comes from is an allowed one`() {
-        // The gap this closes: `Viewport.apply()` reaches `Gdx.gl` through `HdpiUtils`, so a
-        // headless module holding one dies on a machine with no display -- and `UDEA-MG-002`
-        // cannot see it, because viewports ship inside `com.badlogicgames.gdx:gdx`, the jar
-        // that rule deliberately allows. It is precisely the transitive case this scan owns.
-        val violations = HeadlessScan.violations(MODULE, fixtureClasses("ViewportNamingFixture"))
-
-        val diagnostic = violations.firstOrNull { "widthOf" in it.message }
-        assertNotNull(diagnostic, "a Viewport passed the headless gate: $violations")
-        assertTrue("com/badlogic/gdx/utils/viewport/ExtendViewport" in diagnostic.message, diagnostic.message)
-    }
-
-    @Test
-    fun `gdx collections stay legal, so the viewport ban is not a ban on gdx utils`() {
-        // The negative control for the two entries inside `com/badlogic/gdx/utils/`. `Array`,
-        // `ObjectMap` and `Pool` are headless collections the kernel uses everywhere; a gate
-        // that banned the package would be switched off within a week.
-        val violations = HeadlessScan.violations(MODULE, fixtureClasses("GdxCollectionNamingFixture"))
-
-        assertEquals(emptyList(), violations.map { it.message })
-    }
-
-    @Test
     fun `a class entry matches nested classes but not siblings that merely share a prefix`() {
-        val gdx = GL_BANNED_OWNERS.first { it.pattern == "com/badlogic/gdx/Gdx" }
+        // The table itself holds only package entries since issue #213, so the single-class
+        // semantics are held on an entry built here: the rule is `BannedOwner`'s, not the table's.
+        val gl = BannedOwner("org/lwjgl/opengl/GL", "a single class")
 
-        assertTrue(gdx.matches("com/badlogic/gdx/Gdx"))
-        assertTrue(gdx.matches("com/badlogic/gdx/Gdx\$Companion"))
-        // The two that must stay legal in a headless module, and would not be with a naive
-        // startsWith: an exception type and the whole of gdx-math.
-        assertTrue(!gdx.matches("com/badlogic/gdx/GdxRuntimeException"))
-        assertTrue(!gdx.matches("com/badlogic/gdx/math/Vector2"))
+        assertTrue(gl.matches("org/lwjgl/opengl/GL"))
+        assertTrue(gl.matches("org/lwjgl/opengl/GL\$Companion"))
+        // A sibling sharing the prefix is a different class, and a naive startsWith would ban it.
+        assertTrue(!gl.matches("org/lwjgl/opengl/GL11"))
+        assertTrue(!gl.matches("org/lwjgl/opengl/GLCapabilities"))
     }
 
     @Test

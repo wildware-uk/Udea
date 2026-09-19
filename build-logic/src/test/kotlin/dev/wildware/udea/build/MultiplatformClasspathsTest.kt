@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 /**
  * How the classpath gates read a multiplatform module (issue #201).
  *
- * `udeaVerifyModuleGraph`, `udeaVerifyNoLegacyDependencies` and `udeaVerifyKotlinPin` name the
+ * `udeaVerifyModuleGraph` and `udeaVerifyKotlinPin` name the
  * classpaths they govern the way a JVM module spells them - `runtimeClasspath`,
  * `testCompileClasspath`. A multiplatform module has none of those names: it has one per
  * target, and the gates found nothing to inspect on either converted module until they learned

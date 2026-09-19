@@ -40,12 +40,24 @@ class AgentsMdTest {
     }
 
     @Test
-    fun `the deleted D6 modules are not documented as if they still existed`() {
+    fun `the deleted modules are not documented as if they still existed`() {
         val documented = AgentsMd.documentedModules(agentsMd)
 
-        listOf("level-editor", "idea-plugin", "compose-ui").forEach {
-            assertTrue(it !in documented, "AGENTS.md still lists the deleted module '$it'")
-        }
+        // D6 deleted the first three in Phase 0; issue #213 deleted the rest of the old tree.
+        listOf("level-editor", "idea-plugin", "compose-ui", "common", "gradle-plugin", "example", "example:assets")
+            .forEach { assertTrue(it !in documented, "AGENTS.md still lists the deleted module '$it'") }
+    }
+
+    @Test
+    fun `a failure report says what to fix and points at no document that is gone`() {
+        val findings = AgentsMd.findings(agentsMd, settingsWithout("udea-gas"))
+
+        val report = AgentsMd.report("udeaVerifyAgentsMd", findings)
+
+        assertTrue(report != null && "udea-gas" in report, "$report")
+        assertTrue("settings.gradle.kts" in report, report)
+        // Issue #213 deleted the migration ledger; a message sending a reader there is a dead end.
+        assertTrue("ledger" !in report && "migration" !in report, report)
     }
 
     @Test

@@ -171,6 +171,22 @@ class SceneGizmoDragTest {
         }
     }
 
+    @Test
+    fun `with two selected a radius drag on the shared grip grows each by the drag, measured from its own centre`() {
+        val radius = units(70f)
+        val left = body(atX = -120f, atY = 0f, circle = Circle(radius = radius), select = false)
+        val right = body(atX = 100f, atY = 50f, circle = Circle(radius = radius), select = false)
+        loop.select(listOf(left, right))
+        open { ui ->
+            // The shared grip is the first one's rim moved to the centre, (-10, 25): 70 right of it.
+            drag(ui, at(-10f + 70f, 25f), at(-10f + 100f, 25f))
+
+            assertNear(radius + units(30f), circleOf(left).radius, "the first circle did not grow by the drag")
+            assertNear(radius + units(30f), circleOf(right).radius, "the second circle did not grow by the drag")
+            assertEquals(listOf(COMMIT), loop.history(), "a drag of two is one undo entry")
+        }
+    }
+
     // --- snapping and axes ---------------------------------------------------------------------------
 
     @Test

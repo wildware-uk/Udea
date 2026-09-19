@@ -2,14 +2,17 @@
 
 ## kmp baseline
 
-**SHA `08ca441`** (kmp after #221 merge; merged tree differs from the trial tree ONLY in `.claude/WAVE.md`,
-so the trial build IS the merged build), refreshed 2026-09-19 with
-`ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
+**SHA `6a7a9b1`** (kmp after #212 merge; branch already contained origin/kmp `21232ff`, merged tree ==
+reviewed tree `648ef72`), 2026-09-19. Reviewer ran
+`ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`
+on that exact tree:
 
-**Failing tasks: `:moba:compileKotlin` ONLY** - and every moba task downstream of it does not run.
-That is the authorised D9 red: moba still draws with LibGDX until #212 ports it. Nothing else fails.
-A reviewer or trial merge sees exactly that one red and treats any other as the branch's.
+**BUILD SUCCESSFUL - 952 tasks, failing tasks: NONE.** The D9 red is gone: `:moba:compileKotlin` no longer
+exists (moba is `:moba:game`, `:moba:desktop`, `:moba:android`). GL under xvfb (`-Pudea.render.requireGl=true`)
+14/0 skipped; `-p build-logic check` green; runNetProof AGREED 3/3; runUdpProof all hashes match incl. lossy.
+**From here any red task on a branch is the branch's** (latency budgets: re-run alone first).
 
+Previous baseline `08ca441` (after #221): one red `:moba:compileKotlin`.
 Earlier: `30731e4` (after #227), `26333d5` (after #230), `7ac6559` (after #229), `18bb13f` (after #224), `87d8b7c` (after #211), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
 `JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`:
 
@@ -73,7 +76,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   - Dropped as a card: AGENTS.md's Kool-port paragraph still says "udea-render will apply" in future tense (not the module table; udeaVerifyAgentsMd green). Fold into #212 or #213.
 - **Wave 9 is done. #224 (input + composegl-kool UI host) and #212 (moba split) are the wave 10 candidates; #221 is now unblocked too.**
 
-## Wave 10 (2026-09-18): in flight
+## Wave 10 (2026-09-18): done
 
 - Baseline unchanged: `87d8b7c`, one red: `:moba:compileKotlin` (authorised D9; #212 repairs it).
 - **#212 split (commented):** `:moba:web` + `runWebShot` moved to new issue **#226** (needs #212 and #223).
@@ -428,6 +431,20 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `AudioLoadException` -> `AudioDevice.Silent`. Relayed to dev-212. Not reported upstream to Kool (outward
   third-party filing is the owner's call). Trial: only baseline red; module-graph/no-legacy/AgentsMd green;
   GL green. Worktree kept: `.claude/worktrees/agent-a86393fdc904896ad`.
+
+- **#212 MERGED `6a7a9b1`**, round 1 PASS, no findings. **kmp is FULLY GREEN.** moba split into `:moba:game`
+  (jvm+android), `:moba:desktop`, `:moba:android` (debug APK), no LibGDX (UDEA-MG-009 goes red if restored).
+  Audio: `MobaDesktopAudio.forHost` - Headless->Silent, else `koolAudioDevice`; `AudioLoadException` -> close,
+  one log line, Silent. #221 ledger condition MET. Net-protocol lock blob unchanged (no ids moved). 57 files
+  outside moba, reviewer checked all: forced renames (`moba/assets`->`moba/game/assets`,
+  `:moba:udeaReplayDigest`->`:moba:desktop:udeaReplayDigest`, `moba/*/src` globs). Rulings: withdrawing the
+  2.5% MOVING threshold is honest (branch fails it against itself; `CameraRig` smooths on wall-clock frame
+  seconds, render side - expected, not a determinism smell). `lane/clash` crescent = soldier attack sprite
+  frame, timing not a missing draw (reviewer caught it at tick 758); shot tick moves with frame pacing (shot =
+  2 ticks after first corpse seen on a frame), no tick-numbering off-by-one. Out of scope (no cards, owner
+  rule): one collage left-panel label wrong; frame-paced shot harness could be tick-exact. Worktree kept:
+  `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
+- **In flight: 0.** Wave 10 complete.
 
 ## Wave 10 plan
 

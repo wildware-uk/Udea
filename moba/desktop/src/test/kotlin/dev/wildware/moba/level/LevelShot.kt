@@ -1,9 +1,12 @@
 package dev.wildware.moba.level
 
+import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.moba.MobaScene
 import dev.wildware.moba.Position
 import dev.wildware.moba.entry.MobaEntry
 import dev.wildware.moba.entry.MobaLaunch
 import dev.wildware.moba.entry.MobaLaunch.Rendering
+import dev.wildware.moba.entry.MobaLaunchLevel
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.level.LevelOutcome
@@ -39,6 +42,12 @@ import kotlin.system.exitProcess
  * A separate process is the point: nothing in the loaded game can have been left over from the
  * saved one, so everything in `loaded.png` came out of the file.
  *
+ * A third phase, `boot` (issue #192, `:moba:desktop:runLevelShotBoot`), photographs a launch exactly as
+ * every entry point does it: `MobaLaunch.runWithGl` builds the game over the launch level -
+ * `levels/test_level.udealevel`, or the file `-Plevel` names - and `MobaEntry.seed` boots it. The
+ * clock is paused on the boot tick and the camera is the scene's default, which frames the whole
+ * field, so the picture is the level as it loads. It is written as `boot-<level file>.png`.
+ *
  * ## Why the pair that must match is the one a tick later
  *
  * `saved.png` and `loaded.png` differ, in one place: the score strip across the top. The HUD draws
@@ -59,7 +68,7 @@ import kotlin.system.exitProcess
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 public object LevelShot {
 
-    /** `save` or `load`. */
+    /** `save`, `load` or `boot`. */
     public const val PHASE_PROPERTY: String = "udea.levelshot.phase"
 
     /** Where the level, the pictures and the camera note are written and read. */
@@ -126,8 +135,9 @@ public object LevelShot {
         when (val phase = System.getProperty(PHASE_PROPERTY)) {
             "save" -> save(dir, log)
             "load" -> load(dir, log)
+            "boot" -> boot(dir, log)
             else -> {
-                System.err.println("[level.shot] -D$PHASE_PROPERTY must be save or load, was $phase")
+                System.err.println("[level.shot] -D$PHASE_PROPERTY must be save, load or boot, was $phase")
                 exitProcess(2)
             }
         }
@@ -213,6 +223,36 @@ public object LevelShot {
             System.err.println("[level.shot] one tick after the save and one tick after the load look different")
             exitProcess(1)
         }
+    }
+
+    private fun boot(dir: Path, log: StringBuilder) {
+        val named = System.getProperty(MobaLaunchLevel.PROPERTY)?.trim().orEmpty()
+        val name = if (named.isEmpty()) "test_level" else Path.of(named).fileName.toString().substringBefore('.')
+        MobaLaunch.runWithGl(RenderMode.Offscreen) { host, rendering ->
+            MobaEntry.seed(host)
+            val script = Script(
+                rendering,
+                dir,
+                log,
+                listOf(
+                    Stage("boot-$name") {
+                        host.time.pause()
+                        rendering.presentation().lookAt(MobaScene.CAMERA_X, MobaScene.CAMERA_Y, ZOOM)
+                        val units = host.world.family { all(GameUnit) }.numEntities
+                        log.append("[level.shot] booted ").append(if (named.isEmpty()) "the bundled test level" else named)
+                            .append(": ").append(units).append(" units at tick ").append(host.ctx.clock.tick.value)
+                            .append('\n')
+                    },
+                ),
+            )
+            MobaLaunch.Attachment(
+                frame = { delta ->
+                    host.frame(delta)
+                    script.frame()
+                },
+            )
+        }
+        print(log)
     }
 
     private fun saveLevel(host: GameHost): ByteArray {

@@ -24,11 +24,11 @@ import dev.wildware.udea.core.serviceKey
  * component-name-to-`ComponentType` registry, which is a piece of engine and not a piece of a
  * level.
  *
- * So the roster is authored (`assets/level/test_level.udea.kts` says which unit stands where and
- * `assets/character/<name>.udea.kts` declares the ids it names, with the art and stats each wears) and
- * the *construction* is code. [MobaBlueprints.byAssetId] is the seam between the two, and it is deliberately strict: an authored entity pointing at a blueprint id no code
- * blueprint answers to fails the scene swap loudly rather than spawning nothing and leaving the
- * level short of a unit nobody counted.
+ * So the ids are authored (`assets/character/<name>.udea.kts` declares them, with the art and stats
+ * each wears) and the *construction* is code. [MobaBlueprints.byAssetId] is the seam between the
+ * two, and it is deliberately strict: an id no code blueprint answers to fails loudly rather than
+ * spawning nothing. Which unit stands where is the level file's business (see [MobaLevel]), and a
+ * level stores the units these blueprints built rather than the ids.
  */
 public class UnitBlueprint(
     /** Which unit this spawns: how fast it walks, how close it closes, which art it wears. */
@@ -170,8 +170,8 @@ public class MobaBlueprints(
      */
     public fun byAssetId(id: AssetId?): UnitBlueprint {
         val value = requireNotNull(id) {
-            "a level entity names no blueprint; every entity in `level/test_level` must, because " +
-                "this game builds units from code blueprints keyed by the authored id"
+            "no blueprint id was given; this game builds units from code blueprints keyed by the " +
+                "authored id"
         }.value
         return requireNotNull(byId[value]) {
             "no code blueprint answers to the authored id '$value'; this game knows " +

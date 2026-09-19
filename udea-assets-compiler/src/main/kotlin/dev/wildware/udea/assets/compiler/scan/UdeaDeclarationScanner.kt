@@ -5,18 +5,24 @@ import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
 import dev.wildware.udea.assets.compiler.AssetCompilerRules
 import dev.wildware.udea.diagnostics.SourceSpan
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
+import dev.wildware.udea.diagnostics.UdeaRules
 import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtDoWhileExpression
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtForExpression
 import org.jetbrains.kotlin.psi.KtLambdaArgument
 import org.jetbrains.kotlin.psi.KtLambdaExpression
+import org.jetbrains.kotlin.psi.KtLoopExpression
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.KtQualifiedExpression
 import org.jetbrains.kotlin.psi.KtScriptInitializer
 import org.jetbrains.kotlin.psi.KtSimpleNameStringTemplateEntry
 import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.KtValueArgument
+import org.jetbrains.kotlin.psi.KtWhileExpression
 import java.nio.file.Path
 import java.security.MessageDigest
 import kotlin.io.path.isRegularFile
@@ -262,6 +268,7 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
             collectFileConstants(statements)
             statements.forEach { visitStatement(it, emptyMap()) }
             collectReferences(ktFile)
+            collectLoops(ktFile)
         }
 
         /**
@@ -393,6 +400,64 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
             }
         }
 
+        /**
+         * Every loop in the file, wherever it is nested, as [UdeaRules.LOOP_IN_ASSET] (issue #192).
+         *
+         * **Early feedback, not the guarantee.** This pass resolves nothing, so it can only match
+         * spelling, and it runs before anything compiles - which is what makes it fast enough for
+         * the editor's live path. The guarantee is `udea-compiler-plugin`'s K2 loop checker inside
+         * pass 2, which refuses by resolved symbol: a `forEach`, a script's own looping helper or
+         * a recursive function are refused there and not here. When both see the same loop,
+         * `notAlreadyIn` reports it once.
+         *
+         * A whole-file sweep for the reason [collectReferences] is one: a loop inside a
+         * declaration's lambda, a helper function or a `val` initializer is still a loop. Over PSI
+         * and not over text, so a loop keyword in a comment or a string literal is not a loop.
+         *
+         * `repeat` is matched by the names a script can reach it by: unqualified, as
+         * `kotlin.repeat(...)`, and through an `import kotlin.repeat` - the import itself is
+         * refused, and a call through its alias is a loop at the call. Any other receiver is left
+         * alone: `"-".repeat(3)` is `String.repeat`, which builds a string rather than running a
+         * body. A script's own function named `repeat` would be refused too - the honest cost of
+         * a pass that resolves nothing, the same one `DeterminismValidator` states.
+         */
+        private fun collectLoops(ktFile: KtFile) {
+            val loops = ArrayList<Pair<PsiElement, String>>()
+            for (loop in PsiTreeUtil.collectElementsOfType(ktFile, KtLoopExpression::class.java)) {
+                val keyword = when (loop) {
+                    is KtForExpression -> "for"
+                    is KtDoWhileExpression -> "do-while"
+                    is KtWhileExpression -> "while"
+                    else -> continue
+                }
+                loops += loop to keyword
+            }
+            val repeatImports = ktFile.importDirectives.filter { it.importedFqName?.asString() == REPEAT_FQ_NAME }
+            for (directive in repeatImports) loops += directive to REPEAT_CALLEE
+            val repeatNames = setOf(REPEAT_CALLEE) + repeatImports.mapNotNull { it.aliasName }
+            for (call in PsiTreeUtil.collectElementsOfType(ktFile, KtCallExpression::class.java)) {
+                val callee = call.calleeExpression?.text ?: continue
+                if (callee !in repeatNames) continue
+                val qualified = call.parent as? KtQualifiedExpression
+                if (qualified == null || qualified.selectorExpression !== call) {
+                    loops += call to REPEAT_CALLEE
+                } else if (qualified is KtDotQualifiedExpression && callee == REPEAT_CALLEE &&
+                    qualified.receiverExpression.text == REPEAT_PACKAGE
+                ) {
+                    loops += qualified to REPEAT_CALLEE
+                }
+            }
+            for ((element, keyword) in loops.sortedBy { it.first.textRange.startOffset }) {
+                diagnostics += UdeaRules.LOOP_IN_ASSET.diagnostic(
+                    message = "`$keyword` loop in an asset script. Assets may not contain loops: the " +
+                        "editor saves an exact value back to the line it came from, and a value a " +
+                        "loop produces has no single line. Write each declaration out, or keep a " +
+                        "level's units in a `.udealevel` file.",
+                    span = spanOf(element),
+                )
+            }
+        }
+
         // --- constant folding, syntactic only ------------------------------------------
 
         /**
@@ -464,6 +529,14 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
     public companion object {
         /** The extension every asset script carries. */
         public const val SCRIPT_SUFFIX: String = ".udea.kts"
+
+        /** The standard library's counted loop, refused by `collectLoops`. */
+        private const val REPEAT_CALLEE: String = "repeat"
+
+        /** The package `repeat` lives in, for `kotlin.repeat(...)` and `import kotlin.repeat`. */
+        private const val REPEAT_PACKAGE: String = "kotlin"
+
+        private const val REPEAT_FQ_NAME: String = "$REPEAT_PACKAGE.$REPEAT_CALLEE"
 
         /**
          * IntelliJ PSI documents are LF-only, and a carriage return reaching the parser is

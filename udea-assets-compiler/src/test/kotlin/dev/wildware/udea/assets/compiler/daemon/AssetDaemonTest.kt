@@ -5,6 +5,7 @@ import dev.wildware.udea.assets.DeltaClassification
 import dev.wildware.udea.assets.RestartReason
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpriteSheet
+import dev.wildware.udea.assets.compiler.AssetCompilerRules
 import dev.wildware.udea.diagnostics.Severity
 import dev.wildware.udea.diagnostics.UdeaRules
 import org.junit.jupiter.api.Test
@@ -69,6 +70,62 @@ class AssetDaemonTest {
         assertEquals(1.0f, assertIs<SoundCue>(fixture.daemon.value("character/orc_hit")).volume)
     }
 
+    /**
+     * A loop saved through the live daemon is refused the way the build refuses it (issue #192).
+     *
+     * The daemon is what the agent's `assets.*` tools edit through. Both passes refuse this
+     * `repeat` - pass 1 by name, pass 2's K2 checker by resolved symbol - and `.single` is the
+     * assertion that the agent is told once.
+     */
+    @Test
+    fun `a loop in an edited script is rejected with the loop rule at the loop`() {
+        val fixture = DaemonFixture("loop").writeBaseline()
+        assertTrue(fixture.daemon.start().ok)
+        val generation = fixture.daemon.generation
+
+        val edited = fixture.write(
+            "character/orc.udea.kts",
+            """
+            spriteSheet(name = "orc_idle", spritePath = "/sprites/orc/idle.png", rows = 1, columns = 6, scale = 0.02f)
+            spriteSheet(name = "orc_walk", spritePath = "/sprites/orc/walk.png", rows = 1, columns = 8, scale = 0.02f)
+            spriteAnimation(name = "orc_idle_anim", sheet = reference("character/orc_idle"))
+            soundCue(name = "orc_hit", pitchVariance = 0.3f, volume = 1.0f, sounds = listOf("/sounds/orc/hit.ogg"))
+            repeat(2) { }
+            """.trimIndent(),
+        )
+        val outcome = assertIs<ReloadOutcome.Rejected>(fixture.daemon.reload(listOf(edited)))
+
+        val loop = outcome.diagnostics.single { it.ruleId == UdeaRules.LOOP_IN_ASSET.id }
+        assertEquals(Severity.Error, loop.severity)
+        assertEquals(5, loop.span?.startLine, "the span is the loop's line: $loop")
+        assertEquals(generation, fixture.daemon.generation, "a rejected reload moves nothing")
+    }
+
+    /**
+     * The daemon keeps pass 1's own findings (issue #192), not only the compiler's.
+     *
+     * The loop above no longer shows that on its own: the compile's K2 checker refuses the same
+     * `repeat`. A computed asset name is a finding only pass 1 makes - it compiles, and it
+     * evaluates - so it is what an agent would lose if the daemon dropped the scan's diagnostics.
+     */
+    @Test
+    fun `a finding only the syntactic pass makes reaches the agent`() {
+        val fixture = DaemonFixture("pass-one").writeBaseline()
+        assertTrue(fixture.daemon.start().ok)
+
+        val edited = fixture.write(
+            "character/orc.udea.kts",
+            """
+            val prefix = "orc"
+            spriteSheet(name = prefix.uppercase(), spritePath = "/sprites/orc/idle.png", rows = 1, columns = 6, scale = 0.02f)
+            """.trimIndent(),
+        )
+        val report = fixture.daemon.validate(listOf(edited))
+
+        val nonLiteral = report.diagnostics.single { it.ruleId == AssetCompilerRules.NON_LITERAL_ID.id }
+        assertEquals(2, nonLiteral.span?.startLine, "at the computed name: $nonLiteral")
+    }
+
     @Test
     fun `an unresolved reference is one diagnostic with a did-you-mean, however many referrers`() {
         val fixture = DaemonFixture("unresolved").writeBaseline()
@@ -82,7 +139,11 @@ class AssetDaemonTest {
             spriteSheet(name = "orc_walk", spritePath = "/sprites/orc/walk.png", rows = 1, columns = 8, scale = 0.02f)
             spriteAnimation(name = "orc_idle_anim", sheet = reference("character/orc_idle"))
             soundCue(name = "orc_hit", pitchVariance = 0.3f, volume = 1.0f, sounds = listOf("/sounds/orc/hit.ogg"))
-            repeat(5) { i -> spriteAnimation(name = "broken_${'$'}i", sheet = reference("character/orc_idel")) }
+            spriteAnimation(name = "broken_0", sheet = reference("character/orc_idel"))
+            spriteAnimation(name = "broken_1", sheet = reference("character/orc_idel"))
+            spriteAnimation(name = "broken_2", sheet = reference("character/orc_idel"))
+            spriteAnimation(name = "broken_3", sheet = reference("character/orc_idel"))
+            spriteAnimation(name = "broken_4", sheet = reference("character/orc_idel"))
             """,
         )
         val outcome = assertIs<ReloadOutcome.Rejected>(fixture.daemon.reload(listOf(edited)))

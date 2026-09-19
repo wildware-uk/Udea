@@ -5,6 +5,7 @@ import dev.wildware.udea.assets.compiler.scan.UdeaDeclarationScanner
 import dev.wildware.udea.assets.compiler.script.UdeaAssetScript
 import dev.wildware.udea.diagnostics.SourceSpan
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
+import dev.wildware.udea.diagnostics.UdeaRules
 import org.jetbrains.kotlin.config.KotlinCompilerVersion
 import java.io.File
 import java.nio.file.Path
@@ -85,6 +86,21 @@ public data class AssetCompileResult(
  * A compiler message becomes a [UdeaDiagnostic] with a repo-relative [SourceSpan]. The code
  * this replaces answered a syntax error with
  * `error("Failed to compile ${'$'}{file.name} ... ${'$'}{e.stackTraceToString()}")`.
+ *
+ * ### The loop ban's guarantee
+ *
+ * Every script compiles with `udea-compiler-plugin` loaded, and its K2 loop checker refuses a
+ * loop in an asset by what each call resolves to (issue #192, `UDEA0015`). Nothing in this file
+ * asks for it: the scripting host registers every compiler plugin it finds as a service on the
+ * classpath of the process running it - the same way it finds `kotlin-scripting-compiler-embeddable`
+ * - and this module's `runtimeOnly` dependency puts the plugin on that classpath wherever this
+ * class runs. `AssetLoopResolutionTest` goes red when that dependency is removed. A plugin
+ * diagnostic arrives as compiler text that starts with its rule id, and [toUdeaDiagnostic] turns
+ * that back into the rule, so the id a caller sees is the same one pass 1 raises.
+ *
+ * The plugin is optional here as it is everywhere (spec 7): off the classpath, scripts compile
+ * exactly as before and pass 1's syntactic check is the only loop check. This module names no
+ * plugin type (`PluginOptionalTest`).
  *
  * ### Isolation
  *
@@ -288,8 +304,12 @@ public class AssetCompiler(
             else -> return null
         }
         val location = location?.start
-        return AssetCompilerRules.SCRIPT_COMPILATION_FAILED.diagnostic(
-            message = message,
+        // `udea-compiler-plugin` prints `"<id>: <detail>"`; a registered id is that rule, and the
+        // prefix is dropped so the message reads the same as the one pass 1 would have written.
+        val ruleId = RULE_PREFIX.find(message)?.groupValues?.get(1)
+        val rule = ruleId?.let { UdeaRules.byId(it) }
+        return (rule ?: AssetCompilerRules.SCRIPT_COMPILATION_FAILED).diagnostic(
+            message = if (rule == null) message else message.substringAfter(": "),
             span = SourceSpan(
                 file,
                 location?.line ?: 0,
@@ -302,6 +322,9 @@ public class AssetCompiler(
     }
 
     public companion object {
+        /** A compiler message that starts with a Udea rule id, as the plugin prints one. */
+        private val RULE_PREFIX = Regex("^(UDEA\\d{4}): ")
+
         /**
          * The Kotlin version this module's embedded compiler actually is.
          *

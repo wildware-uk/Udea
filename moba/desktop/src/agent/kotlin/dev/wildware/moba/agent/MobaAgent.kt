@@ -18,6 +18,7 @@ import dev.wildware.moba.match.MatchState
 import dev.wildware.moba.match.MatchStateReplicator
 import dev.wildware.moba.entry.MobaEntry
 import dev.wildware.moba.entry.MobaLaunch
+import dev.wildware.moba.entry.MobaLaunchLevel
 import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.AgentTimings
 import dev.wildware.udea.agent.activity.AgentSessions
@@ -158,7 +159,7 @@ public object MobaAgent {
         // place a decorator can see the value it decorates. See `MobaCueMirrorModule`.
         val extraModules = listOf(MobaCueMirrorModule(bridge))
         if (mode == RenderMode.Headless) {
-            val host = MobaGame.host(RenderMode.Headless, extraModules = extraModules)
+            val host = MobaGame.host(RenderMode.Headless, extraModules = extraModules, level = MobaLaunchLevel.bytes())
             host.ctx[IntentState.KEY].source = injected
             // No GL context in Headless, so no capture surface exists and `null` is the
             // honest answer: every `render.*` tool then answers `no_render_context`.

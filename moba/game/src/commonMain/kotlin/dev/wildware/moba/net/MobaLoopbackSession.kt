@@ -1,5 +1,6 @@
 package dev.wildware.moba.net
 
+import dev.wildware.moba.level.MobaLevel
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.net.input.MoveInput
 import dev.wildware.udea.net.replication.BandwidthBudget
@@ -76,6 +77,9 @@ public class MobaLoopbackSession(
      * the whole roster, which is the exact opposite of what fog does. See [MobaHostSession.fog].
      */
     private val fogSight: Float? = null,
+
+    /** The `.udealevel` the server plays. The bundled test level unless a launcher names one. */
+    private val level: ByteArray = MobaLevel.bundledBytes(),
 ) : AutoCloseable {
 
     init {
@@ -93,6 +97,7 @@ public class MobaLoopbackSession(
         mtu,
         fog = if (fogSight == null) null else MobaHostSession.fogOfWar(),
         championSight = fogSight ?: MobaHostSession.DEFAULT_CHAMPION_SIGHT,
+        level = level,
     )
 
     /** The clients, in peer order. */

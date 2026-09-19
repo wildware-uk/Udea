@@ -95,6 +95,14 @@ internal object UdeaDiagnostics : KtDiagnosticsContainer() {
     )
 
     /**
+     * [UdeaRules.LOOP_IN_ASSET], from [UdeaAssetLoopChecker]. `DEFAULT` positioning, so the span
+     * starts at the loop keyword or at the start of the offending call.
+     */
+    val LOOP_IN_ASSET: KtDiagnosticFactory1<String> by error1<PsiElement, String>(
+        SourceElementPositioningStrategies.DEFAULT,
+    )
+
+    /**
      * Every rule this plugin can raise, and the factory it raises it through.
      *
      * Declared explicitly rather than derived by reflection: reflection over delegated
@@ -109,6 +117,7 @@ internal object UdeaDiagnostics : KtDiagnosticsContainer() {
         UdeaRules.UNRESOLVED_REFERENCE to REFERENCE_UNRESOLVED,
         UdeaRules.REFERENCE_KIND_MISMATCH to REFERENCE_KIND_MISMATCH,
         UdeaRules.ASSET_INDEX_FORMAT to ASSET_INDEX_FORMAT,
+        UdeaRules.LOOP_IN_ASSET to LOOP_IN_ASSET,
     )
 
     /**

@@ -117,18 +117,18 @@ class TranspilerParityTest {
     }
 
     /**
-     * The fixture that motivated keeping `.udea.kts` at all: a local helper function and a
-     * `repeat(n)` loop, the shape of the real `level/test_level.udea.kts`.
+     * The fixture that motivated keeping `.udea.kts` at all: a local helper function, called once
+     * per entity. It was called through a `repeat(n)` loop until loops were banned in assets
+     * (issue #192), so the calls are written out.
      */
     @Test
-    fun `a local helper and a repeat loop transpile to identical ids`() {
+    fun `a local helper transpiles to identical ids`() {
         val scripts = Fixtures.scripts()
         val (viaTranspiled, results) = runTranspiled("helper", Fixtures.assetRoot, scripts)
 
         val level = results.single { it.source.endsWith("level/test_level.udea.kts") }
         val code = assertNotNull(level.code)
         assertTrue("fun spawn(kind: String): Ref = scope.reference" in code, "the helper kept its shape:\n$code")
-        assertTrue("repeat(3)" in code)
         assertTrue("override fun build(scope: AssetScope)" in code)
         assertEquals("dev.wildware.udea.assets.generated.LevelTestLevelAssets", level.className)
 
@@ -140,7 +140,7 @@ class TranspilerParityTest {
         assertEquals(
             listOf("character/orc", "character/orc", "character/orc", "character/goblin"),
             (levelAsset.fields["entities"] as List<*>).map { (it as Ref).id },
-            "the helper called through the loop three times and then once",
+            "the helper called three times for an orc and then once for a goblin",
         )
     }
 
@@ -292,8 +292,8 @@ class TranspilerParityTest {
         val results = transpiler().transpileAll(Fixtures.scripts())
         val sounds = results.single { it.source.endsWith("sounds/sounds.udea.kts") }
         val code = assertNotNull(sounds.code)
-        assertTrue("""listOf("hit", "swoosh").forEach { kind ->""" in code, code)
         assertTrue("scope.soundCue(" in code, code)
+        assertTrue(""""melee_swoosh"""" in code, code)
         assertTrue("""override val idPrefix: String = "sounds"""" in code, code)
     }
 }

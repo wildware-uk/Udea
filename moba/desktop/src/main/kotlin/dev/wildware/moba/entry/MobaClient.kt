@@ -324,6 +324,7 @@ public object MobaClient {
             SESSION_MTU,
             fog = if (sight == null) null else MobaHostSession.fogOfWar(),
             championSight = sight ?: MobaHostSession.DEFAULT_CHAMPION_SIGHT,
+            level = MobaLaunchLevel.bytes(),
         )
         if (sight != null) println("[moba.client] fog of war on: champions see ${sight} units")
         // A fresh key per process, from a CSPRNG. `ConnectionSecret` takes its key from the
@@ -483,7 +484,7 @@ public object MobaClient {
         // thread owns the cadence - which is exactly the case a socket will also be in.
         val clock = ManualClock()
         val network = LoopbackNetwork(clock)
-        val server = MobaHostSession(network.transportFor(PeerId.SERVER))
+        val server = MobaHostSession(network.transportFor(PeerId.SERVER), level = MobaLaunchLevel.bytes())
         server.addClient(PeerId.client(1))
         println("[moba.client] server up: ${server.host.world.numEntities} entities, proto ${server.protocol.protoHash}")
 

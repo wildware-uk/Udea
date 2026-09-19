@@ -104,9 +104,9 @@ public class MatchState(
     /**
      * What `RngStream.Spawn` was seeded with before this match's level was populated.
      *
-     * Recorded rather than derived, because it is the one number that makes a match
-     * reproducible: seeding the spawn stream with it and reloading the scene lays the
-     * twenty-seven units out in exactly the same places. See [MatchSystem].
+     * It laid the twenty-seven units out while the level was a script that scattered them from
+     * that stream. The level is a saved file with exact positions now (issue #192), so it lays out
+     * nothing; see [MatchSystem] for why the field stays.
      */
     @Sim public var seed: Long = 0L,
 ) : Component<MatchState> {

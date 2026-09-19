@@ -7,6 +7,7 @@ import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.SceneId
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
+import dev.wildware.udea.core.level.LevelService
 
 /**
  * The contents of one level, as code that can run with no `Gdx.app` and no window.
@@ -64,6 +65,11 @@ public class SceneScope internal constructor(
     public val netIds: NetIdIndex,
     /** The scene's own seed, forwarded so a populate body need not reach back for it. */
     public val seed: Long,
+    /**
+     * The game's level files, for a scene that populates from one (`LevelScene`). `null` for a
+     * scene manager no built game has been wired to, which only a test constructs.
+     */
+    internal val levels: LevelService? = null,
 ) {
 
     /** How many entities [spawn] has created in this populate. */

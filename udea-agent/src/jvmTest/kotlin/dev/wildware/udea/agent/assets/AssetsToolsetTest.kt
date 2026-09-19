@@ -167,7 +167,11 @@ class AssetsToolsetTest {
                 spriteSheet(name = "orc_idle", spritePath = "/sprites/orc/idle.png", rows = 1, columns = 6, scale = 0.02f)
                 spriteAnimation(name = "orc_idle_anim", sheet = reference("character/orc_idle"))
                 soundCue(name = "orc_hit", pitchVariance = 0.3f, volume = 1.0f, sounds = listOf("/sounds/orc/hit.ogg"))
-                repeat(5) { i -> spriteAnimation(name = "broken_${'$'}i", sheet = reference("character/orc_idel")) }
+                spriteAnimation(name = "broken_0", sheet = reference("character/orc_idel"))
+                spriteAnimation(name = "broken_1", sheet = reference("character/orc_idel"))
+                spriteAnimation(name = "broken_2", sheet = reference("character/orc_idel"))
+                spriteAnimation(name = "broken_3", sheet = reference("character/orc_idel"))
+                spriteAnimation(name = "broken_4", sheet = reference("character/orc_idel"))
             """.trimIndent(),
         )
         assertEquals(

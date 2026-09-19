@@ -32,6 +32,9 @@ internal object UdeaAnnotations {
     /** `@Q`, wire quantisation. */
     val Q: ClassId = classId("Q")
 
+    /** `@AssetDsl`, an asset-DSL function that runs each lambda it takes once (issue #192). */
+    val ASSET_DSL: ClassId = classId("AssetDsl")
+
     private fun classId(simpleName: String): ClassId =
         ClassId(PACKAGE, Name.identifier(simpleName))
 }

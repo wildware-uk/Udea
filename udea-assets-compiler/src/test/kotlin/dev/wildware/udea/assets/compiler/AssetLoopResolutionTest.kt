@@ -1,0 +1,243 @@
+package dev.wildware.udea.assets.compiler
+
+import dev.wildware.udea.assets.compiler.pipeline.AssetPipeline
+import dev.wildware.udea.diagnostics.Severity
+import dev.wildware.udea.diagnostics.UdeaDiagnostic
+import dev.wildware.udea.diagnostics.UdeaRules
+import org.junit.jupiter.api.Assumptions.assumeFalse
+import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.Test
+import java.nio.file.Path
+import kotlin.io.path.createDirectories
+import kotlin.io.path.writeText
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+
+/**
+ * The loop ban as the compiler sees it (issue #192): by what a call **resolves to**, not by how
+ * it is spelled.
+ *
+ * Pass 1 (`LoopInAssetTest`) matches names, and review round 1 showed the cost: `kotlin.repeat`
+ * and `import kotlin.repeat as times` both walked past it. Here each script goes through
+ * [AssetCompiler], the real pass 2, whose K2 compile carries `udea-compiler-plugin`'s loop
+ * checker. That checker refuses every loop node and every lambda handed to a callee that may run
+ * it more than once - anything that is neither a Udea asset-DSL function nor declares
+ * `callsInPlace(EXACTLY_ONCE | AT_MOST_ONCE)` for that parameter. So the spelling of the call is
+ * irrelevant: every script below except the negatives spells a repeat a different way.
+ *
+ * Only the pipeline test runs pass 1, so no other red case can be the name matcher's.
+ *
+ * ### With the plugin disabled
+ *
+ * `-Pudea.compilerPlugin.enabled=false` takes the plugin off the asset compile's classpath, as it
+ * does everywhere (spec 7's degrade procedure). The refusals below then have nothing to assert and
+ * are skipped, and `with the plugin disabled the compile degrades to pass 1 alone` runs instead:
+ * in that build the checker must be absent, not merely quiet.
+ */
+class AssetLoopResolutionTest {
+
+    /** The build's `-Pudea.compilerPlugin.enabled`, passed through by this module's build script. */
+    private val pluginEnabled: Boolean =
+        checkNotNull(System.getProperty("udea.compilerPlugin.enabled")) {
+            "udea-assets-compiler/build.gradle.kts sets udea.compilerPlugin.enabled on every Test task"
+        }.toBooleanStrict()
+
+    private fun requirePlugin() =
+        assumeTrue(pluginEnabled, "-Pudea.compilerPlugin.enabled=false: there is no loop checker to test")
+
+    private fun compile(name: String, source: String): List<UdeaDiagnostic> {
+        val root = TestPaths.scratch("loop-resolution-$name")
+        val assets = root.resolve("assets")
+        assets.createDirectories()
+        val file = assets.resolve("arena.udea.kts")
+        file.writeText(source)
+        return AssetCompiler(
+            repoRoot = root,
+            assetRoot = assets,
+            scriptClasspath = TestPaths.compilerClasspath,
+            cacheDirectory = root.resolve("cache"),
+        ).compile(listOf(file)).diagnostics
+    }
+
+    private fun loops(diagnostics: List<UdeaDiagnostic>) =
+        diagnostics.filter { it.ruleId == UdeaRules.LOOP_IN_ASSET.id }
+
+    /** Line and column of every UDEA0015, in file order. */
+    private fun loopSites(diagnostics: List<UdeaDiagnostic>): List<Pair<Int, Int>> =
+        loops(diagnostics).map { assertNotNull(it.span).let { span -> span.startLine to span.startColumn } }
+
+    @Test
+    fun `a bare repeat is refused at the call`() {
+        requirePlugin()
+        val diagnostics = compile("bare", "blueprint(name = \"b\")\n  repeat(2) { }\n")
+        assertEquals(listOf(2 to 3), loopSites(diagnostics), diagnostics.toString())
+        val loop = loops(diagnostics).single()
+        assertEquals(Severity.Error, loop.severity)
+        assertEquals("assets/arena.udea.kts", assertNotNull(loop.span).path)
+        assertTrue("repeat" in loop.message, loop.message)
+        assertTrue(!loop.message.startsWith("UDEA0015"), "the id is the rule, not message text: ${loop.message}")
+    }
+
+    @Test
+    fun `a repeat qualified with its package is refused`() {
+        requirePlugin()
+        val diagnostics = compile("qualified", "blueprint(name = \"b\")\nkotlin.repeat(2) { }\n")
+        assertEquals(listOf(2 to 1), loopSites(diagnostics), diagnostics.toString())
+    }
+
+    @Test
+    fun `a repeat imported under another name is refused at the call`() {
+        requirePlugin()
+        val diagnostics = compile(
+            "aliased",
+            "import kotlin.repeat as times\n\nblueprint(name = \"b\")\ntimes(2) { }\n",
+        )
+        assertEquals(listOf(4 to 1), loopSites(diagnostics), diagnostics.toString())
+    }
+
+    @Test
+    fun `forEach over a range is refused`() {
+        requirePlugin()
+        val diagnostics = compile("foreach", "(1..3).forEach { i -> blueprint(name = \"b\$i\") }\n")
+        assertEquals(listOf(1 to 1), loopSites(diagnostics), diagnostics.toString())
+        assertTrue("forEach" in loops(diagnostics).single().message, diagnostics.toString())
+    }
+
+    @Test
+    fun `a helper of the script's own that runs its lambda twice is refused at the call`() {
+        requirePlugin()
+        val diagnostics = compile(
+            "helper",
+            """
+            fun twice(body: () -> Unit) {
+                body()
+                body()
+            }
+
+            twice { blueprint(name = "b") }
+            """.trimIndent(),
+        )
+        // No loop keyword anywhere: only the resolved callee says this repeats.
+        assertEquals(listOf(6 to 1), loopSites(diagnostics), diagnostics.toString())
+    }
+
+    @Test
+    fun `a helper that loops inside is refused at the loop and at the call`() {
+        requirePlugin()
+        val diagnostics = compile(
+            "helper-loop",
+            """
+            fun times(n: Int, body: (Int) -> Unit) {
+                var i = 0
+                while (i < n) {
+                    body(i)
+                    i++
+                }
+            }
+
+            times(3) { i -> blueprint(name = "b${'$'}i") }
+            """.trimIndent(),
+        )
+        assertEquals(listOf(3 to 5, 9 to 1), loopSites(diagnostics), diagnostics.toString())
+    }
+
+    @Test
+    fun `for, while and do-while are refused, each at its own keyword`() {
+        requirePlugin()
+        val diagnostics = compile(
+            "keywords",
+            """
+            for (i in 0 until 2) { }
+            var n = 0
+            while (n < 2) { n++ }
+            do { n-- } while (n > 0)
+            """.trimIndent(),
+        )
+        assertEquals(listOf(1 to 1, 3 to 1, 4 to 1), loopSites(diagnostics), diagnostics.toString())
+        assertEquals(
+            listOf("for", "while", "do-while"),
+            loops(diagnostics).map { it.message.substringAfter('`').substringBefore('`') },
+        )
+    }
+
+    @Test
+    fun `a function that calls itself is refused at the recursive call`() {
+        requirePlugin()
+        val diagnostics = compile(
+            "recursion",
+            """
+            fun spawn(n: Int) {
+                if (n == 0) return
+                blueprint(name = "b${'$'}n")
+                spawn(n - 1)
+            }
+
+            spawn(3)
+            """.trimIndent(),
+        )
+        assertEquals(listOf(4 to 5), loopSites(diagnostics), diagnostics.toString())
+    }
+
+    /**
+     * The build's own path, both passes: a loop each of them refuses is one diagnostic.
+     *
+     * Pass 1 reports a bare `repeat` with the element's whole span and pass 2 with its start
+     * only, so `DiagnosticSink`'s rule-and-span dedupe cannot join them; `notAlreadyIn` does.
+     */
+    @Test
+    fun `the build reports a loop both passes find once, at pass 1's span`() {
+        requirePlugin()
+        val root = TestPaths.scratch("loop-resolution-pipeline")
+        val assets = root.resolve("assets")
+        assets.createDirectories()
+        assets.resolve("arena.udea.kts").writeText("blueprint(name = \"b\")\nrepeat(2) { }\n")
+
+        val compiled = AssetPipeline.compileAndValidate(root, assets, TestPaths.compilerClasspath, root.resolve("cache"))
+
+        val loop = compiled.report.diagnostics.single { it.ruleId == UdeaRules.LOOP_IN_ASSET.id }
+        val span = assertNotNull(loop.span)
+        assertEquals(2 to 1, span.startLine to span.startColumn)
+        assertTrue(span.endColumn > span.startColumn, "pass 1's copy, which spans the call: $span")
+    }
+
+    @Test
+    fun `with the plugin disabled the compile degrades to pass 1 alone`() {
+        assumeFalse(pluginEnabled, "the plugin is enabled: the refusals above are the assertions")
+        val diagnostics = compile("disabled", "(1..3).forEach { i -> blueprint(name = \"b\$i\") }\n")
+        assertEquals(emptyList(), diagnostics.filter { it.severity == Severity.Error }, diagnostics.toString())
+    }
+
+    /**
+     * The negatives. The scope functions each declare `callsInPlace(block, EXACTLY_ONCE)`, and
+     * the DSL builders run each lambda they take once, which `@AssetDsl` records. A checker that
+     * refused every lambda would fail here, and so would one that forgot to scope itself.
+     */
+    @Test
+    fun `scope functions and the asset DSL's own builders are not loops`() {
+        val diagnostics = compile(
+            "negatives",
+            """
+            val base = "orc".let { it + "_base" }
+            val tags = mutableListOf<String>().apply { add("melee") }.also { it.add("orc") }
+            val size = run { 1f }
+            with(tags) { add("elite") }
+            val ok = "x".takeIf { it.isNotEmpty() }
+
+            character(
+                name = base,
+                size = size,
+                tags = tags,
+                abilitySpecs = { },
+                components = { component("Team", "team" to "orc") },
+            )
+            blueprint(name = "unit") { component("Position") }
+            level(name = "arena", entities = {
+                entity(name = "e", components = { component("Position") })
+            })
+            """.trimIndent(),
+        )
+        assertEquals(emptyList(), loops(diagnostics), diagnostics.toString())
+        assertEquals(emptyList(), diagnostics.filter { it.severity == Severity.Error }, diagnostics.toString())
+    }
+}

@@ -56,7 +56,7 @@ class AssetCompilerTest {
             result.graph.assets["character/orc_idle_sheet"]?.fields?.get("spritePath"),
         )
 
-        // The sanctioned forEach and the repeat(n) loop both produced their assets.
+        // The written-out sound cues and spawner blueprints produced their assets.
         assertEquals(
             listOf("sounds/melee_hit", "sounds/melee_swoosh"),
             result.graph.ids.filter { it.startsWith("sounds/") },

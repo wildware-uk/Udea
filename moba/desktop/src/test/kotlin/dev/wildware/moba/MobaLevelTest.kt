@@ -70,13 +70,11 @@ class MobaLevelTest {
     }
 
     /**
-     * The same seed lays the same field out, and the layout comes from the `Spawn` stream.
+     * Two boots lay the same field out.
      *
-     * Two independent hosts, so nothing is shared but the seed in `EngineConfig`. This is what
-     * `kotlin.random.Random` in the old level made impossible - and the reason the scatter is
-     * drawn from a *named* stream is that a change to how combat rolls must not move it. That
-     * half cannot be asserted here without a combat roll to change; what can be, and is, is that
-     * the layout is a function of the seed alone.
+     * Two independent hosts, so nothing is shared but the level file they both load. This is what
+     * `kotlin.random.Random` in the old level made impossible, and the layout is now the exact
+     * positions the level file saved (issue #192).
      */
     @Test
     fun `the layout is reproducible across boots`() {
@@ -84,8 +82,8 @@ class MobaLevelTest {
         val second = positions(booted())
         assertEquals(first, second, "two boots of the same seed laid the field out differently")
         assertTrue(first.size == 27, "expected 27 placed units, got ${first.size}")
-        // Not all in one place: a scatter that always returned zero would satisfy the equality
-        // above and put twenty-seven sprites on four points.
+        // Not all in one place: a level that stacked its units would satisfy the equality above
+        // and put twenty-seven sprites on a handful of points.
         assertTrue(first.distinct().size == first.size, "two units share a position: $first")
     }
 

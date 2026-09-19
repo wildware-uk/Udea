@@ -58,19 +58,24 @@ val generatedAccessors: FileCollection =
     files(accessorsTask.map { it.generatedSources }).builtBy(accessorsTask)
 
 /**
- * The packed bundle, laid out as the classpath resource the game opens.
+ * The packed bundle and the saved levels, laid out as the classpath resources the game opens.
  *
  * A `Sync` into `udea/` and not a bare `resources.srcDir`, because the file has to be *renamed
  * into a folder*: `MobaAssets` opens `udea/assets.udeapak` off the classloader, and a source
  * directory holding the bundle at its root would put it where another module's bundle would
  * collide with it.
+ *
+ * `levels/` rides in the same directory (issue #192): `MobaLevel` opens
+ * `levels/test_level.udealevel` when no `-Plevel` names another file, and it has to be inside the
+ * APK as well as the jar, which is exactly where this directory already goes.
  */
 val bundleResources = tasks.register<Sync>("udeaBundleResources") {
     group = UdeaAssetsPlugin.GROUP
-    description = "Lays the packed .udeapak out as the classpath resource the game opens."
+    description = "Lays the packed .udeapak and the saved levels out as the classpath resources the game opens."
     from(tasks.named<UdeaPackBundleTask>(UdeaAssetsPlugin.PACK_TASK).map { it.bundle }) {
         into(UdeaAssetsPlugin.BUNDLE_RESOURCE_DIRECTORY)
     }
+    from(layout.projectDirectory.dir("levels")) { into("levels") }
     into(layout.buildDirectory.dir("generated/udea/bundle-resources"))
 }
 

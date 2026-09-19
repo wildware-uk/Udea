@@ -3,7 +3,9 @@ package dev.wildware.moba
 import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
 import dev.wildware.moba.ability.MobaAbilityModule
+import dev.wildware.moba.level.LaunchLevel
 import dev.wildware.moba.level.MobaBlueprints
+import dev.wildware.moba.level.MobaLevel
 import dev.wildware.moba.level.UnitBattleSystem
 import dev.wildware.udea.core.GameContextBuilder
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
@@ -58,7 +60,11 @@ import dev.wildware.udea.render.input.IntentState
 public class MobaModule(
     /** This game's combat. Contributed to the definition by [MobaGame], not by this module. */
     public val combat: MobaAbilityModule,
+    /** The `.udealevel` this game plays, published under [MobaLevel.KEY] for the entry point that boots it. */
+    level: ByteArray,
 ) : UdeaModule {
+
+    private val level: LaunchLevel = LaunchLevel(level)
 
     override val name: String get() = "moba"
 
@@ -84,6 +90,7 @@ public class MobaModule(
             checkNotNull(spawner) { "MobaGame wires the spawner before building the definition" },
         )
         builder.service(MobaBlueprints.KEY, blueprints)
+        builder.service(MobaLevel.KEY, level)
     }
 
     /**

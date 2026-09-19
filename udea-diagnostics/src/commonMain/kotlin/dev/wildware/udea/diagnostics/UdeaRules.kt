@@ -274,6 +274,32 @@ public object UdeaRules {
             "build cannot read, so no reference is validated",
     )
 
+    /**
+     * A `.udea.kts` contains a loop (issue #192).
+     *
+     * The editor's Save writes an exact value back into the script it came from, and a value
+     * produced inside a loop has no single place in the file to write it to - so a loop in an
+     * asset is a value the editor can show and never save. Levels, which is where loops used to
+     * live, are saved `.udealevel` files now.
+     *
+     * Two producers raise it, and they differ in what they can see:
+     * - `udea-compiler-plugin`'s K2 checker, inside the asset compiler's script compile, is the
+     *   guarantee. It works on resolved calls, so a loop node, a lambda handed to a callee that may
+     *   run it more than once, and a function calling itself are refused however they are spelled.
+     * - the asset compiler's syntactic first pass is early feedback. It matches loop keywords and
+     *   the names `repeat` is reachable by, before anything compiles.
+     *
+     * Registered here rather than in the asset compiler's own reserved band because the id space
+     * is shared, as this object's KDoc says.
+     */
+    public val LOOP_IN_ASSET: UdeaRule = UdeaRule(
+        id = "UDEA0015",
+        defaultSeverity = Severity.Error,
+        description = "a .udea.kts contains a loop - a loop statement, a lambda passed to something " +
+            "that may run it more than once, or a function that calls itself - so a value it " +
+            "produces has no single place in the file an editor can save it to",
+    )
+
     /** Every registered rule, in id order. */
     public val all: List<UdeaRule> = listOf(
         NET_ON_VAL,
@@ -290,6 +316,7 @@ public object UdeaRules {
         AGENT_NAME_COLLISION,
         REFERENCE_KIND_MISMATCH,
         ASSET_INDEX_FORMAT,
+        LOOP_IN_ASSET,
     ).sortedBy { it.id }
 
     private val byId: Map<String, UdeaRule> = all.associateBy { it.id }

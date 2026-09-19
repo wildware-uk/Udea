@@ -144,7 +144,7 @@ public object Team {
  * They are Kotlin constants rather than authored asset fields for one honest reason: the
  * authored `character` kind was `AssetKind.Unpublishable`, so a character's attribute map could not
  * be packed into a `.udeapak` yet and a game that read its stats from one would not boot. The
- * level *roster* is authored and load-bearing (see [TestLevelScene]); the stats are not, yet.
+ * level *roster* is authored and load-bearing (see [MobaLevel]); the stats are not, yet.
  *
  * ## What it no longer carries
  *

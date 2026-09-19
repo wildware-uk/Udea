@@ -268,6 +268,29 @@ tasks.register<JavaExec>("runLevelShot") {
     systemProperty("udea.levelshot.dir", levelShotDir)
 }
 
+// Issue #192's picture: the launch level as it boots - the bundled test level, or the file
+// `-Plevel` names - photographed on the boot tick from the scene's default camera.
+tasks.register<JavaExec>("runLevelShotBoot") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.levelshot, boot: photographs the launch level (-Plevel=<path> or the test level) as it loads."
+    mainClass.set("dev.wildware.moba.level.LevelShot")
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty("udea.levelshot.phase", "boot")
+    systemProperty("udea.levelshot.dir", levelShotDir)
+}
+
+// Issue #192: `-Plevel=<path>` names the `.udealevel` every task in this project that launches the
+// game boots, instead of the bundled `levels/test_level.udealevel`. A relative path is resolved
+// against the repository root, which is where the wrapper is run. Forwarded as `-Dmoba.level`
+// because `JavaExec` forks and a Gradle property stops at the daemon; `MobaLaunchLevel` reads it.
+// Read through `providers` so the configuration cache records it as an input.
+val launchLevel: Provider<String> = providers.gradleProperty("level")
+    .map { rootProject.layout.projectDirectory.file(it).asFile.absolutePath }
+tasks.withType<JavaExec>().configureEach {
+    launchLevel.orNull?.let { systemProperty("moba.level", it) }
+}
+
 /**
  * `moba.netproof`: one server, two clients, the real level, and three hashes that must agree. Run
  * by name rather than wired into `check`, because it prints a transcript that is the point of

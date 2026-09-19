@@ -13,7 +13,6 @@ import dev.wildware.udea.assets.EffectMagnitude
 import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.InputKey
-import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.ModifierKind
 import dev.wildware.udea.assets.SpriteAnimation
 import dev.wildware.udea.assets.SpriteAnimationSet
@@ -29,7 +28,6 @@ import dev.wildware.udea.assets.reference
 import org.junit.jupiter.api.Test
 import kotlin.io.path.exists
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -163,7 +161,8 @@ class MigratedCorpusBundleTest {
             // The config, including the gravity the DSL nests inside `physics { }`.
             val config = bundle.registry[reference<GameConfig>("config")]
             assertEquals(AssetId("character/soldier"), config.defaultCharacter?.id)
-            assertEquals(AssetId("level/test_level"), config.defaultLevel?.id)
+            // No default level: the game's level is a saved `.udealevel` since issue #192.
+            assertEquals(null, config.defaultLevel)
         }
     }
 
@@ -232,32 +231,17 @@ class MigratedCorpusBundleTest {
     }
 
     /**
-     * The twenty-seven dropped references, counted at zero.
+     * Packing the game's asset root reports nothing.
      *
-     * This is the same shape of assertion the old `the one thing the corpus cannot pack is
-     * reported by id` made, inverted: it asserted `entities.all { it.blueprint == null }` and
-     * `packerDiagnostics.size == 27`. Inverted rather than deleted, because a regression here is
-     * invisible from the outside - a bundle whose level has no entity recipes still *opens*, and
-     * the game fails at scene-swap time with a message about a blueprint id nobody named.
+     * This used to sit beside the check that every entity in `level/test_level` carried its
+     * recipe, which is gone with the level script (issue #192: the level is a saved `.udealevel`
+     * now, not a packed asset). The packer staying clean over the rest of the tree is the half
+     * that still describes something in the bundle.
      */
     @Test
-    fun `every entity in the level carries the recipe it spawns from`() {
+    fun `packing the game's asset root is clean`() {
         bundle().use { bundle ->
-            val level = bundle.registry[reference<Level>("level/test_level")]
-            assertEquals(27, level.entities.size)
-            assertTrue(
-                level.entities.all { it.blueprint != null },
-                "an entity lost its recipe: " + level.entities.filter { it.blueprint == null }.map { it.name },
-            )
-            assertTrue(
-                level.entities.all { it.blueprint!!.id.value.startsWith("character/") },
-                "the roster is declared in `character/`, beside the art and stats each unit wears",
-            )
-            // And each one resolves to a real `Character` through the registry.
-            val player = assertNotNull(level.entities.first { it.name == "player" }.blueprint)
-            assertEquals(AssetId("character/orc_elite"), player.id)
-            assertEquals(500F, bundle.registry[player].let { it as Character }.health)
-
+            assertTrue(bundle.registry.size > 0, "the bundle packed nothing")
             assertEquals(emptyList(), packerDiagnostics, "packing the game's asset root is clean")
         }
     }

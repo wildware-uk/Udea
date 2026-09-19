@@ -12,8 +12,9 @@ import java.nio.file.Path
  * They are in the **new implicit-receiver form** — no `bundle { }`, no return value — which is
  * what distinguishes them from the nineteen legacy scripts `ExampleScanTest` reads. Between
  * them they cover: a script at the asset root, references in a `List` and in a `Map`, a file
- * constant, the sanctioned constant-list `forEach`, and a local helper function driving a
- * `repeat(n)` loop.
+ * constant, and a local helper function. None of them contains a loop, a `forEach` included:
+ * assets may not (issue #192), and `LoopInAssetTest` and `AssetLoopResolutionTest` are the
+ * negative cases.
  */
 internal object Fixtures {
 

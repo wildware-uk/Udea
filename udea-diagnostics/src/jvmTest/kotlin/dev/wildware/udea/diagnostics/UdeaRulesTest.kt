@@ -69,7 +69,8 @@ class UdeaRulesTest {
         assertEquals("UDEA0012", UdeaRules.AGENT_NAME_COLLISION.id)
         assertEquals("UDEA0013", UdeaRules.REFERENCE_KIND_MISMATCH.id)
         assertEquals("UDEA0014", UdeaRules.ASSET_INDEX_FORMAT.id)
-        assertEquals(14, UdeaRules.all.size)
+        assertEquals("UDEA0015", UdeaRules.LOOP_IN_ASSET.id)
+        assertEquals(15, UdeaRules.all.size)
         assertTrue(UdeaRules.all.all { it.defaultSeverity == Severity.Error })
     }
 

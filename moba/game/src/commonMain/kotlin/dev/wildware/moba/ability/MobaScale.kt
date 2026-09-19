@@ -11,7 +11,7 @@ package dev.wildware.moba.ability
  * in that game a character was about **one** world unit across, because a Box2D body was authored
  * in metres. In this one a character is a `spriteSheet` whose authored `scale` puts it at about
  * **forty** world units across, which is why `level/test_level` places its four clearings a
- * hundred units apart and why `TestLevelScene.SCATTER` is 40 rather than 4.
+ * hundred units apart and spreads each one about forty units wide rather than four.
  *
  * Left unreconciled, every ability in the game silently does nothing: two units standing sprite
  * to sprite are thirty world units apart, `MeleeAttackExec` looks for an enemy within 0.8, finds

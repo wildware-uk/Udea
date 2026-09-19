@@ -9,8 +9,6 @@ import dev.wildware.udea.assets.Effect
 import dev.wildware.udea.assets.EffectDuration
 import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.GameplayTagName
-import dev.wildware.udea.assets.Level
-import dev.wildware.udea.generated.GameAssets
 import dev.wildware.udea.gas.ticksFromSeconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -196,22 +194,6 @@ class MobaAuthoredContentTest {
             assertTrue(
                 character.animations.values.all { registry.find(it.id) != null },
                 "`${character.id}` has a role pointing at an id the graph does not hold",
-            )
-        }
-    }
-
-    /** Every unit the level places is one of those characters. */
-    @Test
-    fun `the level spawns only characters the bundle declares`() {
-        val level: Level = registry[GameAssets.level.testLevel]
-        val names = everyAsset(Character::class.java).map { it.id }.toSet()
-
-        assertEquals(27, level.entities.size)
-        for (entity in level.entities) {
-            val recipe = assertNotNull(entity.blueprint, "`${entity.name}` names no recipe")
-            assertTrue(
-                recipe.id in names,
-                "`${entity.name}` spawns from `${recipe.id}`, which is not a declared character",
             )
         }
     }

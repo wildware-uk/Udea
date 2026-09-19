@@ -1,8 +1,12 @@
 import dev.wildware.udea.build.CharacterArtStaging
+import dev.wildware.udea.build.UdeaBuildFlags
 
 plugins {
     id("udea.kotlin-build-tool")
 }
+
+/** `-Pudea.compilerPlugin.enabled`, as `udea.kotlin-base` validated and published it. */
+val compilerPluginEnabled: Boolean = extra[UdeaBuildFlags.COMPILER_PLUGIN_ENABLED] as Boolean
 
 dependencies {
     api(project(":udea-diagnostics"))
@@ -22,6 +26,22 @@ dependencies {
     // resolves a newer kotlin-stdlib than the catalog pins, which `udeaVerifyKotlinPin` forces
     // back down - the same arrangement `udea-codegen` already has.
     implementation(libs.kotlinpoet)
+
+    // The loop ban's guarantee (issue #192). Like `kotlin-scripting-compiler-embeddable` below,
+    // it works by being here and is named by nothing: the scripting host registers every compiler
+    // plugin it finds as a service on the running process's classpath, so wherever this module
+    // runs - the forked pipeline, the live daemon, these tests - every `.udea.kts` compiles with
+    // the plugin's K2 loop checker loaded. `runtimeOnly`, never `implementation`: spec 7 says the
+    // plugin is never required for anything to compile, and `PluginOptionalTest` fails on a
+    // production reference to one of its types. Without it scripts still compile, with pass 1's
+    // syntactic check as the only loop check.
+    //
+    // It follows `-Pudea.compilerPlugin.enabled` like every other use of the plugin, so the
+    // degrade procedure in `docs/compiler-plugin.md` takes it out of the asset compile too: a
+    // Kotlin release that breaks the plugin must not break every asset build with it.
+    if (compilerPluginEnabled) runtimeOnly(project(":udea-compiler-plugin"))
+    // `@AssetDsl`, the asset DSL's once-only lambda promise the plugin's loop checker trusts.
+    implementation(project(":udea-annotations"))
 
     implementation(libs.kotlin.compiler.embeddable)
     implementation(libs.kotlin.scripting.common)
@@ -66,6 +86,9 @@ tasks.withType<Test>().configureEach {
     // module to itself would prove nothing.
     systemProperty("udea.pinnedKotlinVersion", libs.versions.kotlin.get())
     systemProperty("udea.exampleAssets", exampleAssets)
+    // Whether the K2 loop checker is on the script compile's classpath; `AssetLoopResolutionTest`
+    // asserts the refusals when it is and the degrade to pass 1 alone when it is not.
+    systemProperty(UdeaBuildFlags.COMPILER_PLUGIN_ENABLED, compilerPluginEnabled)
 
     // The two asset trees these tests read are **inputs**, and saying so is not a tidiness
     // measure. Without it the test task's up-to-date check sees only Kotlin sources and the

@@ -64,6 +64,18 @@ Specifically excluded, and NOT redistributable under this licence:
     that they are the author's to license. Treat them as excluded until that is
     established; docs/art-assets.md tracks it as open.
 
+Third-party files that ARE redistributable, under their own licence rather than
+the MIT licence above:
+
+  * example-assets/models/fox/Fox.glb — the "Fox" sample model from the Khronos
+    Group's glTF-Sample-Assets repository, committed unchanged. Model by
+    PixelMannen (2014, CC0 1.0); rigging and animation by tomkranis (2014,
+    CC BY 4.0); conversion to glTF by @AsoboStudio and @scurest (2017,
+    CC BY 4.0). Licensed as a whole under Creative Commons Attribution 4.0
+    International, https://creativecommons.org/licenses/by/4.0/legalcode.
+    example-assets/models/fox/NOTICE.md next to the file has the source, the
+    links and the checksum.
+
 If you fork, vendor or redistribute this repository, you must supply your own
 art and audio. See docs/art-assets.md for the current status of these files and
 the options for resolving the committed ones.

@@ -13,6 +13,7 @@ import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
+import dev.wildware.udea.assets.Model
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpriteAnimation
 import dev.wildware.udea.assets.SpriteAnimationSet
@@ -52,6 +53,7 @@ public object DslKinds {
         "spriteAnimation" to SpriteAnimation::class,
         "spriteAnimationSet" to SpriteAnimationSet::class,
         "soundCue" to SoundCue::class,
+        "model" to Model::class,
         "blueprint" to Blueprint::class,
         "level" to Level::class,
         "gameConfig" to GameConfig::class,

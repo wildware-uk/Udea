@@ -457,6 +457,12 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   world does NOT implement it and refuses edited files loudly. Cards (no issue): EditorJournal.complete unread;
   replay-side editor needs a frozen idleClock; update_edit values cannot contain a comma; no production host records
   editor sessions yet. Worktree kept `.claude/worktrees/agent-a2d575d58570effd7`.
+- **#240 MERGED `6a3caef`**, round 1 PASS, no findings (trial onto e1311e0: build 917 + GL green). `model("fox",
+  file = ...)` -> typed `Model` asset (udea-assets, no Kool); Kool glTF loader in udea-render jvmMain (`loadModel`;
+  `ImportedModel` ctor internal, so Android cannot reach it); `ModelSource` = MeshModel | ImportedModel; Y-up -> Z-up in
+  one place. UDEA0038 (not glTF 2.0) new; UDEA0032 missing file; UDEA0004 misspelled id. Fox CC BY 4.0 credited. Empty
+  first frame = first shader-program compile (not pinned inside Kool). Gap noted: misspelled-id test never shown red
+  alone. Worktree kept `.claude/worktrees/agent-ac2178956ad64e85f`.
 - Held: udea-physics2d (settings/AGENTS.md collide with #194), #188 HUD (udea-render UI beside #194), #195/#196 (need
   #194), gizmo G2/G3 (need #194), A2 (needs #240).
 - Contracts refreshed for wave 12: `scratchpad/lead/dev-contract.md`, `rev-contract-w11.md` (addenda updated).

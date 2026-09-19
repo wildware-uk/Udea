@@ -149,6 +149,21 @@ public object AssetValidationRules {
             "is built from, or it lists itself as one of them",
     )
 
+    /**
+     * A `model(...)` names a file that is there but is not a glTF 2.0 model: the wrong extension,
+     * a binary glTF whose header does not hold, JSON that does not parse or states another glTF
+     * version, or a buffer or image it names that is not under the asset root (issue #240).
+     *
+     * An error because the renderer cannot draw it, and would only find that out on the render
+     * thread with the game running.
+     */
+    public val MODEL_FILE: UdeaRule = UdeaRule(
+        id = "UDEA0038",
+        defaultSeverity = Severity.Error,
+        description = "a model file is not a readable glTF 2.0 .glb or .gltf, or names files " +
+            "that are not in the asset root",
+    )
+
     /** Every rule pass 3 mints locally, in id order. */
     public val all: List<UdeaRule> = listOf(
         DUPLICATE_ID,
@@ -159,6 +174,7 @@ public object AssetValidationRules {
         NONDETERMINISTIC_ASSET,
         VALIDATOR_FAILED,
         ITEM_RECIPE,
+        MODEL_FILE,
     ).sortedBy { it.id }
 
     /** The reserved band, asserted by `ModuleContractTest`. */

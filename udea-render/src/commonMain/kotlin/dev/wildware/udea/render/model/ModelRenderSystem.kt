@@ -14,8 +14,8 @@ import dev.wildware.udea.render.interp.Pose
 import dev.wildware.udea.render.interp.PoseSource
 
 /**
- * Draws every entity with a [ModelRenderer]: its mesh, in its material, lit by [light], seen from
- * [camera].
+ * Draws every entity with a [ModelRenderer] - a built-in mesh in its material, or an
+ * [ImportedModel] in the materials of its own file - lit by [light], seen from [camera].
  *
  * A [RenderSystem], not a Fleks system, like every drawing system here: `world.update` stays pure
  * simulation. The Kool half - the 3D pass, its light and shadow map, one PBR shader per material -
@@ -91,11 +91,11 @@ public class ModelRenderSystem(
     }
 
     private fun World.draw(entity: Entity, alpha: Float) {
-        val model = entity[ModelRenderer]
+        val model = entity[ModelRenderer].model
         val transform = entity.getOrNull(Transform3D)
         if (transform != null) {
             stage.add(
-                model.mesh, model.material,
+                model,
                 transform.x, transform.y, transform.z,
                 transform.rotationX, transform.rotationY, transform.rotationZ,
                 transform.scaleX, transform.scaleY, transform.scaleZ,
@@ -103,7 +103,7 @@ public class ModelRenderSystem(
         } else {
             val lift = lift ?: return
             if (!lift.poseOf(this, entity, alpha, pose)) return
-            stage.add(model.mesh, model.material, pose.x, pose.y, 0f, 0f, 0f, pose.angle, 1f, 1f, 1f)
+            stage.add(model, pose.x, pose.y, 0f, 0f, 0f, pose.angle, 1f, 1f, 1f)
         }
         drawnCount++
     }

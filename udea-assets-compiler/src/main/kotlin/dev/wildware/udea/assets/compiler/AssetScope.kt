@@ -14,6 +14,7 @@ import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
+import dev.wildware.udea.assets.Model
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpawnRecipe
 import dev.wildware.udea.assets.SpriteAnimation
@@ -299,6 +300,17 @@ public class AssetScope(
         "volume" to volume,
         "sounds" to sounds.map(::resPath),
     )
+
+    /**
+     * A 3D model imported from a glTF 2.0 file, as the runtime [Model] (issue #240).
+     *
+     * @param file the `.glb` or `.gltf`, relative to the asset root. Stamped a [ResFile], so a
+     *   file that is not there is `UDEA0032` with a did-you-mean, and one that is there but is not
+     *   glTF 2.0 is `UDEA0038`. The file's meshes, materials and textures are read by the
+     *   renderer; nothing about them is declared here.
+     */
+    public fun model(name: String, file: String): Unit =
+        declare(AssetKind.of<Model>(), "model", name, "file" to resPath(file))
 
     /**
      * @param notifies notify name to zero-based frame index into [sheet]'s grid. A map rather
@@ -762,6 +774,7 @@ public class AssetScope(
             "reference",
             "spriteSheet",
             "soundCue",
+            "model",
             "spriteAnimation",
             "spriteAnimationSet",
             "character",

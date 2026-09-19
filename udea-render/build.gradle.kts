@@ -182,6 +182,10 @@ val udeaVerifyHeadless = tasks.register<Test>("udeaVerifyHeadless") {
 
 val glTestPackage = "dev.wildware.udea.render.gl"
 
+/** The retired game's asset tree, not a project: the imported-model test and shot read its models. */
+val exampleAssets: Directory = rootProject.layout.projectDirectory.dir("example-assets")
+val exampleModels: Directory = exampleAssets.dir("models")
+
 tasks.named<Test>("jvmTest") {
     // The gate is `udeaVerifyHeadless`'s job; running it twice per `check` buys nothing.
     filter { excludeTestsMatching(gateTestClass) }
@@ -238,6 +242,10 @@ val udeaGlTest = tasks.register<Test>("udeaGlTest") {
         "udea.render.glReportDir",
         layout.buildDirectory.dir("reports/udea/gl").get().asFile.absolutePath,
     )
+    // The asset root holding the committed Khronos Fox, which `GlImportedModelRenderTest` imports
+    // (issue #240). An input, so replacing the file re-runs the test that reads it.
+    systemProperty("udea.render.exampleAssets", exampleAssets.asFile.absolutePath)
+    inputs.dir(exampleModels).withPropertyName("exampleModels").withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 tasks.named("check") {
@@ -261,4 +269,6 @@ tasks.register<JavaExec>("runModelShot") {
         providers.gradleProperty("udea.modelshot.dir").orNull
             ?: layout.buildDirectory.dir("reports/udea/model").get().asFile.absolutePath,
     )
+    // Where the Khronos Fox the shot imports is (issue #240).
+    systemProperty("udea.render.exampleAssets", exampleAssets.asFile.absolutePath)
 }

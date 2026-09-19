@@ -1,4 +1,4 @@
-worldHash=ace4dd33751828cf
+worldHash=bf7638fec93721f1
 netId=0/0 team=orc kind=4 player=true x=-28.83331 (0xc1e6aa9e) y=-27.917236 (0xc1df5680) hp=500.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Inventory,Motion,Player,Position,Respawn,Wallet
 netId=1/0 team=soldier kind=1 player=false x=9.651418 (0x411a6c35) y=-34.9683 (0xc20bdf8a) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
 netId=2/0 team=soldier kind=5 player=false x=-32.77708 (0xc2031bbb) y=-21.350594 (0xc1aace04) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position

@@ -458,6 +458,10 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - Decisions: #228 subsumes ui/KeyTable.kt, per backend = GLFW + Android (web shelved, no stub).
   #192 level at `moba/game/levels/test_level.udealevel`. #213 art `git mv` out of example to a committed
   non-module path, licence position unchanged, never un-ignore moba/game/assets/sprites.
+- **Owner request (dashboard, 2026-09-19): textured model with a material as an example.** No issue (owner
+  rule); tracked by comment on #199. dev-model, branch `model-textured-example`, new files in udea-render
+  (3D mesh + texture + Kool PBR material, Kool-free API), xvfb shot + GL test (texture and lighting
+  mutations red). 4th developer (owner "wip up to 4"); told to check `free -g` before full builds.
 - Held: #194 (settings.gradle.kts + AGENTS.md table collide with #213), #188 (moba HUD beside #228),
   #189 (after #188; may be mostly done by #213), #195/#196 (need #194), #214 last.
 

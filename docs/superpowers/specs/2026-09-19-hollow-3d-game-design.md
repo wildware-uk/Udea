@@ -65,12 +65,26 @@ moba is 2D: sprites on a flat map. Hollow is chosen to exercise what moba cannot
 | H3 | Creatures: fox AI (wander, chase, flee), animated, waves from `RngService` | H2 |
 | H4 | Combat and abilities through `udea-gas`, plus the ComposeGL HUD | H3 |
 | H5 | Pickups, score, game over, and audio cues | H4 |
-| H6 | Co-op over UDP, a net proof and replay equality | H5, E1 |
+| H6 | Multiplayer hardening: lossy links, four players, UDP net proof, replay equality | H5, E1 |
 | H7 | Editor and agent tools: `runEditor` on the clearing, `hollow.*` tools | H1 |
 
 E1, E2, E3 and H1 touch different modules and run in parallel. The H tickets share `:hollow:game`, so
 they run one after another; H7 can run beside H3-H5 because it lives in `:hollow:desktop`'s editor and
 agent source sets.
+
+## Multiplayer from the first ticket (owner, 2026-09-19)
+
+Owner: *"The game should be multiplayer and exercise the engine's features."* So multiplayer is not a
+last step bolted on at H6. It is the shape of the game from H1:
+
+- **Server-authoritative from H1.** The scaffold has `run` (listen server plus a local player), `runServer`
+  (headless) and `runClient host|join`, as moba does, and the clearing loads on the server and replicates.
+- **Every H ticket proves its feature with two players.** A headless test runs a server and two clients
+  in-process, and the ticket's feature (movement, foxes, combat, pickups) agrees on every machine. Its
+  screenshot shows two clients where that makes sense.
+- **H6 becomes the hardening ticket:** lossy and laggy links, up to four players, the UDP net proof and
+  replay equality over a recorded match.
+- Prediction for the local player uses `udea-net`'s `OwnerPredicted` authority, so movement feels immediate.
 
 ## Proof every ticket owes
 

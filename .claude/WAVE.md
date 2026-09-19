@@ -446,6 +446,21 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
+## Wave 11 (2026-09-19): in flight
+
+- Baseline `6a7a9b1`: FULLY GREEN. Any red on a branch is the branch's.
+- Dispatched: dev-228 (#228 symbolic keys; udea-render input + moba controls), dev-192 (#192 binary
+  test_level + loop ban; udea-assets-compiler, udea-diagnostics rule id, moba level, -Plevel on
+  :moba:desktop), dev-213 (#213 delete old tree/LibGDX/legacy gates; root build, build-logic, AGENTS.md,
+  CI, art source move). Box: 24 cores, 13G available, melon-merge running. Three developers.
+- Shared developer contract (skill block + wave-11 addenda, task paths updated for the moba split):
+  `scratchpad/lead/dev-contract.md`.
+- Decisions: #228 subsumes ui/KeyTable.kt, per backend = GLFW + Android (web shelved, no stub).
+  #192 level at `moba/game/levels/test_level.udealevel`. #213 art `git mv` out of example to a committed
+  non-module path, licence position unchanged, never un-ignore moba/game/assets/sprites.
+- Held: #194 (settings.gradle.kts + AGENTS.md table collide with #213), #188 (moba HUD beside #228),
+  #189 (after #188; may be mostly done by #213), #195/#196 (need #194), #214 last.
+
 ## Wave 10 plan
 
 - Ready: #212 (moba, scoped down), #224 (udea-render).

@@ -39,16 +39,23 @@ internal class SkySystem(private val resources: RenderResources) : RenderSystem 
         const val ROWS: Int = 256
 
         /** Straight up, sRGB. */
-        val ZENITH: FloatArray = floatArrayOf(0.30f, 0.50f, 0.78f)
+        val ZENITH: FloatArray = floatArrayOf(0.26f, 0.46f, 0.76f)
 
         /** At the horizon, sRGB: a warm haze. */
-        val HORIZON: FloatArray = floatArrayOf(0.80f, 0.86f, 0.88f)
+        val HORIZON: FloatArray = floatArrayOf(0.82f, 0.87f, 0.86f)
 
-        /** The gradient, top row first: [ZENITH] at the top, easing into [HORIZON] at the bottom. */
+        /**
+         * How far down the frame the haze is thickest, as a fraction of its height: where the far
+         * edge of the ground meets the sky from [HollowScene]'s camera. Below it the sky is only
+         * seen between trunks, and stays haze.
+         */
+        const val HORIZON_AT: Float = 0.4f
+
+        /** The gradient, top row first: [ZENITH] at the top, easing into [HORIZON] at [HORIZON_AT]. */
         fun gradient(): SpriteTexture {
             val rgba = ByteArray(ROWS * 4)
             for (row in 0 until ROWS) {
-                val t = row / (ROWS - 1f)
+                val t = minOf(1f, row / (ROWS - 1f) / HORIZON_AT)
                 // Eased so most of the sky is blue and the haze gathers near the horizon.
                 val haze = t * t
                 for (channel in 0 until 3) {

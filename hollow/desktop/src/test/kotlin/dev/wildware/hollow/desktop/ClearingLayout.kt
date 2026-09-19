@@ -23,9 +23,9 @@ internal object ClearingLayout {
     /** One prop: where it stands, its heading in radians about Z, and one uniform scale. */
     data class Placed(val prop: Prop, val x: Float, val y: Float, val heading: Float, val scale: Float)
 
-    /** The sun: low in the south-west behind the camera, warm, with a cool sky light. */
+    /** The sun: high in the south-west behind the camera, warm, with a cool sky light. */
     val SUN = Sunlight(
-        directionX = 0.55f, directionY = 0.5f, directionZ = -0.62f,
+        directionX = 0.5f, directionY = 0.42f, directionZ = -0.76f,
         red = 1f, green = 0.93f, blue = 0.8f,
         intensity = 3.4f,
         ambientRed = 0.36f, ambientGreen = 0.42f, ambientBlue = 0.52f,

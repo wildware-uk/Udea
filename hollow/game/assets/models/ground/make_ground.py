@@ -22,7 +22,7 @@ SIZE = 80.0  # metres a side
 PIXELS = 1024  # texture resolution: about 8 cm a pixel
 SEED = 249
 
-CLEARING = 8.0  # metres: the earth patch's radius
+CLEARING = 6.0  # metres: the earth patch's radius
 FOREST = 17.0  # metres: where the ground turns to forest floor
 
 GRASS_DARK = np.array([54, 88, 34], dtype=np.float64)

@@ -75,21 +75,24 @@ class GizmoFrameTest {
     }
 
     @Test
-    fun `a gizmo declares guides beside its handles, in order, and neither list sees the other`() {
+    fun `a gizmo declares marks beside its handles, in order, and neither list sees the other`() {
         val gizmo = object : Gizmo<Dial> {
             override val component: ComponentType<Dial> = Dial
 
             override fun GizmoScope<Dial>.build(target: GizmoTarget<Dial>) {
-                guide(Guide.Circle(target.origin, 5f))
+                mark(target.origin, HandleShape.Circle(5f))
                 handle(target.origin, HandleShape.Point, DragConstraint.Across(Plane.XY)) {}
-                guide(Guide.Line(target.origin, WorldPoint(5f, 0f)))
+                mark(target.origin, HandleShape.Line(WorldPoint(5f, 0f)))
             }
         }
         val target = GizmoTarget(entity, Dial(), WorldPoint(0f, 0f))
 
         assertEquals(
-            listOf(Guide.Circle(WorldPoint(0f, 0f), 5f, AxisFrame.WORLD), Guide.Line(WorldPoint(0f, 0f), WorldPoint(5f, 0f))),
-            gizmo.guides(target),
+            listOf(
+                Mark(WorldPoint(0f, 0f), HandleShape.Circle(5f, Axis.Z)),
+                Mark(WorldPoint(0f, 0f), HandleShape.Line(WorldPoint(5f, 0f))),
+            ),
+            gizmo.marks(target),
         )
         assertEquals(1, gizmo.handles(target).size)
     }

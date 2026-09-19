@@ -293,6 +293,9 @@ tasks.register<JavaExec>("runEditor") {
     // instance with a window over it, so `assets.*` answers the same way in both.
     systemProperty("udea.assets.root", gameAssetRoot.asFile.absolutePath)
     systemProperty("udea.repoRoot", rootProject.layout.projectDirectory.asFile.absolutePath)
+    // The Scene tab's snapping and axes (issue #236): this project's, kept beside it and ignored by
+    // git, because a person's grid is an editor preference and not game data.
+    systemProperty("udea.editor.preferences", layout.projectDirectory.file(".udea/editor-preferences.properties").asFile.absolutePath)
     val scriptClasspath: FileCollection = files(udeaAssetScript)
     jvmArgumentProviders.add(
         CommandLineArgumentProvider {

@@ -100,7 +100,7 @@ public class EditorSession(
     /** Click, Shift-click and box select in the Scene tab. */
     internal val picking: ScenePicking = ScenePicking(picker, selection)
 
-    /** The gizmos' handles and guides for the selection, drawn over it; `null` with no gizmos. */
+    /** The gizmos' handles and marks for the selection, drawn over it; `null` with no gizmos. */
     private val handles: HandleLayer? = gizmos?.let { offered -> HandleLayer { offered.frameFor(selection.ids) } }
 
     /** A drag on one of [handles], as an edit session. */

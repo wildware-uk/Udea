@@ -14,7 +14,7 @@ import dev.wildware.udea.editor.gizmo.GizmoFrame
 import dev.wildware.udea.editor.gizmo.GizmoPlacement
 import dev.wildware.udea.editor.gizmo.GizmoRegistry
 import dev.wildware.udea.editor.gizmo.GizmoTarget
-import dev.wildware.udea.editor.gizmo.Guide
+import dev.wildware.udea.editor.gizmo.Mark
 import dev.wildware.udea.editor.gizmo.HandlePart
 import dev.wildware.udea.editor.gizmo.Placement
 import dev.wildware.udea.editor.gizmo.ShownHandle
@@ -44,7 +44,7 @@ import dev.wildware.udea.editor.gizmo.shifted
  * One set of handles, at the selection's centre: each handle is the first selected entity's, moved by
  * how far that entity is from the centre, and dragging it drags the same handle of every selected
  * entity by the same amount, each measured from its own place ([ShownHandle]). A gizmo that declares a
- * different number of handles for different entities is not offered for them together; its guides are
+ * different number of handles for different entities is not offered for them together; its marks are
  * drawn round each entity where it is.
  *
  * @param placement where each entity is and which way it faces: the game says, since the engine has no
@@ -60,7 +60,7 @@ public class EditorGizmos(
     internal val preferences: GizmoPreferences = GizmoPreferences(),
 ) {
 
-    /** The handles and guides [selection] shows now. Render thread. */
+    /** The handles and marks [selection] shows now. Render thread. */
     internal fun frameFor(selection: List<NetId>): GizmoFrame {
         val placed = selection.mapNotNull { id ->
             val entity = netIds.resolveOrNull(id) ?: return@mapNotNull null
@@ -75,9 +75,9 @@ public class EditorGizmos(
         // Several entities turn with the first one's axes, so one drag means one direction for all.
         val axes = if (preferences.axes == GizmoAxes.Local) placed.first().place.axes else AxisFrame.WORLD
         val handles = ArrayList<ShownHandle>()
-        val guides = ArrayList<Guide>()
-        for (gizmo in registry.gizmos) collect(gizmo, placed, centre, axes, handles, guides)
-        return GizmoFrame(handles, guides)
+        val marks = ArrayList<Mark>()
+        for (gizmo in registry.gizmos) collect(gizmo, placed, centre, axes, handles, marks)
+        return GizmoFrame(handles, marks)
     }
 
     /**
@@ -95,22 +95,22 @@ public class EditorGizmos(
         centre: WorldPoint,
         axes: AxisFrame,
         handles: MutableList<ShownHandle>,
-        guides: MutableList<Guide>,
+        marks: MutableList<Mark>,
     ) {
         val builds = placed.map { entry ->
             val component = componentOf(entry.entity, gizmo.component) ?: return
             gizmo.built(GizmoTarget(entry.id, component, entry.place.origin, axes))
         }
-        for (build in builds) guides += build.guides
-        val count = builds.first().handles.size
-        if (builds.any { it.handles.size != count }) return
+        for (build in builds) marks += build.marked()
+        val count = builds.first().declared().size
+        if (builds.any { it.declared().size != count }) return
         val lead = placed.first().place.origin
         val shift = WorldPoint(centre.x - lead.x, centre.y - lead.y, centre.z - lead.z)
         for (index in 0 until count) {
-            val first = builds.first().handles[index]
+            val first = builds.first().declared()[index]
             val at = first.at.shifted(shift)
             val parts = builds.map { build ->
-                val handle = build.handles[index]
+                val handle = build.declared()[index]
                 HandlePart(handle, WorldPoint(handle.at.x - at.x, handle.at.y - at.y, handle.at.z - at.z))
             }
             handles += ShownHandle(at, first.shape.shifted(shift), first.constraint, first.axes, parts)

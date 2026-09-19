@@ -2,16 +2,16 @@ package dev.wildware.udea.editor.gizmo
 
 /**
  * What the Scene tab shows of the gizmos for the selection, in one frame (issue #236): the handles a
- * press can take, and the guides drawn under them. Built by `EditorGizmos.frameFor`.
+ * press can take, and the marks drawn under them. Built by `EditorGizmos.frameFor`.
  */
-internal class GizmoFrame(val handles: List<ShownHandle>, val guides: List<Guide>) {
+internal class GizmoFrame(val handles: List<ShownHandle>, val marks: List<Mark>) {
 
-    override fun toString(): String = "GizmoFrame(${handles.size} handles, ${guides.size} guides)"
+    override fun toString(): String = "GizmoFrame(${handles.size} handles, ${marks.size} marks)"
 
     companion object {
         val EMPTY: GizmoFrame = GizmoFrame(emptyList(), emptyList())
 
-        /** One entity's [handles] exactly where each was declared, and no guides: a test's frame. */
+        /** One entity's [handles] exactly where each was declared, and no marks: a test's frame. */
         fun of(handles: List<Handle<*>>): GizmoFrame = GizmoFrame(
             handles.map { handle ->
                 ShownHandle(handle.at, handle.shape, handle.constraint, handle.axes, listOf(HandlePart(handle, WorldPoint(0f, 0f))))
@@ -61,6 +61,6 @@ internal fun Drag.shifted(by: WorldPoint): Drag = Drag(start.shifted(by), at.shi
 internal fun HandleShape.shifted(by: WorldPoint): HandleShape = when (this) {
     is HandleShape.Line -> HandleShape.Line(to.shifted(by))
     HandleShape.Point, HandleShape.BoxCorner, HandleShape.Sphere,
-    is HandleShape.Arrow, is HandleShape.PlaneSquare, is HandleShape.Ring, is HandleShape.BoxEdge,
+    is HandleShape.Arrow, is HandleShape.PlaneSquare, is HandleShape.Ring, is HandleShape.BoxEdge, is HandleShape.Circle,
     -> this
 }

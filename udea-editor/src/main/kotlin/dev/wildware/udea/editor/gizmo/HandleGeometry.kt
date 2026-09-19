@@ -49,11 +49,12 @@ public sealed interface DragConstraint {
 }
 
 /**
- * What the editor draws for a handle.
+ * What the editor draws for a handle or a [Mark].
  *
- * **Every shape keeps a constant size on screen.** None of them carries a world size, so zooming the
- * camera out cannot shrink a handle past being grabbed; the editor sizes each in view pixels. The
- * one world-space dimension is [Line]'s far end, which is a place rather than a size.
+ * **Every shape but [Circle] keeps a constant size on screen.** They carry no world size, so zooming
+ * the camera out cannot shrink a handle past being grabbed; the editor sizes each in view pixels.
+ * [Line]'s far end is a world place rather than a size. [Circle] is the exception on purpose: it
+ * shows how big something is, so it is drawn at that size.
  */
 public sealed interface HandleShape {
 
@@ -80,6 +81,13 @@ public sealed interface HandleShape {
 
     /** A ball: a free grip in 3D. */
     public data object Sphere : HandleShape
+
+    /**
+     * A circle of world [radius] about the point, square to [normal] - a range, a reach, drawn at the
+     * size it is (issue #236), so zooming changes it as it changes the world. What a range gizmo marks
+     * round its grip; as a handle it is grabbed on its rim.
+     */
+    public data class Circle(val radius: Float, val normal: Axis = Axis.Z) : HandleShape
 }
 
 /**

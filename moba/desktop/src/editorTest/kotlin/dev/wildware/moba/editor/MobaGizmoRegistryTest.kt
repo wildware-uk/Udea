@@ -3,10 +3,14 @@ package dev.wildware.moba.editor
 import dev.wildware.moba.Position
 import dev.wildware.moba.PositionPositionGizmo
 import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.editor.gizmo.Axis
 import dev.wildware.udea.editor.gizmo.Drag
 import dev.wildware.udea.editor.gizmo.FieldName
 import dev.wildware.udea.editor.gizmo.FieldWrite
 import dev.wildware.udea.editor.gizmo.GizmoTarget
+import dev.wildware.udea.editor.gizmo.HandleShape
+import dev.wildware.udea.editor.gizmo.Plane
+import dev.wildware.udea.editor.gizmo.Snap
 import dev.wildware.udea.editor.gizmo.WorldPoint
 import dev.wildware.udea.editor.gizmo.handles
 import dev.wildware.udea.generated.MobaGizmoRegistry
@@ -25,23 +29,28 @@ import kotlin.test.assertEquals
 class MobaGizmoRegistryTest {
 
     @Test
-    fun `the editor's registry lists the move gizmo generated from Position's handle`() {
-        assertEquals(listOf<Any>(PositionPositionGizmo), MobaGizmoRegistry.gizmos)
+    fun `the editor's registry lists the move gizmo generated from Position's handle, and the tower's range ring`() {
+        // Sorted by name: the generated gizmo sits beside `Position`, the hand-written one in the editor's package.
+        assertEquals(listOf<Any>(PositionPositionGizmo, TowerRangeGizmo), MobaGizmoRegistry.gizmos)
     }
 
     @Test
     fun `dragging a unit's move handle writes its position and leaves the component alone`() {
         val unit = NetId.of(index = 12, generation = 0)
         val position = Position(x = 3f, y = 4f)
-        val handle = PositionPositionGizmo.handles(GizmoTarget(unit, position, WorldPoint(3f, 4f))).single()
+        // The built-in move gizmo: an arrow along X, one along Y, and the free square between them.
+        val (alongX, alongY, free) = PositionPositionGizmo.handles(GizmoTarget(unit, position, WorldPoint(3f, 4f)))
 
-        assertEquals(WorldPoint(3f, 4f, 0f), handle.at)
+        assertEquals(listOf(WorldPoint(3f, 4f, 0f)), listOf(alongX.at, alongY.at, free.at).distinct())
+        assertEquals(HandleShape.Arrow(Axis.X), alongX.shape)
+        assertEquals(HandleShape.Arrow(Axis.Y), alongY.shape)
+        assertEquals(HandleShape.PlaneSquare(Plane.XY), free.shape)
         assertEquals(
             listOf(
-                FieldWrite(unit, Position, FieldName("x"), 5f),
-                FieldWrite(unit, Position, FieldName("y"), 3f),
+                FieldWrite(unit, Position, FieldName("x"), 5f, Snap.Grid),
+                FieldWrite(unit, Position, FieldName("y"), 3f, Snap.Grid),
             ),
-            handle.drag(Drag(start = WorldPoint(3f, 4f), at = WorldPoint(5f, 3f))),
+            free.drag(Drag(start = WorldPoint(3f, 4f), at = WorldPoint(5f, 3f))),
         )
         assertEquals(3f, position.x, "a drag moved the unit itself; it must only answer writes")
     }

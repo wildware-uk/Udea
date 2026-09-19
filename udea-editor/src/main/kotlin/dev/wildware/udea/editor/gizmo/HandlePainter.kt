@@ -10,7 +10,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * How the editor draws every [HandleShape] and [Guide], and where a press takes a handle (issue #236).
+ * How the editor draws every [HandleShape] and [Mark], and where a press takes a handle (issue #236).
  *
  * One path for every gizmo, the built-ins and a game's alike: a gizmo declares a shape at a world
  * point in a frame of axes, and this draws it and hit-tests it, so a built-in gets nothing a game's
@@ -19,8 +19,8 @@ import kotlin.math.sqrt
  * **Handles keep their size on screen.** Each is measured in view pixels from the point its world
  * position projects to, so zooming out never shrinks one past being grabbed. An arrow or a ring finds
  * which way its axes run on screen by projecting a step along them, and nothing else about the camera,
- * so the same code draws a handle in the 2D view and in the 3D one. **Guides are world-sized**: a range
- * ring is drawn at the range. A press takes a handle where it is drawn: within [GRAB] pixels of an
+ * so the same code draws a handle in the 2D view and in the 3D one. A [HandleShape.Circle] is the one
+ * world-sized shape: a range ring is drawn at the range. A press takes a handle where it is drawn: within [GRAB] pixels of an
  * arrow's shaft, a ring's rim, or a grip's square.
  *
  * Render thread only, like the canvas; the scratch points are reused rather than allocated per frame.
@@ -33,15 +33,22 @@ internal class HandlePainter {
 
     // --- drawing -------------------------------------------------------------------------------
 
-    /** Draws [guide], thin, in world space. */
-    fun draw(canvas: GizmoCanvas, guide: Guide) {
-        when (guide) {
-            is Guide.Line -> if (canvas.project(guide.from, from) && canvas.project(guide.to, to)) {
+    /**
+     * Draws [mark], thin, in the guide colour: a line to its far end, a circle at its world size, and
+     * any other shape as a dot - a mark is a place to look, and an arrow's direction means nothing to
+     * a hand that cannot grab it.
+     */
+    fun draw(canvas: GizmoCanvas, mark: Mark) {
+        when (val shape = mark.shape) {
+            is HandleShape.Line -> if (canvas.project(mark.at, from) && canvas.project(shape.to, to)) {
                 canvas.line(from.x, from.y, to.x, to.y, GUIDE_WIDTH, GUIDE)
             }
-            is Guide.Circle -> ring(canvas, guide.centre, guide.axes, Axis.Z, guide.radius) { x0, y0, x1, y1 ->
+            is HandleShape.Circle -> ring(canvas, mark.at, AxisFrame.WORLD, shape.normal, shape.radius) { x0, y0, x1, y1 ->
                 canvas.line(x0, y0, x1, y1, GUIDE_WIDTH, GUIDE)
             }
+            HandleShape.Point, HandleShape.BoxCorner, HandleShape.Sphere,
+            is HandleShape.Arrow, is HandleShape.PlaneSquare, is HandleShape.Ring, is HandleShape.BoxEdge,
+            -> if (canvas.project(mark.at, from)) grip(canvas, from.x, from.y, MARK_DOT, GUIDE)
         }
     }
 
@@ -81,6 +88,10 @@ internal class HandlePainter {
             HandleShape.Sphere -> grip(canvas, x, y, SPHERE, if (lit) LIT else GRIP)
             HandleShape.BoxCorner -> grip(canvas, x, y, DOT, if (lit) LIT else BOX)
             is HandleShape.BoxEdge -> grip(canvas, x, y, EDGE, if (lit) LIT else BOX)
+            is HandleShape.Circle -> {
+                val colour = if (lit) LIT else GRIP
+                ring(canvas, at, axes, shape.normal, shape.radius) { x0, y0, x1, y1 -> stroke(canvas, x0, y0, x1, y1, colour) }
+            }
         }
     }
 
@@ -95,16 +106,20 @@ internal class HandlePainter {
             is HandleShape.Arrow -> onScreen(canvas, at, axes.direction(shape.axis)) &&
                 distanceToSegment(x, y, cx + step.x * ARROW_START, cy + step.y * ARROW_START, cx + step.x * ARROW_LENGTH, cy + step.y * ARROW_LENGTH) <= GRAB
             is HandleShape.PlaneSquare -> within(x, y, cx, cy, SQUARE / 2f + GRAB_MARGIN)
-            is HandleShape.Ring -> {
-                var hit = false
-                ring(canvas, at, axes, shape.normal, radius = null) { x0, y0, x1, y1 ->
-                    if (distanceToSegment(x, y, x0, y0, x1, y1) <= GRAB) hit = true
-                }
-                hit
-            }
+            is HandleShape.Ring -> onRim(canvas, at, axes, shape.normal, radius = null, x, y)
+            is HandleShape.Circle -> onRim(canvas, at, axes, shape.normal, shape.radius, x, y)
             HandleShape.Sphere -> within(x, y, cx, cy, SPHERE / 2f + GRAB_MARGIN)
             HandleShape.Point, HandleShape.BoxCorner, is HandleShape.BoxEdge, is HandleShape.Line -> within(x, y, cx, cy, GRAB)
         }
+    }
+
+    /** Whether ([x], [y]) is within [GRAB] pixels of the rim [ring] walks for the same arguments. */
+    private fun onRim(canvas: GizmoCanvas, at: WorldPoint, axes: AxisFrame, normal: Axis, radius: Float?, x: Float, y: Float): Boolean {
+        var hit = false
+        ring(canvas, at, axes, normal, radius) { x0, y0, x1, y1 ->
+            if (distanceToSegment(x, y, x0, y0, x1, y1) <= GRAB) hit = true
+        }
+        return hit
     }
 
     // --- geometry ------------------------------------------------------------------------------
@@ -219,6 +234,9 @@ internal class HandlePainter {
 
         /** A 3D ball's side, in view pixels. */
         const val SPHERE: Float = 12f
+
+        /** A mark drawn as a dot, in view pixels: smaller than any grip, since nothing grabs it. */
+        const val MARK_DOT: Float = 5f
 
         const val STROKE: Float = 2.5f
         const val EDGE_WIDTH: Float = 1f

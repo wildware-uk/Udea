@@ -4,13 +4,13 @@ import dev.wildware.udea.render.view.GizmoCanvas
 import dev.wildware.udea.render.view.GizmoLayer
 
 /**
- * The gizmos in a Scene view (issues #235 and #236): each guide drawn, each handle drawn over them, and
+ * The gizmos in a Scene view (issues #235 and #236): each mark drawn, each handle drawn over them, and
  * a press on a handle taken before the editor picks any entity under it.
  *
  * Every shape is drawn and hit-tested by one [HandlePainter], the built-ins' and a game's alike. Where
  * two handles overlap, the one declared later is drawn on top and is the one a press takes.
  *
- * @param frame this frame's handles and guides, asked for each time the view draws or is pressed.
+ * @param frame this frame's handles and marks, asked for each time the view draws or is pressed.
  */
 internal class HandleLayer(private val frame: () -> GizmoFrame) : GizmoLayer {
 
@@ -25,7 +25,7 @@ internal class HandleLayer(private val frame: () -> GizmoFrame) : GizmoLayer {
 
     override fun draw(canvas: GizmoCanvas) {
         val shown = frame()
-        for (guide in shown.guides) painter.draw(canvas, guide)
+        for (mark in shown.marks) painter.draw(canvas, mark)
         shown.handles.forEachIndexed { index, handle ->
             painter.draw(canvas, handle.at, handle.shape, handle.axes, lit = index == pressedIndex)
         }

@@ -78,11 +78,9 @@ public class GizmoCanvas internal constructor(
     }
 
     /**
-     * Draws a straight line from view pixel ([x0], [y0]) to ([x1], [y1]), [thickness] pixels across.
-     * Inside [GizmoLayer.draw] only.
-     *
-     * What a gizmo's arrows, rings and outlines are drawn with (issue #236): one turned strip, so a
-     * line at any angle is one draw rather than a staircase of [fill]s.
+     * Draws a straight line from ([x0], [y0]) to ([x1], [y1]), [thickness] pixels wide, in view
+     * pixels from the bottom left: a bone, a spoke, a tether (issue #243). Inside [GizmoLayer.draw]
+     * only.
      */
     public fun line(x0: Float, y0: Float, x1: Float, y1: Float, thickness: Float, colour: Rgba) {
         batch.line(x0, y0, x1, y1, thickness, colour)

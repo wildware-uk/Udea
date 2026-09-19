@@ -127,12 +127,12 @@ class BuiltinGizmosTest {
         assertEquals(8, handles.size)
         assertEquals(
             setOf(
-                Guide.Line(WorldPoint(12f, 11f), WorldPoint(8f, 11f)),
-                Guide.Line(WorldPoint(8f, 11f), WorldPoint(8f, 9f)),
-                Guide.Line(WorldPoint(8f, 9f), WorldPoint(12f, 9f)),
-                Guide.Line(WorldPoint(12f, 9f), WorldPoint(12f, 11f)),
+                Mark(WorldPoint(12f, 11f), HandleShape.Line(WorldPoint(8f, 11f))),
+                Mark(WorldPoint(8f, 11f), HandleShape.Line(WorldPoint(8f, 9f))),
+                Mark(WorldPoint(8f, 9f), HandleShape.Line(WorldPoint(12f, 9f))),
+                Mark(WorldPoint(12f, 9f), HandleShape.Line(WorldPoint(12f, 11f))),
             ),
-            Size.guides(target).toSet(),
+            Size.marks(target).toSet(),
         )
     }
 
@@ -186,7 +186,7 @@ class BuiltinGizmosTest {
     // --- radius and range -----------------------------------------------------------------------
 
     @Test
-    fun `a radius and a range each have a grip on the rim and a circle guide, and follow the distance`() {
+    fun `a radius and a range each have a grip on the rim and a circle marked, and follow the distance`() {
         val crate = Crate(reach = 2f, sight = 5f)
         val target = GizmoTarget(entity, crate, WorldPoint(1f, 1f))
         val (reach, sight) = Reach.handles(target)
@@ -197,8 +197,8 @@ class BuiltinGizmosTest {
         assertEquals(HandleShape.Line(WorldPoint(1f, 1f)), sight.shape, "a range draws its spoke back to the entity")
         assertEquals(DragConstraint.Along(Axis.X), sight.constraint)
         assertEquals(
-            listOf(Guide.Circle(WorldPoint(1f, 1f), 2f), Guide.Circle(WorldPoint(1f, 1f), 5f)),
-            Reach.guides(target),
+            listOf(Mark(WorldPoint(1f, 1f), HandleShape.Circle(2f)), Mark(WorldPoint(1f, 1f), HandleShape.Circle(5f))),
+            Reach.marks(target),
         )
         assertEquals(mapOf("sight" to 8f), sight.writes(sight.at, offset(sight.at, 3f, 0f)))
         // Grabbed 4 out and dragged onto the entity: 2 less 4 is clamped to nothing.

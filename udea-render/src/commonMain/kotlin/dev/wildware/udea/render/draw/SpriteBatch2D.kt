@@ -171,24 +171,23 @@ public class SpriteBatch2D internal constructor(
     }
 
     /**
-     * Records a straight line from ([x0], [y0]) to ([x1], [y1]), in the [begin] projection's units:
-     * [whitePixel] stretched along it, [thickness] pixels across and centred on it, and turned about
-     * its first end. The thickness is pixels whatever the projection, so a line drawn through a
-     * camera keeps its weight at any zoom.
+     * Records a solid line from ([x0], [y0]) to ([x1], [y1]), [thickness] wide: [whitePixel]
+     * stretched along it and turned to its angle. In the [begin] projection's units, which for a
+     * gizmo are view pixels. Nothing is recorded for a line of no length.
      */
     internal fun line(x0: Float, y0: Float, x1: Float, y1: Float, thickness: Float, tint: Rgba) {
         check(isDrawing) { "SpriteBatch2D.line called outside begin/end" }
-        val px0 = projection.pixelX(x0)
-        val py0 = projection.pixelY(y0)
-        val dx = projection.pixelX(x1) - px0
-        val dy = projection.pixelY(y1) - py0
+        val dx = x1 - x0
+        val dy = y1 - y0
         val length = sqrt(dx * dx + dy * dy)
-        val degrees = atan2(dy, dx) * DEGREES_PER_RADIAN
+        if (length == 0f) return
+        val half = thickness / 2f
         record(
             whitePixel,
-            px0, py0 - thickness / 2f,
-            length, thickness,
-            0f, thickness / 2f, degrees,
+            projection.pixelX(x0), projection.pixelY(y0 - half),
+            length * projection.scaleX, thickness * projection.scaleY,
+            0f, half * projection.scaleY,
+            atan2(dy, dx) * DEGREES_PER_RADIAN,
             0f, 0f, 1f, 1f,
             tint,
         )
@@ -261,7 +260,7 @@ public class SpriteBatch2D internal constructor(
         const val DU: Int = 9
         const val DV: Int = 10
 
-        /** [line] turns by degrees, as [draw] does, and `atan2` answers radians. */
+        /** A line's angle comes from `atan2` in radians; a record's rotation is in degrees. */
         const val DEGREES_PER_RADIAN: Float = (180.0 / PI).toFloat()
 
     }

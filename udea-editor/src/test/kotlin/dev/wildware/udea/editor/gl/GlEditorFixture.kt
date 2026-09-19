@@ -1,18 +1,23 @@
 package dev.wildware.udea.editor.gl
 
 import dev.wildware.composegl.ui.geometry.Offset
+import dev.wildware.composegl.ui.geometry.Rect
+import dev.wildware.composegl.ui.geometry.Size
+import dev.wildware.composegl.ui.testing.uiTest
 import dev.wildware.udea.agent.AgentBridge
 import dev.wildware.udea.agent.activity.AgentSessions
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.blueprint.BlueprintId
 import dev.wildware.udea.editor.EditorSession
 import dev.wildware.udea.editor.EditorSpawn
+import dev.wildware.udea.editor.EditorTags
 import dev.wildware.udea.editor.EditorTools
 import dev.wildware.udea.editor.EditorViews
 import dev.wildware.udea.render.OverlaySystem
 import dev.wildware.udea.render.ScreenTarget
 import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.kool.KoolPointer
+import dev.wildware.udea.render.view.ViewPoint
 import org.lwjgl.glfw.GLFW
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -94,6 +99,89 @@ private fun currentWindow(): Long {
     check(window != 0L) { "no GLFW window is current on the render thread" }
     return window
 }
+
+/**
+ * Presses the left button at [from], drags it to [to], runs [during] with the button held, and lets
+ * go - unless [release] is false, when the button is left down for the caller.
+ */
+internal fun KoolBackend.drag(
+    frames: FrameProbe,
+    from: Offset,
+    to: Offset,
+    release: Boolean = true,
+    during: () -> Unit = {},
+) {
+    moveTo(from.x.toDouble(), from.y.toDouble())
+    awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
+    button(GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_PRESS)
+    awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
+    // In steps, as a hand drags: one jump would be one move event.
+    for (step in 1..DRAG_STEPS) {
+        val t = step.toFloat() / DRAG_STEPS
+        moveTo((from.x + (to.x - from.x) * t).toDouble(), (from.y + (to.y - from.y) * t).toDouble())
+        awaitFrames(frames, frames.count.get() + 1)
+    }
+    awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
+    during()
+    if (!release) return
+    button(GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_RELEASE)
+    awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
+}
+
+/** A key on Kool's own GLFW key callback, as `udea-render`'s `GlKeys` presses one. */
+internal fun KoolBackend.key(glfwKey: Int, action: Int) = onRenderThread {
+    val window = currentWindow()
+    val callback = checkNotNull(GLFW.glfwSetKeyCallback(window, null)) {
+        "Kool installed no GLFW key callback, so this test would be pressing nothing"
+    }
+    try {
+        callback.invoke(window, glfwKey, NO_SCANCODE, action, NO_MODIFIERS)
+    } finally {
+        GLFW.glfwSetKeyCallback(window, callback)
+    }
+}
+
+/** Holds [glfwKey], on Kool's own GLFW key callback, for the length of [block]. */
+internal fun KoolBackend.holding(frames: FrameProbe, glfwKey: Int, block: () -> Unit) {
+    key(glfwKey, GLFW.GLFW_PRESS)
+    awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
+    try {
+        block()
+    } finally {
+        key(glfwKey, GLFW.GLFW_RELEASE)
+        awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
+    }
+}
+
+/**
+ * The Scene tab's rectangle on a [width] by [height] screen, read from the same window laid out with
+ * no GL at the same size, as `GlEditorTabsTest` reads it: exact across, off down by the few pixels the
+ * bundled font's line height differs from the headless one's.
+ */
+internal fun sceneViewOn(width: Int, height: Int): Rect {
+    val twin = glEditorSession(EditorViews.detached())
+    return uiTest(Size(width.toFloat(), height.toFloat())) { twin.window.content() }.use { ui ->
+        ui.settle()
+        ui.node(EditorTags.SCENE_VIEW).boundsInRoot
+    }
+}
+
+/** Where world point ([x], [y]) is on the screen: through the editor camera into the view, then onto [view]. */
+internal fun screenOfWorld(views: EditorViews, view: Rect, x: Float, y: Float): Offset {
+    val at = ViewPoint()
+    views.camera.project(x, y, 0f, at)
+    return screenOfView(views, view, at)
+}
+
+/** Where view pixel [at] of the Scene tab is on the screen, [view] being the tab's rectangle there. */
+internal fun screenOfView(views: EditorViews, view: Rect, at: ViewPoint): Offset =
+    Offset(view.left + at.x * view.width / views.scene.width, view.bottom - at.y * view.height / views.scene.height)
+
+/** Moves a drag is made of. */
+private const val DRAG_STEPS = 6
+
+/** GLFW passes a scancode with a key, and Kool's mapping reads the key alone. */
+private const val NO_SCANCODE = 0
 
 /** GLFW passes modifiers with a mouse button, and Kool's mapping reads none. */
 private const val NO_MODIFIERS = 0

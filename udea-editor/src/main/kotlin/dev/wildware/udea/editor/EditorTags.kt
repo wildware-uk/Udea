@@ -13,7 +13,7 @@ public object EditorTags {
     internal const val GAME_TAB: String = "editor:tab-game"
 
     /** The world through the editor's camera, in its `SceneView`: the Scene tab's page. */
-    internal const val SCENE_VIEW: String = "editor:scene-view"
+    public const val SCENE_VIEW: String = "editor:scene-view"
 
     /** The world through the game's camera, in its `SceneView`: the Game tab's page. */
     internal const val GAME_VIEW: String = "editor:game-view"

@@ -18,7 +18,7 @@ public class GizmoScope<C : Component<C>> internal constructor(
 
     private val declared = ArrayList<Handle<C>>()
 
-    private val guides = ArrayList<Guide>()
+    private val marked = ArrayList<Mark>()
 
     /**
      * Declares one handle.
@@ -44,15 +44,34 @@ public class GizmoScope<C : Component<C>> internal constructor(
         declared += Handle(at, shape, constraint, axes, entity, component, respond)
     }
 
-    /** Declares a [Guide]: drawn in world space under the handles, and never grabbed. */
-    public fun guide(guide: Guide) {
-        guides += guide
+    /**
+     * Draws [shape] at [at] with nothing to grab: a guide the gizmo shows rather than a handle a
+     * person drags - a skeleton's joints and bones, a path, a range seen but not changed
+     * (issue #243). A mark is never hit-tested and never answers a write, so a read-only gizmo is
+     * one that declares marks and no handles.
+     *
+     * Like a handle it keeps its size on screen; a [HandleShape.Line] runs to its far end in world
+     * space.
+     */
+    public fun mark(at: WorldPoint, shape: HandleShape) {
+        marked += Mark(at, shape)
     }
 
     internal fun declared(): List<Handle<C>> = declared
 
-    internal fun guides(): List<Guide> = guides
+    internal fun marked(): List<Mark> = marked
 }
+
+/**
+ * One guide a gizmo drew with [GizmoScope.mark]: where, and what. A value the editor draws and a
+ * test reads, and nothing else - there is nothing to drag.
+ */
+public data class Mark(
+    /** Where the mark sits, in world space. */
+    val at: WorldPoint,
+    /** What the editor draws there. */
+    val shape: HandleShape,
+)
 
 /**
  * One handle a gizmo declared: where it is, what it looks like, how it may move, and what dragging

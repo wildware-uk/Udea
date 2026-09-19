@@ -7,7 +7,7 @@ import kotlin.reflect.KMutableProperty1
  * The editor's built-in 2D gizmos (issue #236): move, resize, rotate, and the radius and range rings.
  *
  * Each is a public function on [GizmoScope] that declares handles through [GizmoScope.handle] and
- * guides through [GizmoScope.guide], and nothing else - so a built-in has no private path. The
+ * marks through [GizmoScope.mark], and nothing else - so a built-in has no private path. The
  * gizmos `udea-codegen` generates from `@PositionHandle`, `@SizeHandle`, `@RotationHandle`,
  * `@RadiusHandle` and `@RangeHandle` are one call to one of these, and a hand-written gizmo calls
  * the same function the same way.
@@ -61,7 +61,7 @@ public fun <C : Component<C>> GizmoScope<C>.sizeHandles(
     val up = axes.direction(Axis.Y)
     // Anticlockwise from the corner at +X, +Y.
     val corners = CORNER_SIGNS.map { (sx, sy) -> origin.plus(across, sx * width0 / 2f).plus(up, sy * height0 / 2f) }
-    for (index in corners.indices) guide(Guide.Line(corners[index], corners[(index + 1) % corners.size]))
+    for (index in corners.indices) mark(corners[index], HandleShape.Line(corners[(index + 1) % corners.size]))
 
     val widthFrom: DragScope<C>.(Drag) -> Unit = { drag -> write(width, maxOf(0f, width0 + drag.spread(Axis.X, origin, axes)), Snap.Grid) }
     val heightFrom: DragScope<C>.(Drag) -> Unit = { drag -> write(height, maxOf(0f, height0 + drag.spread(Axis.Y, origin, axes)), Snap.Grid) }
@@ -125,7 +125,7 @@ private fun <C : Component<C>> GizmoScope<C>.reach(
     grip: HandleShape,
 ) {
     val origin = target.origin
-    guide(Guide.Circle(origin, value0, target.axes))
+    mark(origin, HandleShape.Circle(value0))
     val rim = origin.plus(target.axes.direction(Axis.X), value0)
     handle(rim, grip, DragConstraint.Along(Axis.X), target.axes) { drag ->
         write(field, maxOf(0f, value0 + drag.stretchFrom(origin)), Snap.Grid)

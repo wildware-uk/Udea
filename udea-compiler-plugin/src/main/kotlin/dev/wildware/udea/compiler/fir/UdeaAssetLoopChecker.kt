@@ -44,8 +44,9 @@ import org.jetbrains.kotlin.realElement
  *
  * ### Where it runs
  *
- * Only in a file named `*.udea.kts`, which in practice means inside the asset compiler:
- * `AssetCompiler` passes this plugin to its K2 script compile. Every other compilation the
+ * Only in a file named `*.udea.kts`, which in practice means inside the asset compiler's script
+ * compile: `udea-assets-compiler` carries this plugin `runtimeOnly`, and the scripting host
+ * registers it from the classpath. Every other compilation the
  * plugin reaches is ordinary game and engine source, where loops are the point, and this checker
  * returns before looking at anything.
  *

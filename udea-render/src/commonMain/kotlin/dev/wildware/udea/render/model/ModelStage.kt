@@ -60,9 +60,9 @@ import de.fabmax.kool.scene.Model as KoolModel
  * a skinned model animates per entity (issues #241, #242), and one instance list cannot hold two
  * poses. The nodes share the file's textures, which Kool caches on the parsed file.
  *
- * A node is shown only once every texture it samples has been decoded. Kool decodes a glTF texture
- * on its loader threads after the node is made, and until then the mesh would be drawn without it;
- * not showing it is what keeps an untextured frame out of a capture.
+ * Kool decodes a glTF texture on its loader threads after the node is made, and until it has, Kool
+ * itself does not draw the mesh: its GL backend refuses a draw whose texture has no pixels yet
+ * (`MappedUniformTex.checkLoadingState` in 0.19.0), so an untextured model never reaches a capture.
  */
 internal class ModelStage(
     private val passes: ScenePasses,
@@ -158,16 +158,13 @@ internal class ModelStage(
         for (index in allImports.indices) allImports[index].setAmbient()
     }
 
-    /**
-     * Draws [source] with the given transform this frame, and answers whether it was drawn: an
-     * [ImportedModel] whose textures are still loading is not drawn yet. Render thread only.
-     */
+    /** Draws [source] with the given transform this frame. Render thread only. */
     fun add(
         source: ModelSource,
         x: Float, y: Float, z: Float,
         rotationX: Float, rotationY: Float, rotationZ: Float,
         scaleX: Float, scaleY: Float, scaleZ: Float,
-    ): Boolean {
+    ) {
         // Translate, then turn about Z, Y, X - so X is applied to the model first - then scale.
         matrix.setIdentity()
             .translate(x, y, z)
@@ -175,12 +172,11 @@ internal class ModelStage(
             .rotate(rotationY.rad, Vec3f.Y_AXIS)
             .rotate(rotationX.rad, Vec3f.X_AXIS)
             .scale(axisScale.set(scaleX, scaleY, scaleZ))
-        return when (source) {
+        when (source) {
             is MeshModel -> {
                 val run = runFor(source.mesh, source.material)
                 run.instances.addInstance(writeMatrix)
                 run.mesh.isVisible = true
-                true
             }
             // The file is Y-up: turned onto the world's Z-up before anything else is applied.
             is ImportedModel -> importsFor(source).show(matrix.rotate(Y_UP_TO_Z_UP, Vec3f.X_AXIS))
@@ -260,13 +256,11 @@ internal class ModelStage(
         }
 
         /** Shows the next free node at [transform], making one if every node is in use. */
-        fun show(transform: MutableMat4f): Boolean {
+        fun show(transform: MutableMat4f) {
             val placed = if (shown < nodes.size) nodes[shown] else make()
             shown++
             placed.node.transform.setMatrix(transform)
-            val ready = placed.isReady()
-            placed.node.isVisible = ready
-            return ready
+            placed.node.isVisible = true
         }
 
         private fun make(): Placed = Placed(model.gltf.makeModel(config)).also { placed ->
@@ -277,26 +271,14 @@ internal class ModelStage(
     }
 
     /**
-     * One scene node made from a glTF file, with its shaders and textures listed once so that a
-     * frame reads them without walking Kool's maps.
+     * One scene node made from a glTF file, with its shaders listed once so that a frame sets
+     * their ambient light without walking Kool's maps.
      */
     private inner class Placed(val node: KoolModel) {
         private val shaders = node.meshes.values.mapNotNull { it.shader as? KslPbrShader }
-        private val textures = node.textures.values.toList()
-        private var loaded = false
 
         fun setAmbient() {
             for (index in shaders.indices) shaders[index].ambientFactor = ambient
-        }
-
-        /**
-         * Whether every texture the node samples has its pixels: decoded and waiting for its
-         * upload, which Kool does when the texture is first bound, or already on the GPU. Once
-         * true, true for good.
-         */
-        fun isReady(): Boolean {
-            if (!loaded) loaded = textures.all { it.isLoaded || it.uploadData != null }
-            return loaded
         }
     }
 

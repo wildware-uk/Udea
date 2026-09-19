@@ -65,10 +65,7 @@ public class ModelRenderSystem(
     /** Reused: the pose [lift] writes into, one for the whole frame. */
     private val pose = Pose()
 
-    /**
-     * Models drawn by the most recent frame. What `GlModelRenderTest` counts. An imported model
-     * whose textures are still loading is not drawn, and not counted.
-     */
+    /** Models drawn by the most recent frame. What `GlModelRenderTest` counts. */
     internal var drawnCount: Int = 0
         private set
 
@@ -96,7 +93,7 @@ public class ModelRenderSystem(
     private fun World.draw(entity: Entity, alpha: Float) {
         val model = entity[ModelRenderer].model
         val transform = entity.getOrNull(Transform3D)
-        val drawn = if (transform != null) {
+        if (transform != null) {
             stage.add(
                 model,
                 transform.x, transform.y, transform.z,
@@ -108,7 +105,7 @@ public class ModelRenderSystem(
             if (!lift.poseOf(this, entity, alpha, pose)) return
             stage.add(model, pose.x, pose.y, 0f, 0f, 0f, pose.angle, 1f, 1f, 1f)
         }
-        if (drawn) drawnCount++
+        drawnCount++
     }
 
     /** Everything resolved at bind time. */

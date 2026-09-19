@@ -69,9 +69,9 @@ class GlImportedModelRenderTest {
 
             // Frames are taken until the fox is drawn, within a budget, and how many it took is
             // printed. Two things take frames here, and neither is a sleep. The texture decodes on
-            // Kool's loader threads, and `ModelRenderSystem` does not show the fox until it has.
-            // And the first frame that uses a shader program Kool has not compiled before comes
-            // back empty: seen in this test's probes, where a second fox added later - same
+            // Kool's loader threads, and Kool does not draw the fox until it has. And the first
+            // frame that uses a shader program Kool has not compiled before comes back empty:
+            // seen in this test's probes, where a second fox added later - same
             // program, new node, new mesh - drew on its very first frame, while a first fox added
             // after a cube drew one frame late. The cause inside Kool is not pinned; see #240.
             var frames = 0
@@ -88,9 +88,9 @@ class GlImportedModelRenderTest {
             assertEquals(1, backend.onRenderThread { system.drawnCount }, "one entity has a ModelRenderer")
             assertTrue(foxPixels >= MIN_FOX_PIXELS, "the fox is not drawn: $foxPixels lit pixels after $frames frames")
 
-            // Upright and side-on: taller than a fox lying on its side, and longer than it is tall.
-            // The file is Y-up, so a renderer that drew it without turning it onto the world's Z-up
-            // would lay it flat along the camera's line of sight, a sliver a few pixels high.
+            // Upright and side-on: a fox's height, and longer than it is tall. The file is Y-up
+            // with the fox's length along its Z, so a renderer that drew it without turning it onto
+            // the world's Z-up would stand it on its tail: taller than it is long (measured 115x197).
             val (width, height) = extent(image)
             println("GlImportedModelRenderTest: the fox is ${width}x$height pixels")
             assertTrue(height >= MIN_FOX_HEIGHT, "the fox is not standing up: ${width}x$height pixels")

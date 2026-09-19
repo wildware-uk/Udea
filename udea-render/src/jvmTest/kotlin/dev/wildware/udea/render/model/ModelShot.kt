@@ -63,10 +63,7 @@ object ModelShot {
         val light = ModelLight(directionX = -1f, directionY = 0.25f, directionZ = -0.7f, intensity = 3.2f, ambient = Rgba.of(0.08f, 0.08f, 0.1f))
         val registry = RenderRegistry()
         registry.register(RenderPhase.PreRender, ::SkySystem)
-        lateinit var system: ModelRenderSystem
-        registry.register(RenderPhase.World, { resources ->
-            ModelRenderSystem(resources, camera, light).also { system = it }
-        })
+        registry.register(RenderPhase.World, { resources -> ModelRenderSystem(resources, camera, light) })
 
         val backend = KoolBackend.start(
             RenderMode.Offscreen,
@@ -125,24 +122,28 @@ object ModelShot {
             // The imported Khronos Fox (issue #240), on the same ground, under the same sun, with
             // the crate turned back. Drawn from its own `.glb`: its mesh, its material, its texture.
             val fox = loadModel(exampleAssets(), Model(AssetId("models/fox"), ResPath("models/fox/Fox.glb")))
+            backend.onRenderThread { with(world) { crate[Transform3D].rotationZ = 0.5f } }
+            val withoutFox = slot.capture(CaptureRequest()).bytes
             lateinit var foxEntity: Entity
             backend.onRenderThread {
-                with(world) { crate[Transform3D].rotationZ = 0.5f }
                 foxEntity = world.entity {
                     it += Transform3D(x = 1.2f, y = -2.6f, rotationZ = FOX_HEADING, scaleX = FOX_SCALE, scaleY = FOX_SCALE, scaleZ = FOX_SCALE)
                     it += ModelRenderer(model = fox)
                 }
             }
-            // Its texture decodes on Kool's loader threads, and the system does not draw it until it
-            // has; then one more frame for its first shader compile (see GlImportedModelRenderTest).
-            var waited = 0
-            while (backend.onRenderThread { system.drawnCount } < MODELS_WITH_FOX && waited < FOX_FRAME_BUDGET) {
-                slot.capture(CaptureRequest())
+            // Kool draws the fox once its texture has decoded on Kool's loader threads, and not on
+            // the first frame its shader program is used (see GlImportedModelRenderTest). So frames
+            // are taken until one shows something new and the next one is the same picture.
+            var previous = withoutFox
+            var current = slot.capture(CaptureRequest()).bytes
+            var waited = 1
+            while ((current.contentEquals(withoutFox) || !current.contentEquals(previous)) && waited < FOX_FRAME_BUDGET) {
+                previous = current
+                current = slot.capture(CaptureRequest()).bytes
                 waited++
             }
-            check(backend.onRenderThread { system.drawnCount } == MODELS_WITH_FOX) { "the fox was not drawn in $waited frames" }
-            slot.capture(CaptureRequest())
-            File(out, "model-fox.png").writeBytes(slot.capture(CaptureRequest()).bytes)
+            check(!current.contentEquals(withoutFox)) { "the fox was not drawn in $waited frames" }
+            File(out, "model-fox.png").writeBytes(current)
             for (step in 0 until TURN_STEPS) {
                 backend.onRenderThread {
                     with(world) { foxEntity[Transform3D].rotationZ = FOX_HEADING + step * (PI / 2).toFloat() }
@@ -162,9 +163,6 @@ object ModelShot {
 
     /** Facing down and to the left of the picture, three-quarters on to the camera. */
     private const val FOX_HEADING = -0.9f
-
-    /** The ground, two crates, the ball and the fox. */
-    private const val MODELS_WITH_FOX = 5
 
     private const val FOX_FRAME_BUDGET = 240
 

@@ -471,6 +471,13 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   restore == rebuild-at-tick exactly; != unrewound run once bodies touch/spin (warm-start lost); only reachable via
   time.rewind+step and no game installs physics yet. Static chains ok; changed chain throws. Card: Physics2DModule KDoc
   should name the rewind limit. Worktree kept `.claude/worktrees/agent-afe076be56583b1e7`.
+- **#195 MERGED `f2839c6`**, round 1 PASS, no findings. Asset panel in udea-editor; Save/Ctrl+S splices a
+  KotlinPoet literal over the pass-1 span (git diff = one value); computed fields refused (typed `read_only_field`, reason +
+  line); Save-as-new via KotlinPoet (0 diagnostics incl. UDEA0015). Patcher in udea-assets-compiler as `assets.fields`
+  (paged) / `assets.set` / `assets.create` - deviation from issue (editor source set) ruled design choice: Kotlin compiler
+  only on :moba:desktop agent/editor classpaths, not runtime. Hot reload works (AssetHotReload on kmp; #91 closed
+  NOT_PLANNED). Cards: `$` string saves as ${'$'} and reads back read-only; editor keys "has it now" on `applied` not
+  `pushedToGame`. Worktree kept `.claude/worktrees/agent-ad11f31c6132f037c`.
 - Held: #241 A2 (asset compiler clip gen collides with #195), gizmo G2 #233 / G3 #234 (udea-editor busy), #189.
 - Remaining for #214: #195, #196 (then docs + kmp -> master). Shelved #223/#226 stay open (owner's shelving).
 

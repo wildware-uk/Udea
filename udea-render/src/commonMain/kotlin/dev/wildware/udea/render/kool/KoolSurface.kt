@@ -28,6 +28,9 @@ import dev.wildware.udea.render.draw.SpriteTexture
  * ## Two passes, two batches
  *
  * ```
+ * (a system's own passes, e.g. the 3D model pass: see ScenePasses)
+ *      |
+ *      v  (their colour textures, drawn through the offscreen batch)
  * OffscreenPass2d  <- offscreen batch: every RenderSystem       <- the ONLY thing a capture reads
  *      |
  *      v  (its colour texture)

@@ -43,8 +43,9 @@ import kotlin.test.assertTrue
  * colours that differ in *hue* (warm orange, cool teal), so lighting, which scales brightness,
  * cannot turn one into the other.
  *
- * - **Texture.** Each face's window must hold both hues. An unbound texture draws a face in one
- *   colour, whatever the light does.
+ * - **Texture.** Each face's window must hold both hues. A material with no texture in it draws a
+ *   face in one colour, whatever the light does; a shader whose texture was never bound drew
+ *   nothing at all when this was written, which fails the same assertion.
  * - **Lighting.** The lit face must be clearly brighter than the unlit one. A material with no
  *   lighting, or a light that never reaches the shader, draws both faces alike: they carry the
  *   same checker.

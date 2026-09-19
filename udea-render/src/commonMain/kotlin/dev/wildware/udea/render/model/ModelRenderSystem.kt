@@ -65,8 +65,8 @@ public class ModelRenderSystem(
     /** Reused: the pose [lift] writes into, one for the whole frame. */
     private val pose = Pose()
 
-    /** Models drawn by the most recent frame. */
-    public var drawnCount: Int = 0
+    /** Models drawn by the most recent frame. What `GlModelRenderTest` counts. */
+    internal var drawnCount: Int = 0
         private set
 
     override fun onBind(world: World, ctx: GameContext) {

@@ -128,6 +128,8 @@ untracked `local.properties` (`sdk.dir=...`), which is never committed.
 - **60Hz fixed simulation.** Every duration, deadline, ring slot, baseline and input stamp is a
   `Tick`. Never a float of seconds, never a wall-clock millisecond.
 - **`SimClock.time` is derived** (`tick * dt`), never accumulated. Accumulating drifts.
+- **Animation time is `Animator.clipTime(now)`**, derived from a start `Tick`, never accumulated
+  (#241).
 - **`SimBarrier` is drained at the top of `Simulation.step()`**, before any system runs. Scene
   swaps, asset hot-reload deltas, agent tool mutations and snapshot application all queue on it.
   No system ever observes a torn world, and there is one place to reason about atomicity.

@@ -1,8 +1,13 @@
 # BRIEF-265 — a game that builds and runs outside the Udea repository
 
-SHA: PENDING
+SHA: `b8b0ac9`
 
 Branch `issue-265-outside-game`, off `origin/master` at `a45636c`.
+
+`b8b0ac9` is the tree everything below was measured on: `06843c6` is the work, `b8b0ac9` adds this
+brief, and the only commit after it fills in this SHA line and the paragraph you are reading —
+`git diff b8b0ac9 HEAD` shows nothing else. `git rev-parse --short HEAD` on the branch gives that
+last commit.
 
 ---
 

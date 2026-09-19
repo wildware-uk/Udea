@@ -80,6 +80,7 @@ private fun Panels(session: EditorSession) {
         windows.dockToScreen(EditorTags.HISTORY_PANEL, DockSide.Right)
         windows.dockToScreen(EditorTags.ASSET_PANEL, DockSide.Right)
         windows.dockWith(InspectorTags.PANEL, EditorTags.HISTORY_PANEL, DockSide.Bottom)
+        if (session.animation != null) windows.dockToScreen(EditorTags.ANIMATION_PANEL, DockSide.Left)
     }
     val area = remember { ViewArea() }
     DebugWindowHost(Modifier.fillMaxSize().onPlaced(area.host), state = windows) {
@@ -97,6 +98,11 @@ private fun Panels(session: EditorSession) {
         }
         DebugWindow("Asset", id = EditorTags.ASSET_PANEL, modifier = Modifier.onPlaced(area.pane(EditorTags.ASSET_PANEL))) {
             AssetPanel(session.assets)
+        }
+        session.animation?.let { animation ->
+            DebugWindow("Animation", id = EditorTags.ANIMATION_PANEL, modifier = Modifier.onPlaced(area.pane(EditorTags.ANIMATION_PANEL))) {
+                AnimationPanel(animation)
+            }
         }
         DebugWindow("History", id = EditorTags.HISTORY_PANEL, modifier = Modifier.onPlaced(area.pane(EditorTags.HISTORY_PANEL))) {
             Column(Modifier.fillMaxWidth()) {

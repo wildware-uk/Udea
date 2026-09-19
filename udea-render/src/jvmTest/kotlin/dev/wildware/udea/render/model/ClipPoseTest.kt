@@ -176,6 +176,23 @@ class ClipPoseTest {
         assertEquals(first, listOf(pose.current, pose.currentTicks, pose.previous, pose.previousTicks, pose.weight))
     }
 
+    @Test
+    fun `a held pose is its clip at its time alone, clamped to the clip, whatever was set before`() {
+        // An editor's scrub preview (issue #243): no Animator, no tick, no alpha - the clip and the
+        // time the scrubber is at, and nothing fading.
+        val pose = ClipPose()
+        pose.set(Animator().apply { play(walk, at(0)); crossfade(run, at(20), over = Ticks(10L)) }, at(24), 0.3f)
+
+        pose.hold(walk, Ticks(17L))
+        assertEquals(listOf<Any>(walk.index, 17.0, ClipPlayback.NO_CLIP, 0.0, 1f), listOf(pose.current, pose.currentTicks, pose.previous, pose.previousTicks, pose.weight))
+        assertEquals((17.0 / SimClock.DEFAULT_TICK_RATE).toFloat(), pose.currentSeconds)
+
+        pose.hold(run, Ticks(500L))
+        assertEquals(run.length.count.toDouble(), pose.currentTicks, "a time past the clip's end is its end")
+        pose.hold(run, Ticks(-3L))
+        assertEquals(0.0, pose.currentTicks, "a time before the clip's start is its start")
+    }
+
     private companion object {
         /** An alpha just short of the next tick. */
         const val LATE_ALPHA = 0.999f

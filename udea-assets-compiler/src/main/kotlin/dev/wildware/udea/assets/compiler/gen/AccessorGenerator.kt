@@ -9,6 +9,7 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
+import com.squareup.kotlinpoet.joinToCode
 import dev.wildware.udea.assets.Ref
 import dev.wildware.udea.assets.compiler.scan.Declaration
 
@@ -107,8 +108,10 @@ public object AccessorGenerator {
                 model.fileArgument.orEmpty(),
             )
         val used = mutableSetOf<String>()
+        val members = ArrayList<String>(clips.size)
         for (clip in clips) {
             val member = clipMemberName(clip, used)
+            members += member
             clipsType.addProperty(
                 PropertySpec.builder(member, ANIMATION_CLIP)
                     .addKdoc("Animation %L of the file, %L ticks long.\n", clip.index, clip.ticks)
@@ -123,6 +126,13 @@ public object AccessorGenerator {
                     .build(),
             )
         }
+        // `all` is lower case and every clip's member starts with a capital, so the two never meet.
+        clipsType.addProperty(
+            PropertySpec.builder(ALL_CLIPS, LIST.parameterizedBy(ANIMATION_CLIP))
+                .addKdoc("Every clip above, in the file's order: what an editor lists for this model.\n")
+                .initializer("%M(%L)", LIST_OF, members.map { CodeBlock.of("%N", it) }.joinToCode())
+                .build(),
+        )
         val type = TypeSpec.objectBuilder(objectName)
             .addKdoc(
                 "The model `%L`, declared by `model(...)`: its animation clips, typed.\n\n" +
@@ -279,6 +289,11 @@ public object AccessorGenerator {
      */
     private val ANIMATION_CLIP = ClassName("dev.wildware.udea.core.spatial", "AnimationClip")
     private val TICKS = ClassName("dev.wildware.udea.core", "Ticks")
+    private val LIST = ClassName("kotlin.collections", "List")
+    private val LIST_OF = MemberName("kotlin.collections", "listOf")
+
+    /** The member of a model's `Clips` object that lists every clip (issue #243). */
+    private const val ALL_CLIPS = "all"
 
     /** The object inside a model's object that holds its clips: `Fox.Clips`. */
     private const val CLIPS_OBJECT = "Clips"

@@ -65,6 +65,8 @@ public class EditorSession(
     internal val views: EditorViews,
     /** What Play standalone hands the saved level to; `null` leaves that button out (issue #196). */
     standalone: StandaloneLauncher? = null,
+    /** The Animation panel's models and renderer; `null` leaves the panel out (issue #243). */
+    animation: EditorAnimation? = null,
 ) {
 
     /** The toolbar's Play, Stop, Step and Play standalone. */
@@ -92,6 +94,14 @@ public class EditorSession(
 
     /** The Inspector panel: what the selection shares, written to all of it at once. */
     internal val inspector: EditorInspector = EditorInspector(tools, selection)
+
+    /**
+     * The Animation panel, the scrub preview and the bone overlay, when the game has animated models
+     * (issue #243). Made before [init] wraps the Scene view's gizmo layer: the bone overlay goes on
+     * over whatever layer a launcher set, passing it every press, and the selection outline wraps both.
+     */
+    internal val animation: AnimationPanelState? =
+        animation?.let { AnimationPanelState(it, tools, views, selection, sceneChanged = { navigation.markMoved() }) }
 
     /** Which tab is showing. The Scene tab first: an editor opens on the editor's view. */
     internal var tab: EditorTab by mutableStateOf(EditorTab.Scene)
@@ -165,6 +175,7 @@ public class EditorSession(
         if (historyStale && !historyPending) readHistory()
         selection.frame(changed)
         inspector.frame(changed, tick())
+        animation?.frame()
         // Both asked every frame: each keeps what it last saw.
         val resized = resized()
         val due = redraw.due(tick(), completed) || resized

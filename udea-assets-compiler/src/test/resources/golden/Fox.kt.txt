@@ -9,6 +9,8 @@ package dev.wildware.udea.generated
 import dev.wildware.udea.core.Ticks
 import dev.wildware.udea.core.spatial.AnimationClip
 import kotlin.Suppress
+import kotlin.collections.List
+import kotlin.collections.listOf
 
 /**
  * The model `models/fox`, declared by `model(...)`: its animation clips, typed.
@@ -38,5 +40,10 @@ public object Fox {
          * Animation 2 of the file, 70 ticks long.
          */
         public val Run: AnimationClip = AnimationClip(index = 2, name = "Run", length = Ticks(70L))
+
+        /**
+         * Every clip above, in the file's order: what an editor lists for this model.
+         */
+        public val all: List<AnimationClip> = listOf(Survey, Walk, Run)
     }
 }

@@ -15,6 +15,7 @@ import dev.wildware.udea.render.draw.SpriteRegion
 import dev.wildware.udea.render.draw.SpriteTexture
 import dev.wildware.udea.render.kool.Letterbox
 import dev.wildware.udea.render.kool.ViewportPass
+import dev.wildware.udea.render.model.ModelPreview
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 
@@ -86,6 +87,21 @@ public class WorldViewport internal constructor(
      * is turned on - and even then they are only drawn there, never pressed.
      */
     public var showGizmos: Boolean = camera != null
+
+    /**
+     * What this view shows in place of the simulated pose (issue #243): a scrub preview of one
+     * entity, or a model asset on its own. A view setting like [camera], so it changes this view's
+     * picture and nothing else - see [ModelPreview]. `null`, the default, shows the world as
+     * simulated. Render thread.
+     *
+     * @throws IllegalArgumentException when set on the Game tab: that tab is the capturable frame,
+     *   which shows the simulation and nothing else.
+     */
+    public var modelPreview: ModelPreview? = null
+        set(value) {
+            require(value == null || camera != null) { "$this is the Game tab, which shows the simulated pose only" }
+            field = value
+        }
 
     /**
      * The render systems this view draws that can say where their entities are ([PickBounds]), in

@@ -565,6 +565,70 @@ class ModuleGraphRulesTest {
     }
 
     @Test
+    fun `UDEA-MG-002 lets the asset build resolve the FBX converter and nothing else of LWJGL`() {
+        // Issue #244: the asset compiler converts `.fbx` to `.glb` with Assimp, through LWJGL's
+        // binding, and `udea-gradle` carries the compiler. Those two artifacts, on those two
+        // modules, are the whole exemption: a GL binding on the same classpath still fails.
+        ModuleGraphRules.MODEL_CONVERTER_PROJECTS.forEach { project ->
+            val violations = violate(
+                project,
+                "runtimeClasspath",
+                graph(project, "org.lwjgl:lwjgl", "org.lwjgl:lwjgl-assimp", "org.lwjgl:lwjgl-opengl", "de.fabmax.kool:kool-core"),
+            )
+            assertEquals(
+                listOf("de.fabmax.kool:kool-core", "org.lwjgl:lwjgl-opengl"),
+                violations.filter { it.ruleId == RuleId("UDEA-MG-002") }.map { it.coordinate },
+                project,
+            )
+        }
+        assertEquals(listOf(":udea-assets-compiler", ":udea-gradle"), ModuleGraphRules.MODEL_CONVERTER_PROJECTS.sorted())
+    }
+
+    @Test
+    fun `UDEA-MG-002 still refuses the FBX converter on every other headless module`() {
+        (ModuleGraphRules.HEADLESS_PROJECTS - ModuleGraphRules.MODEL_CONVERTER_PROJECTS).forEach { project ->
+            val violations = violate(project, "compileClasspath", graph(project, "org.lwjgl:lwjgl", "org.lwjgl:lwjgl-assimp"))
+                .filter { it.ruleId == RuleId("UDEA-MG-002") }
+            assertEquals(listOf("org.lwjgl:lwjgl", "org.lwjgl:lwjgl-assimp"), violations.map { it.coordinate }, project)
+        }
+    }
+
+    @Test
+    fun `UDEA-MG-013 fails an Assimp binding on every runtime module and every game classpath`() {
+        // The GL-allowed modules and the game are where UDEA-MG-002 says nothing about LWJGL, so
+        // they are the projects this rule exists for; the headless ones are covered twice.
+        val governed = ModuleGraphRules.HEADLESS_PROJECTS + ModuleGraphRules.GL_ALLOWED_PROJECTS +
+            listOf(":moba:game", ":moba:desktop", ":moba:android") - ModuleGraphRules.MODEL_CONVERTER_PROJECTS
+        governed.forEach { project ->
+            listOf("compileClasspath", "runtimeClasspath").forEach { configuration ->
+                val violations = violate(project, configuration, graph(project, "org.lwjgl:lwjgl-assimp", "com.example:jassimp"))
+                    .filter { it.ruleId == RuleId("UDEA-MG-013") }
+                assertEquals(
+                    listOf("com.example:jassimp", "org.lwjgl:lwjgl-assimp"),
+                    violations.map { it.coordinate },
+                    "$project $configuration",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `UDEA-MG-013 leaves the asset build itself alone, and Kool's own LWJGL`() {
+        ModuleGraphRules.MODEL_CONVERTER_PROJECTS.forEach { project ->
+            assertTrue(
+                violate(project, "runtimeClasspath", graph(project, "org.lwjgl:lwjgl-assimp"))
+                    .none { it.ruleId == RuleId("UDEA-MG-013") },
+                project,
+            )
+        }
+        // The renderer and the game resolve LWJGL through Kool; that is not the converter.
+        assertTrue(
+            violate(":moba:desktop", "runtimeClasspath", graph(":moba:desktop", "org.lwjgl:lwjgl", "org.lwjgl:lwjgl-opengl"))
+                .isEmpty(),
+        )
+    }
+
+    @Test
     fun `every rule governs at least one project settings_gradle_kts includes`() {
         // A rule scoped only to projects that do not exist scans nothing and passes for ever,
         // and nothing about it looks wrong: `udeaVerifyModuleGraph` is green because there is no

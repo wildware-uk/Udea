@@ -130,6 +130,40 @@ public object ModuleGraphRules {
     )
 
     /**
+     * The build-time modules that run the FBX converter (issue #244), and the only ones that may
+     * resolve it: `udea-assets-compiler`, which converts an `.fbx` to a `.glb` with Assimp, and
+     * `udea-gradle`, which carries the compiler on its classpath and forks it.
+     *
+     * Both are in [HEADLESS_PROJECTS] and stay there. Assimp is a model importer and not a
+     * renderer, but it arrives through LWJGL's binding, and `UDEA-MG-002` bans every `org.lwjgl`
+     * artifact; so [NO_GL_OUTSIDE_RENDER] excuses exactly [MODEL_CONVERTER_ARTIFACTS] on exactly
+     * these two, and a GL binding on either still fails. [NO_MODEL_CONVERTER_AT_RUN_TIME] is the
+     * other half: Assimp on any other classpath fails. `udeaVerifyHeadless` reads the same set,
+     * through [MODEL_CONVERTER_PROPERTY], to excuse the converter's class references.
+     */
+    public val MODEL_CONVERTER_PROJECTS: Set<String> = setOf(":udea-assets-compiler", ":udea-gradle")
+
+    /** LWJGL's core, which loads native libraries, and its Assimp binding. Nothing else of LWJGL. */
+    private val MODEL_CONVERTER_ARTIFACTS: List<CoordinatePattern> = listOf(
+        CoordinatePattern("org.lwjgl:lwjgl"),
+        CoordinatePattern("org.lwjgl:lwjgl-assimp"),
+    )
+
+    /**
+     * The class-file namespace the converter's code names, excused by `udeaVerifyHeadless` in the
+     * [MODEL_CONVERTER_PROJECTS] that compile it. `org/lwjgl/opengl/` and every other GL package
+     * stay banned there.
+     */
+    public const val MODEL_CONVERTER_NAMESPACE: String = "org/lwjgl/assimp/"
+
+    /**
+     * The system property `udea-render`'s build script uses to hand [MODEL_CONVERTER_PROJECTS]
+     * and [MODEL_CONVERTER_NAMESPACE] to the bytecode scan, for the reason
+     * [HEADLESS_MODULES_PROPERTY] exists.
+     */
+    public const val MODEL_CONVERTER_PROPERTY: String = "udea.headless.modelConverter"
+
+    /**
      * The system property `udea-render`'s build script uses to hand [HEADLESS_PROJECTS] to
      * the bytecode scan.
      *
@@ -205,6 +239,7 @@ public object ModuleGraphRules {
         projects = HEADLESS_PROJECTS,
         configurations = setOf("compileClasspath", "runtimeClasspath"),
         banned = RENDERER_ARTIFACTS,
+        allowedIn = MODEL_CONVERTER_PROJECTS.associateWith { MODEL_CONVERTER_ARTIFACTS },
     )
 
     /**
@@ -416,6 +451,36 @@ public object ModuleGraphRules {
         banned = RENDERER_ARTIFACTS,
     )
 
+    /**
+     * An `.fbx` becomes a `.glb` while the game builds, and never while it runs (issue #244).
+     *
+     * Kool reads glTF and nothing else, so the asset compiler converts every `.fbx` model with
+     * Assimp and the game is given the `.glb`. The converter is native code the size of a small
+     * game, and a runtime module that could name it could start importing models at run time -
+     * the path the design rejects, because the build is where a broken model fails with a
+     * diagnostic. So an Assimp binding, LWJGL's or any other, is banned from every runtime
+     * module's and every game project's classpath, and allowed in [MODEL_CONVERTER_PROJECTS] alone.
+     *
+     * A game's `agent` and `editor` source sets are not among [CONFIGURATIONS], and `:moba:desktop`'s
+     * `agent` source set does carry the converter: it runs the asset daemon, which is the asset
+     * compiler, in process, as it already carries the Kotlin compiler. `UDEA-REL-002` keeps that
+     * source set out of every release, and this rule's `runtimeClasspath` is the one that ships.
+     */
+    public val NO_MODEL_CONVERTER_AT_RUN_TIME: DependencyRule = DependencyRule(
+        id = RuleId("UDEA-MG-013"),
+        summary = "no runtime module and no game classpath resolves the FBX converter; only the asset build may",
+        rationale = "An .fbx model is converted to glTF by the asset compiler, with Assimp, and the game " +
+            "is given the .glb (issue #244). Nothing that runs the game may carry the converter: a " +
+            "runtime import is the path the design rejects, because a model that does not convert " +
+            "must fail the build with a diagnostic, not a player's session. Every Assimp binding is " +
+            "banned from every engine runtime module and every game project, on the compile and " +
+            "runtime classpaths; the asset compiler and udea-gradle, which carries it, are the exceptions.",
+        specSection = "issue #244",
+        projects = HEADLESS_PROJECTS + GL_ALLOWED_PROJECTS + MOBA_PROJECTS - MODEL_CONVERTER_PROJECTS,
+        configurations = setOf("compileClasspath", "runtimeClasspath"),
+        banned = listOf(CoordinatePattern("*:*assimp*")),
+    )
+
     /** Every rule, in id order. */
     public val ALL: List<DependencyRule> = listOf(
         ANNOTATIONS_ARE_A_LEAF,
@@ -428,6 +493,7 @@ public object ModuleGraphRules {
         NO_LIBGDX,
         NO_EDITOR_ON_A_SHIPPED_CLASSPATH,
         EDITOR_NAMES_NO_RENDERER,
+        NO_MODEL_CONVERTER_AT_RUN_TIME,
     )
 
     /**

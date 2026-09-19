@@ -56,6 +56,7 @@ import java.nio.file.Path
 import javax.imageio.ImageIO
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -205,6 +206,30 @@ class GlAnimationPreviewTest {
                 assertTrue(joints.size >= MIN_JOINTS, "the fox's skeleton has ${joints.size} joints")
                 assertEquals(joints.size, dotted, "at clip tick $at not every joint has its dot where the Scene camera puts it")
                 assertTrue(onFox >= joints.size * ON_FOX_SHARE, "at clip tick $at only $onFox of ${joints.size} joints are on the fox")
+
+                // A line from each joint up to the one it hangs from: yellow halfway along every bone
+                // long enough on screen for its middle to be clear of both dots.
+                val hanging = joints.filter { it[3].toInt() != ModelSkeleton.ROOT }
+                assertTrue(hanging.size >= joints.size / 2, "at clip tick $at only ${hanging.size} of ${joints.size} joints hang from another")
+                var bones = 0
+                var lined = 0
+                for (joint in hanging) {
+                    val parent = joints[joint[3].toInt()]
+                    val a = ViewPoint()
+                    val b = ViewPoint()
+                    backend.onRenderThread {
+                        scene.project(joint[0], joint[1], joint[2], a)
+                        scene.project(parent[0], parent[1], parent[2], b)
+                    }
+                    if (hypot(a.x - b.x, a.y - b.y) < MIN_BONE_PIXELS) continue
+                    bones++
+                    val x = ((a.x + b.x) / 2f).toInt()
+                    val y = picture.height - 1 - ((a.y + b.y) / 2f).toInt()
+                    if (near(picture, x, y, LINE_REACH, ::isMark)) lined++
+                }
+                println("GlAnimationPreviewTest: clip tick $at: $lined of $bones bones drawn")
+                assertTrue(bones >= MIN_BONES, "at clip tick $at only $bones bones are long enough to see")
+                assertEquals(bones, lined, "at clip tick $at not every bone has its line")
                 assertEquals(0, count(poses.getValue(at).capture, ::isMark), "the bone overlay reached the capturable frame")
             }
             val travelled = skeletons.getValue(first).zip(skeletons.getValue(last)).maxOf { (a, b) -> distance(a, b) }
@@ -270,7 +295,7 @@ class GlAnimationPreviewTest {
         backend.onRenderThread {
             val out = ModelSkeleton()
             check(models.skeletonOf(id, views.scene, out)) { "the renderer has no skeleton for the fox" }
-            List(out.size) { floatArrayOf(out.x(it), out.y(it), out.z(it)) }
+            List(out.size) { floatArrayOf(out.x(it), out.y(it), out.z(it), out.parent(it).toFloat()) }
         }
 
     private fun awaitFox(capture: () -> BufferedImage) {
@@ -379,6 +404,15 @@ class GlAnimationPreviewTest {
 
         /** The share of joints that must be on the fox's silhouette. */
         const val ON_FOX_SHARE = 0.9
+
+        /** A bone shorter than this on screen has its middle under its two dots. */
+        const val MIN_BONE_PIXELS = 16f
+
+        /** A bone's middle is on its line within this many pixels. */
+        const val LINE_REACH = 1
+
+        /** The fox's legs, spine and tail each have bones longer than that. */
+        const val MIN_BONES = 8
 
         /** World units the farthest-moving joint must travel between two clip times a half stride apart. */
         const val MIN_JOINT_TRAVEL = 0.05f

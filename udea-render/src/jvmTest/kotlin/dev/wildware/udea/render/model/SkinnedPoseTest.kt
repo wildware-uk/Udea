@@ -49,6 +49,26 @@ class SkinnedPoseTest {
     }
 
     @Test
+    fun `the skeleton the bone overlay reads is the skin's one tree, each joint hanging from the one above it`() {
+        val node = node()
+        val joints = skinJointsOf(node, fox.gltf)
+        assertEquals(node.skins.single().nodes.size, joints.size, "one entry per joint of the skin")
+        val roots = joints.indices.filter { joints[it].parent == ModelSkeleton.ROOT }
+        assertEquals(1, roots.size, "the Fox's skin has one root joint, found ${roots.size}")
+        for (index in joints.indices) {
+            // Up from every joint to the root, never through itself: a tree, not a cycle.
+            var at = index
+            var steps = 0
+            while (joints[at].parent != ModelSkeleton.ROOT) {
+                at = joints[at].parent
+                steps++
+                assertTrue(steps <= joints.size, "joint $index never reaches the root")
+            }
+            assertEquals(roots.single(), at)
+        }
+    }
+
+    @Test
     fun `a clip moves the head, and the same clip time puts it back`() {
         val node = node()
         val animator = Animator().apply { play(survey, at(0)) }

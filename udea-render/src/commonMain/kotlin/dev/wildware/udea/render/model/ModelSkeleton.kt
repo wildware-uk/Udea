@@ -5,7 +5,7 @@ import de.fabmax.kool.math.MutableVec3f
 import de.fabmax.kool.math.Vec3f
 import de.fabmax.kool.scene.Mesh
 import de.fabmax.kool.scene.Model as KoolModel
-import de.fabmax.kool.scene.Node
+import de.fabmax.kool.modules.gltf.GltfFile
 import de.fabmax.kool.scene.animation.Skin
 
 /**
@@ -85,35 +85,60 @@ internal class SkinJoint(
     val mesh: Mesh<*>,
     val bindOrigin: Vec3f,
     val parent: Int,
+    /** The joint's node in the glTF file. */
+    val node: Int,
 )
 
 /**
  * The joints of every skin in [model] that a mesh of [model] is skinned by, in skin order. A joint
  * two skins share is listed once, from the first. Empty for a model with no skin.
+ *
+ * [model] is a node made from [gltf], and which joint hangs from which is read from [gltf]'s own
+ * node tree: the Kool node a joint drives is not reliably under its parent joint's node (the Fox's
+ * are all parentless), and a skin keeps its own tree private. Kool makes one skin for each of the
+ * file's skins with inverse bind matrices, in the file's order, and lists a skin's joints in the
+ * order the file does, so the two line up index for index.
  */
-internal fun skinJointsOf(model: KoolModel): List<SkinJoint> {
+internal fun skinJointsOf(model: KoolModel, gltf: GltfFile): List<SkinJoint> {
+    // A node made without the file's animations has no skins at all.
+    if (model.skins.isEmpty()) return emptyList()
+    val fileSkins = gltf.skins.filter { it.inverseBindMatrices >= 0 }
+    check(fileSkins.size == model.skins.size) { "${model.skins.size} skins made from ${fileSkins.size} in the file" }
+    val parentNode = IntArray(gltf.nodes.size) { NO_NODE }
+    gltf.nodes.forEachIndexed { index, node -> for (child in node.children) parentNode[child] = index }
+
     val joints = ArrayList<SkinJoint>()
-    val indexOf = HashMap<Node, Int>()
+    val indexOfNode = HashMap<Int, Int>()
     val bind = MutableMat4f()
-    for (skin in model.skins) {
+    for ((skinIndex, skin) in model.skins.withIndex()) {
         val mesh = model.meshes.values.firstOrNull { it.skin === skin } ?: continue
+        val fileJoints = fileSkins[skinIndex].joints
+        check(fileJoints.size == skin.nodes.size) { "a skin of ${skin.nodes.size} joints made from ${fileJoints.size}" }
         val first = joints.size
-        for (skinNode in skin.nodes) {
-            if (skinNode.joint in indexOf) continue
-            indexOf[skinNode.joint] = joints.size
+        for ((place, skinNode) in skin.nodes.withIndex()) {
+            val node = fileJoints[place]
+            if (node in indexOfNode) continue
+            indexOfNode[node] = joints.size
             // The inverse bind matrix takes a vertex into the joint's space; its inverse takes the
             // joint's own origin back to where the joint rests in the mesh.
             skinNode.inverseBindMatrix.invert(bind)
             val origin = bind.transform(MutableVec3f(), 1f)
-            joints += SkinJoint(skinNode, mesh, origin, ModelSkeleton.ROOT)
+            joints += SkinJoint(skinNode, mesh, origin, ModelSkeleton.ROOT, node)
         }
-        // Parents once every joint of the skin has its index, whatever order the skin lists them in.
+        // Parents once every joint of the skin has its index, whatever order the skin lists them in:
+        // the nearest joint above in the file's tree, through any node that is not a joint. A file's
+        // nodes are a tree, so the walk is bounded by its size even in one that is not.
         for (index in first until joints.size) {
             val joint = joints[index]
-            var above = joint.skinNode.joint.parent
-            while (above != null && above !in indexOf) above = above.parent
-            if (above != null) joints[index] = SkinJoint(joint.skinNode, joint.mesh, joint.bindOrigin, indexOf.getValue(above))
+            var above = parentNode[joint.node]
+            var steps = 0
+            while (above != NO_NODE && above !in indexOfNode && steps++ < parentNode.size) above = parentNode[above]
+            val parent = indexOfNode[above] ?: continue
+            joints[index] = SkinJoint(joint.skinNode, joint.mesh, joint.bindOrigin, parent, joint.node)
         }
     }
     return joints
 }
+
+/** A glTF node with no parent: a scene root. */
+private const val NO_NODE = -1

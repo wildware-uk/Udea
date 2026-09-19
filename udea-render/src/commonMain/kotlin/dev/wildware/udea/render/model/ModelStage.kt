@@ -387,7 +387,7 @@ internal class ModelStage(
         private val shaders = node.meshes.values.mapNotNull { it.shader as? KslPbrShader }
 
         /** The skin's joints, read the first time a skeleton is asked for: most nodes never are. */
-        private val joints: List<SkinJoint> by lazy { skinJointsOf(node) }
+        private val joints: List<SkinJoint> by lazy { skinJointsOf(node, model.gltf) }
 
         fun setAmbient() {
             for (index in shaders.indices) shaders[index].ambientFactor = ambient

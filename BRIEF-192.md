@@ -1,4 +1,4 @@
-3d2197a
+ab19e5f
 
 # BRIEF-192: boot moba from a saved level file, and ban loops in asset scripts
 
@@ -9,10 +9,16 @@ Branch `issue-192-binary-test-level-kmp`, worktree
 - `7d73496` (#228, named keys) at `312bd31`, with the replay fixtures regenerated inside that
   merge.
 
-Round 1's review found one gap: the loop ban missed `kotlin.repeat(...)` and an aliased import of
-`kotlin.repeat`. The fix is `3d2197a`, which is the SHA above and the last code commit. It
-touches only the scanner and `LoopInAssetTest`; section 2 and section 5 (AC2) cover it. This
-brief is committed on top of it and changes no code.
+`ab19e5f` is the last code commit. This brief is committed on top of it and changes no code.
+
+**Rounds.**
+- Round 1's review found one gap: the loop ban missed `kotlin.repeat(...)` and an aliased import
+  of `kotlin.repeat`. `3d2197a` fixed that in the syntactic scanner (pass 1).
+- The owner then asked for a smarter check. `a6146ec` to `ab19e5f` add one: a K2 compiler
+  checker that decides by what a call **resolves to**, running inside the real asset compile
+  (pass 2). Pass 1 stays as early feedback. Section 2 has the spike, the design and the gaps.
+- Everything round 1 passed is unchanged: the level file, `-Plevel`, the roster test, the boot
+  shots and the replay fixtures. `origin/kmp` has not moved since `7d73496`.
 
 Scratch artefacts quoted below are in
 `/tmp/claude-1000/-srv-ssd1-workspace-Udea/1ad8c5e6-2def-4055-91d2-72acdfe77daf/scratchpad/issue192/`
@@ -27,6 +33,8 @@ JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem ANDROID_HOME=$HOME/Android/S
                      --tests dev.wildware.moba.level.MobaLevelLaunchTest \
   :udea-assets-compiler:test --tests dev.wildware.udea.assets.compiler.scan.LoopInAssetTest \
                              --tests dev.wildware.udea.assets.compiler.daemon.AssetDaemonTest \
+                             --tests dev.wildware.udea.assets.compiler.AssetLoopResolutionTest \
+  :udea-compiler-plugin:test --tests dev.wildware.udea.compiler.fir.UdeaAssetLoopCheckerTest \
   --continue
 ```
 
@@ -41,31 +49,53 @@ What each part holds:
   named at launch boots, and a match restart comes back into it. The level's clock and random
   streams come back with it. A missing path fails and names the path.
 - `LevelSceneTest` is the `udea-core` scene that puts a saved level back into the world.
-- `LoopInAssetTest` and `AssetDaemonTest` cover the loop rule, in the build and in the live
-  editor path. This is AC2's rule.
+- `AssetLoopResolutionTest` is AC2's rule as the compiler sees it: each script goes through the
+  real asset compile, with the plugin's checker in it. Bare `repeat`, `kotlin.repeat`, an aliased
+  import, `forEach` over a range, a helper of the script's own, `for`/`while`/`do-while`,
+  recursion, the build's own two-pass path, and the negatives (`let`, `apply`, `also`, `run`,
+  `with`, `takeIf` and the asset DSL's builders).
+- `UdeaAssetLoopCheckerTest` is the scope: the same shapes in ordinary Kotlin source compile
+  clean, so the checker touches asset scripts only.
+- `LoopInAssetTest` is pass 1, the early check. `AssetDaemonTest` is the live editor path.
 
-**Green at `3d2197a`**, from `$S/evidence-r2.log` and the JUnit XML it left. I ran it with
-`--rerun` added, so every test ran again rather than coming from the cache; the timestamps
-show they ran in that invocation:
+**Green at `ab19e5f`**, from `$S/evidence-r5.log`, run with `--rerun-tasks` added so every task
+executed in that invocation. The JUnit suite lines below are from that run's XML, copied into
+`$S/evidence-r5-suites.txt` straight afterwards: the log was last written at 03:27:50 and every
+timestamp is inside its 36 seconds. One
+skip in `AssetLoopResolutionTest` is expected: the degrade test runs only with the plugin off
+(section 3).
 
 ```
-BUILD SUCCESSFUL in 13s
+BUILD SUCCESSFUL in 36s
+146 actionable tasks: 146 executed
+Configuration cache entry reused.
 ```
 ```
-<testsuite name="dev.wildware.udea.core.level.LevelSceneTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:40:52.403Z"
-<testsuite name="dev.wildware.moba.level.TestLevelRosterTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:40:52.916Z"
-<testsuite name="dev.wildware.moba.level.MobaLevelLaunchTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:40:52.457Z"
-<testsuite name="dev.wildware.udea.assets.compiler.scan.LoopInAssetTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:41:00.628Z"
-<testsuite name="dev.wildware.udea.assets.compiler.daemon.AssetDaemonTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:40:52.391Z"
+<testsuite name="dev.wildware.udea.core.level.LevelSceneTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:27:39.584Z"
+<testsuite name="dev.wildware.moba.level.TestLevelRosterTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:27:48.155Z"
+<testsuite name="dev.wildware.moba.level.MobaLevelLaunchTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:27:47.759Z"
+<testsuite name="dev.wildware.udea.assets.compiler.scan.LoopInAssetTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:27:46.195Z"
+<testsuite name="dev.wildware.udea.assets.compiler.daemon.AssetDaemonTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:27:39.315Z"
+<testsuite name="dev.wildware.udea.assets.compiler.AssetLoopResolutionTest" tests="11" skipped="1" failures="0" errors="0" timestamp="2026-09-19T03:27:31.867Z"
+<testsuite name="dev.wildware.udea.compiler.fir.UdeaAssetLoopCheckerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:27:21.399Z"
 ```
 
-**Red when the feature is reverted.** I ran each mutation below against this command before the
-merge, and restored it afterwards. Each diff is the literal `git diff` I saved at the time, and
-the failing tests are spliced from that run's log. The `index` line of each diff names the
-mutated file's starting blob. For mut1 to mut5, each of those blobs is the same at `a0a9c1b`,
-`adee707` and `312bd31`. So every mutation applies unchanged to `312bd31`. mut1, mut2, mut4
-and mut5 also apply unchanged to the SHA above. mut3's line still exists there. mut6 to mut8 are
-round 1's, made against `3d2197a`.
+**Red when the feature is reverted.** Each mutation below is the literal `git diff` I saved at
+the time, and the failing tests are spliced from that run's log. The `index` line of each diff
+names the mutated file's starting blob, and every one of those blobs is the file as it is at
+`ab19e5f` (`$S/blobcheck.txt`, all `SAME`). So every diff applies to the SHA above. When each
+ran:
+- mut1, mut2 and mut5 ran before the merges.
+- mut9 to mut12 and mut14 to mut16 ran at `ac9058f`. `AssetLoopResolutionTest` was shorter
+  then, so its line numbers in those logs are lower than today's.
+- mut13 and mut17 ran at `f9974a5`.
+- mut4b ran on the tree then committed as `2cbe5ca`. mut18, mut3 and mut6 to mut8 ran at
+  `ab19e5f`.
+
+(The round-1 brief's mut4 is dropped. mut4b replaces it, against a test that only pass 1 can
+satisfy.)
+
+### The level
 
 **mut1: boot no longer loads the level** (`$S/mut1.diff`, `$S/mut1.log`)
 ```diff
@@ -106,55 +136,6 @@ TestLevelRosterTest > a boot places every unit where the authored test level pla
 5 tests completed, 1 failed
 ```
 
-**mut3: the scanner no longer looks for loops** (`$S/mut3.diff`, `$S/mut3.log`)
-```diff
-diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
-index b90d27a..b22f40f 100644
---- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
-+++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
-@@ -268,7 +268,6 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
-             collectFileConstants(statements)
-             statements.forEach { visitStatement(it, emptyMap()) }
-             collectReferences(ktFile)
--            collectLoops(ktFile)
-         }
- 
-         /**
-```
-```
-AssetDaemonTest > a loop in an edited script is rejected with the loop rule at the loop() FAILED
-...
-LoopInAssetTest > a repeat is an error that points at the repeat(Path) FAILED
-...
-LoopInAssetTest > for, while and do-while are errors too, each at its own line(Path) FAILED
-...
-LoopInAssetTest > a loop inside a declaration's lambda is found(Path) FAILED
-...
-14 tests completed, 4 failed
-```
-
-**mut4: the live daemon drops pass 1's diagnostics again** (`$S/mut4.diff`, `$S/mut4.log`)
-```diff
-diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
-index fdd5e89..133ab21 100644
---- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
-+++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
-@@ -280,7 +280,7 @@ public class AssetDaemon(
-         // Pass 1's own diagnostics first, as `AssetPipeline.compileAndValidate` reports them: a
-         // script the build refuses in its syntactic pass - a loop (issue #192) - must not be one
-         // the live daemon applies.
--        return scan.diagnostics + result.diagnostics
-+        return result.diagnostics
-     }
- 
-     /**
-```
-```
-AssetDaemonTest > a loop in an edited script is rejected with the loop rule at the loop() FAILED
-...
-14 tests completed, 1 failed
-```
-
 **mut5: a loaded level gets its `NetId`s in the wrong order** (`$S/mut5.diff`, `$S/mut5.log`)
 ```diff
 diff --git a/udea-core/src/commonMain/kotlin/dev/wildware/udea/core/level/LevelService.kt b/udea-core/src/commonMain/kotlin/dev/wildware/udea/core/level/LevelService.kt
@@ -180,15 +161,354 @@ Only `LevelSceneTest` catches mut5. The moba tests stay green under it: at boot,
 bound by `LevelService.load`, which restores the saved bindings, so the only path that uses
 `populate`'s order alone is a match restart. No moba test compares ids across a restart.
 
-Round 1 added mut6 to mut8. Each one removes one part of the fix for `kotlin.repeat`.
+### The loop checker (pass 2, the guarantee)
+
+**mut9: the checker no longer sees loop keywords** (`$S/mut9.diff`, `$S/mut9.log`)
+```diff
+diff --git a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaFirExtensionRegistrar.kt b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaFirExtensionRegistrar.kt
+index f419790..c18c5dd 100644
+--- a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaFirExtensionRegistrar.kt
++++ b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaFirExtensionRegistrar.kt
+@@ -84,6 +84,6 @@ internal class UdeaFirAdditionalCheckers(
+ 
+         /** Issue #192: loops in a `.udea.kts`. [UdeaAssetLoopChecker] is silent in any other file. */
+         override val loopExpressionCheckers: Set<FirExpressionChecker<FirLoop>> =
+-            setOf(UdeaAssetLoopChecker.Loops)
++            emptySet()
+     }
+ }
+```
+```
+AssetLoopResolutionTest > a helper that loops inside is refused at the loop and at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:117
+
+AssetLoopResolutionTest > for, while and do-while are refused, each at its own keyword() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:131
+
+9 tests completed, 2 failed
+```
+
+**mut10: contracts are ignored, so every lambda is a loop** (`$S/mut10.diff`, `$S/mut10.log`)
+```diff
+diff --git a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
+index 1496934..16d90c0 100644
+--- a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
++++ b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
+@@ -105,7 +105,7 @@ internal object UdeaAssetLoopChecker {
+             if (callee.hasAnnotation(UdeaAnnotations.ASSET_DSL, context.session)) return
+ 
+             val mapping = expression.resolvedArgumentMapping ?: return
+-            val runsOnce = parametersRunAtMostOnce(callee)
++            val runsOnce = emptySet<Int>()
+             val repeatable = mapping.values.any { parameter ->
+                 parameter.returnTypeRef.coneType.isSomeFunctionType(context.session) &&
+                     callee.valueParameterSymbols.indexOf(parameter.symbol) !in runsOnce
+```
+```
+AssetLoopResolutionTest > scope functions and the asset DSL's own builders are not loops() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:184
+
+9 tests completed, 1 failed
+```
+
+**mut11: `@AssetDsl` is ignored** (`$S/mut11.diff`, `$S/mut11.log`)
+```diff
+diff --git a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
+index 1496934..05136cd 100644
+--- a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
++++ b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
+@@ -102,7 +102,6 @@ internal object UdeaAssetLoopChecker {
+                 report(expression.source, "`$name` calls itself, which is a loop in an asset script.")
+                 return
+             }
+-            if (callee.hasAnnotation(UdeaAnnotations.ASSET_DSL, context.session)) return
+ 
+             val mapping = expression.resolvedArgumentMapping ?: return
+             val runsOnce = parametersRunAtMostOnce(callee)
+```
+```
+AssetLoopResolutionTest > scope functions and the asset DSL's own builders are not loops() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:184
+
+9 tests completed, 1 failed
+```
+
+**mut12: recursion is no longer a loop** (`$S/mut12.diff`, `$S/mut12.log`)
+```diff
+diff --git a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
+index 1496934..e617631 100644
+--- a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
++++ b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
+@@ -98,10 +98,6 @@ internal object UdeaAssetLoopChecker {
+             val callee = expression.calleeReference.toResolvedCallableSymbol() as? FirFunctionSymbol<*> ?: return
+             val name = callee.name.asString()
+ 
+-            if (context.containingDeclarations.any { it == callee }) {
+-                report(expression.source, "`$name` calls itself, which is a loop in an asset script.")
+-                return
+-            }
+             if (callee.hasAnnotation(UdeaAnnotations.ASSET_DSL, context.session)) return
+ 
+             val mapping = expression.resolvedArgumentMapping ?: return
+```
+```
+AssetLoopResolutionTest > a function that calls itself is refused at the recursive call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:152
+
+9 tests completed, 1 failed
+```
+
+**mut15: the checker forgets it is scoped to asset scripts** (`$S/mut15.diff`, `$S/mut15.log`)
+```diff
+diff --git a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
+index 1496934..a903443 100644
+--- a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
++++ b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaAssetLoopChecker.kt
+@@ -67,7 +67,7 @@ internal object UdeaAssetLoopChecker {
+         "declaration out, or keep a level's units in a `.udealevel` file."
+ 
+     context(context: CheckerContext)
+-    private fun inAssetScript(): Boolean = context.containingFile?.name?.endsWith(SCRIPT_SUFFIX) == true
++    private fun inAssetScript(): Boolean = true
+ 
+     context(context: CheckerContext, reporter: DiagnosticReporter)
+     private fun report(source: KtSourceElement?, detail: String) {
+```
+```
+UdeaAssetLoopCheckerTest > loops, repeat, forEach and recursion in ordinary source are not asset loops() FAILED
+    org.opentest4j.AssertionFailedError at UdeaAssetLoopCheckerTest.kt:19
+
+1 test completed, 1 failed
+```
+
+**mut16: the rule id is not read back out of the compiler's message**, so every refusal
+arrives as a generic compile failure (`$S/mut16.diff`, `$S/mut16.log`)
+```diff
+diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/AssetCompiler.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/AssetCompiler.kt
+index e20fa24..bfeb0f1 100644
+--- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/AssetCompiler.kt
++++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/AssetCompiler.kt
+@@ -307,7 +307,7 @@ public class AssetCompiler(
+         // `udea-compiler-plugin` prints `"<id>: <detail>"`; a registered id is that rule, and the
+         // prefix is dropped so the message reads the same as the one pass 1 would have written.
+         val ruleId = RULE_PREFIX.find(message)?.groupValues?.get(1)
+-        val rule = ruleId?.let { UdeaRules.byId(it) }
++        val rule = ruleId?.let { null as dev.wildware.udea.diagnostics.UdeaRule? }
+         return (rule ?: AssetCompilerRules.SCRIPT_COMPILATION_FAILED).diagnostic(
+             message = if (rule == null) message else message.substringAfter(": "),
+             span = SourceSpan(
+```
+```
+AssetLoopResolutionTest > a repeat qualified with its package is refused() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:65
+
+AssetLoopResolutionTest > a helper of the script's own that runs its lambda twice is refused at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:98
+
+AssetLoopResolutionTest > a repeat imported under another name is refused at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:74
+
+AssetLoopResolutionTest > a function that calls itself is refused at the recursive call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:152
+
+AssetLoopResolutionTest > a helper that loops inside is refused at the loop and at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:117
+
+AssetLoopResolutionTest > forEach over a range is refused() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:80
+
+AssetLoopResolutionTest > a bare repeat is refused at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:54
+
+AssetLoopResolutionTest > for, while and do-while are refused, each at its own keyword() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:131
+
+9 tests completed, 8 failed
+```
+
+### How the checker reaches the asset compile
+
+**mut13: the asset compiler no longer carries the plugin** (`$S/mut13.diff`, `$S/mut13.log`)
+```diff
+diff --git a/udea-assets-compiler/build.gradle.kts b/udea-assets-compiler/build.gradle.kts
+index 7ba6012..27b07ba 100644
+--- a/udea-assets-compiler/build.gradle.kts
++++ b/udea-assets-compiler/build.gradle.kts
+@@ -39,7 +39,6 @@ dependencies {
+     // It follows `-Pudea.compilerPlugin.enabled` like every other use of the plugin, so the
+     // degrade procedure in `docs/compiler-plugin.md` takes it out of the asset compile too: a
+     // Kotlin release that breaks the plugin must not break every asset build with it.
+-    if (compilerPluginEnabled) runtimeOnly(project(":udea-compiler-plugin"))
+     // `@AssetDsl`, the asset DSL's once-only lambda promise the plugin's loop checker trusts.
+     implementation(project(":udea-annotations"))
+ 
+```
+```
+AssetLoopResolutionTest > a repeat qualified with its package is refused() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:85
+
+AssetLoopResolutionTest > a helper of the script's own that runs its lambda twice is refused at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:121
+
+AssetLoopResolutionTest > a repeat imported under another name is refused at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:95
+
+AssetLoopResolutionTest > a function that calls itself is refused at the recursive call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:178
+
+AssetLoopResolutionTest > a helper that loops inside is refused at the loop and at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:141
+
+AssetLoopResolutionTest > forEach over a range is refused() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:102
+
+AssetLoopResolutionTest > a bare repeat is refused at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:73
+
+AssetLoopResolutionTest > for, while and do-while are refused, each at its own keyword() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:156
+
+10 tests completed, 8 failed, 1 skipped
+```
+
+**mut17: the plugin stays on when the build says it is disabled.** Run with
+`-Pudea.compilerPlugin.enabled=false` (`$S/mut17.diff`, `$S/mut17.log`)
+```diff
+diff --git a/udea-assets-compiler/build.gradle.kts b/udea-assets-compiler/build.gradle.kts
+index 7ba6012..3ce5855 100644
+--- a/udea-assets-compiler/build.gradle.kts
++++ b/udea-assets-compiler/build.gradle.kts
+@@ -39,7 +39,7 @@ dependencies {
+     // It follows `-Pudea.compilerPlugin.enabled` like every other use of the plugin, so the
+     // degrade procedure in `docs/compiler-plugin.md` takes it out of the asset compile too: a
+     // Kotlin release that breaks the plugin must not break every asset build with it.
+-    if (compilerPluginEnabled) runtimeOnly(project(":udea-compiler-plugin"))
++    runtimeOnly(project(":udea-compiler-plugin"))
+     // `@AssetDsl`, the asset DSL's once-only lambda promise the plugin's loop checker trusts.
+     implementation(project(":udea-annotations"))
+ 
+```
+```
+AssetLoopResolutionTest > with the plugin disabled the compile degrades to pass 1 alone() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:185
+
+10 tests completed, 1 failed, 8 skipped
+```
+
+### Both passes together
+
+**mut18: the build reports a loop twice, once from each pass** (`$S/mut18.diff`, `$S/mut18.log`)
+```diff
+diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/pipeline/AssetPipeline.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/pipeline/AssetPipeline.kt
+index 2ebbee3..e3b5cb5 100644
+--- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/pipeline/AssetPipeline.kt
++++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/pipeline/AssetPipeline.kt
+@@ -79,7 +79,7 @@ public object AssetPipeline {
+         // author with the consequence and not the defect.
+         val sink = DiagnosticSink()
+         sink.reportAll(scan.diagnostics)
+-        sink.reportAll(result.diagnostics.notAlreadyIn(scan.diagnostics))
++        sink.reportAll(result.diagnostics)
+         sink.reportAll(validated.diagnostics)
+         val report = sink.build()
+         return Compiled(
+```
+```
+AssetLoopResolutionTest > the build reports a loop both passes find once, at pass 1's span() FAILED
+    java.lang.IllegalArgumentException at AssetLoopResolutionTest.kt:261
+
+11 tests completed, 1 failed, 1 skipped
+```
+
+**mut14: the live daemon reports a loop twice** (`$S/mut14.diff`, `$S/mut14.log`)
+```diff
+diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
+index bc53bc0..d181f58 100644
+--- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
++++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
+@@ -281,7 +281,7 @@ public class AssetDaemon(
+         // Pass 1's own diagnostics first, as `AssetPipeline.compileAndValidate` reports them: a
+         // script the build refuses in its syntactic pass - a loop (issue #192) - must not be one
+         // the live daemon applies. A loop both passes found is reported once, at pass 1's span.
+-        return scan.diagnostics + result.diagnostics.notAlreadyIn(scan.diagnostics)
++        return scan.diagnostics + result.diagnostics
+     }
+ 
+     /**
+```
+```
+AssetDaemonTest > a loop in an edited script is rejected with the loop rule at the loop() FAILED
+    java.lang.IllegalArgumentException at AssetDaemonTest.kt:267
+
+10 tests completed, 1 failed
+```
+
+**mut4b: the live daemon drops pass 1's diagnostics again** (`$S/mut4b.diff`, `$S/mut4b.log`)
+```diff
+diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
+index bc53bc0..731e9d0 100644
+--- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
++++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/daemon/AssetDaemon.kt
+@@ -281,7 +281,7 @@ public class AssetDaemon(
+         // Pass 1's own diagnostics first, as `AssetPipeline.compileAndValidate` reports them: a
+         // script the build refuses in its syntactic pass - a loop (issue #192) - must not be one
+         // the live daemon applies. A loop both passes found is reported once, at pass 1's span.
+-        return scan.diagnostics + result.diagnostics.notAlreadyIn(scan.diagnostics)
++        return result.diagnostics
+     }
+ 
+     /**
+```
+```
+AssetDaemonTest > a finding only the syntactic pass makes reaches the agent() FAILED
+    java.util.NoSuchElementException at AssetDaemonTest.kt:310
+
+11 tests completed, 1 failed
+```
+
+### Pass 1 (the early check)
+
+**mut3: the scanner no longer looks for loops** (`$S/mut3.diff`, `$S/mut3.log`)
+```diff
+diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
+index d37a867..cdf7af2 100644
+--- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
++++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
+@@ -268,7 +268,6 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
+             collectFileConstants(statements)
+             statements.forEach { visitStatement(it, emptyMap()) }
+             collectReferences(ktFile)
+-            collectLoops(ktFile)
+         }
+ 
+         /**
+```
+```
+LoopInAssetTest > a repeat qualified with its package is still a repeat(Path) FAILED
+    java.util.NoSuchElementException at LoopInAssetTest.kt:104
+
+LoopInAssetTest > a repeat is an error that points at the repeat(Path) FAILED
+    java.util.NoSuchElementException at LoopInAssetTest.kt:44
+
+LoopInAssetTest > for, while and do-while are errors too, each at its own line(Path) FAILED
+    org.opentest4j.AssertionFailedError at LoopInAssetTest.kt:67
+
+LoopInAssetTest > a loop inside a declaration's lambda is found(Path) FAILED
+    org.opentest4j.AssertionFailedError at LoopInAssetTest.kt:91
+
+LoopInAssetTest > an import of repeat is refused, and so is every call through its alias(Path) FAILED
+    org.opentest4j.AssertionFailedError at LoopInAssetTest.kt:123
+
+17 tests completed, 5 failed
+```
 
 **mut6: an import of `kotlin.repeat` is no longer refused** (`$S/mut6.diff`, `$S/mut6.log`)
 ```diff
 diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
-index 0649414..b1c63ff 100644
+index d37a867..23119cd 100644
 --- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
 +++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
-@@ -426,7 +426,6 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
+@@ -433,7 +433,6 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
                  loops += loop to keyword
              }
              val repeatImports = ktFile.importDirectives.filter { it.importedFqName?.asString() == REPEAT_FQ_NAME }
@@ -206,10 +526,10 @@ LoopInAssetTest > an import of repeat is refused, and so is every call through i
 **mut7: a call through the import's alias is no longer a loop** (`$S/mut7.diff`, `$S/mut7.log`)
 ```diff
 diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
-index 0649414..646ee74 100644
+index d37a867..228a323 100644
 --- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
 +++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
-@@ -427,7 +427,7 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
+@@ -434,7 +434,7 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
              }
              val repeatImports = ktFile.importDirectives.filter { it.importedFqName?.asString() == REPEAT_FQ_NAME }
              for (directive in repeatImports) loops += directive to REPEAT_CALLEE
@@ -228,10 +548,10 @@ LoopInAssetTest > an import of repeat is refused, and so is every call through i
 **mut8: `kotlin.repeat(...)` is no longer a loop** (`$S/mut8.diff`, `$S/mut8.log`)
 ```diff
 diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
-index 0649414..e5253a9 100644
+index d37a867..2fc03f5 100644
 --- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
 +++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/scan/UdeaDeclarationScanner.kt
-@@ -434,7 +434,7 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
+@@ -441,7 +441,7 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
                  val qualified = call.parent as? KtQualifiedExpression
                  if (qualified == null || qualified.selectorExpression !== call) {
                      loops += call to REPEAT_CALLEE
@@ -275,63 +595,115 @@ at `5e53e31`. The next commit (`c51b96e`) switched the game to the file and dele
 - `runLevelShotBoot` is new, beside the existing `runLevelShot*` phases. It photographs a boot
   from whatever level `-Plevel` names.
 
-**The loop ban is `UDEA0015` (`UdeaRules.LOOP_IN_ASSET`).** Pass 1 (`UdeaDeclarationScanner`)
-flags `for`, `while` and `do`-`while` anywhere in a `.udea.kts` file, at the loop's own line and
-column. It flags `repeat` by every name a script can reach it by:
+**The loop ban is `UDEA0015` (`UdeaRules.LOOP_IN_ASSET`), and two passes produce it.**
 
-- `repeat(...)`, unqualified.
-- `kotlin.repeat(...)`, flagged at the qualified expression. This was added in round 1.
-- `import kotlin.repeat`, with or without an alias. The import is flagged at its line, and every
-  call through the alias is flagged at the call. This was added in round 1.
+**The spike: K2, and the plugin is honoured.** Before building anything I ran a throwaway test
+(`$S/SpikeScriptPluginTest.kt`, not committed) that compiled small scripts through the same
+Kotlin scripting host the asset compiler uses. From `$S/spike1.log`:
+```
+    SPIKE[no-plugin] success=true
+...
+    SPIKE[plugin] success=true
+...
+    SPIKE[plugin]   WARNING The Udea K2 compiler plugin is loaded and its FIR checkers are running. @Position(line=1, col=1, absolutePos=null)
+...
+    SPIKE[k2-feature] success=true
+...
+    SPIKE[k2-feature-lv19] success=false
+    SPIKE[k2-feature-lv19]   ERROR This script compiler implementatione is not compatible with Kotlin 1.9 and earlier @null
+```
+- `no-plugin` compiled a probe script with nothing extra. `plugin` compiled the same script
+  with the plugin's jars passed as `-Xplugin`, and got the plugin's own "loaded" warning, so the
+  plugin's FIR checkers run inside a script compile.
+- The `-Xplugin` turned out to be unnecessary; see "How the checker gets into the asset compile"
+  below.
+- `k2-feature` compiled a `when` with a guard (`is Int if a > 0`), which only K2 accepts.
+  The same script with `-language-version 1.9`
+  was refused by the host itself, so the scripting host is K2-only. (The typo "implementatione"
+  is the compiler's.)
+- One more run in the log, `plugin-bad-option`, is elided above. It is not part of either answer.
 
-These are not flagged:
+So route A (a checker in the script compile) works, and route B (bytecode inspection) was not
+needed.
 
-- `"-".repeat(3)`, because a receiver that is not `kotlin` is `String.repeat`;
-- a comment that mentions a loop, or a string that contains one;
-- an unrelated import (`import kotlin.math.max`).
+**Pass 2, the guarantee: `UdeaAssetLoopChecker` in `udea-compiler-plugin`.** It runs only in
+files named `*.udea.kts`, and it refuses:
+- every `for`, `while` and `do`-`while`, at the keyword;
+- any call that hands a lambda to a function that may run it more than once, at the call. A
+  function is trusted with a lambda only when:
+  - it carries the new `@AssetDsl` marker (in `udea-annotations`); or
+  - its contract says `callsInPlace(..., EXACTLY_ONCE)` or `AT_MOST_ONCE` for that parameter,
+    as `let`, `apply`, `also`, `run`, `with` and `takeIf` do.
+- a function that calls itself, at the recursive call.
 
-`LoopInAssetTest` has that control.
+Because it goes by the resolved function, the spelling does not matter: `repeat`,
+`kotlin.repeat`, `import kotlin.repeat as times` and `(1..3).forEach` are all the same call to
+the compiler. A helper the script defines itself is refused at its call too. There is no loop
+keyword in it, only the resolved function's missing promise.
 
-**Round 1: what else reaches a repeated body.** The reviewer's finding was one shape of a wider
-class: running a body many times under a name the scanner does not match. I fixed the two
-shapes the review named. Two others are still open:
+`@AssetDsl` is on the four DSL functions that take lambdas: `character`, the lambda form of
+`blueprint`, the lambda form of `level`, and `EntityScope.entity`. Each runs its lambdas once,
+through `apply`.
 
-- a function reference, `val r = ::repeat; r(2) { }`;
-- a builder that runs its lambda n times, such as `List(3) { ... }`, `Array(3) { ... }`,
-  `(0..2).map { ... }` or `generateSequence`.
+**How the checker gets into the asset compile.** `udea-assets-compiler` depends on the plugin
+`runtimeOnly`. The Kotlin scripting host registers any compiler plugin it finds on its own
+classpath, the same way it finds `kotlin-scripting-compiler-embeddable`. My first version also
+passed `-Xplugin=<jar>`. A mutation that removed that flag stayed green, which showed it was
+redundant, so `ac9058f` removed it. The mutation that matters now is mut13: remove the
+dependency and eight refusals go red.
 
-`forEach` over a literal list is allowed by the earlier decision. No moba asset uses any of these
-shapes: a grep of `moba/game/assets` for all of them came back empty (`$S/r2-class-sweep.txt`,
-`exit=1`). The same pattern does find the compiler fixture's allowed `forEach`, so the grep
-itself works. I did not widen the scanner to these shapes, because round 1's scope was the two
-named shapes. They are listed here for the lead to rule on.
+- No production source names a plugin type. Spec section 7 says the plugin must never be
+  required, and `PluginOptionalTest` enforces it.
+- The dependency follows `-Pudea.compilerPlugin.enabled`, so the documented degrade procedure
+  turns the asset checker off too (mut17). The build is green both ways (section 3).
+- The plugin reports `UDEA0015: <message>`. `AssetCompiler` maps that prefix back to the rule
+  through `UdeaRules.byId` and strips it from the message (mut16).
+
+**Pass 1, early feedback: the syntactic scanner.** Its code is unchanged since `3d2197a`; only its
+KDoc changed, to say it is not the guarantee. It flags `for`, `while`, `do`-`while`, `repeat`,
+`kotlin.repeat` and an import of `kotlin.repeat` (at the import, and at every call through an
+alias). It runs in `udeaScanAssets`, so it reports the shapes it knows before anything is
+compiled.
+
+**A loop both passes find is reported once.** Pass 1's copy spans the whole call, while pass 2's
+carries only a start position, so the sink's rule-and-span dedupe could not join them. A small
+`notAlreadyIn` filter drops a pass-2 finding at the same rule, file, line and column. It is used
+in both the build (`AssetPipeline`, mut18) and the live daemon (`AssetDaemon`, mut14).
 
 The live `AssetDaemon` (the `assets.*` tools) used to drop every pass-1 diagnostic. It now keeps
-them, as `AssetPipeline.compileAndValidate` already did, so the editor cannot save a loop that the
-next build would refuse.
+them, as the build already did, so the editor cannot save a loop the next build would refuse
+(mut4b).
 
 **Decisions**, each commented on #192:
 
 - Rule id `UDEA0015`, in the shared `UdeaRules`. The alternative was the asset compiler's
   stopgap `UDEA002x` band, whose own KDoc says it is waiting to move into `UdeaRules`.
-- `forEach` over a literal list is not banned. The issue names three loop kinds.
+- **The route**: resolved calls in the K2 script compile. This comment replaced my round-1 comment
+  about how far the ban follows `repeat`. It also reverses that comment's point about `forEach`:
+  `listOf(...).forEach { }` is now refused.
+- Trust is by marker (`@AssetDsl`) or by contract. The rejected alternative was "anything in the
+  asset compiler's package", because a marker is a promise someone has to make on purpose.
 - A restart reloads the exact saved layout. Before, it rescattered units from the `Spawn` stream,
   and the file has no cluster centres left to scatter around. This is why the replay fixtures
   moved; section 6 has the numbers.
 - `MatchState.seed` stays. Removing it would move a replicated component and the wire lock.
 
-**Surprise.** The loop ban also caught a udea-agent test. `AssetsToolsetTest`'s "one unresolved
-id with five referrers" wrote its five referrers with `repeat(5)`. Once the daemon kept pass-1
-diagnostics, that script had two errors instead of one. The test now writes the five out
-(`02f2d7f`).
+**What the checker refused that was not a moba asset.** Each was rewritten without a loop:
+- the compiler fixture `sounds.udea.kts` declared two cues with `forEach`;
+- `WorkerTest`'s memory-hog script grew a list in a `while` loop. It is now one large
+  allocation, which still exceeds the worker's heap;
+- `AssetsToolsetTest`'s five referrers were written with `repeat(5)`. That one was found by
+  pass 1 before round 1, and fixed in `02f2d7f`.
 
-I looked for any other asset script with a loop in it. The search covered the test sources of
-`udea-agent`, `udea-assets-compiler`, `udea-gradle` and `moba/desktop`. It matched a line-start
-`repeat(`, `for (` or `while (` within 30 lines after a `"""`. Every hit was either
-`LoopInAssetTest`'s own negative scripts or ordinary test code that sits after a string.
-
-The same file's blob (`5681886`) is at `moba/levels/` in `5e53e31` and at `moba/game/levels/`
-here, which is the byte-identity claim above.
+**Not covered, and why.**
+- Mutual recursion (`a` calls `b` calls `a`). The checker refuses only a call to a function that
+  lexically contains it.
+- A function reference, `val r = ::repeat; r(2) { }`. The call resolves to `invoke` on a function
+  type, which has no contract, so it should be refused. I have not run it.
+- `example-assets/`, the retired corpus. No test compiles it through pass 2: `ExampleScanTest`
+  only scans it and its golden records declarations, not diagnostics. So no file there is
+  refused by the build. If one were compiled, `level/test_level.udea.kts` (three `repeat`
+  loops) would be. It is not a moba asset, so it is outside AC3.
 
 **Merges.**
 - The #213 merge had one textual conflict: a comment in the compiler fixture
@@ -342,36 +714,45 @@ here, which is the byte-identity claim above.
     which this branch no longer uses.
   - The two replay fixtures. I regenerated them rather than merging them (section 6).
 
-`example-assets/level/test_level.udea.kts` still has three `repeat` loops. That tree is the
-retired game's corpus: `ExampleScanTest` reads it, and its golden records declarations, not
-diagnostics. It is not a moba asset, so it is outside AC3, and I left it as history.
-
 ## 3. `sh gradlew build`
 
-Run alone on the box, at `3d2197a`: `sh gradlew build --continue`, with no `-x`. Spliced from
-`$S/build-r2.log`:
+Run alone on the box, at `ab19e5f`: `sh gradlew build --continue`, with no `-x`. Spliced from
+`$S/build-r4.log`:
 
 ```
-BUILD SUCCESSFUL in 1m 12s
-908 actionable tasks: 40 executed, 3 from cache, 865 up-to-date
+BUILD SUCCESSFUL in 1m 16s
+908 actionable tasks: 56 executed, 82 from cache, 770 up-to-date
 Configuration cache entry reused.
 ```
 
-This run printed 908 tasks and the run on `312bd31` printed 917 (`$S/build-merged-228.log`).
-The two logs differ only in the included `build-logic` build. The first run stored the
-configuration cache and ran `build-logic`; this one reused the cache, and `build-logic` did not
-run. I checked this by comparing the sorted `> Task` lists of both logs. The only lines in one
-and not the other are `:build-logic:*`, and every one of them is in the `312bd31` log.
+**The degrade leg**, also at `ab19e5f`:
+`sh gradlew build udeaVerifyCompilerPlugin -Pudea.compilerPlugin.enabled=false --continue`.
+Spliced from `$S/build-r4-plugin-off.log`:
 
-The same build on the #213-only merge `6019569` was also green, at 915 tasks
-(`$S/build-merged.log`). That is the lead's stated baseline for `322dde9`.
+```
+BUILD SUCCESSFUL in 1m 16s
+908 actionable tasks: 44 executed, 116 from cache, 748 up-to-date
+Configuration cache entry reused.
+```
+In that run `AssetLoopResolutionTest` reported 11 tests with 9 skipped: the refusals skip and
+the degrade test and the negatives run. I read that from the JUnit XML before the evidence
+re-run overwrote it, and did not keep a copy.
 
-The build before this one (`$S/build-full.log`, at `adee707`, before the merge) failed only
-`:udea-agent:udeaAssetTools`. That was the `AssetsToolsetTest` case in section 2.
+**The gates outside `check`**, `sh gradlew udeaVerifyModuleGraph udeaVerifyAgentsMd`
+(`$S/r4-gates.log`). `docs/module-graph.md` now lists the new arrows
+(`udea-assets-compiler` to `udea-annotations`, and to `udea-compiler-plugin` at run time).
+```
+BUILD SUCCESSFUL in 3s
+164 actionable tasks: 14 executed, 30 from cache, 120 up-to-date
+Configuration cache entry reused.
+```
 
-**GL, run for real**, on `312bd31` (`$S/gl-merged-228.log`). Round 1's fix touches only the asset
-scanner, so I did not run GL again. The branch touches no `udea-render` code, but the level
-shots open a Kool context, so I ran the GL suites under xvfb:
+The task count is 908 in these runs and 917 in `$S/build-r3b.log` at `f9974a5`. The difference is
+the included `build-logic` build, which runs only when the configuration cache is stored, not
+when it is reused. `build-r4.log` has no `> Task :build-logic` line and `build-r3b.log` has 12.
+
+**GL, run for real**, at `ab19e5f` (`$S/gl-r4.log`). The branch touches no `udea-render` code,
+but the level shots open a Kool context, so I ran the GL suites under xvfb:
 
 ```
 xvfb-run -a -s "-screen 0 1280x720x24" env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
@@ -380,30 +761,33 @@ xvfb-run -a -s "-screen 0 1280x720x24" env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVE
 ```
 > Task :udea-agent-host:udeaAgentGlTest
 > Task :udea-render:udeaGlTest
-BUILD SUCCESSFUL in 58s
+BUILD SUCCESSFUL in 56s
 ```
-The JUnit XML shows every GL suite ran, and none was skipped:
+The JUnit XML shows every GL suite ran, and none was skipped. I copied the suite lines out of the
+XML straight after the run into `$S/gl-r4-suites.txt`, because any later build without a display
+rewrites those files with every test skipped:
 ```
-<testsuite name="dev.wildware.udea.render.gl.GlCaptureDeterminismTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:25:54.687Z"
-<testsuite name="dev.wildware.udea.render.gl.GlCaptureTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:00.039Z"
-<testsuite name="dev.wildware.udea.render.gl.GlKoolInputTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:10.899Z"
-<testsuite name="dev.wildware.udea.render.gl.GlKoolKeyTableTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:12.106Z"
-<testsuite name="dev.wildware.udea.render.gl.GlKoolPointerTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:15.441Z"
-<testsuite name="dev.wildware.udea.render.gl.GlModelRenderTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:16.926Z"
-<testsuite name="dev.wildware.udea.render.gl.GlOverlayIsolationTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:19.783Z"
-<testsuite name="dev.wildware.udea.render.gl.GlUiLayerTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:22.607Z"
-<testsuite name="dev.wildware.udea.render.gl.KoolThreadShutdownTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:23.748Z"
-<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendExplodingCaptureTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:25.287Z"
-<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendSecondCreateTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:26.858Z"
-<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendShutdownTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:27.407Z"
-<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendTest" tests="2" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:26:28.830Z"
-<testsuite name="dev.wildware.udea.agent.host.gl.OffscreenRenderToolsTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:25:42.400Z"
-<testsuite name="dev.wildware.udea.agent.host.gl.OverlayCaptureIsolationTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-09-19T02:25:56.884Z"
+<testsuite name="dev.wildware.udea.render.gl.GlCaptureDeterminismTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:28:52.265Z"
+<testsuite name="dev.wildware.udea.render.gl.GlCaptureTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:28:54.987Z"
+<testsuite name="dev.wildware.udea.render.gl.GlKoolInputTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:28:59.766Z"
+<testsuite name="dev.wildware.udea.render.gl.GlKoolKeyTableTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:29:08.060Z"
+<testsuite name="dev.wildware.udea.render.gl.GlKoolPointerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:29:15.725Z"
+<testsuite name="dev.wildware.udea.render.gl.GlModelRenderTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:29:20.026Z"
+<testsuite name="dev.wildware.udea.render.gl.GlOverlayIsolationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:29:23.692Z"
+<testsuite name="dev.wildware.udea.render.gl.GlUiLayerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:29:27.096Z"
+<testsuite name="dev.wildware.udea.render.gl.KoolThreadShutdownTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:29:29.239Z"
+<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendExplodingCaptureTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:29:31.155Z"
+<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendSecondCreateTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:29:33.266Z"
+<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendShutdownTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:29:34.424Z"
+<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:29:36.389Z"
+<testsuite name="dev.wildware.udea.agent.host.gl.OffscreenRenderToolsTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:28:51.455Z"
+<testsuite name="dev.wildware.udea.agent.host.gl.OverlayCaptureIsolationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T03:28:56.076Z"
 ```
 
 ## 4. Images
 
-All four are in `/srv/ssd1/workspace/Udea/build/debug-screenshots/` and on the dashboard.
+All four are in `/srv/ssd1/workspace/Udea/build/debug-screenshots/` and on the dashboard. None
+changed in the loop-checker rounds, which touch no rendering and no moba asset.
 
 - `issue192-before-script-level-boot.png`: the Kool boot shot of the old script level. It is the
   "before" picture. I took it on a detached checkout of `3a72b83`, where the script still boots
@@ -437,8 +821,7 @@ All four are in `/srv/ssd1/workspace/Udea/build/debug-screenshots/` and on the d
 
 **AC2: adding `repeat(2) { }` to any asset fails the build with the new rule id, pointing at that
 line.** I appended `repeat(2) { }` as line 16 of `moba/game/assets/config.udea.kts` and ran
-`sh gradlew :moba:game:assemble`, before the merges. The merges did not change the scanner, and
-`LoopInAssetTest` is green on `312bd31`. Spliced from `$S/ac2-red.log`:
+`sh gradlew :moba:game:assemble`, before the merges. Spliced from `$S/ac2-red.log`:
 
 ```
 > Task :moba:game:udeaScanAssets FAILED
@@ -455,8 +838,9 @@ I restored the file, and the same command went green (`$S/ac2-green.log`):
 ```
 BUILD SUCCESSFUL in 47s
 ```
-**Round 1: the two shapes the review found, now refused by the real build.** Both were run with
-the fix at `3d2197a`, and the asset file was restored afterwards.
+
+**Round 1: the two shapes the review found, refused by the real build.** Both ran at `3d2197a`,
+and the asset file was restored afterwards.
 
 First, `kotlin.repeat(2) { }` appended to the asset (`$S/r2-qualified.diff`):
 ```diff
@@ -470,7 +854,7 @@ index 9a4a744..dd45bee 100644
  )
 +kotlin.repeat(2) { }
 ```
-The build refused it. Spliced from `$S/r2-qualified-red.log`:
+Spliced from `$S/r2-qualified-red.log`:
 ```
 > Task :moba:game:udeaScanAssets FAILED
 [udeaScanAssets] 22 script(s), 160 declaration(s)
@@ -479,7 +863,8 @@ The build refused it. Spliced from `$S/r2-qualified-red.log`:
 BUILD FAILED in 11s
 ```
 
-Second, `import kotlin.repeat as times` added with `times(2) { }` (`$S/r2-alias.diff`):
+Second, `import kotlin.repeat as times` added with `times(2) { }` (`$S/r2-alias.diff`). The build
+refused both the import on line 1 and the call on line 17:
 ```diff
 diff --git a/moba/game/assets/config.udea.kts b/moba/game/assets/config.udea.kts
 index 9a4a744..e6dea6d 100644
@@ -496,8 +881,7 @@ index 9a4a744..e6dea6d 100644
  )
 +times(2) { }
 ```
-The build refused both the import on line 1 and the call on line 17. Spliced from
-`$S/r2-alias-red.log`:
+Spliced from `$S/r2-alias-red.log`:
 ```
 > Task :moba:game:udeaScanAssets FAILED
 [udeaScanAssets] 22 script(s), 161 declaration(s)
@@ -507,7 +891,63 @@ The build refused both the import on line 1 and the call on line 17. Spliced fro
 BUILD FAILED in 6s
 ```
 
-The two new `LoopInAssetTest` cases were red before the fix. Spliced from `$S/r2-loop-red.log`:
+**The resolved-call checker, in the real build.** A shape pass 1 does not know: `(1..2).forEach
+{ }` appended to the same asset, at `ac9058f` (`$S/r3-foreach.diff`):
+```diff
+diff --git a/moba/game/assets/config.udea.kts b/moba/game/assets/config.udea.kts
+index 9a4a744..c484805 100644
+--- a/moba/game/assets/config.udea.kts
++++ b/moba/game/assets/config.udea.kts
+@@ -13,3 +13,4 @@
+ gameConfig(
+     defaultCharacter = reference("character/soldier"),
+ )
++(1..2).forEach { }
+```
+Pass 1 (`udeaScanAssets`) let it through; the asset compile in `udeaPackBundle` refused it with
+the same rule id at the line. Spliced from `$S/r3-foreach-red.log`:
+```
+> Task :moba:game:udeaScanAssets
+[udeaScanAssets] 22 script(s), 160 declaration(s)
+...
+> Task :moba:game:udeaPackBundle
+[udeaPackBundle] error UDEA0015 moba/game/assets/config.udea.kts:16:1 `forEach` takes a lambda it may run more than once, which is a loop in an asset script. Assets may not contain loops: the editor saves an exact value back to the line it came from, and a value a loop produces has no single line. Write each declaration out, or keep a level's units in a `.udealevel` file.
+
+> Task :moba:game:udeaPackBundle FAILED
+...
+BUILD FAILED in 14s
+```
+
+**Seen red first.** `AssetLoopResolutionTest` was written before the checker. Every refusal case
+failed and the negatives passed, as they must with no checker at all (`$S/r3-red.log`):
+```
+AssetLoopResolutionTest > a repeat qualified with its package is refused() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:65
+
+AssetLoopResolutionTest > a helper of the script's own that runs its lambda twice is refused at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:98
+
+AssetLoopResolutionTest > a repeat imported under another name is refused at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:74
+
+AssetLoopResolutionTest > a function that calls itself is refused at the recursive call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:152
+
+AssetLoopResolutionTest > a helper that loops inside is refused at the loop and at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:117
+
+AssetLoopResolutionTest > forEach over a range is refused() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:80
+
+AssetLoopResolutionTest > a bare repeat is refused at the call() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:54
+
+AssetLoopResolutionTest > for, while and do-while are refused, each at its own keyword() FAILED
+    org.opentest4j.AssertionFailedError at AssetLoopResolutionTest.kt:131
+
+9 tests completed, 8 failed
+```
+The two round-1 `LoopInAssetTest` cases were red before `3d2197a` (`$S/r2-loop-red.log`):
 ```
 LoopInAssetTest > a repeat qualified with its package is still a repeat(Path) FAILED
 ...
@@ -515,18 +955,14 @@ LoopInAssetTest > an import of repeat is refused, and so is every call through i
 ...
 6 tests completed, 2 failed
 ```
+Tests added after their production code were each seen red by a mutation instead: the scope
+test (mut15), the pipeline overlap (mut18), the daemon's pass-1 finding (mut4b) and the degrade
+test (mut17).
 
-The rule's unit tests are `LoopInAssetTest`. It covers repeat, qualified `kotlin.repeat`, the
-aliased import, for, while and do-while, a loop inside a lambda, and the control.
-`AssetDaemonTest` covers the editor path. The mutations each test catches:
-
-- mut3 turns the original cases red;
-- mut6 to mut8 turn the round-1 cases red;
-- mut4 turns the daemon test red.
-
-**AC3: no `.udea.kts` under `moba/game/assets` contains a loop.** Enforced: the build scans every
-moba asset with the rule above, and section 3 is green. Also checked directly (`$S/ac3-grep.txt`). The last command is the known negative: the same
-probe does find loops in the retired corpus.
+**AC3: no `.udea.kts` under `moba/game/assets` contains a loop.** Enforced: the build compiles
+every moba asset with the checker on, and section 3 is green. Also checked directly
+(`$S/ac3-grep.txt`). The last command is the known negative: the same probe does find loops in
+the retired corpus.
 
 ```
 $ grep -rnE '\b(repeat *\(|for *\(|while *\(|do *\{)' moba/game/assets --include='*.udea.kts'
@@ -562,7 +998,7 @@ Not exercised:
   regenerated with `:moba:desktop:udeaWriteReplayFixture`. This happened twice: once on the branch
   (`$S/regen-fixtures.log`), and again inside the #228 merge (`$S/regen-fixtures-228.log`). For
   the second, I took #228's files only as a placeholder in the conflict and then overwrote them.
-  Nothing was text-merged.
+  Nothing was text-merged. The loop-checker rounds did not touch them.
 
   **Starting hashes.** Each fixture header carries an asset graph hash:
 

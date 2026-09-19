@@ -20,7 +20,8 @@ import dev.wildware.udea.render.input.KeyboardState
 import dev.wildware.udea.render.input.UiInput
 import dev.wildware.udea.render.kool.KoolKeyboard
 import dev.wildware.udea.render.ui.UiLayer
-import dev.wildware.udea.render.ui.WorldView
+import dev.wildware.udea.render.view.EditorCamera
+import dev.wildware.udea.render.view.WorldViewport
 
 /**
  * The desktop half of what was `MobaEntry`: the mode, the window, the backend and the boot order.
@@ -207,7 +208,8 @@ public object MobaLaunch {
                     requestExit = { requestExit(backend) },
                     onRenderThread = { block -> backend.onRenderThread(block) },
                     show = backend::show,
-                    world = backend::worldView,
+                    sceneView = backend::openSceneView,
+                    gameView = backend::openGameView,
                 ),
             )
             attachment = attached
@@ -266,11 +268,19 @@ public object MobaLaunch {
          */
         public val show: (UiLayer) -> Unit = { error("this Rendering has no backend to show $it on") },
         /**
-         * The world this backend draws, for a `SceneView` to show (`KoolBackend.worldView`).
+         * Opens an editor's Scene tab on this backend: the world again, through [EditorCamera]
+         * (`KoolBackend.openSceneView`, issue #234). Not from the render thread.
          *
          * The default refuses, for the same reason as [show].
          */
-        public val world: () -> WorldView = { error("this Rendering has no backend to draw a world") },
+        public val sceneView: (EditorCamera) -> WorldViewport = { error("this Rendering has no backend to draw a view") },
+        /**
+         * Opens an editor's Game tab on this backend: the capturable frame, with room for gizmos
+         * over it (`KoolBackend.openGameView`). Not from the render thread.
+         *
+         * The default refuses, for the same reason as [show].
+         */
+        public val gameView: () -> WorldViewport = { error("this Rendering has no backend to draw a view") },
     ) {
         /** The control surface, for a caller that has an agent toolset to wire to it. */
         public fun presentation(): PresentationControl = scene.presentation(pipeline)

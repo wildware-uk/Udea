@@ -262,8 +262,8 @@ relaying it.**
 command that also passes with the feature reverted is a FAIL** — it asserts nothing.
 
 **The silent GL skip.** `-Pudea.render.requireGl` defaults to `false` and `$DISPLAY` is empty on this
-box, so `udeaGlTest` and `udeaAgentGlTest` **skip** while the build stays green. On any ticket
-touching `udea-render` or the render half of `udea-agent-host`, the brief must carry an xvfb run with
+box, so `udeaGlTest`, `udeaAgentGlTest` and `udeaEditorGlTest` **skip** while the build stays green. On any ticket
+touching `udea-render`, the render half of `udea-agent-host` or `udea-editor`, the brief must carry an xvfb run with
 `-Pudea.render.requireGl=true`. Its absence is a finding, and the reviewer is told so.
 
 **`:moba:desktop:runUdpProof` is green since #219**, lossy leg included. It is wall-clock across

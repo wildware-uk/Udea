@@ -72,6 +72,15 @@ public object AgentHostErrors {
      * model that has learned it must keep getting it from every producer.
      */
     public val NO_RENDER_CONTEXT: AgentErrorKind = AgentErrorKind("no_render_context")
+
+    /**
+     * This instance has the editor tools but no editor window, so `editor.screenshot` has no Scene or
+     * Game tab to read (issue #234).
+     *
+     * Distinct from [NO_RENDER_CONTEXT]: there may well be a GL context, and `render.screenshot` works;
+     * what is missing is the window, which only `runEditor` opens.
+     */
+    public val NO_EDITOR_WINDOW: AgentErrorKind = AgentErrorKind("no_editor_window")
 }
 
 /**

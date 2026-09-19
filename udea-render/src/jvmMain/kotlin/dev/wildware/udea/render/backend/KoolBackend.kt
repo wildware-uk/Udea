@@ -1,5 +1,6 @@
 package dev.wildware.udea.render.backend
 
+import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.PresentationBackend
 import dev.wildware.udea.core.host.PresentationFactory
@@ -11,6 +12,8 @@ import dev.wildware.udea.render.capture.BlockingFrameCapture
 import dev.wildware.udea.render.kool.KoolSurface
 import dev.wildware.udea.render.ui.UiLayer
 import dev.wildware.udea.render.ui.WorldView
+import dev.wildware.udea.render.view.EditorCamera
+import dev.wildware.udea.render.view.WorldViewport
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -85,6 +88,34 @@ public class KoolBackend private constructor(
     public fun worldView(): WorldView =
         checkNotNull(surface.get()) { "$this has not built a surface yet; a GameHost builds it" }.worldView
 
+    /** The simulation clock a view's captures are stamped with. Set by [create]. */
+    private val clock = AtomicReference<SimClock?>(null)
+
+    /**
+     * An editor's Game tab (issue #234): the capturable frame, with gizmos drawn over it only when
+     * its overlay is turned on. Drawn every frame from now until it is closed.
+     *
+     * Not from the render thread: the view is made there, and this waits for it.
+     *
+     * @throws IllegalStateException before [create] has built the surface.
+     */
+    public fun openGameView(): WorldViewport = openView(null)
+
+    /**
+     * An editor's Scene tab (issue #234): the world drawn again every frame through [camera], with
+     * gizmos over it. Not from the render thread, as [openGameView].
+     *
+     * @throws IllegalStateException before [create] has built the surface.
+     */
+    public fun openSceneView(camera: EditorCamera): WorldViewport = openView(camera)
+
+    private fun openView(camera: EditorCamera?): WorldViewport {
+        val surface = checkNotNull(surface.get()) { "$this has not built a surface yet; a GameHost builds it" }
+        val pipeline = checkNotNull(built.get()) { "$this has no pipeline to draw a view with" }
+        val clock = checkNotNull(clock.get()) { "$this has no simulation clock to stamp a view's captures with" }
+        return kool.submit { surface.openView(camera, clock).also(pipeline::open) }
+    }
+
     /**
      * Builds the pipeline and its Kool scene **on the render thread**, and puts the scene on the
      * context.
@@ -105,6 +136,7 @@ public class KoolBackend private constructor(
             val pipeline = registry.build(game.world, game.ctx, surface.targets())
             surface.attach(kool.ctx)
             this.surface.set(surface)
+            this.clock.set(game.ctx.clock)
             pipeline
         }
         built.set(pipeline)
@@ -112,7 +144,7 @@ public class KoolBackend private constructor(
         // If the render loop dies - a renderer threw, the window was closed, the driver went away -
         // every queued capture must be told, or each one waits out its full deadline and reports a
         // timeout for something that was an exception seconds earlier.
-        kool.onShutdown { pipeline.capture?.close() }
+        kool.onShutdown { pipeline.closeCaptures() }
 
         return PresentationBackend(pipeline, pipeline.capture?.let(::BlockingFrameCapture))
     }

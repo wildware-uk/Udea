@@ -34,7 +34,7 @@ class EditorAssetsTest {
         tick = { Tick(0) },
         paused = { true },
         spawn = EditorSpawn("Spawn", BlueprintId("skeleton"), 0f, 0f),
-        viewport = {},
+        views = EditorViews.detached(),
     )
 
     private fun drain(): List<AgentCommand> = ArrayList<AgentCommand>().also { bridge.drain(it) }

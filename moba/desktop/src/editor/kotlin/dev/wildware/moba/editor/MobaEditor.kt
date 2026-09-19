@@ -1,7 +1,6 @@
 package dev.wildware.moba.editor
 
 import dev.wildware.composegl.ui.geometry.Size
-import dev.wildware.composegl.ui.widget.SceneDrawScope
 import dev.wildware.moba.Position
 import dev.wildware.moba.agent.MobaAgent
 import dev.wildware.moba.entry.MobaLaunch
@@ -13,16 +12,19 @@ import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.editor.EditorSession
 import dev.wildware.udea.editor.EditorSpawn
 import dev.wildware.udea.editor.EditorTools
+import dev.wildware.udea.editor.EditorViews
 import dev.wildware.udea.editor.StandaloneLauncher
 import dev.wildware.udea.editor.editorFonts
 import dev.wildware.udea.render.ui.UiLayer
+import dev.wildware.udea.render.view.EditorCamera
 
 /**
  * `sh gradlew :moba:desktop:runEditor`: `moba` in the editor window (issue #194).
  *
  * The same process `:moba:desktop:run -Peditor=true` starts - the same game, the same loop, every
  * agent toolset including `editor.*`, and the HTTP surface when `-PdebugPort=N` is passed - with the
- * editor window shown over it: docked panels, and the world drawn by Kool in a ComposeGL `SceneView`.
+ * editor window shown over it: docked panels, and the world drawn by Kool in its Scene and Game tabs
+ * (issue #234), each a ComposeGL `SceneView`. `editor.screenshot` captures either tab.
  *
  * ## Why it is in an `editor` source set
  *
@@ -32,7 +34,7 @@ import dev.wildware.udea.render.ui.UiLayer
  *
  * ## It starts paused
  *
- * The world is paused before the first frame, so what the viewport shows is the level as it loaded
+ * The world is paused before the first frame, so what the tabs show is the level as it loaded
  * and nothing moves until someone asks it to: Play and Step in the window's toolbar (issue #196), or
  * `editor.play`, `time.resume` and `time.step` from an agent.
  */
@@ -70,8 +72,9 @@ public object MobaEditor {
 
     /** Puts the window over the world, paused. Before the first frame. */
     private fun open(host: GameHost, rendering: MobaLaunch.Rendering, session: MobaAgent.Session): MobaAgent.Screen {
-        val world = rendering.world()
-        val editor = session(host, session, viewport = { world.drawInto(this) }, standalone = MobaStandalone())
+        val views = EditorViews(rendering.sceneView(EditorCamera()), rendering.gameView())
+        session.editorViews(views.scene, views.game)
+        val editor = session(host, session, views, standalone = MobaStandalone())
         val fonts = editorFonts()
         val layer = UiLayer(fonts, DESIGN)
         rendering.show(layer)
@@ -87,7 +90,7 @@ public object MobaEditor {
     internal fun session(
         host: GameHost,
         session: MobaAgent.Session,
-        viewport: SceneDrawScope.() -> Unit,
+        views: EditorViews = EditorViews.detached(),
         standalone: StandaloneLauncher? = null,
     ): EditorSession {
         host.time.pause()
@@ -96,7 +99,7 @@ public object MobaEditor {
             tick = { host.ctx.clock.tick },
             paused = { host.time.paused },
             spawn = spawnBeside(host, session.player),
-            viewport = viewport,
+            views = views,
             standalone = standalone,
         )
     }

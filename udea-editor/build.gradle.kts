@@ -40,4 +40,48 @@ dependencies {
 
     // Tool answers arrive as rendered JSON (`AgentResult.Ok.json`); the history panel reads them.
     implementation(libs.kotlinx.serialization.json)
+
+    // Test-only, for the GL tests (issue #234): they move the mouse through Kool's own GLFW callbacks
+    // and read Kool's pointer buttons, as `udea-render`'s pointer test does. `UDEA-MG-011` governs
+    // `compileClasspath`, what the editor ships against, and this is not on it.
+    testImplementation(libs.kool.core)
+}
+
+// --- udeaEditorGlTest (issue #234) ----------------------------------------------------------------
+//
+// The editor tests that need a real Kool context: the Scene and Game tabs over a running backend, with
+// the mouse driven through Kool's own GLFW callbacks. Each test class in a JVM of its own, for the
+// reason `udea-render`'s `udeaGlTest` gives: Kool allows one context per process, for its lifetime.
+val editorGlTestPackage = "dev.wildware.udea.editor.gl"
+
+val udeaEditorGlTest = tasks.register<Test>("udeaEditorGlTest") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Runs the editor tests that drive a real Kool backend and a display."
+
+    val testSourceSet = sourceSets.test.get()
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("$editorGlTestPackage.*") }
+    forkEvery = 1
+
+    // A machine with no display skips these and says so; a job that has one sets this, so a skip
+    // cannot hide a backend that stopped booting. The same property the other GL suites read.
+    systemProperty(
+        "udea.render.requireGl",
+        providers.gradleProperty("udea.render.requireGl").getOrElse("false"),
+    )
+    // Where the frames the tests read back are written, so a person can look at them.
+    systemProperty(
+        "udea.render.glReportDir",
+        layout.buildDirectory.dir("reports/udea/gl").get().asFile.absolutePath,
+    )
+}
+
+tasks.test {
+    filter { excludeTestsMatching("$editorGlTestPackage.*") }
+}
+
+tasks.check {
+    dependsOn(udeaEditorGlTest)
 }

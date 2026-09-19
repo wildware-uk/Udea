@@ -157,7 +157,36 @@ public class CameraRig(
     }
 
     override fun render(target: OffscreenTarget, alpha: Float) {
+        // An editor's Scene view is being drawn: [projection] is that view's until [leaveView], and
+        // the game's camera neither follows nor eases for a frame it is not drawing.
+        if (inView) return
         advance(target, alpha)
+    }
+
+    /** True between [enterView] and [leaveView]. */
+    private var inView: Boolean = false
+
+    /** The game's projection, kept while a view's is in [projection]. */
+    private val gameProjection = Projection2D()
+
+    /**
+     * Puts [view] in [projection] until [leaveView], for the pipeline's second run of the render
+     * systems through an editor's Scene view (issue #234). Every system that draws through this rig
+     * reads [projection], so each draws the world through the editor's camera without knowing a view
+     * exists. Render thread, called by the pipeline between systems and never by one.
+     */
+    internal fun enterView(view: Projection2D) {
+        check(!inView) { "$this is already drawing a view" }
+        gameProjection.set(projection)
+        projection.set(view)
+        inView = true
+    }
+
+    /** Puts the game's projection back. See [enterView]. */
+    internal fun leaveView() {
+        if (!inView) return
+        projection.set(gameProjection)
+        inView = false
     }
 
     /**

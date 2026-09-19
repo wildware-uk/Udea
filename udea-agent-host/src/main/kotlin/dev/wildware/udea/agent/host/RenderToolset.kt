@@ -10,9 +10,7 @@ import dev.wildware.udea.agent.dispatch.AgentContext
 import dev.wildware.udea.agent.tools.ContextualToolDef
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
-import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
-import java.util.concurrent.TimeUnit
 import kotlin.reflect.KClass
 
 /**
@@ -214,17 +212,19 @@ public class RenderToolset(
     /** The renderer, or `null` when none is wired. */
     private val control: RenderControl? = null,
     /** Where captures are filed. */
-    private val artifacts: AgentArtifacts? = null,
+    artifacts: AgentArtifacts? = null,
     /**
-     * How long [poll] keeps rechecking a capture before reporting a dead render loop.
+     * How long a queued capture is rechecked before a dead render loop is reported.
      *
-     * A constructor parameter rather than the [CAPTURE_GRACE_MILLIS] constant directly, so a
+     * A constructor parameter rather than the [CaptureFiling.DEFAULT_GRACE_MILLIS] constant directly, so a
      * test can shrink it: real production code should wait out a few real frames on a slow
      * driver, but a test simulating a render loop that never settles a capture should not have
      * to sleep out that same real budget to observe it.
      */
-    private val captureGraceMillis: Long = CAPTURE_GRACE_MILLIS,
+    captureGraceMillis: Long = CaptureFiling.DEFAULT_GRACE_MILLIS,
 ) {
+
+    private val filing = CaptureFiling(artifacts, captureGraceMillis)
 
     /**
      * Captures the whole framebuffer.
@@ -322,107 +322,12 @@ public class RenderToolset(
     }
 
     /**
-     * Queues the capture now and answers for it once a frame has settled it.
-     *
-     * The two halves are deliberately split across [AgentContext.answerWhenReady]: the request
-     * has to be queued *before* a frame is drawn, and the answer can only be assembled once one
-     * has actually read the pixels back - which, on Kool, is not the same frame: a request is
-     * claimed at one frame's capture point and only read at the top of the next
-     * (`RenderPipeline`'s "Kool draws after this returns"). [AgentContext.answerLater] runs its
-     * work exactly once, one tick after this call, which is one frame too early on a host whose
-     * dispatch and render share a thread - every `Offscreen` and `Windowed` host driven by
-     * `KoolBackend.drive` - because that thread cannot draw the second frame while it is blocked
-     * waiting for it. [poll] is checked again on the next tick, and the next, until the frame
-     * that settles it has actually happened.
+     * Queues the capture now and answers for it once a frame has settled it: [CaptureFiling], which
+     * `editor.screenshot` shares, says why the answer is polled rather than waited for.
      */
     private fun capture(region: PixelRegion?, context: AgentContext): AgentResult? {
         val renderer = live() ?: return unavailable()
-        val store = artifacts ?: return AgentResult.failed(
-            AgentHostErrors.NO_ARTIFACT_STORE,
-            "this instance has no artifact store, so a capture has nowhere to go",
-        )
-
-        val pending = runCatching { renderer.capture(region) }.getOrElse { failure ->
-            return AgentResult.failed(
-                AgentHostErrors.CAPTURE_FAILED,
-                "the renderer refused the capture request: ${failure.message ?: failure}",
-            )
-        }
-
-        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(captureGraceMillis)
-        context.answerWhenReady { poll(pending, store, region, deadlineNanos) }
-        // The `answerWhenReady` idiom: the dispatcher skips its own completion when a tool has
-        // deferred its answer, so returning anything here would be a second answer under one
-        // command id.
-        return null
-    }
-
-    /**
-     * Checks whether [pending] has settled, without blocking for it.
-     *
-     * Returns `null` - "not ready, ask again next tick" - until either the frame that serves
-     * [pending] has actually been drawn, or [deadlineNanos] has passed. The grace period is
-     * bounded for the same two reasons it always was: a host whose render loop has died must
-     * report that rather than wedge the caller forever, and a host pumped on a separate thread
-     * from its render loop should not wait indefinitely for a frame that a slow driver is simply
-     * still getting to.
-     */
-    private fun poll(
-        pending: Future<CaptureFrame>,
-        store: AgentArtifacts,
-        region: PixelRegion?,
-        deadlineNanos: Long,
-    ): AgentResult? {
-        if (!pending.isDone) {
-            if (System.nanoTime() < deadlineNanos) return null
-            pending.cancel(false)
-            return AgentResult.failed(
-                AgentHostErrors.CAPTURE_FAILED,
-                "no frame was drawn for this capture within ${captureGraceMillis}ms; the " +
-                    "render loop has stopped drawing",
-            )
-        }
-        return file(pending, store, region)
-    }
-
-    /** Reads a [pending] already known to be settled, and files it. */
-    private fun file(
-        pending: Future<CaptureFrame>,
-        store: AgentArtifacts,
-        region: PixelRegion?,
-    ): AgentResult {
-        val frame = try {
-            // Already known done by the caller (`poll`): this reads the value, it does not wait.
-            pending.get()
-        } catch (failed: ExecutionException) {
-            val cause = failed.cause ?: failed
-            return AgentResult.failed(
-                AgentHostErrors.CAPTURE_FAILED,
-                "the renderer could not capture a frame: ${cause.message ?: cause}",
-            )
-        } catch (interrupted: InterruptedException) {
-            Thread.currentThread().interrupt()
-            return AgentResult.failed(
-                AgentHostErrors.CAPTURE_FAILED,
-                "the simulation thread was interrupted while collecting a capture",
-            )
-        }
-
-        val id = store.put(frame.image, AgentArtifacts.PNG)
-            ?: return AgentResult.failed(
-                AgentHostErrors.NO_ARTIFACT_STORE,
-                "the capture succeeded but could not be written to ${store.root}",
-            )
-        val artifact = store.get(id)
-        // Path first, id second: the path is ~10 tokens and covers the same-machine case,
-        // and the id is what a remote agent hands to GET /artifact. Bytes never travel in
-        // a digest.
-        return AgentResult.ok {
-            put("artifactId", id.value)
-            put("path", artifact?.path?.toString())
-            put("w", frame.width)
-            put("h", frame.height)
-            put("tick", frame.tick)
+        return filing.answer(context, request = { renderer.capture(region) }) {
             put("region", region?.toString())
         }
     }
@@ -487,18 +392,6 @@ public class RenderToolset(
     )
 
     override fun toString(): String = "RenderToolset($mode, control=${control != null})"
-
-    private companion object {
-
-        /**
-         * How long the deferred answer waits for a frame that should already have been drawn.
-         *
-         * Half a second: long enough to absorb a stalled frame on a loaded machine, short enough
-         * that a host which shares its thread between simulation and rendering - where crossing
-         * this is a defect, not a delay - reports rather than freezing the game for a human.
-         */
-        const val CAPTURE_GRACE_MILLIS: Long = 500L
-    }
 }
 
 /**

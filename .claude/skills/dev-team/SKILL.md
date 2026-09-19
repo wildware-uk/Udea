@@ -409,14 +409,14 @@ Pass `timeout: 600000` on every `gradlew` Bash call. The tool default is 120
 seconds and a cold build here is minutes.
 
 THE GL TRAP, AND IT IS SILENT. `-Pudea.render.requireGl` defaults to **false**.
-`check` depends on `udeaGlTest` and `udeaAgentGlTest`, and with no DISPLAY they
+`check` depends on `udeaGlTest`, `udeaAgentGlTest` and `udeaEditorGlTest`, and with no DISPLAY they
 SKIP - the build stays green and the whole GL surface went untested. `$DISPLAY`
 is empty on this box. So if your ticket touches `udea-render`, the render half
-of `udea-agent-host`, or anything that opens a context, run them for real:
+of `udea-agent-host`, `udea-editor`, or anything that opens a context, run them for real:
 
     xvfb-run -a -s "-screen 0 1280x720x24" \
       env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
-      sh gradlew udeaGlTest udeaAgentGlTest -Pudea.render.requireGl=true
+      sh gradlew udeaGlTest udeaAgentGlTest udeaEditorGlTest -Pudea.render.requireGl=true
 
 and put that command and its output in BRIEF.md. A green `sh gradlew build` is
 not evidence about GL.
@@ -646,7 +646,7 @@ leaves behind.**
    THE BRANCH. Fix your own invocation and carry on; do not write it up, and do
    not fail a branch because you could not start the build.
 
-   If the ticket touches `udea-render` or the render half of `udea-agent-host`,
+   If the ticket touches `udea-render`, the render half of `udea-agent-host` or `udea-editor`,
    also check the brief carries the xvfb run with
    `-Pudea.render.requireGl=true`. Without it those tests SKIPPED and the brief
    is reporting a green build about a surface nothing tested. That is a finding.

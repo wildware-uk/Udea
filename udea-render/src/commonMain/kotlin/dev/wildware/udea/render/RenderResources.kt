@@ -4,6 +4,7 @@ import dev.wildware.udea.render.draw.SpriteBatch2D
 import dev.wildware.udea.render.kool.ScenePasses
 import dev.wildware.udea.render.ui.CapturedUi
 import dev.wildware.udea.render.ui.UiFonts
+import dev.wildware.udea.render.view.ViewCursor
 
 /**
  * What a [RenderSystem]'s constructor is handed: the capturable batch, the surface it draws on, and
@@ -40,7 +41,11 @@ import dev.wildware.udea.render.ui.UiFonts
  * the overlay side unnoticed.
  */
 public class RenderResources internal constructor(
-    /** The batch that reaches the capturable pass, and nothing else. */
+    /**
+     * The batch that reaches the capturable pass. While an editor's Scene view is open it also
+     * reaches that view's own pass, for the second run the pipeline makes of every system for it
+     * (issue #234); it never reaches a pass the other way round.
+     */
     public val batch: SpriteBatch2D,
     /** The capturable surface this pipeline draws into, so a system can size itself to it. */
     public val offscreen: OffscreenTarget,
@@ -49,6 +54,8 @@ public class RenderResources internal constructor(
      * Kool scene behind this pipeline - the ordering tests, which draw nothing.
      */
     internal val passes: ScenePasses? = null,
+    /** Which editor view the systems are drawing for right now. See [ViewCursor]. */
+    internal val viewing: ViewCursor = ViewCursor(),
 ) {
 
     private val extra = ArrayList<RenderResource>()

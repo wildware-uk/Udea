@@ -34,7 +34,7 @@ No `-x` exclusions. On this project's development box the wrapper is `sh gradlew
 `JAVA_HOME` must point at a JDK 21; `AGENTS.md` and the dev-team skill say why. What `check`
 does not run, and where it runs instead:
 
-- **The GL tests.** `udeaGlTest` and `udeaAgentGlTest` skip with no display unless
+- **The GL tests.** `udeaGlTest`, `udeaAgentGlTest` and `udeaEditorGlTest` skip with no display unless
   `-Pudea.render.requireGl=true`; the `gl tests (xvfb)` CI job runs them for real.
 - **The wall-clock budgets.** `udeaLatencyBudgets`, in the `latency budgets` CI job, with the
   runner to itself.

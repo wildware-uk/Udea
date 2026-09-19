@@ -4,18 +4,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.wildware.composegl.ui.geometry.Size
+import dev.wildware.composegl.ui.input.PointerEvent
 import dev.wildware.composegl.ui.widget.SceneDrawScope
 import dev.wildware.composegl.ui.widget.SceneViewState
 import dev.wildware.udea.agent.AgentResult
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.render.ui.UiScreen
+import dev.wildware.udea.render.view.ViewDimension
+
+/** The editor window's two tabs on the world. */
+internal enum class EditorTab { Scene, Game }
 
 /**
  * One open editor: the window a launcher shows, and the per-frame work that keeps it current.
  *
  * ```kotlin
+ * val views = EditorViews(backend.openSceneView(EditorCamera()), backend.openGameView())
  * val editor = EditorSession(EditorTools(bridge, sessions.intern("editor")), tick = { host.ctx.clock.tick },
- *     paused = { host.time.paused }, spawn = ..., viewport = { world.drawInto(this) })
+ *     paused = { host.time.paused }, spawn = ..., views = views)
  * backend.show(ui); ui.show(editor.window)
  * backend.drive { delta -> loop.pump(delta); editor.frame() }
  * ```
@@ -23,20 +30,25 @@ import dev.wildware.udea.render.ui.UiScreen
  * ## A screen over the tool surface
  *
  * The window holds no model of the world and no record of its own edits. Its buttons are tool calls
- * through [EditorTools]; its History panel is `editor.history`'s answer for the editor's author; its
- * viewport is whatever [viewport] draws, which for a real launcher is `udea-render`'s `WorldView` -
- * the capturable frame, so the viewport shows exactly what an agent's screenshot holds. The panels
- * are drawn into the window, never into that frame, so no screenshot ever contains them.
+ * through [EditorTools]; its History panel is `editor.history`'s answer for the editor's author.
+ *
+ * ## Two tabs on the world (issue #234)
+ *
+ * The world is shown through [views], one tab at a time. The **Game** tab is the capturable frame -
+ * exactly what an agent's screenshot holds - and its pointer is the game's: the window takes no event
+ * over it. The **Scene** tab is the same world at the same tick through the editor's own camera, and
+ * its pointer is the editor's ([SceneNavigation]). The panels are drawn into the window, never into
+ * either view, so no screenshot ever contains them.
  *
  * ## What it does not do
  *
  * It does not pause the world: a launcher starts the editor paused, before the first frame, so no
- * tick runs between boot and the window appearing (issue #194). It does not hit-test or move anything
- * in the viewport: picking, selection and gizmos are epic #231.
+ * tick runs between boot and the window appearing (issue #194). It does not pick or select anything
+ * in the Scene tab: that is epic #231's.
  *
  * @param tick the simulation's tick, read once a frame for the status line and the viewport.
  * @param paused whether the simulation is paused, read once a frame for the status line.
- * @param viewport draws the world into the viewport's picture, after it has been cleared.
+ * @param views the Scene and Game tabs' views of the world.
  * @param standalone starts a separate game on a saved level, for Play standalone.
  */
 public class EditorSession(
@@ -44,7 +56,7 @@ public class EditorSession(
     private val tick: () -> Tick,
     private val paused: () -> Boolean,
     private val spawn: EditorSpawn,
-    private val viewport: SceneDrawScope.() -> Unit,
+    internal val views: EditorViews,
     /** What Play standalone hands the saved level to; `null` leaves that button out (issue #196). */
     standalone: StandaloneLauncher? = null,
 ) {
@@ -52,8 +64,26 @@ public class EditorSession(
     /** The toolbar's Play, Stop, Step and Play standalone. */
     internal val playback: PlayControls = PlayControls(tools, standalone)
 
-    /** The viewport's picture. Held here rather than remembered, because [frame] invalidates it. */
-    internal val viewportState: SceneViewState = SceneViewState()
+    /** The Scene tab's picture. Held here rather than remembered, because [frame] invalidates it. */
+    internal val sceneState: SceneViewState = SceneViewState()
+
+    /** The Game tab's picture. */
+    internal val gameState: SceneViewState = SceneViewState()
+
+    /** The Scene tab's pointer: gizmos, then the editor camera. */
+    internal val navigation: SceneNavigation = SceneNavigation(views.scene)
+
+    /** Which tab is showing. The Scene tab first: an editor opens on the editor's view. */
+    internal var tab: EditorTab by mutableStateOf(EditorTab.Scene)
+        private set
+
+    /** Whether the Game tab draws gizmos over the game. Off until its toggle is turned on. */
+    internal var gameGizmos: Boolean by mutableStateOf(views.game.showGizmos)
+        private set
+
+    /** Which camera a drag in the Scene tab moves. */
+    internal var dimension: ViewDimension by mutableStateOf(views.camera.dimension)
+        private set
 
     /** What the History panel lists: the editor author's undo history, newest first. */
     internal var history: List<HistoryEntry> by mutableStateOf(emptyList())
@@ -80,6 +110,9 @@ public class EditorSession(
 
     private var seenCompleted = Long.MIN_VALUE
 
+    /** Frames the Scene tab is still drawn again for after its camera moved: see [SCENE_MOVED_FRAMES]. */
+    private var sceneMoved = 0
+
     /** The window: menus, docked panels, the viewport and the status line. Show it on a `UiLayer`. */
     public val window: UiScreen = object : UiScreen {
         @Composable
@@ -104,8 +137,52 @@ public class EditorSession(
             seenCompleted = completed
         }
         if (historyStale && !historyPending) readHistory()
-        if (redraw.due(tick(), completed)) viewportState.invalidate()
+        val due = redraw.due(tick(), completed)
+        if (navigation.consumeMoved()) sceneMoved = SCENE_MOVED_FRAMES
+        if (due || sceneMoved > 0) sceneState.invalidate()
+        if (due) gameState.invalidate()
+        if (sceneMoved > 0) sceneMoved--
         status = statusLine()
+    }
+
+    /** The Scene tab's `SceneView` size, in layout units: see [scenePointer]. */
+    internal var sceneBox: Size = Size.Zero
+
+    /**
+     * A pointer event over the Scene tab, positioned in its picture's pixels, handed to [navigation].
+     *
+     * The picture's size is the `SceneViewState`'s once it has been rendered. Before that - and always,
+     * with no GL - the `SceneView` reports a position in its own layout units, one to a pixel, so its
+     * layout size is the picture's size for as long as that holds.
+     */
+    internal fun scenePointer(event: PointerEvent): Boolean {
+        val rendered = sceneState.width > 0 && sceneState.height > 0
+        val width = if (rendered) sceneState.width else sceneBox.width.toInt()
+        val height = if (rendered) sceneState.height else sceneBox.height.toInt()
+        return navigation.onPointer(event, width, height)
+    }
+
+    /** Shows [tab]. */
+    internal fun show(tab: EditorTab) {
+        if (tab == this.tab) return
+        this.tab = tab
+        // The picture a tab shows was last drawn when it was last shown; draw it again now.
+        sceneState.invalidate()
+        gameState.invalidate()
+    }
+
+    /** The Game tab's gizmo toggle: draws them over the game, read-only. */
+    internal fun showGameGizmos(show: Boolean) {
+        views.game.showGizmos = show
+        gameGizmos = show
+        gameState.invalidate()
+    }
+
+    /** The Scene tab's 2D / 3D switch. */
+    internal fun switchDimension(dimension: ViewDimension) {
+        views.camera.dimension = dimension
+        this.dimension = dimension
+        navigation.markMoved()
     }
 
     /** The Create panel's button. */
@@ -123,9 +200,12 @@ public class EditorSession(
 
     internal val spawnLabel: String get() = spawn.label
 
-    /** Draws the world into the viewport's picture. */
-    internal fun drawViewport(scope: SceneDrawScope) {
-        scope.viewport()
+    /** Copies [tab]'s view into the picture [scope] is drawing. */
+    internal fun drawView(tab: EditorTab, scope: SceneDrawScope) {
+        when (tab) {
+            EditorTab.Scene -> views.scene.drawInto(scope)
+            EditorTab.Game -> views.game.drawInto(scope)
+        }
     }
 
     private fun edit(tool: String, args: Map<String, String>) {
@@ -168,5 +248,12 @@ public class EditorSession(
 
         /** How many edits the History panel lists: a screenful, newest first. */
         const val HISTORY_LIMIT: Int = 20
+
+        /**
+         * Frames the Scene tab's picture is copied again after its camera moves. Two, not one: a
+         * pointer event is handled while the window is drawn, which can be after the pipeline drew
+         * the Scene view for this frame, so only the next frame's view is sure to hold the move.
+         */
+        const val SCENE_MOVED_FRAMES: Int = 2
     }
 }

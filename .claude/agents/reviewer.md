@@ -51,16 +51,16 @@ is minutes. If a run is *killed* rather than failing, retry it; do not write it 
 
 ### The silent GL skip — check for it
 
-`-Pudea.render.requireGl` **defaults to `false`**. `check` depends on `udeaGlTest` and
-`udeaAgentGlTest`, and with no `DISPLAY` they **skip** while the build stays green. `$DISPLAY` is
+`-Pudea.render.requireGl` **defaults to `false`**. `check` depends on `udeaGlTest`, `udeaAgentGlTest`
+and `udeaEditorGlTest`, and with no `DISPLAY` they **skip** while the build stays green. `$DISPLAY` is
 empty on this box.
 
-So if the diff touches `udea-render`, the render half of `udea-agent-host`, or anything that opens a
+So if the diff touches `udea-render`, the render half of `udea-agent-host`, `udea-editor`, or anything that opens a
 context, the brief must carry an xvfb run with `-Pudea.render.requireGl=true`:
 
     xvfb-run -a -s "-screen 0 1280x720x24" \
       env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
-      sh gradlew udeaGlTest udeaAgentGlTest -Pudea.render.requireGl=true
+      sh gradlew udeaGlTest udeaAgentGlTest udeaEditorGlTest -Pudea.render.requireGl=true
 
 If it does not, the brief is reporting a green build about a surface that nothing exercised. **That
 is a finding**, and it is on the list below.

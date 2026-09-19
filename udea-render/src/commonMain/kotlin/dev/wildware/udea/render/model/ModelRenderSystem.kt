@@ -75,16 +75,24 @@ public class ModelRenderSystem(
 
     override fun render(target: OffscreenTarget, alpha: Float) {
         val bound = this.bound ?: return
-        drawnCount = 0
-        stage.begin(camera, light)
-        with(bound.world) {
-            bound.models.forEach { entity -> draw(entity, alpha) }
+        // An editor's Scene view (issue #234): the models this frame are already placed, by the run
+        // for the capturable frame, and the view sees them through its own camera and pass.
+        val view = resources.viewing.current
+        val image = if (view != null) {
+            stage.imageFor(view, camera)
+        } else {
+            drawnCount = 0
+            stage.begin(camera, light)
+            with(bound.world) {
+                bound.models.forEach { entity -> draw(entity, alpha) }
+            }
+            stage.image
         }
 
         val batch = resources.batch
         batch.beginPixels()
         try {
-            batch.draw(stage.image, 0f, 0f, target.width.toFloat(), target.height.toFloat(), Rgba.WHITE)
+            batch.draw(image, 0f, 0f, target.width.toFloat(), target.height.toFloat(), Rgba.WHITE)
         } finally {
             batch.end()
         }

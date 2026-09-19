@@ -124,16 +124,16 @@ change.
 
 ### The GL trap, and it is silent
 
-`-Pudea.render.requireGl` **defaults to `false`**. `check` depends on `udeaGlTest` and
-`udeaAgentGlTest`, and with no `DISPLAY` they **skip** — the build stays green and the entire GL
+`-Pudea.render.requireGl` **defaults to `false`**. `check` depends on `udeaGlTest`, `udeaAgentGlTest`
+and `udeaEditorGlTest`, and with no `DISPLAY` they **skip** — the build stays green and the entire GL
 surface went untested. `$DISPLAY` is empty on this box.
 
-So if your ticket touches `udea-render`, the render half of `udea-agent-host`, or anything that
+So if your ticket touches `udea-render`, the render half of `udea-agent-host`, `udea-editor`, or anything that
 opens a context, run them for real and put the command and its output in `BRIEF.md`:
 
     xvfb-run -a -s "-screen 0 1280x720x24" \
       env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
-      sh gradlew udeaGlTest udeaAgentGlTest -Pudea.render.requireGl=true
+      sh gradlew udeaGlTest udeaAgentGlTest udeaEditorGlTest -Pudea.render.requireGl=true
 
 A green `sh gradlew build` is not evidence about GL. Saying it is, is the exact shape of error the
 rest of this file is about.

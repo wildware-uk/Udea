@@ -108,14 +108,14 @@ jobs:
         run: chmod +x ./gradlew
 
       # `-Pudea.render.requireGl=false` is written out rather than left to the property's
-      # default, and it is a decision rather than a formality. `check` depends on `udeaGlTest`
-      # and `udeaAgentGlTest`, so this leg *does* run them - and neither runner here can serve
-      # them a context: `windows-latest` exposes only the GDI generic renderer (OpenGL 1.1),
-      # which is below what Kool's desktop backend asks for, and this `ubuntu-latest` step runs with
-      # no X server at all. Both therefore skip, on purpose, and the `gl-tests` job below is
-      # where the same tests are made to *pass or fail*. Deleting that job and leaving this
-      # property alone would silently return the whole GL surface to being untested, which is
-      # the state this comment exists to make impossible to reach by accident.
+      # default, and it is a decision rather than a formality. `check` depends on the GL suites -
+      # `udeaGlTest`, `udeaAgentGlTest`, `udeaEditorGlTest` - so this leg *does* run them - and
+      # neither runner here can serve them a context: `windows-latest` exposes only the GDI
+      # generic renderer (OpenGL 1.1), which is below what Kool's desktop backend asks for, and this
+      # `ubuntu-latest` step runs with no X server at all. Both therefore skip, on purpose, and
+      # the `gl-tests` job below is where the same tests are made to *pass or fail*. Deleting that
+      # job and leaving this property alone would silently return the whole GL surface to being
+      # untested, which is the state this comment exists to make impossible to reach by accident.
       - name: Build and verify the module graph
         shell: bash
         run: >-
@@ -482,7 +482,7 @@ jobs:
           MESA_GL_VERSION_OVERRIDE: "3.3"
         run: >-
           xvfb-run -a --server-args="-screen 0 1280x1024x24"
-          ./gradlew :udea-render:udeaGlTest :udea-agent-host:udeaAgentGlTest
+          ./gradlew :udea-render:udeaGlTest :udea-agent-host:udeaAgentGlTest :udea-editor:udeaEditorGlTest
           -Pudea.render.requireGl=true
           --rerun-tasks --stacktrace
 
@@ -498,6 +498,7 @@ jobs:
           reports=()
           reports+=(udea-render/build/test-results/udeaGlTest/*.xml)
           reports+=(udea-agent-host/build/test-results/udeaAgentGlTest/*.xml)
+          reports+=(udea-editor/build/test-results/udeaEditorGlTest/*.xml)
           if [ ${#reports[@]} -eq 0 ]; then
             echo "::error::no GL test results were written at all - the suites did not run"
             exit 1
@@ -519,6 +520,8 @@ jobs:
             udea-render/build/test-results/**
             udea-agent-host/build/reports/tests/**
             udea-agent-host/build/test-results/**
+            udea-editor/build/reports/tests/**
+            udea-editor/build/test-results/**
           if-no-files-found: warn
           retention-days: 7
 

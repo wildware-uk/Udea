@@ -82,7 +82,7 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `udea-agent` | MCP tool surface and test harness — the same code path |
 | `udea-agent-host` | HTTP server. Debug-only, verified absent from release |
 | `udea-replay` | `.udearep` input recording, deterministic headless replay, and the bisect tools |
-| `udea-editor` | The editor window: docked ComposeGL panels, the world in a `SceneView`, buttons that call `editor.*` tools. Debug-only and JVM; only a game's `editor` source set may depend on it (`UDEA-MG-010`) |
+| `udea-editor` | The editor window: docked ComposeGL panels, the world in Scene and Game tabs (the Scene tab through its own editor camera), buttons that call `editor.*` tools. Debug-only and JVM; only a game's `editor` source set may depend on it (`UDEA-MG-010`) |
 | `udea-gradle` | Tasks, verifiers, `gamebridge.json` emission |
 | `moba:game` | The example game: a 5v5 three-lane MOBA. A library - components, systems, assets and what it draws - with no entry point in it |
 | `moba:desktop` | The desktop launcher: `run`, `runServer`, `runClient`, the shot mains, the proofs and the agent surface. JVM |
@@ -239,7 +239,10 @@ surface on that port; the generated `gamebridge.json` launches the same task. Th
 is a screen over that tool surface, not a second implementation of it: `udea-editor`'s window
 (`sh gradlew :moba:desktop:runEditor`, issue #194) turns each button into an `editor.*` call filed
 under the author `editor`, so an agent calling with `session=editor` sees and undoes the same edits.
-**The tool surface is the editor.**
+**The tool surface is the editor.** The window shows the world in a Scene tab, through the editor's
+own camera, and a Game tab, the game's own picture (issue #234); `editor.screenshot` with
+`view=scene` or `view=game` captures either, gizmos included, while `render.screenshot` never holds
+a gizmo - the same structural exclusion as the agent overlay's.
 
 | Endpoint | Answers |
 |---|---|

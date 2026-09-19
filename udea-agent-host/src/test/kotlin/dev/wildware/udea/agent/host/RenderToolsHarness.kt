@@ -49,6 +49,8 @@ internal class RenderToolsHarness(
      * `RenderToolsetTest`'s "a frame that is never drawn" test.
      */
     captureGraceMillis: Long = 500L,
+    /** `editor.screenshot`'s toolset, registered when given (issue #234). */
+    editorViews: EditorViewToolset? = null,
 ) {
 
     val bridge = AgentBridge()
@@ -61,6 +63,7 @@ internal class RenderToolsHarness(
         .module(AgentHostTools)
         .toolset(toolset)
         .toolset(ArtifactToolset(artifacts))
+        .let { builder -> if (editorViews == null) builder else builder.module(EditorViewTools).toolset(editorViews) }
         .build()
 
     private val runtime = AgentRuntime(

@@ -8,7 +8,9 @@ import dev.wildware.udea.agent.host.RenderToolset
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.render.camera.CameraOutcome as RenderCameraOutcome
 import dev.wildware.udea.render.capture.CaptureRegion
+import dev.wildware.udea.render.capture.CaptureResult
 import dev.wildware.udea.render.control.PresentationControl
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Future
@@ -54,25 +56,10 @@ public class OffscreenRenderControl(
      * [RenderControl.capture] is still a `java.util.concurrent.Future` - that is the frozen shape
      * `RenderToolset`/`AgentContext.answerLater` are written against, and changing it is a wider
      * change than this ticket's - while `PresentationControl.capture` answers with a `Deferred`
-     * (spec section 6, issue #211). `Deferred.invokeOnCompletion` is this file's bridge between
-     * the two: it runs on whichever thread completes the `Deferred`, which is the render thread
-     * at the capture point, exactly as `Future.thenApply` did. That is deliberate and it is why
-     * the mapping is four field reads: the render thread must not be handed work here.
+     * (spec section 6, issue #211). [asCaptureFrame] is the bridge between the two.
      */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    override fun capture(region: PixelRegion?): Future<CaptureFrame> {
-        val deferred = presentation.capture(region?.let { CaptureRegion(it.x, it.y, it.w, it.h) })
-        val future = CompletableFuture<CaptureFrame>()
-        deferred.invokeOnCompletion { cause ->
-            if (cause != null) {
-                future.completeExceptionally(cause)
-            } else {
-                val frame = deferred.getCompleted()
-                future.complete(CaptureFrame(frame.width, frame.height, frame.tick.value, frame.bytes))
-            }
-        }
-        return future
-    }
+    override fun capture(region: PixelRegion?): Future<CaptureFrame> =
+        presentation.capture(region?.let { CaptureRegion(it.x, it.y, it.w, it.h) }).asCaptureFrame()
 
     override fun setCamera(x: Float, y: Float, zoom: Float): CameraOutcome =
         mapped(presentation.lookAt(x, y, zoom))
@@ -98,4 +85,25 @@ public class OffscreenRenderControl(
     override fun toggleDebugDraw(enabled: Boolean?): Boolean = presentation.toggleDebugDraw(enabled)
 
     override fun toString(): String = "OffscreenRenderControl($presentation)"
+}
+
+/**
+ * A renderer's capture as the port's future.
+ *
+ * `Deferred.invokeOnCompletion` runs on whichever thread completes the `Deferred`, which is the render
+ * thread at the capture point, exactly as `Future.thenApply` did. That is deliberate and it is why the
+ * mapping is four field reads: the render thread must not be handed work here.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+internal fun Deferred<CaptureResult>.asCaptureFrame(): Future<CaptureFrame> {
+    val future = CompletableFuture<CaptureFrame>()
+    invokeOnCompletion { cause ->
+        if (cause != null) {
+            future.completeExceptionally(cause)
+        } else {
+            val frame = getCompleted()
+            future.complete(CaptureFrame(frame.width, frame.height, frame.tick.value, frame.bytes))
+        }
+    }
+    return future
 }

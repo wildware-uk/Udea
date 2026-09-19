@@ -51,7 +51,7 @@ class MobaEditorTest {
     @Test
     fun `the editor opens paused, and the frames it pumps do not tick the world`() {
         val tickBefore = host.ctx.clock.tick
-        val editor = MobaEditor.session(host, session, viewport = {})
+        val editor = MobaEditor.session(host, session)
 
         assertTrue(host.time.paused, "the editor opened on a running world")
         uiTest { editor.window.content() }.use { ui ->
@@ -63,7 +63,7 @@ class MobaEditorTest {
 
     @Test
     fun `the spawn button adds a unit beside the player, paused, in the editor author's undo history`() {
-        val editor = MobaEditor.session(host, session, viewport = {})
+        val editor = MobaEditor.session(host, session)
         val playerX = positionOf(session.player).first
         val tickBefore = host.ctx.clock.tick
 

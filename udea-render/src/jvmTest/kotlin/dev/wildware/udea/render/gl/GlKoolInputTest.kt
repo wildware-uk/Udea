@@ -5,7 +5,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import de.fabmax.kool.input.KeyboardInput
 import dev.wildware.composegl.ui.geometry.Size
 import dev.wildware.composegl.ui.input.Key
 import dev.wildware.composegl.ui.input.KeyEventType
@@ -16,13 +15,12 @@ import dev.wildware.composegl.ui.modifier.onKeyEvent
 import dev.wildware.composegl.ui.modifier.size
 import dev.wildware.composegl.ui.widget.Button
 import dev.wildware.composegl.ui.widget.TextField
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.generated.CoreUdeaRegistry
-import dev.wildware.udea.render.OverlaySystem
 import dev.wildware.udea.render.RenderRegistry
-import dev.wildware.udea.render.ScreenTarget
 import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.input.ActionBinding
@@ -36,7 +34,6 @@ import dev.wildware.udea.render.ui.DesktopFonts
 import dev.wildware.udea.render.ui.UiLayer
 import dev.wildware.udea.render.ui.UiScreen
 import org.lwjgl.glfw.GLFW
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
@@ -100,9 +97,9 @@ class GlKoolInputTest {
         val watcher = ThreadWatchingUi(ui)
         val bindings = InputBindings(
             actions = listOf(
-                ActionBinding(name = "test/walk", keys = intArrayOf(W)),
-                ActionBinding(name = "test/menu", keys = intArrayOf(ESCAPE)),
-            ) + PRINTABLE.map { ActionBinding(name = it.action, keys = intArrayOf(it.glfw)) },
+                ActionBinding(name = "test/walk", keys = listOf(InputKey.W)),
+                ActionBinding(name = "test/menu", keys = listOf(InputKey.Escape)),
+            ) + PRINTABLE.map { ActionBinding(name = it.action, keys = listOf(it.input)) },
             axes = emptyList(),
         )
         val walk = bindings.catalog.action("test/walk")
@@ -133,32 +130,14 @@ class GlKoolInputTest {
 
             assertTrue(
                 walking.isPressed(walk),
-                "W never became an intent. The binding is on $W; the codes Kool derived from the " +
-                    "physical keys pressed were ${watcher.codes}. This is where a game's controls " +
-                    "asset stops matching the keyboard, and it is silent everywhere else.",
+                "W never became an intent. The binding is on InputKey.W; the keys the table read " +
+                    "from the physical keys pressed were ${watcher.keys}. This is where a game's " +
+                    "controls asset stops matching the keyboard, and it is silent everywhere else.",
             )
             assertEquals(1, walking.pressCount(walk), "W's press edge was lost between Kool and the intent")
 
-            // The key table, measured rather than assumed. A binding is an int in a `.udea.kts`, and
-            // the whole point of driving Kool's own GLFW callback above is that this number is Kool's
-            // answer and not this test's premise.
-            assertEquals(
-                'W'.code,
-                W,
-                "GLFW numbers a letter key by its ASCII *uppercase*; that is the number a controls " +
-                    "asset has to carry",
-            )
-            assertTrue(
-                keyboard.isKeyDown(W),
-                "the physical W key came out of Kool as something other than $W: ${watcher.codes}",
-            )
-            assertFalse(
-                keyboard.isKeyDown('w'.code),
-                "the physical W key came out as the *lowercase* code ${'w'.code}. That is what " +
-                    "`UniversalKeyCode(Char)` produces on Kool main (0.19.0 uppercases instead), and " +
-                    "GLFW never calls it - `GlfwInput` passes the raw GLFW key. A controls asset " +
-                    "written in lowercase codes would bind the wrong keys silently.",
-            )
+            // Which *name* each physical key arrives as, for every key, is `GlKoolKeyTableTest`'s.
+            assertTrue(keyboard.isKeyDown(InputKey.W), "W was pressed and is not held: ${watcher.keys}")
 
             // 2. A key the interface takes never does.
             backend.release(GLFW.GLFW_KEY_W)
@@ -247,7 +226,7 @@ class GlKoolInputTest {
                     "their name would walk while doing it",
             )
             assertTrue(
-                LETTERS.none { keyboard.isKeyDown(it.glfw) },
+                LETTERS.none { keyboard.isKeyDown(it.input) },
                 "a letter typed into the text field is still held down for the game",
             )
 
@@ -290,29 +269,6 @@ class GlKoolInputTest {
     private fun sample(source: DeviceIntent, bindings: InputBindings): Intent =
         Intent(bindings.catalog).also { source.sample(it) }
 
-    private fun awaitFrames(probe: FrameProbe, target: Int) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)
-        while (probe.count.get() < target && System.nanoTime() < deadline) Thread.onSpinWait()
-        assertTrue(probe.count.get() >= target, "the render thread stopped drawing")
-    }
-
-    /**
-     * Presses [glfwKey] on Kool's own GLFW key callback, as a keyboard would.
-     *
-     * The point of going this far round rather than calling `KeyboardInput.handleKeyEvent` with an
-     * event this test built: an event this test builds carries whatever code this test chose, so a
-     * binding on the same code passes whatever the number is, and the *key table* - the thing a
-     * game's controls asset is written in - would never be measured at all. Here the raw GLFW key
-     * goes in and Kool decides the code, in `GlfwInput`'s `KEY_CODE_MAP[key] ?: UniversalKeyCode(key)`.
-     *
-     * GLFW has no getter for a callback, only a setter that returns the previous one, so it is taken
-     * off and put straight back. Render thread only: it is the thread that owns the window, and GLFW
-     * requires its own.
-     */
-    private fun KoolBackend.press(glfwKey: Int) = key(glfwKey, GLFW.GLFW_PRESS)
-
-    private fun KoolBackend.release(glfwKey: Int) = key(glfwKey, GLFW.GLFW_RELEASE)
-
     /**
      * Types [case]'s letter the way GLFW reports a real keystroke: the key callback and then the
      * character callback from the same poll, so Kool queues them together, and the release after.
@@ -334,53 +290,22 @@ class GlKoolInputTest {
         release(case.glfw)
     }
 
-    private fun KoolBackend.key(glfwKey: Int, action: Int) = onRenderThread {
-        val window = GLFW.glfwGetCurrentContext()
-        check(window != 0L) { "no GLFW window is current on the render thread" }
-        invokeKeyCallback(window, glfwKey, action)
-    }
-
-    /** Kool's installed key callback, taken off, called once and put straight back. Render thread. */
-    private fun invokeKeyCallback(window: Long, glfwKey: Int, action: Int) {
-        val callback = checkNotNull(GLFW.glfwSetKeyCallback(window, null)) {
-            "Kool installed no GLFW key callback, so this test would be driving nothing"
-        }
-        try {
-            callback.invoke(window, glfwKey, NO_SCANCODE, action, NO_MODIFIERS)
-        } finally {
-            GLFW.glfwSetKeyCallback(window, callback)
-        }
-    }
-
-    /** Counts frames and remembers the thread one ran on. */
-    private class FrameProbe : OverlaySystem {
-
-        val count: AtomicInteger = AtomicInteger()
-
-        val thread: AtomicReference<Thread?> = AtomicReference(null)
-
-        override fun render(target: ScreenTarget, dtSeconds: Float) {
-            thread.compareAndSet(null, Thread.currentThread())
-            count.incrementAndGet()
-        }
-    }
-
     /**
-     * The real layer, with a note of which thread it was asked on and which codes it was offered.
+     * The real layer, with a note of which thread it was asked on and which keys it was offered.
      *
-     * [codes] is not decoration: when a key-table assertion fails, the useful thing to print is the
-     * number Kool actually produced, and this is the only place it is visible.
+     * [keys] is not decoration: when an assertion about a key fails, the useful thing to print is the
+     * key the table actually read, and this is the only place it is visible.
      */
     private class ThreadWatchingUi(private val delegate: UiInput) : UiInput {
 
         val thread: AtomicReference<Thread?> = AtomicReference(null)
 
-        /** Every code offered, in order. Written and read on the render thread. */
-        val codes: MutableList<Int> = java.util.concurrent.CopyOnWriteArrayList()
+        /** Every key offered, in order, as the table named it. Written and read on the render thread. */
+        val keys: MutableList<InputKey?> = java.util.concurrent.CopyOnWriteArrayList()
 
         override fun onKey(event: KeyStroke): Boolean {
             thread.compareAndSet(null, Thread.currentThread())
-            codes += event.keycode
+            keys += event.key
             return delegate.onKey(event)
         }
     }
@@ -462,6 +387,9 @@ class GlKoolInputTest {
      */
     private class Case(val name: String, val glfw: Int, val key: Key) {
 
+        /** The name a game binds a [PRINTABLE] key by. */
+        val input: InputKey get() = INPUT_NAMES.getValue(name)
+
         /** The binding a [PRINTABLE] key fires when the interface declines it. */
         val action: String = "test/key-$name"
 
@@ -505,19 +433,17 @@ class GlKoolInputTest {
         /** The size the default button style asks for. A style whose size is not registered throws. */
         const val FONT_SIZE = 16
 
-        /** No scancode and no modifiers: GLFW passes both, and Kool's mapping reads neither. */
-        const val NO_SCANCODE = 0
-        const val NO_MODIFIERS = 0
-
-        /**
-         * Escape is one of the 41 special keys `GlfwInput.KEY_CODE_MAP` renames, so its code is
-         * Kool's own `-9` rather than GLFW's `256`. A binding on 256 would never fire, which is why
-         * this reads Kool's constant instead of GLFW's.
-         */
-        val ESCAPE = KeyboardInput.KEY_ESC.code
-
-        /** W is not in that map, so its code is the raw GLFW key: `GLFW_KEY_W`, which is `'W'.code`. */
-        val W = GLFW.GLFW_KEY_W
+        /** The [InputKey] each [PRINTABLE] case's name stands for. */
+        val INPUT_NAMES: Map<String, InputKey> =
+            ('A'..'Z').associate { it.toString() to InputKey.valueOf(it.toString()) } +
+                ('0'..'9').associate { it.toString() to InputKey.valueOf("Digit$it") } +
+                mapOf(
+                    "Space" to InputKey.Space, "Minus" to InputKey.Minus, "Equal" to InputKey.Equals,
+                    "LeftBracket" to InputKey.LeftBracket, "RightBracket" to InputKey.RightBracket,
+                    "Backslash" to InputKey.Backslash, "Semicolon" to InputKey.Semicolon,
+                    "Apostrophe" to InputKey.Apostrophe, "Grave" to InputKey.Grave,
+                    "Comma" to InputKey.Comma, "Period" to InputKey.Period, "Slash" to InputKey.Slash,
+                )
 
         /** Every letter, because the failure in issue #230 was per key. */
         val LETTERS = listOf(

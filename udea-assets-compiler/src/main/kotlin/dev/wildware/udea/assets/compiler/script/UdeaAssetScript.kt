@@ -49,6 +49,8 @@ public abstract class UdeaAssetScript
 public object UdeaAssetScriptConfiguration : ScriptCompilationConfiguration({
     defaultImports(
         "dev.wildware.udea.assets.compiler.*",
+        // `key(InputKey.W)`: a controls asset names its keys, never a backend's numbers (issue #228).
+        "dev.wildware.udea.assets.InputKey",
         "kotlin.math.*",
     )
 
@@ -68,9 +70,13 @@ public object UdeaAssetScriptConfiguration : ScriptCompilationConfiguration({
         // issue #201 and its JVM jar is now `udea-diagnostics-jvm-<version>.jar`. With the old
         // name this object failed to initialise in the forked pipeline, and every `.udea.kts`
         // in `moba` reported UDEA0022 with `ExceptionInInitializerError`.
+        //
+        // `udea-assets-jvm` for the same reason, since issue #228: a controls script names its keys
+        // with `InputKey`, which is the asset model's.
         dependenciesFromClassContext(
             UdeaAssetScript::class,
             "udea-assets-compiler",
+            "udea-assets-jvm",
             "udea-diagnostics-jvm",
             "kotlin-stdlib",
         )

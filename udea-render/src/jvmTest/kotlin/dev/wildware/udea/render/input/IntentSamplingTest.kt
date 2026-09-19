@@ -1,5 +1,6 @@
 package dev.wildware.udea.render.input
 
+import dev.wildware.udea.assets.InputKey
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.configureWorld
 import dev.wildware.udea.core.GameContext
@@ -172,7 +173,7 @@ class IntentSamplingTest {
 
     private companion object {
 
-        const val KEY_FIRE: Int = 62
+        val KEY_FIRE: InputKey = InputKey.Space
 
         const val TICKS: Int = 40
         const val HOLD_FROM: Int = 5
@@ -180,7 +181,7 @@ class IntentSamplingTest {
         const val TAP_AT: Int = 20
 
         val BINDINGS: InputBindings = InputBindings(
-            actions = listOf(ActionBinding("t/fire", keys = intArrayOf(KEY_FIRE))),
+            actions = listOf(ActionBinding("t/fire", keys = listOf(KEY_FIRE))),
             axes = listOf(Axis2DBinding("t/move")),
         )
 

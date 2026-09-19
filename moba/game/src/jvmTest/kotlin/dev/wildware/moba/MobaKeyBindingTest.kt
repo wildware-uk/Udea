@@ -1,5 +1,6 @@
 package dev.wildware.moba
 
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.render.input.ActionId
 import dev.wildware.udea.render.input.DeviceIntent
 import dev.wildware.udea.render.input.Intent
@@ -14,50 +15,36 @@ import kotlin.test.assertTrue
  *
  * ## The defect this exists for
  *
- * A key code is a number, and the number changed underneath this game when LibGDX left. Gdx's
- * `W` is 51 and Kool's 51 is the digit `3`; gdx's `Space` is 62 and Kool's 62 is `>`. Carried
- * across unchanged, `moba/game/assets/control/controls.udea.kts` would have gone on compiling,
- * `udeaValidateAssets` would have gone on passing it, `MobaControlAssets` would have built a
- * perfectly well-formed `InputBindings` out of it, and the game would have answered to eight
- * keys nobody presses. Nothing in the build catches that. Nothing in a screenshot shows it:
- * `runShot`, `runMatchShot` and `runLaneShot` all synthesise their input through
- * `InjectedIntent`, which never touches a key code at all.
+ * The controls asset used to hold numbers, and the numbers changed underneath this game twice:
+ * LibGDX's `W` was 51, which under Kool is the digit `3`, and Kool's own desktop codes are not its
+ * Android codes. Since issue #228 the asset names its keys - `key(InputKey.W)` - and `udea-render`
+ * owns the numbers, so what is left to go wrong on this side is the *naming*: an asset that binds
+ * walk-up to `InputKey.S`, or attack to a key nobody expects. Nothing in the build catches that and
+ * nothing in a screenshot shows it: `runShot`, `runMatchShot` and `runLaneShot` all synthesise their
+ * input through `InjectedIntent`, which never touches a key at all.
  *
- * So this is the only thing between a renumbered keyboard and a player. It drives **all eight**
- * bound keys, because the failure is per-key: a table with one number wrong looks exactly like a
- * table with eight numbers right until the wrong key is the one you press.
+ * So this drives **all eight** bound keys, because the failure is per-key, and then every key the
+ * game does not bind, because a key doing a job it should not is the same failure seen from the
+ * other side.
  *
  * ## Why it stops at the `Intent`
  *
  * `MobaInputTest` already carries the other half - a key held through a whole `GameHost` moving
  * the player's coordinate - and repeating that eight times would be eight seeded matches to
- * assert one array index each. The claim here is narrower and is the one that broke: *this code
- * reaches this action*. `DeviceIntent` is the real production `IntentSource`, sampling the real
- * `MobaControls.BINDINGS` read out of the real packed bundle, so nothing on the path from the
- * asset to the intent is a stand-in.
+ * assert one array index each. The claim here is narrower: *this key reaches this action*.
+ * `DeviceIntent` is the real production `IntentSource`, sampling the real `MobaControls.BINDINGS`
+ * read out of the real packed bundle, so nothing on the path from the asset to the intent is a
+ * stand-in.
  *
- * `KeyboardState` is, and that is the seam rather than a shortcut: `DeviceIntent` names no
- * backend type, and the class that feeds it real key events is `udea-render`'s `KoolKeyboard`
- * (issue #224). What a Kool key event *is* - and therefore whether 87 is the number a driver
- * delivers - is pinned there, against a running context. What this file pins is that the game
- * asks for 87, that the asset and the constant table agree it is "walk up", and that no other key
- * does.
- *
- * ## The eight are all printable, which is why they are GLFW's own numbers
- *
- * Kool's desktop backend resolves a key as `KEY_CODE_MAP[key] ?: UniversalKeyCode(key)`, and
- * `KEY_CODE_MAP` holds only special keys - the modifiers, escape, enter, tab, backspace, delete,
- * insert, home, end, the page and cursor keys, the numpad and F1-F12 - which it maps to Kool's
- * own **negative** codes (escape is -9, not GLFW's 256). Every key this game binds is a letter or
- * the space bar, so every one of them falls through to the raw GLFW int. A binding on escape or
- * an arrow would need Kool's number instead, and neither the character nor the GLFW constant
- * would be right for it.
+ * `KeyboardState` is, and that is the seam rather than a shortcut: which physical key arrives as
+ * which [InputKey] is `udea-render`'s, pinned per key against Kool's real key path by
+ * `GlKoolKeyTableTest` (desktop) and `AndroidKeyTableTest` (Kool's Android key map).
  */
 class MobaKeyBindingTest {
 
     /** Holding a key and sampling the real source, as a tick does. */
-    private fun sample(vararg keycodes: Int): Intent {
-        val keys = HeldKeys(keycodes.toSet())
+    private fun sample(vararg held: InputKey): Intent {
+        val keys = HeldKeys(held.toSet())
         val intent = Intent(MobaControls.BINDINGS.catalog)
         DeviceIntent(MobaControls.BINDINGS, keys).sample(intent)
         return intent
@@ -68,24 +55,24 @@ class MobaKeyBindingTest {
     fun `each movement key deflects the move axis its own way`() {
         val axis = MobaControls.MOVE_AXIS
         val cases = listOf(
-            Triple("W", MobaControls.Keys.W, 0f to 1f),
-            Triple("A", MobaControls.Keys.A, -1f to 0f),
-            Triple("S", MobaControls.Keys.S, 0f to -1f),
-            Triple("D", MobaControls.Keys.D, 1f to 0f),
+            Triple("W", InputKey.W, 0f to 1f),
+            Triple("A", InputKey.A, -1f to 0f),
+            Triple("S", InputKey.S, 0f to -1f),
+            Triple("D", InputKey.D, 1f to 0f),
         )
-        cases.forEach { (name, code, expected) ->
-            val intent = sample(code)
+        cases.forEach { (name, key, expected) ->
+            val intent = sample(key)
             assertEquals(
                 expected.first,
                 intent.axisX(axis),
                 absoluteTolerance = 1e-6f,
-                message = "$name (code $code) deflected move x the wrong way",
+                message = "$name deflected move x the wrong way",
             )
             assertEquals(
                 expected.second,
                 intent.axisY(axis),
                 absoluteTolerance = 1e-6f,
-                message = "$name (code $code) deflected move y the wrong way",
+                message = "$name deflected move y the wrong way",
             )
         }
     }
@@ -94,22 +81,22 @@ class MobaKeyBindingTest {
     @Test
     fun `each ability key fires its own action and only its own`() {
         val bound = listOf(
-            Triple("Space", MobaControls.Keys.SPACE, MobaControls.ATTACK_ACTION),
-            Triple("Q", MobaControls.Keys.Q, MobaControls.ATTACK_2_ACTION),
-            Triple("E", MobaControls.Keys.E, MobaControls.ITEM_1_ACTION),
-            Triple("R", MobaControls.Keys.R, MobaControls.ITEM_2_ACTION),
+            Triple("Space", InputKey.Space, MobaControls.ATTACK_ACTION),
+            Triple("Q", InputKey.Q, MobaControls.ATTACK_2_ACTION),
+            Triple("E", InputKey.E, MobaControls.ITEM_1_ACTION),
+            Triple("R", InputKey.R, MobaControls.ITEM_2_ACTION),
         )
-        bound.forEach { (name, code, action) ->
-            val intent = sample(code)
+        bound.forEach { (name, key, action) ->
+            val intent = sample(key)
             assertTrue(
                 intent.isPressed(action),
-                "$name (code $code) did not press the action it is bound to",
+                "$name did not press the action it is bound to",
             )
             bound.forEach { (otherName, _, other) ->
                 if (other != action) {
                     assertFalse(
                         intent.isPressed(other),
-                        "$name (code $code) also pressed $otherName's action",
+                        "$name also pressed $otherName's action",
                     )
                 }
             }
@@ -119,149 +106,77 @@ class MobaKeyBindingTest {
     /**
      * The four movement keys fire no ability, and the four ability keys move nothing.
      *
-     * The cross-check the two tests above cannot make on their own: a table where `W` happened to
-     * carry `Space`'s number would pass "W deflects the axis" and "Space fires attack" and still
+     * The cross-check the two tests above cannot make on their own: an asset where `W` were also
+     * bound to attack would pass "W deflects the axis" and "Space fires attack" and still
      * be wrong, because one key would be doing two jobs.
      */
     @Test
     fun `movement and ability keys do not cross over`() {
         val movement = listOf(
-            MobaControls.Keys.W,
-            MobaControls.Keys.A,
-            MobaControls.Keys.S,
-            MobaControls.Keys.D,
+            InputKey.W,
+            InputKey.A,
+            InputKey.S,
+            InputKey.D,
         )
         val abilities = listOf(
-            MobaControls.Keys.SPACE,
-            MobaControls.Keys.Q,
-            MobaControls.Keys.E,
-            MobaControls.Keys.R,
+            InputKey.Space,
+            InputKey.Q,
+            InputKey.E,
+            InputKey.R,
         )
-        movement.forEach { code ->
-            val intent = sample(code)
+        movement.forEach { key ->
+            val intent = sample(key)
             repeat(MobaControls.BINDINGS.catalog.actionCount) { index ->
                 assertFalse(
                     intent.isPressed(ActionId(index)),
-                    "movement key $code fired action $index",
+                    "movement key $key fired action $index",
                 )
             }
         }
-        abilities.forEach { code ->
-            val intent = sample(code)
+        abilities.forEach { key ->
+            val intent = sample(key)
             assertEquals(
                 0f,
                 intent.axisX(MobaControls.MOVE_AXIS),
                 absoluteTolerance = 1e-6f,
-                message = "ability key $code moved the player",
+                message = "ability key $key moved the player",
             )
             assertEquals(
                 0f,
                 intent.axisY(MobaControls.MOVE_AXIS),
                 absoluteTolerance = 1e-6f,
-                message = "ability key $code moved the player",
+                message = "ability key $key moved the player",
             )
         }
     }
 
     /**
-     * None of the eight is still on the number LibGDX used for it.
+     * Every key the game does not bind does nothing: no action, no movement.
      *
-     * ## Why this is a negative and not `assertEquals('W'.code, Keys.W)`
-     *
-     * `MobaControls.Keys.W` *is* `'W'.code`, so asserting that would restate the declaration and
-     * pass for any value it ever took. A test that cannot fail is worse than no test, because it
-     * reads as coverage. What can fail is the revert: somebody merging an older branch, or
-     * copying a binding out of one of this repository's many surviving gdx-era documents, puts
-     * `51` back and the game answers to the digit `3`.
-     *
-     * ## What this file does not claim
-     *
-     * That 87 is the number a driver delivers. Nothing here has a GL context, a window or a key
-     * event in it, so that claim would have no subject; it belongs to `udea-render`, where issue
-     * #224's `GlKoolInputTest` drives Kool's own GLFW key callback and reads the code back out of
-     * a running context. What these tests pin is the game's half - that the packed asset, this
-     * constant table and the action each key fires all agree, key by key, with no crossover -
-     * which is the half that would otherwise have no test at all.
+     * The negative the positive tests cannot make: each of them holds a bound key and asserts the
+     * job happened, so an asset that *also* bound attack to, say, `InputKey.Digit3` would pass all
+     * of them. Here every other key is held alone and must leave the intent empty.
      */
     @Test
-    fun `no binding is still on the LibGDX code it replaced`() {
-        // `com.badlogic.gdx.Input.Keys` values, from the table this game used to import.
-        val gdx = listOf(
-            Triple("Q", MobaControls.Keys.Q, 45),
-            Triple("W", MobaControls.Keys.W, 51),
-            Triple("A", MobaControls.Keys.A, 29),
-            Triple("S", MobaControls.Keys.S, 47),
-            Triple("D", MobaControls.Keys.D, 32),
-            Triple("E", MobaControls.Keys.E, 33),
-            Triple("R", MobaControls.Keys.R, 46),
-            Triple("SPACE", MobaControls.Keys.SPACE, 62),
+    fun `a key the game does not bind does nothing`() {
+        val bound = setOf(
+            InputKey.W, InputKey.A, InputKey.S, InputKey.D,
+            InputKey.Space, InputKey.Q, InputKey.E, InputKey.R,
         )
-        gdx.forEach { (name, bound, old) ->
-            assertTrue(
-                bound != old,
-                "$name is back on LibGDX's code $old, which is a different key under Kool",
-            )
+        val live = InputKey.entries.filter { it !in bound }.filter { key ->
+            val intent = sample(key)
+            val fired = (0 until MobaControls.BINDINGS.catalog.actionCount).any { intent.isPressed(ActionId(it)) }
+            fired || intent.axisX(MobaControls.MOVE_AXIS) != 0f || intent.axisY(MobaControls.MOVE_AXIS) != 0f
         }
-    }
-
-    /**
-     * The code each key used to carry does not do that key's job any more.
-     *
-     * ## Why the positive tests above are not enough on their own
-     *
-     * Each of them holds `MobaControls.Keys.W` and asserts the axis moved, so it proves the code
-     * in the table reaches the action the table says it does. It cannot notice that the table
-     * holds the wrong number, because it asks the question using the answer. The first draft of
-     * `udea-render`'s `GlKoolInputTest` had that shape - it built the key event and bound the same
-     * code - and so passed for any number at all.
-     *
-     * The negative closes it. Holding the **LibGDX** code for a key and getting nothing is a
-     * measurement of the table rather than a restatement of it: a branch that reverts these eight
-     * numbers passes every assertion above and fails every assertion here.
-     *
-     * ## One of the eight needs care, and it is the reason this is per-key
-     *
-     * Gdx's `D` is 32, and 32 is Kool's space bar, so holding gdx-`D` really does press attack -
-     * it is a live code, just not the one `D` should be. So the claim is not "the old code does
-     * nothing" but "the old code does not do *this key's* job", which is what a player would
-     * notice and is true of all eight.
-     */
-    @Test
-    fun `the LibGDX code for each key no longer does that key's job`() {
-        val axis = MobaControls.MOVE_AXIS
-        listOf(
-            Triple("W", 51, 0f to 1f),
-            Triple("A", 29, -1f to 0f),
-            Triple("S", 47, 0f to -1f),
-            Triple("D", 32, 1f to 0f),
-        ).forEach { (name, gdxCode, wouldBe) ->
-            val intent = sample(gdxCode)
-            assertFalse(
-                intent.axisX(axis) == wouldBe.first && intent.axisY(axis) == wouldBe.second,
-                "LibGDX's $name (code $gdxCode) still walks the player $name-wards, so the " +
-                    "binding table was never moved off gdx's numbering",
-            )
-        }
-        listOf(
-            Triple("Space", 62, MobaControls.ATTACK_ACTION),
-            Triple("Q", 45, MobaControls.ATTACK_2_ACTION),
-            Triple("E", 33, MobaControls.ITEM_1_ACTION),
-            Triple("R", 46, MobaControls.ITEM_2_ACTION),
-        ).forEach { (name, gdxCode, action) ->
-            assertFalse(
-                sample(gdxCode).isPressed(action),
-                "LibGDX's $name (code $gdxCode) still fires $name's ability, so the binding " +
-                    "table was never moved off gdx's numbering",
-            )
-        }
+        assertEquals(emptyList(), live, "keys the game does not bind still did something")
     }
 
     /** A keyboard with a fixed set of keys held down and nothing else. */
-    private class HeldKeys(private val down: Set<Int>) : KeyboardState {
+    private class HeldKeys(private val down: Set<InputKey>) : KeyboardState {
 
-        override fun isKeyDown(keycode: Int): Boolean = keycode in down
+        override fun isKeyDown(key: InputKey): Boolean = key in down
 
-        override fun pressesSince(keycode: Int): Int = if (keycode in down) 1 else 0
+        override fun pressesSince(key: InputKey): Int = if (key in down) 1 else 0
 
         override fun endSample(): Unit = Unit
     }

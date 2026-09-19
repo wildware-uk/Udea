@@ -1,5 +1,6 @@
 package dev.wildware.udea.render.input
 
+import dev.wildware.udea.assets.InputKey
 import kotlin.math.sqrt
 
 /**
@@ -43,7 +44,9 @@ public class DeviceIntent(
             val binding = actions[index]
             var held = false
             var presses = 0
-            for (key in binding.keys) {
+            val keys = binding.keys
+            for (k in keys.indices) {
+                val key = keys[k]
                 if (keyboard.isKeyDown(key)) held = true
                 presses += keyboard.pressesSince(key)
             }
@@ -107,10 +110,10 @@ public class DeviceIntent(
     }
 
     /** `-1`, `0` or `+1` from an opposing key pair. Both down cancels, which is what a player means. */
-    private fun keyAxis(negative: Int, positive: Int): Float {
+    private fun keyAxis(negative: InputKey?, positive: InputKey?): Float {
         var value = 0f
-        if (negative != Axis2DBinding.UNBOUND && keyboard.isKeyDown(negative)) value -= 1f
-        if (positive != Axis2DBinding.UNBOUND && keyboard.isKeyDown(positive)) value += 1f
+        if (negative != null && keyboard.isKeyDown(negative)) value -= 1f
+        if (positive != null && keyboard.isKeyDown(positive)) value += 1f
         return value
     }
 

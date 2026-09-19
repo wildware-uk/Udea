@@ -8,6 +8,7 @@ import dev.wildware.udea.core.fixtures.testGameContext
 import dev.wildware.udea.core.gameContext
 import dev.wildware.udea.render.support.RepoLayout
 import dev.wildware.udea.render.support.testTargets
+import org.objectweb.asm.ClassReader
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -46,14 +47,13 @@ class NoRenderSystemIsAFleksSystemTest {
         val classes = RepoLayout.classFiles("udea-render", "main")
         check(classes.isNotEmpty()) { "udea-render has no compiled classes; this check is vacuous" }
 
-        val offenders = classes
-            .map { file -> loadClass(file) }
-            .filter { candidate ->
-                (RenderSystem::class.java.isAssignableFrom(candidate) ||
-                    OverlaySystem::class.java.isAssignableFrom(candidate)) &&
-                    IntervalSystem::class.java.isAssignableFrom(candidate)
+        val byName = classes.associateBy { binaryName(it) }
+        val offenders = byName.keys
+            .filter { name ->
+                (isA(name, RenderSystem::class.java, byName) || isA(name, OverlaySystem::class.java, byName)) &&
+                    isA(name, IntervalSystem::class.java, byName)
             }
-            .map { it.name }
+            .sorted()
 
         assertEquals(emptyList(), offenders)
     }
@@ -78,20 +78,35 @@ class NoRenderSystemIsAFleksSystemTest {
         override fun render(target: OffscreenTarget, alpha: Float) = Unit
     }
 
-    /**
-     * Loads a compiled class by the binary name its path spells out.
-     *
-     * Not wrapped in a `runCatching`: every class file under a `main` output directory is on this
-     * test's runtime classpath, so a failure to load one means the classpath and the output
-     * directory disagree -- which would make the scan above silently skip classes, and is
-     * exactly the kind of quiet hole a gate must not have.
-     */
-    private fun loadClass(file: java.io.File): Class<*> {
+    /** The binary name [file]'s path spells out, under its `main` output directory. */
+    private fun binaryName(file: java.io.File): String {
         val root = generateSequence(file.parentFile) { it.parentFile }.first { it.name == "main" }
-        val binaryName = file.relativeTo(root).invariantSeparatorsPath
-            .removeSuffix(".class")
-            .replace('/', '.')
-        return Class.forName(binaryName, false, javaClass.classLoader)
+        return file.relativeTo(root).invariantSeparatorsPath.removeSuffix(".class").replace('/', '.')
+    }
+
+    /**
+     * Whether the class [name] is a [type], by loading it where this JVM can.
+     *
+     * Every class compiled from `commonMain` or `jvmMain` is on this test's runtime classpath and is
+     * loaded, not wrapped in a `runCatching`: a class that should load and does not means the
+     * classpath and the output directory disagree, which would make the scan silently skip classes.
+     * The one exception is a class compiled from `androidMain` alone (`KoolKeyTable.android.kt`,
+     * issue #228), which no JVM test classpath holds. Its header is read from the class file instead
+     * and each of its supertypes checked the same way, so an Android-only class cannot slip past.
+     */
+    private fun isA(name: String, type: Class<*>, files: Map<String, java.io.File>): Boolean {
+        val loaded = try {
+            Class.forName(name, false, javaClass.classLoader)
+        } catch (missing: ClassNotFoundException) {
+            val file = files[name] ?: throw missing
+            check("/android/main/" in file.invariantSeparatorsPath) {
+                "$name is compiled for the JVM and is not on the JVM test classpath: $file"
+            }
+            val header = ClassReader(file.readBytes())
+            val supertypes = listOfNotNull(header.superName) + header.interfaces
+            return supertypes.any { isA(it.replace('/', '.'), type, files) }
+        }
+        return type.isAssignableFrom(loaded)
     }
 
     private val ctx: GameContext = testGameContext(seed = 3L)

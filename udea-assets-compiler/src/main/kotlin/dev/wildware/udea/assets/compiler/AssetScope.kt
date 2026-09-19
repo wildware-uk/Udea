@@ -10,6 +10,7 @@ import dev.wildware.udea.assets.Control
 import dev.wildware.udea.assets.Effect
 import dev.wildware.udea.assets.GameConfig
 import dev.wildware.udea.assets.GameplayEffect
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.SoundCue
@@ -522,10 +523,15 @@ public class AssetScope(
         "direction" to direction,
     )
 
-    /** A keyboard key, by its libGDX key code. */
-    public fun key(code: Int): Map<String, Any?> = linkedMapOf("kind" to "key", "code" to code)
+    /**
+     * A keyboard key, by name: `key(InputKey.W)`.
+     *
+     * A name and never a number (issue #228): the renderer owns the table from a name to the code
+     * its backend reports, so the same asset means the same key on the desktop and on Android.
+     */
+    public fun key(key: InputKey): Map<String, Any?> = linkedMapOf("kind" to "key", "key" to key.name)
 
-    /** A mouse button, by its libGDX button code. */
+    /** A mouse button, by index: `0` is the primary button. */
     public fun mouse(button: Int): Map<String, Any?> =
         linkedMapOf("kind" to "mouseButton", "code" to button)
 

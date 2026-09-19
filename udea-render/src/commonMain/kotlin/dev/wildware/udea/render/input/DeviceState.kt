@@ -1,5 +1,7 @@
 package dev.wildware.udea.render.input
 
+import dev.wildware.udea.assets.InputKey
+
 /**
  * The keyboard, as the sampler needs it: what is down, and what was tapped since the last tick.
  *
@@ -22,18 +24,16 @@ package dev.wildware.udea.render.input
 public interface KeyboardState {
 
     /**
-     * Whether [keycode] is down right now.
+     * Whether [key] is down right now.
      *
-     * The code is the *backend's* own table, and there is exactly one per build: Kool's universal
-     * key codes since issue #224 - GLFW's constant for a printable key, so `'W'.code` (87, the ASCII
-     * uppercase) for W, and a small negative for Escape and the other special keys - where
-     * it used to be `com.badlogic.gdx.Input.Keys`. `ActionBinding.keys` speaks the same table, and
-     * `KoolKeyboard` is what fills this in.
+     * By name, never by a backend's number (issue #228): `KoolKeyboard` translates what the backend
+     * reports through `KoolKeyTable`, so a caller - `DeviceIntent`, a test, an agent - cannot hold
+     * a number that means a different key on another backend.
      */
-    public fun isKeyDown(keycode: Int): Boolean
+    public fun isKeyDown(key: InputKey): Boolean
 
-    /** How many times [keycode] went down since [endSample] was last called. */
-    public fun pressesSince(keycode: Int): Int
+    /** How many times [key] went down since [endSample] was last called. */
+    public fun pressesSince(key: InputKey): Int
 
     /**
      * Marks the end of one tick's sample: every press counted so far is now spent.
@@ -46,8 +46,8 @@ public interface KeyboardState {
     public companion object {
         /** A keyboard nobody is at. */
         public val NONE: KeyboardState = object : KeyboardState {
-            override fun isKeyDown(keycode: Int): Boolean = false
-            override fun pressesSince(keycode: Int): Int = 0
+            override fun isKeyDown(key: InputKey): Boolean = false
+            override fun pressesSince(key: InputKey): Int = 0
             override fun endSample(): Unit = Unit
             override fun toString(): String = "KeyboardState.NONE"
         }
@@ -61,10 +61,10 @@ public interface KeyboardState {
  * The same shape as [KeyboardState] - a level plus a counted edge that [endSample] spends - for the
  * same reason: a click pressed and released between two ticks is still exactly one press.
  *
- * A button is the backend's own index, as a key is the backend's own code: on Kool `0` is the left
- * button, `1` the right, `2` the middle, `3` back and `4` forward (`PointerInput.LEFT_BUTTON` and
- * its neighbours), and a finger on a touch screen presses `0`. Every pointer is folded together: a
- * button is down when any pointer holds it, and two fingers landing are two presses.
+ * A button is the backend's own index: on Kool `0` is the left button, `1` the right, `2` the
+ * middle, `3` back and `4` forward (`PointerInput.LEFT_BUTTON` and its neighbours), and a finger on
+ * a touch screen presses `0`. Every pointer is folded together: a button is down when any pointer
+ * holds it, and two fingers landing are two presses.
  *
  * ## Threading
  *

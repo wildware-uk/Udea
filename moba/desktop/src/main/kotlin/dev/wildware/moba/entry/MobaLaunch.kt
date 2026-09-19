@@ -99,8 +99,8 @@ public object MobaLaunch {
      * a test holds keys on (`MobaInputTest`), with no window and no context; the device half is
      * `udea-render`'s `KoolKeyboard`, tested there against Kool's real GLFW callback.
      *
-     * The codes the bindings speak are Kool's own, not LibGDX's - see `MobaControls.Keys` for what
-     * that ties this game to and the issue that moves the table into the engine.
+     * The bindings name their keys (`InputKey`) and hold no backend's numbers: `KoolKeyboard`
+     * translates what the backend reports through `udea-render`'s key table (issue #228).
      *
      * ## Where an agent's input joins
      *

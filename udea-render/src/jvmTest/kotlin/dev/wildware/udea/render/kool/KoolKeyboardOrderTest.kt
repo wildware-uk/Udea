@@ -4,6 +4,7 @@ import de.fabmax.kool.input.KeyEvent
 import de.fabmax.kool.input.KeyboardInput
 import de.fabmax.kool.input.LocalKeyCode
 import de.fabmax.kool.input.UniversalKeyCode
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.render.input.ActionBinding
 import dev.wildware.udea.render.input.DeviceIntent
 import dev.wildware.udea.render.input.InputBindings
@@ -99,7 +100,7 @@ class KoolKeyboardOrderTest {
     @Test
     fun `a press the interface declined becomes an intent`() {
         val bindings = InputBindings(
-            actions = listOf(ActionBinding(name = "test/walk", keys = intArrayOf(W))),
+            actions = listOf(ActionBinding(name = "test/walk", keys = listOf(W))),
             axes = emptyList(),
         )
         val source = DeviceIntent(bindings, keyboard)
@@ -116,7 +117,7 @@ class KoolKeyboardOrderTest {
     @Test
     fun `a press the interface took becomes no intent`() {
         val bindings = InputBindings(
-            actions = listOf(ActionBinding(name = "test/menu", keys = intArrayOf(ESCAPE))),
+            actions = listOf(ActionBinding(name = "test/menu", keys = listOf(ESCAPE))),
             axes = emptyList(),
         )
         val source = DeviceIntent(bindings, keyboard)
@@ -180,7 +181,7 @@ class KoolKeyboardOrderTest {
     fun `a character only speaks for the key immediately before it`() {
         val typing = KoolKeyboard(TakesText)
         try {
-            val s = 'S'.code
+            val s = InputKey.S
             typing.onKeyEvents(listOf(down(W), down(s), typed('s')))
 
             assertEquals(1, typing.pressesSince(W), "W typed nothing, and a later key's character took it anyway")
@@ -206,7 +207,7 @@ class KoolKeyboardOrderTest {
 
     /** An interface that wants Escape and nothing else. */
     private object TakesEscape : UiInput {
-        override fun onKey(event: KeyStroke): Boolean = event.keycode == ESCAPE
+        override fun onKey(event: KeyStroke): Boolean = event.key == ESCAPE
     }
 
     /** A focused text field: it takes every printable character and no key. */
@@ -214,9 +215,9 @@ class KoolKeyboardOrderTest {
         override fun onKey(event: KeyStroke): Boolean = event.phase == KeyPhase.Character
     }
 
-    private fun repeat(code: Int) = KeyEvent(
-        UniversalKeyCode(code),
-        LocalKeyCode(code),
+    private fun repeat(key: InputKey) = KeyEvent(
+        UniversalKeyCode(codeOf(key)),
+        LocalKeyCode(codeOf(key)),
         KeyboardInput.KEY_EV_DOWN or KeyboardInput.KEY_EV_REPEATED,
         0,
     )
@@ -230,23 +231,34 @@ class KoolKeyboardOrderTest {
         char,
     )
 
-    private fun down(code: Int) = KeyEvent(
-        UniversalKeyCode(code),
-        LocalKeyCode(code),
+    private fun down(key: InputKey) = KeyEvent(
+        UniversalKeyCode(codeOf(key)),
+        LocalKeyCode(codeOf(key)),
         KeyboardInput.KEY_EV_DOWN,
         0,
     )
 
-    private fun up(code: Int) = KeyEvent(
-        UniversalKeyCode(code),
-        LocalKeyCode(code),
+    private fun up(key: InputKey) = KeyEvent(
+        UniversalKeyCode(codeOf(key)),
+        LocalKeyCode(codeOf(key)),
         KeyboardInput.KEY_EV_UP,
         0,
     )
 
+    /**
+     * The code Kool reports for [key] on the desktop, for building an event by hand. This test is
+     * about ordering, not the table: which physical key arrives as which name is
+     * `GlKoolKeyTableTest`'s, through Kool's real callback.
+     */
+    private fun codeOf(key: InputKey): Int = when (key) {
+        ESCAPE -> KeyboardInput.KEY_ESC.code
+        W -> 'W'.code
+        InputKey.S -> 'S'.code
+        else -> error("this test builds events for Escape, W and S only, not $key")
+    }
+
     private companion object {
-        val ESCAPE = KeyboardInput.KEY_ESC.code
-        /** What GLFW sends for W, and so what Kool reports: the ASCII uppercase, 87. */
-        val W = 'W'.code
+        val ESCAPE = InputKey.Escape
+        val W = InputKey.W
     }
 }

@@ -1,5 +1,6 @@
 package dev.wildware.udea.assets.compiler
 
+import dev.wildware.udea.assets.compiler.pipeline.AssetPipeline
 import dev.wildware.udea.diagnostics.Severity
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
 import dev.wildware.udea.diagnostics.UdeaRules
@@ -25,7 +26,7 @@ import kotlin.test.assertTrue
  * `callsInPlace(EXACTLY_ONCE | AT_MOST_ONCE)` for that parameter. So the spelling of the call is
  * irrelevant: every script below except the negatives spells a repeat a different way.
  *
- * Nothing here runs pass 1, so a red case cannot be the name matcher's.
+ * Only the pipeline test runs pass 1, so no other red case can be the name matcher's.
  *
  * ### With the plugin disabled
  *
@@ -176,6 +177,28 @@ class AssetLoopResolutionTest {
             """.trimIndent(),
         )
         assertEquals(listOf(4 to 5), loopSites(diagnostics), diagnostics.toString())
+    }
+
+    /**
+     * The build's own path, both passes: a loop each of them refuses is one diagnostic.
+     *
+     * Pass 1 reports a bare `repeat` with the element's whole span and pass 2 with its start
+     * only, so `DiagnosticSink`'s rule-and-span dedupe cannot join them; `notAlreadyIn` does.
+     */
+    @Test
+    fun `the build reports a loop both passes find once, at pass 1's span`() {
+        requirePlugin()
+        val root = TestPaths.scratch("loop-resolution-pipeline")
+        val assets = root.resolve("assets")
+        assets.createDirectories()
+        assets.resolve("arena.udea.kts").writeText("blueprint(name = \"b\")\nrepeat(2) { }\n")
+
+        val compiled = AssetPipeline.compileAndValidate(root, assets, TestPaths.compilerClasspath, root.resolve("cache"))
+
+        val loop = compiled.report.diagnostics.single { it.ruleId == UdeaRules.LOOP_IN_ASSET.id }
+        val span = assertNotNull(loop.span)
+        assertEquals(2 to 1, span.startLine to span.startColumn)
+        assertTrue(span.endColumn > span.startColumn, "pass 1's copy, which spans the call: $span")
     }
 
     @Test

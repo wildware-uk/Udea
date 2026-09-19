@@ -46,5 +46,26 @@ public data class AxisFrame(
             // `0f - s`, not `-s`: a zero heading must be exactly [WORLD], and -0f is not 0f to a data class.
             return AxisFrame(WorldPoint(c, s, 0f), WorldPoint(0f - s, c, 0f), WORLD.z)
         }
+
+        /**
+         * The world's axes turned [rotationX] radians about X, then [rotationY] about Y, then
+         * [rotationZ] about Z (issue #237): the frame of an entity turned by a `Transform3D`'s three
+         * angles, in the order its model is drawn with them. A turn about Z alone is [heading], and no
+         * turn at all is exactly [WORLD].
+         */
+        public fun euler(rotationX: Float, rotationY: Float, rotationZ: Float): AxisFrame {
+            val cx = cos(rotationX)
+            val sx = sin(rotationX)
+            val cy = cos(rotationY)
+            val sy = sin(rotationY)
+            val cz = cos(rotationZ)
+            val sz = sin(rotationZ)
+            // The columns of Rz * Ry * Rx. `0f - ...` rather than `-...` for [heading]'s reason.
+            return AxisFrame(
+                WorldPoint(cz * cy, sz * cy, 0f - sy),
+                WorldPoint(cz * sy * sx - sz * cx, sz * sy * sx + cz * cx, cy * sx),
+                WorldPoint(cz * sy * cx + sz * sx, sz * sy * cx - cz * sx, cy * cx),
+            )
+        }
     }
 }

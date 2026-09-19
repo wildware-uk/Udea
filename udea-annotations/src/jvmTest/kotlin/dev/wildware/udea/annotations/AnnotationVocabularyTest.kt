@@ -41,6 +41,8 @@ class AnnotationVocabularyTest {
         "dev.wildware.udea.annotations.PositionHandle" to setOf(AnnotationTarget.CLASS),
         "dev.wildware.udea.annotations.SizeHandle" to setOf(AnnotationTarget.CLASS),
         "dev.wildware.udea.annotations.RotationHandle" to setOf(AnnotationTarget.CLASS),
+        // Issue #237: the 3D scale handle, which names its three factors like @PositionHandle names its axes.
+        "dev.wildware.udea.annotations.ScaleHandle" to setOf(AnnotationTarget.CLASS),
         "dev.wildware.udea.annotations.RadiusHandle" to setOf(AnnotationTarget.PROPERTY),
         "dev.wildware.udea.annotations.RangeHandle" to setOf(AnnotationTarget.PROPERTY),
         // Written by `udea-codegen` on a module registry, never by hand: which of the module's
@@ -146,8 +148,8 @@ class AnnotationVocabularyTest {
 
     /**
      * The defaults are the spec's (issue #233): a 2D position is `x`/`y` with no `z`, a size is
-     * `width`/`height` with no `depth`, and a rotation is `rotation`. An empty string is "no such
-     * axis", which is what makes one annotation mean 2D or 3D.
+     * `width`/`height` with no `depth`, and a rotation is `rotation` with no `aboutX` or `aboutY`.
+     * An empty string is "no such axis", which is what makes one annotation mean 2D or 3D.
      */
     @Test
     fun `the multi-field handles name their fields as strings, with the spec's defaults`() {
@@ -156,7 +158,9 @@ class AnnotationVocabularyTest {
 
         assertEquals(mapOf("x" to "x", "y" to "y", "z" to ""), defaults(PositionHandle::class.java))
         assertEquals(mapOf("width" to "width", "height" to "height", "depth" to ""), defaults(SizeHandle::class.java))
-        assertEquals(mapOf("rotation" to "rotation"), defaults(RotationHandle::class.java))
+        // Issue #237: a rotation names its two other angles only in 3D, and a scale is Transform3D's.
+        assertEquals(mapOf("rotation" to "rotation", "aboutX" to "", "aboutY" to ""), defaults(RotationHandle::class.java))
+        assertEquals(mapOf("x" to "scaleX", "y" to "scaleY", "z" to "scaleZ"), defaults(ScaleHandle::class.java))
         assertEquals(emptyMap(), defaults(RadiusHandle::class.java), "a one-field handle names nothing: it marks its field")
         assertEquals(emptyMap(), defaults(RangeHandle::class.java), "a one-field handle names nothing: it marks its field")
     }

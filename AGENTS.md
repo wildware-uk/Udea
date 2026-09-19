@@ -66,7 +66,7 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 
 | Module | Purpose |
 |---|---|
-| `udea-annotations` | Zero-dependency leaf: `@Net`, `@Sim`, `@Q`, `@Replicated`, `@AgentTool`, `@Arg`, and the gizmo handles `@PositionHandle`, `@SizeHandle`, `@RotationHandle`, `@RadiusHandle`, `@RangeHandle` |
+| `udea-annotations` | Zero-dependency leaf: `@Net`, `@Sim`, `@Q`, `@Replicated`, `@AgentTool`, `@Arg`, and the gizmo handles `@PositionHandle`, `@SizeHandle`, `@RotationHandle`, `@ScaleHandle`, `@RadiusHandle`, `@RangeHandle` |
 | `udea-diagnostics` | Zero-dependency leaf: `UdeaDiagnostic`, `Severity`, `SourceSpan`, `Fix`, rule ids, the JSON report |
 | `udea-codegen` | The KSP2 processor and KotlinPoet emitters; owns id assignment |
 | `udea-compiler-plugin` | The K2 FIR/IR plugin: checkers, KDoc propagation, gated declaration synthesis |
@@ -207,7 +207,8 @@ The pieces a newcomer meets first, each with the issue that made it so.
 
 - **Drawing is Kool, inside `udea-render`, on one thread.** Sprites and 3D models both:
   `Transform3D` (`udea-core`) places an entity in 3D - Z is up, a 2D position is the point on
-  the ground plane, it is saved in levels and never replicated - and `ModelRenderer`
+  the ground plane, it is saved in levels, and it is `@Replicated` with every field `@Sim` so the
+  editor's tools can write it while no delta packet ever carries it (#237) - and `ModelRenderer`
   (`udea-render`) draws a built-in mesh or a glTF/GLB model imported as a typed asset (#240).
   A skinned model is posed from its entity's `Animator` - clip, time and crossfade, read at the
   tick plus the interpolation alpha - and skinned on the GPU; the pose is the renderer's alone,
@@ -232,7 +233,7 @@ The pieces a newcomer meets first, each with the issue that made it so.
   an exact value back into the script (#195), and a value made inside a loop has no one place to
   write it.
 - **Gizmos are editor-only and never ship** (#233). A handle annotation on a component
-  (`@PositionHandle`, `@SizeHandle`, `@RotationHandle` on the class, naming its fields;
+  (`@PositionHandle`, `@SizeHandle`, `@RotationHandle`, `@ScaleHandle` on the class, naming its fields;
   `@RadiusHandle`, `@RangeHandle` on a field) becomes a generated `Gizmo` in the game's `editor`
   source set, listed with the hand-written ones in `<Game>GizmoRegistry`. A misspelled or non-`Float`
   field fails the build with `UDEA0017` and a did-you-mean. A drag answers field writes and never
@@ -241,7 +242,10 @@ The pieces a newcomer meets first, each with the issue that made it so.
   In the Scene tab a gizmo's handles are dragged with the mouse (#236): the built-in move, resize,
   rotate, radius and range handles (`moveHandles`, `sizeHandles`, ... on `GizmoScope`, which the
   generated gizmos call too), each drag one `editor.begin_edit` session and so one undo entry, Escape
-  cancelling it. Snapping and world/local axes are per-project editor preferences in
+  cancelling it. In 3D (#237) `Transform3D`'s handles are the built-in translate arrows and plane
+  squares, a rotation ring per Euler angle (each ring writes its own angle alone) and scale boxes
+  (`translateHandles`, `rotationRings`, `scaleHandles`), dragged through the Scene tab's 3D camera by
+  holding the pointer's ray to the handle's line or plane. Snapping and world/local axes are per-project editor preferences in
   `<project>/.udea/editor-preferences.properties`, never committed; Ctrl bypasses snapping.
 - **Replays are `.udearep` format 2**, which adds the recorded editor edits (#232). A recording
   with no edits is still written as format 1, and this build reads both.

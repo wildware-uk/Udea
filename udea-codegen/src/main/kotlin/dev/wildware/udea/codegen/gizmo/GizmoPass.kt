@@ -203,6 +203,7 @@ internal class GizmoPass(private val logger: KSPLogger, private val scope: Sourc
             AnnotationNames.POSITION_HANDLE,
             AnnotationNames.SIZE_HANDLE,
             AnnotationNames.ROTATION_HANDLE,
+            AnnotationNames.SCALE_HANDLE,
             AnnotationNames.RADIUS_HANDLE,
             AnnotationNames.RANGE_HANDLE,
         )

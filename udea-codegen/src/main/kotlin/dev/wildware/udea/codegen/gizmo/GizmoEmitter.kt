@@ -19,10 +19,11 @@ import dev.wildware.udea.codegen.registry.RegistryEmitter
  *
  * A generated gizmo is written exactly as a person would write it against the public API, which is
  * the point: an annotation is shorthand, and `GeneratedGizmoTest` holds each kind to a hand-written
- * twin. A 2D handle is one call to the editor's built-in for it (issue #236) - `moveHandles`,
- * `sizeHandles`, `rotationHandle`, `radiusHandle`, `rangeHandle` - the public functions a
- * hand-written gizmo calls too, so a generated gizmo and a built-in cannot differ. A 3D position or
- * size is still written out here, as issue #233 wrote it, until the 3D built-ins exist (issue #237).
+ * twin. A handle is one call to the editor's built-in for it - `moveHandles`, `sizeHandles`,
+ * `rotationHandle`, `radiusHandle`, `rangeHandle` in 2D (issue #236), and `translateHandles`,
+ * `rotationRings`, `scaleHandles` in 3D (issue #237) - the public functions a hand-written gizmo
+ * calls too, so a generated gizmo and a built-in cannot differ. A 3D size is the one handle still
+ * written out here, as issue #233 wrote it: the editor has no built-in 3D resize.
  * Every field is read by direct property access and named by a property reference, so nothing is
  * looked up by name at run time, and the whole file is KotlinPoet.
  *
@@ -96,23 +97,14 @@ internal object GizmoEmitter {
         is HandleModel.Position -> position(model)
         is HandleModel.Size -> size(model)
         is HandleModel.Rotation -> rotation(model)
+        is HandleModel.Scale -> builtin(EditorNames.SCALE_HANDLES, model.component, model.x, model.y, model.z)
         is HandleModel.Reach -> reach(model)
     }
 
-    /** At the fields' point; moved by the drag. The built-in on the ground plane in 2D; in the view's plane in 3D. */
+    /** At the fields' point; moved by the drag. The built-in move on the ground plane in 2D; the built-in translate in 3D. */
     private fun position(model: HandleModel.Position): CodeBlock {
-        val c = model.component
-        val z = model.z ?: return builtin(EditorNames.MOVE_HANDLES, c, model.x, model.y)
-        return CodeBlock.builder()
-            .addStatement("val x0 = target.component.%N", model.x)
-            .addStatement("val y0 = target.component.%N", model.y)
-            .addStatement("val z0 = target.component.%N", z)
-            .beginControlFlow("handle(%T(x0, y0, z0), %L, %L) { drag ->", EditorNames.WORLD_POINT, sphere(), viewPlane())
-            .addStatement("write(%T::%N, x0 + drag.dx)", c, model.x)
-            .addStatement("write(%T::%N, y0 + drag.dy)", c, model.y)
-            .addStatement("write(%T::%N, z0 + drag.dz)", c, z)
-            .endControlFlow()
-            .build()
+        val z = model.z ?: return builtin(EditorNames.MOVE_HANDLES, model.component, model.x, model.y)
+        return builtin(EditorNames.TRANSLATE_HANDLES, model.component, model.x, model.y, z)
     }
 
     /**
@@ -140,9 +132,13 @@ internal object GizmoEmitter {
             .build()
     }
 
-    /** A ring about the up axis at the entity: the built-in. */
-    private fun rotation(model: HandleModel.Rotation): CodeBlock =
-        builtin(EditorNames.ROTATION_HANDLE, model.component, model.field)
+    /** A ring about the up axis at the entity, or one per angle in 3D: the built-in either way. */
+    private fun rotation(model: HandleModel.Rotation): CodeBlock {
+        val aboutX = model.aboutX
+        val aboutY = model.aboutY
+        if (aboutX == null || aboutY == null) return builtin(EditorNames.ROTATION_HANDLE, model.component, model.field)
+        return builtin(EditorNames.ROTATION_RINGS, model.component, aboutX, aboutY, model.field)
+    }
 
     /** A grip on the rim of a circle of the field's size: the built-in for its kind. */
     private fun reach(model: HandleModel.Reach): CodeBlock =
@@ -158,8 +154,6 @@ internal object GizmoEmitter {
             .addStatement("%M(target, %L)", function, arguments.joinToCode())
             .build()
     }
-
-    private fun sphere(): CodeBlock = CodeBlock.of("%T.Sphere", EditorNames.HANDLE_SHAPE)
 
     /** Across the plane facing the view: a free drag in 3D. */
     private fun viewPlane(): CodeBlock = CodeBlock.of("%T.ViewPlane", EditorNames.DRAG_CONSTRAINT)

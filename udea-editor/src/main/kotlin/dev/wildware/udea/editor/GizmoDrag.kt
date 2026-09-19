@@ -10,8 +10,8 @@ import dev.wildware.udea.editor.gizmo.Plane
 import dev.wildware.udea.editor.gizmo.ShownHandle
 import dev.wildware.udea.editor.gizmo.WorldPoint
 import dev.wildware.udea.render.view.EditorCamera
-import dev.wildware.udea.render.view.ViewDimension
-import dev.wildware.udea.render.view.ViewPoint
+import dev.wildware.udea.render.view.ViewRay
+import kotlin.math.abs
 
 /**
  * A drag on a gizmo handle in the Scene tab, as one edit session (issue #236).
@@ -29,11 +29,14 @@ import dev.wildware.udea.render.view.ViewPoint
  *
  * ## Where the pointer is, on the handle
  *
- * The pointer's view pixel is taken to the ground plane under it, then held to the handle's
- * [DragConstraint] - onto its line, or its plane - through the point where the handle was when it was
- * pressed. A drag is those two points: where the press was held, and where the pointer is held now.
- * That reading of the pointer is the 2D camera's; with the 3D camera on, a press on a handle does
- * nothing yet, because the 3D drags are issue #237's.
+ * The pointer's view pixel is the line of world points drawn there ([EditorCamera.ray]), held to the
+ * handle's [DragConstraint] through the point where the handle was when it was pressed: where that
+ * line crosses the handle's plane, or the point on the handle's line nearest it (issue #237). A drag
+ * is those two points: where the press was held, and where the pointer is held now. In 2D the line
+ * runs straight down, so a point is the ground-plane point under the pointer; in 3D it runs from the
+ * eye, so the same handle is dragged along the same line whichever way the camera looks. A move
+ * whose line runs along the handle's line or plane, and so never meets it, is skipped: the handle
+ * stays where the last move put it.
  *
  * Render thread only, like [EditorTools].
  */
@@ -48,7 +51,7 @@ internal class GizmoDrag(
     private val told: (String?) -> Unit,
 ) {
 
-    private val pointer = ViewPoint()
+    private val pointer = ViewRay()
 
     /** The drag the button is holding, or `null`. */
     private var held: Held? = null
@@ -59,15 +62,14 @@ internal class GizmoDrag(
     /** A press at view pixel ([viewX], [viewY]) that the handle layer took. Starts the drag on its handle. */
     fun press(viewX: Float, viewY: Float) {
         val handle = layer.pressed ?: return
-        if (camera.dimension != ViewDimension.TwoD) {
-            layer.letGo()
-            told("Dragging a handle in the 3D view comes with the 3D gizmos; switch the Scene tab to 2D")
-            return
-        }
-        val start = constrain(handle, ground(viewX, viewY))
-        val still = handle.drag(Drag(start, start))
+        camera.ray(viewX, viewY, pointer)
+        // A free drag's plane faces the way the press looked, for the whole drag.
+        val facing = WorldPoint(pointer.directionX, pointer.directionY, pointer.directionZ)
+        val start = constrain(handle, pointer, facing) ?: handle.at
+        val unitsPerPixel = camera.unitsPerPixelAt(handle.at.x, handle.at.y, handle.at.z)
+        val still = handle.drag(Drag(start, start, unitsPerPixel))
         val paths = still.map { write -> gizmos.pathOf(write) ?: return refuse(write) }
-        val drag = Held(handle, start)
+        val drag = Held(handle, start, facing, unitsPerPixel)
         held = drag
         drag.inFlight = true
         val args = mapOf(
@@ -94,7 +96,9 @@ internal class GizmoDrag(
     fun move(viewX: Float, viewY: Float) {
         val drag = held ?: return
         if (drag.cancelled) return
-        val writes = drag.handle.drag(Drag(drag.start, constrain(drag.handle, ground(viewX, viewY))))
+        camera.ray(viewX, viewY, pointer)
+        val at = constrain(drag.handle, pointer, drag.facing) ?: return
+        val writes = drag.handle.drag(Drag(drag.start, at, drag.unitsPerPixel))
         val bypass = ctrl()
         drag.latest = writes.joinToString(",") { write -> "${write.entity.raw}:${gizmos.pathOf(write)}=${gizmos.preferences.snapped(write, bypass)}" }
         flush(drag)
@@ -159,19 +163,14 @@ internal class GizmoDrag(
         told("Not moved: ${write.component} is not a component the tools can edit, so its gizmo cannot write ${write.field}")
     }
 
-    /** The ground-plane point under view pixel ([viewX], [viewY]). */
-    private fun ground(viewX: Float, viewY: Float): WorldPoint {
-        camera.unproject(viewX, viewY, pointer)
-        return WorldPoint(pointer.x, pointer.y)
-    }
-
     override fun toString(): String = "GizmoDrag(holding=${held?.handle})"
 
     /**
-     * One drag's edit session: the handle pressed and where the press was held to it, the session id
-     * once `editor.begin_edit` answers, and what has been sent of it.
+     * One drag's edit session: the handle pressed, where the press was held to it, which way the press
+     * looked and how big a pixel was there, the session id once `editor.begin_edit` answers, and what
+     * has been sent of it.
      */
-    private class Held(val handle: ShownHandle, val start: WorldPoint) {
+    private class Held(val handle: ShownHandle, val start: WorldPoint, val facing: WorldPoint, val unitsPerPixel: Float) {
         var session: Int? = null
         var latest: String? = null
         var sent: String? = null
@@ -186,17 +185,28 @@ internal class GizmoDrag(
     internal companion object {
 
         /**
-         * [point] held to [handle]'s constraint, through where the handle is: onto the line along one
-         * of its axes, or onto the plane across two of them. A free drag in the view's plane is the
-         * ground plane, which is the view's plane in 2D.
+         * The pointer's line [ray] held to [handle]'s constraint, through where the handle is: the
+         * point on the line along one of its axes nearest the ray, or where the ray crosses the plane
+         * across two of them, or - for a free drag - the plane square to [facing], the way the press
+         * looked, which is the ground plane in 2D, where every ray runs straight down. `null` when the
+         * ray runs along the handle's line or plane and never meets it.
          */
-        fun constrain(handle: ShownHandle, point: WorldPoint): WorldPoint {
+        fun constrain(handle: ShownHandle, ray: ViewRay, facing: WorldPoint): WorldPoint? {
             val at = handle.at
+            val wx = at.x - ray.originX
+            val wy = at.y - ray.originY
+            val wz = at.z - ray.originZ
             return when (val constraint = handle.constraint) {
                 is DragConstraint.Along -> {
-                    val direction = handle.axes.direction(constraint.axis)
-                    val along = (point.x - at.x) * direction.x + (point.y - at.y) * direction.y + (point.z - at.z) * direction.z
-                    WorldPoint(at.x + direction.x * along, at.y + direction.y * along, at.z + direction.z * along)
+                    // The closest points of two lines: the handle's, at + d s, and the ray's, o + r t.
+                    val d = handle.axes.direction(constraint.axis)
+                    val b = d.x * ray.directionX + d.y * ray.directionY + d.z * ray.directionZ
+                    val parallel = 1f - b * b
+                    if (parallel < PARALLEL) return null
+                    val alongD = d.x * wx + d.y * wy + d.z * wz
+                    val alongR = ray.directionX * wx + ray.directionY * wy + ray.directionZ * wz
+                    val s = (b * alongR - alongD) / parallel
+                    WorldPoint(at.x + d.x * s, at.y + d.y * s, at.z + d.z * s)
                 }
                 is DragConstraint.Across -> {
                     val normal = handle.axes.direction(
@@ -206,12 +216,21 @@ internal class GizmoDrag(
                             Plane.YZ -> Axis.X
                         },
                     )
-                    val lifted = WorldPoint(point.x, point.y, at.z)
-                    val off = (lifted.x - at.x) * normal.x + (lifted.y - at.y) * normal.y + (lifted.z - at.z) * normal.z
-                    WorldPoint(lifted.x - normal.x * off, lifted.y - normal.y * off, lifted.z - normal.z * off)
+                    crossing(ray, normal.x, normal.y, normal.z, wx, wy, wz)
                 }
-                DragConstraint.ViewPlane -> WorldPoint(point.x, point.y, at.z)
+                DragConstraint.ViewPlane -> crossing(ray, facing.x, facing.y, facing.z, wx, wy, wz)
             }
         }
+
+        /** Where [ray] crosses the plane square to (nx, ny, nz) a step of (wx, wy, wz) from its origin, or `null` when it runs along it. */
+        private fun crossing(ray: ViewRay, nx: Float, ny: Float, nz: Float, wx: Float, wy: Float, wz: Float): WorldPoint? {
+            val facing = nx * ray.directionX + ny * ray.directionY + nz * ray.directionZ
+            if (abs(facing) < PARALLEL) return null
+            val t = (nx * wx + ny * wy + nz * wz) / facing
+            return WorldPoint(ray.originX + ray.directionX * t, ray.originY + ray.directionY * t, ray.originZ + ray.directionZ * t)
+        }
+
+        /** Less than this of the ray across a handle's line or plane, and it never meets it. */
+        private const val PARALLEL: Float = 1e-4f
     }
 }

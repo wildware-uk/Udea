@@ -28,6 +28,22 @@ public class ViewPoint(public var x: Float = 0f, public var y: Float = 0f) {
 }
 
 /**
+ * The line of world points drawn at one view pixel (issue #237): where it starts, and the unit
+ * direction it runs in, away from the eye. What a 3D gizmo drag holds to a handle's line or plane.
+ * Mutable and reused, like [ViewPoint].
+ */
+public class ViewRay {
+    public var originX: Float = 0f
+    public var originY: Float = 0f
+    public var originZ: Float = 0f
+    public var directionX: Float = 0f
+    public var directionY: Float = 0f
+    public var directionZ: Float = -1f
+
+    override fun toString(): String = "ViewRay(($originX, $originY, $originZ) along ($directionX, $directionY, $directionZ))"
+}
+
+/**
  * The Scene tab's camera (issue #234): the editor's own look at the world, apart from the game's.
  *
  * It is **presentation state**. Nothing in it is a `Tick`, nothing in it is read by the simulation,
@@ -255,6 +271,50 @@ public class EditorCamera(
         checkFitted()
         out.x = (viewX - projection.offsetX) / projection.scaleX
         out.y = (viewY - projection.offsetY) / projection.scaleY
+    }
+
+    /**
+     * Writes into [out] the line of world points drawn at view pixel ([viewX], [viewY]), through the
+     * camera [dimension] names (issue #237): in 3D from the eye out through the pixel; in 2D straight
+     * down onto the ground-plane point [unproject] names, since the 2D camera looks down Z.
+     */
+    public fun ray(viewX: Float, viewY: Float, out: ViewRay) {
+        checkFitted()
+        if (dimension == ViewDimension.TwoD) {
+            out.originX = (viewX - projection.offsetX) / projection.scaleX
+            out.originY = (viewY - projection.offsetY) / projection.scaleY
+            out.originZ = 0f
+            out.directionX = 0f
+            out.directionY = 0f
+            out.directionZ = -1f
+            return
+        }
+        frame()
+        // [projectOrbit] backwards: a pixel's normalised position, spread by the field of view.
+        val t = tan(radians(fovYDegrees) / 2f)
+        val across = (viewX / width * 2f - 1f) * t * (width.toFloat() / height)
+        val up = (viewY / height * 2f - 1f) * t
+        val dx = forwardX + sideX * across + upX * up
+        val dy = forwardY + sideY * across + upY * up
+        val dz = forwardZ + sideZ * across + upZ * up
+        val length = sqrt(dx * dx + dy * dy + dz * dz)
+        out.originX = eyeX
+        out.originY = eyeY
+        out.originZ = eyeZ
+        out.directionX = dx / length
+        out.directionY = dy / length
+        out.directionZ = dz / length
+    }
+
+    /**
+     * How many world units one view pixel covers at world point ([x], [y], [z]), through the camera
+     * [dimension] names (issue #237): the zoom in 2D; in 3D, what a pixel spans at the point's depth.
+     */
+    public fun unitsPerPixelAt(x: Float, y: Float, z: Float): Float {
+        checkFitted()
+        if (dimension == ViewDimension.TwoD) return 1f / projection.scaleX
+        val depth = maxOf(depthOf(x, y, z), near)
+        return 2f * depth * tan(radians(fovYDegrees) / 2f) / height
     }
 
     /**

@@ -20,13 +20,8 @@ import dev.wildware.udea.core.identity.NetId
 internal fun PlayEditsPanel(playEdits: EditorPlayEdits) {
     Column(Modifier.fillMaxWidth().testTag(PlayEditTags.LIST)) {
         val edits = playEdits.edits
-        val tooLong = playEdits.tooLong
         when {
             !playEdits.playing -> Text("Not playing. Edits made after Play are listed here, to keep past Stop.")
-            tooLong != null -> Text(
-                "The list of changes is too long to show here ($tooLong characters). " +
-                    "editor.play_edits lists them all, and editor.keep keeps one.",
-            )
             edits.isEmpty() -> Text("No changes yet. Anything edited while the game plays is listed here.")
             else -> for (row in edits) PlayEditRowView(playEdits, row)
         }

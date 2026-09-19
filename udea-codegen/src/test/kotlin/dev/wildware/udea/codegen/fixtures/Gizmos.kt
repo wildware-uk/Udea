@@ -6,6 +6,7 @@ import dev.wildware.udea.annotations.PositionHandle
 import dev.wildware.udea.annotations.RadiusHandle
 import dev.wildware.udea.annotations.RangeHandle
 import dev.wildware.udea.annotations.RotationHandle
+import dev.wildware.udea.annotations.ScaleHandle
 import dev.wildware.udea.annotations.SizeHandle
 import dev.wildware.udea.editor.gizmo.Gizmo
 import dev.wildware.udea.editor.gizmo.GizmoScope
@@ -13,6 +14,9 @@ import dev.wildware.udea.editor.gizmo.GizmoTarget
 import dev.wildware.udea.editor.gizmo.moveHandles
 import dev.wildware.udea.editor.gizmo.radiusHandle
 import dev.wildware.udea.editor.gizmo.rotationHandle
+import dev.wildware.udea.editor.gizmo.rotationRings
+import dev.wildware.udea.editor.gizmo.scaleHandles
+import dev.wildware.udea.editor.gizmo.translateHandles
 
 /*
  * The gizmo fixtures (issue #233): components carrying every handle annotation, and hand-written
@@ -56,6 +60,59 @@ public class Crate(
     override fun type(): ComponentType<Crate> = Crate
 
     public companion object : ComponentType<Crate>()
+}
+
+/**
+ * A 3D component turned about all three axes and scaled (issue #237), with its own field names: the
+ * shape of `Transform3D`, which carries the same three annotations.
+ */
+@PositionHandle(x = "px", y = "py", z = "pz")
+@RotationHandle(rotation = "yaw", aboutX = "roll", aboutY = "pitch")
+@ScaleHandle(x = "wide", y = "deep", z = "tall")
+public class Drone(
+    public var px: Float = 0f,
+    public var py: Float = 0f,
+    public var pz: Float = 0f,
+    public var roll: Float = 0f,
+    public var pitch: Float = 0f,
+    public var yaw: Float = 0f,
+    public var wide: Float = 1f,
+    public var deep: Float = 1f,
+    public var tall: Float = 1f,
+) : Component<Drone> {
+    override fun type(): ComponentType<Drone> = Drone
+
+    public companion object : ComponentType<Drone>()
+}
+
+/** The hand-written twin of the gizmo `@PositionHandle(z = ...)` generates on [Drone]. */
+public object DronePositionTwin : Gizmo<Drone> {
+    override val component: ComponentType<Drone> = Drone
+
+    override fun GizmoScope<Drone>.build(target: GizmoTarget<Drone>) {
+        val drone = target.component
+        translateHandles(target, Drone::px, drone.px, Drone::py, drone.py, Drone::pz, drone.pz)
+    }
+}
+
+/** The hand-written twin of the gizmo the three-angle `@RotationHandle` generates on [Drone]. */
+public object DroneRotationTwin : Gizmo<Drone> {
+    override val component: ComponentType<Drone> = Drone
+
+    override fun GizmoScope<Drone>.build(target: GizmoTarget<Drone>) {
+        val drone = target.component
+        rotationRings(target, Drone::roll, drone.roll, Drone::pitch, drone.pitch, Drone::yaw, drone.yaw)
+    }
+}
+
+/** The hand-written twin of the gizmo `@ScaleHandle` generates on [Drone]. */
+public object DroneScaleTwin : Gizmo<Drone> {
+    override val component: ComponentType<Drone> = Drone
+
+    override fun GizmoScope<Drone>.build(target: GizmoTarget<Drone>) {
+        val drone = target.component
+        scaleHandles(target, Drone::wide, drone.wide, Drone::deep, drone.deep, Drone::tall, drone.tall)
+    }
 }
 
 /**

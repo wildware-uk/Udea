@@ -57,12 +57,36 @@ public annotation class SizeHandle(
  *
  * Radians about Z because that is `Transform3D.rotationZ`, the heading, and Z is up in this engine.
  * The handle is a ring around the entity's position, lying on the ground plane.
+ *
+ * With [aboutX] and [aboutY] named as well it is a 3D handle (issue #237): three rings, one per
+ * angle, for angles in radians applied about X first, then Y, then Z - `Transform3D`'s order. Each
+ * ring turns its own field alone. Name both or neither.
  */
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.BINARY)
 @MustBeDocumented
 public annotation class RotationHandle(
     val rotation: String = "rotation",
+    /** Empty for a turn about the up axis alone. */
+    val aboutX: String = "",
+    /** Empty for a turn about the up axis alone. */
+    val aboutY: String = "",
+)
+
+/**
+ * A handle that scales the entity in 3D (issue #237): drags the factors [x], [y] and [z], each a
+ * multiplier along the entity's own axis, like `Transform3D`'s `scaleX`, `scaleY` and `scaleZ`.
+ *
+ * A box out along each axis scales that axis alone, and a box on the entity scales all three
+ * together.
+ */
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.BINARY)
+@MustBeDocumented
+public annotation class ScaleHandle(
+    val x: String = "scaleX",
+    val y: String = "scaleY",
+    val z: String = "scaleZ",
 )
 
 /**

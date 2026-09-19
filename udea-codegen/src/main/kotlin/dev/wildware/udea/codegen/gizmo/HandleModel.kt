@@ -24,6 +24,11 @@ internal object EditorNames {
 
     /** The built-in 2D gizmos (issue #236): what a generated gizmo calls, as a hand-written one would. */
     val MOVE_HANDLES: MemberName = MemberName(GIZMO, "moveHandles")
+
+    /** The built-in 3D gizmos (issue #237), likewise. */
+    val TRANSLATE_HANDLES: MemberName = MemberName(GIZMO, "translateHandles")
+    val ROTATION_RINGS: MemberName = MemberName(GIZMO, "rotationRings")
+    val SCALE_HANDLES: MemberName = MemberName(GIZMO, "scaleHandles")
     val SIZE_HANDLES: MemberName = MemberName(GIZMO, "sizeHandles")
     val ROTATION_HANDLE: MemberName = MemberName(GIZMO, "rotationHandle")
     val RADIUS_HANDLE: MemberName = MemberName(GIZMO, "radiusHandle")
@@ -77,13 +82,31 @@ internal sealed interface HandleModel {
         override val annotation: String get() = "SizeHandle"
     }
 
-    /** `@RotationHandle`: a ring about the up axis, turning [field], in radians. */
+    /**
+     * `@RotationHandle`: a ring about the up axis, turning [field], in radians - or, with [aboutX] and
+     * [aboutY] named, a ring per angle for a turn about X, then Y, then [field] about Z.
+     */
     data class Rotation(
         override val component: ClassName,
         val field: String,
+        /** Absent for a turn about the up axis alone; named with [aboutY] or not at all. */
+        val aboutX: String? = null,
+        /** Absent for a turn about the up axis alone; named with [aboutX] or not at all. */
+        val aboutY: String? = null,
     ) : HandleModel {
         override val gizmo: ClassName = gizmoName(component, "Rotation")
         override val annotation: String get() = "RotationHandle"
+    }
+
+    /** `@ScaleHandle`: a box per factor and one for all three. */
+    data class Scale(
+        override val component: ClassName,
+        val x: String,
+        val y: String,
+        val z: String,
+    ) : HandleModel {
+        override val gizmo: ClassName = gizmoName(component, "Scale")
+        override val annotation: String get() = "ScaleHandle"
     }
 
     /**

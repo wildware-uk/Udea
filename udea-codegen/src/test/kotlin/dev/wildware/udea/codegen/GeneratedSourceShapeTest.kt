@@ -34,6 +34,9 @@ class GeneratedSourceShapeTest {
                 "dev/wildware/udea/codegen/fixtures/CratePositionGizmo.kt",
                 "dev/wildware/udea/codegen/fixtures/CrateRotationGizmo.kt",
                 "dev/wildware/udea/codegen/fixtures/CrateSizeGizmo.kt",
+                "dev/wildware/udea/codegen/fixtures/DronePositionGizmo.kt",
+                "dev/wildware/udea/codegen/fixtures/DroneRotationGizmo.kt",
+                "dev/wildware/udea/codegen/fixtures/DroneScaleGizmo.kt",
                 "dev/wildware/udea/codegen/fixtures/HealthAgentState.kt",
                 "dev/wildware/udea/codegen/fixtures/HealthReplicator.kt",
                 "dev/wildware/udea/codegen/fixtures/MatchClockAgentState.kt",
@@ -50,6 +53,11 @@ class GeneratedSourceShapeTest {
                 // toolset-qualified name, and an AgentContext parameter (a ContextualToolDef).
                 "dev/wildware/udea/codegen/fixtures/TimelineAdvanceTool.kt",
                 "dev/wildware/udea/codegen/fixtures/TimelineDescribeTool.kt",
+                // udea-core's own handles, on Transform3D (issue #237): an editor run writes a gizmo
+                // for each component on the `@HandleIndex` of every module registry the build names.
+                "dev/wildware/udea/core/spatial/Transform3DPositionGizmo.kt",
+                "dev/wildware/udea/core/spatial/Transform3DRotationGizmo.kt",
+                "dev/wildware/udea/core/spatial/Transform3DScaleGizmo.kt",
                 // The module-level outputs, one aggregating group per module: the module's
                 // registry, the protocol constant a packet header carries, and the launcher
                 // registry naming every module registry on this module's test classpath. And the
@@ -188,7 +196,7 @@ class GeneratedSourceShapeTest {
 
         assertEquals(
             listOf(
-                "CodegenFixturesModuleRegistry.kt" to "@HandleIndex(components = [Beacon::class, Crate::class])",
+                "CodegenFixturesModuleRegistry.kt" to "@HandleIndex(components = [Beacon::class, Crate::class, Drone::class])",
                 "HealthAgentState.kt" to "import kotlin.reflect.KClass",
                 "HealthAgentState.kt" to "override val owner: KClass<*> = Health::class",
                 "MatchClockAgentState.kt" to "import kotlin.reflect.KClass",

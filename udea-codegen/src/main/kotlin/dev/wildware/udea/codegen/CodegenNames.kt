@@ -45,10 +45,11 @@ internal object AnnotationNames {
      */
     const val AGENT_STATE: String = "$PACKAGE.AgentState"
 
-    /** The gizmo handles (issue #233): three that mark a class and name its fields... */
+    /** The gizmo handles (issue #233): those that mark a class and name its fields... */
     const val POSITION_HANDLE: String = "$PACKAGE.PositionHandle"
     const val SIZE_HANDLE: String = "$PACKAGE.SizeHandle"
     const val ROTATION_HANDLE: String = "$PACKAGE.RotationHandle"
+    const val SCALE_HANDLE: String = "$PACKAGE.ScaleHandle"
 
     /** ...two that mark the one field they drive... */
     const val RADIUS_HANDLE: String = "$PACKAGE.RadiusHandle"

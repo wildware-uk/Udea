@@ -234,8 +234,16 @@ public class AgentBridge(
         )
     }
 
-    /** The most recent command answers, oldest first. Allocating; for tools and tests. */
-    public fun commandResults(): List<CommandResult> = results.toList()
+    /** The most recent command answers, oldest first, as `/state` carries them. Allocating; for tools and tests. */
+    public fun commandResults(): List<CommandResult> = results.toList(whole = false)
+
+    /**
+     * [commandResults] as the tools answered them, before an oversized answer was replaced by its
+     * handle ([complete]). For a caller in this process, with no transport between it and the
+     * answer: the editor's panels (issue #237), whose inspector reads `editor.common_fields` here and
+     * cannot follow a handle. What `/state` and every HTTP caller get is [commandResults], unchanged.
+     */
+    public fun wholeCommandResults(): List<CommandResult> = results.toList(whole = true)
 
     /**
      * Renders the recent command answers into [json] as a named array member.
@@ -299,7 +307,7 @@ public class AgentBridge(
      * a timeout - and a bridge that times out reports a healthy game as frozen.
      */
     public fun complete(id: Long, result: AgentResult) {
-        results.record(id, deliverable(result))
+        results.record(id, deliverable(result), result)
         // A high-water mark, not a store: commands may complete out of order if a tool ever
         // defers, and a plain set would let an older id retract a newer confirmation.
         while (true) {
@@ -429,22 +437,26 @@ internal class CommandResultRing(private val capacity: Int) {
 
     private val ids = LongArray(capacity)
     private val values = arrayOfNulls<AgentResult>(capacity)
+
+    /** Each answer as its tool gave it: the same object as [values]' unless that one is a handle. */
+    private val wholes = arrayOfNulls<AgentResult>(capacity)
     private var writeIndex = 0
     private var held = 0
 
-    fun record(id: Long, result: AgentResult) {
+    fun record(id: Long, result: AgentResult, whole: AgentResult = result) {
         synchronized(lock) {
             ids[writeIndex] = id
             values[writeIndex] = result
+            wholes[writeIndex] = whole
             writeIndex++
             if (writeIndex == capacity) writeIndex = 0
             if (held < capacity) held++
         }
     }
 
-    fun toList(): List<CommandResult> = synchronized(lock) {
+    fun toList(whole: Boolean): List<CommandResult> = synchronized(lock) {
         val out = ArrayList<CommandResult>(held)
-        walk(held) { id, result -> out.add(CommandResult(id, result)) }
+        walk(held, if (whole) wholes else values) { id, result -> out.add(CommandResult(id, result)) }
         out
     }
 
@@ -544,13 +556,13 @@ internal class CommandResultRing(private val capacity: Int) {
     }
 
     /** Oldest-first walk over the newest [limit] entries. Caller holds the monitor. */
-    private inline fun walk(limit: Int, visit: (Long, AgentResult) -> Unit) {
+    private inline fun walk(limit: Int, from: Array<AgentResult?> = values, visit: (Long, AgentResult) -> Unit) {
         val visiting = if (limit < held) limit else held
         var cursor = writeIndex - visiting
         if (cursor < 0) cursor += capacity
         var visited = 0
         while (visited < visiting) {
-            val result = values[cursor]
+            val result = from[cursor]
             if (result != null) visit(ids[cursor], result)
             cursor++
             if (cursor == capacity) cursor = 0

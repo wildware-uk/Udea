@@ -85,6 +85,7 @@ private fun Panels(session: EditorSession) {
         windows.dockToScreen(EditorTags.HISTORY_PANEL, DockSide.Right)
         windows.dockToScreen(EditorTags.ASSET_PANEL, DockSide.Right)
         windows.dockWith(InspectorTags.PANEL, EditorTags.HISTORY_PANEL, DockSide.Bottom)
+        windows.dockWith(PlayEditTags.PANEL, EditorTags.CREATE_PANEL, DockSide.Bottom)
         if (session.animation != null) windows.dockToScreen(EditorTags.ANIMATION_PANEL, DockSide.Left)
     }
     val area = remember { ViewArea() }
@@ -99,7 +100,10 @@ private fun Panels(session: EditorSession) {
             Button(session.spawnLabel, onClick = { session.spawn() }, modifier = Modifier.fillMaxWidth().testTag(EditorTags.SPAWN))
         }
         DebugWindow("Inspector", id = InspectorTags.PANEL, modifier = Modifier.onPlaced(area.pane(InspectorTags.PANEL))) {
-            InspectorPanel(session.inspector)
+            InspectorPanel(session.inspector) { key -> KeepPin(session.playEdits, session.selection.ids, key) }
+        }
+        DebugWindow("Changes during Play", id = PlayEditTags.PANEL, modifier = Modifier.onPlaced(area.pane(PlayEditTags.PANEL))) {
+            PlayEditsPanel(session.playEdits)
         }
         DebugWindow("Asset", id = EditorTags.ASSET_PANEL, modifier = Modifier.onPlaced(area.pane(EditorTags.ASSET_PANEL))) {
             AssetPanel(session.assets)

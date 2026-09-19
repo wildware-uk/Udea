@@ -55,6 +55,13 @@ internal enum class EditorTab { Scene, Game }
  * back by Escape. The toolbar over the Scene tab sets snapping and the world/local axes
  * ([GizmoPreferences]).
  *
+ * ## Keeping what was tuned during Play (issue #238)
+ *
+ * The Scene tab and the Inspector stay live while the game plays. Every edit made then is listed in
+ * the "Changes during Play" panel, `editor.play_edits`' answer, with a Keep toggle; the Inspector pins
+ * a field one of them wrote ([EditorPlayEdits]). Stop makes each kept edit again after the world is
+ * put back.
+ *
  * ## What it does not do
  *
  * It does not pause the world: a launcher starts the editor paused, before the first frame, so no
@@ -134,6 +141,9 @@ public class EditorSession(
     /** The Inspector panel: what the selection shares, written to all of it at once. */
     internal val inspector: EditorInspector = EditorInspector(tools, selection)
 
+    /** The "Changes during Play" panel and the Inspector's Keep pins (issue #238). */
+    internal val playEdits: EditorPlayEdits = EditorPlayEdits(tools) { problem = it }
+
     /** Which tab is showing. The Scene tab first: an editor opens on the editor's view. */
     internal var tab: EditorTab by mutableStateOf(EditorTab.Scene)
         private set
@@ -206,6 +216,7 @@ public class EditorSession(
         if (historyStale && !historyPending) readHistory()
         selection.frame(changed)
         inspector.frame(changed, tick())
+        playEdits.frame(changed)
         animation?.frame()
         // Both asked every frame: each keeps what it last saw.
         val resized = resized()

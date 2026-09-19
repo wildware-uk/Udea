@@ -101,8 +101,7 @@ internal object GltfCheck {
         if (extension !in Model.EXTENSIONS) {
             return "is not a model file: a model is glTF 2.0, a .glb or .gltf file"
         }
-        val bytes = file.readBytes()
-        val text = if (extension == "glb") glbJson(bytes).getOrElse { return it.message } else bytes.decodeToString()
+        val text = jsonOf(extension, file.readBytes()).getOrElse { return it.message }
         val document = parse(text) ?: return "is not a glTF 2.0 file: its JSON does not parse"
         val version = ((document["asset"] as? JsonObject)?.get("version") as? JsonPrimitive)?.content
         if (version == null || !version.startsWith("2.")) {
@@ -121,6 +120,14 @@ internal object GltfCheck {
         }
         return null
     }
+
+    /**
+     * The glTF JSON of a file with [extension]: the whole of a `.gltf`, or a `.glb`'s JSON chunk,
+     * or a failure whose message completes "the file ...". Shared with `GltfClips`, so the
+     * validator and the clip reader cannot disagree about what a glTF file is.
+     */
+    fun jsonOf(extension: String, bytes: ByteArray): Result<String> =
+        if (extension == "glb") glbJson(bytes) else Result.success(bytes.decodeToString())
 
     /** The JSON chunk of a binary glTF, or a failure saying why [bytes] is not one. */
     private fun glbJson(bytes: ByteArray): Result<String> {

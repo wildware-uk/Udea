@@ -231,7 +231,9 @@ public abstract class UdeaScanAssetsTask : UdeaAssetTask() {
  *
  * Its input is [declarations] and **not** the asset tree, which is what makes the split into two
  * tasks worth having: an edit that moves a declaration within its file changes the scan's spans
- * and produces byte-identical accessors, so nothing downstream recompiles.
+ * and produces byte-identical accessors, so nothing downstream recompiles. The model files are
+ * the exception, and the only one: an animated model's typed clips (`Fox.Clips.Run`, issue #241)
+ * are read out of its glTF, so the `.glb` and `.gltf` files under the root are inputs too.
  */
 @CacheableTask
 public abstract class UdeaGenerateAccessorsTask : UdeaAssetTask() {
@@ -256,6 +258,7 @@ public abstract class UdeaGenerateAccessorsTask : UdeaAssetTask() {
             "accessors",
             compilerClasspath,
             option("declarations", declarations.get().asFile),
+            option("assetRoot", assetRoot.get().asFile),
             option("srcOut", generatedSources.get().asFile),
             option("resourceOut", generatedResources.get().asFile),
         )
@@ -533,8 +536,14 @@ public class UdeaAssetsPlugin : Plugin<Project> {
             task.assetRoot.fileProvider(assetRoot)
             task.repoRoot.set(repoRoot)
             // Deliberately NOT the asset tree: this task's input is the scan, which is what lets
-            // an edit that changes no id leave the generated sources byte-identical.
-            task.sources.setFrom(scan.map { it.declarations })
+            // an edit that changes no id leave the generated sources byte-identical. The model
+            // files are the one exception (issue #241): a model's typed clips are read out of its
+            // glTF, so a re-exported model has to regenerate them, and a changed PNG or script
+            // still does not reach this task except through the scan.
+            task.sources.setFrom(
+                scan.map { it.declarations },
+                sources.asFileTree.matching(gradleAction { it.include(MODEL_FILE_PATTERNS) }),
+            )
             task.declarations.set(scan.flatMap { it.declarations })
             task.generatedSources.set(output.map { it.dir("generated/kotlin") })
             task.generatedResources.set(output.map { it.dir("generated/resources") })
@@ -672,6 +681,13 @@ public class UdeaAssetsPlugin : Plugin<Project> {
 
         /** The configuration `.udea.kts` are compiled against. */
         public const val SCRIPT_CONFIGURATION: String = "udeaAssetScript"
+
+        /**
+         * The model files pass 5 reads typed clips from: `model(...)`'s glTF, binary or JSON. The
+         * extensions are `Model.EXTENSIONS`, spelled here because this plugin names no type from
+         * the asset modules.
+         */
+        private val MODEL_FILE_PATTERNS: List<String> = listOf("**/*.glb", "**/*.gltf")
 
         /** The entry point of the forked pipeline. A string, never an import - see the class KDoc. */
         public const val CLI: String = "dev.wildware.udea.assets.compiler.pipeline.AssetPipelineCli"

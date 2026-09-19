@@ -41,6 +41,14 @@ public data class Declaration(
     public val name: String,
     /** The callee, e.g. the `character` in `character(name = "orc_elite", ...)`. */
     public val span: SourceSpan,
+    /**
+     * The `file = "..."` argument as written, when the declaration has one and it is a literal.
+     *
+     * How a `model(...)` names its glTF, which the accessors pass reads to generate the model's
+     * typed clips (issue #241). Recorded for any kind, not only `model`, for the reason this
+     * scanner keeps no vocabulary of kinds.
+     */
+    public val fileArgument: String? = null,
 )
 
 /** One `reference("...")` literal, with the span of the literal itself. */
@@ -373,11 +381,15 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
                 )
                 return
             }
+            val fileExpression = call.valueArguments
+                .firstOrNull { it.getArgumentName()?.asName?.asString() == FILE_ARGUMENT }
+                ?.getArgumentExpression()
             val declaration = Declaration(
                 kind = kind,
                 id = if (idPrefix.isEmpty()) name else "$idPrefix/$name",
                 name = name,
                 span = calleeSpan,
+                fileArgument = fileExpression?.let { constantString(it, bindings) },
             )
             declarations += declaration
             declarationElements += call to declaration
@@ -567,6 +579,9 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
         private const val LFS: String = "\n"
 
         private const val NAME_ARGUMENT = "name"
+
+        /** The argument [Declaration.fileArgument] is read from. */
+        private const val FILE_ARGUMENT = "file"
         private const val REFERENCE_CALLEE = "reference"
         private const val IMPLICIT_PARAMETER = "it"
 

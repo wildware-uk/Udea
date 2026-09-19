@@ -9,7 +9,9 @@ import dev.wildware.udea.core.snapshot.ColumnarFieldStore
 import dev.wildware.udea.core.snapshot.ComponentRegistry
 import dev.wildware.udea.core.snapshot.FieldKind
 import dev.wildware.udea.core.snapshot.WorldFieldStore
+import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.net.wire.VisibilityPolicy
+import kotlin.reflect.KClass
 
 /**
  * "Do these three processes hold the same world?", answered as one number.
@@ -121,22 +123,44 @@ public object NetStateProbe {
      * index that stopped updating on the client, and this hash is what showed it. Projectiles are
      * not folded; [netHash] is the fold that includes them.
      */
-    public fun unitHash(fields: WorldFieldStore, include: (String) -> Boolean = ALL): Long {
+    public fun unitHash(fields: WorldFieldStore, include: (String) -> Boolean = ALL): Long =
+        hashOfRowsWith(fields, GameUnit::class, include)
+
+    /**
+     * [netHash] restricted to the entities that carry an [Animator]: what a client plays.
+     *
+     * Its own number, beside [unitHash], because an animated entity need not be a unit - the net
+     * proof's fox is not - and folding it into the unit hash would make the battle's headline
+     * claim depend on a prop. The count of such entities is folded first, so a client that never
+     * received the animated entity at all differs here rather than agreeing about nothing.
+     */
+    public fun animatedHash(fields: WorldFieldStore): Long = hashOfRowsWith(fields, Animator::class, ALL)
+
+    /** How many entities in [fields] carry an [Animator]. */
+    public fun animatedCount(fields: WorldFieldStore): Int {
+        val animator = indexOf(fields.registry, Animator::class)
+        return (0 until fields.rowCount).count { fields.isPresent(it, animator) }
+    }
+
+    /** The row count, then every row carrying [marker], folded in ascending id order. */
+    private fun hashOfRowsWith(fields: WorldFieldStore, marker: KClass<*>, include: (String) -> Boolean): Long {
         val registry = fields.registry
-        val unit = (0 until registry.size).firstOrNull {
-            registry.typeAt(it).componentClass == GameUnit::class
-        } ?: error("this registry has no GameUnit; the battle cannot be identified")
+        val present = indexOf(registry, marker)
         var hash = OFFSET_BASIS
         var rows = 0L
         var body = OFFSET_BASIS
         for (row in 0 until fields.rowCount) {
-            if (!fields.isPresent(row, unit)) continue
+            if (!fields.isPresent(row, present)) continue
             rows++
             body = foldRow(body, fields, row, registry, include)
         }
         hash = fold(hash, rows)
         return fold(hash, body)
     }
+
+    private fun indexOf(registry: ComponentRegistry, type: KClass<*>): Int =
+        (0 until registry.size).firstOrNull { registry.typeAt(it).componentClass == type }
+            ?: error("this registry has no ${type.simpleName}; the entities carrying it cannot be identified")
 
     /**
      * How many roster [GameUnit]s this world holds. The headline "27" of the example's battle.

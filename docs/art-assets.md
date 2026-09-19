@@ -195,6 +195,10 @@ Read from `Models/Fox/metadata.json` and `LICENSE.md` in `KhronosGroup/glTF-Samp
 commit `81e8b567643b5166e6ff40024e4ff71ad4b18676`. `NOTICE.md` next to the file carries the
 links and the checksum, and `LICENSE` names it.
 
+`moba/game/assets/models/fox/Fox.glb` is the same file, byte for byte, with the same `NOTICE.md`
+(issue #241). It is in the game's asset root because that is where the build reads a model's
+animation clips from to generate `Fox.Clips`; git stores the two copies as one object.
+
 ## Committed art in `example-assets`
 
 `example-assets/sprites/` holds 64 committed image files from the same **Tiny

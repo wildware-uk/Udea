@@ -2,6 +2,7 @@ package dev.wildware.udea.assets.compiler.pipeline
 
 import dev.wildware.udea.assets.compiler.gen.AccessorGenerator
 import dev.wildware.udea.assets.compiler.gen.AssetIndexWriter
+import dev.wildware.udea.assets.compiler.gen.ModelClipSource
 import dev.wildware.udea.assets.compiler.scan.DeclarationsJson
 import dev.wildware.udea.diagnostics.DiagnosticsJson
 import dev.wildware.udea.diagnostics.Severity
@@ -39,7 +40,7 @@ import kotlin.system.exitProcess
  *
  * ```
  * scan       --repoRoot= --assetRoot= --out=<declarations.json>
- * accessors  --declarations=<declarations.json> --srcOut=<dir> --resourceOut=<dir>
+ * accessors  --declarations=<declarations.json> --assetRoot= --srcOut=<dir> --resourceOut=<dir>
  * validate   --repoRoot= --assetRoot= --cache=<dir> --out=<diagnostics.json>
  * pack       --repoRoot= --assetRoot= --cache=<dir> --out=<file.udeapak> --diagnostics=<file>
  * ```
@@ -77,7 +78,10 @@ public object AssetPipelineCli {
     }
 
     /**
-     * Pass 5: `GameAssets`, and `META-INF/udea/asset-index.json`.
+     * Pass 5: `GameAssets`, each animated model's typed clips, and `META-INF/udea/asset-index.json`.
+     *
+     * The clips are the one thing here not taken from the scan alone: they are read out of the
+     * model files the scan names, under `--assetRoot` (issue #241).
      *
      * Both output directories are **emptied first**. A generated source tree that keeps a file
      * for an asset group somebody deleted still compiles, and then fails at runtime on a
@@ -91,7 +95,11 @@ public object AssetPipelineCli {
         val resourceOut = options.path("resourceOut")
         srcOut.deleteRecursively()
         resourceOut.deleteRecursively()
-        val files = AccessorGenerator.generate(declarations)
+        // Before anything is written, so a model whose clips cannot be read leaves no half-made
+        // source tree behind for `compileKotlin` to find (issue #241).
+        val models = ModelClipSource.read(options.path("assetRoot"), declarations)
+        failOn(models.diagnostics, "udeaGenerateAccessors")
+        val files = AccessorGenerator.generate(declarations, models.clips)
         for (file in files) srcOut.resolve(file.path).write(file.text)
         resourceOut.resolve(AssetIndexWriter.RESOURCE_PATH).write(AssetIndexWriter.fromScan(declarations))
         println("[udeaGenerateAccessors] ${files.size} file(s) from ${declarations.size} declaration(s)")

@@ -37,6 +37,9 @@ public object DeclarationsJson {
                 append("{\"id\": ").append(quote(declaration.id))
                 append(", \"kind\": ").append(quote(declaration.kind))
                 append(", \"name\": ").append(quote(declaration.name))
+                // Only when present, so a tree with no `file =` argument writes the bytes it
+                // always wrote and every cached accessor build of it stays valid.
+                declaration.fileArgument?.let { append(", \"fileArgument\": ").append(quote(it)) }
                 appendSpan(declaration.span)
                 append("}")
             }

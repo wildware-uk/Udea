@@ -1,8 +1,10 @@
 package dev.wildware.moba.net
 
 import dev.wildware.udea.core.Tick
+import dev.wildware.udea.generated.Fox
 import dev.wildware.udea.net.input.MoveInput
 import dev.wildware.udea.net.transport.NetConditions
+import kotlin.system.exitProcess
 
 /**
  * `moba.netproof`: one server, two clients, the **real** game, and three numbers that must match.
@@ -42,6 +44,14 @@ import dev.wildware.udea.net.transport.NetConditions
  * Nothing else changes: the same packer, the same delta encoding, the same baselines out of the
  * same ring, the same loss.
  *
+ * ## An animated entity, since issue #241
+ *
+ * The server also holds a fox with an `Animator`, directed every [DIRECTION_TICKS] ticks by
+ * [NetProofFox] through the clip API: Survey once, a crossfade to Walk when it finishes, and a
+ * crossfade to Run. Each client's [NetStateProbe.animatedHash] must equal the server's at the
+ * client's tick, and a session only agrees when the units and the animation both do. The fox is
+ * not a unit, so the unit hash is the same number it always was.
+ *
  * `./gradlew :moba:runServer` is the dedicated server; this is the same simulation with two
  * clients bolted to it and an assertion at the end.
  */
@@ -49,6 +59,9 @@ public object MobaNetProof {
 
     /** Ticks of live battle before the reading is taken. */
     private const val BATTLE_TICKS: Int = 240
+
+    /** How often the fox is directed: its [NetProofFox.direct] runs once per this many ticks. */
+    private const val DIRECTION_TICKS: Int = 10
 
     /**
      * Datagram ceiling for the measurement.
@@ -72,15 +85,18 @@ public object MobaNetProof {
             NetConditions.TRELLO_8,
         )
         println()
-        println("[moba.netproof] perfect        units ${verdict(perfect)}")
-        println("[moba.netproof] 150ms+5% loss  units ${verdict(steady)}")
-        println("[moba.netproof] TRELLO_8       units ${verdict(lossy)}")
+        println("[moba.netproof] perfect        units and animation ${verdict(perfect)}")
+        println("[moba.netproof] 150ms+5% loss  units and animation ${verdict(steady)}")
+        println("[moba.netproof] TRELLO_8       units and animation ${verdict(lossy)}")
+        // What this KDoc always said and the method did not do until issue #241: a disagreement
+        // fails the task, so the proof is a command that can go red rather than a report to read.
+        if (!(perfect && steady && lossy)) exitProcess(1)
     }
 
     /**
      * Runs one whole session under [conditions] and reports it.
      *
-     * @return true when every client's `@Net` hash equals the server's at the tick that client
+     * @return true when every client's unit hash and animation hash equal the server's at the tick that client
      *   holds.
      */
     public fun run(label: String, conditions: NetConditions): Boolean {
@@ -99,7 +115,13 @@ public object MobaNetProof {
             },
         )
         return session.use { live ->
-            live.step(BATTLE_TICKS)
+            // The fox is directed between chunks of the battle, the way a system would direct it
+            // tick by tick; the battle itself steps exactly as it did in one call.
+            val fox = NetProofFox(live.server)
+            repeat(BATTLE_TICKS / DIRECTION_TICKS) {
+                fox.direct()
+                live.step(DIRECTION_TICKS)
+            }
             val report = report(live)
             println()
             println("=== $label ===")
@@ -113,12 +135,17 @@ public object MobaNetProof {
                     "entities=${row.entities} applied=${row.applied} stale=${row.stale}")
                 println("           unitHash  client=${hex(row.unitHash)} " +
                     "server@t${row.tick.value}=${hex(row.serverUnitHash)} " +
-                    (if (row.agrees) "MATCH" else "DIFFER"))
+                    (if (row.unitHash == row.serverUnitHash) "MATCH" else "DIFFER"))
+                println("           animHash  client=${hex(row.animatedHash)} " +
+                    "server@t${row.tick.value}=${hex(row.serverAnimatedHash)} " +
+                    "animated=${row.animated}/${row.serverAnimated} " +
+                    (if (row.animationAgrees) "MATCH" else "DIFFER"))
                 println("           worldHash client=${hex(row.hash)} " +
                     "server@t${row.tick.value}=${hex(row.serverHash)} " +
                     (if (row.hash == row.serverHash) "MATCH" else "DIFFER"))
                 for (line in row.differences) println("             ! " + line)
             }
+            println("  animated fox ${fox.fox} on the server: " + describe(fox, live.server.tick))
             println("  budget deferrals ${report.deferrals} (must be 0 for the hash claim), " +
                 "baseline recoveries ${report.recoveries}")
             // The input path, end to end and in one line. The player unit spawns at (0, 0)
@@ -145,6 +172,10 @@ public object MobaNetProof {
                 serverHash = NetStateProbe.netHash(session.server.stateAt(at).fields),
                 unitHash = NetStateProbe.unitHash(state.fields),
                 serverUnitHash = NetStateProbe.unitHash(session.server.stateAt(at).fields),
+                animated = NetStateProbe.animatedCount(state.fields),
+                serverAnimated = NetStateProbe.animatedCount(session.server.stateAt(at).fields),
+                animatedHash = NetStateProbe.animatedHash(state.fields),
+                serverAnimatedHash = NetStateProbe.animatedHash(session.server.stateAt(at).fields),
                 applied = client.applied,
                 stale = client.staleDropped,
                 differences = NetStateProbe.differences(
@@ -170,6 +201,14 @@ public object MobaNetProof {
             playerY = position?.y ?: Float.NaN,
             clients = rows,
         )
+    }
+
+    /** Which clip the fox is on, how far in, and how much of it shows, read through the clip API. */
+    private fun describe(fox: NetProofFox, now: Tick): String {
+        val animator = fox.animator() ?: return "missing"
+        val clip = listOf(Fox.Clips.Survey, Fox.Clips.Walk, Fox.Clips.Run).firstOrNull { animator.isPlaying(it) }
+        return "${clip?.name ?: "no clip"} at ${animator.clipTime(now)} of ${clip?.length}, " +
+            "blend ${"%.2f".format(animator.blendWeight(now))}, finished=${animator.isFinished(now)}"
     }
 
     /** A slow left-right walk, so the player's own unit is genuinely moving under replication. */
@@ -203,6 +242,12 @@ public object MobaNetProof {
         public val serverHash: Long,
         public val unitHash: Long,
         public val serverUnitHash: Long,
+        /** Entities carrying an `Animator`, on this client and on the server at its tick. */
+        public val animated: Int,
+        public val serverAnimated: Int,
+        /** [NetStateProbe.animatedHash] on this client and on the server at its tick. */
+        public val animatedHash: Long,
+        public val serverAnimatedHash: Long,
         public val applied: Long,
         public val stale: Long,
         /** The first `@Net` fields this client and the server disagree about. Empty on a match. */
@@ -213,7 +258,15 @@ public object MobaNetProof {
          *
          * The units, and not the whole world: see [NetStateProbe.unitHash].
          */
-        public val agrees: Boolean get() = unitHash == serverUnitHash
+        public val agrees: Boolean get() = unitHash == serverUnitHash && animationAgrees
+
+        /**
+         * True when this client plays exactly what the server plays: the same animated entities
+         * with the same `Animator` fields (issue #241). Never true of a server with nothing
+         * animated, so a proof that lost its fox cannot pass by agreeing about nothing.
+         */
+        public val animationAgrees: Boolean
+            get() = serverAnimated > 0 && animatedHash == serverAnimatedHash
     }
 
     private fun verdict(agreed: Boolean): String = if (agreed) "AGREED" else "DISAGREED"

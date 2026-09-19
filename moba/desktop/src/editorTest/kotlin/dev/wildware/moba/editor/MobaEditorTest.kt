@@ -49,8 +49,20 @@ class MobaEditorTest {
     }
 
     @Test
+    fun `the editor opens paused, and the frames it pumps do not tick the world`() {
+        val tickBefore = host.ctx.clock.tick
+        val editor = MobaEditor.session(host, session, viewport = {})
+
+        assertTrue(host.time.paused, "the editor opened on a running world")
+        uiTest { editor.window.content() }.use { ui ->
+            frames(ui, editor)
+            assertEquals(tickBefore, host.ctx.clock.tick, "the world ticked under the editor")
+            assertTrue(ui.text(EditorTags.STATUS).startsWith("Paused"), "the status line says \"${ui.text(EditorTags.STATUS)}\"")
+        }
+    }
+
+    @Test
     fun `the spawn button adds a unit beside the player, paused, in the editor author's undo history`() {
-        host.time.pause()
         val editor = MobaEditor.session(host, session, viewport = {})
         val playerX = positionOf(session.player).first
         val tickBefore = host.ctx.clock.tick
@@ -62,8 +74,8 @@ class MobaEditorTest {
 
             // What an agent calling `editor.history` with `session=editor` is told.
             val edits = historyAsAnAgent()
+            assertEquals(listOf("editor.spawn"), edits.map { it.first }, "the edits filed under `editor` were $edits")
             val spawn = edits.single()
-            assertEquals("editor.spawn", spawn.first, "the edit filed under `editor` was $edits")
             val spawned = NetId.ofRaw(spawn.second)
             val (x, _) = assertNotNull(positionOrNull(spawned), "the history names $spawned, and it is not in the world")
             assertEquals(playerX + MobaEditor.SPAWN_OFFSET_X, x, "the skeleton is not beside the player")

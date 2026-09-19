@@ -67,9 +67,8 @@ public object MobaEditor {
         }
     }
 
-    /** Pauses the world, then puts the window over it. Before the first frame. */
+    /** Puts the window over the world, paused. Before the first frame. */
     private fun open(host: GameHost, rendering: MobaLaunch.Rendering, session: MobaAgent.Session): MobaAgent.Screen {
-        host.time.pause()
         val world = rendering.world()
         val editor = session(host, session, viewport = { world.drawInto(this) })
         val fonts = editorFonts()
@@ -81,16 +80,18 @@ public object MobaEditor {
 
     /**
      * The editor over a wired agent [session] on [host]: everything except the window's pixels, so a
-     * test can press its buttons with no GL context.
+     * test can press its buttons with no GL context. Pauses [host] first: the editor starts paused.
      */
-    internal fun session(host: GameHost, session: MobaAgent.Session, viewport: SceneDrawScope.() -> Unit): EditorSession =
-        EditorSession(
+    internal fun session(host: GameHost, session: MobaAgent.Session, viewport: SceneDrawScope.() -> Unit): EditorSession {
+        host.time.pause()
+        return EditorSession(
             tools = EditorTools(session.wiring.bridge, session.wiring.sessions.intern(AUTHOR)),
             tick = { host.ctx.clock.tick },
             paused = { host.time.paused },
             spawn = spawnBeside(host, session.player),
             viewport = viewport,
         )
+    }
 
     /** A skeleton, [SPAWN_OFFSET_X] to the right of where [player] stands now. */
     private fun spawnBeside(host: GameHost, player: NetId): EditorSpawn {

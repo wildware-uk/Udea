@@ -63,3 +63,8 @@ tasks.withType<Test>().configureEach {
     // against the daemon's working directory under an IDE, and a scan of nothing passes.
     systemProperty("udea.physics2d.projectDir", layout.projectDirectory.asFile.absolutePath)
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's 2D physics: Box2D 3 behind the kernel's physics interface, headless, with no " +
+    "Box2D type in any public signature."

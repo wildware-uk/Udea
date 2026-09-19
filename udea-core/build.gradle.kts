@@ -306,3 +306,9 @@ tasks.register<Test>("udeaPhysicsRebuildBudget") {
 // No `check` wiring. The four tasks above are reached through the root's `udeaLatencyBudgets`,
 // which the `latency-budgets` CI job runs serially on both runner images. Putting one back here
 // puts a millisecond measurement back inside a parallel build, which is issue #175.
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's headless kernel: the fixed 60Hz simulation, the entity component system, NetId " +
+    "identity, the tick-denominated clock, the between-tick barrier, seeded randomness and " +
+    "the snapshot model. It runs with no graphics context at all."

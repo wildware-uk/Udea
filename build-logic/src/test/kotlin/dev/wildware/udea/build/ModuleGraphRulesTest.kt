@@ -286,6 +286,33 @@ class ModuleGraphRulesTest {
     }
 
     @Test
+    fun `UDEA-MG-005 governs the projects of a game in its own repository`() {
+        // Issue #265. The rule named `:moba`'s paths, so a game whose projects are called
+        // anything else - which is every game outside this repository - shipped whatever it
+        // liked, with `udeaVerifyModuleGraph` green because no rule applied to it.
+        listOf(":game", ":desktop", ":robot:units").forEach { project ->
+            val violations = violate(
+                project,
+                "runtimeClasspath",
+                graph(project, "org.jetbrains.kotlin:kotlin-scripting-jvm", "org.reflections:reflections"),
+            )
+            assertEquals(
+                listOf("org.jetbrains.kotlin:kotlin-scripting-jvm", "org.reflections:reflections"),
+                violations.map { it.coordinate },
+                project,
+            )
+            assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-005") }, project)
+        }
+    }
+
+    @Test
+    fun `UDEA-MG-013 governs an outside game's projects too`() {
+        val violations = violate(":game", "runtimeClasspath", graph(":game", "org.lwjgl:lwjgl-assimp"))
+            .filter { it.ruleId == RuleId("UDEA-MG-013") }
+        assertEquals(listOf("org.lwjgl:lwjgl-assimp"), violations.map { it.coordinate })
+    }
+
+    @Test
     fun `UDEA-MG-006 fails anything the asset model is not allowed to hold`() {
         val violations = violate(
             ":udea-assets",
@@ -648,9 +675,16 @@ class ModuleGraphRulesTest {
             "the settings scan found only $included - the regex has stopped matching, so this " +
                 "test would pass against nothing",
         )
+        // Asked through `appliesTo` rather than by reading `projects`, because since issue #265 a
+        // rule may narrow by role instead of by path - `ProjectScope.GAME` names no project and
+        // governs every one that is not an engine module. Reading the path list alone would have
+        // called those rules unscoped and skipped them, which is the same blind spot one level up.
         val scanningNothing = ModuleGraphRules.ALL
-            .filter { it.projects.isNotEmpty() && it.projects.none { project -> project in included } }
-            .map { "${it.id.value} governs only ${it.projects.sorted()}" }
+            .filter { rule ->
+                val configurations = rule.configurations.ifEmpty { ModuleGraphRules.CONFIGURATIONS }
+                included.none { project -> configurations.any { rule.appliesTo(project, it) } }
+            }
+            .map { "${it.id.value} governs only ${it.projects.sorted()} (scope ${it.scope})" }
         assertEquals(emptyList(), scanningNothing, "rules that govern no project in settings.gradle.kts")
     }
 

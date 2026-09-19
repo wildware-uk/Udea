@@ -365,3 +365,8 @@ tasks.register<JavaExec>("udeaPackBundle") {
         },
     )
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's asset pipeline: it scans, compiles and validates .udea.kts asset scripts, packs " +
+    "them into a .udeapak, and converts models and atlases. Build-time only."

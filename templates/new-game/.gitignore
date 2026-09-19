@@ -1,0 +1,5 @@
+build/
+.gradle/
+gamebridge.json
+local.properties
+.udea/

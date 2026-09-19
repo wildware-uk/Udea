@@ -70,19 +70,6 @@ public object ModuleGraphRules {
     public val GL_ALLOWED_PROJECTS: Set<String> = setOf(":udea-render", ":udea-agent-host", ":udea-editor")
 
     /**
-     * The game, as every path it has had or is planned to have.
-     *
-     * `:moba:game` is the library, and `:moba:desktop` and `:moba:android` are the launchers that
-     * ship it (issue #212); a rule about what the shipped game carries has to read all three,
-     * because each launcher's classpath is the game's plus its own. `:moba` stays in although that
-     * project no longer exists, so re-creating a flat `moba` cannot re-open a rule, and `:moba:web`
-     * is there ahead of issue #226. `ModuleGraphRulesTest` fails a rule that governs only paths
-     * `settings.gradle.kts` does not include, which is what a flat `:moba` alone would now be.
-     */
-    internal val MOBA_PROJECTS: Set<String> =
-        setOf(":moba", ":moba:game", ":moba:desktop", ":moba:android", ":moba:web")
-
-    /**
      * Every module that must stay free of GL: the whole `udea-*` tree except
      * [GL_ALLOWED_PROJECTS].
      *
@@ -148,6 +135,13 @@ public object ModuleGraphRules {
         CoordinatePattern("org.lwjgl:lwjgl"),
         CoordinatePattern("org.lwjgl:lwjgl-assimp"),
     )
+
+    /**
+     * Any Assimp binding at all, whoever publishes it: what [NO_MODEL_CONVERTER_AT_RUN_TIME]
+     * bans everywhere and excuses in [MODEL_CONVERTER_PROJECTS]. One list, read by both halves
+     * of that rule, so the ban and the exemption cannot come to mean different sets.
+     */
+    private val ASSIMP_ARTIFACTS: List<CoordinatePattern> = listOf(CoordinatePattern("*:*assimp*"))
 
     /**
      * The class-file namespace the converter's code names, excused by `udeaVerifyHeadless` in the
@@ -285,8 +279,12 @@ public object ModuleGraphRules {
 
     /**
      * Placed before Phase 2 had a reason to reach for `kotlin-scripting-jvm-host`, as a ratchet.
-     * It governs [MOBA_PROJECTS]: scoped to the flat `:moba` alone, it scanned nothing once issue
-     * #212 split that project up.
+     *
+     * It governs [ProjectScope.GAME] - every project of the build that is not an engine module.
+     * It named `:moba`'s own paths until issue #265, and that was wrong twice over for the same
+     * reason: scoped to the flat `:moba`, it scanned nothing once issue #212 split that project
+     * up, and it scanned nothing at all in the build of a game that lives in its own repository.
+     * The rule is about what a shipped game carries, so its scope is now what a shipped game is.
      */
     public val NO_SCRIPTING_OR_REFLECTION_IN_THE_GAME: DependencyRule = DependencyRule(
         id = RuleId("UDEA-MG-005"),
@@ -296,7 +294,7 @@ public object ModuleGraphRules {
             "reflection-on-hot-paths smell the rewrite exists to kill. Asset scripts are compiled " +
             "at build time; discovery is a generated registry, not classpath scanning.",
         specSection = "6 (Phase 2 exit), 3.6",
-        projects = MOBA_PROJECTS,
+        scope = ProjectScope.GAME,
         configurations = setOf("runtimeClasspath"),
         banned = listOf(
             CoordinatePattern("org.jetbrains.kotlin:kotlin-scripting-*"),
@@ -477,9 +475,15 @@ public object ModuleGraphRules {
             "banned from every engine runtime module and every game project, on the compile and " +
             "runtime classpaths; the asset compiler and udea-gradle, which carries it, are the exceptions.",
         specSection = "issue #244",
-        projects = HEADLESS_PROJECTS + GL_ALLOWED_PROJECTS + MOBA_PROJECTS - MODEL_CONVERTER_PROJECTS,
         configurations = setOf("compileClasspath", "runtimeClasspath"),
-        banned = listOf(CoordinatePattern("*:*assimp*")),
+        banned = ASSIMP_ARTIFACTS,
+        // Every project, with the two that run the converter excused by name, rather than the
+        // list of every project there is minus those two (issue #265). That list was this
+        // repository's engine modules plus `:moba`'s paths, so the projects of a game in its own
+        // repository were in none of it and the rule inspected nothing there. `allowedIn` is
+        // keyed by the project being scanned, and is how `UDEA-MG-002` already excuses the same
+        // converter on the same two modules.
+        allowedIn = MODEL_CONVERTER_PROJECTS.associateWith { ASSIMP_ARTIFACTS },
     )
 
     /** Every rule, in id order. */
@@ -496,17 +500,6 @@ public object ModuleGraphRules {
         EDITOR_NAMES_NO_RENDERER,
         NO_MODEL_CONVERTER_AT_RUN_TIME,
     )
-
-    /**
-     * True when [projectPath] is an engine module or part of the game, and so subject to [ALL].
-     *
-     * `:moba:` as a prefix and not `:moba` alone, because issue #212 split the game into nested
-     * projects (spec D12): `:moba:game`, `:moba:desktop` and `:moba:android`. Matching the parent
-     * path only would leave every one of them ungoverned - silently, because an ungoverned project
-     * is not reported as skipped. The compiler-plugin wiring asks the same question through here.
-     */
-    public fun governs(projectPath: String): Boolean =
-        projectPath.startsWith(":udea-") || projectPath == ":moba" || projectPath.startsWith(":moba:")
 
     /** Every violation visible on [configuration] of [projectPath]. */
     public fun violations(

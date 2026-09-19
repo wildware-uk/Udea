@@ -20,3 +20,8 @@ plugins {
  * and must fail rather than pass vacuously — so that moved into `DependencyRules.vacuity`,
  * where it now covers every `allowOnly` rule in the build instead of this one module.
  */
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's annotations: @Net, @Sim, @Q, @Replicated, @AgentTool, @Arg and the editor's gizmo " +
+    "handles. A zero-dependency leaf every other module reads."

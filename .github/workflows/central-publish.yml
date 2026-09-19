@@ -1,0 +1,76 @@
+# Presses the publish button on a deployment that Central has already validated (issue #265).
+#
+# This is the permanent one. A version on Maven Central can never be deleted, replaced or edited -
+# only superseded by a later one. Everything before this step is undoable: a validated deployment
+# that is never published can be dropped in the portal and forgotten.
+#
+# Separate from the release workflow on purpose. Releasing uploads and stops; somebody then
+# decides. That decision is this workflow, run by hand, with the deployment id in front of them.
+#
+# Nothing has ever been published from this repository. The first run of this is Udea's first
+# release.
+
+name: Central publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_id:
+        description: The validated deployment id to publish, permanently
+        required: true
+      confirm:
+        description: Type the version being published, e.g. 0.1.0
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish, permanently
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish
+        env:
+          USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ID: ${{ inputs.deployment_id }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          token=$(printf '%s:%s' "$USERNAME" "$PASSWORD" | base64 -w0)
+
+          # What is it, and does Central agree it is ready? Publishing anything not VALIDATED is
+          # either a no-op or a surprise, and the name is the last chance to notice a wrong id.
+          before=$(curl -sS -X POST -H "Authorization: Bearer $token" \
+            "https://central.sonatype.com/api/v1/publisher/status?id=$ID")
+          echo "$before" | jq .
+          name=$(echo "$before" | jq -r '.deploymentName // ""')
+          state=$(echo "$before" | jq -r '.deploymentState // ""')
+          [ "$state" = "VALIDATED" ] || { echo "::error::deployment is $state, not VALIDATED"; exit 1; }
+          case "$name" in
+            *"$CONFIRM"*) echo "publishing $name" ;;
+            *) echo "::error::you typed '$CONFIRM' and this deployment is '$name'"; exit 1 ;;
+          esac
+
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $token" \
+            "https://central.sonatype.com/api/v1/publisher/deployment/$ID")
+          echo "publish returned $code"
+          case "$code" in 2*) ;; *) echo "::error::Central returned $code"; exit 1 ;; esac
+
+          for _ in $(seq 1 60); do
+            body=$(curl -sS -X POST -H "Authorization: Bearer $token" \
+              "https://central.sonatype.com/api/v1/publisher/status?id=$ID" || true)
+            state=$(echo "$body" | jq -r '.deploymentState // "unknown"')
+            echo "$state"
+            case "$state" in
+              PUBLISHED) echo "$body" | jq .; echo "### Published $name" >> "$GITHUB_STEP_SUMMARY"; exit 0 ;;
+              FAILED) echo "$body" | jq .; echo "::error::Central failed the publish"; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::warning::still $state after fifteen minutes; it is on its way, look at the portal"

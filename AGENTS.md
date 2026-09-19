@@ -99,8 +99,9 @@ Three rules that are cheap to break and expensive to find:
   bytecode names a LibGDX class however it arrived - its old UI toolkit above all, since the
   interface is ComposeGL (#189).
 
-Enforced by `./gradlew udeaVerifyModuleGraph`, applied automatically to every `udea-*` project
-and every `moba` project. Rule ids and rationale: `docs/module-graph.md`.
+Enforced by `./gradlew udeaVerifyModuleGraph`, applied automatically to every project of the
+build that has a build script of its own — `udea.game-gates`, on the root, is what applies it.
+Rule ids and rationale: `docs/module-graph.md`.
 
 **Multiplatform (the Kool/KMP port, issue #201).** A runtime module moves to KMP by applying
 `udea.kotlin-multiplatform` (`jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64`);
@@ -253,6 +254,20 @@ The pieces a newcomer meets first, each with the issue that made it so.
 - **Web is shelved** (#223, #226, owner decision of 2026-09-18). Kool 0.19.0 publishes no wasmJs
   artifact, so `udea-render` and `moba:game` have no wasmJs target; the headless modules still
   build and test on wasmJs.
+- **A game does not have to live in this repository** (#265). The engine publishes: every
+  `udea-*` module goes to Maven Central as `dev.wildware.udea:<module>`, and `build-logic`
+  publishes the convention plugins and a `udea-version-catalog` beside them, so a game's own
+  build resolves `dev.wildware.udea:udea-core` and applies `id("udea.game-gates")` without
+  naming a path to this checkout. That plugin is how it gets the same module-graph,
+  determinism, editor-absent and release checks `moba` gets; `moba` declares itself to those
+  gates through the same `udeaGates { }` block, in the root build script, so there is one code
+  path. Publishing is `-PudeaVersion` plus `.github/workflows/release.yml`, which uploads a
+  deployment and stops - a person presses publish in `central-publish.yml`. **Nothing has been
+  published yet**, so an outside game resolves the engine from `mavenLocal()` after
+  `./gradlew publishToMavenLocal` and `./gradlew -p build-logic publishToMavenLocal`.
+  `templates/new-game/` is a working game of that shape, `docs/new-game.md` is the guide, and
+  `scripts/outside-game-proof.sh` publishes, builds it from outside the tree, runs it, and
+  proves its gates still fail when the game breaks them.
 
 ---
 

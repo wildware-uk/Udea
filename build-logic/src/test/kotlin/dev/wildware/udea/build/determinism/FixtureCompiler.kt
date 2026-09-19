@@ -123,7 +123,7 @@ internal object FixtureCompiler {
             project = project,
             sourceSet = "main",
             packagePrefixes = packagePrefixes,
-            why = "test fixture",
+            why = "A compiled fixture, declared simulation so the scan has something to read; SimScope requires a reason long enough to have been argued for.",
         ),
         classRoots = listOf(compiled.classesDir),
         sourceRoots = listOf(compiled.sourceDir),

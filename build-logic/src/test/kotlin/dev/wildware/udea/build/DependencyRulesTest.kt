@@ -28,6 +28,42 @@ class DependencyRulesTest {
         ),
     )
 
+    /** A rule about what a shipped game carries, scoped by role rather than by path (issue #265). */
+    private val gameBan = DependencyRule(
+        id = RuleId("UDEA-TEST-002"),
+        summary = "no scripting host in a shipped game",
+        rationale = "asset scripts are compiled at build time",
+        specSection = "6",
+        scope = ProjectScope.GAME,
+        configurations = setOf("runtimeClasspath"),
+        banned = listOf(CoordinatePattern("org.jetbrains.kotlin:kotlin-scripting-*")),
+    )
+
+    @Test
+    fun `a GAME-scoped rule governs every project that is not an engine module`() {
+        // The point of the scope: these are the paths a game in its own repository has, and a
+        // rule that named `:moba`'s applied to none of them.
+        listOf(":game", ":desktop", ":robot:units", ":moba:game").forEach {
+            assertTrue(gameBan.appliesTo(it, "runtimeClasspath"), it)
+        }
+        listOf(":udea-core", ":udea-render", ":udea-assets-compiler").forEach {
+            assertFalse(gameBan.appliesTo(it, "runtimeClasspath"), it)
+        }
+        // The configuration still narrows: this rule is about what ships, not what compiles.
+        assertFalse(gameBan.appliesTo(":game", "compileClasspath"))
+    }
+
+    @Test
+    fun `an ENGINE-scoped rule is the other half, and EVERY is both`() {
+        val engineOnly = gameBan.copy(id = RuleId("UDEA-TEST-003"), scope = ProjectScope.ENGINE)
+        assertTrue(engineOnly.appliesTo(":udea-core", "runtimeClasspath"))
+        assertFalse(engineOnly.appliesTo(":game", "runtimeClasspath"))
+
+        val everything = gameBan.copy(id = RuleId("UDEA-TEST-004"), scope = ProjectScope.EVERY)
+        assertTrue(everything.appliesTo(":udea-core", "runtimeClasspath"))
+        assertTrue(everything.appliesTo(":game", "runtimeClasspath"))
+    }
+
     @Test
     fun `a wildcard matches a whole group but not a neighbouring one`() {
         assertTrue(CoordinatePattern("org.lwjgl:*").matches("org.lwjgl:lwjgl-opengl"))

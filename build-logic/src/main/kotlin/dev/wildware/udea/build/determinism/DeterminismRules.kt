@@ -24,10 +24,30 @@ public data class SimScope(
     public val packagePrefixes: List<String>,
     /** Why this is simulation. Read in review; not decorative. */
     public val why: String,
-) {
+) : java.io.Serializable {
+
+    init {
+        require(project.startsWith(":")) { "a simulation scope names a Gradle path, was '$project'" }
+        require(sourceSet.isNotBlank()) { "$project declares a simulation scope with no source set" }
+        // The length is a floor under "argued for", not a style rule: issue #150 is explicit that
+        // membership is never inferred from a module name, and a one-word reason is a scope
+        // nobody can review. `udeaGates.simulation` and the engine's own table both come through
+        // here, so a game outside this repository is held to the same thing `moba` is.
+        require(why.trim().length >= MINIMUM_REASON) {
+            "$project is declared simulation with the reason '$why'. Membership is a decision " +
+                "somebody makes and reviews (issue #150), so it has to be argued for in at " +
+                "least $MINIMUM_REASON characters."
+        }
+    }
+
     /** Whether [className] (dotted FQN) falls inside this scope. */
     public fun covers(className: String): Boolean =
         packagePrefixes.isEmpty() || packagePrefixes.any { className.startsWith("$it.") }
+
+    public companion object {
+        /** How long a [why] has to be before it counts as an argument. */
+        public const val MINIMUM_REASON: Int = 60
+    }
 }
 
 /**
@@ -82,13 +102,19 @@ public data class DeterminismRule(
 public object DeterminismRules {
 
     /**
-     * The simulation surface, declared.
+     * The **engine's** simulation surface, declared.
      *
      * `:udea-gas` is here because ability activation, cooldowns and effect application are
      * authoritative state. `:udea-render`, `:udea-audio` and `:udea-agent-host` are deliberately
      * absent: spec 3.3 puts presentation outside `world.update` by construction, and spec 5
      * gives it a separately typed `PresentationRandom`, so wall-clock reads and unseeded
      * randomness are *correct* there.
+     *
+     * A **game's** rules are not in this list, `moba`'s included (issue #265). They are declared
+     * by the build that contains the game, through `udeaGates { simulation(...) }`, because a
+     * game in its own repository has to be able to declare its own and a table inside
+     * `build-logic` can only ever name this one. [engineScopesIn] is what adds these to a build
+     * that contains the engine, and what leaves them out of one that does not.
      */
     public val SIMULATION_SCOPES: List<SimScope> = listOf(
         SimScope(
@@ -125,22 +151,42 @@ public object DeterminismRules {
                 "world.update and its result is copied into PhysicsBody, which WorldHasher " +
                 "hashes and rewind restores, so every line of it is authoritative state.",
         ),
-        SimScope(
-            // `:moba:game` since issue #212 split the launchers off. The game's rules are the
-            // whole of what simulates; neither launcher holds a system.
-            project = ":moba:game",
-            sourceSet = "main",
-            packagePrefixes = listOf(
-                "dev.wildware.moba.ability",
-                "dev.wildware.moba.ai",
-                "dev.wildware.moba.match",
-            ),
-            why = "The example game's own rules: abilities and combat, unit AI, and the match " +
-                "lifecycle. Its HUD, audio cues, scene, animation and renderers live outside " +
-                "these prefixes and are presentation, where seconds and PresentationRandom are " +
-                "allowed (spec 3.3, spec 5).",
-        ),
     )
+
+    /**
+     * The engine scope for the one project that anchors [SIMULATION_SCOPES] to a build.
+     *
+     * If this project is in the build, the engine is, and every other engine scope has to be
+     * there too; if it is not, the build is a game's own and the engine is an included build
+     * whose modules that build does not scan (it scans itself, in its own `check`).
+     */
+    private const val ENGINE_ANCHOR: String = ":udea-core"
+
+    /**
+     * [SIMULATION_SCOPES] for a build whose projects are [projectPaths], or none at all.
+     *
+     * Two builds run this gate and they contain different things. This repository's build has the
+     * engine in it and must scan every engine scope. A game's own build (issue #265) resolves the
+     * engine as published artifacts, so none of these projects is one of its own - scanning them
+     * would resolve module directories that do not exist under its root, and declaring them would
+     * make the gate fail on "contributed no compiled classes". The engine's own bytecode is
+     * scanned where it is compiled, which is here.
+     *
+     * The choice is not "skip what is missing", which is how a gate quietly stops scanning what
+     * it was written for: a build that has [ENGINE_ANCHOR] and is missing another engine module
+     * fails here rather than scanning one fewer module.
+     */
+    public fun engineScopesIn(projectPaths: Set<String>): List<SimScope> {
+        if (ENGINE_ANCHOR !in projectPaths) return emptyList()
+        val missing = SIMULATION_SCOPES.map { it.project }.filterNot { it in projectPaths }
+        check(missing.isEmpty()) {
+            "this build contains $ENGINE_ANCHOR, so it is the engine's own, but it does not " +
+                "contain ${missing.joinToString()} - which DeterminismRules.SIMULATION_SCOPES " +
+                "declares to be simulation. Either the module was renamed and the table was not, " +
+                "or the gate is about to scan less than it says it does."
+        }
+        return SIMULATION_SCOPES
+    }
 
     /**
      * Classes `DET005` treats as **predicted**: re-run locally against a server that ran the

@@ -20,7 +20,7 @@ Udea is a high-level 2D game engine built on **LibGDX** and the **Fleks ECS** fr
 > - [The K2 compiler plugin](compiler-plugin.md) — the FIR checkers, the KDoc harvester, and why the plugin must stay optional.
 
 #### Documentation Index:
-- [🚀 Getting Started](getting_started.md)
+- [🚀 A new game, in its own repository](new-game.md)
 - [🧩 ECS Framework (Fleks)](ecs.md)
 - [⚔️ Gameplay Ability System (GAS)](gas.md)
 - [📦 Asset Management & DSL](assets.md)

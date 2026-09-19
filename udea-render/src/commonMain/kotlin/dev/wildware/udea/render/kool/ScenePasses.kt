@@ -19,6 +19,12 @@ internal interface ScenePasses {
     /** Puts [pass] on the scene, drawn before the capturable pass reads it. Render thread only. */
     fun addBeforeCapture(pass: OffscreenPass)
 
+    /**
+     * Puts [pass] on the scene and **not** before the capturable pass: an editor view's own 3D pass
+     * (issue #234), which no capture may wait on or read. Render thread only.
+     */
+    fun addBeside(pass: OffscreenPass)
+
     /** Takes [pass] off the scene. It is the caller's to release. Render thread only. */
     fun remove(pass: OffscreenPass)
 

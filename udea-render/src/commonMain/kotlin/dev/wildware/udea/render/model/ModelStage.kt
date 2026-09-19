@@ -18,6 +18,7 @@ import de.fabmax.kool.scene.Light
 import de.fabmax.kool.scene.Lighting
 import de.fabmax.kool.scene.Mesh
 import de.fabmax.kool.scene.MeshInstanceList
+import de.fabmax.kool.scene.Model as KoolModel
 import de.fabmax.kool.scene.Node
 import de.fabmax.kool.scene.PerspectiveCamera
 import de.fabmax.kool.scene.VertexLayouts
@@ -30,7 +31,7 @@ import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteRegion
 import dev.wildware.udea.render.draw.SpriteTexture
 import dev.wildware.udea.render.kool.ScenePasses
-import de.fabmax.kool.scene.Model as KoolModel
+import dev.wildware.udea.render.view.WorldViewport
 
 /**
  * The Kool half of [ModelRenderSystem]: a 3D pass with a depth buffer, a perspective camera, a
@@ -76,17 +77,7 @@ internal class ModelStage(
 
     private val sun = Light.Directional()
 
-    private val pass = OffscreenPass2d(
-        drawNode = drawNode,
-        attachmentConfig = AttachmentConfig {
-            // Transparent where no model is, so whatever the 2D pass drew beneath shows through.
-            addColor(TexFormat.RGBA, clearColor = ClearColorFill(Color(0f, 0f, 0f, 0f)))
-            defaultDepth()
-        },
-        initialSize = Vec2i(width, height),
-        name = "udea-models",
-        numSamples = MSAA_SAMPLES,
-    ).apply {
+    private val pass = modelPass(drawNode, width, height, "udea-models").apply {
         camera = this@ModelStage.camera
         lighting = Lighting().apply { addLight(sun) }
     }
@@ -116,6 +107,12 @@ internal class ModelStage(
     private val imports = HashMap<ImportedModel, Imports>()
     private val allImports = ArrayList<Imports>()
 
+    /** Each open Scene view's pass over this stage's models. */
+    private val views = HashMap<WorldViewport, ViewPass>()
+
+    /** Where a Scene view's orbit is written before it aims its pass. Reused. */
+    private val orbit = ModelCamera()
+
     private val eye = MutableVec3f()
     private val target = MutableVec3f()
     private val direction = MutableVec3f()
@@ -136,11 +133,7 @@ internal class ModelStage(
         }
         for (index in allImports.indices) allImports[index].hideAll()
 
-        eye.set(view.eyeX, view.eyeY, view.eyeZ)
-        target.set(view.targetX, view.targetY, view.targetZ)
-        camera.setupCamera(position = eye, up = Vec3f.Z_AXIS, lookAt = target)
-        camera.fovY = view.fovYDegrees.deg
-        camera.setClipRange(view.near, view.far)
+        aim(camera, view)
 
         direction.set(light.directionX, light.directionY, light.directionZ).norm()
         sun.setup(direction)
@@ -156,6 +149,32 @@ internal class ModelStage(
         ambient.set(light.ambient)
         for (index in allRuns.indices) allRuns[index].shader.ambientFactor = ambient
         for (index in allImports.indices) allImports[index].setAmbient()
+    }
+
+    /**
+     * This frame's models seen from an editor's Scene view (issue #234), through its orbit camera:
+     * a second pass over the same scene nodes, made the first time [view] asks and released when it
+     * closes. The models are the ones [begin] and [add] placed this frame; nothing is placed again.
+     *
+     * The pass sits beside the capturable pass rather than before it, and only [view]'s own pass
+     * waits on it, so a capture neither waits for it nor reads it. Render thread only.
+     */
+    fun imageFor(view: WorldViewport, game: ModelCamera): SpriteRegion {
+        val editor = checkNotNull(view.camera) { "$view is the Game tab, which shows the capturable frame" }
+        editor.adopt(game)
+        val seen = views.getOrPut(view) { ViewPass(view) }
+        editor.writeOrbit(orbit)
+        aim(seen.camera, orbit)
+        return seen.image
+    }
+
+    /** Points [camera] the way [view] says, Z up. */
+    private fun aim(camera: PerspectiveCamera, view: ModelCamera) {
+        eye.set(view.eyeX, view.eyeY, view.eyeZ)
+        target.set(view.targetX, view.targetY, view.targetZ)
+        camera.setupCamera(position = eye, up = Vec3f.Z_AXIS, lookAt = target)
+        camera.fovY = view.fovYDegrees.deg
+        camera.setClipRange(view.near, view.far)
     }
 
     /** Draws [source] with the given transform this frame. Render thread only. */
@@ -282,8 +301,51 @@ internal class ModelStage(
         }
     }
 
+    /** An editor view's pass over [drawNode]: its own camera, the stage's light and shadow map. */
+    private inner class ViewPass(view: WorldViewport) {
+
+        val camera = PerspectiveCamera("udea-model-view-camera")
+
+        private val pass = modelPass(drawNode, view.width, view.height, "udea-models-view").apply {
+            camera = this@ViewPass.camera
+            lighting = this@ModelStage.pass.lighting
+            // The stage's own pass updates and releases the shared nodes; this one only draws them.
+            isUpdateDrawNode = false
+            isReleaseDrawNode = false
+        }
+
+        val image: SpriteRegion = SpriteRegion(
+            SpriteTexture.ofPassColour(
+                checkNotNull(pass.colorTexture) { "a view's model pass has no colour attachment" },
+                view.width,
+                view.height,
+            ),
+        )
+
+        private var released = false
+
+        init {
+            pass.dependsOn(shadow)
+            passes.addBeside(pass)
+            view.dependsOn(pass)
+            view.onClose {
+                views.remove(view)
+                release()
+            }
+        }
+
+        fun release() {
+            if (released) return
+            released = true
+            passes.remove(pass)
+            pass.release()
+        }
+    }
+
     /** Takes both passes off the scene and releases them, meshes and shaders with the draw node. */
     override fun release() {
+        for (seen in views.values) seen.release()
+        views.clear()
         passes.remove(pass)
         passes.remove(shadow)
         pass.release()
@@ -294,13 +356,29 @@ internal class ModelStage(
         /** Texels along each side of the shadow map: sharp shadow edges at a modest memory cost. */
         const val SHADOW_MAP_SIZE = 2048
 
-        /** Samples per pixel: smooth model edges, where one sample leaves them stair-stepped. */
-        const val MSAA_SAMPLES = 4
-
         /** A quarter turn about X takes a glTF file's +Y, its up, to the world's +Z. */
         val Y_UP_TO_Z_UP = 90f.deg
     }
 }
+
+/**
+ * A pass that draws a stage's models: colour transparent where no model is, so whatever the 2D pass
+ * drew beneath shows through, a depth buffer, and [ModelStage]'s multisampling.
+ */
+private fun modelPass(drawNode: Node, width: Int, height: Int, name: String): OffscreenPass2d =
+    OffscreenPass2d(
+        drawNode = drawNode,
+        attachmentConfig = AttachmentConfig {
+            addColor(TexFormat.RGBA, clearColor = ClearColorFill(Color(0f, 0f, 0f, 0f)))
+            defaultDepth()
+        },
+        initialSize = Vec2i(width, height),
+        name = name,
+        numSamples = MODEL_MSAA_SAMPLES,
+    )
+
+/** Samples per pixel: smooth model edges, where one sample leaves them stair-stepped. */
+private const val MODEL_MSAA_SAMPLES = 4
 
 /** Kool's colour from Udea's. */
 private fun MutableColor.set(color: Rgba): MutableColor = set(color.r, color.g, color.b, color.a)

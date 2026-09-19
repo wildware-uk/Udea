@@ -14,16 +14,21 @@ import de.fabmax.kool.scene.Node
 import de.fabmax.kool.scene.OrthographicCamera
 import de.fabmax.kool.scene.Scene
 import de.fabmax.kool.util.Color
+import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.render.FrameSurface
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderResource
 import dev.wildware.udea.render.RenderTargets
 import dev.wildware.udea.render.ScreenTarget
+import dev.wildware.udea.render.capture.FrameCaptureSlot
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteBatch2D
+import dev.wildware.udea.render.draw.SpriteRecord
 import dev.wildware.udea.render.draw.SpriteRegion
 import dev.wildware.udea.render.draw.SpriteTexture
 import dev.wildware.udea.render.ui.WorldView
+import dev.wildware.udea.render.view.EditorCamera
+import dev.wildware.udea.render.view.WorldViewport
 
 /**
  * The Kool scene a render pipeline draws into, and the reason an overlay cannot reach a capture.
@@ -50,6 +55,13 @@ import dev.wildware.udea.render.ui.WorldView
  * pass; and [KoolPixelSource] reads the pass's colour texture and nothing else. No frame ordering
  * can change any of the three.
  *
+ * ## Editor views
+ *
+ * An editor's Game and Scene tabs (issue #234) are passes of their own, made by [openView] and put
+ * on this scene *beside* the capturable pass rather than before it: the capturable pass never waits
+ * on one and never reads one, so the gizmos drawn into them cannot reach a capture either. A Game
+ * tab's pass reads the capturable pass's picture; the other direction does not exist.
+ *
  * ## Why the capture's size never moves
  *
  * The pass is created at [width] x [height] and never resized. A human dragging the window changes
@@ -70,7 +82,7 @@ internal class KoolSurface(
     private val screenBatch = SpriteBatch2D(SpriteTexture.whitePixel("udea-screen-white"))
     private val presentBatch = SpriteBatch2D(SpriteTexture.whitePixel("udea-present-white"))
 
-    private val offscreenNode = SpriteBatchNode(offscreenBatch, "udea-offscreen-sprites")
+    private val offscreenNode = SpriteBatchNode(offscreenBatch.home, "udea-offscreen-sprites")
 
     /** The capturable pass. Its draw node holds the offscreen batch's meshes and nothing else. */
     val pass: OffscreenPass2d = OffscreenPass2d(
@@ -92,8 +104,8 @@ internal class KoolSurface(
         camera = pixelCamera()
         clearColor = ClearColorFill(Color.BLACK)
         addOffscreenPass(pass)
-        addNode(SpriteBatchNode(presentBatch, "udea-present"))
-        addNode(SpriteBatchNode(screenBatch, "udea-overlay-sprites"))
+        addNode(SpriteBatchNode(presentBatch.home, "udea-present"))
+        addNode(SpriteBatchNode(screenBatch.home, "udea-overlay-sprites"))
     }
 
     private val blit = PassBlit(pass)
@@ -145,6 +157,39 @@ internal class KoolSurface(
         scene.release()
     }
 
+    /** How many views [openView] has made, so each pass has a name of its own. */
+    private var views = 0
+
+    /**
+     * An editor view of the world (issue #234): the Game tab when [camera] is `null`, the Scene tab
+     * otherwise. Its pass is on this scene and is not a dependency of the capturable pass; the Game
+     * tab's depends on the capturable pass instead, whose picture it copies. Render thread only; the
+     * caller hands it to the pipeline, which draws it.
+     */
+    fun openView(camera: EditorCamera?, clock: SimClock): WorldViewport {
+        views++
+        val name = "udea-view-${if (camera == null) "game" else "scene"}-$views"
+        val record = SpriteRecord()
+        val kool = ViewportPass(record, width, height, name, scene)
+        if (camera == null) kool.dependsOn(pass)
+        val batch = SpriteBatch2D(SpriteTexture.whitePixel("$name-white"), home = record)
+        val view = WorldViewport(
+            camera = camera,
+            target = OffscreenTarget(width, height),
+            record = record,
+            batch = batch,
+            frame = if (camera == null) presented else null,
+            captures = FrameCaptureSlot(kool.pixels, clock),
+            kool = kool,
+        )
+        view.onClose { batch.releaseOwned() }
+        return view
+    }
+
+    override fun addBeside(pass: OffscreenPass) {
+        scene.addOffscreenPass(pass)
+    }
+
     override fun addBeforeCapture(pass: OffscreenPass) {
         scene.addOffscreenPass(pass)
         this.pass.dependsOn(pass)
@@ -183,7 +228,7 @@ internal class KoolSurface(
 
     override fun toString(): String = "KoolSurface(${width}x$height)"
 
-    private companion object {
+    internal companion object {
 
         /**
          * One unit per pixel, origin at the bottom left of whatever viewport the camera is drawing:

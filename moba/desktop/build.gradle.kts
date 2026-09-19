@@ -182,8 +182,8 @@ tasks.register<JavaExec>("run") {
 
 // --- the editor (issue #194) ---------------------------------------------------------------------
 //
-// `runEditor` opens `moba` in the editor window: docked panels, and the world drawn by Kool in a
-// ComposeGL `SceneView`, paused. Its entry point lives in a source set of its own, over the agent
+// `runEditor` opens `moba` in the editor window: docked panels, and the world drawn by Kool in its
+// Scene and Game tabs, paused. Its entry point lives in a source set of its own, over the agent
 // source set, so the editor reaches this project through `editorRuntimeClasspath` and nothing else:
 // `runtimeClasspath` - what the release jar runs on - never resolves `udea-editor`, and `UDEA-MG-010`
 // fails the build the day it does. `jar` packages `main` alone, so no editor class is in the artifact

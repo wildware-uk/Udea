@@ -6,8 +6,23 @@ package dev.wildware.udea.editor
  */
 public object EditorTags {
 
-    /** The world, in its `SceneView`. */
-    internal const val VIEWPORT: String = "editor:viewport"
+    /** The Scene tab's heading. */
+    internal const val SCENE_TAB: String = "editor:tab-scene"
+
+    /** The Game tab's heading. */
+    internal const val GAME_TAB: String = "editor:tab-game"
+
+    /** The world through the editor's camera, in its `SceneView`: the Scene tab's page. */
+    internal const val SCENE_VIEW: String = "editor:scene-view"
+
+    /** The world through the game's camera, in its `SceneView`: the Game tab's page. */
+    internal const val GAME_VIEW: String = "editor:game-view"
+
+    /** The Scene tab's 2D / 3D switch: which camera a drag moves. */
+    internal const val DIMENSION: String = "editor:dimension"
+
+    /** The Game tab's toggle that draws gizmos over the game, read-only. */
+    internal const val GAME_GIZMOS: String = "editor:game-gizmos"
 
     /** The Create panel's spawn button. */
     public const val SPAWN: String = "editor:spawn"

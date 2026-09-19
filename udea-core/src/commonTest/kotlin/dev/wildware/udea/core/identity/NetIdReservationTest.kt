@@ -199,7 +199,7 @@ class NetIdReservationTest {
      * index that was saved, a free queue in the order it had, and an id `attach` accepts.
      */
     @Test
-    fun `a detached id recorded as free by a save is reclaimed as the same reservation, free queue intact`() {
+    fun `a detached id recorded as free by a save is reclaimed as the same reservation with the free queue intact`() {
         val index = NetIdIndex(capacity = 8, entityCapacity = 8)
         val ids = List(5) { index.allocate(Entity(it, version = 0u)) }
         // A free queue that is not in index order, with the detached index in the middle of it.
@@ -229,7 +229,7 @@ class NetIdReservationTest {
     }
 
     @Test
-    fun `reclaiming a live id, or one whose index was handed out again, changes nothing`() {
+    fun `reclaiming a live id - or one whose index was handed out again - changes nothing`() {
         val index = NetIdIndex(capacity = 1, entityCapacity = 8)
         val first = index.allocate(Entity(1, version = 0u))
         index.free(first)

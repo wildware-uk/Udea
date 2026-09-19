@@ -35,6 +35,7 @@ import dev.wildware.udea.render.ui.WorldView
  *      |
  *      v  (their colour textures, drawn through the offscreen batch)
  * OffscreenPass2d  <- offscreen batch: every RenderSystem       <- the ONLY thing a capture reads
+ *                  <- then its views added by addOnTop: a CapturedUi, the game's HUD
  *      |
  *      v  (its colour texture)
  * Scene main pass  <- present batch: that texture, letterboxed to the window

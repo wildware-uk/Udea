@@ -2,15 +2,13 @@
 
 ## kmp baseline
 
-**SHA `6a7a9b1`** (kmp after #212 merge; branch already contained origin/kmp `21232ff`, merged tree ==
-reviewed tree `648ef72`), 2026-09-19. Reviewer ran
+**SHA `72b949d`** (kmp after #213; merged tree == trial tree `/tmp/trial-213`, which merged #213 onto `fdb82b9`
+= kmp with the textured-model example). Trial, 2026-09-19:
 `ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`
-on that exact tree:
 
-**BUILD SUCCESSFUL - 952 tasks, failing tasks: NONE.** The D9 red is gone: `:moba:compileKotlin` no longer
-exists (moba is `:moba:game`, `:moba:desktop`, `:moba:android`). GL under xvfb (`-Pudea.render.requireGl=true`)
-14/0 skipped; `-p build-logic check` green; runNetProof AGREED 3/3; runUdpProof all hashes match incl. lossy.
-**From here any red task on a branch is the branch's** (latency budgets: re-run alone first).
+**BUILD SUCCESSFUL - 915 tasks, failing tasks: NONE** (952 -> 915: the old tree's tasks are gone). GL under xvfb
+requireGl green; `-p build-logic check` green. **Any red task on a branch is the branch's** (latency budgets: re-run
+alone first). Earlier fully green: `6a7a9b1` (after #212, 952 tasks).
 
 Previous baseline `08ca441` (after #221): one red `:moba:compileKotlin`.
 Earlier: `30731e4` (after #227), `26333d5` (after #230), `7ac6559` (after #229), `18bb13f` (after #224), `87d8b7c` (after #211), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
@@ -481,6 +479,17 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   #221 precedent - the first game that draws a model must call them** (moba showcase). Cards (commented on #199, no
   issue): cause of the empty first frame of a new mesh/material; mutation on the up axis; mutation making a
   model-less entity draw. Worktree kept `.claude/worktrees/agent-a13d42bc124dab5fc`.
+- **#213 MERGED `72b949d`**, round 1 PASS, no findings. Deleted common, gradle-plugin, example, example:assets,
+  migration ledger, the three legacy gates (+ CI step), every com.badlogicgames coordinate (incl. gdx-box2d), the
+  udea.kotlin-library-gl convention. Old asset tree moved (history kept, 107 renames) to `example-assets/` (not a
+  project; staging reads example-assets/sprites; assets-compiler test corpus lives there). MG-009 now bans LibGDX from
+  EVERY project; MG-008 retired (not reused); MG-002 drops gdx patterns. `udea.migration-check` -> `udea.docs-check`.
+  udea-render jvmTest fixtures moved off gdx to LWJGL GL11. Owner-open (commented #213): moba/game/assets/sounds are
+  byte copies of LICENSE's 24 unknown-provenance sounds; LICENSE never named that path (pre-existing). Out of scope:
+  RenderModuleGraphTest never reads moba/game/build.gradle.kts; bytecode banned-owner table has no Kool entry.
+  Lead removed untracked leftovers of deleted modules in the main checkout (common/, gradle-plugin/, example/ build
+  dirs, stale moba/assets/ staged art). Worktree kept `.claude/worktrees/agent-a56d33c250e95b123`.
+- **#194 now unblocked** (settings/AGENTS.md collision gone).
 - Held: #194 (settings.gradle.kts + AGENTS.md table collide with #213), #188 (moba HUD beside #228),
   #189 (after #188; may be mostly done by #213), #195/#196 (need #194), #214 last.
 

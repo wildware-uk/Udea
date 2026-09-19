@@ -444,6 +444,13 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
+## Wave 18 (2026-09-19): in flight - robot-game engine features (epic #256, R1-R9 = #257-#265, filed by owner)
+- dispatched: dev-260 (sockets; udea-core, assets compiler, udea-render), dev-264 (pathfinding, new module udea-nav),
+  dev-265 (outside-repo games by composite build; build-logic, udea-gradle gates). Decisions commented on #264, #265.
+- held: #257/#258/#259/#262/#263 touch udea-render camera and presentation and wait for #248 (camera rig) to merge;
+  #261 needs #260; #263 needs #262. Order after that: #257, #258, then #259 and #262, then #263.
+- published wiki-core pages to the GitHub wiki (881e3da) before its review, on the owner's word.
+
 ## Wave 17 (2026-09-19): in flight - Hollow (owner: "Create a feature rich 3D game to test out the engine")
 
 - Spec docs/superpowers/specs/2026-09-19-hollow-3d-game-design.md; epic #245; tickets E1 #246, E2 #247, E3 #248, H1 #249, H2 #250 .. H7 #255 (created at the owner's request).

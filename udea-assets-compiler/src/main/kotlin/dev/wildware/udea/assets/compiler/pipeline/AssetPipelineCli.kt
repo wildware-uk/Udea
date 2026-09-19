@@ -43,6 +43,7 @@ import kotlin.system.exitProcess
  * accessors  --declarations=<declarations.json> --assetRoot= --srcOut=<dir> --resourceOut=<dir>
  * validate   --repoRoot= --assetRoot= --cache=<dir> --out=<diagnostics.json>
  * pack       --repoRoot= --assetRoot= --cache=<dir> --out=<file.udeapak> --diagnostics=<file>
+ *            --models=<dir>   (each .fbx model converted to its .glb, issue #244)
  * ```
  *
  * The script compile classpath comes from `-Dudea.assetsCompiler.classpath`, the spelling the
@@ -120,6 +121,7 @@ public object AssetPipelineCli {
         failOn(compiled.report.diagnostics, "udeaValidateAssets")
     }
 
+    @OptIn(kotlin.io.path.ExperimentalPathApi::class)
     private fun pack(options: Map<String, String>) {
         val assetRoot = options.path("assetRoot")
         val compiled = AssetPipeline.compileAndValidate(
@@ -129,16 +131,27 @@ public object AssetPipelineCli {
             cacheDirectory = options.path("cache"),
         )
         val packed = if (compiled.hasErrors) null else AssetPipeline.pack(assetRoot, compiled.graph)
-        val diagnostics = compiled.report.diagnostics + packed?.diagnostics.orEmpty()
+        val converted = if (compiled.hasErrors) null else AssetPipeline.convertModels(assetRoot, compiled.graph)
+        val diagnostics = compiled.report.diagnostics + packed?.diagnostics.orEmpty() + converted?.diagnostics.orEmpty()
         options.path("diagnostics").write(DiagnosticsJson.encode(compiled.report.copy(diagnostics = diagnostics)))
+        // Emptied whether or not packing succeeds, so a model deleted or renamed since the last
+        // build leaves no `.glb` behind for a game to load.
+        val models = options.path("models")
+        models.deleteRecursively()
         failOn(diagnostics, "udeaPackBundle")
         val bundle = checkNotNull(packed) { "the graph had no errors, so it was packed" }
         val out = options.path("out")
         out.parent?.createDirectories()
         out.writeBytes(bundle.bytes)
+        val glbs = checkNotNull(converted) { "the graph had no errors, so its models were converted" }.files
+        for ((relative, bytes) in glbs) {
+            val file = models.resolve(relative)
+            file.parent.createDirectories()
+            file.writeBytes(bytes)
+        }
         println(
             "[udeaPackBundle] ${out.fileName}: ${bundle.assets} asset(s), ${bundle.sheets} sheet(s), " +
-                "${bundle.pages} atlas page(s), ${bundle.bytes.size} bytes",
+                "${bundle.pages} atlas page(s), ${bundle.bytes.size} bytes; ${glbs.size} model(s) converted",
         )
     }
 

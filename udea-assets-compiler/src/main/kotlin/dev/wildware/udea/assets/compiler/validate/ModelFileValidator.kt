@@ -2,6 +2,9 @@ package dev.wildware.udea.assets.compiler.validate
 
 import dev.wildware.udea.assets.Model
 import dev.wildware.udea.assets.compiler.ResFile
+import dev.wildware.udea.assets.compiler.model.FbxConverter
+import dev.wildware.udea.assets.compiler.model.GlbContainer
+import dev.wildware.udea.assets.compiler.model.ModelSources
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
 import dev.wildware.udea.diagnostics.UdeaRule
 import kotlinx.serialization.SerializationException
@@ -12,8 +15,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
 import java.net.URISyntaxException
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.file.Path
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readBytes
@@ -27,7 +28,10 @@ import kotlin.io.path.readBytes
  *
  * ### What it checks, in order
  *
- * 1. The extension is one of [Model.EXTENSIONS].
+ * 1. The extension is one of [Model.EXTENSIONS], or `.fbx`. An `.fbx` is converted instead, by
+ *    [FbxConverter], and a file that does not convert is `UDEA0039` (issue #244) rather than
+ *    the steps below: the `.glb` the converter writes is Assimp's, compacted, and the checks
+ *    here are about files a person wrote.
  * 2. A `.glb` has the binary glTF header - magic `glTF`, container version 2, a length equal to
  *    the file's - and its first chunk is JSON.
  * 3. The JSON (the whole of a `.gltf`, or the `.glb`'s first chunk) is an object whose
@@ -53,7 +57,7 @@ public object ModelFileValidator : AssetValidator {
     /** The declaration field that names the file. */
     public const val FILE_FIELD: String = "file"
 
-    override val rules: List<UdeaRule> = listOf(AssetValidationRules.MODEL_FILE)
+    override val rules: List<UdeaRule> = listOf(AssetValidationRules.MODEL_FILE, AssetValidationRules.MODEL_CONVERSION)
 
     override fun validate(context: ValidationContext): List<UdeaDiagnostic> =
         context.graph.assets.values
@@ -64,8 +68,13 @@ public object ModelFileValidator : AssetValidator {
                 if (path.isMalformed) return@mapNotNull null
                 val file = context.fileOf(path)
                 if (!file.isRegularFile()) return@mapNotNull null
-                val problem = GltfCheck.problemWith(path, file, context::fileOf) ?: return@mapNotNull null
-                AssetValidationRules.MODEL_FILE.diagnostic(
+                val (rule, problem) = if (ModelSources.isConverted(path)) {
+                    val failure = FbxConverter.convert(context.assetRoot, path).exceptionOrNull() ?: return@mapNotNull null
+                    AssetValidationRules.MODEL_CONVERSION to failure.message
+                } else {
+                    AssetValidationRules.MODEL_FILE to (GltfCheck.problemWith(path, file, context::fileOf) ?: return@mapNotNull null)
+                }
+                rule.diagnostic(
                     message = "model `${model.id}` names `$path`, which $problem",
                     span = context.spanFor(model),
                     assetId = model.id,
@@ -75,17 +84,6 @@ public object ModelFileValidator : AssetValidator {
 
 /** The four checks [ModelFileValidator] makes, each answering what is wrong or `null`. */
 internal object GltfCheck {
-
-    /** `glTF`, little-endian. */
-    private const val GLB_MAGIC = 0x46546C67
-
-    /** `JSON`, little-endian: the type of a `.glb`'s first chunk. */
-    private const val JSON_CHUNK = 0x4E4F534A
-
-    private const val GLB_VERSION = 2
-
-    /** Magic, version and length, then the first chunk's length and type. */
-    private const val GLB_HEADER_BYTES = 20
 
     private const val DATA_URI = "data:"
 
@@ -99,7 +97,7 @@ internal object GltfCheck {
     fun problemWith(path: ResFile, file: Path, resolve: (ResFile) -> Path): String? {
         val extension = path.value.substringAfterLast('.', missingDelimiterValue = "").lowercase()
         if (extension !in Model.EXTENSIONS) {
-            return "is not a model file: a model is glTF 2.0, a .glb or .gltf file"
+            return "is not a model file: a model is glTF 2.0, a .glb or .gltf file, or an .fbx the build converts to one"
         }
         val text = jsonOf(extension, file.readBytes()).getOrElse { return it.message }
         val document = parse(text) ?: return "is not a glTF 2.0 file: its JSON does not parse"
@@ -127,32 +125,7 @@ internal object GltfCheck {
      * validator and the clip reader cannot disagree about what a glTF file is.
      */
     fun jsonOf(extension: String, bytes: ByteArray): Result<String> =
-        if (extension == "glb") glbJson(bytes) else Result.success(bytes.decodeToString())
-
-    /** The JSON chunk of a binary glTF, or a failure saying why [bytes] is not one. */
-    private fun glbJson(bytes: ByteArray): Result<String> {
-        if (bytes.size < GLB_HEADER_BYTES) {
-            return notGlb("it is ${bytes.size} bytes, shorter than a binary glTF header")
-        }
-        val header = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-        val magic = header.getInt(0)
-        val version = header.getInt(4)
-        val length = header.getInt(8)
-        val chunkLength = header.getInt(12)
-        val chunkType = header.getInt(16)
-        return when {
-            magic != GLB_MAGIC -> notGlb("its first four bytes are not `glTF`")
-            version != GLB_VERSION -> notGlb("its container version is $version, not $GLB_VERSION")
-            length != bytes.size -> notGlb("its header says $length bytes and the file is ${bytes.size}")
-            chunkType != JSON_CHUNK -> notGlb("its first chunk is not JSON")
-            chunkLength < 0 || GLB_HEADER_BYTES + chunkLength > bytes.size ->
-                notGlb("its JSON chunk runs past the end of the file")
-            else -> Result.success(bytes.decodeToString(GLB_HEADER_BYTES, GLB_HEADER_BYTES + chunkLength))
-        }
-    }
-
-    private fun notGlb(why: String): Result<String> =
-        Result.failure(IllegalArgumentException("is not a binary glTF 2.0 file: $why"))
+        if (extension == "glb") GlbContainer.jsonText(bytes) else Result.success(bytes.decodeToString())
 
     private fun parse(text: String): JsonObject? = try {
         json.parseToJsonElement(text) as? JsonObject

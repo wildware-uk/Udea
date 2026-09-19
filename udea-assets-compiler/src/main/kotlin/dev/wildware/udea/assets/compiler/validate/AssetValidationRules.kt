@@ -164,6 +164,23 @@ public object AssetValidationRules {
             "that are not in the asset root",
     )
 
+    /**
+     * A `model(...)` names an `.fbx` that does not convert to glTF (issue #244): Assimp cannot
+     * read it, it holds no mesh, or a texture its materials name is missing, outside the asset
+     * root, or neither PNG nor JPEG.
+     *
+     * Its own id rather than [MODEL_FILE]'s, because the remedy differs: a bad `.glb` is fixed in
+     * the file, and a bad `.fbx` is fixed in the tool that exported it or the folder beside it.
+     * Raised by the validator, by the clip reader before any typed clip is generated, and by the
+     * pack, which is where the converted `.glb` is written; all three say the same thing.
+     */
+    public val MODEL_CONVERSION: UdeaRule = UdeaRule(
+        id = "UDEA0039",
+        defaultSeverity = Severity.Error,
+        description = "a model's .fbx cannot be converted to glTF: it does not read, holds no " +
+            "mesh, or names a texture that is missing or is not PNG or JPEG",
+    )
+
     /** Every rule pass 3 mints locally, in id order. */
     public val all: List<UdeaRule> = listOf(
         DUPLICATE_ID,
@@ -175,6 +192,7 @@ public object AssetValidationRules {
         VALIDATOR_FAILED,
         ITEM_RECIPE,
         MODEL_FILE,
+        MODEL_CONVERSION,
     ).sortedBy { it.id }
 
     /** The reserved band, asserted by `ModuleContractTest`. */

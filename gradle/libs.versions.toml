@@ -101,6 +101,12 @@ kool = "0.19.0"
 # same API under `box2dandroid.*`. No iOS and no Wasm artifact exists.
 box2dJni = "1.0.0"
 
+# LWJGL's Assimp binding: how `udea-assets-compiler` turns an `.fbx` into a `.glb` at asset-build
+# time (issue #244; Assimp 5.4.0, BSD-3, under LWJGL's BSD-3). The same LWJGL release Kool 0.19.0
+# resolves, so the build never carries two. Build-time only: UDEA-MG-013 keeps Assimp off every
+# runtime classpath, and UDEA-MG-002 lets exactly these two artifacts onto the asset compiler's.
+lwjgl = "3.3.6"
+
 # kotlinx-io: how `udea-assets` reads a `.udeapak` from a file on every target (issue #205, spec
 # section 6: "kotlinx-io everywhere; on Wasm, a 'file' is an HTTP fetch or an in-memory buffer").
 kotlinxIo = "0.9.1"
@@ -120,6 +126,10 @@ kotlin-scripting-jvm-host = { module = "org.jetbrains.kotlin:kotlin-scripting-jv
 kotlin-scripting-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable", version.ref = "kotlin" }
 ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
 kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
+# The FBX converter's binding and LWJGL's core, which loads it (issue #244). Each desktop platform's
+# native library is a classified jar beside the artifact (`natives-linux`, ...).
+lwjgl-core = { module = "org.lwjgl:lwjgl", version.ref = "lwjgl" }
+lwjgl-assimp = { module = "org.lwjgl:lwjgl-assimp", version.ref = "lwjgl" }
 asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
 # The toolkit: nodes, modifiers, layout, widgets, input, and `HeadlessBackend`/`uiTest`, which is
 # how a composable is composed and asserted on with no window (see ComposeGlLinkTest).

@@ -179,6 +179,22 @@ if a visual faction split is wanted. That is a gameplay decision, not baked into
 
 ---
 
+## 3D models
+
+`example-assets/models/fox/Fox.glb` is the Khronos **Fox** sample (issue #240): a textured,
+rigged low-poly fox with three animations, used by `udea-render`'s imported-model test and shot.
+Unlike the sprite art below it **is** redistributable, under CC BY 4.0 with attribution:
+
+| Part | Author | Year | Licence |
+|---|---|---|---|
+| Model | PixelMannen | 2014 | CC0 1.0 |
+| Rigging and animation | tomkranis | 2014 | CC BY 4.0 |
+| Conversion to glTF | @AsoboStudio and @scurest | 2017 | CC BY 4.0 |
+
+Read from `Models/Fox/metadata.json` and `LICENSE.md` in `KhronosGroup/glTF-Sample-Assets` at
+commit `81e8b567643b5166e6ff40024e4ff71ad4b18676`. `NOTICE.md` next to the file carries the
+links and the checksum, and `LICENSE` names it.
+
 ## Committed art in `example-assets`
 
 `example-assets/sprites/` holds 64 committed image files from the same **Tiny

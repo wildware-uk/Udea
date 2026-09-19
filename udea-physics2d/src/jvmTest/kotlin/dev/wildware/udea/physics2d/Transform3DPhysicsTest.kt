@@ -30,22 +30,26 @@ class Transform3DPhysicsTest {
         Box2DScene(Physics2DSettings(gravityY = 0f)).use { scene ->
             // A wall whose near face is at x = 5, and a ball of radius 0.5 rolling at it at 4 units
             // a second: without the wall it would be at x = 8 after two seconds.
-            scene.spawn(PhysicsBody(kind = BodyKind.Static, x = 5.5f), Box(halfWidth = 0.5f, halfHeight = 5f))
+            val wall = scene.spawn(PhysicsBody(kind = BodyKind.Static, x = 5.5f), Box(halfWidth = 0.5f, halfHeight = 5f))
             val ball = scene.spawn(PhysicsBody(linearX = 4f), Circle(0.5f), Transform3D(z = 1.25f))
+            SceneTrace("wall").use { trace ->
+                trace.record(scene, 0, listOf(wall, ball))
 
-            repeat(120) { tick ->
-                scene.step()
-                val body = scene.bodyOf(ball)
+                repeat(120) { tick ->
+                    scene.step()
+                    trace.record(scene, tick + 1, listOf(wall, ball))
+                    val body = scene.bodyOf(ball)
+                    val transform = scene.transformOf(ball)
+                    assertEquals(body.x.toRawBits(), transform.x.toRawBits(), "tick $tick: Transform3D.x is the body's x")
+                    assertEquals(body.y.toRawBits(), transform.y.toRawBits(), "tick $tick: Transform3D.y is the body's y")
+                    assertEquals(body.angle.toRawBits(), transform.rotationZ.toRawBits(), "tick $tick: rotationZ is the body's angle")
+                }
+
                 val transform = scene.transformOf(ball)
-                assertEquals(body.x.toRawBits(), transform.x.toRawBits(), "tick $tick: Transform3D.x is the body's x")
-                assertEquals(body.y.toRawBits(), transform.y.toRawBits(), "tick $tick: Transform3D.y is the body's y")
-                assertEquals(body.angle.toRawBits(), transform.rotationZ.toRawBits(), "tick $tick: rotationZ is the body's angle")
+                assertTrue(transform.x > 4.4f, "the ball reached the wall, x = ${transform.x}")
+                assertTrue(transform.x <= 4.5f + WALL_SLOP, "the wall stopped it at its face, x = ${transform.x}")
+                assertEquals(1.25f, transform.z, "z is the game's, and physics left it alone")
             }
-
-            val transform = scene.transformOf(ball)
-            assertTrue(transform.x > 4.4f, "the ball reached the wall, x = ${transform.x}")
-            assertTrue(transform.x <= 4.5f + WALL_SLOP, "the wall stopped it at its face, x = ${transform.x}")
-            assertEquals(1.25f, transform.z, "z is the game's, and physics left it alone")
         }
     }
 
@@ -72,21 +76,25 @@ class Transform3DPhysicsTest {
                 Transform3D(x = 0f),
             )
             val crate = scene.spawn(PhysicsBody(x = 2f), Circle(0.5f), Transform3D(x = 2f))
+            SceneTrace("push").use { trace ->
+                trace.record(scene, 0, listOf(pusher, crate))
 
-            // The game moves the pusher by writing its Transform3D, 3 units a second, for two seconds.
-            repeat(120) { tick ->
-                scene.transformOf(pusher).x = (tick + 1) * PUSH_PER_TICK
-                scene.step()
-                val target = scene.transformOf(pusher).x
-                val reached = scene.bodyOf(pusher).x
-                assertTrue(abs(reached - target) < FOLLOW_TOLERANCE, "tick $tick: the pusher's body is at $reached, its Transform3D at $target")
+                // The game moves the pusher by writing its Transform3D, 3 units a second, for two seconds.
+                repeat(120) { tick ->
+                    scene.transformOf(pusher).x = (tick + 1) * PUSH_PER_TICK
+                    scene.step()
+                    trace.record(scene, tick + 1, listOf(pusher, crate))
+                    val target = scene.transformOf(pusher).x
+                    val reached = scene.bodyOf(pusher).x
+                    assertTrue(abs(reached - target) < FOLLOW_TOLERANCE, "tick $tick: the pusher's body is at $reached, its Transform3D at $target")
+                }
+
+                val pusherX = scene.transformOf(pusher).x
+                val crateX = scene.transformOf(crate).x
+                assertEquals(6f, pusherX, 1e-4f, "the pusher went where the game put it")
+                assertTrue(crateX >= pusherX + 1f - WALL_SLOP, "the crate was pushed ahead of the pusher: crate $crateX, pusher $pusherX")
+                assertTrue(crateX > 6.5f, "the crate moved: it started at 2 and is at $crateX")
             }
-
-            val pusherX = scene.transformOf(pusher).x
-            val crateX = scene.transformOf(crate).x
-            assertEquals(6f, pusherX, 1e-4f, "the pusher went where the game put it")
-            assertTrue(crateX >= pusherX + 1f - WALL_SLOP, "the crate was pushed ahead of the pusher: crate $crateX, pusher $pusherX")
-            assertTrue(crateX > 6.5f, "the crate moved: it started at 2 and is at $crateX")
         }
     }
 

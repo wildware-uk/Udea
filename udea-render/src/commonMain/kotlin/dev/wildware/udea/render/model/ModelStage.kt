@@ -9,10 +9,13 @@ import de.fabmax.kool.math.rad
 import de.fabmax.kool.modules.gltf.GltfLoadConfig
 import de.fabmax.kool.modules.gltf.GltfMaterialConfig
 import de.fabmax.kool.modules.ksl.KslPbrShader
+import de.fabmax.kool.modules.ksl.KslShader
 import de.fabmax.kool.pipeline.AttachmentConfig
 import de.fabmax.kool.pipeline.ClearColorFill
+import de.fabmax.kool.pipeline.CullMethod
 import de.fabmax.kool.pipeline.OffscreenPass2d
 import de.fabmax.kool.pipeline.TexFormat
+import de.fabmax.kool.pipeline.shading.DepthShader
 import de.fabmax.kool.scene.InstanceLayouts
 import de.fabmax.kool.scene.Light
 import de.fabmax.kool.scene.Lighting
@@ -280,7 +283,7 @@ internal class ModelStage(
             placed.node.isVisible = true
         }
 
-        private fun make(): Placed = Placed(model.gltf.makeModel(config)).also { placed ->
+        private fun make(): Placed = Placed(model.gltf.makeModel(config).withOwnShadowSkins()).also { placed ->
             placed.setAmbient()
             nodes += placed
             drawNode.addNode(placed.node)
@@ -379,6 +382,26 @@ internal fun gltfLoadConfig(model: ImportedModel, shadowMaps: List<ShadowMap>): 
     // strength is set every frame from the `ModelLight`.
     pbrBlock = { _ -> lighting { uniformAmbientLight(Color.WHITE) } },
 )
+
+/**
+ * Gives each skinned mesh of this node a depth shader of its own in the shadow pass, so its shadow
+ * is skinned with its own joints (#242, reopened).
+ *
+ * Kool's shadow pass draws a mesh that names no depth shader with one it shares between every mesh
+ * of the same layout and shader configuration, and a skin's joint matrices are a uniform of that
+ * shader: every skinned mesh sharing it cast its shadow in the pose of whichever was drawn last.
+ * The glTF reader names a depth shader configuration only for an alpha-masked material. So every
+ * skinned mesh without one is given Kool's own configuration for it - `DepthShader.Config.forMesh`,
+ * skinned because the mesh has a skin - and the pass makes a shader per mesh from it. The cull
+ * method is the one the shared shader would have used: the mesh's own material's.
+ */
+internal fun KoolModel.withOwnShadowSkins(): KoolModel = apply {
+    for (mesh in meshes.values) {
+        if (mesh.skin == null || mesh.depthShaderConfig != null) continue
+        val cull = (mesh.shader as? KslShader)?.pipelineConfig?.cullMethod ?: CullMethod.CULL_BACK_FACES
+        mesh.depthShaderConfig = DepthShader.Config.forMesh(mesh, cull)
+    }
+}
 
 /**
  * A pass that draws a stage's models: colour transparent where no model is, so whatever the 2D pass

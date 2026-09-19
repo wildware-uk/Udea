@@ -473,6 +473,14 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   (`24c9fa4`, pushed). Owner explicitly asked for issues (overrides no-new-issues for this): epic **#231**, G1 #232
   (edit sessions/selection tools, udea-agent, needs #193 only: READY next wave), G2 #233 + G3 #234 (need #194), G4
   #235, G5 #236, G6 #237 (needs textured-model work), G7 #238 (needs #196). NOT part of #199, does not block #214.
+- **Textured model MERGED `52d8684`**, round 1 PASS, no findings. `Transform3D` (udea-core, plain floats, Z up,
+  @Serializable, not replicated: locks unchanged) + `ModelRenderer` (udea-render: ModelMesh box/sphere/plane,
+  ModelMaterial albedo/roughness/metallic) drawn by `ModelRenderSystem` (RenderSystem) in its own Kool pass
+  (KslPbrShader, directional + ambient, SimpleShadowMap, 4x MSAA) composited into the capturable 2D pass. 2D lift via
+  `PoseSource`. `:udea-render:runModelShot`; `GlModelRenderTest`. **Ledger: public model types stay public on the
+  #221 precedent - the first game that draws a model must call them** (moba showcase). Cards (commented on #199, no
+  issue): cause of the empty first frame of a new mesh/material; mutation on the up axis; mutation making a
+  model-less entity draw. Worktree kept `.claude/worktrees/agent-a13d42bc124dab5fc`.
 - Held: #194 (settings.gradle.kts + AGENTS.md table collide with #213), #188 (moba HUD beside #228),
   #189 (after #188; may be mostly done by #213), #195/#196 (need #194), #214 last.
 

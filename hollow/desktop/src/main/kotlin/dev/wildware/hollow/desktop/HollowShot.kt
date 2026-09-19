@@ -22,7 +22,7 @@ import kotlin.system.exitProcess
  */
 public object HollowShot {
 
-    public const val OUTPUT_PROPERTY: String = "udea.shot.out"
+    private const val OUTPUT_PROPERTY: String = "udea.shot.out"
 
     @JvmStatic
     public fun main(args: Array<String>) {

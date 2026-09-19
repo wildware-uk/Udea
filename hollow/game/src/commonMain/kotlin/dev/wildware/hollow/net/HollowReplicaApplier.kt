@@ -33,9 +33,9 @@ import dev.wildware.udea.net.wire.ReplicaStore
  * way to make one from outside a system. It is drained here, at once, so a frame drawn after [apply]
  * shows what was just received.
  */
-public class HollowReplicaApplier(
+public class HollowReplicaApplier internal constructor(
     /** The component types the session shares: the registry the store was read into. */
-    public val registry: ComponentRegistry,
+    internal val registry: ComponentRegistry,
     private val world: World,
     private val netIds: NetIdIndex,
     private val barrier: SimBarrier,
@@ -47,19 +47,19 @@ public class HollowReplicaApplier(
     private var createdCount = 0
 
     /** Entities created because the store held an id the world did not. */
-    public var entitiesCreated: Long = 0L
+    internal var entitiesCreated: Long = 0L
         private set
 
     /** Entities destroyed because the store stopped holding an id this applier created. */
-    public var entitiesDestroyed: Long = 0L
+    internal var entitiesDestroyed: Long = 0L
         private set
 
     /** Component writes performed. */
-    public var componentsApplied: Long = 0L
+    internal var componentsApplied: Long = 0L
         private set
 
     /** Applies [store] to the world now, between ticks. */
-    public fun apply(store: ReplicaStore) {
+    internal fun apply(store: ReplicaStore) {
         require(store.registry === registry) { "this applier is built over $registry and was handed a store over ${store.registry}" }
         barrier.submit(Apply(store))
         barrier.drain(world, ctx)

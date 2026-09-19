@@ -14,7 +14,7 @@ import dev.wildware.hollow.net.HollowNet
 public object HollowServerMain {
 
     /** Stops the server after this many ticks. Unset or 0 runs for ever. */
-    public const val TICKS_PROPERTY: String = "hollow.server.ticks"
+    private const val TICKS_PROPERTY: String = "hollow.server.ticks"
 
     @JvmStatic
     public fun main(args: Array<String>) {

@@ -43,10 +43,10 @@ public class HollowServer(
     }
 
     /** The baselines every client is sent deltas against. */
-    public val ring: SnapshotRing get() = travel.ring
+    internal val ring: SnapshotRing get() = travel.ring
 
     /** What replicates. */
-    public val registry: ComponentRegistry get() = ring.registry
+    internal val registry: ComponentRegistry get() = ring.registry
 
     /** This build's protocol. */
     public val protocol: ProtocolDescriptor = HollowNet.protocol(registry)
@@ -67,7 +67,7 @@ public class HollowServer(
      * Datagrams [onPacket] could not decode. Counted and dropped rather than thrown: a malformed or
      * hostile datagram must not stop the server for everybody else.
      */
-    public var malformedPackets: Long = 0L
+    internal var malformedPackets: Long = 0L
         private set
 
     /** The server's simulation tick. */
@@ -105,7 +105,7 @@ public class HollowServer(
     }
 
     /** The world as the ring captured it at the current tick: what was just sent. */
-    public fun state(): WorldSnapshot {
+    internal fun state(): WorldSnapshot {
         val slot = checkNotNull(ring.nearestAtOrBefore(host.tick)) { "the server's ring holds nothing at ${host.tick}" }
         check(slot.tick == host.tick) { "the ring's newest slot is ${slot.tick}, not ${host.tick}" }
         return slot

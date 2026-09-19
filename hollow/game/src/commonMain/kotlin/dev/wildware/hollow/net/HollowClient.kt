@@ -43,7 +43,7 @@ public class HollowClient(
     }
 
     /** What replicates: the same registry the server built, from the same sources. */
-    public val registry: ComponentRegistry get() = travel.ring.registry
+    internal val registry: ComponentRegistry get() = travel.ring.registry
 
     /** This build's protocol. A server whose protocol differs is refused at connect. */
     public val protocol: ProtocolDescriptor = HollowNet.protocol(registry)

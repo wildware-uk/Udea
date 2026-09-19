@@ -23,7 +23,7 @@ import dev.wildware.udea.render.RenderModule
 public object HollowGame {
 
     /** How the game names itself. */
-    public const val NAME: String = "hollow"
+    internal const val NAME: String = "hollow"
 
     /**
      * A fresh definition playing [level] (see [HollowLevel]). Fresh per call, because building one

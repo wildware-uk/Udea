@@ -13,7 +13,7 @@ import dev.wildware.udea.generated.GameAssets
 public object HollowAssets {
 
     /** Where `processResources` puts the bundle: `UdeaAssetsPlugin`'s resource directory and bundle name. */
-    public const val RESOURCE: String = "udea/assets.udeapak"
+    internal const val RESOURCE: String = "udea/assets.udeapak"
 
     /** The opened bundle. Lazy, so a test that never draws never decodes it. */
     public val bundle: Bundle by lazy { BundleReader.open(readBundleBytes()) }
@@ -29,7 +29,7 @@ public object HollowAssets {
  * The model asset each [Prop] is drawn with, one line each, so a prop added without a model is a
  * compile error here rather than an invisible entity.
  */
-public fun Prop.asset(): Ref<Model> = with(GameAssets.models) {
+internal fun Prop.asset(): Ref<Model> = with(GameAssets.models) {
     when (this@asset) {
         Prop.GROUND -> ground
         Prop.PINE_TALL_A -> pineTallA

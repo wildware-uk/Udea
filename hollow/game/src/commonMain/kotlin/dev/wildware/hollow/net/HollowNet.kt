@@ -31,7 +31,7 @@ public object HollowNet {
      * The registry both ends of a session share, and the game's snapshot ring captures: every
      * `@Replicated` component Hollow's world holds.
      */
-    public fun registry(): ComponentRegistry = ComponentRegistry(listOf(Transform3D.snapshotType()))
+    internal fun registry(): ComponentRegistry = ComponentRegistry(listOf(Transform3D.snapshotType()))
 
     /**
      * This build's protocol, derived from [registry]: a server and a client built from different

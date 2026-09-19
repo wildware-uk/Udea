@@ -39,7 +39,7 @@ import dev.wildware.udea.render.model.ModelSource
  * @param models the model each prop is drawn with. Asked for every prop every frame, so it is a
  *   lookup: the same object for the same prop, and nothing loaded or made here.
  */
-public class ScenerySystem(
+internal class ScenerySystem(
     private val models: (Prop) -> ModelSource,
     private val light: ModelLight,
 ) : RenderSystem {

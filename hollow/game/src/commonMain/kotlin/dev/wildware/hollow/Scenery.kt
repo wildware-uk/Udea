@@ -39,7 +39,7 @@ public class Scenery(
 @Serializable
 public enum class Prop(
     /** What sort of thing this is. */
-    public val kind: PropKind,
+    internal val kind: PropKind,
 ) {
     GROUND(PropKind.Ground),
 
@@ -73,7 +73,7 @@ public enum class Prop(
 }
 
 /** What sort of thing a [Prop] is. */
-public enum class PropKind {
+internal enum class PropKind {
     Ground,
     Tree,
     Stone,

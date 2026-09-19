@@ -12,7 +12,7 @@ import dev.wildware.udea.core.SceneId
 public object HollowLevel {
 
     /** The scene the launch level is registered under. */
-    public val SCENE_ID: SceneId = SceneId("level")
+    internal val SCENE_ID: SceneId = SceneId("level")
 
     /** The bundled clearing, as a resource path. `hollow/game/build.gradle.kts` packages `levels/`. */
     internal const val DEFAULT_RESOURCE: String = "levels/clearing.udealevel"

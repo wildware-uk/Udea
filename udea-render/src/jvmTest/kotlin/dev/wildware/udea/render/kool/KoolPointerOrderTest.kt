@@ -234,6 +234,29 @@ class KoolPointerOrderTest {
         assertTrue(onScene.isPressed(fire), "a press on the scene did not hold its binding")
     }
 
+    /**
+     * Motion (issue #248) is summed until the reader that turns a camera spends it, and a tick's
+     * [KoolPointer.endSample] - the input sampler's, once per tick - does not spend it: the two are read
+     * on different clocks, and a tick that ate the motion would leave the camera nothing to turn by.
+     */
+    @Test
+    fun `motion adds up until it is spent, and a tick does not spend it`() {
+        pointer.onMotion(12f, -3f)
+        pointer.onMotion(8f, 5f)
+        pointer.endSample()
+
+        assertEquals(20f, pointer.motionX, "motion right was not summed, or a tick spent it")
+        assertEquals(2f, pointer.motionY, "motion down was not summed, or a tick spent it")
+
+        pointer.spendMotion()
+        assertEquals(0f, pointer.motionX, "spent motion was still there")
+        assertEquals(0f, pointer.motionY, "spent motion was still there")
+
+        pointer.onMotion(4f, 4f)
+        pointer.close()
+        assertEquals(0f, pointer.motionX, "a closed pointer still reported motion")
+    }
+
     // --- fixture -------------------------------------------------------------------------
 
     /** One of Kool's frames, as its pointer listener sees it. */

@@ -10,10 +10,9 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertTrue
 
 /*
- * A real keyboard, for the GL tests that need one: `GlKoolInputTest` and `GlKoolKeyTableTest`.
- * Shared rather than copied, because the one thing these helpers must get right - going in through
- * Kool's own GLFW callback, so Kool and not the test decides the key code - is the thing a copy
- * would drift on.
+ * A real keyboard and a real mouse, for the GL tests that need one. Shared rather than copied,
+ * because the one thing these helpers must get right - going in through Kool's own GLFW callback,
+ * so Kool and not the test decides the key code or the pointer - is the thing a copy would drift on.
  */
 
 /** Counts frames and remembers the thread one ran on. */
@@ -69,6 +68,36 @@ internal fun invokeKeyCallback(window: Long, glfwKey: Int, action: Int) {
         callback.invoke(window, glfwKey, NO_SCANCODE, action, NO_MODIFIERS)
     } finally {
         GLFW.glfwSetKeyCallback(window, callback)
+    }
+}
+
+/**
+ * Moves the mouse on Kool's own GLFW cursor callback, as a real mouse would.
+ *
+ * The same round trip [press] takes for keys, for the same reason: the position goes in as GLFW's and
+ * Kool decides the pointer, so what reaches `KoolPointer` - and what the toolkit hit-tests - is what
+ * Kool made of it rather than a value the test chose. GLFW has no getter for a callback, only a setter
+ * that returns the previous one, so it is taken off and put straight back. Render thread only: GLFW
+ * requires the thread that owns the window.
+ *
+ * Reported twice, as a real mouse reports a drag in many small moves. Kool holds back the position
+ * of the move that *starts* a drag, so that the drag begins where the press was
+ * (`BufferedPointerInput.movePointer`), and a single jump with a button held would leave Kool's
+ * pointer - and so the toolkit's hit test - where it started. That is not hypothetical: with one
+ * move, `GlKoolPointerTest`'s "dragged off the button and released on the scene" released on the
+ * button, and clicked it. The second report is at the same place, so it adds no motion.
+ */
+internal fun KoolBackend.moveMouseTo(x: Double, y: Double) = onRenderThread {
+    val window = GLFW.glfwGetCurrentContext()
+    check(window != 0L) { "no GLFW window is current on the render thread" }
+    val callback = checkNotNull(GLFW.glfwSetCursorPosCallback(window, null)) {
+        "Kool installed no GLFW cursor callback, so this test would be moving nothing"
+    }
+    try {
+        callback.invoke(window, x, y)
+        callback.invoke(window, x, y)
+    } finally {
+        GLFW.glfwSetCursorPosCallback(window, callback)
     }
 }
 

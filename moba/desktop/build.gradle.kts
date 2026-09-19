@@ -1,5 +1,7 @@
 import dev.wildware.udea.build.ReleaseRules
+import dev.wildware.udea.build.UdeaModuleRegistry
 import dev.wildware.udea.build.UdeaVerifyReleaseTask
+import dev.wildware.udea.build.udeaRegistryModules
 import dev.wildware.udea.gradle.UdeaAgentPlugin
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
@@ -31,6 +33,10 @@ plugins {
     // It lives here and not with the game: a launch declaration names a task that starts a
     // process, and this is the project that has one.
     id("dev.wildware.udea.agent")
+
+    // The editor source set's gizmos (issue #233). KSP runs on that one source set and no other in
+    // this project: see `kspEditor` below.
+    id("com.google.devtools.ksp") version libs.versions.ksp.get()
 }
 
 /**
@@ -198,6 +204,20 @@ val editorSources: SourceSet = sourceSets.create("editor") {
 dependencies {
     // The window, and nothing else in this project names it: see `UDEA-MG-010`.
     "editorImplementation"(project(":udea-editor"))
+
+    // The gizmos (issue #233), generated here and nowhere else. `:moba:game`'s own KSP run checks the
+    // handle annotations on its components and lists them on `MobaModuleRegistry`'s `@HandleIndex`;
+    // this run reads that index and writes one `Gizmo` per annotation, plus `MobaGizmoRegistry`
+    // naming them and every hand-written `Gizmo` in `src/editor`. A gizmo implements a `udea-editor`
+    // type, so it cannot live in the game: `UDEA-MG-012` fails the build if one reaches a release
+    // classpath.
+    "kspEditor"(project(":udea-codegen"))
+}
+
+ksp {
+    arg(UdeaModuleRegistry.GIZMO_REGISTRY_OPTION, "Moba")
+    // Every Udea module the editor source set runs on: the run reads each one's registry for handles.
+    arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistryModules("Moba", "editorRuntimeClasspath"))
 }
 
 // The editor calls `MobaAgent.runWithGl`, which is `internal`: one Kotlin module for the two

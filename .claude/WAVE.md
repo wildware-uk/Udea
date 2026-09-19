@@ -451,6 +451,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - Merge-order risk: 233 and 244 both touch udea-gradle module-graph rules; 234v, 242 and 233 all touch udea-render or udea-editor, but different files.
 - #189: merged, round 1 PASS (no findings). New `:udea-render:udeaVerifyNoLibGdx` (UDEA-MG-009-BYTECODE, on check) scans every project's main bytecode for com/badlogic/ and box2dLight/; moba:android gets `udeaMainBytecode`. Shared BytecodeBan with the headless scan. 960 tasks. Cards: headless table doesn't ban Kool (de/fabmax/kool/); docs/home.md stale overall ("built on LibGDX"); UiConfig.defaultSkin unused.
 - #242: merged, round 1 PASS (no findings). Trial on master after #189: build --no-configuration-cache 960 tasks green, GL green. ClipPose is the only ticks-to-seconds place; applyPose writes Kool clip weights once per entity per frame; ClipPlayback holds/clipTime/isFinished now internal. Cards: Kool keyframe sampler boxes a Float per lookup; Kool culls skinned meshes by bind-pose bounds; no unskinned glTF in the tree to test.
+- #233: merged, round 1 PASS (no findings). Trial on master after #242: build --no-configuration-cache 984 tasks green, GL green. Gizmo API in udea-editor `gizmo` package; handle annotations; UDEA0017 did-you-mean; `<Game>GizmoRegistry` (moba: MobaGizmoRegistry, PositionPositionGizmo); UDEA-MG-012 `udeaVerifyEditorAbsent` on check (not moba:android: udea-editor is JVM-only). Card: size/range handles have no hand-written twin test. **Baseline now 984 tasks.**
 
 ## Wave 14 (2026-09-19): done
 

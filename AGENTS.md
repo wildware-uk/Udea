@@ -66,7 +66,7 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 
 | Module | Purpose |
 |---|---|
-| `udea-annotations` | Zero-dependency leaf: `@Net`, `@Sim`, `@Q`, `@Replicated`, `@AgentTool`, `@Arg` |
+| `udea-annotations` | Zero-dependency leaf: `@Net`, `@Sim`, `@Q`, `@Replicated`, `@AgentTool`, `@Arg`, and the gizmo handles `@PositionHandle`, `@SizeHandle`, `@RotationHandle`, `@RadiusHandle`, `@RangeHandle` |
 | `udea-diagnostics` | Zero-dependency leaf: `UdeaDiagnostic`, `Severity`, `SourceSpan`, `Fix`, rule ids, the JSON report |
 | `udea-codegen` | The KSP2 processor and KotlinPoet emitters; owns id assignment |
 | `udea-compiler-plugin` | The K2 FIR/IR plugin: checkers, KDoc propagation, gated declaration synthesis |
@@ -82,7 +82,7 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `udea-agent` | MCP tool surface and test harness — the same code path |
 | `udea-agent-host` | HTTP server. Debug-only, verified absent from release |
 | `udea-replay` | `.udearep` input recording, deterministic headless replay, and the bisect tools |
-| `udea-editor` | The editor window: docked ComposeGL panels, the world in Scene and Game tabs (the Scene tab through its own editor camera), buttons that call `editor.*` tools. Debug-only and JVM; only a game's `editor` source set may depend on it (`UDEA-MG-010`) |
+| `udea-editor` | The editor window: docked ComposeGL panels, the world in Scene and Game tabs (the Scene tab through its own editor camera), buttons that call `editor.*` tools, and the public gizmo API (`Gizmo`, `Handle`). Debug-only and JVM; only a game's `editor` source set may depend on it (`UDEA-MG-010`), and no editor class or `Gizmo` may reach a release classpath (`UDEA-MG-012`) |
 | `udea-gradle` | Tasks, verifiers, `gamebridge.json` emission |
 | `moba:game` | The example game: a 5v5 three-lane MOBA. A library - components, systems, assets and what it draws - with no entry point in it |
 | `moba:desktop` | The desktop launcher: `run`, `runServer`, `runClient`, the shot mains, the proofs and the agent surface. JVM |
@@ -228,6 +228,13 @@ The pieces a newcomer meets first, each with the issue that made it so.
   the guarantee and a syntactic first pass is the early warning (#192). The editor's Save writes
   an exact value back into the script (#195), and a value made inside a loop has no one place to
   write it.
+- **Gizmos are editor-only and never ship** (#233). A handle annotation on a component
+  (`@PositionHandle`, `@SizeHandle`, `@RotationHandle` on the class, naming its fields;
+  `@RadiusHandle`, `@RangeHandle` on a field) becomes a generated `Gizmo` in the game's `editor`
+  source set, listed with the hand-written ones in `<Game>GizmoRegistry`. A misspelled or non-`Float`
+  field fails the build with `UDEA0017` and a did-you-mean. A drag answers field writes and never
+  mutates the world. `UDEA-MG-012` (`udeaVerifyEditorAbsent`, on `check`) fails the build when a
+  `udea-editor` class or a `Gizmo` is on a release classpath.
 - **Replays are `.udearep` format 2**, which adds the recorded editor edits (#232). A recording
   with no edits is still written as format 1, and this build reads both.
 - **Web is shelved** (#223, #226, owner decision of 2026-09-18). Kool 0.19.0 publishes no wasmJs

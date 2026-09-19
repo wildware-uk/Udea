@@ -450,6 +450,13 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - Dispatched: dev-194 (#194 editor window: new udea-editor, settings, AGENTS.md, :moba:desktop editor source set,
   udea-render SceneView binding, new release-classpath MG rule), dev-232 (#232 gizmo G1: udea-agent editor toolset),
   dev-240 (#240 animated A1: glTF import; udea-render/model + model asset kind + Fox CC-BY sample). Three devs.
+- **#232 MERGED `e8f3bed`**, round 1 PASS, no findings. editor.begin/update/commit/cancel_edit, editor.leave,
+  multi-entity set_field (typed `List<NetId>` via existing @Arg List<T>), select/selection, common_fields (mixed).
+  Idle timeout 30 s on AgentClock, read only in the AgentBridge.drain sweep before the step; cancels journaled.
+  **.udearep format 2** (edits section; no edits = byte-identical format 1). ReplayWorld.applyEdits; moba's replay
+  world does NOT implement it and refuses edited files loudly. Cards (no issue): EditorJournal.complete unread;
+  replay-side editor needs a frozen idleClock; update_edit values cannot contain a comma; no production host records
+  editor sessions yet. Worktree kept `.claude/worktrees/agent-a2d575d58570effd7`.
 - Held: udea-physics2d (settings/AGENTS.md collide with #194), #188 HUD (udea-render UI beside #194), #195/#196 (need
   #194), gizmo G2/G3 (need #194), A2 (needs #240).
 - Contracts refreshed for wave 12: `scratchpad/lead/dev-contract.md`, `rev-contract-w11.md` (addenda updated).

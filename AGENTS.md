@@ -69,6 +69,7 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `udea-assets-compiler` | Build-time only. **Zero Gradle types** |
 | `udea-gas` | Abilities, attributes, effects — tick-denominated |
 | `udea-net` | Transports, baselines, relevancy, prediction, RPC |
+| `udea-physics2d` | 2D physics: Box2D 3 through `box2d-jni`, behind `udea-core`'s `PhysicsWorld`. Headless (no Kool, no GL), `jvm` and `android` only because that is what `box2d-jni` publishes; no Box2D type in any public API |
 | `udea-render` | **The only module that touches GL**. Kool stays inside it (spec section 3), and so does the Kool-backed `AudioDevice` (`koolAudioDevice`, desktop) |
 | `udea-audio` | Drains `GameContext.cues` and plays sound. No GL, no `Gdx` and no Kool: playback is an `AudioDevice` SPI, `AudioDevice.Silent` is what Headless uses, and the device that makes a noise is `udea-render`'s |
 | `udea-agent` | MCP tool surface and test harness — the same code path |
@@ -103,7 +104,7 @@ edit to it fails `udeaVerifyDeterminism` until `determinism-audit.md` is re-read
 too. `udea-net` (issue #209) and `udea-agent` (issue #208) are on
 `udea.kotlin-multiplatform-no-ios` (`jvm`, `android`, `wasmJs`), because each has an `expect` with
 no native `actual` yet, and each build script names it. `udea-net`'s UDP transport runs on `jvm`
-and `android` through a shared `socketMain` source set, and `wasmJs` has the WebSocket client only. In `udea-audio` the
+and `android` through a shared `socketMain` source set, and `wasmJs` has the WebSocket client only. `udea-physics2d` is on `udea.kotlin-multiplatform-jvm-android` (`jvm`, `android`), because `box2d-jni` publishes desktop natives and an Android AAR and nothing else; the AAR puts the same API in another Java package, so the solver code lives in `src/box2dMain`, compiled into both targets, over a per-target `Box2DBindings.kt`. In `udea-audio` the
 `AudioDevice` SPI, `AudioDevice.Silent` and the cue drain are `commonMain`, and a device that makes
 a noise is not in it on any target: that is `udea-render`'s `KoolAudioDevice` (issue #221), common
 code over Kool's `AudioClip`, with a clip loader on `jvm` only so far. In `udea-agent` the tools and dispatcher are common, the

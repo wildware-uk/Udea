@@ -1,4 +1,6 @@
 import dev.wildware.udea.build.UdeaModuleRegistry
+import dev.wildware.udea.build.UdeaNetComponents
+import dev.wildware.udea.build.registerNetProtocolLock
 import dev.wildware.udea.build.udeaModule
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
@@ -29,9 +31,29 @@ plugins {
 // Declares this module to every launcher that has it on its runtime classpath (issue #202), and
 // hands the processor the list its own `CoreUdeaRegistry` names - the kernel alone.
 val udeaRegistry = udeaModule("Core")
+
+/**
+ * The project-wide `@Replicated` id space, read from the reviewed `net-components.lock`.
+ *
+ * `udea-core` joined it with the physics components (`PhysicsBody` and the shapes, every field
+ * `@Sim`), so that a snapshot carries physics state at all. A module that names itself and emits
+ * a `Replicator` must be numbered from the project's space, or its first id is also another
+ * module's first id - the processor refuses to run without it.
+ */
+val projectComponents: Provider<String> =
+    providers.fileContents(rootProject.layout.projectDirectory.file(UdeaNetComponents.FILE_NAME))
+        .asText
+        .map { text ->
+            when (val parsed = UdeaNetComponents.parse(text)) {
+                is UdeaNetComponents.Parse.Success -> UdeaNetComponents.optionValue(parsed.components)
+                is UdeaNetComponents.Parse.Failure -> throw GradleException(parsed.problem)
+            }
+        }
+
 ksp {
     arg(UdeaModuleRegistry.MODULE_NAME_OPTION, udeaRegistry.name)
     arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
+    arg(UdeaNetComponents.KSP_OPTION, projectComponents.get())
 }
 
 kotlin {
@@ -111,6 +133,18 @@ dependencies {
 val kspCommonMain = "kspCommonMainKotlinMetadata"
 tasks.withType<KotlinCompilationTask<*>>().configureEach { dependsOn(kspCommonMain) }
 tasks.matching { it.name.startsWith("ksp") && it.name != kspCommonMain }.configureEach { dependsOn(kspCommonMain) }
+
+/**
+ * `udea-core` emits protocol identity since the physics components became `@Replicated`, so it
+ * gets the reviewed lock gate `:udea-codegen` and `:moba:game` have: `udeaCheckProtocolLock` on
+ * `check`, and `udeaWriteProtocolLock` to rewrite `net-protocol.lock` deliberately.
+ */
+registerNetProtocolLock(
+    generatedLock = layout.buildDirectory.file(
+        "generated/ksp/metadata/commonMain/resources/udea/${udeaRegistry.name}-net-protocol.lock",
+    ),
+    producingTask = kspCommonMain,
+)
 
 // --- Phase 0 budget gates (spec 6 exit criteria, spec 7 risk row) -----------------------------
 //

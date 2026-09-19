@@ -32,6 +32,9 @@ include("udea-assets")
 include("udea-assets-compiler")
 include("udea-gas")
 include("udea-net")
+// 2D physics: Box2D 3 through `box2d-jni`, behind `udea-core`'s `PhysicsWorld`. Headless - no Kool,
+// no GL - so a dedicated server, CI and a replay can all simulate it.
+include("udea-physics2d")
 include("udea-render")
 
 // Presentation, like `udea-render`, and headless like every other module here: it names no GL

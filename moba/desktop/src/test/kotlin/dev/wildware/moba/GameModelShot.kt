@@ -5,9 +5,14 @@ import dev.wildware.udea.assets.Model
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.core.Tick
+import dev.wildware.udea.core.Ticks
+import dev.wildware.udea.core.spatial.Animator
+import dev.wildware.udea.core.spatial.Loop
 import dev.wildware.udea.core.spatial.Transform3D
 import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.generated.GameAssets
+import dev.wildware.udea.generated.Human
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
@@ -16,6 +21,7 @@ import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.capture.CaptureRequest
+import dev.wildware.udea.render.capture.FrameCaptureSlot
 import dev.wildware.udea.render.capture.capture
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteTexture
@@ -42,9 +48,10 @@ import kotlin.math.PI
  * `:moba:game:udeaPackBundle` converted and wrote under `build/udea/converted`. No FBX is read here,
  * and nothing that could read one is on this classpath (`UDEA-MG-013`).
  *
- * Writes `model-human.png` (the character beside the fox, for scale) and `model-human-turn-<n>.png`
- * (the character a quarter turn a step) into `-Dudea.modelshot.dir`. It draws the bind pose: posing
- * a skin from the `Animator` is issue #242's.
+ * Writes `model-human.png` (the character beside the fox, for scale), `model-human-turn-<n>.png`
+ * (the character a quarter turn a step, in its bind pose) and `model-human-anim-<nn>-*.png` (the
+ * character played by an `Animator` through `Human.Clips`, each picture at a known tick) into
+ * `-Dudea.modelshot.dir`.
  *
  * In the test source set and run by name, never by `check`: it needs a GL driver, and a missing
  * driver in `check` would be a skip, which hides exactly the failure it exists to show.
@@ -90,6 +97,9 @@ object GameModelShot {
         )
         try {
             val host = GameHost(RenderMode.Offscreen, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()), backend)
+            // Paused before the first frame, so the clock moves only when `animate` runs it and
+            // every animated picture is a known tick, the interpolation alpha at zero.
+            host.loop.paused = true
             backend.drive(host)
             val slot = checkNotNull(backend.pipeline?.capture) { "the pipeline has no capture slot" }
             val world = host.world
@@ -122,10 +132,54 @@ object GameModelShot {
                 }
                 File(out, "model-human-turn-$step.png").writeBytes(slot.capture(CaptureRequest()).bytes)
             }
+            animate(backend, host, humanEntity, slot, out)
             println("model shots written to ${out.absolutePath}")
         } finally {
             backend.close()
         }
+    }
+
+    /**
+     * The character animated by an `Animator` through its generated clips, the same API the fox
+     * plays through (issue #242): Idle, a crossfade to Walk, a crossfade to Run photographed at each
+     * third of the way, a Punch played once, and a crossfade back to Idle. Each picture is
+     * `model-human-anim-<nn>-<what>-t<tick>.png`, the tick counted from the first, and the tick is
+     * moved on only by `host.run` on the render thread, so a picture is named by its tick exactly.
+     */
+    private fun animate(backend: KoolBackend, host: GameHost, human: Entity, slot: FrameCaptureSlot, out: File) {
+        val world = host.world
+        val start = backend.onRenderThread { host.tick }
+        backend.onRenderThread {
+            with(world) {
+                human[Transform3D].rotationZ = HUMAN_HEADING
+                human.configure { it += Animator().apply { play(Human.Clips.Idle, start) } }
+            }
+        }
+        var shot = 0
+        fun at(tick: Long, what: String, direct: (Animator, Tick) -> Unit = { _, _ -> }) {
+            backend.onRenderThread {
+                host.run((tick - host.tick.ticksSince(start)).toInt())
+                with(world) { direct(human[Animator], host.tick) }
+            }
+            shot++
+            val name = "model-human-anim-%02d-%s-t%03d.png".format(shot, what, tick)
+            File(out, name).writeBytes(slot.capture(CaptureRequest()).bytes)
+        }
+        at(0, "idle")
+        at(30, "idle-to-walk") { animator, now -> animator.crossfade(Human.Clips.Walk, now, over = Ticks(FADE)) }
+        at(50, "walk")
+        at(65, "walk")
+        at(80, "walk")
+        at(90, "walk-to-run-0") { animator, now -> animator.crossfade(Human.Clips.Run, now, over = Ticks(FADE)) }
+        at(90 + FADE / 3, "walk-to-run-33")
+        at(90 + FADE * 2 / 3, "walk-to-run-67")
+        at(90 + FADE, "run")
+        at(111, "run")
+        at(120, "punch") { animator, now -> animator.crossfade(Human.Clips.Punch, now, over = Ticks(PUNCH_FADE), loop = Loop.Once) }
+        at(140, "punch")
+        at(155, "punch")
+        at(180, "punch-to-idle") { animator, now -> animator.crossfade(Human.Clips.Idle, now, over = Ticks(FADE)) }
+        at(180 + FADE, "idle")
     }
 
     /**
@@ -148,6 +202,12 @@ object GameModelShot {
     private fun property(name: String): String = System.getProperty(name) ?: error("-D$name is not set")
 
     private const val TURN_STEPS = 4
+
+    /** How long a crossfade between locomotion clips takes: a fifth of a second. */
+    private const val FADE = 12L
+
+    /** A punch cuts in faster than a change of gait. */
+    private const val PUNCH_FADE = 4L
     private const val FRAME_BUDGET = 240
 
     /**

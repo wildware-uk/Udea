@@ -444,6 +444,11 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
+## Wave 14 (2026-09-19): in flight
+
+- Dispatched: #214 docs + CI green (dev-214: AGENTS.md, standards, module-graph, skill + .claude/agents, HANDOFF, ci.yml, per-task tmpdir, budget tests), #241 Animator (dev-241, udea-core/codegen/compiler-plugin/assets-compiler), #234 Scene/Game tabs (dev-234, udea-editor/udea-render).
+- #241: merged, round 1 PASS (no findings). Reviewer build --no-configuration-cache 958 tasks green. Animator id 27, udea-core protoHash 0x0826 -> 0xa328; UDEA0016 clip checker, UDEA0027 unreadable model; runNetProof now exits 1 on disagreement. Ledger: ClipPlayback public for #242 (use or make internal); tick counts as Long/Int OK. Card: MobaNetProof.kt KDoc "same number it always was" is stale. Possible AGENTS.md tick-model line: "Animation time is Animator.clipTime(now), derived from a start Tick, never accumulated."
+
 ## Wave 13 (2026-09-19): done
 
 - Baseline `5821d25`: FULLY GREEN, 928 tasks.

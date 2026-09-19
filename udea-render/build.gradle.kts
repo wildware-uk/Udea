@@ -39,8 +39,8 @@ kotlin {
                 api(project(":udea-audio"))
 
                 // Kool draws, and nothing else in the engine may name it: UDEA-MG-002 bans
-                // `de.fabmax.kool:*` from every headless module, and UDEA-MG-008 bans LibGDX from
-                // this one. `implementation`, so a consumer's compile classpath carries no Kool
+                // `de.fabmax.kool:*` from every headless module, and UDEA-MG-009 bans LibGDX from
+                // every project. `implementation`, so a consumer's compile classpath carries no Kool
                 // type - the public surface of this module is Udea's own (`SpriteBatch2D`,
                 // `SpriteTexture`, `Rgba`), which is what lets `moba` and the agent host draw
                 // without being able to reach past it.
@@ -89,18 +89,10 @@ kotlin {
                 // The bytecode gate. A class-file parser is a check, not a runtime feature.
                 implementation(libs.asm)
 
-                // The GL tests name Kool directly: they build scenes and read pixels back.
+                // The GL tests name Kool directly: they build scenes and read pixels back. It is
+                // also what puts LWJGL's GL binding on this classpath, which `GlFixtures` names as
+                // the headless bytecode gate's positive control.
                 implementation(libs.kool.core)
-
-                // Test-only, for `GlFixtures`: the headless bytecode gate's positive/negative
-                // controls have to *be* gdx types to prove the scanner catches a real one. The
-                // gate itself scans other modules' compiled output (`udea-core` and friends);
-                // this module needing gdx on its own test classpath to compile its fixtures is
-                // unrelated to whether udea-render's shipped code names gdx, which it does not
-                // (issue #211: udea-render draws with Kool now). The ban this gate extends
-                // (`UDEA-MG-002`) keeps its gdx entries until the old tree and moba's LibGDX
-                // launcher are gone (docs/module-graph.md); this line goes with them.
-                implementation(libs.gdx)
             }
         }
     }
@@ -250,4 +242,23 @@ val udeaGlTest = tasks.register<Test>("udeaGlTest") {
 
 tasks.named("check") {
     dependsOn(udeaVerifyHeadless, udeaGlTest)
+}
+
+// --- runModelShot ------------------------------------------------------------------------
+//
+// Pictures of textured, lit 3D models drawn by `ModelRenderSystem`, captured from the same pass an
+// agent's screenshot reads. Run by name and never by `check`: it needs a GL driver, and in `check`
+// a missing driver would have to be a skip, which hides the failure it exists to show. The
+// assertions about the same path are `GlModelRenderTest`, which `udeaGlTest` runs.
+tasks.register<JavaExec>("runModelShot") {
+    group = "udea"
+    description = "Captures textured, lit 3D models to -Pudea.modelshot.dir (default build/reports/udea/model)."
+    mainClass.set("dev.wildware.udea.render.model.ModelShot")
+    classpath = jvmTestRuntime
+    dependsOn(jvmTestCompilation.compileTaskProvider)
+    systemProperty(
+        "udea.modelshot.dir",
+        providers.gradleProperty("udea.modelshot.dir").orNull
+            ?: layout.buildDirectory.dir("reports/udea/model").get().asFile.absolutePath,
+    )
 }

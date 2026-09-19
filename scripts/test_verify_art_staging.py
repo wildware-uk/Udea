@@ -55,7 +55,7 @@ ENGINEER_IMPERATIVE = textwrap.dedent("""\
 
         python3 scripts/stage-moba-art.py
 
-    It copies 33 sheets out of `example/src/main/resources/assets/sprites/`, where they already are.
+    It copies 33 sheets out of `example-assets/sprites/`, where they already are.
     Idempotent, overwrites what it copies, deletes nothing. Run it once, before your first build.
     """)
 

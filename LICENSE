@@ -34,7 +34,7 @@ use, copy, modify or redistribute them is granted by this file.
 Specifically excluded, and NOT redistributable under this licence:
 
   * Character sprite art, shadow sheets and spell-effect sheets under
-    example/src/main/resources/assets/sprites/ — derived from the "Tiny RPG
+    example-assets/sprites/ — derived from the "Tiny RPG
     Character Asset Pack" by Free Game Assets (craftpix.net). This includes,
     but is not limited to, the wizard/, priest/, skeleton/ and orc_elite/
     directories, which come from the PAID pack rather than the free demo.
@@ -55,11 +55,11 @@ Specifically excluded, and NOT redistributable under this licence:
     and nothing else.
 
     moba/game/assets/sprites/arrow/arrow.png is committed but is NOT an exception. It
-    is byte-identical to example/src/main/resources/assets/sprites/arrow/arrow.png
+    is byte-identical to example-assets/sprites/arrow/arrow.png
     and comes from the same free Soldier & Orc demo — usable under that demo's own
     terms, and still not this project's to sublicense.
 
-  * Audio under example/src/main/resources/assets/sounds/. The provenance of
+  * Audio under example-assets/sounds/. The provenance of
     these files is not recorded anywhere in the repository, so no claim is made
     that they are the author's to license. Treat them as excluded until that is
     established; docs/art-assets.md tracks it as open.

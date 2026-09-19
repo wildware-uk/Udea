@@ -8,7 +8,7 @@ import kotlin.jvm.JvmInline
  * Distinct from [AssetId] because they are different things that were the same `String` in the
  * old tree, and that is precisely where the two-keys-for-one-file bug lived: a script wrote
  * `spritePath = "/sprites/orc_elite/orc_elite_idle.png"`
- * (`example/src/main/resources/assets/character/orc_elite.udea.kts:122`) while the loader
+ * (`example-assets/character/orc_elite.udea.kts:122`) while the loader
  * registered the same file under the stripped key `sprites/...`
  * (`common/UdeaGameManager.kt:506`), so the lookup missed and the texture was loaded twice
  * under two names.

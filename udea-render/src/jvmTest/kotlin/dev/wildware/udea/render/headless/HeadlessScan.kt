@@ -19,17 +19,17 @@ import java.io.File
  * ## It extends UDEA-MG-002; it does not restate it
  *
  * `UDEA-MG-002` -- owned by `udeaVerifyModuleGraph` in the build tooling -- is the
- * *configuration-level* rule: no GL backend, no LWJGL, no gdx natives on a headless module's
+ * *configuration-level* rule: no Kool, no GL backend and no LWJGL on a headless module's
  * compile classpath. That rule is the one that should fail, because "you added
- * `gdx-backend-lwjgl3` to `udea-core`" is a far better message than forty class-level ones,
- * and it is checked first.
+ * `lwjgl-opengl` to `udea-core`" is a far better message than forty class-level ones, and it
+ * is checked first.
  *
  * This scan is the same rule one level down, and catches what a configuration check
  * structurally cannot:
  *
  * - a GL type reaching a headless module **transitively**, through a dependency that is
- *   itself allowed (`com.badlogicgames.gdx:gdx` is legal for `Vector2`, and carries
- *   `com/badlogic/gdx/graphics/Texture` in the same jar);
+ *   itself allowed. Until issue #213 that was concrete: `com.badlogicgames.gdx:gdx` was legal
+ *   for `Vector2` and carried `com/badlogic/gdx/graphics/Texture` in the same jar;
  * - a type named in *source* while the dependency that provides it is `compileOnly`, so it
  *   never appears on the runtime classpath the dependency rule inspects.
  *

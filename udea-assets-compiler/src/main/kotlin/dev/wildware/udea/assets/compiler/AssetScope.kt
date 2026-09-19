@@ -233,7 +233,7 @@ public object UdeaBuildContext {
  * ### Provisional
  *
  * These declaration functions stand in for the generated DSL that issue #84 owns in
- * `udea-assets`. They are modelled on the real kinds in `example/src/main/resources/assets`
+ * `udea-assets`. They are modelled on the real kinds in `example-assets`
  * and are deliberately narrow: this module needed *a* receiver to compile scripts against
  * before #84 landed one, and inventing a wide DSL here would be inventing the thing #84 is
  * for. See the report for the seam.

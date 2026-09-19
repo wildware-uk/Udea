@@ -2,15 +2,13 @@
 
 ## kmp baseline
 
-**SHA `6a7a9b1`** (kmp after #212 merge; branch already contained origin/kmp `21232ff`, merged tree ==
-reviewed tree `648ef72`), 2026-09-19. Reviewer ran
+**SHA `72b949d`** (kmp after #213; merged tree == trial tree `/tmp/trial-213`, which merged #213 onto `fdb82b9`
+= kmp with the textured-model example). Trial, 2026-09-19:
 `ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`
-on that exact tree:
 
-**BUILD SUCCESSFUL - 952 tasks, failing tasks: NONE.** The D9 red is gone: `:moba:compileKotlin` no longer
-exists (moba is `:moba:game`, `:moba:desktop`, `:moba:android`). GL under xvfb (`-Pudea.render.requireGl=true`)
-14/0 skipped; `-p build-logic check` green; runNetProof AGREED 3/3; runUdpProof all hashes match incl. lossy.
-**From here any red task on a branch is the branch's** (latency budgets: re-run alone first).
+**BUILD SUCCESSFUL - 915 tasks, failing tasks: NONE** (952 -> 915: the old tree's tasks are gone). GL under xvfb
+requireGl green; `-p build-logic check` green. **Any red task on a branch is the branch's** (latency budgets: re-run
+alone first). Earlier fully green: `6a7a9b1` (after #212, 952 tasks).
 
 Previous baseline `08ca441` (after #221): one red `:moba:compileKotlin`.
 Earlier: `30731e4` (after #227), `26333d5` (after #230), `7ac6559` (after #229), `18bb13f` (after #224), `87d8b7c` (after #211), same single red. Before #211 the baseline was fully green: `52e92aa` (after #225), `0befdec` (kmp after #215 merge; trial tree identical, root build + build-logic check green); earlier `73a09e5` (kmp after #219 merge; trial tree identical, root build + build-logic check green); earlier `fcdeb63` (kmp after #193 merge; trial tree identical, root build + build-logic check green); earlier `303abe7` (kmp after #217 merge; trial tree identical to merged tree, root build + build-logic check green); earlier `25cc650` (kmp after #218 merge; trial root build + build-logic check green); earlier `47ec3b9` (kmp after #208 merge; trial root build + build-logic check green); earlier `89e6113` (kmp after #220 merge; trial root build + build-logic check green); earlier `e9639e0` (kmp after #207 merge; trial root build + build-logic check green; `6d95f67` #216, trial tree identical, root build + `-p build-logic check` both green; `dc6c708` #209; `236ad47` #206; before: `abba97b` #205, `4ca994d` #204, `a634450` #203), refreshed 2026-09-16; first taken at `6097ae7` on a detached checkout with
@@ -445,6 +443,55 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   rule): one collage left-panel label wrong; frame-paced shot harness could be tick-exact. Worktree kept:
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
+
+## Wave 11 (2026-09-19): in flight
+
+- Baseline `6a7a9b1`: FULLY GREEN. Any red on a branch is the branch's.
+- Dispatched: dev-228 (#228 symbolic keys; udea-render input + moba controls), dev-192 (#192 binary
+  test_level + loop ban; udea-assets-compiler, udea-diagnostics rule id, moba level, -Plevel on
+  :moba:desktop), dev-213 (#213 delete old tree/LibGDX/legacy gates; root build, build-logic, AGENTS.md,
+  CI, art source move). Box: 24 cores, 13G available, melon-merge running. Three developers.
+- Shared developer contract (skill block + wave-11 addenda, task paths updated for the moba split):
+  `scratchpad/lead/dev-contract.md`.
+- Decisions: #228 subsumes ui/KeyTable.kt, per backend = GLFW + Android (web shelved, no stub).
+  #192 level at `moba/game/levels/test_level.udealevel`. #213 art `git mv` out of example to a committed
+  non-module path, licence position unchanged, never un-ignore moba/game/assets/sprites.
+- **Owner request (dashboard, 2026-09-19): textured model with a material as an example.** No issue (owner
+  rule); tracked by comment on #199. dev-model, branch `model-textured-example`, new files in udea-render
+  (3D mesh + texture + Kool PBR material, Kool-free API), xvfb shot + GL test (texture and lighting
+  mutations red). 4th developer (owner "wip up to 4"); told to check `free -g` before full builds.
+- **Owner, 2D/3D + physics (dashboard, 2026-09-19):** separate Transform2D/Transform3D components (plain floats,
+  no vector objects; one copy step per library in the engine), one renderer; 3D model system also lifts 2D
+  positions onto the ground plane. Physics 2D = Box2D 3 (owner). Lead advice: use `de.fabmax.box2d-jni:box2d-jni`
+  1.0.0 (Box2D 3.3.1, Kool-free) in a `udea-physics2d` module behind udea-core's `PhysicsWorld`, NOT
+  `kool-physics-2d` (pulls kool-core into simulation/headless, UDEA-MG-002). 3D: Kool uses PhysX (physx-jni
+  2.7.1); Box3D (erincatto, MIT, v0.1.0) has no JVM/KMP binding yet. No physics backend exists today (#213
+  confirmed gdx-box2d unused). **Owner: "sounds good" - `udea-physics2d` (box2d-jni) QUEUED FOR WAVE 12** (commented on #199, no issue).
+- **Owner brainstorm: editor gizmos (2026-09-19).** Spec `docs/superpowers/specs/2026-09-19-editor-gizmos-design.md`
+  (`24c9fa4`, pushed). Owner explicitly asked for issues (overrides no-new-issues for this): epic **#231**, G1 #232
+  (edit sessions/selection tools, udea-agent, needs #193 only: READY next wave), G2 #233 + G3 #234 (need #194), G4
+  #235, G5 #236, G6 #237 (needs textured-model work), G7 #238 (needs #196). NOT part of #199, does not block #214.
+- **Textured model MERGED `52d8684`**, round 1 PASS, no findings. `Transform3D` (udea-core, plain floats, Z up,
+  @Serializable, not replicated: locks unchanged) + `ModelRenderer` (udea-render: ModelMesh box/sphere/plane,
+  ModelMaterial albedo/roughness/metallic) drawn by `ModelRenderSystem` (RenderSystem) in its own Kool pass
+  (KslPbrShader, directional + ambient, SimpleShadowMap, 4x MSAA) composited into the capturable 2D pass. 2D lift via
+  `PoseSource`. `:udea-render:runModelShot`; `GlModelRenderTest`. **Ledger: public model types stay public on the
+  #221 precedent - the first game that draws a model must call them** (moba showcase). Cards (commented on #199, no
+  issue): cause of the empty first frame of a new mesh/material; mutation on the up axis; mutation making a
+  model-less entity draw. Worktree kept `.claude/worktrees/agent-a13d42bc124dab5fc`.
+- **#213 MERGED `72b949d`**, round 1 PASS, no findings. Deleted common, gradle-plugin, example, example:assets,
+  migration ledger, the three legacy gates (+ CI step), every com.badlogicgames coordinate (incl. gdx-box2d), the
+  udea.kotlin-library-gl convention. Old asset tree moved (history kept, 107 renames) to `example-assets/` (not a
+  project; staging reads example-assets/sprites; assets-compiler test corpus lives there). MG-009 now bans LibGDX from
+  EVERY project; MG-008 retired (not reused); MG-002 drops gdx patterns. `udea.migration-check` -> `udea.docs-check`.
+  udea-render jvmTest fixtures moved off gdx to LWJGL GL11. Owner-open (commented #213): moba/game/assets/sounds are
+  byte copies of LICENSE's 24 unknown-provenance sounds; LICENSE never named that path (pre-existing). Out of scope:
+  RenderModuleGraphTest never reads moba/game/build.gradle.kts; bytecode banned-owner table has no Kool entry.
+  Lead removed untracked leftovers of deleted modules in the main checkout (common/, gradle-plugin/, example/ build
+  dirs, stale moba/assets/ staged art). Worktree kept `.claude/worktrees/agent-a56d33c250e95b123`.
+- **#194 now unblocked** (settings/AGENTS.md collision gone).
+- Held: #194 (settings.gradle.kts + AGENTS.md table collide with #213), #188 (moba HUD beside #228),
+  #189 (after #188; may be mostly done by #213), #195/#196 (need #194), #214 last.
 
 ## Wave 10 plan
 

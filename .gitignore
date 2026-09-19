@@ -4,7 +4,7 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-# Test-report output. `allure-results/` is written by the old `example` suite; both of these
+# Test-report output. `allure-results/` was written by the old `example` suite; both of these
 # have been committed by accident before, which is why they are named rather than left to the
 # `build/` rule - neither lives under a `build/` directory.
 allure-results/
@@ -80,7 +80,8 @@ moba/game/assets/sprites/*
 !moba/game/assets/sprites/champion_idle.png
 #
 # The arrow is not from that pack and is not new exposure: `arrow.png` has been committed at
-# `example/src/main/resources/assets/sprites/arrow/arrow.png` since the old game shipped, and the
+# `example-assets/sprites/arrow/arrow.png` (under `example/` until issue #213) since the old game
+# shipped, and the
 # copy under `moba/game/assets/sprites/arrow/` is the same 260-byte file at the path the packed bundle
 # reads from. It is excepted here rather than filed under `effects/` because the `.udea.kts` that
 # declares it has to sit beside it, and an ignored asset script is a build that packs on this

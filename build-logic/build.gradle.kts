@@ -171,7 +171,7 @@ val outerBuildInputs: FileCollection = files(
         // without these two lines the test stays UP-TO-DATE across a new character and across the
         // deletion of the art it stages - which are the two edits it exists to notice.
         include("moba/game/assets/**/*.udea.kts")
-        include("example/src/main/resources/assets/sprites/**")
+        include("example-assets/sprites/**")
     },
 )
 

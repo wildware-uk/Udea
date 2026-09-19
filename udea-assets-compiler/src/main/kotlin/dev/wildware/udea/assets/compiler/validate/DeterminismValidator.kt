@@ -19,7 +19,7 @@ import kotlin.io.path.readBytes
  * A `.udea.kts` reads a clock or an unseeded random.
  *
  * The live offender when this was written is
- * `example/src/main/resources/assets/level/test_level.udea.kts`, which imports
+ * `example-assets/level/test_level.udea.kts`, which imports
  * `kotlin.random.Random` and spawns every entity at `Random.nextFloat()` positions. That makes
  * the *asset pack* a different artefact on every build, which is a different and worse thing
  * than randomness at spawn time: spec 3.6 makes a pack a deterministic function of its sources,

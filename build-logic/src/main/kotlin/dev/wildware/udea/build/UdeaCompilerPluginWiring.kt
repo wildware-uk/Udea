@@ -163,7 +163,7 @@ public object UdeaCompilerPluginWiring {
      */
     public fun appliesTo(projectPath: String, enabled: Boolean): Boolean =
         enabled &&
-            LegacyDependencyRules.governs(projectPath) &&
+            ModuleGraphRules.governs(projectPath) &&
             projectPath !in EXCLUDED_PROJECTS
 
     /**
@@ -243,7 +243,7 @@ public object UdeaCompilerPluginWiring {
             "-P${UdeaBuildFlags.COMPILER_PLUGIN_ENABLED}=false: spec 7's degrade path, so no " +
                 "module gets the K2 plugin"
 
-        !LegacyDependencyRules.governs(projectPath) ->
+        !ModuleGraphRules.governs(projectPath) ->
             "$projectPath is not part of the rewrite tree; the plugin is applied to udea-* " +
                 "and moba only"
 

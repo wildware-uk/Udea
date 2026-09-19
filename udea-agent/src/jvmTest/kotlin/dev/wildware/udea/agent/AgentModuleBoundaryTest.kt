@@ -9,9 +9,8 @@ import kotlin.test.assertTrue
  * What `udea-agent` is not allowed to carry, checked as a gate rather than as a convention.
  *
  * This module is compiled into every Udea game, so anything on its classpath is on the game's.
- * Three things must never arrive:
+ * These must never arrive:
  *
- * - **`common`**, the old tree, which the rewrite exists to replace;
  * - **a GL backend or a native platform artifact**, because the agent surface has to run in a
  *   headless test JVM and on a dedicated server;
  * - **an HTTP server or a JSON serialiser**, because the server belongs to `udea-agent-host` one
@@ -19,11 +18,11 @@ import kotlin.test.assertTrue
  *
  * ## Why this is a test and not a `ModuleGraphRules` coordinate rule
  *
- * The first two *are* covered by coordinate rules already - `udeaVerifyNoLegacyDependencies` and
- * `UDEA-MG-002`, which lists `:udea-agent` - and this restates them one level down as a
- * belt-and-braces check that costs nothing. The third cannot be a coordinate rule at all: the
- * HTTP server this module must not use is `com.sun.net.httpserver`, which ships **inside the
- * JDK**. There is no coordinate to ban, so the only thing that can catch it is a source scan.
+ * The first *is* covered by a coordinate rule already - `UDEA-MG-002`, which lists `:udea-agent`
+ * - and this restates it one level down as a belt-and-braces check that costs nothing. (The old
+ * `common` tree was a third, banned here and by its own gate, until issue #213 deleted it.) The
+ * HTTP server cannot be a coordinate rule at all: the one this module must not use is
+ * `com.sun.net.httpserver`, which ships **inside the JDK**. There is no coordinate to ban, so the only thing that can catch it is a source scan.
  *
  * The classpath half reads the test JVM's own classpath, which is this module's runtime
  * classpath plus its test dependencies. That needs no build wiring, works under the
@@ -138,7 +137,6 @@ class AgentModuleBoundaryTest {
 
     private companion object {
         val BANNED_ARTIFACTS: List<String> = listOf(
-            "common-1.0-snapshot",
             "lwjgl",
             "gdx-backend",
             "natives-desktop",

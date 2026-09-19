@@ -9,7 +9,7 @@ The pixels are **not committed** - they are third-party licensed art and this re
 `moba/game/assets/sprites/` is the path the character scripts under `moba/game/assets/character/` actually
 name and the one `:moba:game:udeaPackBundle` reads, so a clone carries none of it. **The build puts it
 there.** `:moba:game:udeaStageCharacterArt` copies the sheets out of
-`example/src/main/resources/assets/sprites/`, where this repository already holds them, and runs
+`example-assets/sprites/`, where this repository already holds them, and runs
 ahead of `udeaScanAssets`, `udeaValidateAssets` and `udeaPackBundle`.
 
 ## Getting the art
@@ -83,9 +83,9 @@ stages 33 sheets for six characters, and the corpus shape is the point of those 
 This manifest IS committed so blueprints, issues and champion designs can name real
 characters and animation frame counts without shipping the art.
 
-> **The `moba` half of that is true. The `example` half is not.** Third-party art from the same
-> pack is already committed under `example/src/main/resources/assets/sprites/`, and this
-> repository is public. See [Committed art in `example`](#committed-art-in-example) at the
+> **The `moba` half of that is true. The `example-assets` half is not.** Third-party art from
+> the same pack is already committed under `example-assets/sprites/`, and this
+> repository is public. See [Committed art in `example-assets`](#committed-art-in-example-assets) at the
 > bottom of this file for what is there, the options, and **the decision** — which is to leave
 > it, because `:moba`'s build now stages `moba`'s art out of it and removing it would red-build
 > the repository.
@@ -179,11 +179,23 @@ if a visual faction split is wanted. That is a gameplay decision, not baked into
 
 ---
 
-## Committed art in `example`
+## Committed art in `example-assets`
 
-`example/src/main/resources/assets/sprites/` holds 64 committed image files from the same **Tiny
+`example-assets/sprites/` holds 64 committed image files from the same **Tiny
 RPG Character Asset Pack**, 42 of them in the four paid-pack directories. They landed in commit `2ffb932`, long before the `moba` rule above
 existed, and the repository is **public**.
+
+### Where it lives, and why it moved (issue #213)
+
+Until issue #213 this tree was `example/src/main/resources/assets/sprites/`, inside the old
+`example` game module. That module was deleted with the rest of the old tree, and the art was
+moved - not copied, and with its history - to `example-assets/sprites/`, a directory no Gradle
+project owns, together with the rest of the retired game's asset tree. The move changes the path
+and nothing else: the same 64 files, byte for byte, under the same `LICENSE` exclusion, with the
+same decision below. It was not deleted with the module because it is still the only copy of the
+art `:moba`'s build stages, and it was not committed into `moba/game/assets/sprites/` because that
+would have doubled the exposure this section is about. `CharacterArtStagingTest` fails if the
+source tree is ever put back inside a project.
 
 ### What is actually there
 
@@ -199,13 +211,16 @@ has a licence to *use* and no right to *sublicense*.
 Two smaller inconsistencies found alongside it, both worth fixing when their module is next
 touched:
 
-- `common/build.gradle.kts` and `gradle-plugin/build.gradle.kts` both publish a POM declaring
+- `common/build.gradle.kts` and `gradle-plugin/build.gradle.kts` both published a POM declaring
   **Apache-2.0**, while `README.md` and the new `LICENSE` say MIT. Three claims, one project.
-  Those two POMs belong to old-tree modules deleted in Phase 6, so the cheapest correct fix is
-  to let them go with the modules rather than edit them now — but a `mavenLocal` publish made
-  before then carries the wrong licence.
-- The provenance of `example/src/main/resources/assets/sounds/` is recorded nowhere. It may be
+  Both POMs went with their modules in issue #213, which was the fix chosen here — but a
+  `mavenLocal` publish made before then carries the wrong licence.
+- The provenance of `example-assets/sounds/` is recorded nowhere. It may be
   the author's, it may not. Until somebody says which, `LICENSE` excludes it.
+  `moba/game/assets/sounds/` holds byte-identical copies of its 24 `.ogg` files, and `LICENSE`
+  does not name that path. That gap predates issue #213, which only moved the source tree; it is
+  recorded on that issue for the owner rather than closed by an agent, because widening what
+  `LICENSE` excludes is a licence decision.
 
 ### The options
 
@@ -215,7 +230,7 @@ licence actually permits and what the risk appetite is. All four options are rea
 | # | Option | Cost | What it does not fix |
 |---|---|---|---|
 | 1 | **Leave it. Rely on the `LICENSE` exclusion.** | None | The files stay in the published tree and in every clone. A reader who does not open `LICENSE` still sees art under an MIT repo |
-| 2 | **Delete the four paid directories from `HEAD`**, keep the free demo art, and replace the affected `.udea.kts` characters with placeholders | Half a day; `example` is deleted in Phase 6 anyway | History still carries them. Anyone can `git checkout` an old commit |
+| 2 | **Delete the four paid directories from `HEAD`**, keep the free demo art, and replace the affected `.udea.kts` characters with placeholders | Half a day | History still carries them. Anyone can `git checkout` an old commit |
 | 3 | **Option 2, plus rewrite history** (`git filter-repo`) and force-push | Breaks every clone and every open PR; rewrites 500+ commits | Nothing, but it is the most expensive option and the tree is public, so copies may already exist |
 | 4 | **Make the repository private** until the art is out | Loses the public project | Reversible, but it is a bigger decision than the art |
 
@@ -276,7 +291,7 @@ now stated rather than implied, which is what option 1 requires to be defensible
 any of them. **If you disagree with this decision**, the change is: pick option 2, re-source
 `moba`'s six characters from art the project may redistribute, update
 `CharacterArtStaging`'s plan in `build-logic` to the new sources, and delete
-`example/src/main/resources/assets/sprites/{wizard,priest,skeleton,orc_elite}/`. In that order —
+`example-assets/sprites/{wizard,priest,skeleton,orc_elite}/`. In that order —
 the last step alone breaks the build. `scripts/verify-art-staging.py` will tell you if it does.
 
 ### The ongoing mechanism for `moba`'s art

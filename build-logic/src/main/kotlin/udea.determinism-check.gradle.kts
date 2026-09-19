@@ -9,7 +9,7 @@ import dev.wildware.udea.build.udeaCatalog
  * Registers `udeaVerifyDeterminism` and wires it into `check` (issue #150).
  *
  * Applied to the **root** project, not to each module, for the same reason
- * `udea.migration-check` is: the question is about a *set* of source sets across several
+ * `udea.docs-check` is: the question is about a *set* of source sets across several
  * modules, and a per-module answer to "does simulation read the wall clock" would be four
  * answers to a question that has one. It also keeps the gate off the build script of the
  * module it polices, which is the wrong place for the switch that turns it off.

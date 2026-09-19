@@ -44,13 +44,15 @@ import java.nio.file.StandardCopyOption
  * `CharacterArtStagingTest` holds it against the sprites the real `.udea.kts` name: a seventh
  * character fails that test by name rather than failing CI three pushes later.
  *
- * ## The coupling this carries, stated
+ * ## Where the committed copy lives
  *
- * [SOURCE_TREE] is inside `example`, which is old tree scheduled for deletion. Deleting the
- * *module* from `settings.gradle.kts` is safe - this reads files, and declares no Gradle
- * dependency on the project, so `UDEA-LEGACY-001` is not engaged. Deleting the *files* is what
- * breaks it, and it breaks loudly: [UdeaStageCharacterArtTask] names every sheet it could not
- * find. `docs/art-assets.md` carries the decision and what to do instead.
+ * [SOURCE_TREE] is under `example-assets/`, a directory no Gradle project owns. It was the asset
+ * tree of the retired `example` game until issue #213 deleted that module, and it was moved out,
+ * history kept, rather than deleted with it: a tree inside a module goes when the module goes and
+ * is packaged into its artefacts, and this one is neither to be lost nor to be shipped.
+ * `CharacterArtStagingTest` fails if it is ever put back inside a project. If the files go, the
+ * failure is loud: [UdeaStageCharacterArtTask] names every sheet it could not find.
+ * `docs/art-assets.md` carries the licence position.
  */
 public object CharacterArtStaging {
 
@@ -63,7 +65,7 @@ public object CharacterArtStaging {
     public const val TASK: String = "udeaStageCharacterArt"
 
     /** Repo-relative tree the sheets are copied out of. Committed; see the class KDoc. */
-    internal const val SOURCE_TREE: String = "example/src/main/resources/assets/sprites"
+    internal const val SOURCE_TREE: String = "example-assets/sprites"
 
     /** Repo-relative tree the sheets are copied into: the part of `:moba`'s asset root git ignores. */
     internal const val DESTINATION_TREE: String = "moba/game/assets/sprites"

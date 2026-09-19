@@ -68,6 +68,7 @@ public object HollowClientMain {
         )
         val client = HollowClient(PeerId.client(1), socket, started.host, UdpServing.SESSION_MTU)
         var announced = false
+        var frames = 0L
         try {
             started.backend.drive { _ ->
                 val tick = clock.advance()
@@ -79,6 +80,14 @@ public object HollowClientMain {
                 if (socket.isConnected && !announced) {
                     println("[hollow.client] connected as ${socket.localPeer}; ${started.host.world.numEntities} entities")
                     announced = true
+                }
+                if (announced && ++frames % REPORT_FRAMES == 0L) {
+                    // What only the wire can have delivered: the server's tick, and the entities
+                    // its snapshots have put in this client's replica store.
+                    println(
+                        "[hollow.client] server tick ${client.serverTick.value}; " +
+                            "${client.replication.world.liveNetIds().size} entities replicated; ${client.applier}",
+                    )
                 }
                 dropped?.let {
                     println("[hollow.client] disconnected: $it")
@@ -109,4 +118,7 @@ public object HollowClientMain {
     }
 
     private const val LOOPBACK: String = "127.0.0.1"
+
+    /** Frames between the client's progress lines: ten seconds at 60Hz. */
+    private const val REPORT_FRAMES: Long = 600L
 }

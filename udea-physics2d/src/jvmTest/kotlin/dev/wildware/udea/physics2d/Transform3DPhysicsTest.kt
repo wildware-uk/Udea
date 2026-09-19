@@ -136,10 +136,10 @@ class Transform3DPhysicsTest {
 
     @Test
     fun `a body without a Transform3D moves exactly as the solver alone moves it`() {
-        // Two runs of one scene. `game` steps the whole game, with the Transform3D systems installed;
-        // `solverOnly` drives the same solver the way it was driven before issue #247 - reconcile,
-        // then step, and nothing else. Every body without a Transform3D must follow the same path to
-        // the bit in both, beside a 3D entity that the systems do move.
+        // Two runs of one scene. `game = true` steps the whole game, with the Transform3D systems
+        // installed; `game = false` drives the same solver the way it was driven before issue #247:
+        // reconcile, then step, and nothing else. Every body without a Transform3D must follow the
+        // same path to the bit in both, beside a 3D entity that the systems do move.
         fun run(game: Boolean): List<Int> = Box2DScene(Physics2DSettings(gravityY = 0f)).use { scene ->
             scene.spawn(PhysicsBody(kind = BodyKind.Static, x = 5.5f), Box(0.5f, 5f))
             val ball = scene.spawn(PhysicsBody(linearX = 4f, angularVelocity = 1f), Circle(0.5f))
@@ -211,9 +211,11 @@ class Transform3DPhysicsTest {
      * Ticks CUT+1 .. TOTAL of one scene, as every watched entity's `Transform3D` in raw bits.
      *
      * The first watched entity, if kinematic, is driven by the game along x at [PUSH_PER_TICK] a
-     * tick, from the clock - so a restored run drives it along the same path it drove the first
-     * time. [Rewind.Control] rebuilds the solver from the live components at CUT; [Rewind.Restore]
-     * captures at CUT, runs on to TOTAL, restores the capture and re-simulates.
+     * tick, the way a game system moves one: `x += step`, from wherever its `Transform3D` is. So a
+     * restored run re-drives it from the restored `Transform3D`, and a restore that lost it would
+     * drive the body on from where the future left it. [Rewind.Control] rebuilds the solver from
+     * the live components at CUT; [Rewind.Restore] captures at CUT, runs on to TOTAL, restores the
+     * capture and re-simulates.
      */
     private fun transformRun(rewind: Rewind, build: Box2DScene.() -> List<NetId>): List<IntArray> =
         Box2DScene(Physics2DSettings(gravityY = 0f)).use { scene ->
@@ -221,7 +223,7 @@ class Transform3DPhysicsTest {
             fun tick() {
                 val driven = watched.first()
                 if (scene.bodyOf(driven).kind == BodyKind.Kinematic) {
-                    scene.transformOf(driven).x = (scene.game.ctx.tick.value + 1) * PUSH_PER_TICK
+                    scene.transformOf(driven).x += PUSH_PER_TICK
                 }
                 scene.step()
             }

@@ -79,6 +79,10 @@ class MigratedCorpusGapTest {
                 // and a corpus that quietly stopped using one would make the assertion above pass
                 // for the wrong reason.
                 "item",
+                // The animated Fox of issue #241, whose clips the accessor generator reads out of
+                // its glTF file. Not a migrated kind - the old tree had no 3D models - but the
+                // corpus is the live game's asset root, so it is in the set that root declares.
+                "model",
                 // No `level`: the game's one level is a saved `.udealevel` file since issue #192,
                 // not a script, so the corpus no longer declares one.
                 "soundCue",

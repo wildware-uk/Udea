@@ -34,6 +34,7 @@ import dev.wildware.udea.core.snapshot.ComponentSchema
 import dev.wildware.udea.core.snapshot.FieldKind
 import dev.wildware.udea.core.snapshot.fleksComponentType
 import dev.wildware.udea.core.snapshot.snapshotTimeTravel
+import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.gas.Abilities
 import dev.wildware.udea.gas.AbilitiesReplicator
 import dev.wildware.udea.gas.AttributeTable
@@ -411,7 +412,10 @@ public object MobaGame {
             attributesType(attributes),
             abilitiesType(),
             effectsType(),
-        ) + LaneModule.snapshotTypes() + ItemModule.snapshotTypes(),
+        ) + LaneModule.snapshotTypes() + ItemModule.snapshotTypes() +
+            // An animated model's clip, start, speed, loop and fade (issue #241): udea-core's own
+            // registration, so its field kinds are written once, beside the component.
+            Animator.snapshotType(),
     )
 
     /**

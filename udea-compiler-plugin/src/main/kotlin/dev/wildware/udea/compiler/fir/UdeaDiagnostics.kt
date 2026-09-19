@@ -103,6 +103,14 @@ internal object UdeaDiagnostics : KtDiagnosticsContainer() {
     )
 
     /**
+     * [UdeaRules.UNRESOLVED_ANIMATION_CLIP], from [UdeaAnimationClipChecker]. `DEFAULT`
+     * positioning on the unresolved name itself, so the span is the typo's.
+     */
+    val UNRESOLVED_ANIMATION_CLIP: KtDiagnosticFactory1<String> by error1<PsiElement, String>(
+        SourceElementPositioningStrategies.DEFAULT,
+    )
+
+    /**
      * Every rule this plugin can raise, and the factory it raises it through.
      *
      * Declared explicitly rather than derived by reflection: reflection over delegated
@@ -118,6 +126,7 @@ internal object UdeaDiagnostics : KtDiagnosticsContainer() {
         UdeaRules.REFERENCE_KIND_MISMATCH to REFERENCE_KIND_MISMATCH,
         UdeaRules.ASSET_INDEX_FORMAT to ASSET_INDEX_FORMAT,
         UdeaRules.LOOP_IN_ASSET to LOOP_IN_ASSET,
+        UdeaRules.UNRESOLVED_ANIMATION_CLIP to UNRESOLVED_ANIMATION_CLIP,
     )
 
     /**

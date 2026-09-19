@@ -95,3 +95,4 @@ dev.wildware.udea.core.physics.Capsule
 dev.wildware.udea.core.physics.Circle
 dev.wildware.udea.core.physics.PhysicsBody
 dev.wildware.udea.core.physics.Teleport
+dev.wildware.udea.core.spatial.Animator

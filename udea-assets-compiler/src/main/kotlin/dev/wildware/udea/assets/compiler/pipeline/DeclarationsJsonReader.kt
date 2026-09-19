@@ -53,6 +53,7 @@ public object DeclarationsJsonReader {
                     int("endLine"),
                     int("endColumn"),
                 ),
+                fileArgument = fields["fileArgument"] as? String,
             )
         }
     }

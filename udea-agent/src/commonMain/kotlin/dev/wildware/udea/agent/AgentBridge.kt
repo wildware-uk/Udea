@@ -25,7 +25,7 @@ import dev.wildware.udea.agent.state.DigestBudgets
  * `FruitGameKTX`'s `DebugBridge` has this shape and it has survived a lot of automated
  * sessions, because the invariant is structural rather than a rule anyone has to remember:
  * **the off-thread side only ever calls [snapshot] and [submit].** It cannot reach Fleks,
- * Box2D or scene2d, because they are not here. The simulation thread is the only writer of
+ * Box2D or the UI toolkit, because they are not here. The simulation thread is the only writer of
  * world state and the only consumer of commands, so no lock is needed and none is taken.
  *
  * Three things are carried forward from that implementation unchanged: the published document

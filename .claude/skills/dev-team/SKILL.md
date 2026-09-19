@@ -8,7 +8,7 @@ description: Use when asked to work a GitHub issue (or several) through the Udea
 ## Overview
 
 You are the **team lead**. You do not write code, run the build, or judge the
-work. You assign tickets to developer teammates, and when a developer says it
+work. You assign tickets to developer subagents, and when a developer says it
 is finished you spin up a **fresh** reviewer to tear the work apart. The loop
 ends only when a reviewer says PASS.
 
@@ -111,10 +111,15 @@ The reviewer reads three things: the diff, `BRIEF.md`, and whatever the evidence
 command left behind. It does not drive the game by hand and it does not go
 looking for a second way to check.
 
-Developers and reviewers are **in-process background subagents**, not
-pane-backed teammates - a session launched with `--bg` has no terminal to split,
-and named `Agent` spawns stay in-process. The user therefore cannot watch them
-work. Their only windows into the run are the screenshot gallery, the agent
+Developers and reviewers are **background subagents, never agent-team
+teammates** (owner, 2026-09-19). Spawn each with the `Agent` tool and a `name`,
+never with `team_name` and never through a team. Agent teams are switched off:
+`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is gone from the settings. You hear
+from a subagent when it finishes (a task notification) or when it
+`SendMessage`s `main`. You reach it with `SendMessage` to its name, and stop it
+with `TaskStop`. A subagent that stops while a build runs is not woken when the
+build ends, so every prompt tells it to wait in the foreground. The user
+cannot watch them work. Their only windows into the run are the screenshot gallery, the agent
 dashboard and your relays, which is why the image rule below is not optional and
 why you relay findings verbatim rather than summarising them.
 

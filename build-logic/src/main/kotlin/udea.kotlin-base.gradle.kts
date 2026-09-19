@@ -1,3 +1,4 @@
+import dev.wildware.udea.build.ForkedJvmTmpdir
 import dev.wildware.udea.build.UdeaBuildFlags
 import dev.wildware.udea.build.UdeaCompilerPluginSupport
 import dev.wildware.udea.build.UdeaCompilerPluginWiring
@@ -56,6 +57,17 @@ extensions.extraProperties[UdeaBuildFlags.COMPILER_PLUGIN_ENABLED] =
     )
 
 apply<UdeaCompilerPluginSupport>()
+
+// --- one temporary directory per forked JVM (issue #214) -----------------------------
+
+/**
+ * Every test and `JavaExec` JVM this module forks unpacks native libraries into its own task's
+ * temporary directory, never the machine's shared one. [ForkedJvmTmpdir] has the crash this
+ * prevents; it is here, in the convention every module is on, because the two JVMs that raced
+ * belonged to two different modules.
+ */
+tasks.withType<Test>().configureEach { ForkedJvmTmpdir.isolate(this, this) }
+tasks.withType<JavaExec>().configureEach { ForkedJvmTmpdir.isolate(this, this) }
 
 // --- kotlin-stdlib pin (spec 7) ------------------------------------------------------
 

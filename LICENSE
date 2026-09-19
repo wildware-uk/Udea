@@ -77,6 +77,12 @@ the MIT licence above:
     links and the checksum. moba/game/assets/models/fox/Fox.glb is the same
     file, byte for byte, under the same licence, with the same NOTICE.md.
 
+  * moba/game/assets/models/human/Human.fbx and ClothedLightSkin.png beside it —
+    from Quaternius' "Animated Man Pack", released under Creative Commons Zero
+    1.0 Universal (public domain), https://creativecommons.org/publicdomain/zero/1.0/.
+    The FBX is modified by relink.py next to it; NOTICE.md there has the source,
+    the checksums and the change.
+
 If you fork, vendor or redistribute this repository, you must supply your own
 art and audio. See docs/art-assets.md for the current status of these files and
 the options for resolving the committed ones.

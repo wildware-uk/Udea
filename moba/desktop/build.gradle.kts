@@ -339,6 +339,28 @@ tasks.register<JavaExec>("runMatchShot") {
     )
 }
 
+// The imported models' evidence task (issue #244). `GameModelShot` lives in the test source set for
+// the reason `MatchShot` does. It draws the game's FBX character from the `.glb` that
+// `:moba:game:udeaPackBundle` converted it to, under that project's `build/udea/converted` - the
+// directory `UdeaAssetsPlugin` writes each converted model to - and the fox from the asset root.
+val convertedModels: Provider<Directory> = project(":moba:game").layout.buildDirectory.dir("udea/converted")
+
+tasks.register<JavaExec>("runModelShot") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.modelshot: the game's FBX character, converted at build time, drawn with its texture."
+    mainClass.set("dev.wildware.moba.GameModelShot")
+    classpath = sourceSets.test.get().runtimeClasspath
+    dependsOn(":moba:game:udeaPackBundle")
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty("udea.moba.gameAssets", gameAssetRoot.asFile.absolutePath)
+    systemProperty("udea.moba.convertedModels", convertedModels.get().asFile.absolutePath)
+    systemProperty(
+        "udea.modelshot.dir",
+        providers.gradleProperty("udea.modelshot.dir").orNull
+            ?: layout.buildDirectory.dir("reports/udea/model").get().asFile.absolutePath,
+    )
+}
+
 // The lane's evidence task. `LaneShot` lives in the test source set for the same reason
 // `MatchShot` does - it needs a GL driver, and wiring it into `check` would turn a missing driver
 // into a skip, which is a failure mode this repository has already shipped once. Run by name.

@@ -1,10 +1,10 @@
 # Makes `bender/Bender.fbx`, the asset compiler's FBX test fixture (issue #244), and the texture it
-# names, `bender/checker.png`. Written for this repository and dedicated to the public domain
-# (CC0 1.0), like the file it makes.
+# names, `bender/checker.png`. Written for this repository, and under its licence like the files
+# it makes.
 #
 #   blender -b -P make_bender.py -- <output folder>
 #
-# A column of eight rings, skinned to a two-bone armature, with a 4x4 checker texture linked (not
+# An eight-sided cylinder, skinned to a two-bone armature, with a 4x4 checker texture linked (not
 # embedded) through its material, and two actions: `Bend` (24 frames) and `Twist` (15 frames) at
 # 24 frames a second, so one clip is a whole second and the other a length that is not a whole
 # number of 60Hz ticks. Blender's FBX exporter names each take `<armature>|<action>`, which is
@@ -13,6 +13,19 @@ import os
 import sys
 
 import bpy
+from io_scene_fbx import export_fbx_bin
+
+# Blender's exporter writes each texture's absolute path beside its relative one, which would put
+# the directory of whoever ran this into the committed file. Both are written as the relative path.
+_gen_vid_path = export_fbx_bin._gen_vid_path
+
+
+def _relative_only(img, scene_data):
+    _, relative = _gen_vid_path(img, scene_data)
+    return relative, relative
+
+
+export_fbx_bin._gen_vid_path = _relative_only
 
 out = sys.argv[sys.argv.index("--") + 1]
 os.makedirs(out, exist_ok=True)
@@ -36,10 +49,6 @@ image.save()
 bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.3, depth=2.0, location=(0, 0, 1.0))
 body = bpy.context.active_object
 body.name = "Body"
-bpy.ops.object.mode_set(mode="EDIT")
-bpy.ops.mesh.loopcut_slide(MESH_OT_loopcut={"number_cuts": 6, "edge_index": 1})
-bpy.ops.uv.cylinder_project()
-bpy.ops.object.mode_set(mode="OBJECT")
 
 material = bpy.data.materials.new("Checker")
 material.use_nodes = True

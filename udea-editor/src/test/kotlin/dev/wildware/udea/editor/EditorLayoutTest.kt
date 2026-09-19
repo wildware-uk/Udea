@@ -3,6 +3,8 @@ package dev.wildware.udea.editor
 import dev.wildware.composegl.ui.geometry.Offset
 import dev.wildware.composegl.ui.geometry.Rect
 import dev.wildware.composegl.ui.geometry.Size
+import dev.wildware.composegl.ui.input.Key
+import dev.wildware.composegl.ui.input.Modifiers
 import dev.wildware.composegl.ui.testing.UiTest
 import dev.wildware.composegl.ui.testing.uiTest
 import dev.wildware.udea.agent.AgentBridge
@@ -69,6 +71,34 @@ class EditorLayoutTest {
             assertEquals(before.left + DRAG, after.left, 1f, "the view's left edge did not follow the divider")
             assertEquals(before.right, after.right, 1f, "the view's right edge moved with a divider on its left")
             assertBetweenPanels(ui, EditorTags.SCENE_VIEW)
+        }
+    }
+
+    @Test
+    fun `a panel floated off its dock gives its room to the view, and docked along the bottom takes room from below`() {
+        open().use { ui ->
+            val before = ui.node(EditorTags.SCENE_VIEW).boundsInRoot
+            val create = ui.node("debugwindow:${EditorTags.CREATE_PANEL}").boundsInRoot
+            // A press on the panel's empty lower part puts focus on its frame, which hears the keys
+            // that float and dock it.
+            assertTrue(ui.click(Offset(create.centre.x, create.bottom - EMPTY)), "the Create panel took no press")
+            assertTrue(ui.key(Key.F, Modifiers.Primary + Modifiers.Alt), "the Create panel did not float")
+            ui.settle()
+
+            val floated = ui.node(EditorTags.SCENE_VIEW).boundsInRoot
+            assertEquals(create.left, floated.left, 1f, "the view did not take the room the floated panel left")
+            assertEquals(before.right, floated.right, 1f, "floating the Create panel moved the view's right edge")
+
+            assertTrue(ui.key(Key.Down, Modifiers.Primary + Modifiers.Alt), "the Create panel did not dock along the bottom")
+            ui.settle()
+            val docked = ui.node(EditorTags.SCENE_VIEW).boundsInRoot
+            val bottom = ui.node("debugwindow:${EditorTags.CREATE_PANEL}").boundsInRoot
+            val context = "view $docked, Create panel $bottom"
+            assertTrue(bottom.top > docked.top && bottom.width > bottom.height, "the Create panel is not along the bottom: $context")
+            assertEquals(bottom.top - DIVIDER, docked.bottom, 1f, "the view does not end at the divider above the Create panel: $context")
+            for (other in PANELS.map { ui.node("debugwindow:$it").boundsInRoot } + dividers(ui)) {
+                assertFalse(docked.overlaps(other), "the view lies under $other: $context")
+            }
         }
     }
 
@@ -153,5 +183,8 @@ class EditorLayoutTest {
 
         /** How far each drag goes, in design units. */
         const val DRAG = 40f
+
+        /** How far above a panel's bottom edge a press lands on nothing but the panel's frame. */
+        const val EMPTY = 20f
     }
 }

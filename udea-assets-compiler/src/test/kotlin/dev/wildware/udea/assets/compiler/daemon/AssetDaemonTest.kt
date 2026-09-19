@@ -5,6 +5,7 @@ import dev.wildware.udea.assets.DeltaClassification
 import dev.wildware.udea.assets.RestartReason
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpriteSheet
+import dev.wildware.udea.assets.compiler.AssetCompilerRules
 import dev.wildware.udea.diagnostics.Severity
 import dev.wildware.udea.diagnostics.UdeaRules
 import org.junit.jupiter.api.Test
@@ -72,9 +73,9 @@ class AssetDaemonTest {
     /**
      * A loop saved through the live daemon is refused the way the build refuses it (issue #192).
      *
-     * The daemon is what the agent's `assets.*` tools edit through, and pass 1 is where the loop
-     * ban lives; a daemon that kept only pass 2's diagnostics would apply a script the build then
-     * fails on.
+     * The daemon is what the agent's `assets.*` tools edit through. Both passes refuse this
+     * `repeat` - pass 1 by name, pass 2's K2 checker by resolved symbol - and `.single` is the
+     * assertion that the agent is told once.
      */
     @Test
     fun `a loop in an edited script is rejected with the loop rule at the loop`() {
@@ -98,6 +99,31 @@ class AssetDaemonTest {
         assertEquals(Severity.Error, loop.severity)
         assertEquals(5, loop.span?.startLine, "the span is the loop's line: $loop")
         assertEquals(generation, fixture.daemon.generation, "a rejected reload moves nothing")
+    }
+
+    /**
+     * The daemon keeps pass 1's own findings (issue #192), not only the compiler's.
+     *
+     * The loop above no longer shows that on its own: the compile's K2 checker refuses the same
+     * `repeat`. A computed asset name is a finding only pass 1 makes - it compiles, and it
+     * evaluates - so it is what an agent would lose if the daemon dropped the scan's diagnostics.
+     */
+    @Test
+    fun `a finding only the syntactic pass makes reaches the agent`() {
+        val fixture = DaemonFixture("pass-one").writeBaseline()
+        assertTrue(fixture.daemon.start().ok)
+
+        val edited = fixture.write(
+            "character/orc.udea.kts",
+            """
+            val prefix = "orc"
+            spriteSheet(name = prefix.uppercase(), spritePath = "/sprites/orc/idle.png", rows = 1, columns = 6, scale = 0.02f)
+            """.trimIndent(),
+        )
+        val report = fixture.daemon.validate(listOf(edited))
+
+        val nonLiteral = report.diagnostics.single { it.ruleId == AssetCompilerRules.NON_LITERAL_ID.id }
+        assertEquals(2, nonLiteral.span?.startLine, "at the computed name: $nonLiteral")
     }
 
     @Test

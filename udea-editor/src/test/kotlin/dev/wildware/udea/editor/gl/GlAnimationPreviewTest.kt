@@ -273,14 +273,7 @@ class GlAnimationPreviewTest {
             val turned = frame(backend, slot, views)
             save(shown.scene, "animation-preview-model.png")
             save(turned.scene, "animation-preview-model-turned.png")
-            val box = foxBox(shown.scene)
-            println("GlAnimationPreviewTest: the model preview covers $box of ${shown.scene.width}x${shown.scene.height}")
-            assertTrue(box.left > 0 && box.top > 0 && box.right < WIDTH - 1 && box.bottom < HEIGHT - 1, "the model preview is cut off by the view's edge: $box")
-            val tallest = maxOf(box.width.toFloat() / WIDTH, box.height.toFloat() / HEIGHT)
-            assertTrue(tallest in MODEL_SHARE, "the model preview fills $tallest of the view")
-            val centreX = (box.left + box.right) / 2f / WIDTH
-            val centreY = (box.top + box.bottom) / 2f / HEIGHT
-            assertTrue(abs(centreX - 0.5f) < MODEL_OFF_CENTRE && abs(centreY - 0.5f) < MODEL_OFF_CENTRE, "the model preview is off the view's middle: $box")
+            assertModelShown(shown.scene)
             assertTrue(moved(shown.scene, turned.scene) >= MIN_MOVED_PIXELS, "the model preview does not turn")
             // The entity's own fox is not drawn with it: where that fox stood and the model does not,
             // the background shows.
@@ -289,6 +282,23 @@ class GlAnimationPreviewTest {
             assertTrue(alone >= MIN_MOVED_PIXELS, "the entity's fox is drawn under the model preview: $alone pixels uncovered")
             assertContentEquals(pixels(simulated.capture), pixels(shown.capture), "the model preview changed the capturable frame")
             assertEquals(hash, worldHash(), "the model preview changed the world")
+
+            // The selected fox is hidden while the model shows, so its bones are not drawn either.
+            backend.onRenderThread { views.scene.showGizmos = true }
+            val withOverlay = frame(backend, slot, views)
+            assertEquals(0, count(withOverlay.scene, ::isMark), "the hidden fox's bones are drawn over the model preview")
+
+            // Side on, in a tall narrow Scene tab: whole, its length fitted to the width.
+            backend.onRenderThread {
+                views.scene.showGizmos = false
+                views.scene.modelPreview = ModelPreview.Asset(fox, null, Ticks(0L), SIDE_ON)
+                views.scene.resizeTo(NARROW_WIDTH, HEIGHT)
+            }
+            frame(backend, slot, views)
+            val narrow = frame(backend, slot, views)
+            save(narrow.scene, "animation-preview-model-narrow.png")
+            assertEquals(NARROW_WIDTH, narrow.scene.width, "the Scene view did not take its narrow size")
+            assertModelShown(narrow.scene)
         } finally {
             backend.close()
         }
@@ -376,6 +386,18 @@ class GlAnimationPreviewTest {
         return n
     }
 
+    /** The model preview in [image]: whole, at its middle, and at a size to look at. */
+    private fun assertModelShown(image: BufferedImage) {
+        val box = foxBox(image)
+        println("GlAnimationPreviewTest: the model preview covers $box of ${image.width}x${image.height}")
+        assertTrue(box.left > 0 && box.top > 0 && box.right < image.width - 1 && box.bottom < image.height - 1, "the model preview is cut off by the view's edge: $box")
+        val largest = maxOf(box.width.toFloat() / image.width, box.height.toFloat() / image.height)
+        assertTrue(largest in MODEL_SHARE, "the model preview fills $largest of the view")
+        val centreX = (box.left + box.right) / 2f / image.width
+        val centreY = (box.top + box.bottom) / 2f / image.height
+        assertTrue(abs(centreX - 0.5f) < MODEL_OFF_CENTRE && abs(centreY - 0.5f) < MODEL_OFF_CENTRE, "the model preview is off the view's middle: $box")
+    }
+
     /** The smallest rectangle holding every fox pixel of [image]. */
     private fun foxBox(image: BufferedImage): Box {
         var left = image.width
@@ -440,6 +462,12 @@ class GlAnimationPreviewTest {
 
         /** How far the model preview's middle may sit from the view's, as a share of the view. */
         const val MODEL_OFF_CENTRE = 0.15f
+
+        /** A Scene tab narrower than it is tall, as the editor's is between its docked panels. */
+        const val NARROW_WIDTH = 200
+
+        /** The Fox's heading at which its length runs across the view. */
+        const val SIDE_ON = 90f
 
         const val WIDTH = 480
         const val HEIGHT = 320

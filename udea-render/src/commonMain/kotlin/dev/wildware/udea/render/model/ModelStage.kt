@@ -246,7 +246,10 @@ internal class ModelStage(
      */
     fun skeleton(entity: Int, view: WorldViewport?, out: ModelSkeleton): Boolean {
         out.clear()
-        val placed = view?.let { views[it] }?.previewFor(entity) ?: drawnFor(entity) ?: return false
+        val seen = view?.let { views[it] }
+        // A model shown on its own hides every entity's from that view, so none has a skeleton there.
+        if (seen != null && seen.showingAsset) return false
+        val placed = seen?.previewFor(entity) ?: drawnFor(entity) ?: return false
         return placed.writeSkeleton(out)
     }
 
@@ -448,7 +451,8 @@ internal class ModelStage(
         private var previewEntity = NO_ENTITY
 
         /** Whether [preview] is a model shown on its own ([showAsset]), with every other model hidden. */
-        private var showingAsset = false
+        var showingAsset = false
+            private set
 
         private val placing = MutableMat4f()
 
@@ -501,7 +505,8 @@ internal class ModelStage(
 
         /**
          * Shows [model] on its own at [orbit]'s centre, turned [turnDegrees] about Z, in [pose],
-         * scaled so its largest side is [ASSET_FILL] of the view's height at the orbit's distance.
+         * scaled so its largest side is [ASSET_FILL] of the view's height at the orbit's distance, or
+         * of its width in a view narrower than it is tall.
          */
         fun showAsset(model: ImportedModel, pose: ClipPose, turnDegrees: Float, orbit: ModelCamera) {
             val shown = previewNode(model)
@@ -511,8 +516,10 @@ internal class ModelStage(
             val dy = orbit.eyeY - orbit.targetY
             val dz = orbit.eyeZ - orbit.targetZ
             val distance = sqrt(dx * dx + dy * dy + dz * dz)
-            // The view is 2 d tan(fov / 2) high at the orbit's distance d.
-            val wanted = ASSET_FILL * 2f * distance * tan(orbit.fovYDegrees.deg.rad / 2f)
+            // The view is 2 d tan(fov / 2) high at the orbit's distance d, and its aspect times that
+            // wide: the model fits the narrower of the two.
+            val viewHeight = 2f * distance * tan(orbit.fovYDegrees.deg.rad / 2f)
+            val wanted = ASSET_FILL * viewHeight * minOf(1f, width.toFloat() / height)
             val scale = if (largest > 0f) wanted / largest else 1f
             placing.setIdentity()
                 .translate(orbit.targetX, orbit.targetY, orbit.targetZ)

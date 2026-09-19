@@ -17,9 +17,14 @@ import dev.wildware.udea.core.physics.ContactListener
 import dev.wildware.udea.core.physics.PhysicsBody
 import dev.wildware.udea.core.physics.PhysicsSnapshotTypes
 import dev.wildware.udea.core.snapshot.ComponentRegistry
+import dev.wildware.udea.core.snapshot.ComponentSchema
+import dev.wildware.udea.core.snapshot.FieldKind
 import dev.wildware.udea.core.snapshot.SnapshotService
 import dev.wildware.udea.core.snapshot.WorldHasher
 import dev.wildware.udea.core.snapshot.WorldSnapshot
+import dev.wildware.udea.core.snapshot.fleksComponentType
+import dev.wildware.udea.core.spatial.Transform3D
+import dev.wildware.udea.core.spatial.Transform3DReplicator
 import dev.wildware.udea.generated.CoreUdeaRegistry
 
 /**
@@ -51,7 +56,11 @@ internal class Box2DScene(
     /** The installed solver, which is also `game.ctx.physics`. */
     val physics: Box2DPhysicsWorld = module.backend as Box2DPhysicsWorld
 
-    val registry = ComponentRegistry(PhysicsSnapshotTypes.all())
+    /**
+     * The physics components and `Transform3D`, so a capture and a hash see the pose a body drives
+     * (issue #247). An entity without a `Transform3D` contributes nothing to its column.
+     */
+    val registry = ComponentRegistry(PhysicsSnapshotTypes.all() + transform3DType())
 
     val snapshots = SnapshotService(registry, game.world, game.ctx, netIds)
 
@@ -109,6 +118,13 @@ internal class Box2DScene(
     }
 
     companion object {
+
+        /** `Transform3D`'s snapshot registration: nine floats, in the replicator's sorted order. */
+        private fun transform3DType() = fleksComponentType(
+            Transform3DReplicator,
+            ComponentSchema.of(Transform3DReplicator, "Transform3D", List(Transform3DReplicator.fieldNames.size) { FieldKind.Float }),
+            Transform3D,
+        ) { Transform3D() }
 
         /**
          * The standard scene: bodies falling, stacking and colliding.

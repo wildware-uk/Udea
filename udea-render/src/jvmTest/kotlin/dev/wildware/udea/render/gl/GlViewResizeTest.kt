@@ -1,6 +1,9 @@
 package dev.wildware.udea.render.gl
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import dev.wildware.composegl.ui.geometry.Size
 import dev.wildware.composegl.ui.graphics.Colour
 import dev.wildware.composegl.ui.layout.Box
@@ -46,11 +49,14 @@ import kotlin.test.assertTrue
  * with the old viewport draw the world into one corner of them. The world is red with a blue square
  * in its top-right corner, which is at the panel's top-right corner only if the pass draws into the
  * whole of the new picture.
+ *
+ * Then the panel changes size again, as it does when a person drags a divider, after the view has been
+ * shown at the first size - so the picture being copied is replaced after it has been copied from.
  */
 class GlViewResizeTest {
 
     @Test
-    fun `a view resized to its SceneView fills it, and is still shown after the resize`() {
+    fun `a view resized to its SceneView fills it, and is still shown after each resize`() {
         GlAvailability.require()
 
         val registry = RenderRegistry()
@@ -87,29 +93,39 @@ class GlViewResizeTest {
                 host.frame(delta)
                 state.invalidate()
             }
+            val panel = TallPanel(view, state)
             backend.show(ui)
-            ui.show(TallPanel(view, state))
+            ui.show(panel)
 
             awaitFrames(probe, probe.frames.get() + SETTLE_FRAMES)
             probe.window()?.let { writeReport("window.png", it) }
-
-            val size = backend.onRenderThread { view.width to view.height }
-            assertEquals(PANEL_WIDTH to PANEL_HEIGHT, size, "the view did not take its SceneView's size")
-            for ((x, y) in listOf(
-                PANEL_X + PANEL_WIDTH / 2 to PANEL_Y + PANEL_HEIGHT / 2,
-                PANEL_X + INSET to PANEL_Y + INSET,
-                PANEL_X + PANEL_WIDTH - 1 - INSET to PANEL_Y + PANEL_HEIGHT - 1 - INSET,
-            )) {
-                val pixel = probe.pixelAt(x, y)
-                assertEquals(RED, pixel, "the resized view is not shown at ($x, $y): ${"#%06X".format(pixel)}")
-            }
-            val corner = probe.pixelAt(PANEL_X + PANEL_WIDTH - 1 - INSET, PANEL_Y + INSET)
-            assertEquals(BLUE, corner, "the world's top-right corner is not at the panel's: ${"#%06X".format(corner)}")
+            assertShown(backend, probe, view, PANEL_WIDTH, PANEL_HEIGHT)
             assertTrue(state.draws >= 2, "the SceneView drew once, so it never showed the view after its resize")
+
+            backend.onRenderThread { panel.size = RESIZED_WIDTH to RESIZED_HEIGHT }
+            awaitFrames(probe, probe.frames.get() + SETTLE_FRAMES)
+            probe.window()?.let { writeReport("window-resized.png", it) }
+            assertShown(backend, probe, view, RESIZED_WIDTH, RESIZED_HEIGHT)
         } finally {
             backend.close()
             fonts.close()
         }
+    }
+
+    /** [view] is [width] x [height] and the window shows all of it in the panel: red, its top-right corner blue. */
+    private fun assertShown(backend: KoolBackend, probe: BackbufferProbe, view: WorldViewport, width: Int, height: Int) {
+        val size = backend.onRenderThread { view.width to view.height }
+        assertEquals(width to height, size, "the view did not take its SceneView's size")
+        for ((x, y) in listOf(
+            PANEL_X + width / 2 to PANEL_Y + height / 2,
+            PANEL_X + INSET to PANEL_Y + INSET,
+            PANEL_X + width - 1 - INSET to PANEL_Y + height - 1 - INSET,
+        )) {
+            val pixel = probe.pixelAt(x, y)
+            assertEquals(RED, pixel, "the ${width}x$height view is not shown at ($x, $y): ${"#%06X".format(pixel)}")
+        }
+        val corner = probe.pixelAt(PANEL_X + width - 1 - INSET, PANEL_Y + INSET)
+        assertEquals(BLUE, corner, "the ${width}x$height world's top-right corner is not at the panel's: ${"#%06X".format(corner)}")
     }
 
     // --- fixture -------------------------------------------------------------------------
@@ -141,12 +157,16 @@ class GlViewResizeTest {
 
     /** A grey window with one tall `SceneView` in it, a shape nothing like the frame's, showing [view]. */
     private class TallPanel(private val view: WorldViewport, private val state: SceneViewState) : UiScreen {
+        /** The `SceneView`'s width and height. Render thread. */
+        var size: Pair<Int, Int> by mutableStateOf(PANEL_WIDTH to PANEL_HEIGHT)
+
         @Composable
         override fun content() {
+            val (width, height) = size
             Box(Modifier.size(WIDTH.toFloat(), HEIGHT.toFloat()).background(Colour.rgb(GREY.toLong()))) {
                 SceneView(
                     state,
-                    Modifier.offset(PANEL_X.toFloat(), PANEL_Y.toFloat()).size(PANEL_WIDTH.toFloat(), PANEL_HEIGHT.toFloat()),
+                    Modifier.offset(PANEL_X.toFloat(), PANEL_Y.toFloat()).size(width.toFloat(), height.toFloat()),
                 ) {
                     clear(Colour.rgb(0x000000))
                     view.drawInto(this)
@@ -167,6 +187,10 @@ class GlViewResizeTest {
         const val PANEL_Y = 40
         const val PANEL_WIDTH = 200
         const val PANEL_HEIGHT = 300
+
+        /** The panel's size once it is changed, after the view has been shown at the first. */
+        const val RESIZED_WIDTH = 260
+        const val RESIZED_HEIGHT = 280
 
         /** Pixels in from the panel's edge a colour is read at. */
         const val INSET = 3

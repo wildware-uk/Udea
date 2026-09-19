@@ -300,6 +300,22 @@ public object UdeaRules {
             "produces has no single place in the file an editor can save it to",
     )
 
+    /**
+     * A member of a model's generated clip object that the model has no clip for (issue #241),
+     * such as `Fox.Clips.Rnu`.
+     *
+     * The code does not compile either way - Kotlin reports the unresolved reference itself - so
+     * what this rule carries is the did-you-mean spec section 5 makes mandatory: the clip the
+     * author meant, or the clips the model has when nothing is close. Raised by the K2 checker in
+     * `udea-compiler-plugin`, which recognises a clip object by its members being typed
+     * `AnimationClip`, so it is silent on every other unresolved name.
+     */
+    public val UNRESOLVED_ANIMATION_CLIP: UdeaRule = UdeaRule(
+        id = "UDEA0016",
+        defaultSeverity = Severity.Error,
+        description = "a model's clips are asked for a clip the model's file does not have",
+    )
+
     /** Every registered rule, in id order. */
     public val all: List<UdeaRule> = listOf(
         NET_ON_VAL,
@@ -317,6 +333,7 @@ public object UdeaRules {
         REFERENCE_KIND_MISMATCH,
         ASSET_INDEX_FORMAT,
         LOOP_IN_ASSET,
+        UNRESOLVED_ANIMATION_CLIP,
     ).sortedBy { it.id }
 
     private val byId: Map<String, UdeaRule> = all.associateBy { it.id }

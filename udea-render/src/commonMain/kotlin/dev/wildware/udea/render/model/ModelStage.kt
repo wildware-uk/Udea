@@ -61,7 +61,8 @@ import dev.wildware.udea.render.view.WorldViewport
  * for that model and hides the rest. A node per entity rather than an instance per entity because
  * a skinned model animates per entity, and one instance list cannot hold two poses: each node is
  * posed from its entity's `Animator` as it is shown ([applyPose], issue #242). An editor's Scene
- * view draws the same nodes, so it sees the same pose without posing anything again. The nodes share the file's textures, which Kool caches on the parsed file.
+ * view draws the same nodes, so it sees the same pose without posing anything again. The nodes
+ * share the file's textures, which Kool caches on the parsed file.
  *
  * Kool decodes a glTF texture on its loader threads after the node is made, and until it has, Kool
  * itself does not draw the mesh: its GL backend refuses a draw whose texture has no pixels yet

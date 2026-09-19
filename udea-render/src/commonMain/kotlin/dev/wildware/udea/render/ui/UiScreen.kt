@@ -14,9 +14,10 @@ import androidx.compose.runtime.Composable
  * ## It is not a `RenderSystem`
  *
  * A `RenderSystem` is handed a batch and draws into the frame an agent captures. A screen is
- * composed, laid out and drawn by the toolkit, into the window, over everything the game drew. The
- * two are different enough that sharing an interface would only hide it - and `GlUiLayerTest` pins
- * the consequence in pixels: a screen is absent from every capture.
+ * composed, laid out and drawn by the toolkit, over everything the game drew. The two are different
+ * enough that sharing an interface would only hide it. Where a screen lands is decided by what shows
+ * it: a [UiLayer] draws into the window and is absent from every capture (`GlUiLayerTest`), and a
+ * [CapturedUi] draws into the capturable frame and is in every one (`GlCapturedUiTest`).
  */
 public interface UiScreen {
 

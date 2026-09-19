@@ -2,6 +2,7 @@ package dev.wildware.udea.agent.host
 
 import dev.wildware.udea.agent.AgentCommand
 import dev.wildware.udea.agent.AgentResult
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.render.input.ActionBinding
 import dev.wildware.udea.render.input.Axis2DBinding
 import dev.wildware.udea.render.input.InjectedIntent
@@ -193,7 +194,7 @@ class InputToolsetTest {
     private class Fixture {
 
         val bindings: InputBindings = InputBindings(
-            actions = listOf(ActionBinding("t/fire", keys = intArrayOf(62))),
+            actions = listOf(ActionBinding("t/fire", keys = listOf(InputKey.Space))),
             axes = listOf(Axis2DBinding("t/move")),
         )
 

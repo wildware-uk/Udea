@@ -215,7 +215,7 @@ class ReplayFormatTest {
     }
 
     @Test
-    fun `a recording with edits is format 2, and every edit comes back at its tick`() {
+    fun `a recording with edits is format 2 and every edit comes back at its tick`() {
         val recorder = recorder(peers = 1)
         val slots = recorder.newSampleSlots()
         val long = "x".repeat(ReplayFormat.MAX_STRING_BYTES * 3)
@@ -240,7 +240,7 @@ class ReplayFormatTest {
     }
 
     @Test
-    fun `a recording with no edits is written as format 1, which every earlier build reads`() {
+    fun `a recording with no edits is written as format 1 which every earlier build reads`() {
         val bytes = recorded().encode()
 
         assertEquals(ReplayFormat.EDITLESS_FORMAT_VERSION, bytes[ReplayFormat.MAGIC.size].toInt())
@@ -248,7 +248,7 @@ class ReplayFormatTest {
     }
 
     @Test
-    fun `an edit for a tick already recorded is refused, because it can no longer come before it`() {
+    fun `an edit for a tick already recorded is refused because it can no longer come before it`() {
         val recorder = recorder(peers = 1)
         val slots = recorder.newSampleSlots()
         recorder.record(FIRST, slots, 1L)

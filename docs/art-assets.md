@@ -199,6 +199,14 @@ links and the checksum, and `LICENSE` names it.
 (issue #241). It is in the game's asset root because that is where the build reads a model's
 animation clips from to generate `Fox.Clips`; git stores the two copies as one object.
 
+`moba/game/assets/models/human/Human.fbx` and its texture `ClothedLightSkin.png` are from
+**Quaternius' Animated Man Pack**, CC0 1.0 (issue #244): a rigged, animated, textured character,
+and the FBX the asset build converts to glTF. The FBX is modified - its material linked to the
+pack's texture, four of its nine takes kept - by `relink.py` beside it; `NOTICE.md` there has the
+source, the checksums of the published files and the whole change. `udea-assets-compiler`'s own FBX
+test fixture, `src/test/resources/fbx/bender/`, is made by `make_bender.py` beside it, for this
+repository, under its own licence.
+
 ## Committed art in `example-assets`
 
 `example-assets/sprites/` holds 64 committed image files from the same **Tiny

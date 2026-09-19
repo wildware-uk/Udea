@@ -345,6 +345,13 @@ public abstract class UdeaPackBundleTask : UdeaAssetTask() {
     @get:OutputFile
     public abstract val diagnostics: RegularFileProperty
 
+    /**
+     * Every `.fbx` model converted to the `.glb` the bundle names for it, at the `.fbx`'s path
+     * under the asset root with the extension changed (issue #244). Empty for a game with none.
+     */
+    @get:OutputDirectory
+    public abstract val convertedModels: DirectoryProperty
+
     /** @see UdeaValidateAssetsTask.scriptCache */
     @get:Internal
     public abstract val scriptCache: DirectoryProperty
@@ -360,6 +367,7 @@ public abstract class UdeaPackBundleTask : UdeaAssetTask() {
             option("cache", scriptCache.get().asFile),
             option("out", bundle.get().asFile),
             option("diagnostics", diagnostics.get().asFile),
+            option("models", convertedModels.get().asFile),
         )
     }
 }
@@ -583,6 +591,7 @@ public class UdeaAssetsPlugin : Plugin<Project> {
                 extension.bundleName.flatMap { name -> output.map { it.file("pack/$name.udeapak") } },
             )
             task.diagnostics.set(output.map { it.file("pack/diagnostics.json") })
+            task.convertedModels.set(output.map { it.dir(CONVERTED_MODELS_DIRECTORY) })
             },
         )
 
@@ -683,11 +692,18 @@ public class UdeaAssetsPlugin : Plugin<Project> {
         public const val SCRIPT_CONFIGURATION: String = "udeaAssetScript"
 
         /**
-         * The model files pass 5 reads typed clips from: `model(...)`'s glTF, binary or JSON. The
-         * extensions are `Model.EXTENSIONS`, spelled here because this plugin names no type from
+         * The model files pass 5 reads typed clips from: `model(...)`'s glTF, binary or JSON, and
+         * the `.fbx` it converts to glTF first (issue #244). The extensions are the asset
+         * compiler's `ModelSources.EXTENSIONS`, spelled here because this plugin names no type from
          * the asset modules.
          */
-        private val MODEL_FILE_PATTERNS: List<String> = listOf("**/*.glb", "**/*.gltf")
+        private val MODEL_FILE_PATTERNS: List<String> = listOf("**/*.glb", "**/*.gltf", "**/*.fbx")
+
+        /**
+         * Where, under `build/udea`, [PACK_TASK] writes each `.fbx` model's `.glb` (issue #244):
+         * the root a game reads a converted model from, as it reads a `.glb` from the asset root.
+         */
+        private const val CONVERTED_MODELS_DIRECTORY: String = "converted"
 
         /** The entry point of the forked pipeline. A string, never an import - see the class KDoc. */
         public const val CLI: String = "dev.wildware.udea.assets.compiler.pipeline.AssetPipelineCli"

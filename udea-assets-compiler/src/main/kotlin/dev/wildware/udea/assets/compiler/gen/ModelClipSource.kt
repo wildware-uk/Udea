@@ -1,9 +1,11 @@
 package dev.wildware.udea.assets.compiler.gen
 
-import dev.wildware.udea.assets.Model
 import dev.wildware.udea.assets.compiler.AssetCompilerRules
 import dev.wildware.udea.assets.compiler.ResFile
+import dev.wildware.udea.assets.compiler.model.FbxConverter
+import dev.wildware.udea.assets.compiler.model.ModelSources
 import dev.wildware.udea.assets.compiler.scan.Declaration
+import dev.wildware.udea.assets.compiler.validate.AssetValidationRules
 import dev.wildware.udea.assets.compiler.validate.ModelFileValidator
 import dev.wildware.udea.diagnostics.DidYouMean
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
@@ -41,7 +43,8 @@ internal object ModelClipSource {
             readOne(assetRoot, model).fold(
                 onSuccess = { clips[model.id] = it },
                 onFailure = { problem ->
-                    diagnostics += AssetCompilerRules.MODEL_CLIPS.diagnostic(
+                    val rule = if (problem is ConversionFailure) AssetValidationRules.MODEL_CONVERSION else AssetCompilerRules.MODEL_CLIPS
+                    diagnostics += rule.diagnostic(
                         message = "model `${model.id}` ${problem.message}",
                         span = model.span,
                         assetId = model.id,
@@ -69,15 +72,27 @@ internal object ModelClipSource {
                     (suggestion?.let { " Did you mean '$it'?" } ?: ""),
             )
         }
-        val read = GltfClips.read(file)
+        // An `.fbx` is read as the `.glb` it converts to (issue #244); one that does not convert
+        // is the converter's `UDEA0039`, the same defect the validator reports, and not this rule.
+        val read = if (ModelSources.isConverted(path)) {
+            val glb = FbxConverter.convert(assetRoot, path).getOrElse { reason ->
+                return Result.failure(ConversionFailure("names `$path`, which ${reason.message}"))
+            }
+            GltfClips.read(glb)
+        } else {
+            GltfClips.read(file)
+        }
         return read.exceptionOrNull()?.let { reason -> failure("names `$path`, which ${reason.message}") } ?: read
     }
 
-    /** Every `.glb` and `.gltf` under [assetRoot], `/`-separated and relative to it. */
+    /** A model whose `.fbx` did not convert: reported under [AssetValidationRules.MODEL_CONVERSION]. */
+    private class ConversionFailure(message: String) : IllegalArgumentException(message)
+
+    /** Every model file under [assetRoot] - glTF or FBX - `/`-separated and relative to it. */
     @OptIn(ExperimentalPathApi::class)
     private fun modelFilesUnder(assetRoot: Path): List<String> =
         assetRoot.walk()
-            .filter { it.isRegularFile() && it.extension.lowercase() in Model.EXTENSIONS }
+            .filter { it.isRegularFile() && it.extension.lowercase() in ModelSources.EXTENSIONS }
             .map { it.relativeTo(assetRoot).toString().replace('\\', '/') }
             .sorted()
             .toList()

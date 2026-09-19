@@ -6,13 +6,17 @@ import dev.wildware.udea.assets.compiler.DeclaredAsset
 import dev.wildware.udea.assets.compiler.ResFile
 import dev.wildware.udea.assets.compiler.atlas.AtlasPacker
 import dev.wildware.udea.assets.compiler.atlas.SheetInput
+import dev.wildware.udea.assets.compiler.model.FbxConverter
+import dev.wildware.udea.assets.compiler.model.ModelSources
 import dev.wildware.udea.assets.compiler.pack.BundleContent
 import dev.wildware.udea.assets.compiler.pack.BundleWriter
 import dev.wildware.udea.assets.compiler.pack.GraphPacker
 import dev.wildware.udea.assets.compiler.pack.PackedAtlas
 import dev.wildware.udea.assets.compiler.scan.ScanReport
 import dev.wildware.udea.assets.compiler.scan.UdeaDeclarationScanner
+import dev.wildware.udea.assets.compiler.validate.AssetValidationRules
 import dev.wildware.udea.assets.compiler.validate.AssetValidatorPipeline
+import dev.wildware.udea.assets.compiler.validate.ModelFileValidator
 import dev.wildware.udea.assets.compiler.validate.ValidationContext
 import dev.wildware.udea.diagnostics.DiagnosticReport
 import dev.wildware.udea.diagnostics.DiagnosticSink
@@ -145,6 +149,37 @@ public object AssetPipeline {
                 )
             }
             .sortedBy { it.id }
+
+    /**
+     * Every `.fbx` model in [graph] converted to the `.glb` a game is given for it (issue #244),
+     * keyed by that `.glb`'s path relative to the asset root, in id order. A model whose file is
+     * missing or malformed is left out: pass 3 has already reported it. One that does not convert
+     * is a `UDEA0039`, the validator's words for the same defect.
+     */
+    internal fun convertModels(assetRoot: Path, graph: AssetGraph): ConvertedModels {
+        val files = LinkedHashMap<String, ByteArray>()
+        val diagnostics = ArrayList<UdeaDiagnostic>()
+        for (model in graph.assets.values.filter { it.kind == ModelFileValidator.KIND }.sortedBy { it.id }) {
+            val path = model.fields[ModelFileValidator.FILE_FIELD] as? ResFile ?: continue
+            if (path.isMalformed || !ModelSources.isConverted(path) || !assetRoot.resolve(path.value).isRegularFile()) continue
+            FbxConverter.convert(assetRoot, path).fold(
+                onSuccess = { files[ModelSources.runtimeFile(path).value] = it },
+                onFailure = { reason ->
+                    diagnostics += AssetValidationRules.MODEL_CONVERSION.diagnostic(
+                        message = "model `${model.id}` names `$path`, which ${reason.message}",
+                        assetId = model.id,
+                    )
+                },
+            )
+        }
+        return ConvertedModels(files, diagnostics)
+    }
+
+    /** What [convertModels] made: each `.glb` by its path under the asset root, and what failed. */
+    internal class ConvertedModels(
+        val files: Map<String, ByteArray>,
+        val diagnostics: List<UdeaDiagnostic>,
+    )
 
     /** The DSL word whose declarations become atlas pages. */
     public const val SHEET_KIND: String = "spriteSheet"

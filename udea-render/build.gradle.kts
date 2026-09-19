@@ -137,6 +137,13 @@ val headlessModules: List<String> =
 val headlessModulesProperty: String = ModuleGraphRules.HEADLESS_MODULES_PROPERTY
 
 /**
+ * The FBX converter's one allowance in the bytecode scan (issue #244), `<namespace>:<modules>`:
+ * the Assimp namespace, in the modules that run the converter. From the same place as the list.
+ */
+val modelConverterAllowance: String = ModuleGraphRules.MODEL_CONVERTER_NAMESPACE + ":" +
+    ModuleGraphRules.MODEL_CONVERTER_PROJECTS.map { it.removePrefix(":") }.sorted().joinToString(",")
+
+/**
  * The compiled output the scan reads, narrowed to each module's shipped bytecode: `<lang>/main`
  * for a JVM module, `<lang>/jvm/main` and `<lang>/android/main` for a multiplatform one
  * (`RepoLayout.classFiles` reads the same three).
@@ -170,6 +177,7 @@ val udeaVerifyHeadless = tasks.register<Test>("udeaVerifyHeadless") {
     useJUnitPlatform()
     filter { includeTestsMatching(gateTestClass) }
     systemProperty(headlessModulesProperty, headlessModules.joinToString(","))
+    systemProperty(ModuleGraphRules.MODEL_CONVERTER_PROPERTY, modelConverterAllowance)
 
     dependsOn(headlessModules.map { ":$it:${ModuleGraphRules.MAIN_BYTECODE_TASK}" })
     inputs.files(headlessModuleClasses)
@@ -242,6 +250,7 @@ tasks.named<Test>("jvmTest") {
 
     // HeadlessScanTest reads the same designated list, so it needs the same hand-off.
     systemProperty(headlessModulesProperty, headlessModules.joinToString(","))
+    systemProperty(ModuleGraphRules.MODEL_CONVERTER_PROPERTY, modelConverterAllowance)
 
     // `SkinnedPoseTest` poses the committed Khronos Fox's skin without a GL context (issue #242).
     systemProperty("udea.render.exampleAssets", exampleAssets.asFile.absolutePath)

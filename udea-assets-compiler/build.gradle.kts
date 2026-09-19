@@ -8,6 +8,16 @@ plugins {
 /** `-Pudea.compilerPlugin.enabled`, as `udea.kotlin-base` validated and published it. */
 val compilerPluginEnabled: Boolean = extra[UdeaBuildFlags.COMPILER_PLUGIN_ENABLED] as Boolean
 
+/** The desktop platforms LWJGL publishes Assimp's native library for, each a classified jar. */
+val assimpNatives: List<String> = listOf(
+    "natives-linux",
+    "natives-linux-arm64",
+    "natives-macos",
+    "natives-macos-arm64",
+    "natives-windows",
+    "natives-windows-arm64",
+)
+
 dependencies {
     api(project(":udea-diagnostics"))
 
@@ -46,6 +56,18 @@ dependencies {
     // The JSON half of a glTF model, read by `ModelFileValidator` to check that a `model(...)`
     // names a glTF 2.0 file whose buffers and images are present (issue #240).
     implementation(libs.kotlinx.serialization.json)
+
+    // The FBX converter (issue #244): Assimp, through LWJGL's binding, turns a `model(...)`'s `.fbx`
+    // into the `.glb` the rest of the pipeline and the renderer already read. `implementation`, so
+    // a module compiling against this one's API sees none of it. Every desktop platform's native
+    // library, so the asset build runs wherever a developer builds. UDEA-MG-002 allows exactly
+    // these two artifacts here and UDEA-MG-013 keeps Assimp off every runtime classpath.
+    implementation(libs.lwjgl.core)
+    implementation(libs.lwjgl.assimp)
+    for (natives in assimpNatives) {
+        runtimeOnly(variantOf(libs.lwjgl.core) { classifier(natives) })
+        runtimeOnly(variantOf(libs.lwjgl.assimp) { classifier(natives) })
+    }
 
     implementation(libs.kotlin.compiler.embeddable)
     implementation(libs.kotlin.scripting.common)

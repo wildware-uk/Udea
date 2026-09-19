@@ -62,6 +62,9 @@ public value class CoordinatePattern(public val pattern: String) : Serializable 
  * @param projects Gradle paths the rule applies to. Empty means every project the owning
  *   task is registered on.
  * @param configurations configuration names the rule applies to. Empty means all scanned.
+ * @param allowedIn coordinates excused on one project only, keyed by its Gradle path: a named,
+ *   per-module exemption from a deny list, such as the FBX converter on the asset compiler
+ *   (issue #244), where [allowed] would excuse the coordinate on every project the rule governs.
  */
 public data class DependencyRule(
     public val id: RuleId,
@@ -73,6 +76,7 @@ public data class DependencyRule(
     public val banned: List<CoordinatePattern> = emptyList(),
     public val allowed: List<CoordinatePattern> = emptyList(),
     public val allowOnly: List<CoordinatePattern>? = null,
+    public val allowedIn: Map<String, List<CoordinatePattern>> = emptyMap(),
 ) : Serializable {
 
     init {
@@ -93,6 +97,7 @@ public data class DependencyRule(
     public fun isViolatedBy(coordinate: String, rootProjectPath: String): Boolean {
         if (coordinate == rootProjectPath) return false
         if (allowed.any { it.matches(coordinate) }) return false
+        if (allowedIn[rootProjectPath].orEmpty().any { it.matches(coordinate) }) return false
         val allowList = allowOnly
         return if (allowList == null) {
             banned.any { it.matches(coordinate) }

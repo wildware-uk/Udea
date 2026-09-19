@@ -186,6 +186,14 @@ server and inside an agent harness with no display. Once a GL backend is on the 
 classpath, a context reference or a static initialiser gets written and the headless path is
 gone.
 
+**The one per-module exemption: the FBX converter (issue #244).** `udea-assets-compiler` converts
+an `.fbx` model to glTF with Assimp, which arrives through LWJGL's binding, and `udea-gradle`
+carries the compiler. On those two modules - `ModuleGraphRules.MODEL_CONVERTER_PROJECTS` - this rule
+excuses `org.lwjgl:lwjgl` and `org.lwjgl:lwjgl-assimp` and nothing else, through the rule's
+`allowedIn`: `lwjgl-opengl`, Kool or a ComposeGL frontend on either still fails, and Assimp on any
+other headless module still fails here as well as under `UDEA-MG-013`. Both modules stay in
+`HEADLESS_PROJECTS`.
+
 ### `UDEA-MG-002-BYTECODE` — the same rule, one level down
 
 `udeaVerifyModuleGraph` above reads *dependencies*. `udeaVerifyHeadless` — a task in
@@ -214,8 +222,11 @@ a better message than forty class-level ones. The banned namespace is `org/lwjgl
 (`com/badlogic/`, `box2dLight/`) was in this table until issue #189 moved it to
 `UDEA-MG-009-BYTECODE`, which reads every module rather than the headless ones; the LibGDX
 carve-outs it used to need (gdx-math and the `utils` collections legal, `graphics/`, `backends/`
-and viewports banned) went with LibGDX in issue #213. There is no per-module allowlist: the fix
-is always to move the code to `udea-render`.
+and viewports banned) went with LibGDX in issue #213. The one per-module allowance is the FBX
+converter's (issue #244): in `ModuleGraphRules.MODEL_CONVERTER_PROJECTS`, a reference into
+`ModuleGraphRules.MODEL_CONVERTER_NAMESPACE` (`org/lwjgl/assimp/`) is excused, handed to the scan
+through `udea.headless.modelConverter` as the module set is. Every other `org/lwjgl/` reference in
+those modules still fails, and for GL the fix is always to move the code to `udea-render`.
 
 ## `UDEA-MG-009` — no project resolves LibGDX
 
@@ -309,6 +320,29 @@ The editor is in `GL_ALLOWED_PROJECTS` because its runtime classpath carries Koo
 narrower. Its panels are `composegl-ui` widgets, the toolkit with no backend in it, and the world
 reaches its `SceneView` through `udea-render`'s `WorldView`, so the Kool frontend and the world
 draw stay inside `udea-render` as spec §3 requires. This rule is that sentence as a gate.
+
+## `UDEA-MG-013` — the FBX converter runs in the asset build and nowhere else
+
+**Issue #244.** Banned on `compileClasspath` and `runtimeClasspath` of every `udea-*` module and
+every `moba` project except `ModuleGraphRules.MODEL_CONVERTER_PROJECTS` (`udea-assets-compiler`
+and `udea-gradle`): `*:*assimp*`, every Assimp binding, LWJGL's included.
+
+Kool reads glTF and has no FBX loader, so a game that drops an `.fbx` into its assets gets the
+`.glb` the asset compiler converts it to, with Assimp through `org.lwjgl:lwjgl-assimp`. The
+conversion belongs to the build because that is where a model that does not convert fails with a
+diagnostic (`UDEA0039`) rather than in a player's session, and a runtime module that could name
+the converter could start importing models at run time. The rule governs the GL-allowed modules
+and the game too, which is where it adds to `UDEA-MG-002`: those are the classpaths already
+allowed LWJGL, through Kool.
+
+What it does not scan: a game's `agent` and `editor` source sets. `:moba:desktop`'s `agent` source
+set runs the asset daemon in process, and the daemon is the asset compiler, so that classpath
+carries the converter as it already carries the Kotlin compiler. `UDEA-REL-002` keeps the `agent`
+source set out of every release; the `runtimeClasspath` this rule reads is the one that ships.
+
+The same two modules are the one named exemption in `UDEA-MG-002` - see below - and in
+`udeaVerifyHeadless`, which excuses the namespace `org/lwjgl/assimp/` in their classes and no other
+part of `org/lwjgl/`.
 
 ## `UDEA-MG-003` — `udea-assets-compiler` holds zero Gradle types
 

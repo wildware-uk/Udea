@@ -33,7 +33,11 @@ internal class BytecodeBan(
      *   is a broken gate, not a clean module: it would pass forever while the module quietly grew
      *   what the table bans. (The same reasoning as `DependencyRules.vacuity`.)
      */
-    fun run(modules: List<String>, classFilesOf: (String) -> List<File>): DiagnosticReport {
+    fun run(
+        modules: List<String>,
+        classFilesOf: (String) -> List<File>,
+        excused: Map<String, List<String>> = emptyMap(),
+    ): DiagnosticReport {
         val sink = DiagnosticSink()
         for (module in modules) {
             val classFiles = classFilesOf(module)
@@ -42,14 +46,18 @@ internal class BytecodeBan(
                     "the module: a scan of nothing passes forever. Build the module before " +
                     "running the gate."
             }
-            sink.reportAll(violations(module, classFiles))
+            sink.reportAll(violations(module, classFiles, excused[module].orEmpty()))
         }
         return sink.build()
     }
 
-    /** Every banned reference in [classFiles], as diagnostics attributed to [module]. */
-    fun violations(module: String, classFiles: List<File>): List<UdeaDiagnostic> = classFiles
+    /**
+     * Every banned reference in [classFiles], as diagnostics attributed to [module], except a
+     * reference into one of the [excused] namespaces (the FBX converter's, issue #244).
+     */
+    fun violations(module: String, classFiles: List<File>, excused: List<String> = emptyList()): List<UdeaDiagnostic> = classFiles
         .flatMap { file -> ClassRefScanner.scan(file) }
+        .filterNot { use -> excused.any { use.owner.startsWith(it) } }
         .mapNotNull { use -> banned.firstOrNull { it.matches(use.owner) }?.let { use to it } }
         .map { (use, entry) ->
             UdeaDiagnostic(

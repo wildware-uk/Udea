@@ -84,6 +84,36 @@ class HeadlessScanTest {
         )
     }
 
+    /**
+     * The FBX converter's allowance (issue #244), against the asset compiler's real bytecode: it
+     * does name Assimp, which is why the allowance exists, and the allowance clears exactly that.
+     */
+    @Test
+    fun `the asset compiler names Assimp, and only there is Assimp excused`() {
+        val converter = RepoLayout.classFiles("udea-assets-compiler")
+            .filter { "/model/FbxConverter" in it.invariantSeparatorsPath }
+        assertTrue(converter.isNotEmpty(), "the FBX converter's classes were not found; the test would scan nothing")
+
+        val unexcused = HeadlessScan.violations("udea-assets-compiler", converter)
+        assertTrue(unexcused.any { "org/lwjgl/assimp/" in it.message }, "the converter names no Assimp type: $unexcused")
+
+        assertEquals(listOf("org/lwjgl/assimp/"), HeadlessScan.EXCUSED["udea-assets-compiler"])
+        assertEquals(
+            emptyList(),
+            HeadlessScan.violations("udea-assets-compiler", converter, excused = HeadlessScan.EXCUSED.getValue("udea-assets-compiler"))
+                .map { it.message },
+        )
+    }
+
+    @Test
+    fun `the Assimp allowance does not excuse GL, and no other module has it`() {
+        val excused = HeadlessScan.EXCUSED.getValue("udea-assets-compiler")
+        val violations = HeadlessScan.violations(MODULE, fixtureClasses("GlNamingFixture"), excused = excused)
+        assertTrue(violations.any { "org/lwjgl/opengl/GL11" in it.message }, "$violations")
+
+        assertEquals(listOf("udea-assets-compiler", "udea-gradle"), HeadlessScan.EXCUSED.keys.sorted())
+    }
+
     @Test
     fun `a module that contributed no classes fails the gate rather than passing vacuously`() {
         val failure = assertFailsWith<IllegalStateException> {

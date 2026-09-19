@@ -212,6 +212,9 @@ The pieces a newcomer meets first, each with the issue that made it so.
   A skinned model is posed from its entity's `Animator` - clip, time and crossfade, read at the
   tick plus the interpolation alpha - and skinned on the GPU; the pose is the renderer's alone,
   and a clip's time becomes seconds only there (#242).
+  An `.fbx` is a model too: the asset build converts it to `.glb` with Assimp, textures
+  embedded, and a broken one fails with `UDEA0039`; the converter is build-time only
+  (`UDEA-MG-013`) (#244).
   Everything that touches the scene or the ComposeGL toolkit runs on the Kool render thread
   (#224); `docs/engineering-standards.md` section 2 states the rule.
 - **Interface is ComposeGL, in two places that answer opposite questions.** A `UiLayer` is a

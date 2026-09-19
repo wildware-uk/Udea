@@ -72,8 +72,17 @@ internal object GltfClips {
         maxOf(0L, ceil(seconds.toDouble() * TICKS_PER_SECOND - WHOLE_TICK_TOLERANCE).toLong())
 
     /** Every clip in [file], in the file's order, or a failure saying what is wrong. */
-    fun read(file: Path): Result<List<GltfClip>> {
-        val text = GltfCheck.jsonOf(file.extension.lowercase(), file.readBytes()).getOrElse { return Result.failure(it) }
+    fun read(file: Path): Result<List<GltfClip>> =
+        GltfCheck.jsonOf(file.extension.lowercase(), file.readBytes()).fold(::clipsOf) { Result.failure(it) }
+
+    /** Every clip in the binary glTF [glb], as [read] reads a file: an `.fbx`'s conversion (issue #244). */
+    fun read(glb: ByteArray): Result<List<GltfClip>> =
+        GltfCheck.jsonOf(GLB, glb).fold(::clipsOf) { Result.failure(it) }
+
+    private const val GLB = "glb"
+
+    /** Every clip in the glTF JSON [text]. */
+    private fun clipsOf(text: String): Result<List<GltfClip>> {
         val document = try {
             json.parseToJsonElement(text) as? JsonObject
         } catch (_: SerializationException) {

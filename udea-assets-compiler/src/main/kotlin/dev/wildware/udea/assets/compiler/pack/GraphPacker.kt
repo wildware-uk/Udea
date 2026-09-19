@@ -26,6 +26,7 @@ import dev.wildware.udea.assets.compiler.AssetKindHierarchy
 import dev.wildware.udea.assets.compiler.DeclaredAsset
 import dev.wildware.udea.assets.compiler.Ref
 import dev.wildware.udea.assets.compiler.ResFile
+import dev.wildware.udea.assets.compiler.model.ModelSources
 import dev.wildware.udea.diagnostics.SourceSpan
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
 import dev.wildware.udea.diagnostics.UdeaRules
@@ -194,8 +195,13 @@ public object GraphPacker {
             float("volume", default = 1F)
         }
 
+        /**
+         * A model's file, as the game is given it: an `.fbx` is published as the `.glb` the pack
+         * converts it to (issue #244), because the runtime `Model` and the renderer read glTF alone.
+         */
         fun model(): Map<String, PackValue> = buildMap {
-            path("file", "file")
+            val file = pathOf(asset.fields["file"]) ?: return@buildMap
+            put("file", PackValue.Path(ModelSources.runtimeFile(ResFile.of(file)).value))
         }
 
         fun spriteAnimation(): Map<String, PackValue> = buildMap {

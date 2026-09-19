@@ -32,9 +32,13 @@ import java.io.File
  * imported `com.badlogic.gdx.graphics.Texture` into a component the world tick touched, and
  * nothing failed.
  *
- * There is deliberately **no per-module allowlist**. The fix for a violation is always the
- * same -- move the code to `udea-render` -- and an allowlist is how a gate becomes a
- * formality.
+ * There is **one per-module allowance, and it is not for GL**: the asset compiler converts an
+ * `.fbx` model to glTF with Assimp, whose binding is LWJGL's (issue #244), so in the modules
+ * `ModuleGraphRules.MODEL_CONVERTER_PROJECTS` names, a reference into
+ * `ModuleGraphRules.MODEL_CONVERTER_NAMESPACE` is excused ([EXCUSED]). It is handed over from
+ * `build-logic` as the module list is, and every other `org/lwjgl/` reference in those modules
+ * still fails. For GL the fix is always the same -- move the code to `udea-render` -- and a
+ * wider allowlist is how a gate becomes a formality.
  */
 internal object HeadlessScan {
 
@@ -85,6 +89,33 @@ internal object HeadlessScan {
     }
 
     /**
+     * The system property `udea-render`'s build script hands the FBX converter's allowance over
+     * in, as `<namespace>:<module>,<module>`. Must equal `ModuleGraphRules.MODEL_CONVERTER_PROPERTY`.
+     */
+    const val MODEL_CONVERTER_PROPERTY: String = "udea.headless.modelConverter"
+
+    /**
+     * Namespaces excused per module: the FBX converter's `org/lwjgl/assimp/` in the modules that
+     * run it (issue #244), read from the build like [HEADLESS_MODULES].
+     *
+     * @throws IllegalStateException when the property is missing or malformed. A hand-off that
+     *   silently read as "nothing excused" would fail the gate on the asset compiler, and one that
+     *   read as "everything excused" would pass it on anything; both are louder as an exception.
+     */
+    val EXCUSED: Map<String, List<String>> by lazy {
+        val raw = checkNotNull(System.getProperty(MODEL_CONVERTER_PROPERTY)) {
+            "-D$MODEL_CONVERTER_PROPERTY was not set. The FBX converter's allowance comes from " +
+                "ModuleGraphRules via udea-render's build script; run this through Gradle."
+        }
+        val namespace = raw.substringBeforeLast(':')
+        val modules = raw.substringAfterLast(':').split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        check(namespace.endsWith('/') && namespace.startsWith("org/lwjgl/") && modules.isNotEmpty()) {
+            "-D$MODEL_CONVERTER_PROPERTY was '$raw', not '<an org/lwjgl/ package>/:<module>,...'"
+        }
+        modules.associateWith { listOf(namespace) }
+    }
+
+    /**
      * Runs the scan over [modules].
      *
      * @throws IllegalStateException if a module contributed no class files at all. An empty
@@ -94,9 +125,13 @@ internal object HeadlessScan {
     fun run(
         modules: List<String> = HEADLESS_MODULES,
         classFilesOf: (String) -> List<File> = { RepoLayout.classFiles(it) },
-    ): DiagnosticReport = ban.run(modules, classFilesOf)
+        excused: Map<String, List<String>> = EXCUSED,
+    ): DiagnosticReport = ban.run(modules, classFilesOf, excused)
 
-    /** Every banned reference in [classFiles], as diagnostics attributed to [module]. */
-    fun violations(module: String, classFiles: List<File>): List<UdeaDiagnostic> =
-        ban.violations(module, classFiles)
+    /**
+     * Every banned reference in [classFiles], as diagnostics attributed to [module], except a
+     * reference into one of the [excused] namespaces.
+     */
+    fun violations(module: String, classFiles: List<File>, excused: List<String> = emptyList()): List<UdeaDiagnostic> =
+        ban.violations(module, classFiles, excused)
 }

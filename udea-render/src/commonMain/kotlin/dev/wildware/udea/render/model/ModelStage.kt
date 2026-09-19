@@ -25,6 +25,7 @@ import de.fabmax.kool.scene.VertexLayouts
 import de.fabmax.kool.util.Color
 import de.fabmax.kool.util.MutableColor
 import de.fabmax.kool.util.MutableStructBufferView
+import de.fabmax.kool.util.ShadowMap
 import de.fabmax.kool.util.SimpleShadowMap
 import dev.wildware.udea.render.RenderResource
 import dev.wildware.udea.render.draw.Rgba
@@ -58,8 +59,10 @@ import dev.wildware.udea.render.view.WorldViewport
  * scene node of its own, made by Kool's glTF reader with the file's materials on Kool's PBR shader
  * and kept for the life of the stage: a frame with three foxes shows the first three nodes made
  * for that model and hides the rest. A node per entity rather than an instance per entity because
- * a skinned model animates per entity (issues #241, #242), and one instance list cannot hold two
- * poses. The nodes share the file's textures, which Kool caches on the parsed file.
+ * a skinned model animates per entity, and one instance list cannot hold two poses: each node is
+ * posed from its entity's `Animator` as it is shown ([applyPose], issue #242). An editor's Scene
+ * view draws the same nodes, so it sees the same pose without posing anything again. The nodes
+ * share the file's textures, which Kool caches on the parsed file.
  *
  * Kool decodes a glTF texture on its loader threads after the node is made, and until it has, Kool
  * itself does not draw the mesh: its GL backend refuses a draw whose texture has no pixels yet
@@ -194,12 +197,16 @@ internal class ModelStage(
         camera.setClipRange(view.near, view.far)
     }
 
-    /** Draws [source] with the given transform this frame. Render thread only. */
+    /**
+     * Draws [source] with the given transform this frame, an imported model in [pose]; a built-in
+     * shape has no joints and ignores it. Render thread only.
+     */
     fun add(
         source: ModelSource,
         x: Float, y: Float, z: Float,
         rotationX: Float, rotationY: Float, rotationZ: Float,
         scaleX: Float, scaleY: Float, scaleZ: Float,
+        pose: ClipPose,
     ) {
         // Translate, then turn about Z, Y, X - so X is applied to the model first - then scale.
         matrix.setIdentity()
@@ -215,7 +222,7 @@ internal class ModelStage(
                 run.mesh.isVisible = true
             }
             // The file is Y-up: turned onto the world's Z-up before anything else is applied.
-            is ImportedModel -> importsFor(source).show(matrix.rotate(Y_UP_TO_Z_UP, Vec3f.X_AXIS))
+            is ImportedModel -> importsFor(source).show(matrix.rotate(Y_UP_TO_Z_UP, Vec3f.X_AXIS), pose)
         }
     }
 
@@ -263,21 +270,7 @@ internal class ModelStage(
     /** The scene nodes made so far for one [ImportedModel], and how many this frame has shown. */
     private inner class Imports(private val model: ImportedModel) {
 
-        private val config = GltfLoadConfig(
-            // The reader computes normals for a file that has none - the Fox has none - and the
-            // lighting needs them.
-            generateNormals = true,
-            applyMaterials = true,
-            materialConfig = GltfMaterialConfig(shadowMaps = listOf(shadow)),
-            // The bind pose (issue #240). Skins and clips are issues #241 and #242.
-            loadAnimations = false,
-            applySkins = false,
-            applyMorphTargets = false,
-            assetLoader = model.loader,
-            // The file's material, with the same uniform ambient light the built-in shapes get;
-            // its strength is set every frame from the `ModelLight`.
-            pbrBlock = { _ -> lighting { uniformAmbientLight(Color.WHITE) } },
-        )
+        private val config = gltfLoadConfig(model, listOf(shadow))
 
         private val nodes = ArrayList<Placed>()
         private var shown = 0
@@ -291,11 +284,16 @@ internal class ModelStage(
             for (index in nodes.indices) nodes[index].setAmbient()
         }
 
-        /** Shows the next free node at [transform], making one if every node is in use. */
-        fun show(transform: MutableMat4f) {
+        /**
+         * Shows the next free node at [transform] in [pose], making one if every node is in use.
+         * The pose is set on every node shown, every frame: a node goes to whichever entity is
+         * drawn in its turn, so it must not keep the pose of the entity it drew last.
+         */
+        fun show(transform: MutableMat4f, pose: ClipPose) {
             val placed = if (shown < nodes.size) nodes[shown] else make()
             shown++
             placed.node.transform.setMatrix(transform)
+            placed.node.applyPose(pose)
             placed.node.isVisible = true
         }
 
@@ -388,6 +386,27 @@ internal class ModelStage(
         val Y_UP_TO_Z_UP = 90f.deg
     }
 }
+
+/**
+ * How [ModelStage] makes a scene node from [model]'s file: its materials on Kool's PBR shader,
+ * casting into [shadowMaps], and its clips and skin, skinned on the GPU by Kool's armature shader
+ * (issue #242). A file with no skin or no clips gives a node with none, drawn as it stands.
+ */
+internal fun gltfLoadConfig(model: ImportedModel, shadowMaps: List<ShadowMap>): GltfLoadConfig = GltfLoadConfig(
+    // The reader computes normals for a file that has none - the Fox has none - and the lighting
+    // needs them.
+    generateNormals = true,
+    applyMaterials = true,
+    materialConfig = GltfMaterialConfig(shadowMaps = shadowMaps),
+    // Posed every frame from the entity's `Animator` by `applyPose`.
+    loadAnimations = true,
+    applySkins = true,
+    applyMorphTargets = false,
+    assetLoader = model.loader,
+    // The file's material, with the same uniform ambient light the built-in shapes get; its
+    // strength is set every frame from the `ModelLight`.
+    pbrBlock = { _ -> lighting { uniformAmbientLight(Color.WHITE) } },
+)
 
 /**
  * A pass that draws a stage's models: colour transparent where no model is, so whatever the 2D pass

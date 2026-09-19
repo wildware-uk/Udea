@@ -444,6 +444,29 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
+## Wave 13 (2026-09-19): in flight
+
+- Baseline `5821d25`: FULLY GREEN, 928 tasks.
+- Dispatched (4, owner "wip up to 4"): dev-195 (#195 save to .kts: patcher in :moba:desktop editor source set, Save
+  action in udea-editor), dev-196 (#196 Play/Stop/Step/standalone: toolbar in udea-editor, CBOR-bytes restore, Stop
+  hook point for #238 Keep), dev-physics (udea-physics2d over box2d-jni 1.0.0, no issue, tracked on #199), dev-188 (#188
+  HUD on ComposeGL). **Known overlap:** #195 and #196 both add to udea-editor - told new files + minimal hooks; expect a
+  trial-merge for the second one. physics and #188 may each add one libs.versions.toml hunk.
+- **#196 r1 FAIL (2 findings):** (1) pre-Play undo of a delete puts shared Fleks Snapshot objects back live
+  (EditorToolset.kt:848, EditorHistory.mark shares edits) -> play-time values after Stop; (2) Stop leaves snapshot-ring
+  frames newer than the restored tick -> rewind lands in discarded play, and >120-tick play then Step x2 throws from
+  SnapshotRing.kt:187 require. Relayed verbatim. **Ledger (passed r1):** build 928 green; evidence 5/5, M1 red 2/5;
+  Stop between ticks (AgentGameLoop.pump drains before host.frame); standalone honest (separate MobaAgent JVM, UNDEAD
+  11); public API used cross-module. Out of scope: stale score bar/camera after Stop.
+- **#188 MERGED `569e8de`**, round 1 PASS, no findings. `MobaHudScreen` (ComposeGL composables) replaces the
+  BitmapFont2D HUD; HudState/MobaHudModel/MobaHudTest byte-unchanged. New udea-render `CapturedUi` (internal ctor, via
+  RenderResources.capturedUi(fonts)): second Kool view on the capturable OffscreenPass2d so game HUD is IN captures;
+  UiLayer/overlay/editor stay out (structural). DejaVu Sans font in moba:desktop with licence beside it. runMatchShot
+  checks HUD panels in all 7 PNGs (+ dead.png). HeadlessHostTest 6863/6864 = load flake (udea-core). Card: licence
+  header text copied from udea-editor names the wrong module. Worktree kept `.claude/worktrees/agent-a80b8fdec32c67256`.
+- Held: #241 A2 (asset compiler clip gen collides with #195), gizmo G2 #233 / G3 #234 (udea-editor busy), #189.
+- Remaining for #214: #195, #196 (then docs + kmp -> master). Shelved #223/#226 stay open (owner's shelving).
+
 ## Wave 12 (2026-09-19): done
 
 - Baseline `9d6629f`: FULLY GREEN, 917 tasks.

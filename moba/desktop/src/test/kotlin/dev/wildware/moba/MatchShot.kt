@@ -1,6 +1,7 @@
 package dev.wildware.moba
 
 import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.moba.ability.CharacterAttributes
 import dev.wildware.moba.ability.Combatant
 import dev.wildware.moba.ability.UnitBlueprint
 import dev.wildware.moba.entry.MobaEntry
@@ -16,19 +17,22 @@ import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.gas.Abilities
+import dev.wildware.udea.gas.Attributes
 import dev.wildware.udea.gas.GameplayEffects
 import dev.wildware.udea.gas.GasServices
 import dev.wildware.udea.render.capture.CaptureResult
 import dev.wildware.udea.render.input.InjectedIntent
 import dev.wildware.udea.render.input.IntentState
+import java.io.ByteArrayInputStream
 import java.nio.file.Path
+import javax.imageio.ImageIO
 import kotlinx.coroutines.Deferred
 import kotlin.io.path.createParentDirectories
 import kotlin.io.path.writeBytes
 import kotlin.system.exitProcess
 
 /**
- * Four captures of the shipping game, each taken on the tick its subject is actually on screen.
+ * Captures of the shipping game, each taken on the tick its subject is actually on screen.
  *
  * ## Why this is a harness and not a test
  *
@@ -50,6 +54,7 @@ import kotlin.system.exitProcess
  * | `result.png` | a match ends and the game says who won |
  * | `item_bar.png` | two bought items put their actives on the bar, beside the champion's own |
  * | `item_fired.png` | firing one item active leaves the champion's own two ready |
+ * | `dead.png` | a dead player is told so, and when they are back |
  *
  * The last two are issue #166's, and they are here rather than in a harness of their own because
  * this one already boots the shipped game with a GL context, drives it through the bound keys and
@@ -67,8 +72,22 @@ import kotlin.system.exitProcess
  * the pre-#166 trajectory tick for tick, which is how that was established rather than assumed.
  *
  * `melee.png` and `hud.png` are two moments of one claim rather than the same file twice: the HUD
- * is drawn at `RenderPhase.UI`, which is *before* the capture point on purpose, so every frame
- * here carries it and the second one is taken once a cooldown is visibly running.
+ * is drawn into the capturable frame on purpose (`MobaHudSystem`), so every frame here carries it,
+ * and the second one is taken once a cooldown is visibly running.
+ *
+ * ## Every picture is checked for the HUD, and that check is the point
+ *
+ * Issue #188 moved the HUD to ComposeGL, and ComposeGL's other host - `UiLayer` - draws into the
+ * window and is absent from every capture by design. A HUD routed there would still be on a player's
+ * screen and would vanish from every picture here without a single line of this harness failing. So
+ * each PNG is read back and one pixel of each solid HUD panel that should be in it is compared with the
+ * colour `MobaHudLook` names ([HUD_PANELS]). A missing panel is a failure with a message, and the PNG
+ * is still written so a person can see what was there instead.
+ *
+ * `dead.png` is issue #188's too: the corpse state had never been photographed. It is taken last, once
+ * `result.png` is written, by zeroing the player's health the way `MobaHudTest` does - so every other
+ * picture is of the same match on the same ticks as before, and the result banner is still standing
+ * (`MatchRules.RESULT_TICKS`) when the corpse is photographed under it.
  *
  * ## The input is injected, not simulated
  *
@@ -134,6 +153,7 @@ public object MatchShot {
         val pending = ArrayList<Shot>()
         val written = HashSet<String>()
         val log = StringBuilder()
+        val hudFailures = ArrayList<String>()
         MobaLaunch.runWithGl(mode) { host, rendering ->
             val player = MobaEntry.seed(host)
             val injected = InjectedIntent(MobaControls.BINDINGS.catalog)
@@ -147,6 +167,7 @@ public object MatchShot {
             var shopped = false
             var itemBarAsked = false
             var itemFiredAt = -1L
+            var killedAt = -1L
             MobaLaunch.Attachment(
                 frame = { delta ->
                     host.frame(delta)
@@ -223,12 +244,25 @@ public object MatchShot {
                                 " decided on tick " + match.endedTick,
                         )
                     }
+                    // The corpse: once the result is photographed, so no other picture changes. Killed
+                    // through the health attribute - `DeathSystem` then does what it does to any unit
+                    // on zero - and photographed a second later, with the respawn countdown running.
+                    if (killedAt < 0 && "result" in written) {
+                        killedAt = now
+                        killPlayer(host, netIds, player)
+                        pending += Shot(
+                            "dead",
+                            rendering.presentation().capture(afterTick = now + DEAD_DELAY_TICKS),
+                            "the player killed at tick " + now + ", photographed dead",
+                        )
+                    }
                     val done = pending.filter { it.future.isCompleted }
                     for (shot in done) {
                         val result = shot.future.getCompleted()
                         val out = dir.resolve(shot.name + ".png")
                         out.createParentDirectories()
                         out.writeBytes(result.bytes)
+                        hudFailures += hudMissing(shot.name, result.bytes)
                         written += shot.name
                         pending.remove(shot)
                         log.append("[match.shot] wrote ").append(out.toAbsolutePath())
@@ -253,10 +287,69 @@ public object MatchShot {
             System.err.println("[match.shot] never captured: " + missing)
             exitProcess(1)
         }
+        if (hudFailures.isNotEmpty()) {
+            for (failure in hudFailures) System.err.println("[match.shot] HUD missing: " + failure)
+            exitProcess(1)
+        }
+        println("[match.shot] HUD present in all " + written.size + " captures")
     }
 
     /** Every subject this harness photographs. */
-    private val SUBJECTS = listOf("melee", "hud", "spin", "result", "item_bar", "item_fired")
+    private val SUBJECTS = listOf("melee", "hud", "spin", "result", "item_bar", "item_fired", "dead")
+
+    /** How long after the kill `dead.png` is taken: `DeathSystem` has retired the unit by then. */
+    private const val DEAD_DELAY_TICKS: Long = 60L
+
+    /** One solid HUD panel: where to read it in a capture, and the colour it must be. */
+    private class Panel(val name: String, val rgb: Int, val at: (width: Int, height: Int) -> Pair<Int, Int>)
+
+    private val PLAYER_PANEL = Panel("player panel", MobaHudLook.PANEL_RGB) { _, height ->
+        // Inside the panel's padding, beside its bottom-left corner: always panel, whatever it holds.
+        (MobaHudLook.MARGIN + 2).toInt() to (height - MobaHudLook.MARGIN - 2).toInt()
+    }
+    private val SCORE_STRIP = Panel("score strip", MobaHudLook.PANEL_RGB) { _, _ ->
+        2 to (MobaHudLook.MARGIN + 2).toInt()
+    }
+    private val DEATH_BANNER = Panel("death banner", MobaHudLook.DEATH_RGB) { _, height -> 2 to height / 2 }
+    private val RESULT_BANNER = Panel("result banner", MobaHudLook.RESULT_RGB) { _, height ->
+        2 to (height / 2 - MobaHudLook.BANNER).toInt()
+    }
+
+    /** Which panels each picture must show. Every one has the score; the rest follows the player. */
+    private val HUD_PANELS: Map<String, List<Panel>> = mapOf(
+        "melee" to listOf(SCORE_STRIP, PLAYER_PANEL),
+        "hud" to listOf(SCORE_STRIP, PLAYER_PANEL),
+        "spin" to listOf(SCORE_STRIP, PLAYER_PANEL),
+        "item_bar" to listOf(SCORE_STRIP, PLAYER_PANEL),
+        "item_fired" to listOf(SCORE_STRIP, PLAYER_PANEL),
+        "result" to listOf(SCORE_STRIP, RESULT_BANNER),
+        "dead" to listOf(SCORE_STRIP, RESULT_BANNER, DEATH_BANNER),
+    )
+
+    /** Each panel [name]'s picture should show and does not, as a sentence; empty when all are there. */
+    private fun hudMissing(name: String, png: ByteArray): List<String> {
+        val image = ImageIO.read(ByteArrayInputStream(png)) ?: return listOf("$name.png is not a decodable image")
+        return HUD_PANELS.getValue(name).mapNotNull { panel ->
+            val (x, y) = panel.at(image.width, image.height)
+            val rgb = image.getRGB(x, y) and 0xFFFFFF
+            if (rgb == panel.rgb) {
+                null
+            } else {
+                "%s.png has no %s: (%d, %d) is #%06X, the panel is #%06X".format(name, panel.name, x, y, rgb, panel.rgb)
+            }
+        }
+    }
+
+    /** Zeroes the player's health, as `MobaHudTest.killPlayer` does. Nothing if the player is gone. */
+    private fun killPlayer(host: GameHost, netIds: NetIdIndex, player: NetId) {
+        val entity = netIds.resolveOrNull(player) ?: return
+        val health = host.ctx[GasServices.KEY].attributes.idOf(CharacterAttributes.HEALTH)
+        with(host.world) {
+            val attributes = entity.getOrNull(Attributes) ?: return@with
+            attributes.setBase(health, 0f)
+            attributes.current[health.index] = 0f
+        }
+    }
 
     /** `item/warhammer`, which grants `ability/orc_elite_spin` as an active. */
     private const val WARHAMMER = "item/warhammer"

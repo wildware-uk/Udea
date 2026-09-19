@@ -269,4 +269,6 @@ tasks.register<JavaExec>("runModelShot") {
         providers.gradleProperty("udea.modelshot.dir").orNull
             ?: layout.buildDirectory.dir("reports/udea/model").get().asFile.absolutePath,
     )
+    // Where the Khronos Fox the shot imports is (issue #240).
+    systemProperty("udea.render.exampleAssets", exampleAssets.asFile.absolutePath)
 }

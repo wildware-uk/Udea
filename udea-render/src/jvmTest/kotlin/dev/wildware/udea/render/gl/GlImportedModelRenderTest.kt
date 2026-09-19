@@ -88,6 +88,14 @@ class GlImportedModelRenderTest {
             assertEquals(1, backend.onRenderThread { system.drawnCount }, "one entity has a ModelRenderer")
             assertTrue(foxPixels >= MIN_FOX_PIXELS, "the fox is not drawn: $foxPixels lit pixels after $frames frames")
 
+            // Upright and side-on: taller than a fox lying on its side, and longer than it is tall.
+            // The file is Y-up, so a renderer that drew it without turning it onto the world's Z-up
+            // would lay it flat along the camera's line of sight, a sliver a few pixels high.
+            val (width, height) = extent(image)
+            println("GlImportedModelRenderTest: the fox is ${width}x$height pixels")
+            assertTrue(height >= MIN_FOX_HEIGHT, "the fox is not standing up: ${width}x$height pixels")
+            assertTrue(width > height, "the fox is not side-on: ${width}x$height pixels")
+
             val orange = count(image) { r, g, b -> r > b + 60 && g > b + 20 && r > g + 25 }
             val white = count(image) { r, g, b -> r > 170 && g > 170 && b > 150 && r - b < 70 }
             val orangeShare = orange.toFloat() / foxPixels
@@ -154,6 +162,28 @@ class GlImportedModelRenderTest {
         return n
     }
 
+    /** The width and height, in pixels, of the box around everything that is not background. */
+    private fun extent(image: BufferedImage): Pair<Int, Int> {
+        var left = image.width
+        var right = -1
+        var top = image.height
+        var bottom = -1
+        for (y in 0 until image.height) {
+            for (x in 0 until image.width) {
+                val pixel = image.getRGB(x, y)
+                val lit = ((pixel ushr 16) and 0xFF) > BACKGROUND || ((pixel ushr 8) and 0xFF) > BACKGROUND ||
+                    (pixel and 0xFF) > BACKGROUND
+                if (lit) {
+                    left = minOf(left, x)
+                    right = maxOf(right, x)
+                    top = minOf(top, y)
+                    bottom = maxOf(bottom, y)
+                }
+            }
+        }
+        return if (right < 0) 0 to 0 else (right - left + 1) to (bottom - top + 1)
+    }
+
     private fun decode(png: ByteArray): BufferedImage = ImageIO.read(ByteArrayInputStream(png))
         ?: error("the captured bytes are not a decodable image")
 
@@ -176,6 +206,9 @@ class GlImportedModelRenderTest {
 
         /** Side-on at this size the fox covers about 8900 pixels; fewer than this is not a fox. */
         const val MIN_FOX_PIXELS = 5_000
+
+        /** A standing fox 1.6 tall, 5.5 away, is well over this many pixels tall. */
+        const val MIN_FOX_HEIGHT = 60
 
         /** Frames allowed for the texture to decode and the fox to appear. */
         const val FRAME_BUDGET = 240

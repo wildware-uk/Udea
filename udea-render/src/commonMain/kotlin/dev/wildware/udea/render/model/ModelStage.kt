@@ -30,12 +30,15 @@ import de.fabmax.kool.util.MutableColor
 import de.fabmax.kool.util.MutableStructBufferView
 import de.fabmax.kool.util.ShadowMap
 import de.fabmax.kool.util.SimpleShadowMap
+import dev.wildware.udea.core.Tick
 import dev.wildware.udea.render.RenderResource
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteRegion
 import dev.wildware.udea.render.draw.SpriteTexture
 import dev.wildware.udea.render.kool.ScenePasses
 import dev.wildware.udea.render.view.WorldViewport
+import kotlin.math.sqrt
+import kotlin.math.tan
 
 /**
  * The Kool half of [ModelRenderSystem]: a 3D pass with a depth buffer, a perspective camera, a
@@ -90,10 +93,20 @@ internal class ModelStage(
 
     private val shadow = SimpleShadowMap(camera, drawNode, sun, SHADOW_MAP_SIZE, "udea-model-shadow")
 
+    /**
+     * Every Scene view's preview node (issue #243): drawn by that view's pass and by no other. The
+     * capturable pass and the shadow map skip them, so a preview reaches neither a capture nor a
+     * shadow. Compared by identity: a Kool node has no equality of its own.
+     */
+    private val previewNodes = HashSet<Node>()
+
     init {
         pass.dependsOn(shadow)
         passes.addBeforeCapture(shadow)
         passes.addBeforeCapture(pass)
+        pass.defaultView.drawFilter = { node -> node !in previewNodes }
+        val castsShadow = shadow.defaultView.drawFilter
+        shadow.defaultView.drawFilter = { node -> node !in previewNodes && castsShadow(node) }
     }
 
     /** The pass's picture, for the 2D batch to draw into the capturable frame. */
@@ -115,6 +128,19 @@ internal class ModelStage(
 
     /** Each open Scene view's pass over this stage's models. */
     private val views = HashMap<WorldViewport, ViewPass>()
+
+    /**
+     * Which entity each imported node shown this frame was drawn for, in the order [add] showed
+     * them: the Fleks entity id at the same position as its node. Read by a preview and by
+     * [skeleton], never per entity per frame. Emptied by [begin].
+     */
+    private var drawnEntities = IntArray(INITIAL_DRAWN)
+    private val drawnNodes = ArrayList<Placed>()
+
+    /** The pose a Scene view's preview shows. Reused. */
+    private val previewPose = ClipPose()
+
+    private val jointPosition = MutableVec3f()
 
     /** Where a Scene view's orbit is written before it aims its pass. Reused. */
     private val orbit = ModelCamera()
@@ -154,6 +180,7 @@ internal class ModelStage(
             run.mesh.isVisible = false
         }
         for (index in allImports.indices) allImports[index].hideAll()
+        drawnNodes.clear()
 
         aim(camera, view)
 
@@ -171,6 +198,7 @@ internal class ModelStage(
         ambient.set(light.ambient)
         for (index in allRuns.indices) allRuns[index].shader.ambientFactor = ambient
         for (index in allImports.indices) allImports[index].setAmbient()
+        for (seen in views.values) seen.setPreviewAmbient()
     }
 
     /**
@@ -181,14 +209,51 @@ internal class ModelStage(
      * The pass sits beside the capturable pass rather than before it, and only [view]'s own pass
      * waits on it, so a capture neither waits for it nor reads it. Render thread only.
      */
-    fun imageFor(view: WorldViewport, game: ModelCamera): SpriteRegion {
+    fun imageFor(view: WorldViewport, game: ModelCamera, previewEntity: Int = NO_ENTITY): SpriteRegion {
         val editor = checkNotNull(view.camera) { "$view is the Game tab, which shows the capturable frame" }
         editor.adopt(game)
         val seen = views.getOrPut(view) { ViewPass(view) }
         seen.fit(view.width, view.height)
         editor.writeOrbit(orbit)
         aim(seen.camera, orbit)
+        when (val preview = view.modelPreview) {
+            null -> seen.clearPreview()
+            is ModelPreview.Pose -> {
+                val drawn = drawnFor(previewEntity)
+                if (drawn == null) seen.clearPreview() else seen.showPose(drawn, previewEntity, previewPose.hold(preview.clip, preview.at))
+            }
+            is ModelPreview.Asset -> {
+                val clip = preview.clip
+                val pose = if (clip == null) previewPose.set(null, Tick.ZERO, 0f) else previewPose.hold(clip, preview.at)
+                seen.showAsset(preview.model, pose, preview.turnDegrees, orbit)
+            }
+        }
         return seen.image
+    }
+
+    /**
+     * Writes into [out] the joints of the skinned model drawn this frame for Fleks entity [entity],
+     * as [view] shows it - its preview node, when [view] is previewing that entity - or as the
+     * capturable frame shows it when [view] is `null` (issue #243). Render thread, after this
+     * frame's [add]s and [imageFor]s.
+     *
+     * Each joint's position is where Kool's skinning puts it: the skinned mesh's model matrix, times
+     * the joint's skinning matrix, times its bind matrix, applied to the origin. That is the matrix
+     * the GPU moves the joint's vertices by, so a joint sits where its part of the mesh is drawn.
+     *
+     * @return false, leaving [out] empty, when nothing was drawn for [entity] or what was has no skin.
+     */
+    fun skeleton(entity: Int, view: WorldViewport?, out: ModelSkeleton): Boolean {
+        out.clear()
+        val placed = view?.let { views[it] }?.previewFor(entity) ?: drawnFor(entity) ?: return false
+        return placed.writeSkeleton(out)
+    }
+
+    /** The node [add] showed for [entity] this frame, or `null`. A scan: once per preview per frame. */
+    private fun drawnFor(entity: Int): Placed? {
+        if (entity == NO_ENTITY) return null
+        for (index in drawnNodes.indices) if (drawnEntities[index] == entity) return drawnNodes[index]
+        return null
     }
 
     /** Points [camera] the way [view] says, Z up. */
@@ -210,6 +275,7 @@ internal class ModelStage(
         rotationX: Float, rotationY: Float, rotationZ: Float,
         scaleX: Float, scaleY: Float, scaleZ: Float,
         pose: ClipPose,
+        entity: Int = NO_ENTITY,
     ) {
         // Translate, then turn about Z, Y, X - so X is applied to the model first - then scale.
         matrix.setIdentity()
@@ -225,7 +291,12 @@ internal class ModelStage(
                 run.mesh.isVisible = true
             }
             // The file is Y-up: turned onto the world's Z-up before anything else is applied.
-            is ImportedModel -> importsFor(source).show(matrix.rotate(Y_UP_TO_Z_UP, Vec3f.X_AXIS), pose)
+            is ImportedModel -> {
+                val placed = importsFor(source).show(matrix.rotate(Y_UP_TO_Z_UP, Vec3f.X_AXIS), pose)
+                if (drawnNodes.size == drawnEntities.size) drawnEntities = drawnEntities.copyOf(drawnEntities.size * 2)
+                drawnEntities[drawnNodes.size] = entity
+                drawnNodes += placed
+            }
         }
     }
 
@@ -273,7 +344,7 @@ internal class ModelStage(
     /** The scene nodes made so far for one [ImportedModel], and how many this frame has shown. */
     private inner class Imports(private val model: ImportedModel) {
 
-        private val config = gltfLoadConfig(model, listOf(shadow))
+        val config = gltfLoadConfig(model, listOf(shadow))
 
         private val nodes = ArrayList<Placed>()
         private var shown = 0
@@ -292,15 +363,16 @@ internal class ModelStage(
          * The pose is set on every node shown, every frame: a node goes to whichever entity is
          * drawn in its turn, so it must not keep the pose of the entity it drew last.
          */
-        fun show(transform: MutableMat4f, pose: ClipPose) {
+        fun show(transform: MutableMat4f, pose: ClipPose): Placed {
             val placed = if (shown < nodes.size) nodes[shown] else make()
             shown++
             placed.node.transform.setMatrix(transform)
             placed.node.applyPose(pose)
             placed.node.isVisible = true
+            return placed
         }
 
-        private fun make(): Placed = Placed(model.gltf.makeModel(config).withOwnShadowSkins()).also { placed ->
+        private fun make(): Placed = Placed(model, model.gltf.makeModel(config).withOwnShadowSkins()).also { placed ->
             placed.setAmbient()
             nodes += placed
             drawNode.addNode(placed.node)
@@ -311,11 +383,31 @@ internal class ModelStage(
      * One scene node made from a glTF file, with its shaders listed once so that a frame sets
      * their ambient light without walking Kool's maps.
      */
-    private inner class Placed(val node: KoolModel) {
+    private inner class Placed(val model: ImportedModel, val node: KoolModel) {
         private val shaders = node.meshes.values.mapNotNull { it.shader as? KslPbrShader }
+
+        /** The skin's joints, read the first time a skeleton is asked for: most nodes never are. */
+        private val joints: List<SkinJoint> by lazy { skinJointsOf(node) }
 
         fun setAmbient() {
             for (index in shaders.indices) shaders[index].ambientFactor = ambient
+        }
+
+        /** See [skeleton]. */
+        fun writeSkeleton(out: ModelSkeleton): Boolean {
+            val joints = joints
+            if (joints.isEmpty()) return false
+            // Kool computes model matrices when it next updates the scene, so until then they are
+            // last frame's; this frame's transform was set by `show`, so bring them up to it.
+            node.updateModelMatRecursive()
+            for (index in joints.indices) {
+                val joint = joints[index]
+                jointPosition.set(joint.bindOrigin)
+                joint.skinNode.jointTransform.transform(jointPosition)
+                joint.mesh.modelMatF.transform(jointPosition)
+                out.add(jointPosition.x, jointPosition.y, jointPosition.z, joint.parent)
+            }
+            return true
         }
     }
 
@@ -345,7 +437,21 @@ internal class ModelStage(
         private var width = view.width
         private var height = view.height
 
+        /** This view's own node for a preview, made the first time one is shown and kept for reuse. */
+        private var preview: Placed? = null
+
+        /** The simulated node this view hides while previewing its entity, or `null`. */
+        private var hidden: Node? = null
+
+        /** The entity [preview] stands in for, or [NO_ENTITY] for an asset preview or none. */
+        private var previewEntity = NO_ENTITY
+
+        private val placing = MutableMat4f()
+        private val scaling = MutableVec3f()
+
         init {
+            // Everything but the node this view hides, and no preview node but its own.
+            pass.defaultView.drawFilter = { node -> node !== hidden && (node === preview?.node || node !in previewNodes) }
             pass.dependsOn(shadow)
             passes.addBeside(pass)
             view.dependsOn(pass)
@@ -363,11 +469,85 @@ internal class ModelStage(
             this.height = height
         }
 
+        /** Shows the world as simulated: the preview node hidden, nothing filtered out. */
+        fun clearPreview() {
+            preview?.node?.isVisible = false
+            hidden = null
+            previewEntity = NO_ENTITY
+        }
+
+        /** Stands a node of this view's own in for [real], drawn for [entity], in [pose]. */
+        fun showPose(real: Placed, entity: Int, pose: ClipPose) {
+            val shown = previewNode(real.model)
+            shown.node.transform.setMatrix(real.node.transform.matrixF)
+            shown.node.applyPose(pose)
+            shown.node.isVisible = true
+            hidden = real.node
+            previewEntity = entity
+        }
+
+        /**
+         * Shows [model] on its own at [orbit]'s centre, turned [turnDegrees] about Z, in [pose],
+         * scaled so its largest side is about half the view's height at the orbit's distance.
+         */
+        fun showAsset(model: ImportedModel, pose: ClipPose, turnDegrees: Float, orbit: ModelCamera) {
+            val shown = previewNode(model)
+            // Kool's bounds of the node's own geometry, in the file's units, from its last update;
+            // empty on the first frame a node exists, which shows it at the file's own size once.
+            val bounds = shown.node.bounds
+            val largest = if (bounds.isEmpty) 0f else maxOf(bounds.size.x, bounds.size.y, bounds.size.z)
+            val dx = orbit.eyeX - orbit.targetX
+            val dy = orbit.eyeY - orbit.targetY
+            val dz = orbit.eyeZ - orbit.targetZ
+            val distance = sqrt(dx * dx + dy * dy + dz * dz)
+            val wanted = distance * tan(orbit.fovYDegrees.deg.rad / 2f)
+            val scale = if (largest > 0f) wanted / largest else 1f
+            placing.setIdentity()
+                .translate(orbit.targetX, orbit.targetY, orbit.targetZ)
+                .rotate(turnDegrees.deg, Vec3f.Z_AXIS)
+                .scale(scaling.set(scale, scale, scale))
+                .rotate(Y_UP_TO_Z_UP, Vec3f.X_AXIS)
+            if (!bounds.isEmpty) placing.translate(-bounds.center.x, -bounds.center.y, -bounds.center.z)
+            shown.node.transform.setMatrix(placing)
+            shown.node.applyPose(pose)
+            shown.node.isVisible = true
+            hidden = null
+            previewEntity = NO_ENTITY
+        }
+
+        fun setPreviewAmbient() {
+            preview?.setAmbient()
+        }
+
+        /** This view's preview node when it stands in for [entity], or `null`. */
+        fun previewFor(entity: Int): Placed? = if (entity != NO_ENTITY && entity == previewEntity) preview else null
+
+        /** This view's preview node for [model], made - or remade, for another model - on demand. */
+        private fun previewNode(model: ImportedModel): Placed {
+            preview?.let { if (it.model === model) return it }
+            dropPreview()
+            val made = Placed(model, model.gltf.makeModel(importsFor(model).config).withOwnShadowSkins())
+            made.setAmbient()
+            previewNodes += made.node
+            drawNode.addNode(made.node)
+            preview = made
+            return made
+        }
+
+        private fun dropPreview() {
+            val old = preview ?: return
+            preview = null
+            previewNodes.remove(old.node)
+            drawNode.removeNode(old.node)
+            old.node.release()
+        }
+
         fun release() {
             if (released) return
             released = true
             passes.remove(pass)
             pass.release()
+            dropPreview()
         }
     }
 
@@ -387,6 +567,12 @@ internal class ModelStage(
 
         /** A quarter turn about X takes a glTF file's +Y, its up, to the world's +Z. */
         val Y_UP_TO_Z_UP = 90f.deg
+
+        /** No entity: what `add` is told for a model drawn for none, and what matches no preview. */
+        const val NO_ENTITY = -1
+
+        /** Room for this many imported nodes a frame before the entity list grows. */
+        const val INITIAL_DRAWN = 16
     }
 }
 

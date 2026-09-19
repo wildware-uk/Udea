@@ -76,10 +76,22 @@ val udeaEditorGlTest = tasks.register<Test>("udeaEditorGlTest") {
         "udea.render.glReportDir",
         layout.buildDirectory.dir("reports/udea/gl").get().asFile.absolutePath,
     )
+    readsTheFox()
 }
 
 tasks.test {
     filter { excludeTestsMatching("$editorGlTestPackage.*") }
+    readsTheFox()
+}
+
+/**
+ * The Khronos Fox, which the Animation panel's tests animate (issue #243): the same file
+ * `udea-render`'s tests read, from the retired game's asset tree.
+ */
+fun Test.readsTheFox() {
+    val exampleAssets = rootProject.layout.projectDirectory.dir("example-assets")
+    systemProperty("udea.render.exampleAssets", exampleAssets.asFile.absolutePath)
+    inputs.dir(exampleAssets.dir("models")).withPropertyName("exampleModels").withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 tasks.check {

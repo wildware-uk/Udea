@@ -77,6 +77,15 @@ public class GizmoCanvas internal constructor(
         batch.fill(x, y, width, height, colour)
     }
 
+    /**
+     * Draws a straight line from ([x0], [y0]) to ([x1], [y1]), [thickness] pixels wide, in view
+     * pixels from the bottom left: a bone, a spoke, a tether (issue #243). Inside [GizmoLayer.draw]
+     * only.
+     */
+    public fun line(x0: Float, y0: Float, x1: Float, y1: Float, thickness: Float, colour: Rgba) {
+        batch.line(x0, y0, x1, y1, thickness, colour)
+    }
+
     /** Sizes the canvas and takes the Game tab's projection, before a layer draws or is pressed. */
     internal fun prepare(width: Int, height: Int, game: Projection2D?) {
         this.width = width

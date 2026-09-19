@@ -33,6 +33,9 @@ public object EditorTags {
     /** The History panel's docked window id. */
     internal const val HISTORY_PANEL: String = "editor-history"
 
+    /** The Animation panel's docked window id (issue #243). */
+    internal const val ANIMATION_PANEL: String = "editor-animation"
+
     /** The Create panel's spawn button. */
     public const val SPAWN: String = "editor:spawn"
 

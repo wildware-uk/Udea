@@ -59,7 +59,12 @@ public class EditorSession(
     internal val views: EditorViews,
     /** What Play standalone hands the saved level to; `null` leaves that button out (issue #196). */
     standalone: StandaloneLauncher? = null,
+    /** The Animation panel's models and renderer; `null` leaves the panel out (issue #243). */
+    animation: EditorAnimation? = null,
 ) {
+
+    /** The Animation panel, the scrub preview and the bone overlay, when the game has animated models. */
+    internal val animation: AnimationPanelState? = animation?.let { AnimationPanelState(it, tools, views, sceneChanged = { navigation.markMoved() }) }
 
     /** The toolbar's Play, Stop, Step and Play standalone. */
     internal val playback: PlayControls = PlayControls(tools, standalone)
@@ -101,9 +106,6 @@ public class EditorSession(
 
     private val redraw = ViewportRedraw()
 
-    /** The id of the latest `editor.history` read this session sent, or `null` before the first. */
-    private var historyRead: Long? = null
-
     private var historyPending = false
 
     private var historyStale = true
@@ -138,11 +140,11 @@ public class EditorSession(
     public fun frame() {
         tools.frame()
         val completed = tools.completed
-        if (completed != seenCompleted) {
-            if (completed != historyRead) historyStale = true
-            seenCompleted = completed
-        }
+        // Any command but the editor's own reads: an edit, or an agent's call, may have changed it.
+        if (tools.changedSince(seenCompleted)) historyStale = true
+        seenCompleted = completed
         if (historyStale && !historyPending) readHistory()
+        animation?.frame()
         // Both asked every frame: each keeps what it last saw.
         val resized = resized()
         val due = redraw.due(tick(), completed) || resized
@@ -253,7 +255,7 @@ public class EditorSession(
     private fun readHistory() {
         historyPending = true
         historyStale = false
-        historyRead = tools.call(HISTORY, mapOf("limit" to HISTORY_LIMIT.toString())) { answer ->
+        tools.read(HISTORY, mapOf("limit" to HISTORY_LIMIT.toString())) { answer ->
             historyPending = false
             when (answer) {
                 is AgentResult.Ok -> history = HistoryEntry.parse(answer.json)

@@ -47,10 +47,20 @@ public interface Gizmo<C : Component<C>> {
  * check its gizmo headless, as `udea-codegen`'s tests check a generated gizmo against a hand-written
  * one. It never touches the world.
  */
-public fun <C : Component<C>> Gizmo<C>.handles(target: GizmoTarget<C>): List<Handle<C>> {
+public fun <C : Component<C>> Gizmo<C>.handles(target: GizmoTarget<C>): List<Handle<C>> = built(target).declared()
+
+/**
+ * The marks [this] gizmo draws for [target] - the guides it shows with nothing to grab
+ * ([GizmoScope.mark]) - in the order it drew them. The editor's way to draw a gizmo, and a game
+ * test's way to check a read-only one, as [handles] is for handles. It never touches the world.
+ */
+public fun <C : Component<C>> Gizmo<C>.marks(target: GizmoTarget<C>): List<Mark> = built(target).marked()
+
+/** One run of [Gizmo.build] for [target]: its handles and its marks. */
+internal fun <C : Component<C>> Gizmo<C>.built(target: GizmoTarget<C>): GizmoScope<C> {
     val scope = GizmoScope(target.entity, component)
     with(this) { scope.build(target) }
-    return scope.declared()
+    return scope
 }
 
 /**

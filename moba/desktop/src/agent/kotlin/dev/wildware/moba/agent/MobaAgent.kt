@@ -67,9 +67,12 @@ import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.loop.barrier
 import dev.wildware.udea.core.module.CoreModule
+import dev.wildware.udea.core.spatial.Animator
+import dev.wildware.udea.core.spatial.AnimatorReplicator
 import dev.wildware.udea.generated.MobaUdeaRegistry
 import dev.wildware.udea.render.OverlayResources
 import dev.wildware.udea.render.OverlaySystem
+import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.input.InjectedIntent
 import dev.wildware.udea.render.input.IntentState
 import dev.wildware.udea.render.input.UiInput
@@ -216,11 +219,14 @@ public object MobaAgent {
      * @param editor register the `editor.*` tools and report `"editor":true` on `/health`.
      * @param screen builds an interface over the running session before the first frame, or `null`
      *   for an instance that shows none.
+     * @param renderers registers what the caller draws beside the game's own systems, before the
+     *   backend starts: the editor's 3D models (issue #243).
      */
     internal fun runWithGl(
         mode: RenderMode,
         wiring: Wiring,
         editor: Boolean,
+        renderers: (RenderRegistry) -> Unit = {},
         screen: ((GameHost, MobaLaunch.Rendering, Session) -> Screen)?,
     ) {
         var shown: Screen? = null
@@ -228,6 +234,7 @@ public object MobaAgent {
             mode,
             overlay = overlayFor(mode, wiring.bridge, wiring.sessions),
             extraModules = wiring.extraModules,
+            renderers = renderers,
         ) { host, rendering ->
             // The engine's own adapter, out of `udea-agent-host`'s `src/main`. `moba` used to
             // carry a copy of it in this source set, because a headless agent host could not name
@@ -350,7 +357,7 @@ public object MobaAgent {
 
         val position = positionAccess()
         val components = AgentComponentIndex(
-            listOf(position, unitAccess(), matchAccess(), inventoryAccess()),
+            listOf(position, unitAccess(), matchAccess(), inventoryAccess(), animatorAccess()),
         )
         val worldTools = WorldToolset(
             world = host.world,
@@ -556,6 +563,20 @@ public object MobaAgent {
         name = "Inventory",
         replicator = InventoryReplicator,
         componentType = Inventory,
+    )
+
+    /**
+     * `Animator`, so which clip an animated entity is playing is readable without a screenshot, and
+     * so the editor can set it (issue #243): the Animation panel chooses a clip with
+     * `editor.begin_edit` / `update_edit` / `commit_edit` on `Animator.current.clip` and
+     * `Animator.current.length`, which name fields through this index. `editor.*` writes any field
+     * it names, so nothing here needs to be agent-writable, and nothing is: a game's animation is
+     * its systems' to direct, and `world.set_component_field` keeps refusing it.
+     */
+    private fun animatorAccess(): AgentComponentType = agentComponent(
+        name = "Animator",
+        replicator = AnimatorReplicator,
+        componentType = Animator,
     )
 
     /**

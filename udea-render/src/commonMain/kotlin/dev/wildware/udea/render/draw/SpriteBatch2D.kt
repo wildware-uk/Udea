@@ -1,5 +1,9 @@
 package dev.wildware.udea.render.draw
 
+import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.sqrt
+
 /**
  * Where a frame's sprites are handed over: position, size, texture region, tint, rotation.
  *
@@ -166,6 +170,29 @@ public class SpriteBatch2D internal constructor(
         )
     }
 
+    /**
+     * Records a solid line from ([x0], [y0]) to ([x1], [y1]), [thickness] wide: [whitePixel]
+     * stretched along it and turned to its angle. In the [begin] projection's units, which for a
+     * gizmo are view pixels. Nothing is recorded for a line of no length.
+     */
+    internal fun line(x0: Float, y0: Float, x1: Float, y1: Float, thickness: Float, tint: Rgba) {
+        check(isDrawing) { "SpriteBatch2D.line called outside begin/end" }
+        val dx = x1 - x0
+        val dy = y1 - y0
+        val length = sqrt(dx * dx + dy * dy)
+        if (length == 0f) return
+        val half = thickness / 2f
+        record(
+            whitePixel,
+            projection.pixelX(x0), projection.pixelY(y0 - half),
+            length * projection.scaleX, thickness * projection.scaleY,
+            0f, half * projection.scaleY,
+            atan2(dy, dx) * DEGREES_PER_RADIAN,
+            0f, 0f, 1f, 1f,
+            tint,
+        )
+    }
+
     /** Ends the pass [begin] started. */
     public fun end() {
         check(isDrawing) { "SpriteBatch2D.end called without begin" }
@@ -232,6 +259,9 @@ public class SpriteBatch2D internal constructor(
         const val V0: Int = 8
         const val DU: Int = 9
         const val DV: Int = 10
+
+        /** A line's angle comes from `atan2` in radians; a record's rotation is in degrees. */
+        const val DEGREES_PER_RADIAN: Float = (180.0 / PI).toFloat()
 
     }
 }

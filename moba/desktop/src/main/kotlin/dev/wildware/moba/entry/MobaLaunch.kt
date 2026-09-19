@@ -9,6 +9,7 @@ import dev.wildware.udea.core.module.UdeaModule
 import dev.wildware.udea.render.OverlayResources
 import dev.wildware.udea.render.OverlaySystem
 import dev.wildware.udea.render.RenderPipeline
+import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.control.PresentationControl
@@ -168,6 +169,7 @@ public object MobaLaunch {
         mode: RenderMode,
         overlay: ((OverlayResources) -> OverlaySystem)? = null,
         extraModules: List<UdeaModule> = emptyList(),
+        renderers: (RenderRegistry) -> Unit = {},
         attach: (GameHost, Rendering) -> Attachment,
     ) {
         require(mode != RenderMode.Headless) { "RenderMode.Headless has no GL backend" }
@@ -193,6 +195,10 @@ public object MobaLaunch {
         // Registered before `start`, because `KoolBackend.start` builds the pipeline out of the
         // registry and a registration after that point reaches nothing.
         if (overlay != null) scene.registry.overlay(overlay)
+        // What a caller draws beside the game's own systems - the editor's 3D models (issue #243) -
+        // registered here for the same reason as the overlay: the backend builds its pipeline from
+        // a registry that is complete.
+        renderers(scene.registry)
         val backend = StartupTrace.gl { KoolBackend.start(mode, windowConfig(), scene.registry) }
         var attachment: Attachment? = null
         try {

@@ -7,6 +7,9 @@ import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.Tick
+import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.core.identity.NetIdIndex
+import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.core.spatial.Transform3D
 import dev.wildware.udea.render.OffscreenTarget
@@ -15,6 +18,7 @@ import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.interp.Pose
 import dev.wildware.udea.render.interp.PoseSource
+import dev.wildware.udea.render.view.WorldViewport
 
 /**
  * Draws every entity with a [ModelRenderer] - a built-in mesh in its material, or an
@@ -85,7 +89,29 @@ public class ModelRenderSystem(
         private set
 
     override fun onBind(world: World, ctx: GameContext) {
-        bound = Bound(world, world.family { all(ModelRenderer) }, ctx.clock)
+        bound = Bound(world, world.family { all(ModelRenderer) }, ctx.clock, ctx[CoreModule.NET_IDS])
+    }
+
+    /**
+     * Writes into [out] the joints of [entity]'s skinned model as [view] shows it this frame - in its
+     * scrub preview's pose, when [view] is previewing [entity] ([ModelPreview.Pose]) - or as the
+     * capturable frame shows it when [view] is `null` (issue #243). What the editor's bone overlay
+     * draws; see `ModelStage.skeleton` for where a joint is.
+     *
+     * Render thread, after this frame's models are drawn: from a `GizmoLayer`, which a view draws
+     * after its world.
+     *
+     * @return false, with [out] empty, when [entity] is not in the world, was not drawn this frame,
+     *   or is drawn with a model that has no skin.
+     */
+    public fun skeletonOf(entity: NetId, view: WorldViewport?, out: ModelSkeleton): Boolean {
+        val bound = this.bound
+        val live = bound?.netIds?.resolveOrNull(entity)
+        if (live == null) {
+            out.clear()
+            return false
+        }
+        return stage.skeleton(live.id, view, out)
     }
 
     override fun render(target: OffscreenTarget, alpha: Float) {
@@ -94,7 +120,7 @@ public class ModelRenderSystem(
         // for the capturable frame, and the view sees them through its own camera and pass.
         val view = resources.viewing.current
         val image = if (view != null) {
-            stage.imageFor(view, camera)
+            stage.imageFor(view, camera, previewedEntity(bound, view))
         } else {
             drawnCount = 0
             stage.fit(target.width, target.height)
@@ -115,6 +141,12 @@ public class ModelRenderSystem(
         }
     }
 
+    /** The Fleks id of the entity [view]'s scrub preview is of, or -1 for none (issue #243). */
+    private fun previewedEntity(bound: Bound, view: WorldViewport): Int {
+        val preview = view.modelPreview as? ModelPreview.Pose ?: return NO_PREVIEW
+        return bound.netIds.resolveOrNull(preview.entity)?.id ?: NO_PREVIEW
+    }
+
     private fun World.draw(entity: Entity, now: Tick, alpha: Float) {
         val model = entity[ModelRenderer].model
         val transform = entity.getOrNull(Transform3D)
@@ -125,6 +157,7 @@ public class ModelRenderSystem(
                 transform.rotationX, transform.rotationY, transform.rotationZ,
                 transform.scaleX, transform.scaleY, transform.scaleZ,
                 clips.set(entity.getOrNull(Animator), now, alpha),
+                entity.id,
             )
         } else {
             val lift = lift ?: return
@@ -132,11 +165,17 @@ public class ModelRenderSystem(
             stage.add(
                 model, pose.x, pose.y, 0f, 0f, 0f, pose.angle, 1f, 1f, 1f,
                 clips.set(entity.getOrNull(Animator), now, alpha),
+                entity.id,
             )
         }
         drawnCount++
     }
 
     /** Everything resolved at bind time. */
-    private class Bound(val world: World, val models: Family, val clock: SimClock)
+    private class Bound(val world: World, val models: Family, val clock: SimClock, val netIds: NetIdIndex)
+
+    private companion object {
+        /** No entity is previewed: what `ModelStage.imageFor` matches against no node. */
+        const val NO_PREVIEW = -1
+    }
 }

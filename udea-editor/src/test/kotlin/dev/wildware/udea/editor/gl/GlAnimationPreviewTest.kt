@@ -1,0 +1,380 @@
+package dev.wildware.udea.editor.gl
+
+import dev.wildware.udea.agent.AgentBridge
+import dev.wildware.udea.agent.AgentCommand
+import dev.wildware.udea.agent.AgentResult
+import dev.wildware.udea.agent.activity.AgentSessions
+import dev.wildware.udea.assets.AssetId
+import dev.wildware.udea.assets.Model
+import dev.wildware.udea.assets.ResPath
+import dev.wildware.udea.core.Ticks
+import dev.wildware.udea.core.blueprint.BlueprintId
+import dev.wildware.udea.core.host.GameHost
+import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.core.module.CoreModule
+import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.core.snapshot.ComponentRegistry
+import dev.wildware.udea.core.snapshot.SnapshotService
+import dev.wildware.udea.core.snapshot.WorldHasher
+import dev.wildware.udea.core.spatial.AnimationClip
+import dev.wildware.udea.core.spatial.Animator
+import dev.wildware.udea.core.spatial.Transform3D
+import dev.wildware.udea.editor.AnimatedModel
+import dev.wildware.udea.editor.EditorAnimation
+import dev.wildware.udea.editor.EditorSession
+import dev.wildware.udea.editor.EditorSpawn
+import dev.wildware.udea.editor.EditorTools
+import dev.wildware.udea.editor.EditorViews
+import dev.wildware.udea.editor.gizmo.GizmoMarkLayer
+import dev.wildware.udea.generated.CoreUdeaRegistry
+import dev.wildware.udea.render.RenderPhase
+import dev.wildware.udea.render.RenderRegistry
+import dev.wildware.udea.render.backend.KoolBackend
+import dev.wildware.udea.render.backend.WindowConfig
+import dev.wildware.udea.render.capture.CaptureRequest
+import dev.wildware.udea.render.capture.CaptureResult
+import dev.wildware.udea.render.capture.FrameCaptureSlot
+import dev.wildware.udea.render.capture.capture
+import dev.wildware.udea.render.model.ModelCamera
+import dev.wildware.udea.render.model.ModelLight
+import dev.wildware.udea.render.model.ModelPreview
+import dev.wildware.udea.render.model.ModelRenderSystem
+import dev.wildware.udea.render.model.ModelRenderer
+import dev.wildware.udea.render.model.ModelSkeleton
+import dev.wildware.udea.render.model.loadModel
+import dev.wildware.udea.render.view.EditorCamera
+import dev.wildware.udea.render.view.ViewDimension
+import dev.wildware.udea.render.view.ViewPoint
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.nio.file.Path
+import javax.imageio.ImageIO
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.sqrt
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+/**
+ * The Animation panel's scrub preview and bone overlay, through a real Kool context, on the Khronos
+ * Fox (issue #243).
+ *
+ * The editor is a real [EditorSession] with the panel, over a real backend drawing the Fox with its
+ * `ModelRenderSystem`. Its tool calls are answered by hand, as `EditorSessionTest` answers them: the
+ * only one this test needs is `editor.selection`, which says the Fox is selected. The panel's own
+ * controls - preview, scrub - are pressed through its state, on the render thread.
+ *
+ * The world is paused before the first frame and never ticks, so every picture here differs from
+ * another only by what the editor did.
+ *
+ * - **Scrubbing** moves the Fox in the Scene tab: two clip times draw two different silhouettes.
+ *   The capturable frame - `render.screenshot` - is the same to the byte at both, and the world's
+ *   `WorldHasher` hash is the same before, during and after. Leaving the preview draws the Scene tab
+ *   exactly as it was before it.
+ * - **The bone overlay** draws a dot on every joint the renderer reports, at the pixel the Scene
+ *   camera puts it, and the joints lie on the Fox: each is within a few pixels of the Fox's own
+ *   silhouette, drawn without the overlay. Between two clip times the joints move. Not one overlay
+ *   pixel is in the capturable frame, nor in the Game tab with its gizmo toggle on.
+ *
+ * One `@Test`: Kool allows one context per JVM.
+ */
+class GlAnimationPreviewTest {
+
+    private val walk = AnimationClip(index = 1, name = "Walk", length = Ticks(43L))
+    private val clips = listOf(
+        AnimationClip(index = 0, name = "Survey", length = Ticks(205L)),
+        walk,
+        AnimationClip(index = 2, name = "Run", length = Ticks(70L)),
+    )
+
+    private val camera = ModelCamera().apply { lookAt(0f, -5.5f, 1.6f, 0f, 0f, 0.8f) }
+    private val light = ModelLight(directionX = -0.4f, directionY = 0.7f, directionZ = -1f)
+
+    @Test
+    fun `scrubbing moves the fox in the Scene tab alone, and its bones are drawn on its joints`() {
+        GlAvailabilityHere.require()
+        val fox = loadModel(exampleAssets(), Model(AssetId("models/fox"), ResPath("models/fox/Fox.glb")))
+
+        val registry = RenderRegistry()
+        lateinit var models: ModelRenderSystem
+        registry.register(RenderPhase.World, { resources -> ModelRenderSystem(resources, camera, light).also { models = it } })
+        val backend = KoolBackend.start(
+            RenderMode.Offscreen,
+            WindowConfig(title = "udea-animation-preview", windowWidth = WIDTH, windowHeight = HEIGHT, renderWidth = WIDTH, renderHeight = HEIGHT),
+            registry,
+        )
+        try {
+            val host = GameHost(RenderMode.Offscreen, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()), backend)
+            host.loop.paused = true
+            backend.drive(host)
+            val slot = backend.pipeline!!.capture!!
+            val views = EditorViews(
+                backend.openSceneView(EditorCamera().apply { dimension = ViewDimension.ThreeD }),
+                backend.openGameView(),
+            )
+            val netIds = host.ctx[CoreModule.NET_IDS]
+            val id: NetId = backend.onRenderThread {
+                val entity = host.world.entity {
+                    it += Transform3D(rotationZ = (PI / 2).toFloat(), scaleX = SCALE, scaleY = SCALE, scaleZ = SCALE)
+                    it += ModelRenderer(model = fox)
+                    it += Animator().apply { play(walk, host.tick) }
+                }
+                netIds.allocate(entity)
+            }
+            awaitFox { decode(slot.capture(CaptureRequest()).bytes) }
+
+            val bridge = AgentBridge()
+            val author = AgentSessions().intern("editor")
+            val session: EditorSession = backend.onRenderThread {
+                EditorSession(
+                    tools = EditorTools(bridge, author),
+                    tick = { host.tick },
+                    paused = { true },
+                    spawn = EditorSpawn("Spawn", BlueprintId("skeleton"), 0f, 0f),
+                    views = views,
+                    animation = EditorAnimation(host.world, netIds, listOf(AnimatedModel(fox, clips)), models),
+                )
+            }
+            val panel = checkNotNull(session.animation)
+            val hasher = SnapshotService(ComponentRegistry(listOf(Animator.snapshotType())), host.world, host.ctx, netIds)
+            fun worldHash(): Long = backend.onRenderThread { WorldHasher.hash(hasher.capture()) }
+
+            // Select the Fox, as `editor.selection` would say after a click or an agent's `editor.select`.
+            editorFrames(backend, session, bridge, id)
+            backend.onRenderThread { views.scene.showGizmos = false }
+            val hash = worldHash()
+            val simulated = frame(backend, slot, views)
+            backend.onRenderThread { views.scene.showGizmos = true }
+            val simulatedWithBones = frame(backend, slot, views)
+
+            // 1. Scrub to two clip times: the Scene tab moves; the capture and the world do not.
+            backend.onRenderThread { panel.preview(true) }
+            val poses = LinkedHashMap<Long, Frame>()
+            val bare = LinkedHashMap<Long, BufferedImage>()
+            val skeletons = LinkedHashMap<Long, List<FloatArray>>()
+            for (at in SCRUB_TICKS) {
+                backend.onRenderThread { panel.scrub(at) }
+                editorFrames(backend, session, bridge, id)
+                assertEquals(ModelPreview.Pose(id, walk, Ticks(at)), backend.onRenderThread { views.scene.modelPreview })
+                poses[at] = frame(backend, slot, views)
+                skeletons[at] = skeleton(backend, models, id, views)
+                backend.onRenderThread { views.scene.showGizmos = false }
+                bare[at] = frame(backend, slot, views).scene
+                backend.onRenderThread { views.scene.showGizmos = true }
+                save(poses.getValue(at).scene, "animation-preview-scene-at-$at.png")
+            }
+            save(simulated.capture, "animation-preview-capture.png")
+            val first = SCRUB_TICKS.first()
+            val last = SCRUB_TICKS.last()
+            val moved = moved(bare.getValue(first), bare.getValue(last))
+            println("GlAnimationPreviewTest: $moved fox pixels moved in the Scene tab between clip ticks $first and $last")
+            assertTrue(moved >= MIN_MOVED_PIXELS, "scrubbing did not move the fox in the Scene tab: $moved pixels")
+            for ((at, pose) in poses) {
+                assertContentEquals(pixels(simulated.capture), pixels(pose.capture), "scrubbing to $at changed the capturable frame")
+            }
+            assertEquals(hash, worldHash(), "scrubbing changed the world")
+
+            // 2. The bones: a dot on every joint, on the fox, moving with the clip, in no capture.
+            val scene = checkNotNull(views.scene.camera)
+            for ((at, joints) in skeletons) {
+                val picture = poses.getValue(at).scene
+                val silhouette = bare.getValue(at)
+                var dotted = 0
+                var onFox = 0
+                for (joint in joints) {
+                    val view = ViewPoint()
+                    check(backend.onRenderThread { scene.project(joint[0], joint[1], joint[2], view) }) { "a joint is behind the camera" }
+                    val x = view.x.toInt()
+                    val y = picture.height - 1 - view.y.toInt()
+                    if (near(picture, x, y, DOT_REACH, ::isMark)) dotted++
+                    if (near(silhouette, x, y, FOX_REACH, ::isFox)) onFox++
+                }
+                println("GlAnimationPreviewTest: clip tick $at: ${joints.size} joints, $dotted dotted, $onFox on the fox")
+                assertTrue(joints.size >= MIN_JOINTS, "the fox's skeleton has ${joints.size} joints")
+                assertEquals(joints.size, dotted, "at clip tick $at not every joint has its dot where the Scene camera puts it")
+                assertTrue(onFox >= joints.size * ON_FOX_SHARE, "at clip tick $at only $onFox of ${joints.size} joints are on the fox")
+                assertEquals(0, count(poses.getValue(at).capture, ::isMark), "the bone overlay reached the capturable frame")
+            }
+            val travelled = skeletons.getValue(first).zip(skeletons.getValue(last)).maxOf { (a, b) -> distance(a, b) }
+            assertTrue(travelled >= MIN_JOINT_TRAVEL, "no joint moved between clip ticks $first and $last: at most $travelled units")
+            assertTrue(count(simulatedWithBones.scene, ::isMark) >= MIN_MARK_PIXELS, "the Scene tab drew no bones for the selected fox")
+
+            // The Game tab, its gizmo toggle on: the overlay is the Scene tab's alone, so no bones here
+            // either, and none in the capturable frame.
+            backend.onRenderThread { views.game.showGizmos = true }
+            val gameTab = frame(backend, slot, views)
+            save(gameTab.game, "animation-preview-game-tab.png")
+            assertEquals(0, count(gameTab.game, ::isMark), "the Game tab drew bones through the game's 2D camera")
+            assertEquals(0, count(gameTab.capture, ::isMark), "the bone overlay reached the capturable frame")
+            backend.onRenderThread { views.game.showGizmos = false }
+
+            // 3. Leaving the preview draws the simulated pose again, exactly.
+            backend.onRenderThread { panel.preview(false) }
+            editorFrames(backend, session, bridge, id)
+            val after = frame(backend, slot, views)
+            assertEquals(null, backend.onRenderThread { views.scene.modelPreview })
+            assertContentEquals(pixels(simulatedWithBones.scene), pixels(after.scene), "leaving the preview did not bring back the simulated pose")
+            assertEquals(hash, worldHash(), "the preview changed the world")
+        } finally {
+            backend.close()
+        }
+    }
+
+    // --- fixture -------------------------------------------------------------------------
+
+    private class Frame(val capture: BufferedImage, val scene: BufferedImage, val game: BufferedImage)
+
+    /**
+     * A few editor frames on the render thread, answering the editor's calls between them as the
+     * simulation would: `editor.selection` with [selected] as the editor's, and everything else
+     * with an empty answer. Enough for a read to be sent, answered and delivered.
+     */
+    private fun editorFrames(backend: KoolBackend, session: EditorSession, bridge: AgentBridge, selected: NetId) {
+        repeat(EDITOR_FRAMES) {
+            backend.onRenderThread {
+                session.frame()
+                val sent = ArrayList<AgentCommand>()
+                bridge.drain(sent)
+                for (command in sent) {
+                    val answer = when (command.name) {
+                        "editor.selection" -> """{"you":"editor","authors":[{"author":"editor","ids":[${selected.raw}]}]}"""
+                        "editor.history" -> """{"author":"editor","size":0,"edits":[]}"""
+                        else -> "{}"
+                    }
+                    bridge.complete(command.id, AgentResult.Ok(answer))
+                }
+            }
+        }
+    }
+
+    /** The capturable frame and both tabs, requested between two frames so one frame serves all three. */
+    private fun frame(backend: KoolBackend, slot: FrameCaptureSlot, views: EditorViews): Frame {
+        val (capture, scene, game) = backend.onRenderThread { Triple(slot.submit(CaptureRequest()), views.scene.capture(), views.game.capture()) }
+        return Frame(decode(await(capture).bytes), decode(await(scene).bytes), decode(await(game).bytes))
+    }
+
+    /** The Scene tab's skeleton for [id], as the overlay reads it, each joint `x, y, z`. */
+    private fun skeleton(backend: KoolBackend, models: ModelRenderSystem, id: NetId, views: EditorViews): List<FloatArray> =
+        backend.onRenderThread {
+            val out = ModelSkeleton()
+            check(models.skeletonOf(id, views.scene, out)) { "the renderer has no skeleton for the fox" }
+            List(out.size) { floatArrayOf(out.x(it), out.y(it), out.z(it)) }
+        }
+
+    private fun awaitFox(capture: () -> BufferedImage) {
+        var frames = 0
+        do {
+            val pixels = count(capture(), ::isFox)
+            frames++
+        } while (pixels < MIN_FOX_PIXELS && frames < FRAME_BUDGET)
+    }
+
+    private fun await(result: Deferred<CaptureResult>): CaptureResult =
+        runBlocking { withTimeout(CAPTURE_TIMEOUT_MILLIS) { result.await() } }
+
+    private fun isFox(pixel: Int): Boolean =
+        ((pixel ushr 16) and 0xFF) > BACKGROUND || ((pixel ushr 8) and 0xFF) > BACKGROUND || (pixel and 0xFF) > BACKGROUND
+
+    /** The overlay's yellow, `GizmoMarkLayer.MARK_COLOUR`, and nothing on the fox. */
+    private fun isMark(pixel: Int): Boolean {
+        val expected = GizmoMarkLayer.MARK_COLOUR
+        val r = (pixel ushr 16) and 0xFF
+        val g = (pixel ushr 8) and 0xFF
+        val b = pixel and 0xFF
+        return abs(r - (expected.r * 255).toInt()) <= MARK_TOLERANCE &&
+            abs(g - (expected.g * 255).toInt()) <= MARK_TOLERANCE &&
+            abs(b - (expected.b * 255).toInt()) <= MARK_TOLERANCE
+    }
+
+    /** Whether a pixel within [reach] of ([x], [y]) in [image] passes [test]. */
+    private fun near(image: BufferedImage, x: Int, y: Int, reach: Int, test: (Int) -> Boolean): Boolean {
+        for (dy in -reach..reach) for (dx in -reach..reach) {
+            val px = x + dx
+            val py = y + dy
+            if (px in 0 until image.width && py in 0 until image.height && test(image.getRGB(px, py))) return true
+        }
+        return false
+    }
+
+    private fun moved(a: BufferedImage, b: BufferedImage): Int {
+        var n = 0
+        for (y in 0 until a.height) for (x in 0 until a.width) if (isFox(a.getRGB(x, y)) != isFox(b.getRGB(x, y))) n++
+        return n
+    }
+
+    private fun count(image: BufferedImage, test: (Int) -> Boolean): Int {
+        var n = 0
+        for (y in 0 until image.height) for (x in 0 until image.width) if (test(image.getRGB(x, y))) n++
+        return n
+    }
+
+    private fun distance(a: FloatArray, b: FloatArray): Float {
+        val dx = a[0] - b[0]
+        val dy = a[1] - b[1]
+        val dz = a[2] - b[2]
+        return sqrt(dx * dx + dy * dy + dz * dz)
+    }
+
+    private fun pixels(image: BufferedImage): IntArray = image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
+
+    private fun decode(png: ByteArray): BufferedImage = ImageIO.read(ByteArrayInputStream(png))
+        ?: error("the captured bytes are not a decodable image")
+
+    private fun exampleAssets(): Path = Path.of(
+        System.getProperty("udea.render.exampleAssets") ?: error("-Dudea.render.exampleAssets is not set"),
+    )
+
+    private fun save(image: BufferedImage, name: String) {
+        val dir = System.getProperty("udea.render.glReportDir") ?: return
+        File(dir).mkdirs()
+        ImageIO.write(image, "png", File(dir, name))
+    }
+
+    private companion object {
+        const val WIDTH = 480
+        const val HEIGHT = 320
+
+        /** World units per unit of the file: a fox about 1.6 tall. */
+        const val SCALE = 0.02f
+
+        /** Walk's clip ticks the scrubber visits: its start, a quarter and a half of its 43-tick stride. */
+        val SCRUB_TICKS = listOf(0L, 11L, 21L)
+
+        /** Enough editor frames for a read to be sent, answered, and its answer delivered and drawn. */
+        const val EDITOR_FRAMES = 4
+
+        const val BACKGROUND = 12
+        const val MIN_FOX_PIXELS = 5_000
+        const val FRAME_BUDGET = 400
+        const val MIN_MOVED_PIXELS = 150
+        const val CAPTURE_TIMEOUT_MILLIS = 20_000L
+
+        /** A skinned fox has dozens of joints; fewer than this is not its skeleton. */
+        const val MIN_JOINTS = 10
+
+        /** A joint's dot is drawn centred on its pixel; this far off still counts as on it. */
+        const val DOT_REACH = 2
+
+        /** A joint lies inside the body, or at a paw or ear tip within this many pixels of it. */
+        const val FOX_REACH = 4
+
+        /** The share of joints that must be on the fox's silhouette. */
+        const val ON_FOX_SHARE = 0.9
+
+        /** World units the farthest-moving joint must travel between two clip times a half stride apart. */
+        const val MIN_JOINT_TRAVEL = 0.05f
+
+        /** Overlay pixels a drawn skeleton leaves at the very least. */
+        const val MIN_MARK_PIXELS = 100
+
+        /** How far a channel may be from the overlay's yellow: blending at a dot's edge. */
+        const val MARK_TOLERANCE = 6
+    }
+}

@@ -58,17 +58,19 @@ alternative was, why this one, and what to change if the user disagrees. That
 last part is what makes it reviewable rather than a notification - a comment
 saying "I chose A" is worth nothing to somebody deciding whether A was right.
 
-Every question the run produces ends up in one of two places: a comment on the
-issue, or a new issue of its own. Never in a message that waits for a reply, and
-never dropped because the run finished before anyone answered.
+Every question the run produces ends up as a comment on the issue it belongs
+to, or in your report. Never in a message that waits for a reply, never dropped
+because the run finished before anyone answered, and **never in a new issue: the
+owner's rule is no `gh issue create`, by anyone on the team.** Fix it on the
+branch, or fold it into an existing ticket with a comment.
 
 Two things this project makes tempting to ask about, and you must not:
 
 | Question you wanted to ask | What to do instead |
 |---|---|
-| "Should `kmp` merge into `master`?" | Only as #214, when `sh gradlew build` on `kmp` is fully green. Before that, never. Work on `kmp`, merge to `kmp`, push `kmp`. |
-| "This needs a frozen contract changed" | Stop the ticket and say so. `docs/contracts/` is frozen; `AGENTS.md` says frozen means frozen. File an issue describing the change and what it would break, and take a different ticket. **One owner-approved exception:** #202 replaces `ServiceLoader` discovery with a generated registry (spec D7) and edits `docs/contracts/agent-tools.md` plus `contracts.lock`. That ticket, and only that ticket, may. |
-| "Is this out of scope?" | It is. File it as its own issue and carry on |
+| "Which branch does this go on?" | `master`. Branch from `origin/master`, merge into `master`, push `master`. `kmp` merged in #214 and is retired, as `example` was before it. |
+| "This needs a frozen contract changed" | Stop the ticket and say so. `docs/contracts/` is frozen; `AGENTS.md` says frozen means frozen. Comment on the issue what the change is and what it would break, and take a different ticket. No ticket has a standing exception: #202 (the generated registry, spec D7) and #214 (a stale source-set path) each had one from the owner, and both are merged. |
+| "Is this out of scope?" | It is. Put it in the report, or comment it on an existing ticket, and carry on. Never a new issue. |
 | "Which of these two designs?" | Pick the one the issue text supports, comment the other |
 | "Should I merge this?" | A reviewer's PASS is the sign-off. Merge it. |
 
@@ -77,38 +79,25 @@ rule is that nothing *waits* on them.
 
 ## Where the work lands
 
-**The integration branch is `kmp`.** Udea is being ported to Kool rendering and
-Kotlin Multiplatform, big bang. The authority for that work, above `HANDOFF.md`
-and above any old ticket, is the spec:
+**The integration branch is `master`.** Developers branch from `origin/master`,
+you merge into `master`, and you push `origin master`. It moves; read
+`git log --oneline -1 origin/master` rather than trusting a SHA written here.
 
-    docs/superpowers/specs/2026-09-16-kool-kmp-port-design.md   (on `kmp`)
+Two branches are retired and must never be branched from, merged into or pushed:
+`kmp`, where the Kool/KMP port (epic #199) was built and which merged into
+`master` as #214, and `example` before it. The port's spec is still the authority
+on rendering and targets, above any old ticket:
 
-Epic #199 lists its tickets (#200-#214) in dependency order; the spec's section 9
-says which can run in parallel. On 2026-09-16 the owner fast-forwarded `master`
-to `example`, retired the `example` **branch** (the `example` **module** is old
-tree and is deleted by #213), closed every old issue except the ComposeGL ones
-(#185, #188, #189), and cut `kmp` from `master`.
+    docs/superpowers/specs/2026-09-16-kool-kmp-port-design.md
 
-So: developers branch from `origin/kmp`, you merge into `kmp`, and you push
-`origin kmp`. `kmp` merges into `master` exactly once, as #214, when
-`sh gradlew build` is fully green. The `example` branch is dead - never branch
-from it, merge into it or push it. It moves; read `git log --oneline -1 origin/kmp`
-rather than trusting a SHA written here.
+**`master` is green**, so there is no baseline of known failures to subtract. A
+task that fails on a branch is the branch's - except a wall-clock latency budget,
+which is re-run alone before anyone believes it (see the developer contract). The
+lead keeps the `master` SHA the current wave was cut from at the top of
+`.claude/WAVE.md`, and refreshes it after every merge.
 
-**`kmp` is allowed to be red mid-port** (spec D9). That changes what "green"
-means for a ticket, and it is the one rule in this skill that is new:
-
-- Every ticket names, in its `BRIEF-<N>.md`, **the Gradle tasks it turned green**
-  (e.g. `:udea-core:jvmTest :udea-core:wasmJsNodeTest`). Those must be green.
-- Nothing that was green on `origin/kmp` may go red. The lead keeps the
-  current baseline - the list of failing tasks from
-  `sh gradlew build --continue` on `origin/kmp` - at the top of `.claude/WAVE.md`,
-  with the SHA it was taken at, and refreshes it after every merge.
-- A task newly failing on the branch that passes on the baseline is a red build,
-  exactly as before. A task already failing on the baseline is not the branch's.
-
-Read `.claude/WAVE.md` first. `HANDOFF.md` is pre-port history: useful for what
-`:moba:runUdpProof` does, stale for anything about branches or LibGDX.
+Read `.claude/WAVE.md` first. `HANDOFF.md` is a pointer at the documents that
+carry the state, not a snapshot of it.
 
 ## Roles
 
@@ -158,11 +147,8 @@ digraph loop {
 `gh issue list` unless the user named one. Read the body **and the comments**
 with `gh issue view N` and paste the body verbatim into the dispatch prompt.
 
-**The backlog was reset on 2026-09-16.** Every open issue is either a port
-ticket under #199 or a ComposeGL ticket (#185, #188, #189). Dispatch in the
-spec's order: a ticket whose "Needs #N" names an unmerged ticket is not ready,
-whatever else is free. #188's HUD composables stay; they now target
-`composegl-kool` (#210), not `composegl-gdx`.
+Dispatch in dependency order: a ticket whose "Needs #N" names an unmerged
+ticket is not ready, whatever else is free.
 
 **What you dispatch is the wave, and the wave is closed once you have
 dispatched it.** When one developer finishes and a slot frees, do not put
@@ -177,9 +163,9 @@ or 2. If two issues genuinely cannot be separated, say so and pick the one that
 ships alone.
 
 **Size the ticket before you dispatch it.** If the issue names more than about
-three acceptance criteria, or its scope is "and while we are there", split it
-into issues yourself with `gh issue create`, dispatch the first, and comment on
-the original saying what you split and why. A ticket that cannot be reviewed in
+three acceptance criteria, or its scope is "and while we are there", dispatch
+the first part and comment on the issue what is left for a later wave - not a
+new issue, which the owner's rule forbids. A ticket that cannot be reviewed in
 one pass will not be reviewed in one round.
 
 **Never run two tickets that edit the same module.** Two codegen tickets will
@@ -199,7 +185,7 @@ so they run concurrently.
 The developer prompt MUST contain, in this order:
 
 1. The issue number, title and full body, verbatim.
-2. The branch name: `issue-<N>-<slug>`, **branched from `origin/kmp`**.
+2. The branch name: `issue-<N>-<slug>`, **branched from `origin/master`**.
 3. Any decision you have already made on the ticket, stated as decided - not as
    a question.
 4. "Use superpowers:test-driven-development. Failing test first."
@@ -235,8 +221,9 @@ The moment a developer reports finished, spawn a `reviewer` agent named
    anything the fixes visibly broke. Nothing else. Anything real that no earlier
    round raised goes under out-of-scope and does not fail the branch."
 6. The verification contract from **Reviewer contract** below, copied in.
-7. **The `kmp` baseline** from the top of `.claude/WAVE.md`: the SHA and its
-   failing tasks, and the tasks the brief claims it turned green.
+7. **The `master` SHA** from the top of `.claude/WAVE.md` that the branch was
+   cut from, and the rule that goes with it: `master` is green, so a failing
+   task on the branch is the branch's.
 
 **Dispatch against a SHA and have the reviewer check it out detached.** Freezing
 a developer's tree is honour-based and it fails. A detached checkout cannot move:
@@ -270,11 +257,12 @@ by someone it never met.
 When the developer reports back, go to step 3 with N+1 and a brand new reviewer.
 
 **Every finding goes back to the developer.** A finding is not a ticket. You do
-not file a card for something the reviewer blocked on, and you do not merge with
-one outstanding on the grounds that it is small. Cards are for the reviewer's
-`Out of scope - not findings` section: real problems this ticket did not create,
+not set aside something the reviewer blocked on, and you do not merge with one
+outstanding on the grounds that it is small. The reviewer's `Out of scope - not
+findings` section is the other kind: real problems this ticket did not create,
 which the developer must not be asked to fix because fixing them would put
-changes in the branch that nobody reviewed.
+changes in the branch that nobody reviewed. They go in your report, and a
+substantial one is commented on an existing ticket.
 
 **Then update the ledger.** Copy every judgement from the verdict's "judgements
 made this round" into the list you pass to the next reviewer. This is the single
@@ -285,17 +273,16 @@ the review can hold, not that the developer is careless. Ask the round-3
 reviewer what the smallest shippable version is, then:
 
 - Take the part that passes. Merge it.
-- `gh issue create` for what is left, referencing the original, with the
-  outstanding findings pasted in verbatim.
-- Comment both issues saying what you split and why.
+- Comment on the issue what is left, with the outstanding findings pasted in
+  verbatim, and leave it open for a later wave. No new issue.
 
 This is not giving up and it does not need the user's permission. A merged
-feature plus a card beats a branch on round 7. Only keep looping past round 3 if
+feature plus a comment beats a branch on round 7. Only keep looping past round 3 if
 every outstanding finding is on the closed reject list, in which case say so in
 your report and carry on.
 
 **PASS** - `TaskStop` the reviewer and the developer, **merge the branch into
-`kmp`** (see **Merging** below), run the cleanup checklist, and report to the
+`master`** (see **Merging** below), run the cleanup checklist, and report to the
 user: what shipped, the branch, the round count, and the evidence.
 
 A reviewer's PASS is the sign-off. You do not need to ask again before merging.
@@ -342,19 +329,15 @@ Copy this block into every developer prompt.
 Udea. Kotlin 2.4.20, KSP 2.3.12, Gradle 8.13, JDK 21. `gradle/libs.versions.toml`
 is the authority for every version.
 
-THE PORT. You are working on `kmp`: Udea is moving to Kool rendering and Kotlin
-Multiplatform (JVM, Android, Wasm, iOS). Read the spec before you start:
-docs/superpowers/specs/2026-09-16-kool-kmp-port-design.md. Its decision table (D1-D12) is
-settled - do not re-argue it in code. Where your ticket and the spec disagree, the
-ticket's "Needs" and acceptance criteria win for scope, the spec wins for design,
-and you comment the disagreement on the issue.
+THE BRANCH. `master`, and it is green: branch from `origin/master`, and every task
+that fails on your branch is yours. `kmp` and `example` are retired; never branch
+from, merge into or push either.
 
-  - `kmp` MAY BE RED. Before your first change, run
-      JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue
-    on your fresh branch and save the list of failing tasks: that is YOUR baseline.
-    Your ticket must turn its named tasks green and must not turn any baseline-green
-    task red. Put both lists in BRIEF-<N>.md: "tasks this ticket turned green" and
-    "baseline failures, unchanged".
+THE PLATFORMS. Udea renders with Kool and builds for Kotlin Multiplatform (JVM,
+Android, Wasm, iOS); `AGENTS.md` says which module has which targets, and the port
+spec (docs/superpowers/specs/2026-09-16-kool-kmp-port-design.md) says why. Its
+decision table (D1-D12) is settled - do not re-argue it in code.
+
   - iOS CANNOT BUILD ON THIS BOX. Kotlin/Native needs macOS for iOS targets; on Linux
     those tasks are skipped or disabled. Do not report iOS as tested. CI's macOS runner
     is where iOS runs; if your ticket adds iOS code, push the branch and read the run.
@@ -366,13 +349,16 @@ and you comment the disagreement on the issue.
   - No `java.*`/`javax.*` import in a `commonMain` source set - the compiler enforces
     it, and a reviewer will not accept an `expect`/`actual` whose `jvm` side is the only
     real one while the others `TODO()`.
-  - Kool and ComposeGL backends live ONLY in `udea-render` (spec section 3).
+  - Kool and ComposeGL backends live ONLY in `udea-render` (spec section 3), and every
+    `scene.player` or ComposeGL toolkit call happens on the Kool render thread
+    (engineering standards section 2, issue #224).
+  - WEB IS SHELVED (#223, #226): nothing that draws has a wasmJs target.
 
 THERE IS NO ART STEP, AND YOU TYPE NOTHING. `moba/game/assets/sprites/` is gitignored
 third-party licensed art, so a fresh worktree carries none of it - and it does
-not need to. The build stages it: `:moba:udeaStageCharacterArt` copies the sheets
-out of `example/src/main/resources/assets/sprites/`, where they already are,
-ahead of the asset pipeline, on every build. A clone builds, and `git status`
+not need to. The build stages it: `:moba:game:udeaStageCharacterArt` copies the
+sheets out of `example-assets/sprites/`, where they already are, ahead of the
+asset pipeline, on every build. A clone builds, and `git status`
 stays clean because everything it writes is gitignored.
 
 So run nothing before your first build. A UDEA0032 about a `spritePath` is a REAL
@@ -382,12 +368,10 @@ hand, it is stale: the script it names was deleted by #170.
 
 THE BUILD. One command, no exclusions:
 
-    JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build
+    ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build
 
-`AGENTS.md` and `CLAUDE.md` both say it: no `-x`. On `kmp` the build may be red
-mid-port (see THE PORT above): add `--continue` so every task runs, and compare the
-failing tasks with your baseline. A task red on your branch and green on the
-baseline is your change.
+`AGENTS.md` and `CLAUDE.md` both say it: no `-x`. Add `--continue` so one red task
+does not hide the next; every task that fails is your change.
 
 TWO THINGS ABOUT THAT COMMAND LINE ARE NOT DECORATION. Both were measured on
 this box, and each fails in a way that names no cause.
@@ -399,7 +383,7 @@ this box, and each fails in a way that names no cause.
   for readers; on this box you type `sh gradlew`.
 
   This bites the bridge too: the generated `gamebridge.json` names
-  `./gradlew :moba:run -PdebugPort={port}`, so `launch_instance` fails the same
+  `./gradlew :moba:desktop:run -PdebugPort={port}`, so `launch_instance` fails the same
   way. Fix it in your worktree with `chmod +x gradlew` - and NEVER `git add`
   that mode change. It shows as `M gradlew` and a reviewer will read a mode flip
   on the wrapper as a finding.
@@ -441,20 +425,17 @@ THREE GATES OUTSIDE `check`, run by name, each deliberately excluded for a
 reason stated in its own KDoc - wall-clock timing across forked JVMs, or a GL
 driver CI may not have. Do NOT "fix" that by wiring them into `check`:
 
-    sh gradlew :moba:runUdpProof     # three OS processes, real UDP. RED TODAY - see below
-    sh gradlew :moba:runLaneShot     # lane PNGs, needs a real GL context
-    sh gradlew udeaVerifyModuleGraph udeaVerifyNoLegacyDependencies udeaVerifyAgentsMd
+    sh gradlew :moba:desktop:runUdpProof     # three OS processes, real UDP
+    sh gradlew :moba:desktop:runLaneShot     # lane PNGs, needs a real GL context
+    sh gradlew udeaVerifyModuleGraph udeaVerifyAgentsMd
 
-`:moba:runUdpProof` FAILS under 5% loss, 5/5, and it failed before you got here.
-`HANDOFF.md` documents it. Do not report it as your regression, and do not
-report it as fixed without the numbers. Note the retraction that came with it:
-the earlier "57/57 under loss" claim does NOT hold against a churning creep
-population and must not be repeated.
+`:moba:desktop:runUdpProof` has been green since #219, lossy leg included. It is
+wall-clock across three processes, so re-run a red one alone before believing it;
+a red that survives that is your branch's.
 
 THE FROZEN CONTRACTS. `docs/contracts/` is frozen. If your work needs one to
 change, STOP and say so in your report - do not change it and carry on. That is
-`AGENTS.md`, verbatim. The single owner-approved exception is #202 (generated
-registry replaces ServiceLoader, spec D7); no other ticket may touch a contract.
+`AGENTS.md`, verbatim. No ticket has a standing exception.
 The invariant most worth repeating, because breaking it is silent:
 `fieldNames[i]` == FieldMask bit *i* == FieldStore field index *i*.
 `desync_report` names the differing field by indexing `fieldNames` with each set
@@ -478,19 +459,20 @@ they shift for every component after yours in sorted-FQN order.
 
 YOUR EVIDENCE COMMAND. Name exactly ONE in BRIEF.md, complete and ready to
 paste, and PROVE IT CAN FAIL - revert the feature, run it, watch it go red, put
-it back. A command that passes on `origin/kmp` asserts nothing about your
+it back. A command that passes on `origin/master` asserts nothing about your
 branch. Pick from what already exists; you are not asked to build a harness:
 
   | Ticket shape | Evidence command | What it leaves behind |
   |---|---|---|
-  | moba combat, HUD, match flow | sh gradlew :moba:runMatchShot | moba/build/reports/udea/match/*.png |
-  | lane, creeps, towers, gold | sh gradlew :moba:runLaneShot | moba/build/reports/udea/lane/*.png |
-  | characters, sprites, roster | sh gradlew :moba:runShot | moba/build/reports/udea/roster.png |
-  | replication, snapshots, desync | sh gradlew :moba:runNetProof | transcript: three hashes that must agree |
-  | real UDP over 3 processes | sh gradlew :moba:runUdpProof | test report (RED today) |
+  | moba combat, HUD, match flow | sh gradlew :moba:desktop:runMatchShot | moba/desktop/build/reports/udea/match/*.png |
+  | lane, creeps, towers, gold | sh gradlew :moba:desktop:runLaneShot | moba/desktop/build/reports/udea/lane/*.png |
+  | characters, sprites, roster | sh gradlew :moba:desktop:runShot | moba/desktop/build/reports/udea/roster.png |
+  | replication, snapshots, desync | sh gradlew :moba:desktop:runNetProof | transcript: three hashes that must agree |
+  | real UDP over 3 processes | sh gradlew :moba:desktop:runUdpProof | test report |
   | determinism, replay, bisect | a recorded .udearep replayed back, or sh gradlew udeaVerifyDeterminism | replay/verifier report |
-  | the agent tool surface | a live :moba:run -PdebugPort=N session driven over the bridge | render.screenshot PNGs |
-  | module graph, migration, build logic | sh gradlew udeaVerifyModuleGraph udeaVerifyMigration udeaLegacyReport udeaVerifyAgentsMd | task output |
+  | the agent tool surface | a live :moba:desktop:run -PdebugPort=N session driven over the bridge | render.screenshot PNGs |
+  | the editor | sh gradlew :moba:desktop:runEditor, driven over the same bridge | render.screenshot PNGs |
+  | module graph, build logic | sh gradlew udeaVerifyModuleGraph udeaVerifyAgentsMd, plus build-logic's own tests (sh gradlew -p build-logic check) | task output |
   | codegen, KSP, compiler plugin, contracts | your named test classes + a spliced transcript | test report |
 
   Where a scenario genuinely cannot hold the feature, say so plainly in BRIEF.md
@@ -514,10 +496,10 @@ agent would call. Compiling is not evidence.
 
   Or without the bridge:
 
-    sh gradlew :moba:run -PdebugPort=7841 --console=plain
+    sh gradlew :moba:desktop:run -PdebugPort=7841 --console=plain
 
   `/health` reports the RenderMode so you know which toolsets are live before
-  calling one. `moba.agent` defaults to Offscreen: a real LWJGL3 context, no
+  calling one. `moba.agent` defaults to Offscreen: a real Kool context, no
   window, full screenshots. In Headless every render tool correctly answers
   `no_render_context` - that is the contract working, not a fault.
 
@@ -532,7 +514,7 @@ IMAGES - the user watches these in a live gallery, so post them:
       tools/screenshot-gallery.py --port 8001
     over /srv/ssd1/workspace/Udea/build/debug-screenshots/
   - So copy every shot across:
-      cp <worktree>/moba/build/reports/udea/match/*.png \
+      cp <worktree>/moba/desktop/build/reports/udea/match/*.png \
          /srv/ssd1/workspace/Udea/build/debug-screenshots/
   - Name them issue<N>-<what-it-shows>.png, e.g. issue131-lane-gold-on-lasthit.png
   - Post one for every notable change: the before state, the thing happening,
@@ -555,7 +537,8 @@ IMAGES - the user watches these in a live gallery, so post them:
 Do not ask the user anything and do not ask the lead a question you expect a
 human to answer - nobody is at the keyboard. Make the call, say in your report
 what you decided and what you rejected, and comment it on the issue with
-`gh issue comment <N>` so it is reviewable later.
+`gh issue comment <N>` so it is reviewable later. NEVER `gh issue create`: that is
+the owner's rule. Anything out of scope goes in BRIEF.md and your report.
 
 BRIEF.md, in the root of your worktree, is your deliverable. It contains:
   0. The SHA - `git rev-parse --short HEAD`, on its own line at the top.
@@ -584,11 +567,13 @@ diff against the closed reject list the reviewer is given:
     - Wall-clock or unseeded randomness inside simulation code
     - A `TODO()`, a stubbed return, or a swallowed exception on a reachable path
     - Copy-pasted logic that differs only in a constant
+    - GL, Kool or a ComposeGL backend outside `udea-render`, or a scene or
+      ComposeGL toolkit call made off the Kool render thread
   AGENTS.md "Do not":
     - `by net(...)`; a separate snapshot codec; setter instrumentation for dirty
       tracking; `System.currentTimeMillis` / `nanoTime` / `Instant.now` inside
-      `Simulation.step()`; `Math.random` / `Random.Default`; a new module
-      depending on `common`; reflection on a per-tick path; a bare
+      `Simulation.step()`; `Math.random` / `Random.Default`; anything resolving
+      LibGDX; reflection on a per-tick path; a bare
       Int/Long/String for a domain concept; GL outside `udea-render`; a
       presentation system implemented as a Fleks system; a module arrow pointing
       upward
@@ -600,7 +585,7 @@ Then, on the evidence:
   - Does every acceptance criterion have a test result, a transcript or a picture?
   - Does the brief claim anything nothing shows? Take the shot or drop the claim.
   - Would the test fail if the feature were reverted? If it passes on
-    `origin/kmp` it is not a test.
+    `origin/master` it is not a test.
   - What did you not exercise - the empty case, the full case, the boundary the
     design is built around, the second time through, the way back out?
 
@@ -609,13 +594,13 @@ reviewer handed a SHA is ruling on that state, and a commit landing underneath
 invalidates a review that is already half written. Even a fix you are certain of
 waits - send it to the lead as a note and let it land with the next round.
 
-Done means: failing test written first and now passing, `sh gradlew build --continue`
-with no exclusions showing your named tasks green and no baseline-green task red, the GL tests run for real under xvfb if the ticket touches
+Done means: failing test written first and now passing, `sh gradlew build` green
+with no exclusions, the GL tests run for real under xvfb if the ticket touches
 GL, an evidence command that goes red when the feature is reverted, the feature
 driven for real where there is something to drive, images copied to the gallery,
 every acceptance criterion proved, your own pass over the diff and the brief
 done, BRIEF.md written with its SHA and its evidence command, and work committed
-on your branch off `origin/kmp`. Report the actual output. If something is
+on your branch off `origin/master`. Report the actual output. If something is
 broken, say so - do not report done on a red build.
 ```
 
@@ -624,7 +609,7 @@ broken, say so - do not report done on a red build.
 Copy this block into every reviewer prompt.
 
 ```
-You are judging this branch before it merges into `kmp`, the Kool/KMP port branch. Your default is
+You are judging this branch before it merges into `master`. Your default is
 FAIL, but ONLY for the things on the closed list below.
 
 **You review three things: the diff, BRIEF.md, and what the evidence command
@@ -632,7 +617,7 @@ leaves behind.**
 
 1. THE EVIDENCE COMMAND. The brief names exactly one and gives it to you
    complete. Run it from the detached checkout you were given, so it is the
-   branch's tree and not `kmp`'s. Read what it wrote.
+   branch's tree and not `master`'s. Read what it wrote.
 
    A missing evidence command is a FAIL. An evidence command that does not run
    is a FAIL. An evidence command the brief admits also passes with the feature
@@ -641,17 +626,15 @@ leaves behind.**
 2. THE BUILD. The brief carries its output; that is the developer's *claim*.
    **Re-run it yourself on the checkout:**
 
-     JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue
+     ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue
 
    No `-x` exclusions - that is `CLAUDE.md`, and a build run with an exclusion
    is not this repository's build.
 
-   `kmp` MAY BE RED MID-PORT. So the rule is: every task the brief names as
-   "turned green" must be green on your checkout, and no task that passes on
-   `origin/kmp` may fail on the branch. Your prompt carries the lead's baseline
-   (failing tasks on `origin/kmp` and the SHA). A task failing on the branch
-   that is not on that list: run it alone on a detached `origin/kmp` checkout;
-   if it passes there, it is a FAIL. A baseline failure is not a finding.
+   `master` IS GREEN, so a task failing on the branch is a FAIL - unless it
+   also fails alone on a detached checkout of the `master` SHA in your prompt,
+   in which case say so and do not charge it to the branch. A wall-clock
+   latency budget gets that solo re-run before you believe it either way.
    iOS tasks cannot run on this Linux box; do not fail a branch for that, and do
    not accept a brief that claims iOS was tested here.
 
@@ -668,7 +651,7 @@ leaves behind.**
    `-Pudea.render.requireGl=true`. Without it those tests SKIPPED and the brief
    is reporting a green build about a surface nothing tested. That is a finding.
 
-3. THE DIFF. `git diff origin/kmp...<SHA>`. Read it against the list below
+3. THE DIFF. `git diff origin/master...<SHA>`. Read it against the list below
    and against the issue text.
 
 4. THE IMAGES it names, in /srv/ssd1/workspace/Udea/build/debug-screenshots/.
@@ -690,6 +673,8 @@ From `docs/engineering-standards.md` section 8 - "what a reviewer must reject":
   6. Wall-clock or unseeded randomness inside simulation code.
   7. A `TODO()`, a stubbed return, or a swallowed exception on a reachable path.
   8. Copy-pasted logic that differs only in a constant.
+  8b. GL, Kool or a ComposeGL backend outside `udea-render`, or a scene or
+     ComposeGL toolkit call made off the Kool render thread (section 2).
 
 From `AGENTS.md` "Do not":
 
@@ -700,7 +685,7 @@ From `AGENTS.md` "Do not":
      `Simulation.step()`.
  13. `Math.random` or `Random.Default` in simulation; randomness is `RngService`
      and its named stream.
- 14. Anything new depending on `common`.
+ 14. Anything resolving LibGDX (`UDEA-MG-009`); it left the tree in #213.
  15. Reflection on a per-tick path.
  16. A bare `Int`/`Long`/`String` for a domain concept.
  17. GL outside `udea-render`; a presentation system implemented as a Fleks
@@ -710,8 +695,8 @@ From `AGENTS.md` "Do not":
 And four this repository's own documents make blocking:
 
  18. A file in `docs/contracts/` changed. Frozen means frozen; if the ticket
-     needed one changed, the ticket should have stopped. Sole exception: #202,
-     which the owner approved to replace ServiceLoader discovery (spec D7).
+     needed one changed, the ticket should have stopped. No ticket has a
+     standing exception.
  18b. A spec decision (D1-D12 in the Kool/KMP spec) contradicted in code - e.g.
      Kool outside `udea-render`, a `java.*` import in `commonMain`, an
      `expect`/`actual` whose non-JVM sides are `TODO()`.
@@ -794,7 +779,7 @@ what earlier rounds already settled - you do not reopen those.
 
 IF YOU ARE ROUND 3 AND STILL FAILING, say so at the top of your report and tell
 the lead what the smallest shippable version of this ticket is: what to merge
-now, what to split into a new issue.
+now, and what to leave on the issue for later.
 
 ## Your verdict
 
@@ -815,25 +800,25 @@ then the out-of-scope section.
 
 Weigh the two costs honestly. A FAIL costs a developer round trip, a fresh
 reviewer and another pass over the same diff. A PASS on something imperfect
-costs a card. If the feature works, meets the standards and does what the ticket
-asked, PASS IT AND FILE THE CARD.
+costs a line in the lead's report. If the feature works, meets the standards and
+does what the ticket asked, PASS IT AND LIST THE REST AS OUT OF SCOPE.
 ```
 
 ## Merging
 
-A PASS is the sign-off. Merge it - **into `kmp`.** Never into `master` (that is
-#214 alone) and never into the retired `example` branch.
+A PASS is the sign-off. Merge it - **into `master`.** Never into the retired
+`kmp` or `example` branches.
 
-**Check the branch against `origin/kmp`, never against a local ref.** The
-developers work in worktrees branched from `origin/kmp`, and a local branch in
+**Check the branch against `origin/master`, never against a local ref.** The
+developers work in worktrees branched from `origin/master`, and a local branch in
 the main repo is routinely behind it. Diffed against a stale ref, a one-commit
 branch looks like it is dragging fifty unrelated commits along.
 
 ```
 cd /srv/ssd1/workspace/Udea
 git fetch origin
-git rev-list --count origin/kmp..<branch>   # what the branch really adds
-git log --oneline origin/kmp..<branch>      # and what those commits are
+git rev-list --count origin/master..<branch>   # what the branch really adds
+git log --oneline origin/master..<branch>      # and what those commits are
 ```
 
 If that count is larger than the work the developer described, stop and tell the
@@ -843,29 +828,28 @@ user before merging - that is a real topology problem. If it matches:
 checkout; nobody but you sees the merged tree.
 
 ```
-git worktree add --detach /tmp/trial-<issue> origin/kmp
+git worktree add --detach /tmp/trial-<issue> origin/master
 git -C /tmp/trial-<issue> merge --no-commit --no-ff <branch>
-( cd /tmp/trial-<issue> && JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue ) 2>&1 | tee /tmp/trial-<issue>.log
+( cd /tmp/trial-<issue> && ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue ) 2>&1 | tee /tmp/trial-<issue>.log
 grep -E '^> Task .* FAILED|^Execution failed for task' /tmp/trial-<issue>.log
 git worktree remove --force /tmp/trial-<issue>
 ```
 
-**The trial is green when** every task the brief names as turned green passes,
-and every failing task is already on the baseline in `.claude/WAVE.md`. A
-failing task that is not on the baseline is a red trial. Run that one task alone
-on a detached `origin/kmp` checkout before you rule: if it fails there too, the
-baseline was stale - fix the baseline, not the verdict.
+**The trial is green when** no task fails. A failing task is a red trial. Run
+that one task alone on a detached `origin/master` checkout before you rule: if it
+fails there too, `master` itself went red - say so to the user, because that is
+the finding, not the branch.
 
-`--detach` is not optional: `kmp` is checked out in the main repository, and
-without it the command fails with `fatal: 'kmp' is already used by worktree`.
+`--detach` is not optional: `master` is checked out in the main repository, and
+without it the command fails with `fatal: 'master' is already used by worktree`.
 That failure is dangerous rather than annoying - the `cd` on the next line then
 fails too, and the `git merge` can still run in the main repo. That has
 happened. Use `git -C <path>` rather than `cd` for every git command, and keep
 the build in its own subshell.
 
 **A clean text merge is not a compiling merge, and on this repository it is not
-even a consistent one.** Two branches that both add a replicated component - or,
-during the port, two branches that both touch the registry codegen (#202) - will
+even a consistent one.** Two branches that both add a replicated component - or
+two that both touch the registry codegen - will
 merge with zero textual conflicts and produce a `net-protocol.lock` and an
 `expected-generated-hashes.txt` that agree with neither branch.
 
@@ -877,73 +861,54 @@ wire contract - and send it **back to the developer** to commit on the branch. A
 regenerated lock is a change nobody reviewed, so it does not go in the merge.
 
 If the trial is red, the merge is the finding: send it back to the developer,
-and leave `kmp` alone. If it is green:
+and leave `master` alone. If it is green:
 
 ```
-git switch kmp
-git merge --ff-only origin/kmp          # catch the local branch up first
+git switch master
+git merge --ff-only origin/master       # catch the local branch up first
 git merge --no-ff <branch>              # then the ticket
-JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue
+ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue
 ```
 
-Run the build once more on merged `kmp` and apply the same rule. Then **refresh
-the baseline** at the top of `.claude/WAVE.md`: the new SHA and its failing tasks.
-The list should only ever shrink; if it grew, the merge is the finding - tell the
-user, and send it back.
+Run the build once more on merged `master` and apply the same rule. Then
+**record the new SHA** at the top of `.claude/WAVE.md`. If anything failed, the
+merge is the finding - tell the user, and send it back.
 
 **Push.** The merge is not finished until it is on `origin`:
 
 ```
-git push origin kmp
+git push origin master
 ```
 
 Do it in the same breath as the merge, before you close the issue. Developers
-branch from `origin/kmp`, so a stale remote makes that instruction wrong, and
+branch from `origin/master`, so a stale remote makes that instruction wrong, and
 they find out by building against a tree missing the work they need.
 
-**Never `git push origin master` outside #214, and never push the `example`
-branch.**
+**Never push `kmp` or `example`.** Both are retired.
 
-## Do not file everything
+## Nothing is filed
 
-**The backlog is growing faster than it shrinks, and that is the process
-failing, not working.** A wave that closes twenty tickets and files thirty-three
-cards has gone backwards. The owner's instruction, in their words: *"do not file
-an issue for everything you discover... if it's something that's not a huge
-issue, just ignore it, and we can pick it up later if it surfaces, if it's a
-substantial bug, then file it."*
+**The owner's rule: never `gh issue create`.** Not for a split, not for a
+reviewer's out-of-scope note, not for a defect found on the way. A problem is
+either fixed on the branch that found it, or folded into an existing ticket
+with a comment, or written into the report - and a small one is dropped, and
+picked up later if it surfaces again.
 
-So the bar for a new issue is **a substantial defect** - something that breaks
-the build, corrupts a contract, desyncs a client, or makes a documented thing
-untrue. Everything else is dropped. Not filed smaller, not filed with a "minor"
-label: **dropped**, and picked up later if it surfaces again.
-
-| Do not file | File |
-|---|---|
-| A comment that counts wrong, a naming inconsistency, prose only a developer reads | A frozen contract that is violated, or a lock file that disagrees with the generator |
-| A pre-existing rough edge nobody is going near | A determinism hole - wall clock or unseeded randomness on a simulation path |
-| "The same helper exists elsewhere" - unless somebody is going there | A replication desync, or a `desync_report` that names the wrong field |
-| An unexercised combination that is coherent by construction | A verifier that passes vacuously - a test or a gate that cannot fail |
-| A skipped GL test on a box with no display | A green build hiding a surface that nothing exercised, where the skip is structural |
-
-**Search open issues before filing.** This backlog already carries five open
-tickets for work that shipped. On the sister project a lead filed a duplicate
-within minutes of a developer filing the original, because it did not search
-first.
-
-A reviewer's `## Out of scope - not findings` section is **not a filing queue**.
-Read it, decide, and file the one item in five that clears the bar. Say in the
+A reviewer's `## Out of scope - not findings` section is **not a queue**. Read
+it, decide, and comment the one item in five that is a substantial defect -
+something that breaks the build, corrupts a contract, desyncs a client, or makes
+a documented thing untrue - on the open ticket it belongs with. Say in the
 closing comment what you dropped and why.
 
-## An issue you do file shows the thing
+## A comment about something visible shows the thing
 
-An issue about something visible that carries no picture is asking the reader to
-take your word for it. `build/debug-screenshots` is gitignored and the gallery
+A comment about something visible that carries no picture is asking the reader
+to take your word for it. `build/debug-screenshots` is gitignored and the gallery
 binds the LAN, so an image only the box can see is no use to a reader.
 
 ```
 cp build/debug-screenshots/<shot>.png docs/issue-media/issue<N>-<what>.png
-git add docs/issue-media && git commit && git push origin kmp
+git add docs/issue-media && git commit && git push origin master
 ```
 
 **Link it, do not embed it.** This repository is private, so GitHub's image proxy
@@ -951,10 +916,10 @@ cannot fetch a raw URL and an inline `![]()` renders broken for everyone. A blob
 link works, because the reader is authenticated when they click it:
 
 ```
-https://github.com/wildware-uk/Udea/blob/kmp/docs/issue-media/<file>.png
+https://github.com/wildware-uk/Udea/blob/master/docs/issue-media/<file>.png
 ```
 
-Say in one line what the frame shows and what it proves. For an issue about
+Say in one line what the frame shows and what it proves. For a comment about
 something with nothing to see - a contract, a build rule, a decision - paste the
 transcript instead and say so.
 
@@ -964,44 +929,44 @@ Run this on PASS, and on abandoning a ticket:
 
 - [ ] `TaskStop` every reviewer spawned for this ticket - all rounds, not just the last
 - [ ] `TaskStop` the developer
-- [ ] Merge per **Merging** above, re-run `sh gradlew build --continue` on merged `kmp`, refresh the baseline in `.claude/WAVE.md`, and `git push origin kmp`
-- [ ] Tick the ticket off in epic #199's checklist
+- [ ] Merge per **Merging** above, re-run `sh gradlew build --continue` on merged `master`, record the SHA in `.claude/WAVE.md`, and `git push origin master`
+- [ ] Tick the ticket off in its epic's checklist, if it has one
 - [ ] `mcp__game-bridge__list_instances` and stop any instance the team left running
 - [ ] Kill orphan Xvfb servers with no clients, after reading `/proc/<pid>/cmdline`
 - [ ] Leave the developer's worktree on disk and say where it is - do not remove it without being asked
 - [ ] Comment every judgement call made during the run on its issue, with the alternative and how to overturn it
-- [ ] Raise an issue only for an out-of-scope note that is a **substantial defect**, and for anything cut at round 3
+- [ ] Comment an out-of-scope note that is a **substantial defect**, and anything cut at round 3, on the open ticket it belongs with - never a new issue
 - [ ] Close the ticket's issue, referencing the merge commit
-- [ ] Report to the user: what merged, the commit, the round count, the evidence, the decisions commented and the issues raised
+- [ ] Report to the user: what merged, the commit, the round count, the evidence, and the decisions commented
 
 ## Red flags - STOP
 
 | Thought | Reality |
 |---|---|
 | "The findings are minor, I'll approve it" | Only a reviewer's PASS ends the loop. Spawn the reviewer. |
-| "Round 4 already, this is good enough" | Round 3 is the escalation point. Cut scope, merge what passes, card the rest - do not quietly approve it. |
+| "Round 4 already, this is good enough" | Round 3 is the escalation point. Cut scope, merge what passes, comment the rest on the issue - do not quietly approve it. |
 | "I'll reuse the reviewer, it has the context" | Context is the bias. New reviewer, every round. |
 | "The reviewer found a KDoc miscount, that's a FAIL" | It is not on the closed list. Out of scope, and the branch passes. |
 | "This is ugly but not on the list" | Then it is not a finding. The list is an enumeration, not a starting point. |
-| "The developer says the build passes" | You run `sh gradlew build --continue` yourself on the trial merge and again on merged `kmp`, against the baseline. |
-| "kmp is red anyway, one more failing task is fine" | A task green on the baseline and red after the merge is a red build. The baseline only shrinks. |
+| "The developer says the build passes" | You run `sh gradlew build --continue` yourself on the trial merge and again on merged `master`. |
+| "One failing task is fine, it's flaky" | `master` is green. Re-run it alone; if it still fails, it is a red build. |
 | "This needs a quick `expect`/`actual` with `TODO()` on wasm/iOS" | That is a stubbed return on a reachable path (item 7) and a spec violation (18b). |
 | "iOS passed" (on this box) | It did not run. iOS builds only on the macOS CI runner. |
 | "It built green, so GL is fine" | `requireGl` defaults to false and `$DISPLAY` is empty. GL tests SKIPPED. |
-| "runUdpProof is red, the branch broke it" | Check the baseline first. It was red before the port, and `HANDOFF.md` documents why. |
-| "This needs a contracts/ file changed" | Stop the ticket and say so. Frozen means frozen - unless the ticket is #202. |
+| "runUdpProof is red, the branch broke it" | Re-run it alone first: it is wall-clock across three processes. Green since #219, so a red that survives is the branch's. |
+| "This needs a contracts/ file changed" | Stop the ticket and say so. Frozen means frozen. |
 | "Both branches touch net-protocol.lock, git merged it clean" | It merged text, not an ordering. Regenerate it and compare. |
 | "These two issues go together, one branch" | One issue per branch. The two-issue branch on the sister project reached round 11. |
 | "The developer pushed a fix while the review ran" | Review a detached checkout at the SHA. Then it cannot happen. |
 | "The next reviewer will work this out from the findings" | It will not - it is fresh. Pass the ledger of settled judgements every round. |
 | "I'll just fix this one line myself" | The lead does not write code. Send it to the developer. |
 | "This finding is wrong, I'll drop it" | Relay it verbatim. The developer argues, the next reviewer rules. |
-| "#212 is free, dispatch it now" | Check its "Needs". A port ticket whose dependencies have not merged into `kmp` is not ready. |
+| "That ticket is free, dispatch it now" | Check its "Needs". A ticket whose dependencies have not merged into `master` is not ready. |
 | "PASS, but I should check before merging" | PASS is the sign-off. Merge it. |
-| "I'll merge this into master while I'm here" | No. `kmp` reaches `master` once, as #214, fully green. |
-| "It was green on the branch, no need to re-test" | Green alone is not green merged. Build on merged `kmp`. |
-| "I'll branch from example, it's the one I know" | `example` is retired. `origin/kmp`, always. |
-| "The finding is small, I'll file it as a card" | Findings go to the developer, not the backlog. Cards are for out-of-scope only. |
+| "It was green on the branch, no need to re-test" | Green alone is not green merged. Build on merged `master`. |
+| "I'll branch from kmp, the port was there" | `kmp` merged in #214 and is retired, as `example` was. `origin/master`, always. |
+| "The finding is small, I'll leave it for later" | Findings go to the developer. Only out-of-scope notes are left, and they go in the report or on an existing ticket. |
+| "This deserves its own issue" | Never `gh issue create` - the owner's rule. Fix it on a branch or comment it on an existing ticket. |
 | "I'll just check with the user on this one" | Nobody is there. Decide, then comment the decision on the issue. |
 | "I'll note it in my final report" | The report scrolls past. The issue comment is still there next week. |
 | "I'll clean up the reviewers at the end" | Kill each reviewer the moment its verdict is in. |

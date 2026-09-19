@@ -5,7 +5,8 @@ This document is checkable on purpose: a standard you cannot fail a review again
 platitude, not a standard.
 
 The design spec (`docs/superpowers/specs/2026-08-22-udea-ai-native-rewrite-design.md`) says
-*what* to build. This says *how it must be written*.
+*what* to build, and the port spec (`docs/superpowers/specs/2026-09-16-kool-kmp-port-design.md`)
+says how it runs on Kool and Kotlin Multiplatform. This says *how it must be written*.
 
 ---
 
@@ -55,6 +56,27 @@ The spec makes `GameContext` "the sole Fleks injectable". That is a real risk of
 - Adding a field to `GameContext` requires a justification in the PR/report. If it has more
   than a handful of members, it has already failed.
 
+### GL and Kool live in `udea-render`, and run on one thread
+
+Two rules about drawing, each cheap to break and silent when broken.
+
+- **GL, Kool and ComposeGL's backends are `udea-render`'s alone.** No other engine module
+  names Kool, LWJGL or a GL binding. `udea-core` in particular must build and run with no GL
+  context at all - it is what a dedicated server, a replay and an agent harness run on. A game
+  draws by implementing `RenderSystem` or `OverlaySystem`, whose types are `udea-render`'s, and
+  never opens a context or calls Kool itself. `udeaVerifyModuleGraph` enforces the classpath
+  half (`UDEA-MG-002`, `UDEA-MG-009`); `ModuleGraphRules.GL_ALLOWED_PROJECTS` is the exempt set
+  and its KDoc says why each member is in it.
+- **Everything that touches the scene runs on the Kool render thread.** Kool polls input, runs
+  the frame callbacks and draws on one thread, because `KoolThread` configures it with
+  `asyncSceneUpdate = false`. Every `scene.player` call - keys, pads and pointers alike - and
+  every ComposeGL toolkit call reaches `KeyRouter`, `FocusManager` and the node tree, none of
+  which is thread-safe and none of which marshals, so each happens on that thread (issue #224).
+  Another thread hands work over through a queue the render thread drains - `PresentationControl`
+  and `FrameCaptureSlot` are the shape - and never calls in directly. A call from the wrong
+  thread is a data race, not a slow path: it passes every test that happens to run it on the
+  right one.
+
 ---
 
 ## 3. Patterns we use, and where
@@ -92,8 +114,8 @@ Anything that runs inside `Simulation.step()`:
 - **Allocation-free in steady state** on per-tick paths. Budgets are CI gates, not aspirations.
 - **No I/O, no logging on the hot path**, no blocking calls.
 
-These are enforced by `udeaVerifyDeterminism` (an ASM scan) later, but the scan is a cheap
-first filter. The real gate is the snapshot-equivalence hash test. Write code that would pass
+`udeaVerifyDeterminism` (an ASM scan, on `check`) enforces what it can see, but the scan is a
+cheap first filter, and `determinism-audit.md` records what it structurally cannot. The real gate is the snapshot-equivalence hash test. Write code that would pass
 both from the start; retrofitting determinism is what Phase 7 exists to avoid needing.
 
 ---
@@ -138,8 +160,8 @@ These are review triggers, not hard limits — crossing one means justify it, no
 - `require`/`check` for precondition failures with a message naming the offending value.
 - KDoc on every public declaration, saying *why* it exists, not restating the signature.
   Public API without KDoc is incomplete.
-- No `!!`-laden interop shims around LibGDX — wrap the awkward API once, properly, at the
-  boundary.
+- No `!!`-laden interop shims around Kool, ComposeGL or a native binding — wrap the awkward
+  API once, properly, at the boundary.
 
 ---
 
@@ -153,3 +175,5 @@ These are review triggers, not hard limits — crossing one means justify it, no
 - Wall-clock or unseeded randomness inside simulation code.
 - A `TODO()`, a stubbed return, or a swallowed exception on a reachable path.
 - Copy-pasted logic that differs only in a constant.
+- GL, Kool or a ComposeGL backend outside `udea-render`, or a scene or ComposeGL toolkit call
+  made off the Kool render thread (§2).

@@ -57,7 +57,7 @@ Already real, in `udea-agent`, and used directly by generated code:
 - `dev.wildware.udea.agent.state.GameStateSink` — the digest's `game` block, one overload per
   scalar so publishing costs no boxing.
 
-Declared in `udea-agent`'s `src/main` (`AgentToolDef.kt`, `AgentStateSource.kt`), and on
+Declared in `udea-agent`'s `src/commonMain` (`AgentToolDef.kt`, `AgentStateSource.kt`), and on
 `udea-codegen`'s **test** classpath so generated code is compiled, reached through the generated
 registry and dispatched through the real runtime indexes:
 

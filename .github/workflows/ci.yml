@@ -70,7 +70,7 @@ concurrency:
 
 # No build exclusions. There used to be four: `level-editor` and `idea-plugin` could not
 # compile, and every job worked around it with `-x`. D6 deleted both modules along with
-# `compose-ui` (Phase 0, issue #137), so the whole repository - old tree included - builds
+# `compose-ui` (Phase 0, issue #137), and #213 deleted the rest of the old tree, so the whole repository builds
 # green. A workflow that carries an exclusion nobody has retested is a workflow that hides the
 # next breakage, so the list is gone rather than emptied.
 
@@ -111,7 +111,7 @@ jobs:
       # default, and it is a decision rather than a formality. `check` depends on `udeaGlTest`
       # and `udeaAgentGlTest`, so this leg *does* run them - and neither runner here can serve
       # them a context: `windows-latest` exposes only the GDI generic renderer (OpenGL 1.1),
-      # which is below what `Lwjgl3Backend` asks for, and this `ubuntu-latest` step runs with
+      # which is below what Kool's desktop backend asks for, and this `ubuntu-latest` step runs with
       # no X server at all. Both therefore skip, on purpose, and the `gl-tests` job below is
       # where the same tests are made to *pass or fail*. Deleting that job and leaving this
       # property alone would silently return the whole GL surface to being untested, which is
@@ -436,7 +436,7 @@ jobs:
     #
     # Ubuntu only, and that is a stated limitation rather than an oversight: `windows-latest`
     # runners expose the GDI generic renderer (OpenGL 1.1) with no software fallback that
-    # `Lwjgl3Backend` can use, and `macos-latest` cannot run a GL context under a headless
+    # Kool's desktop backend can use, and `macos-latest` cannot run a GL context under a headless
     # runner session at all. The `build` job therefore passes `-Pudea.render.requireGl=false`
     # explicitly on both of its legs, so the skip there is written down instead of defaulted.
     name: gl tests (xvfb)
@@ -1380,7 +1380,7 @@ jobs:
     #   `java.lang.Math` against `java.lang.StrictMath` on the JVM it is running on, and
     #   `determinism-audit.md` section 3.1 rests on that measurement: `Math.sin` is permitted a
     #   1-ulp error and is not specified to agree between implementations, which is what makes
-    #   LibGDX's `MathUtils$Sin` lookup table a per-JVM artifact. Measuring it on one vendor
+    #   a lookup table built from it (LibGDX's `MathUtils$Sin` was one) a per-JVM artifact. Measuring it on one vendor
     #   proves nothing about the pair. Temurin and Corretto are two independent builds, so this
     #   matrix is genuinely two dimensions - two OSes and two JVMs - rather than two OSes on one.
     #
@@ -1723,7 +1723,7 @@ jobs:
     # That is the number to revisit if the storage bill ever matters, and `retention-days` below is
     # the lever.
     #
-    # ## Which branch this covers, and what happens at #214
+    # ## Which branch this covers
     #
     # The push clause names the **integration branch**, which is the only thing it has ever meant.
     # It named the `example` branch until 2026-09-16, when the Kool/KMP port (#199) retired that
@@ -1739,10 +1739,12 @@ jobs:
     # The push clause is what closes that, and it fires on every merge into `kmp`, which is more
     # often than a nightly cron would.
     #
-    # At #214, when `kmp` merges into `master` and is retired, this configuration is already the one
-    # that day wants and needs no edit: `refs/heads/kmp` stops existing so the clause stops
-    # matching, and `schedule` - by then running on the ported tree, because `master` is it - is the
-    # coverage again. The clause may be deleted with the branch; leaving it costs nothing.
+    # Issue #214 merges `kmp` into `master`, and `master` is the integration branch again. So the
+    # push clause names `master` as well: `schedule` alone would replay each merge up to a day
+    # later, and the push arm is what has been catching a drift on the merge that caused it since
+    # #229. `kmp` stays named while `clean-build-base.sh` still lists it; once it is deleted there
+    # the check below asks for it to go here too, and a push to a branch that no longer exists
+    # cannot fire either way.
     # `ReplayEqualityProofTest` holds this clause to the integration branches the
     # `clean-build-budget` job passes `clean-build-base.sh`, in both directions, so a branch retired
     # there and still named here - or listed there and covered by nothing here - fails the build.
@@ -1753,7 +1755,7 @@ jobs:
     if: >-
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/kmp')
+      (github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/kmp'))
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

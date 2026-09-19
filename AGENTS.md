@@ -6,19 +6,26 @@ Package root `dev.wildware.udea`. Kotlin 2.4.20, KSP 2.3.12, Gradle 8.13, JDK 21
 Three of those four moved in issue #186, and two of the moves change a shape rather than a
 number. KSP has left the `<kotlin>-<ksp>` scheme — from 2.3.0 it publishes one version of its
 own and names no compiler — so a KSP version can no longer be read off the Kotlin version. And
-the JDK went 17 to 21 because every published ComposeGL artifact is Java 21 bytecode
-(`org.gradle.jvm.version = 21` on `composegl-gdx`, class-file major 65 throughout), which is a
-resolution failure long before it is a compile failure. `gradle/libs.versions.toml` is the
+the JDK went 17 to 21 because the ComposeGL artifacts published then were Java 21 bytecode
+(`org.gradle.jvm.version = 21` in their module metadata, class-file major 65 throughout), which
+is a resolution failure long before it is a compile failure. `gradle/libs.versions.toml` is the
 authoritative source for all of it; `UdeaVersions` mirrors the two that build logic needs as
 constants and `UdeaVersionsTest` is what stops the mirror drifting.
 
-Three documents, in order of authority:
+Four documents, in order of authority:
 
 1. **`docs/engineering-standards.md`** — the charter. Binding on every `udea-*` module and on
    `moba`. Section 8 is the reject list a reviewer works from. Read it before writing code.
 2. **`docs/superpowers/specs/2026-08-22-udea-ai-native-rewrite-design.md`** — the design. What
    to build and why, in eight phases.
-3. **This file** — orientation and rules. Not a tutorial, not API docs.
+3. **`docs/superpowers/specs/2026-09-16-kool-kmp-port-design.md`** — the port to Kool rendering
+   and Kotlin Multiplatform (epic #199). Its decisions D1-D12 are settled; where it and the
+   design above disagree about rendering or targets, it is the later word.
+4. **This file** — orientation and rules. Not a tutorial, not API docs.
+
+**Branches.** `master` is the integration branch: work branches from `origin/master` and merges
+back into it. The port was done on `kmp`, which merged into `master` in issue #214 and is
+retired; `example` was retired before it.
 
 `docs/contracts/` holds the frozen contracts. **Frozen means frozen**: if your work needs one
 to change, stop and say so. Do not change it and carry on. `./gradlew udeaVerifyContracts` fails
@@ -121,6 +128,8 @@ untracked `local.properties` (`sdk.dir=...`), which is never committed.
 - **60Hz fixed simulation.** Every duration, deadline, ring slot, baseline and input stamp is a
   `Tick`. Never a float of seconds, never a wall-clock millisecond.
 - **`SimClock.time` is derived** (`tick * dt`), never accumulated. Accumulating drifts.
+- **Animation time is `Animator.clipTime(now)`**, derived from a start `Tick`, never accumulated
+  (#241).
 - **`SimBarrier` is drained at the top of `Simulation.step()`**, before any system runs. Scene
   swaps, asset hot-reload deltas, agent tool mutations and snapshot application all queue on it.
   No system ever observes a torn world, and there is one place to reason about atomicity.
@@ -181,8 +190,8 @@ All three run the identical `Simulation` and differ only in whether a `Presentat
 | Mode | GL context | Window | Screenshots | Used by |
 |---|---|---|---|---|
 | `Headless` | none | none | typed `no_render_context` error | dedicated server, CI, `SimHarness`, fast-forward |
-| `Offscreen` | real LWJGL3 | hidden | full | `moba.agent` default |
-| `Windowed` | real LWJGL3 | visible | full | the player |
+| `Offscreen` | real, Kool over LWJGL | hidden | full | `moba.agent` default |
+| `Windowed` | real, Kool over LWJGL | visible | full | the player, and `udea-editor` |
 
 The agent activity overlay draws only in `Windowed`, and only onto `ScreenTarget`, which
 `FrameCapture` never reads. An agent must not be able to see its own narration in a screenshot
@@ -190,9 +199,43 @@ it diffs. That exclusion is structural, not a flag somebody remembers to clear.
 
 ---
 
+## What the engine does today
+
+The pieces a newcomer meets first, each with the issue that made it so.
+
+- **Drawing is Kool, inside `udea-render`, on one thread.** Sprites and 3D models both:
+  `Transform3D` (`udea-core`) places an entity in 3D - Z is up, a 2D position is the point on
+  the ground plane, it is saved in levels and never replicated - and `ModelRenderer`
+  (`udea-render`) draws a built-in mesh or a glTF/GLB model imported as a typed asset (#240).
+  Everything that touches the scene or the ComposeGL toolkit runs on the Kool render thread
+  (#224); `docs/engineering-standards.md` section 2 states the rule.
+- **Interface is ComposeGL, in two places that answer opposite questions.** A `UiLayer` is a
+  menu or an editor panel: it draws into the window after the captured frame, so no screenshot
+  sees it. A `CapturedUi` is a HUD: it draws into the captured frame, so an agent's screenshot
+  sees the cooldown a player sees (#188).
+- **Controls name keys.** A controls asset binds an `InputKey`, and `udea-render` owns the one
+  table per backend that turns a platform key into it (#228). A key or a click the interface
+  took never becomes an intent (#227, #230).
+- **Levels are saved files.** `.udealevel` (#191, #192), under `moba/game/levels/`; a launcher
+  takes `-Plevel=<path>`.
+- **Assets hold no loops.** A `.udea.kts` with a loop, a lambda something may run more than once,
+  or a function that calls itself fails with `UDEA0015`: the K2 checker in the asset compile is
+  the guarantee and a syntactic first pass is the early warning (#192). The editor's Save writes
+  an exact value back into the script (#195), and a value made inside a loop has no one place to
+  write it.
+- **Replays are `.udearep` format 2**, which adds the recorded editor edits (#232). A recording
+  with no edits is still written as format 1, and this build reads both.
+- **Web is shelved** (#223, #226, owner decision of 2026-09-18). Kool 0.19.0 publishes no wasmJs
+  artifact, so `udea-render` and `moba:game` have no wasmJs target; the headless modules still
+  build and test on wasmJs.
+
+---
+
 ## Driving a running game
 
-Every Udea game exposes an MCP tool surface automatically, and there is no IDE plugin. The editor
+Every Udea game exposes an MCP tool surface automatically, and there is no IDE plugin. For
+`moba`, `sh gradlew :moba:desktop:run -PdebugPort=<port>` starts it `Offscreen` with the
+surface on that port; the generated `gamebridge.json` launches the same task. The editor
 is a screen over that tool surface, not a second implementation of it: `udea-editor`'s window
 (`sh gradlew :moba:desktop:runEditor`, issue #194) turns each button into an `editor.*` call filed
 under the author `editor`, so an agent calling with `session=editor` sees and undoes the same edits.

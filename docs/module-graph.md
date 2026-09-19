@@ -86,7 +86,7 @@ render toolset and may not name a render type cannot implement the toolset's own
 observable cost was not hypothetical: `OffscreenRenderControl` and the GL `OverlaySystem` were
 both written and both proven against a real LWJGL3 context, and both sat in **test** sources
 because that was the only place the rule allowed — so every `render.*` tool answered
-`no_render_context` on a real `:moba:run`, and the activity overlay spec §3.7 describes was drawn
+`no_render_context` on a real game run, and the activity overlay spec §3.7 describes was drawn
 by nothing but its own tests.
 
 So `udea-agent-host` takes `udea-render` as a plain `implementation` dependency, owns both

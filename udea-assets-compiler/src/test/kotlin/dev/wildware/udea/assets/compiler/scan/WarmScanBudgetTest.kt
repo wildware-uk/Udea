@@ -40,18 +40,27 @@ class WarmScanBudgetTest {
         LatencyBudget.measuredBy(TASK)
 
         UdeaDeclarationScanner(TestPaths.repoRoot, TestPaths.exampleAssets).use { scanner ->
-            scanner.scanTree() // warm the PSI environment and the JIT
-            scanner.clearCache()
-            val start = TimeSource.Monotonic.markNow()
-            val report = scanner.scanTree()
-            val elapsed = start.elapsedNow()
+            // Warm the PSI environment and the JIT. See [WARMUP_SCANS].
+            repeat(WARMUP_SCANS) {
+                scanner.scanTree()
+                scanner.clearCache()
+            }
+            val samples = List(SAMPLES) {
+                scanner.clearCache()
+                val start = TimeSource.Monotonic.markNow()
+                val report = scanner.scanTree()
+                val elapsed = start.elapsedNow()
+                // The control: a scan that found nothing would come in comfortably under any budget.
+                assertEquals(19, report.files.size)
+                elapsed
+            }
 
-            println("warm scan of the example tree: $elapsed over ${report.files.size} files")
-            // The control: a scan that found nothing would come in comfortably under any budget.
-            assertEquals(19, report.files.size)
+            val median = samples.sorted()[samples.size / 2]
+            println("warm scan of the example tree: median $median over 19 files, samples $samples")
             assertTrue(
-                elapsed < BUDGET,
-                "warm scan took $elapsed, budget is $BUDGET. " + LatencyBudget.contentionNote(TASK),
+                median < BUDGET,
+                "warm scan median was $median $samples, budget is $BUDGET. " +
+                    LatencyBudget.contentionNote(TASK),
             )
         }
     }
@@ -63,5 +72,18 @@ class WarmScanBudgetTest {
 
         /** Issue #85's number. See the class KDoc before changing it. */
         val BUDGET = 200.milliseconds
+
+        /**
+         * Untimed whole-tree scans before the timed ones, and it was one until issue #214.
+         *
+         * One scan builds the PSI environment; it does not finish the JIT's work on the parser. With
+         * one warm-up and one timed scan, `windows-latest` runners in CI and in run 35427618170
+         * printed 80-225ms against 200ms, and the 225ms failed its leg. Several warm-ups and a median of several scans measure the rescan the daemon
+         * does all day, rather than one scan's luck with the scheduler.
+         */
+        const val WARMUP_SCANS = 3
+
+        /** Timed scans; the median is the gate, the same statistic the daemon budgets use. */
+        const val SAMPLES = 5
     }
 }

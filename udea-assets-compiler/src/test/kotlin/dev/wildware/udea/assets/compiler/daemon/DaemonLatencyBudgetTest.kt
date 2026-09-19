@@ -20,9 +20,10 @@ import kotlin.test.assertTrue
  * ## What is measured, and what would be cheating
  *
  * The measured call is a validate of **one edited file against a started daemon**, which is the
- * call an agent makes between two keystrokes. It is measured after a warm-up validate, because the
- * first one pays for classloading the scripting host and for a cold jar cache, and a budget that
- * included those would be measuring JVM start-up.
+ * call an agent makes between two keystrokes. It is measured after warm-up validates, because the
+ * first pays for classloading the scripting host and for a cold jar cache, and the next few for a
+ * JIT that has not finished with the compiler ([WARMUP_ITERATIONS]); a budget that included those
+ * would be measuring JVM start-up.
  *
  * It would be cheating to measure `validate()` over zero files, or over a file whose text has not
  * changed since the warm-up (the jar cache would answer it without compiling). So the file is
@@ -58,8 +59,9 @@ class DaemonLatencyBudgetTest {
                 report.recompiled > 0,
                 "the jar cache answered this validate, so it measured a cache hit and not a compile",
             )
-            // The first sample pays for classloading the scripting host; it is warmed, not counted.
-            if (iteration > 0) samples += report.durationMs
+            // The first samples pay for classloading the scripting host and for a JIT that has not
+            // finished with it; they are warmed, not counted. See [WARMUP_ITERATIONS].
+            if (iteration >= WARMUP_ITERATIONS) samples += report.durationMs
         }
 
         val median = samples.sorted()[samples.size / 2]
@@ -89,7 +91,7 @@ class DaemonLatencyBudgetTest {
             )
             val outcome = assertIs<ReloadOutcome.Applied>(fixture.daemon.reload(listOf(edited)))
             fixture.daemon.commit()
-            if (iteration > 0) samples += outcome.durationMs
+            if (iteration >= WARMUP_ITERATIONS) samples += outcome.durationMs
         }
 
         // Median, the same statistic the validate half above uses, and changed from `slowest`
@@ -148,7 +150,24 @@ class DaemonLatencyBudgetTest {
          */
         const val WARM_RELOAD_BUDGET_MS = 500L
 
-        /** Enough for a median that is not one sample, short enough not to dominate `check`. */
-        const val ITERATIONS = 5
+        /**
+         * Five edits warmed and not counted, and it was one until issue #214 measured what one buys.
+         *
+         * One warm-up pays for classloading the scripting host, and the KDoc above says so. It does
+         * not pay for the JIT: the Kotlin compiler behind a validate is a great deal of code, and on
+         * a four-core `windows-latest` runner it was still getting faster several edits in. Run
+         * 35427097692 printed four samples after one warm-up on two such runners - validate medians
+         * of 318ms and 372ms against 300ms, reload medians of 521ms and 615ms against 500ms, both
+         * failing. Run 35427618170 printed twenty per test on eight runners of both images: the
+         * early reloads ran up to 723ms, and the median of the nine edits after the first five was
+         * 151-216ms for validate and 197-412ms for reload, against 300ms and 500ms. The budgets are
+         * about the warm editing loop, which is an agent's hundredth edit and not its second.
+         */
+        const val WARMUP_ITERATIONS = 5
+
+        /** Enough for a median that is not one sample or two, short enough not to dominate the job. */
+        const val SAMPLES = 9
+
+        const val ITERATIONS = WARMUP_ITERATIONS + SAMPLES
     }
 }

@@ -36,7 +36,7 @@ class EditorSessionTest {
         tick = { tick },
         paused = { paused },
         spawn = EditorSpawn("Spawn skeleton at centre", BlueprintId("skeleton"), SPAWN_X, SPAWN_Y),
-        viewport = {},
+        views = EditorViews.detached(),
     )
 
     private fun open(): UiTest = uiTest { session.window.content() }

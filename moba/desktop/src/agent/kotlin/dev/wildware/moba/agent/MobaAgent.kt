@@ -29,6 +29,8 @@ import dev.wildware.udea.agent.host.AgentGameLoop
 import dev.wildware.udea.agent.host.AgentHost
 import dev.wildware.udea.agent.host.AgentHostConfig
 import dev.wildware.udea.agent.host.AgentHostTools
+import dev.wildware.udea.agent.host.EditorViewTools
+import dev.wildware.udea.agent.host.EditorViewToolset
 import dev.wildware.udea.agent.host.AgentInputTools
 import dev.wildware.udea.agent.host.EditorMode
 import dev.wildware.udea.agent.host.ArtifactToolset
@@ -39,6 +41,8 @@ import dev.wildware.udea.agent.host.RenderControl
 import dev.wildware.udea.agent.host.RenderToolset
 import dev.wildware.udea.agent.host.ToolManifest
 import dev.wildware.udea.agent.host.render.OffscreenRenderControl
+import dev.wildware.udea.agent.host.render.WorldViewportControl
+import dev.wildware.udea.render.view.WorldViewport
 import dev.wildware.udea.agent.query.AgentComponentIndex
 import dev.wildware.udea.agent.query.AgentComponentType
 import dev.wildware.udea.agent.query.PositionRef
@@ -387,6 +391,10 @@ public object MobaAgent {
         } else {
             null
         }
+        // `editor.screenshot` (issue #234) with the rest of `editor.*`. Its views are the editor
+        // window's, which opens after this index is built, so they are bound when it does
+        // (`Session.editorViews`); until then the tool answers `no_editor_window`.
+        val editorViews = if (editor) EditorViewToolset(mode, artifacts) else null
         val tools = EngineToolModules
             .wireAll(
                 // Every generated `ToolModule` facet on this game's registry (issue #202). None of
@@ -412,6 +420,7 @@ public object MobaAgent {
             .module(AgentHostTools)
             .toolset(RenderToolset(mode, control, artifacts))
             .toolset(ArtifactToolset(artifacts))
+            .let { builder -> if (editorViews == null) builder else builder.module(EditorViewTools).toolset(editorViews) }
             // `input.*`, over the same source a keyboard writes through. A separate module from
             // `AgentHostTools` because a `ToolModule` promises every tool in it has a receiver,
             // and a host that only wants screenshots must not be forced to wire input as well.
@@ -479,7 +488,7 @@ public object MobaAgent {
         shutdown
             .onClose("frame-loop") { loop.stop() }
             .onClose("agent-host") { agentHost?.stop() }
-        return Session(loop = loop, shutdown = shutdown, player = player, wiring = wiring)
+        return Session(loop = loop, shutdown = shutdown, player = player, wiring = wiring, views = editorViews)
     }
 
     /** [Position], with x and y writable and `hp` not - so `field_not_writable` is reachable. */
@@ -565,9 +574,17 @@ public object MobaAgent {
         val player: dev.wildware.udea.core.identity.NetId,
         /** The bridge and session table the toolsets were wired over. */
         val wiring: Wiring,
+        /** `editor.screenshot`'s toolset, on an editor instance; `null` on any other. */
+        private val views: EditorViewToolset? = null,
     ) {
         fun close(reason: String) {
             shutdown.shutdown(reason)
+        }
+
+        /** Hands the editor window's two views to `editor.screenshot`, when the window opens them. */
+        fun editorViews(scene: WorldViewport, game: WorldViewport) {
+            checkNotNull(views) { "this instance was not attached as an editor, so it has no editor.screenshot" }
+                .bind(WorldViewportControl(scene, game))
         }
     }
 }

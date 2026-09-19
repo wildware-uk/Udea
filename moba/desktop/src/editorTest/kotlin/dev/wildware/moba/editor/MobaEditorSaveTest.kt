@@ -76,7 +76,7 @@ class MobaEditorSaveTest {
 
     @Test
     fun `changing one value in a commented script and pressing Ctrl+S changes exactly that value`() {
-        val editor = MobaEditor.session(host, session, viewport = {})
+        val editor = MobaEditor.session(host, session)
         val before = soldier.readText()
         val original = root.resolve("soldier-before.udea.kts").also { Files.writeString(it, before) }
 
@@ -100,7 +100,7 @@ class MobaEditorSaveTest {
 
     @Test
     fun `a value set by the file's own constant is read-only, with the constant and its line`() {
-        val editor = MobaEditor.session(host, session, viewport = {})
+        val editor = MobaEditor.session(host, session)
         val before = soldier.readText()
 
         uiTest { editor.window.content() }.use { ui ->
@@ -117,7 +117,7 @@ class MobaEditorSaveTest {
 
     @Test
     fun `save as new writes a generated asset the asset compiler accepts with no diagnostics`() {
-        val editor = MobaEditor.session(host, session, viewport = {})
+        val editor = MobaEditor.session(host, session)
 
         uiTest { editor.window.content() }.use { ui ->
             open(ui, editor, "character/soldier_idle_sheet")

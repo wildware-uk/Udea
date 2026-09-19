@@ -12,6 +12,7 @@ import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteBatch2D
 import dev.wildware.udea.render.draw.SpriteRecord
 import dev.wildware.udea.render.draw.SpriteRegion
+import dev.wildware.udea.render.draw.SpriteTexture
 import dev.wildware.udea.render.kool.Letterbox
 import dev.wildware.udea.render.kool.ViewportPass
 import kotlinx.coroutines.CompletableDeferred
@@ -183,4 +184,29 @@ public class WorldViewport internal constructor(
     }
 
     override fun toString(): String = "WorldViewport(${if (camera == null) "game" else "scene"}, ${width}x$height)"
+
+    public companion object {
+
+        /**
+         * A view with no render context behind it: [camera] is fitted to [width] x [height], a
+         * pointer maps and a press reaches [gizmos] exactly as on a live view, but no pass draws it,
+         * [drawInto] shows nothing and [capture] fails. What an editor window is built on when there
+         * is no GL - its headless tests, and a launcher's own.
+         */
+        public fun detached(camera: EditorCamera?, width: Int, height: Int): WorldViewport {
+            val record = SpriteRecord()
+            val view = WorldViewport(
+                camera = camera,
+                target = OffscreenTarget(width, height),
+                record = record,
+                batch = SpriteBatch2D(SpriteTexture.whitePixel("udea-detached-view-white"), home = record),
+                frame = null,
+                captures = null,
+                kool = null,
+            )
+            camera?.fit(width, height)
+            view.canvas.prepare(width, height, null)
+            return view
+        }
+    }
 }

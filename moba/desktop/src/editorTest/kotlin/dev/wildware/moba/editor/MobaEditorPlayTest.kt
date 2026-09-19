@@ -56,7 +56,7 @@ class MobaEditorPlayTest {
     /** Every level file the standalone launcher was handed, in order. */
     private val launched = ArrayList<Path>()
 
-    private val editor: EditorSession = MobaEditor.session(host, session, viewport = {}, standalone = { launched.add(it) })
+    private val editor: EditorSession = MobaEditor.session(host, session, standalone = { launched.add(it) })
 
     @AfterTest
     fun close() {

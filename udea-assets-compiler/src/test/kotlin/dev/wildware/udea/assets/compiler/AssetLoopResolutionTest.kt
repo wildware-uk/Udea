@@ -3,6 +3,8 @@ package dev.wildware.udea.assets.compiler
 import dev.wildware.udea.diagnostics.Severity
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
 import dev.wildware.udea.diagnostics.UdeaRules
+import org.junit.jupiter.api.Assumptions.assumeFalse
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -24,8 +26,24 @@ import kotlin.test.assertTrue
  * irrelevant: every script below except the negatives spells a repeat a different way.
  *
  * Nothing here runs pass 1, so a red case cannot be the name matcher's.
+ *
+ * ### With the plugin disabled
+ *
+ * `-Pudea.compilerPlugin.enabled=false` takes the plugin off the asset compile's classpath, as it
+ * does everywhere (spec 7's degrade procedure). The refusals below then have nothing to assert and
+ * are skipped, and `with the plugin disabled the compile degrades to pass 1 alone` runs instead:
+ * in that build the checker must be absent, not merely quiet.
  */
 class AssetLoopResolutionTest {
+
+    /** The build's `-Pudea.compilerPlugin.enabled`, passed through by this module's build script. */
+    private val pluginEnabled: Boolean =
+        checkNotNull(System.getProperty("udea.compilerPlugin.enabled")) {
+            "udea-assets-compiler/build.gradle.kts sets udea.compilerPlugin.enabled on every Test task"
+        }.toBooleanStrict()
+
+    private fun requirePlugin() =
+        assumeTrue(pluginEnabled, "-Pudea.compilerPlugin.enabled=false: there is no loop checker to test")
 
     private fun compile(name: String, source: String): List<UdeaDiagnostic> {
         val root = TestPaths.scratch("loop-resolution-$name")
@@ -50,6 +68,7 @@ class AssetLoopResolutionTest {
 
     @Test
     fun `a bare repeat is refused at the call`() {
+        requirePlugin()
         val diagnostics = compile("bare", "blueprint(name = \"b\")\n  repeat(2) { }\n")
         assertEquals(listOf(2 to 3), loopSites(diagnostics), diagnostics.toString())
         val loop = loops(diagnostics).single()
@@ -61,12 +80,14 @@ class AssetLoopResolutionTest {
 
     @Test
     fun `a repeat qualified with its package is refused`() {
+        requirePlugin()
         val diagnostics = compile("qualified", "blueprint(name = \"b\")\nkotlin.repeat(2) { }\n")
         assertEquals(listOf(2 to 1), loopSites(diagnostics), diagnostics.toString())
     }
 
     @Test
     fun `a repeat imported under another name is refused at the call`() {
+        requirePlugin()
         val diagnostics = compile(
             "aliased",
             "import kotlin.repeat as times\n\nblueprint(name = \"b\")\ntimes(2) { }\n",
@@ -76,6 +97,7 @@ class AssetLoopResolutionTest {
 
     @Test
     fun `forEach over a range is refused`() {
+        requirePlugin()
         val diagnostics = compile("foreach", "(1..3).forEach { i -> blueprint(name = \"b\$i\") }\n")
         assertEquals(listOf(1 to 1), loopSites(diagnostics), diagnostics.toString())
         assertTrue("forEach" in loops(diagnostics).single().message, diagnostics.toString())
@@ -83,6 +105,7 @@ class AssetLoopResolutionTest {
 
     @Test
     fun `a helper of the script's own that runs its lambda twice is refused at the call`() {
+        requirePlugin()
         val diagnostics = compile(
             "helper",
             """
@@ -100,6 +123,7 @@ class AssetLoopResolutionTest {
 
     @Test
     fun `a helper that loops inside is refused at the loop and at the call`() {
+        requirePlugin()
         val diagnostics = compile(
             "helper-loop",
             """
@@ -119,6 +143,7 @@ class AssetLoopResolutionTest {
 
     @Test
     fun `for, while and do-while are refused, each at its own keyword`() {
+        requirePlugin()
         val diagnostics = compile(
             "keywords",
             """
@@ -137,6 +162,7 @@ class AssetLoopResolutionTest {
 
     @Test
     fun `a function that calls itself is refused at the recursive call`() {
+        requirePlugin()
         val diagnostics = compile(
             "recursion",
             """
@@ -150,6 +176,13 @@ class AssetLoopResolutionTest {
             """.trimIndent(),
         )
         assertEquals(listOf(4 to 5), loopSites(diagnostics), diagnostics.toString())
+    }
+
+    @Test
+    fun `with the plugin disabled the compile degrades to pass 1 alone`() {
+        assumeFalse(pluginEnabled, "the plugin is enabled: the refusals above are the assertions")
+        val diagnostics = compile("disabled", "(1..3).forEach { i -> blueprint(name = \"b\$i\") }\n")
+        assertEquals(emptyList(), diagnostics.filter { it.severity == Severity.Error }, diagnostics.toString())
     }
 
     /**

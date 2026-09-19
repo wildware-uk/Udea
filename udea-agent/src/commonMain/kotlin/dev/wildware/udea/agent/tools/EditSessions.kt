@@ -95,11 +95,6 @@ internal class EditSessionTable(authors: Int) {
         check(byAuthor[session.author.raw] === session) { "${session.id} is not open" }
         byAuthor[session.author.raw] = null
     }
-
-    /** Every open session, in author order. */
-    fun forEachOpen(action: (EditSession) -> Unit) {
-        for (session in byAuthor) if (session != null) action(session)
-    }
 }
 
 /** How `editor.select` combines the entities it is given with what the author already selected. */

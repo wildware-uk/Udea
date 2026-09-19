@@ -241,3 +241,22 @@ val udeaGlTest = tasks.register<Test>("udeaGlTest") {
 tasks.named("check") {
     dependsOn(udeaVerifyHeadless, udeaGlTest)
 }
+
+// --- runModelShot ------------------------------------------------------------------------
+//
+// Pictures of textured, lit 3D models drawn by `ModelRenderSystem`, captured from the same pass an
+// agent's screenshot reads. Run by name and never by `check`: it needs a GL driver, and in `check`
+// a missing driver would have to be a skip, which hides the failure it exists to show. The
+// assertions about the same path are `GlModelRenderTest`, which `udeaGlTest` runs.
+tasks.register<JavaExec>("runModelShot") {
+    group = "udea"
+    description = "Captures textured, lit 3D models to -Pudea.modelshot.dir (default build/reports/udea/model)."
+    mainClass.set("dev.wildware.udea.render.model.ModelShot")
+    classpath = jvmTestRuntime
+    dependsOn(jvmTestCompilation.compileTaskProvider)
+    systemProperty(
+        "udea.modelshot.dir",
+        providers.gradleProperty("udea.modelshot.dir").orNull
+            ?: layout.buildDirectory.dir("reports/udea/model").get().asFile.absolutePath,
+    )
+}

@@ -121,7 +121,7 @@ public class RenderRegistry(
         ctx: GameContext,
         targets: RenderTargets,
     ): RenderPipeline {
-        val resources = RenderResources(targets.batch, targets.offscreen)
+        val resources = RenderResources(targets.batch, targets.offscreen, targets.passes)
         // A second, deliberately poorer set for the overlay side: the screen batch and the window,
         // and no capturable target or capturable batch anywhere on it (spec 3.7).
         val overlayResources = OverlayResources(targets.screenBatch, targets.screen)

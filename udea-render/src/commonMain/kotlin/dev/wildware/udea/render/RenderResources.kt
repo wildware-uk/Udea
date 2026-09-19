@@ -1,6 +1,7 @@
 package dev.wildware.udea.render
 
 import dev.wildware.udea.render.draw.SpriteBatch2D
+import dev.wildware.udea.render.kool.ScenePasses
 
 /**
  * What a [RenderSystem]'s constructor is handed: the capturable batch, the surface it draws on, and
@@ -41,6 +42,11 @@ public class RenderResources internal constructor(
     public val batch: SpriteBatch2D,
     /** The capturable surface this pipeline draws into, so a system can size itself to it. */
     public val offscreen: OffscreenTarget,
+    /**
+     * Where a system adds a render pass of its own (the 3D model pass), or `null` when there is no
+     * Kool scene behind this pipeline - the ordering tests, which draw nothing.
+     */
+    internal val passes: ScenePasses? = null,
 ) {
 
     private val extra = ArrayList<RenderResource>()

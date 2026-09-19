@@ -5,6 +5,7 @@ import de.fabmax.kool.math.Vec2i
 import de.fabmax.kool.math.Vec3f
 import de.fabmax.kool.pipeline.AttachmentConfig
 import de.fabmax.kool.pipeline.ClearColorFill
+import de.fabmax.kool.pipeline.OffscreenPass
 import de.fabmax.kool.pipeline.OffscreenPass2d
 import de.fabmax.kool.pipeline.TexFormat
 import de.fabmax.kool.scene.Camera
@@ -56,7 +57,7 @@ internal class KoolSurface(
     val height: Int,
     private val windowWidth: Int,
     private val windowHeight: Int,
-) : FrameSurface {
+) : FrameSurface, ScenePasses {
 
     private val offscreenBatch = SpriteBatch2D(SpriteTexture.whitePixel("udea-offscreen-white"))
     private val screenBatch = SpriteBatch2D(SpriteTexture.whitePixel("udea-screen-white"))
@@ -104,6 +105,7 @@ internal class KoolSurface(
         screenBatch = screenBatch,
         surface = this,
         pixels = KoolPixelSource(pass),
+        passes = this,
         // Construction order, released in reverse: the scene goes before the batches whose
         // textures its meshes sample.
         owned = listOf(
@@ -128,6 +130,15 @@ internal class KoolSurface(
         attachedTo?.removeScene(scene)
         attachedTo = null
         scene.release()
+    }
+
+    override fun addBeforeCapture(pass: OffscreenPass) {
+        scene.addOffscreenPass(pass)
+        this.pass.dependsOn(pass)
+    }
+
+    override fun remove(pass: OffscreenPass) {
+        scene.removeOffscreenPass(pass)
     }
 
     override fun begin() {

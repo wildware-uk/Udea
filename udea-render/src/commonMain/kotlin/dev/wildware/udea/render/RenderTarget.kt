@@ -2,6 +2,7 @@ package dev.wildware.udea.render
 
 import dev.wildware.udea.render.capture.PixelSource
 import dev.wildware.udea.render.draw.SpriteBatch2D
+import dev.wildware.udea.render.kool.ScenePasses
 
 /**
  * Somewhere a frame can be drawn.
@@ -104,6 +105,8 @@ public class RenderTargets internal constructor(
     internal val pixels: PixelSource? = null,
     /** Resources whose lifetime the pipeline owns, in construction order. Released in reverse. */
     internal val owned: List<RenderResource> = emptyList(),
+    /** Where a system adds a pass of its own, or `null` when there is no Kool scene behind this. */
+    internal val passes: ScenePasses? = null,
 ) {
 
     override fun toString(): String = "RenderTargets(offscreen=$offscreen, screen=$screen, " +

@@ -33,11 +33,7 @@ internal class ScenePicker(private val view: WorldViewport) {
     private val camera: EditorCamera = checkNotNull(view.camera) { "$view is the Game tab, which the editor does not pick in" }
 
     /** Every entity drawn under view pixel ([x], [y]), front-most first, each once. */
-    fun under(x: Float, y: Float): List<NetId> = collect()
-        .filter { it.contains(x, y) }
-        .sortedWith(FRONT_FIRST)
-        .map { it.entity }
-        .distinct()
+    fun under(x: Float, y: Float): List<NetId> = frontFirst { it.contains(x, y) }
 
     /**
      * Every entity whose drawn rectangle touches the view rectangle from ([left], [bottom]) to
@@ -48,12 +44,12 @@ internal class ScenePicker(private val view: WorldViewport) {
         val maxX = maxOf(left, right)
         val minY = minOf(bottom, top)
         val maxY = maxOf(bottom, top)
-        return collect()
-            .filter { it.left <= maxX && it.right >= minX && it.bottom <= maxY && it.top >= minY }
-            .sortedWith(FRONT_FIRST)
-            .map { it.entity }
-            .distinct()
+        return frontFirst { it.left <= maxX && it.right >= minX && it.bottom <= maxY && it.top >= minY }
     }
+
+    /** The entities of every rectangle [where] holds for, front-most first, each once. */
+    private inline fun frontFirst(where: (Bounds) -> Boolean): List<NetId> =
+        collect().filter(where).sortedWith(FRONT_FIRST).map { it.entity }.distinct()
 
     /** Each on-screen rectangle [entities] are drawn over, for outlining a selection. */
     fun bounds(entities: Collection<NetId>): List<Bounds> {

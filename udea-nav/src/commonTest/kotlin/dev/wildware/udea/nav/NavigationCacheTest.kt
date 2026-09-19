@@ -80,12 +80,16 @@ class NavigationCacheTest {
         // `Navigation` holding entries across one would be holding them against a different object.
         val navigation = navigation(wall)
         val goal = navigation.grid.cellAt(4f, 0f)
-        navigation.flowField(goal, clearanceCells = 1)
+        val before = navigation.flowField(goal, clearanceCells = 1)
         assertEquals(1, navigation.fieldSweeps)
 
         navigation.rebuild(NavGridBuilder(layout).block(wall[0], wall[1], wall[2], wall[3]).build())
-        navigation.flowField(goal, clearanceCells = 1)
+        val after = navigation.flowField(goal, clearanceCells = 1)
 
-        assertEquals(1, navigation.fieldSweeps, "the field was handed out from the cache of the previous grid")
+        // The two fields hold the same numbers, so only their identity can tell them apart: the
+        // second is swept over the grid that is standing, and the first is not.
+        assertNotEquals(before, after, "the field was handed out from the cache of the previous grid")
+        assertEquals(1, navigation.fieldSweeps, "the sweep counter belongs to the grid, and starts again with it")
+        assertEquals(before.cost(navigation.grid.cellAt(-4f, 0f)), after.cost(navigation.grid.cellAt(-4f, 0f)))
     }
 }

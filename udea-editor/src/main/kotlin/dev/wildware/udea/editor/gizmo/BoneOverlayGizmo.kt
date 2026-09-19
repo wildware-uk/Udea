@@ -5,6 +5,7 @@ import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.render.model.ModelRenderSystem
 import dev.wildware.udea.render.model.ModelSkeleton
+import dev.wildware.udea.render.view.ViewDimension
 import dev.wildware.udea.render.view.WorldViewport
 
 /**
@@ -58,6 +59,10 @@ public data class SkeletonJoint(val at: WorldPoint, val parent: Int) {
  * The joints [models] draws, as [view] shows them: `ModelRenderSystem.skeletonOf` read into
  * [SkeletonJoint]s. The Scene tab passes itself, so its overlay follows its scrub preview; `null`
  * reads the capturable frame's simulated pose.
+ *
+ * None while [view] is in [ViewDimension.TwoD]: the Scene tab draws models through its 3D orbit in
+ * either dimension, but places a gizmo through its 2D camera in 2D, so a joint would be drawn where
+ * its model is not.
  */
 public fun modelSkeletons(models: ModelRenderSystem, view: WorldViewport?): SkeletonSource = ModelSkeletons(models, view)
 
@@ -66,6 +71,7 @@ private class ModelSkeletons(private val models: ModelRenderSystem, private val 
     private val read = ModelSkeleton()
 
     override fun skeletonOf(entity: NetId): List<SkeletonJoint> {
+        if (view?.camera?.dimension == ViewDimension.TwoD) return emptyList()
         if (!models.skeletonOf(entity, view, read)) return emptyList()
         return List(read.size) { joint ->
             SkeletonJoint(WorldPoint(read.x(joint), read.y(joint), read.z(joint)), read.parent(joint))

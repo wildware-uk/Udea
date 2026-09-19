@@ -245,6 +245,14 @@ class GlAnimationPreviewTest {
             assertEquals(0, count(gameTab.capture, ::isMark), "the bone overlay reached the capturable frame")
             backend.onRenderThread { views.game.showGizmos = false }
 
+            // The Scene tab in 2D still draws the fox through its 3D orbit, but would place a gizmo
+            // through its 2D camera: there is nowhere right for a joint, so no bone is drawn.
+            backend.onRenderThread { scene.dimension = ViewDimension.TwoD }
+            val flat = frame(backend, slot, views)
+            save(flat.scene, "animation-preview-scene-2d.png")
+            assertEquals(0, count(flat.scene, ::isMark), "the Scene tab in 2D drew bones through its 2D camera")
+            backend.onRenderThread { scene.dimension = ViewDimension.ThreeD }
+
             // 3. Leaving the preview draws the simulated pose again, exactly.
             backend.onRenderThread { panel.preview(false) }
             editorFrames(backend, session, bridge, id)

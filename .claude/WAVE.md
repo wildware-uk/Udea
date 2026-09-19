@@ -458,6 +458,12 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   SnapshotRing.kt:187 require. Relayed verbatim. **Ledger (passed r1):** build 928 green; evidence 5/5, M1 red 2/5;
   Stop between ticks (AgentGameLoop.pump drains before host.frame); standalone honest (separate MobaAgent JVM, UNDEAD
   11); public API used cross-module. Out of scope: stale score bar/camera after Stop.
+- **#188 MERGED `569e8de`**, round 1 PASS, no findings. `MobaHudScreen` (ComposeGL composables) replaces the
+  BitmapFont2D HUD; HudState/MobaHudModel/MobaHudTest byte-unchanged. New udea-render `CapturedUi` (internal ctor, via
+  RenderResources.capturedUi(fonts)): second Kool view on the capturable OffscreenPass2d so game HUD is IN captures;
+  UiLayer/overlay/editor stay out (structural). DejaVu Sans font in moba:desktop with licence beside it. runMatchShot
+  checks HUD panels in all 7 PNGs (+ dead.png). HeadlessHostTest 6863/6864 = load flake (udea-core). Card: licence
+  header text copied from udea-editor names the wrong module. Worktree kept `.claude/worktrees/agent-a80b8fdec32c67256`.
 - Held: #241 A2 (asset compiler clip gen collides with #195), gizmo G2 #233 / G3 #234 (udea-editor busy), #189.
 - Remaining for #214: #195, #196 (then docs + kmp -> master). Shelved #223/#226 stay open (owner's shelving).
 

@@ -126,6 +126,16 @@ public object DeterminismRules {
                 "hashes and rewind restores, so every line of it is authoritative state.",
         ),
         SimScope(
+            project = ":udea-nav",
+            sourceSet = "main",
+            packagePrefixes = emptyList(),
+            why = "The nav grid, both planners and the movement system run inside world.update " +
+                "and write Transform3D, which WorldHasher hashes and rewind restores. A unit's " +
+                "next step is re-derived from the grid every tick rather than remembered, so " +
+                "anything non-deterministic here diverges a client from its server silently. " +
+                "The nav.* toolset is jvmMain and is not simulation; it only reads.",
+        ),
+        SimScope(
             // `:moba:game` since issue #212 split the launchers off. The game's rules are the
             // whole of what simulates; neither launcher holds a system.
             project = ":moba:game",

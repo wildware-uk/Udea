@@ -35,7 +35,7 @@ public class ReplayDigestHeader(
     /** `os.name` and `os.arch` of the machine that produced the stream. Recorded, not asserted. */
     public val os: String,
     /**
-     * The Gradle project whose `udeaReplayDigest` produced this stream, e.g. `:moba`.
+     * The Gradle project whose `udeaReplayDigest` produced this stream, e.g. `:moba:desktop`.
      *
      * Carried because the join step has to tell a reader how to reproduce a divergence and cannot
      * work it out: `ReplayEqualsMain` reads nothing but the files, and since issue #172 two

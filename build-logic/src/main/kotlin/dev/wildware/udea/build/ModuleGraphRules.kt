@@ -60,6 +60,19 @@ public object ModuleGraphRules {
     public val GL_ALLOWED_PROJECTS: Set<String> = setOf(":udea-render", ":udea-agent-host")
 
     /**
+     * The game, as every path it has had or is planned to have.
+     *
+     * `:moba:game` is the library, and `:moba:desktop` and `:moba:android` are the launchers that
+     * ship it (issue #212); a rule about what the shipped game carries has to read all three,
+     * because each launcher's classpath is the game's plus its own. `:moba` stays in although that
+     * project no longer exists, so re-creating a flat `moba` cannot re-open a rule, and `:moba:web`
+     * is there ahead of issue #226. `ModuleGraphRulesTest` fails a rule that governs only paths
+     * `settings.gradle.kts` does not include, which is what a flat `:moba` alone would now be.
+     */
+    internal val MOBA_PROJECTS: Set<String> =
+        setOf(":moba", ":moba:game", ":moba:desktop", ":moba:android", ":moba:web")
+
+    /**
      * Every module that must stay free of GL: the whole `udea-*` tree except
      * [GL_ALLOWED_PROJECTS].
      *
@@ -246,8 +259,9 @@ public object ModuleGraphRules {
     )
 
     /**
-     * Passes trivially while `moba` is empty. That is the point: it is placed before Phase 2
-     * has a reason to reach for `kotlin-scripting-jvm-host`.
+     * Placed before Phase 2 had a reason to reach for `kotlin-scripting-jvm-host`, as a ratchet.
+     * It governs [MOBA_PROJECTS]: scoped to the flat `:moba` alone, it scanned nothing once issue
+     * #212 split that project up.
      */
     public val NO_SCRIPTING_OR_REFLECTION_IN_THE_GAME: DependencyRule = DependencyRule(
         id = RuleId("UDEA-MG-005"),
@@ -257,7 +271,7 @@ public object ModuleGraphRules {
             "reflection-on-hot-paths smell the rewrite exists to kill. Asset scripts are compiled " +
             "at build time; discovery is a generated registry, not classpath scanning.",
         specSection = "6 (Phase 2 exit), 3.6",
-        projects = setOf(":moba"),
+        projects = MOBA_PROJECTS,
         configurations = setOf("runtimeClasspath"),
         banned = listOf(
             CoordinatePattern("org.jetbrains.kotlin:kotlin-scripting-*"),
@@ -335,6 +349,34 @@ public object ModuleGraphRules {
         ),
     )
 
+    /**
+     * The game draws with Kool too, because it draws through `udea-render` (issue #212).
+     *
+     * `moba` was the last project in the rewrite tree with LibGDX on it: it named `libs.gdx` to
+     * write a `RenderSystem` against `Batch`, and `gdx-box2d` plus its desktop natives for a
+     * physics world spec D4 retires with LibGDX. Both are gone with the split, and this is what
+     * stops either coming back through a nested project nobody thought to check.
+     *
+     * Every `:moba:*` project, not only the one that used to name it: `:moba:desktop` and
+     * `:moba:android` each resolve `:moba:game`, so a gdx artifact reintroduced on any of them
+     * reaches the shipped game the same way.
+     */
+    public val MOBA_HAS_NO_LIBGDX: DependencyRule = DependencyRule(
+        id = RuleId("UDEA-MG-009"),
+        summary = "no moba project resolves a LibGDX artifact",
+        rationale = "moba draws through udea-render, which draws with Kool (issue #211). LibGDX " +
+            "on a moba classpath is a second renderer in the shipped game - the parallel-renderer " +
+            "arrangement spec D9 rejected - and it is how the Box2D world spec D4 retires would " +
+            "come back. The rule covers every target classpath each nested project has.",
+        specSection = "kool port 3, 4, D4, D9, D12",
+        projects = MOBA_PROJECTS,
+        configurations = setOf("compileClasspath", "runtimeClasspath"),
+        banned = listOf(
+            CoordinatePattern("com.badlogicgames.gdx:*"),
+            CoordinatePattern("dev.wildware.composegl:composegl-gdx*"),
+        ),
+    )
+
     /** Every rule, in id order. */
     public val ALL: List<DependencyRule> = listOf(
         ANNOTATIONS_ARE_A_LEAF,
@@ -345,6 +387,7 @@ public object ModuleGraphRules {
         ASSETS_MODEL_IS_A_LEAF,
         VENDORED_FLEKS_IS_A_LEAF,
         RENDER_HAS_NO_LIBGDX,
+        MOBA_HAS_NO_LIBGDX,
     )
 
     /** True when [projectPath] is part of the rewrite tree and therefore subject to [ALL]. */

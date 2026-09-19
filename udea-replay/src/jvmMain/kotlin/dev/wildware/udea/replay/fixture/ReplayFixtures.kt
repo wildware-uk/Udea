@@ -159,7 +159,7 @@ public object ReplayFixtures {
      * Fails unless every status is [ReplayFixtureStatus.Outcome.CURRENT] or regenerated.
      *
      * @param gradleTask the task that owns these fixtures, e.g. `:udea-replay:jvmTest`. It is the
-     *   caller's because the fixtures are: `moba`'s live under `:moba:test` and this module's
+     *   caller's because the fixtures are: `moba`'s live under `:moba:desktop:test` and this module's
      *   under `:udea-replay:jvmTest`, and a message naming the wrong one sends a reader to a task
      *   that would rebuild nothing.
      */

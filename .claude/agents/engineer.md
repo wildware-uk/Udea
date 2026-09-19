@@ -57,7 +57,7 @@ late contract change breaks several modules at once and the breakage is silent.
 ## There is no art step, and you type nothing
 
 **Your worktree does not have the sprites, and it does not need them.**
-`moba/assets/sprites/` is gitignored — it is third-party licensed art from the Tiny RPG Character
+`moba/game/assets/sprites/` is gitignored — it is third-party licensed art from the Tiny RPG Character
 Asset Pack (`docs/art-assets.md`) that this repository has no right to sublicense — so a fresh
 worktree carries none of it. The build stages it for you: `:moba:udeaStageCharacterArt` copies the
 sheets out of `example/src/main/resources/assets/sprites/`, where they already are, ahead of the

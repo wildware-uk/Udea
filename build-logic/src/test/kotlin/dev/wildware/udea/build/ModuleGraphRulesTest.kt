@@ -114,6 +114,39 @@ class ModuleGraphRulesTest {
     }
 
     @Test
+    fun `UDEA-MG-009 fails LibGDX on every nested moba project`() {
+        // Issue #212: `moba` drew with `Batch` and solved collisions with `gdx-box2d`, and both
+        // left with LibGDX. `:moba:desktop` and `:moba:android` each resolve `:moba:game`, so the
+        // ban has to name all of them or the artifact comes back one project along.
+        listOf(":moba", ":moba:game", ":moba:desktop", ":moba:android", ":moba:web").forEach { project ->
+            val violations = violate(
+                project,
+                "runtimeClasspath",
+                graph(project, "com.badlogicgames.gdx:gdx", "com.badlogicgames.gdx:gdx-box2d"),
+            )
+            assertEquals(
+                listOf("com.badlogicgames.gdx:gdx", "com.badlogicgames.gdx:gdx-box2d"),
+                violations.map { it.coordinate },
+                "$project is not guarded",
+            )
+            assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-009") }, "$project")
+        }
+    }
+
+    @Test
+    fun `UDEA-MG-009 leaves Kool alone - the game draws through udea-render, which draws with Kool`() {
+        // The ban is on the renderer that left, not on drawing. `:moba:desktop` resolves Kool
+        // transitively through `udea-render` and that is the arrangement, not a violation.
+        assertTrue(
+            violate(
+                ":moba:desktop",
+                "runtimeClasspath",
+                graph(":moba:desktop", "de.fabmax.kool:kool-core", ":udea-render"),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
     fun `UDEA-MG-002 leaves udea-render alone - it is the module allowed to see GL`() {
         assertTrue(
             violate(
@@ -468,6 +501,32 @@ class ModuleGraphRulesTest {
             val violations = violate(it, "compileClasspath", graph(it, "com.badlogicgames.gdx:gdx-backend-lwjgl3"))
             assertEquals(RuleId("UDEA-MG-002"), violations.single().ruleId, "$it is not guarded")
         }
+    }
+
+    @Test
+    fun `every rule governs at least one project settings_gradle_kts includes`() {
+        // A rule scoped only to projects that do not exist scans nothing and passes for ever,
+        // and nothing about it looks wrong: `udeaVerifyModuleGraph` is green because there is no
+        // classpath to fail. Issue #212 split `:moba` into nested projects, and UDEA-MG-005 - the
+        // ban on a scripting host and a classpath scanner in the shipped game - was still scoped
+        // to the flat `:moba` that no longer exists. A rule may still name a path that is gone
+        // (MG-009 keeps `:moba` so re-creating it cannot re-open the hole); it may not name
+        // *only* such paths.
+        val settings = File("../settings.gradle.kts").canonicalFile
+        assertTrue(settings.isFile, "settings.gradle.kts not found at ${settings.absolutePath}")
+        val included = Regex("""^include\("([a-z0-9:-]+)"\)""", RegexOption.MULTILINE)
+            .findAll(settings.readText())
+            .map { ":" + it.groupValues[1] }
+            .toSet()
+        assertTrue(
+            ":moba:game" in included && ":udea-core" in included,
+            "the settings scan found only $included - the regex has stopped matching, so this " +
+                "test would pass against nothing",
+        )
+        val scanningNothing = ModuleGraphRules.ALL
+            .filter { it.projects.isNotEmpty() && it.projects.none { project -> project in included } }
+            .map { "${it.id.value} governs only ${it.projects.sorted()}" }
+        assertEquals(emptyList(), scanningNothing, "rules that govern no project in settings.gradle.kts")
     }
 
     @Test

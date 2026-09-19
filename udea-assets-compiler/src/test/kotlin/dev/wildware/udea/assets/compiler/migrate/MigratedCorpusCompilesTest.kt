@@ -16,12 +16,12 @@ import kotlin.test.assertTrue
  * ## The corpus is the game's one asset root now
  *
  * It used to be `moba/src/main/assets`, a tree nothing packed and nothing shipped, sitting beside
- * `moba/assets` - the smaller hand-reduced root the build actually pointed at. Two roots, and the
+ * `moba/game/assets` - the smaller hand-reduced root the build actually pointed at. Two roots, and the
  * reason was never that the corpus failed to compile: it was that `character`, `gameplayEffect`
  * and `effect` were `AssetKind.Unpublishable`, so packing the corpus dropped all twenty-seven of
  * `level/test_level`'s entity references and produced a bundle with a level that spawned nothing.
  * With those three kinds published the two roots are one, `moba/src/main/assets` is deleted, and
- * this test runs over the tree `:moba:udeaPackBundle` packs and `MobaGame` boots.
+ * this test runs over the tree `:moba:game:udeaPackBundle` packs and `MobaGame` boots.
  *
  * That is what makes it a live check rather than a museum piece: it now fails when somebody
  * breaks the running game's assets, not only when somebody breaks a corpus nobody loads.
@@ -35,7 +35,7 @@ import kotlin.test.assertTrue
  */
 class MigratedCorpusCompilesTest {
 
-    private val root = TestPaths.repoRoot.resolve("moba/assets")
+    private val root = TestPaths.repoRoot.resolve("moba/game/assets")
 
     @Test
     fun `every migrated script compiles and validates with zero errors`() {

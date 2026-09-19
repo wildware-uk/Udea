@@ -9,7 +9,7 @@ package dev.wildware.udea.agent.host
  * one.
  *
  * Until the editor window (#194) exists, the switch is a JVM property, `-Dudea.editor=true`, which
- * `:moba:run` forwards from `-Peditor=true`.
+ * `:moba:desktop:run` forwards from `-Peditor=true`.
  */
 public object EditorMode {
 

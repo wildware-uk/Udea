@@ -75,6 +75,16 @@ class LegacyDependencyRulesTest {
     }
 
     @Test
+    fun `the game's nested projects are governed too`() {
+        // Issue #212 split the game (spec D12). Matching `:moba` alone would have left all three
+        // of these ungoverned by this rule, by the module-graph rules that delegate to it, and by
+        // the compiler-plugin wiring - none of which reports a project it skipped.
+        assertTrue(LegacyDependencyRules.governs(":moba:game"))
+        assertTrue(LegacyDependencyRules.governs(":moba:desktop"))
+        assertTrue(LegacyDependencyRules.governs(":moba:android"))
+    }
+
+    @Test
     fun `the report names the task, the module, the configuration and the coordinate`() {
         val report = assertNotNull(
             LegacyDependencyRules.report(

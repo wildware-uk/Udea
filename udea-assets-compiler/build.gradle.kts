@@ -71,10 +71,10 @@ tasks.withType<Test>().configureEach {
     // measure. Without it the test task's up-to-date check sees only Kotlin sources and the
     // classpath, so editing a `.udea.kts` and re-running leaves the task UP-TO-DATE and Gradle
     // re-publishes the previous, passing report. That was observed here, not theorised: a
-    // deliberately broken reference in `moba/assets/character/orc.udea.kts` produced a
+    // deliberately broken reference in `moba/game/assets/character/orc.udea.kts` produced a
     // green `MigratedCorpusCompilesTest` twice, `cleanTest` included, until this was declared.
     // A corpus check whose corpus is not an input is a check that silently stops running.
-    inputs.dir(rootProject.layout.projectDirectory.dir("moba/assets"))
+    inputs.dir(rootProject.layout.projectDirectory.dir("moba/game/assets"))
         .withPropertyName("migratedAssetCorpus")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(rootProject.layout.projectDirectory.dir("example/src/main/resources/assets"))
@@ -82,18 +82,18 @@ tasks.withType<Test>().configureEach {
         .withPathSensitivity(PathSensitivity.RELATIVE)
 
     // Part of that first tree is **produced**, so these tasks have to be ordered after the task
-    // that produces it. `moba/assets/sprites` is gitignored licensed art and
-    // `:moba:udeaStageCharacterArt` copies it in from the tree that holds it (issue #170); Gradle
+    // that produces it. `moba/game/assets/sprites` is gitignored licensed art and
+    // `:moba:game:udeaStageCharacterArt` copies it in from the tree that holds it (issue #170); Gradle
     // rejects the whole graph rather than the tests, with "uses this output of task
-    // ':moba:udeaStageCharacterArt' without declaring an explicit or implicit dependency".
+    // ':moba:game:udeaStageCharacterArt' without declaring an explicit or implicit dependency".
     //
-    // Naming a task of `:moba` from an engine module is worth a sentence, because it looks like
+    // Naming a task of `:moba:game` from an engine module is worth a sentence, because it looks like
     // an arrow pointing the wrong way and is not one. This is not a classpath edge -
     // `UDEA-MG-*` and `UDEA-LEGACY-001` read resolved configurations, and this module resolves
-    // nothing of `:moba` - it is build ordering for a corpus these tests already read by path,
+    // nothing of `:moba:game` - it is build ordering for a corpus these tests already read by path,
     // deliberately, and have since `MigratedCorpusCompilesTest` was written. The alternative is
     // an undeclared read of a file another task writes, which is the flake Gradle is describing.
-    dependsOn(":moba:${CharacterArtStaging.TASK}")
+    dependsOn(":moba:game:${CharacterArtStaging.TASK}")
 
     // The script classpath used by AssetCompilerTest, and the classpath the forked worker is
     // launched with. It is this module's own test runtime classpath, which is what makes the
@@ -180,12 +180,12 @@ tasks.register<Test>("udeaScanBudget") {
 //
 //   ./gradlew :udea-assets-compiler:udeaMigrateAssets \
 //       -Pudea.migrate.from=example/src/main/resources/assets \
-//       -Pudea.migrate.to=moba/assets
+//       -Pudea.migrate.to=moba/game/assets
 
 val migrateFrom: String = providers.gradleProperty("udea.migrate.from")
     .getOrElse("example/src/main/resources/assets")
 val migrateTo: String = providers.gradleProperty("udea.migrate.to")
-    .getOrElse("moba/assets")
+    .getOrElse("moba/game/assets")
 val migrateDryRun: Boolean = providers.gradleProperty("udea.migrate.dryRun").isPresent
 
 tasks.register<JavaExec>("udeaMigrateAssets") {

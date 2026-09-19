@@ -50,7 +50,7 @@ async function loadConfig() {
   assert.ok(
     project,
     `no launch declaration found walking up from ${repoRoot} (looked for ${CONFIG_FILENAMES.join(", ")}). ` +
-      "It is generated, not committed: run `./gradlew :moba:udeaGenerateLaunchDeclaration` " +
+      "It is generated, not committed: run `./gradlew :moba:desktop:udeaGenerateLaunchDeclaration` " +
       "(or any `assemble`/`run`, which depend on it) and try again."
   );
   return project;
@@ -77,7 +77,7 @@ test("the bridge's own finder locates the declaration and parses it", async () =
  * polls the one it chose: reported as a boot timeout, for a game that booted perfectly.
  *
  * What no static check can prove is that the forwarding still *works* end to end - that is a
- * live launch of `:moba:run`, which needs a display this job does not have. It is stated here as
+ * live launch of `:moba:desktop:run`, which needs a display this job does not have. It is stated here as
  * the remaining gap rather than papered over with a longer regex: `AgentJvmArguments` turning
  * `-PdebugPort` into `-Dudea.agent.port` is covered by `UdeaAgentPluginTest` in `udea-gradle`,
  * and the socket half is covered by the live instance the rest of this directory drives.

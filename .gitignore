@@ -67,25 +67,25 @@ scripts/cache/
 # Third-party character art (Tiny RPG Character Asset Pack parts 1 & 2).
 # Licensed art, NOT redistributable under this repo's terms - see docs/art-assets.md.
 # Extract locally with scripts/extract-art.py; the manifest is committed, the pixels are not.
-moba/src/main/resources/assets/sprites/
+moba/game/src/commonMain/resources/assets/sprites/
 moba/raw-assets/
 #
 # The same pack, at the path the packed bundle reads from. The wave that brought the characters
 # back copied the pack's sheets here - four of the six characters (wizard, priest, skeleton,
 # orc_elite) are from the *paid* pack, which docs/art-assets.md calls "the part that matters".
 # Committing them would have doubled an exposure that file already recommends removing.
-# `:moba:udeaStageCharacterArt` puts them here from art the repository already holds, on every
+# `:moba:game:udeaStageCharacterArt` puts them here from art the repository already holds, on every
 # build, which is why a clone builds without any manual step and still commits none of them.
-moba/assets/sprites/*
-!moba/assets/sprites/champion_idle.png
+moba/game/assets/sprites/*
+!moba/game/assets/sprites/champion_idle.png
 #
 # The arrow is not from that pack and is not new exposure: `arrow.png` has been committed at
 # `example/src/main/resources/assets/sprites/arrow/arrow.png` since the old game shipped, and the
-# copy under `moba/assets/sprites/arrow/` is the same 260-byte file at the path the packed bundle
+# copy under `moba/game/assets/sprites/arrow/` is the same 260-byte file at the path the packed bundle
 # reads from. It is excepted here rather than filed under `effects/` because the `.udea.kts` that
 # declares it has to sit beside it, and an ignored asset script is a build that packs on this
 # machine and fails on a fresh clone with a missing `spritePath`.
-!moba/assets/sprites/arrow/
+!moba/game/assets/sprites/arrow/
 
 # `gamebridge.json` - the launch declaration `game-bridge-mcp` reads.
 #
@@ -116,3 +116,8 @@ moba/assets/sprites/*
 # Gradle invocation gives you a launchable project" is a thing CI proves rather than a thing this
 # comment asserts. If the file is missing, that suite fails and names the task to run.
 gamebridge.json
+
+# LWJGL extracts its native libraries into the working directory of whatever launched it - a
+# desktop launcher run from its own project directory leaves `moba/desktop/.lwjgl/` behind. They
+# are a cache of jars already in the Gradle cache, never source (issue #212).
+**/.lwjgl/

@@ -3,12 +3,12 @@
 Source: **Tiny RPG Character Asset Pack**, parts 1 and 2 (40 characters).
 
 The pixels are **not committed** - they are third-party licensed art and this repo is public.
-`.gitignore` excludes `moba/src/main/resources/assets/sprites/`, `moba/assets/sprites/` and
+`.gitignore` excludes `moba/src/main/resources/assets/sprites/`, `moba/game/assets/sprites/` and
 `moba/raw-assets/`.
 
-`moba/assets/sprites/` is the path the character scripts under `moba/assets/character/` actually
-name and the one `:moba:udeaPackBundle` reads, so a clone carries none of it. **The build puts it
-there.** `:moba:udeaStageCharacterArt` copies the sheets out of
+`moba/game/assets/sprites/` is the path the character scripts under `moba/game/assets/character/` actually
+name and the one `:moba:game:udeaPackBundle` reads, so a clone carries none of it. **The build puts it
+there.** `:moba:game:udeaStageCharacterArt` copies the sheets out of
 `example/src/main/resources/assets/sprites/`, where this repository already holds them, and runs
 ahead of `udeaScanAssets`, `udeaValidateAssets` and `udeaPackBundle`.
 
@@ -18,7 +18,7 @@ Nothing. Build the game:
 
 <!-- verify-art-staging: the documented step begins -->
 ```
-./gradlew :moba:build
+./gradlew :moba:game:build
 ```
 <!-- verify-art-staging: the documented step ends -->
 
@@ -37,7 +37,7 @@ genuine failures sat unnoticed in the same runs. The script is gone; its knowled
 belong where is `CharacterArtStaging` in `build-logic`, held against the sprites the real asset
 scripts name by `CharacterArtStagingTest`.
 
-If `:moba:udeaValidateAssets` ever fails with `UDEA0032` on a `spritePath` again, it now means one
+If `:moba:game:udeaValidateAssets` ever fails with `UDEA0032` on a `spritePath` again, it now means one
 of two things and neither of them is "you forgot a step": a character was added whose sheets
 nothing stages (that test says which), or the committed tree the sheets come from has moved.
 
@@ -58,8 +58,8 @@ separate things make it useless as a fresh-clone step:
   needs files nobody who clones this repository has.
 - Its `MOBA` destination is an absolute path on the author's own machine.
 - It writes `sprites/<char>/idle.png`, lowercased and un-hyphenated, under
-  `moba/src/main/resources/assets/sprites/` — the old asset root. `moba/assets/character/*.udea.kts`
-  name `sprites/wizard/Wizard-Idle.png` under `moba/assets/`. Neither the root nor the filenames
+  `moba/src/main/resources/assets/sprites/` — the old asset root. `moba/game/assets/character/*.udea.kts`
+  name `sprites/wizard/Wizard-Idle.png` under `moba/game/assets/`. Neither the root nor the filenames
   match.
 
 It is kept, and not only for provenance: **it is the only thing that produces its output.**
@@ -77,7 +77,7 @@ again. The paid corpus is now the *additional* run — `RealArtAtlasPackerTest` 
 archives are absent, and that skip now means "the real pixels were not checked here" rather than
 "the property was not checked at all".
 
-Do not repoint the real-art tests at the art `:moba:udeaStageCharacterArt` puts in place: that
+Do not repoint the real-art tests at the art `:moba:game:udeaStageCharacterArt` puts in place: that
 stages 33 sheets for six characters, and the corpus shape is the point of those tests.
 
 This manifest IS committed so blueprints, issues and champion designs can name real
@@ -236,10 +236,10 @@ $ git log --oneline --diff-filter=A -- scripts/stage-moba-art.py
 lists the deletion too.)
 
 That script is gone — issue #170 moved the copying into the build — and the dependency it created
-is not. Four of the six characters `:moba:udeaStageCharacterArt` stages — `wizard`, `priest`,
+is not. Four of the six characters `:moba:game:udeaStageCharacterArt` stages — `wizard`, `priest`,
 `skeleton`, `orc_elite` — are the four paid directories, and they are the only copy in the
 repository.
-Deleting them makes `:moba:udeaValidateAssets` fail on every fresh clone with nothing to replace
+Deleting them makes `:moba:game:udeaValidateAssets` fail on every fresh clone with nothing to replace
 it. Option 2 stopped being "a placeholder swap in a module being deleted anyway" the moment the
 new game started reading from the old module's art, and nobody noticed because the two changes
 landed in the same wave.
@@ -281,7 +281,7 @@ the last step alone breaks the build. `scripts/verify-art-staging.py` will tell 
 
 ### The ongoing mechanism for `moba`'s art
 
-**Unchanged in substance, and deliberately so:** `.gitignore` excludes `moba/assets/sprites/`,
+**Unchanged in substance, and deliberately so:** `.gitignore` excludes `moba/game/assets/sprites/`,
 the build populates it from art the repository already holds, and this file is the committed
 manifest. Issue #170 changed only who runs the copying — the build rather than a person who had
 read this file. Three alternatives were considered for the same decision and rejected:

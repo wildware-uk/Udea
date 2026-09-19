@@ -95,10 +95,11 @@ class KotlinClockTest {
             parentFile.mkdirs()
             writeBytes(classBytes(internalName, sourceName, methods))
         }
+        val project = ":" + module.replace('/', ':')
         val inputs = DeterminismRules.SIMULATION_SCOPES
-            .filter { it.project == ":$module" }
+            .filter { it.project == project }
             .map { DeterminismLayout.scopeInput(repo, it) }
-        assertEquals(1, inputs.size, "no declared simulation scope for :$module")
+        assertEquals(1, inputs.size, "no declared simulation scope for $project")
         return DeterminismScan.run(inputs = inputs, allowlist = Allowlist.parse(""), repoRoot = repo)
     }
 
@@ -323,7 +324,7 @@ class KotlinClockTest {
         assertEquals("", throughInterface.rendered())
 
         val presentation = plant(
-            module = "moba",
+            module = "moba/game",
             className = "dev.wildware.moba.hud.HudClockKt",
             sourceLines = listOf(
                 "package dev.wildware.moba.hud",
@@ -335,6 +336,6 @@ class KotlinClockTest {
             methods = listOf(systemNow("kotlin/time", line = 5), markNow(line = 5)),
         )
         assertEquals("", presentation.rendered())
-        assertTrue(presentation.scannedClasses.getValue(":moba") > 0, "the control scanned nothing")
+        assertTrue(presentation.scannedClasses.getValue(":moba:game") > 0, "the control scanned nothing")
     }
 }

@@ -53,4 +53,17 @@ include("udea-agent-host")
 // `udea-agent` and nothing that has ever seen a device.
 include("udea-replay")
 include("udea-gradle")
-include("moba")
+
+// --- the example game, as four nested projects (spec D12, issue #212) ------------------------
+//
+// One module per thing that can be built on its own, rather than flat `moba-*` modules: the game
+// is a library with no `main` in it, and each launcher is a project whose targets are decided by
+// the platform it launches on rather than by the game's.
+//
+// `:moba:web` is deliberately absent rather than declared and empty. Kool publishes no `wasmJs`
+// artifact (issue #223), so `udea-render` has no `wasmJs` target and a browser client cannot be
+// built today; issue #226 adds this line with the module it names. A project declared now would
+// be one that fails resolution on every build, which is worse than one that does not exist.
+include("moba:game")
+include("moba:desktop")
+include("moba:android")

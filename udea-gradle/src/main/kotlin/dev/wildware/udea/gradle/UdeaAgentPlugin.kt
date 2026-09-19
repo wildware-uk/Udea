@@ -258,7 +258,7 @@ public class UdeaAgentPlugin : Plugin<Project> {
      * because this module compiles against `gradleApi()` alone and has no Kotlin Gradle plugin
      * types to name. The Kotlin compilation the KGP creates for a source set sources that source
      * set's java directories as well as `src/<name>/kotlin`, so a generated `.kt` there is
-     * compiled - which `:moba:compileAgentKotlin` demonstrates rather than assumes.
+     * compiled - which `:moba:desktop:compileAgentKotlin` demonstrates rather than assumes.
      */
     private fun createAgentSourceSet(project: Project, extension: UdeaAgentExtension): SourceSet {
         val java = project.extensions.getByType(JavaPluginExtension::class.java)

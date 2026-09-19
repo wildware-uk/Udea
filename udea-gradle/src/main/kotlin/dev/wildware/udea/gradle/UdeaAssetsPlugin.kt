@@ -159,7 +159,7 @@ public abstract class UdeaAssetTask : DefaultTask() {
  * [scan] skips the fork entirely in that case. That is the whole of the incrementality here and
  * the limit is deliberate rather than unfinished:
  *
- * - **Measured, the fork is the cost.** On `moba/assets` - a couple of dozen scripts declaring a
+ * - **Measured, the fork is the cost.** On `moba/game/assets` - a couple of dozen scripts declaring a
  *   couple of hundred assets - a whole-tree rescan is about 1.6s wall, and almost all of it is JVM
  *   start-up plus building the PSI environment. Re-parsing the handful of small files that were
  *   going to be parsed anyway is not where the time goes, so per-file scoping would buy a fraction

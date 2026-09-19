@@ -163,14 +163,14 @@ val outerBuildInputs: FileCollection = files(
         include("*/build.gradle.kts")
         include("build.gradle.kts")
         include("udea-gradle/src/**")
-        include("moba/src/**/*.kt")
+        include("moba/*/src/**/*.kt")
 
         // `CharacterArtStagingTest` derives what the build has to stage from the sprites the real
         // asset scripts name, and checks every one of them against the committed tree it copies
         // out of. Both are outside anything Gradle would otherwise associate with this module, so
         // without these two lines the test stays UP-TO-DATE across a new character and across the
         // deletion of the art it stages - which are the two edits it exists to notice.
-        include("moba/assets/**/*.udea.kts")
+        include("moba/game/assets/**/*.udea.kts")
         include("example/src/main/resources/assets/sprites/**")
     },
 )
@@ -209,7 +209,7 @@ tasks.test {
     //
     // A `CommandLineArgumentProvider` rather than `systemProperty` so the trees are walked when
     // the task runs: walking them while this script is configured would make every edit under
-    // `moba/src` invalidate the configuration cache for the whole build. The two locals exist
+    // `moba/*/src` invalidate the configuration cache for the whole build. The two locals exist
     // for the same reason - the lambda has to close over a FileCollection and a File and
     // nothing else, because a lambda that reaches back into the script cannot be serialized
     // into the configuration cache at all.

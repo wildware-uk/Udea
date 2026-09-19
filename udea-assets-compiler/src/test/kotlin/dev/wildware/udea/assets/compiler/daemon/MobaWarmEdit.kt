@@ -39,7 +39,7 @@ import kotlin.test.assertTrue
  * they are deliberately outside it: a benchmark whose measured region includes its own assertions
  * is measuring the assertions too.
  *
- * The corpus is **copied** into `build/tmp/scratch` first. A run that edited `moba/assets` would
+ * The corpus is **copied** into `build/tmp/scratch` first. A run that edited `moba/game/assets` would
  * leave the game's own asset tree modified when it failed halfway.
  */
 internal class MobaWarmEdit(label: String) {
@@ -126,7 +126,7 @@ internal class MobaWarmEdit(label: String) {
     private companion object {
 
         /**
-         * `moba/assets`, copied whole into scratch.
+         * `moba/game/assets`, copied whole into scratch.
          *
          * Whole and not scripts-only: the daemon's reference walk is over ids, but a corpus
          * missing its PNGs would be a different tree from the one this claims to exercise the day
@@ -134,7 +134,7 @@ internal class MobaWarmEdit(label: String) {
          */
         @OptIn(kotlin.io.path.ExperimentalPathApi::class)
         fun copyCorpus(label: String): Path {
-            val source = TestPaths.repoRoot.resolve("moba/assets")
+            val source = TestPaths.repoRoot.resolve("moba/game/assets")
             assertTrue(
                 source.exists() && AssetCompiler.scriptsUnder(source).isNotEmpty(),
                 "this is about the game's one asset root; $source is not it",

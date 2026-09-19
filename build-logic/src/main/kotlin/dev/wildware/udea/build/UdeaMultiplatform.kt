@@ -46,13 +46,62 @@ internal object UdeaMultiplatform {
      * its `CompileKlibraries` stands for `compileClasspath`.
      */
     fun jvmRole(configurationName: String): String? {
-        val match = TARGET_CLASSPATH.matchEntire(configurationName) ?: return null
+        val match = TARGET_CLASSPATH.matchEntire(configurationName)
+            ?: return androidVariantRole(configurationName)
         val (compilation, kind) = match.destructured
         val classpath = if (kind == "RuntimeClasspath") "RuntimeClasspath" else "CompileClasspath"
         return when (compilation) {
             "", "Main" -> classpath.replaceFirstChar { it.lowercase() }
             "Test", "HostTest" -> "test$classpath"
             else -> "testFixtures$classpath"
+        }
+    }
+
+    /**
+     * AGP's build types, which name the front of an Android application's classpaths.
+     *
+     * Written out rather than read off the project, because this is a pure function used by the
+     * gates and by `UdeaMultiplatformTest`; `udea.android-application` declares exactly these two
+     * and nothing in this repository adds a third. A build type added there without a line here
+     * is a classpath the gates would stop seeing - which is why `UdeaStdlibPin.unclassified` is
+     * the backstop: it fails on any resolvable configuration nothing has classified, so the new
+     * build type's classpaths would fail the build rather than slip past the scan.
+     */
+    private val ANDROID_BUILD_TYPES = listOf("debug", "release")
+
+    /**
+     * `<buildType><testKind?><kind>`: the classpath names AGP gives an Android **application**.
+     *
+     * `debugCompileClasspath`, `releaseRuntimeClasspath`, `debugUnitTestCompileClasspath`,
+     * `debugAndroidTestRuntimeClasspath`. None of them is matched by [TARGET_CLASSPATH], which is
+     * anchored to Kotlin target names: an AGP application is not a multiplatform module and its
+     * classpaths are named after build types instead.
+     */
+    private val ANDROID_VARIANT_CLASSPATH = Regex(
+        "^(?:${ANDROID_BUILD_TYPES.joinToString("|")})(UnitTest|AndroidTest)?" +
+            "(CompileClasspath|RuntimeClasspath)$",
+    )
+
+    /**
+     * The JVM classpath an Android application's variant classpath stands for (issue #212).
+     *
+     * The same argument [jvmRole] makes for a multiplatform target: the gates name what they
+     * govern as a JVM module spells it, and an Android application has a copy per build type.
+     * LibGDX on `releaseRuntimeClasspath` is the same defect as LibGDX on `runtimeClasspath`, and
+     * `:moba:android` would otherwise be a project the module-graph gate, the old-tree ban and
+     * the stdlib pin all inspected nothing of - which the gates refuse outright rather than pass.
+     *
+     * Both test kinds fold onto the `test*` roles. A unit test runs on the development JVM and an
+     * instrumented test runs on a device, but neither is shipped, which is the distinction every
+     * rule keyed on these roles is making.
+     */
+    private fun androidVariantRole(configurationName: String): String? {
+        val match = ANDROID_VARIANT_CLASSPATH.matchEntire(configurationName) ?: return null
+        val (testKind, kind) = match.destructured
+        return if (testKind.isEmpty()) {
+            kind.replaceFirstChar { it.lowercase() }
+        } else {
+            "test$kind"
         }
     }
 

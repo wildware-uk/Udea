@@ -320,7 +320,7 @@ class RepositoryTest(unittest.TestCase):
         verify.check_no_instruction_to_run_a_missing_script(ROOT)
 
     def test_every_committed_record_of_the_deleted_script_reads_as_history(self):
-        # Wider than the fence's scope on purpose: `moba/build.gradle.kts`'s KDoc is one of the
+        # Wider than the fence's scope on purpose: `moba/game/build.gradle.kts`'s KDoc is one of the
         # past-tense records the issue says must keep saying so, and this holds the rule itself
         # to every record wherever it sits. Left out: the briefs, for the reason
         # `AGENT_DOCUMENTS` gives, and the fence and these tests, which quote instructions to run
@@ -336,7 +336,9 @@ class RepositoryTest(unittest.TestCase):
             if not os.path.basename(name).startswith("BRIEF") and name not in fence
         ]
         self.assertIn("docs/art-assets.md", records)
-        self.assertIn("moba/build.gradle.kts", records)
+        # `moba/build.gradle.kts` until issue #212 split the project; the KDoc moved with the
+        # staging task into `:moba:game`.
+        self.assertIn("moba/game/build.gradle.kts", records)
         tracked = set(git_stdout(ROOT, "ls-tree", "-r", "--name-only", "HEAD").decode().splitlines())
         self.assertNotIn(GONE, tracked)
         for name in records:

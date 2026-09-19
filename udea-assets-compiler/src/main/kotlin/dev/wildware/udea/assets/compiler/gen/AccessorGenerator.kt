@@ -29,7 +29,7 @@ public data class GeneratedFile(
  * generated from the scripts, so putting them on the script compile classpath makes every asset
  * rename invalidate that classpath and recompile every script in the tree - **every** script,
  * whatever the corpus happens to hold, against a 3s asset-edit budget. (This sentence used to
- * cost that out as "nineteen script compilations". It was true when it was written, `moba/assets`
+ * cost that out as "nineteen script compilations". It was true when it was written, `moba/game/assets`
  * has grown since, and the cost was never the number: it is that the count is the size of the
  * tree rather than the size of the edit.)
  *

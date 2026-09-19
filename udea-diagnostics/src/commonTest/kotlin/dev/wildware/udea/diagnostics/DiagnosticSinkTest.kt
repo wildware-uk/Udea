@@ -139,7 +139,7 @@ class DiagnosticSinkTest {
         val sink = DiagnosticSink()
         val rootCause = UdeaRules.UNRESOLVED_REFERENCE.diagnostic(
             message = "asset \"character/orc\" is declared nowhere",
-            span = SourceSpan("moba/assets/characters.udea.kts", 4, 1, 4, 20),
+            span = SourceSpan("moba/game/assets/characters.udea.kts", 4, 1, 4, 20),
             assetId = "character/orc",
         )
         sink.report(rootCause)

@@ -134,10 +134,10 @@ class ReplayBisectGuideTest {
         // was rendering, so the instruction printed under a red `moba` gate was a command that
         // exits non-zero with `no fixture is called 'moba-3600.udearep'`: a reader following the
         // summary's own advice would have been told the gate was broken in a second way.
-        val moba = ReplayBisectGuide.render("moba-3600.udearep", ":moba", listOf(Tick(1_200L)))
+        val moba = ReplayBisectGuide.render("moba-3600.udearep", ":moba:desktop", listOf(Tick(1_200L)))
 
-        assertContains(moba, "./gradlew :moba:udeaReplayEqualityProof")
-        assertContains(moba, "./gradlew :moba:udeaReplayDigest -Pudea.replay.fixture=moba-3600.udearep")
+        assertContains(moba, "./gradlew :moba:desktop:udeaReplayEqualityProof")
+        assertContains(moba, "./gradlew :moba:desktop:udeaReplayDigest -Pudea.replay.fixture=moba-3600.udearep")
         assertTrue(
             ":udea-replay" !in moba,
             "the guide sends a reader to a project that cannot replay this fixture:\n$moba",

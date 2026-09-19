@@ -61,9 +61,17 @@ public object LegacyDependencyRules {
         ),
     )
 
-    /** True when [projectPath] is part of the rewrite tree and therefore subject to [RULE]. */
+    /**
+     * True when [projectPath] is part of the rewrite tree and therefore subject to [RULE].
+     *
+     * `:moba:` as a prefix and not `:moba` alone, because issue #212 split the game into nested
+     * projects (spec D12): `:moba:game`, `:moba:desktop` and `:moba:android`. Matching the parent
+     * path only would have left every one of them ungoverned by this rule, by
+     * [ModuleGraphRules.governs] which delegates here, and by the compiler-plugin wiring that asks
+     * the same question - silently, because an ungoverned project is not reported as skipped.
+     */
     public fun governs(projectPath: String): Boolean =
-        projectPath.startsWith(":udea-") || projectPath == ":moba"
+        projectPath.startsWith(":udea-") || projectPath == ":moba" || projectPath.startsWith(":moba:")
 
     /** Every violation of [RULE] on [configuration] of [projectPath]. */
     public fun violations(

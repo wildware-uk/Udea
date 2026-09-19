@@ -33,7 +33,7 @@ package dev.wildware.udea.assets
  * [unique], [grantedAbility] and [passive] are the schema half of issue #166, which owns the
  * systems that act on them: unique-passive deduplication, granted item actives on a shared
  * item-cooldown slot, and stat modifiers applied as GAS effects. They are declared here, and
- * authored in `moba/assets/item`, because a schema that grows a field later is an asset tree that
+ * authored in `moba/game/assets/item`, because a schema that grows a field later is an asset tree that
  * has to be re-authored later - and because a reference is only checked at build time if
  * something declares it as a reference.
  *

@@ -33,7 +33,7 @@ import kotlin.io.path.exists
  */
 class MigratedCorpusGapTest {
 
-    private val root = TestPaths.repoRoot.resolve("moba/assets")
+    private val root = TestPaths.repoRoot.resolve("moba/game/assets")
 
     /** Every declaration kind the corpus uses is a declaration function on the receiver. */
     @Test

@@ -35,7 +35,7 @@ class AgentsMdTest {
         val declared = AgentsMd.declaredModules(settings)
 
         assertTrue(declared.contains("udea-core"), declared.toString())
-        assertTrue(declared.contains("moba"), declared.toString())
+        assertTrue(declared.contains("moba:game"), declared.toString())
         assertEquals(declared.sorted(), AgentsMd.documentedModules(agentsMd).sorted())
     }
 

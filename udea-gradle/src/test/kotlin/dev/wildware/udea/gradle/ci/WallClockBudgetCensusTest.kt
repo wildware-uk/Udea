@@ -316,9 +316,9 @@ class WallClockBudgetCensusTest {
          *   claim about complexity and cancels the machine out.
          */
         val NOT_A_BUDGET: Map<String, String> = mapOf(
-            "moba/src/test/kotlin/dev/wildware/moba/net/MobaUdpTwoProcessTest.kt" to
+            "moba/desktop/src/test/kotlin/dev/wildware/moba/net/MobaUdpTwoProcessTest.kt" to
                 "a deadline: how long to wait for a line from a forked process",
-            "moba/src/test/kotlin/dev/wildware/moba/replay/MobaReplayProofTest.kt" to
+            "moba/desktop/src/test/kotlin/dev/wildware/moba/replay/MobaReplayProofTest.kt" to
                 "a seed: the pilot must differ between runs or the proof repeats one run",
             "udea-agent-host/src/test/kotlin/dev/wildware/udea/agent/host/LiveInstance.kt" to
                 "a deadline: how long to poll a live instance for a state change",

@@ -169,7 +169,7 @@ class ReplayEqualityProofTest {
         for (job in listOf(PR_JOB, NIGHTLY_JOB)) {
             val block = jobBlock(job)
             assertContains(
-                block, ":moba:udeaReplayDigest",
+                block, ":moba:desktop:udeaReplayDigest",
                 message = "the '$job' job no longer replays the game",
             )
             assertTrue(
@@ -254,7 +254,7 @@ class ReplayEqualityProofTest {
         // approximation of it. `--out` resolution is `ReplayEqualityPaths.resolve` and never
         // consults the fixture list at all: the list is reached only by `--fixture`, which is a
         // different option on a different line of the job. So this asks `ReplayDigestCli.parse` -
-        // the exact function `:moba:udeaReplayDigest` runs - the exact question the leg asks it.
+        // the exact function `:moba:desktop:udeaReplayDigest` runs - the exact question the leg asks it.
         // What the list *would* change, `MobaReplayEqualityTest` covers against `moba`'s own.
         val requested = gradlePropertyInJob(PR_JOB, "out")
         val written = ReplayDigestCli.parse(
@@ -310,7 +310,7 @@ class ReplayEqualityProofTest {
         // tests above exercise is never reached with the right base in CI.
         //
         // Two here - `udeaReplayDigest`, the self-test's own, and `udeaReplayEquals`, the join
-        // both CI jobs run. `:moba:udeaReplayDigest` is the third, and it is fenced by
+        // both CI jobs run. `:moba:desktop:udeaReplayDigest` is the third, and it is fenced by
         // `MobaReplayEqualityTest > the digest task tells its entry point which directory the
         // workspace is` against `moba`'s own build script, which this test cannot read.
         assertContains(

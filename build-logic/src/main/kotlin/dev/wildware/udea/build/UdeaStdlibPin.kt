@@ -220,6 +220,12 @@ public object UdeaStdlibPin {
             "javac's annotation-processor path for a non-main source set; same reasoning.",
         ),
         ToolClasspath(
+            "*AnnotationProcessorClasspath",
+            "the same path under the name AGP gives it per variant " +
+                "(`debugAnnotationProcessorClasspath`). A tool classpath with no Kotlin stdlib " +
+                "on it, for the reason the entry above states.",
+        ),
+        ToolClasspath(
             "udeaAsset*",
             "the build-time asset pipeline's own classpaths (`udeaAssetsCompiler`, which the " +
                 "forked `AssetPipelineCli` runs on, and `udeaAssetScript`, which `.udea.kts` " +
@@ -268,6 +274,24 @@ public object UdeaStdlibPin {
             "coreLibraryDesugaring",
             "AGP's core-library desugaring library, consumed by the dexer when a module enables " +
                 "desugaring; not a classpath the code compiles against.",
+        ),
+        // --- an Android application's own tooling (issue #212) ---
+        ToolClasspath(
+            "_internal-unified-test-platform-*",
+            "AGP's Unified Test Platform: the runner, the device providers and the host plugins " +
+                "that install and drive an instrumented test. They are AGP's own processes, not " +
+                "classpaths this project compiles or runs against, and the twelve of them appear " +
+                "on every Android application whether or not it has an instrumented test.",
+        ),
+        ToolClasspath(
+            "*WearBundling",
+            "AGP's path for embedding a Wear OS APK inside a phone APK. This project embeds " +
+                "none, and the configuration is a packaging input rather than a classpath.",
+        ),
+        ToolClasspath(
+            "*ReverseMetadataValues",
+            "AGP's dynamic-feature metadata, which a feature module publishes back to its base. " +
+                "This project has no feature modules; nothing compiles against it.",
         ),
         ToolClasspath(
             "*DependenciesMetadata",

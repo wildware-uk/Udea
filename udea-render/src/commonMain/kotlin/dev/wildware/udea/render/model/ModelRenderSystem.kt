@@ -5,6 +5,9 @@ import com.github.quillraven.fleks.Family
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.udea.core.GameContext
+import dev.wildware.udea.core.SimClock
+import dev.wildware.udea.core.Tick
+import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.core.spatial.Transform3D
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderResources
@@ -30,6 +33,15 @@ import dev.wildware.udea.render.interp.PoseSource
  *   shows a 3D model without carrying 3D data: pass the same `PoseSource` its camera follows
  *   (`Interpolator` for `PhysicsBody`, or the game's own).
  * - With neither, it is not drawn.
+ *
+ * ## How an imported model is posed
+ *
+ * An [ImportedModel] with a skin and clips is posed from the entity's `Animator` (issue #242): the
+ * clip, where in it, and the crossfade from the clip before, read at the simulation's current tick
+ * plus the interpolation alpha - see [ClipPose], which is where a clip's time becomes seconds - and
+ * skinned on the GPU. An entity with no `Animator` draws the bind pose; a model with no skin
+ * ignores its `Animator`. The pose depends on nothing but the tick, the alpha and the `Animator`,
+ * so a replay draws the same frames at the same ticks.
  *
  * ## How it reaches the capture
  *
@@ -65,12 +77,15 @@ public class ModelRenderSystem(
     /** Reused: the pose [lift] writes into, one for the whole frame. */
     private val pose = Pose()
 
+    /** Reused: each entity's clips this frame, one for the whole frame. */
+    private val clips = ClipPose()
+
     /** Models drawn by the most recent frame. What `GlModelRenderTest` counts. */
     internal var drawnCount: Int = 0
         private set
 
     override fun onBind(world: World, ctx: GameContext) {
-        bound = Bound(world, world.family { all(ModelRenderer) })
+        bound = Bound(world, world.family { all(ModelRenderer) }, ctx.clock)
     }
 
     override fun render(target: OffscreenTarget, alpha: Float) {
@@ -83,8 +98,9 @@ public class ModelRenderSystem(
         } else {
             drawnCount = 0
             stage.begin(camera, light)
+            val now = bound.clock.tick
             with(bound.world) {
-                bound.models.forEach { entity -> draw(entity, alpha) }
+                bound.models.forEach { entity -> draw(entity, now, alpha) }
             }
             stage.image
         }
@@ -98,7 +114,7 @@ public class ModelRenderSystem(
         }
     }
 
-    private fun World.draw(entity: Entity, alpha: Float) {
+    private fun World.draw(entity: Entity, now: Tick, alpha: Float) {
         val model = entity[ModelRenderer].model
         val transform = entity.getOrNull(Transform3D)
         if (transform != null) {
@@ -107,15 +123,19 @@ public class ModelRenderSystem(
                 transform.x, transform.y, transform.z,
                 transform.rotationX, transform.rotationY, transform.rotationZ,
                 transform.scaleX, transform.scaleY, transform.scaleZ,
+                clips.set(entity.getOrNull(Animator), now, alpha),
             )
         } else {
             val lift = lift ?: return
             if (!lift.poseOf(this, entity, alpha, pose)) return
-            stage.add(model, pose.x, pose.y, 0f, 0f, 0f, pose.angle, 1f, 1f, 1f)
+            stage.add(
+                model, pose.x, pose.y, 0f, 0f, 0f, pose.angle, 1f, 1f, 1f,
+                clips.set(entity.getOrNull(Animator), now, alpha),
+            )
         }
         drawnCount++
     }
 
     /** Everything resolved at bind time. */
-    private class Bound(val world: World, val models: Family)
+    private class Bound(val world: World, val models: Family, val clock: SimClock)
 }

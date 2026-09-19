@@ -19,9 +19,8 @@
 # including a component that currently fails to compile, so that one broken component cannot
 # renumber all of its successors on the wire while somebody fixes it.
 #
-# Today the only source set contributing components is udea-codegen's own fixture source set,
-# which is what exercises the generator end to end (issue #29). moba and udea-gas add their
-# names here as they gain components.
+# udea-codegen's own fixture source set is here because it exercises the generator end to end
+# (issue #29). Every other module adds its names here as it gains components.
 #
 # udea-gas's three components - Attributes, Abilities and GameplayEffects - are deliberately
 # NOT here, and that is a statement rather than an omission: each is a variable-length array of
@@ -62,6 +61,13 @@
 # INVISIBLE to capture. It sorts between `ability.Projectile` and `lane.LaneCreep`, so the five
 # lane names, `level.GameUnit`, `match.MatchState`, `match.Respawn` and the six codegen fixtures
 # all move up by one. Nothing has shipped against those ids.
+# The five `dev.wildware.udea.core.physics` names (Box, Capsule, Circle, PhysicsBody, Teleport)
+# are `@Sim` in every field, so their `netMask` is empty and no delta packet ever carries them.
+# They are here because a snapshot must: before them no physics state was captured at all, so a
+# rewind left every Box2D body where the future had put it. They sort after every earlier name,
+# so adding them moved no existing id. `Chain` is not here - an array cannot be lowered - and is
+# static level geometry instead; `udea-physics2d` refuses a chain that changes at runtime.
+#
 dev.wildware.moba.CharacterView
 dev.wildware.moba.Player
 dev.wildware.moba.Position
@@ -84,3 +90,8 @@ dev.wildware.udea.codegen.fixtures.Health
 dev.wildware.udea.codegen.fixtures.Movement
 dev.wildware.udea.codegen.fixtures.Placement
 dev.wildware.udea.codegen.fixtures.QuantisedProbe
+dev.wildware.udea.core.physics.Box
+dev.wildware.udea.core.physics.Capsule
+dev.wildware.udea.core.physics.Circle
+dev.wildware.udea.core.physics.PhysicsBody
+dev.wildware.udea.core.physics.Teleport

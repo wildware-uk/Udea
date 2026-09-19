@@ -2,6 +2,8 @@ package dev.wildware.udea.core.physics
 
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
+import dev.wildware.udea.annotations.Replicated
+import dev.wildware.udea.annotations.Sim
 import dev.wildware.udea.core.identity.NetId
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -22,22 +24,31 @@ import kotlinx.serialization.encoding.Encoder
  *
  * `x`/`y`/`angle` rather than a `Vector2`: `udea-core` has no gdx-math, and a component whose
  * field type came from LibGDX would put LibGDX on the classpath of every module that reads it.
+ *
+ * ## Snapshotted, never sent
+ *
+ * Every field is `@Sim`, so capture carries it (and `WorldHasher` folds it) while a delta write,
+ * which considers only `netMask`, never does. Physics is server-only (spec 3.4): a client gets
+ * positions from the game's own replicated components, never from a solver it does not run.
+ * Before these annotations the component had no `Replicator` at all, so a snapshot held no
+ * physics state and a rewind left every body where the future had put it.
  */
 @Serializable
+@Replicated
 public class PhysicsBody(
-    public var kind: BodyKind = BodyKind.Dynamic,
-    public var x: Float = 0f,
-    public var y: Float = 0f,
+    @Sim public var kind: BodyKind = BodyKind.Dynamic,
+    @Sim public var x: Float = 0f,
+    @Sim public var y: Float = 0f,
     /** Radians. */
-    public var angle: Float = 0f,
-    public var linearX: Float = 0f,
-    public var linearY: Float = 0f,
+    @Sim public var angle: Float = 0f,
+    @Sim public var linearX: Float = 0f,
+    @Sim public var linearY: Float = 0f,
     /** Radians per second. */
-    public var angularVelocity: Float = 0f,
+    @Sim public var angularVelocity: Float = 0f,
     /** Restored explicitly, so a body asleep before a rewind is asleep after it. */
-    public var awake: Boolean = true,
+    @Sim public var awake: Boolean = true,
     /** Sensors report overlaps and never resolve collisions. */
-    public var isSensor: Boolean = false,
+    @Sim public var isSensor: Boolean = false,
 ) : Component<PhysicsBody> {
 
     /**
@@ -92,9 +103,10 @@ public sealed interface ShapeComponent {
 
 /** An axis-aligned box, by half-extents. */
 @Serializable
+@Replicated
 public class Box(
-    public var halfWidth: Float = 0.5f,
-    public var halfHeight: Float = 0.5f,
+    @Sim public var halfWidth: Float = 0.5f,
+    @Sim public var halfHeight: Float = 0.5f,
 ) : Component<Box>, ShapeComponent {
 
     override val shapeOrder: Int get() = ORDER
@@ -110,7 +122,8 @@ public class Box(
 
 /** A circle centred on the body origin. */
 @Serializable
-public class Circle(public var radius: Float = 0.5f) : Component<Circle>, ShapeComponent {
+@Replicated
+public class Circle(@Sim public var radius: Float = 0.5f) : Component<Circle>, ShapeComponent {
 
     override val shapeOrder: Int get() = ORDER
 
@@ -125,9 +138,10 @@ public class Circle(public var radius: Float = 0.5f) : Component<Circle>, ShapeC
 
 /** A vertical capsule: a box of `2 * halfHeight` capped by two circles of [radius]. */
 @Serializable
+@Replicated
 public class Capsule(
-    public var radius: Float = 0.5f,
-    public var halfHeight: Float = 0.5f,
+    @Sim public var radius: Float = 0.5f,
+    @Sim public var halfHeight: Float = 0.5f,
 ) : Component<Capsule>, ShapeComponent {
 
     override val shapeOrder: Int get() = ORDER
@@ -151,6 +165,15 @@ public class Capsule(
  * Saved in a level through [ChainSerializer], because its constructor parameter is not the
  * property: the property is a `var` behind a checking setter, which the plugin cannot generate
  * a serializer for directly.
+ *
+ * ## Not in a snapshot, so it must not change
+ *
+ * Not `@Replicated`: `udea-codegen` lowers scalars and refuses an array. A rewind therefore
+ * leaves a chain as it is, which is correct only because a chain is static level geometry. It
+ * comes from the level, it is on the entity before that entity's body is first built, and it
+ * never changes or goes away until the scene is torn down. A backend that can tell must refuse a
+ * chain that breaks this, loudly, at the tick it happens. It must not leave the change for a
+ * later rewind to turn into a silent desync.
  */
 @Serializable(with = ChainSerializer::class)
 public class Chain(vertices: FloatArray = FloatArray(0)) : Component<Chain>, ShapeComponent {
@@ -225,11 +248,12 @@ internal object ChainSerializer : KSerializer<Chain> {
  * Removed by `TeleportSystem` after it applies, so it cannot re-fire on the next tick.
  */
 @Serializable
+@Replicated
 public class Teleport(
-    public var x: Float = 0f,
-    public var y: Float = 0f,
+    @Sim public var x: Float = 0f,
+    @Sim public var y: Float = 0f,
     /** Radians. */
-    public var angle: Float = 0f,
+    @Sim public var angle: Float = 0f,
 ) : Component<Teleport> {
 
     override fun type(): ComponentType<Teleport> = Teleport

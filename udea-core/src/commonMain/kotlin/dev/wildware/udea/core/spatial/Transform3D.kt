@@ -23,9 +23,8 @@ import kotlinx.serialization.Serializable
  *
  * ## What it is not
  *
- * Not replicated: `udea-core` has no `@Replicated` component, and the first one would move the
- * wire contract for a picture. `@Serializable`, so a level file saves it the way it saves
- * `PhysicsBody`.
+ * Not replicated: making it `@Replicated` would move the wire contract for a picture.
+ * `@Serializable`, so a level file saves it the way it saves `PhysicsBody`.
  */
 @Serializable
 public class Transform3D(

@@ -118,6 +118,14 @@ public object DeterminismRules {
                 "excluded by these prefixes.",
         ),
         SimScope(
+            project = ":udea-physics2d",
+            sourceSet = "main",
+            packagePrefixes = emptyList(),
+            why = "The Box2D solver behind PhysicsWorld. It is stepped once per tick inside " +
+                "world.update and its result is copied into PhysicsBody, which WorldHasher " +
+                "hashes and rewind restores, so every line of it is authoritative state.",
+        ),
+        SimScope(
             // `:moba:game` since issue #212 split the launchers off. The game's rules are the
             // whole of what simulates; neither launcher holds a system.
             project = ":moba:game",
@@ -272,7 +280,14 @@ public object DeterminismRules {
         title = "reaches the Box2D solver from a predicted system",
         didYouMean = "PhysicsWorld - the server owns the solver; prediction re-runs " +
             "CharacterMover, which is a closed-form step",
-        matches = { ref -> ref.owner.startsWith("com.badlogic.gdx.physics.box2d") },
+        // LibGDX's Box2D is gone (issue #213) and kept for the legacy regression fixture;
+        // `box2d.` and `box2dandroid.` are `box2d-jni` on the desktop and in its Android AAR,
+        // which `:udea-physics2d` binds to - one solver under two package names.
+        matches = { ref ->
+            ref.owner.startsWith("com.badlogic.gdx.physics.box2d") ||
+                ref.owner.startsWith("box2d.") ||
+                ref.owner.startsWith("box2dandroid.")
+        },
         appliesTo = ::isPredicted,
     )
 

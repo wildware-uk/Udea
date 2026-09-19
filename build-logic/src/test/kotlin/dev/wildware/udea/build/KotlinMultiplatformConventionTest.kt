@@ -71,11 +71,25 @@ class KotlinMultiplatformConventionTest {
     }
 
     @Test
+    fun `the JVM-and-Android convention has no iOS and no Wasm target`(@TempDir root: File) {
+        // `box2d-jni` publishes desktop natives and an Android AAR and nothing else, so a module
+        // over it declares only the two targets a dependency on it can resolve for.
+        val result = multiplatformFixture(root, "udea.kotlin-multiplatform-jvm-android").build(":sample:printTargets")
+
+        assertEquals(listOf("android", "jvm"), printed(result.output, "targets"))
+    }
+
+    @Test
     fun `every multiplatform convention carries the stdlib pin and the compiler-plugin gate on check`(@TempDir root: File) {
         // A module moving from `udea.kotlin-library` to multiplatform must not lose the two gates
         // that convention hangs on `check`. `--dry-run` lists what `check` would execute without
         // compiling anything.
-        for (plugin in listOf("udea.kotlin-multiplatform", "udea.kotlin-multiplatform-no-ios", "udea.kotlin-multiplatform-render")) {
+        for (plugin in listOf(
+            "udea.kotlin-multiplatform",
+            "udea.kotlin-multiplatform-no-ios",
+            "udea.kotlin-multiplatform-render",
+            "udea.kotlin-multiplatform-jvm-android",
+        )) {
             val dir = File(root, plugin).also { it.mkdirs() }
             val output = multiplatformFixture(dir, plugin).build(":sample:check", "--dry-run").output
 

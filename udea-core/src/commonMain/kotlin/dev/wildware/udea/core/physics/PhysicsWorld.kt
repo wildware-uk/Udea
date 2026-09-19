@@ -29,27 +29,16 @@ import dev.wildware.udea.core.identity.NetIdIndex
  *
  * ## No Box2D types here
  *
- * Not one signature on this interface names `com.badlogic.gdx.physics.box2d`, and a source
- * scan test enforces it. `udea-core` has no GL and no natives on its compile classpath.
+ * Not one signature on this interface names a solver type, and `NoBox2DInCoreTest` enforces it.
+ * `udea-core` has no GL and no natives on its compile classpath.
  *
- * ## Honest status: there is no Box2D backend yet
+ * ## The implementations
  *
- * As of Phase 0 this interface has **exactly one implementation, [NoOpPhysicsWorld]**, and no
- * module in the tree imports Box2D. "Box2D is demoted behind an interface" is therefore a
- * statement of intent, not of fact: what exists is the seam and the shape of the contract —
- * handles rather than body references, whole-tick stepping, a rebuild driven by
- * [PhysicsRebuildPlan] — chosen so that a solver-backed implementation is an addition rather
- * than a redesign.
- *
- * What that seam has actually bought already, and what makes it more than speculation: the
- * restore path is written and tested against it (spec 3.4's "components are the truth" is
- * checkable today), `udea-core` compiles and tests with no natives, and every consumer is
- * written against handles, so a backend cannot leak solver objects into game code later.
- *
- * What it has **not** bought is any evidence that the contract survives a real solver. Nothing
- * here has been exercised against contacts, fixtures or a body that goes to sleep on its own.
- * Treat a signature that a Box2D backend cannot implement as a defect in *this* file when one
- * lands, not as a reason to widen the interface in advance.
+ * [NoOpPhysicsWorld] is the kernel's default: bookkeeping and no solver. `udea-physics2d` holds
+ * the solver-backed one, Box2D 3 through `box2d-jni`, which a game installs from its module's
+ * `context` hook. That module is where this contract meets contacts, fixtures and sleeping
+ * bodies, and its tests are where a signature a solver cannot honour would show up. Treat such
+ * a signature as a defect in *this* file, not as a reason to widen the interface in advance.
  *
  * ## There is no `step(seconds)`
  *

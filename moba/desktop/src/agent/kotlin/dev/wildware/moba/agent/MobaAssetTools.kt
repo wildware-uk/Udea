@@ -1,6 +1,7 @@
 package dev.wildware.moba.agent
 
 import dev.wildware.moba.MobaAssets
+import dev.wildware.moba.entry.MobaLaunch
 import dev.wildware.udea.agent.assets.AssetHotReload
 import dev.wildware.udea.agent.assets.AssetToolModule
 import dev.wildware.udea.agent.assets.AssetsToolset
@@ -52,7 +53,7 @@ import kotlin.io.path.isDirectory
 internal object MobaAssetTools {
 
     /** Where the asset tree is, absolute. Set by `:moba:desktop:run`; absent in a packaged game. */
-    const val ASSET_ROOT_PROPERTY: String = "udea.assets.root"
+    const val ASSET_ROOT_PROPERTY: String = MobaLaunch.ASSET_ROOT_PROPERTY
 
     /** The repository root every diagnostic span is relative to. Set by `:moba:desktop:run`. */
     const val REPO_ROOT_PROPERTY: String = "udea.repoRoot"

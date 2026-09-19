@@ -42,6 +42,13 @@ public object MobaLaunch {
     public const val RENDER_MODE_PROPERTY: String = "udea.render.mode"
 
     /**
+     * System property naming the game's asset root, absolute. Set by the `run` and `runClient`
+     * tasks; absent in a packaged game. The asset daemon compiles that tree, and the sound device
+     * reads its `.ogg` files from it, because the packed bundle carries no audio bytes.
+     */
+    public const val ASSET_ROOT_PROPERTY: String = "udea.assets.root"
+
+    /**
      * The [RenderMode] named by `-Dudea.render.mode`, or [fallback].
      *
      * An unrecognised value throws rather than falling back. A launcher that misspells the mode

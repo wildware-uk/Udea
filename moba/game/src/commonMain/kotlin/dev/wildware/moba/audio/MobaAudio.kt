@@ -11,7 +11,6 @@ import dev.wildware.udea.core.CueQueue
 import dev.wildware.udea.core.CueSink
 import dev.wildware.udea.core.innermost
 import dev.wildware.udea.core.host.GameHost
-import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.module.CoreModule
@@ -36,8 +35,14 @@ import dev.wildware.udea.core.module.CoreModule
  * [silent] builds the same object over [AudioDevice.Silent]. It loads no files, opens no device,
  * plays nothing and allocates nothing per frame - and it still drains, which is the whole point:
  * a headless server, a CI run and an agent session all keep the queue bounded rather than relying
- * on nobody noticing. [forHost] picks it for [RenderMode.Headless] itself, so a caller cannot get
- * that wrong by forgetting a branch.
+ * on nobody noticing.
+ *
+ * ## Which device is the launcher's call
+ *
+ * This module compiles for Android too and cannot name the device that makes a noise, which is
+ * `udea-render`'s JVM `koolAudioDevice` (issue #221). So the choice - silent in Headless, Kool
+ * otherwise, silent again and said out loud when Kool cannot load the sounds - is
+ * `:moba:desktop`'s `MobaDesktopAudio`, and this class takes whatever device it is handed.
  *
  * ## What is honestly not wired
  *
@@ -136,25 +141,6 @@ public class MobaAudio private constructor(
 
         /** Full stereo pan six character widths off centre. */
         public const val PAN_WIDTH: Float = 6F * MobaScale.WORLD
-
-        /**
-         * Audio for [host]. Silent on every render mode, because on this branch there is no
-         * device that makes a noise.
-         *
-         * ## This is a gap and not a design
-         *
-         * `GdxAudioDevice` was the only real `AudioDevice` in the tree and it went with LibGDX.
-         * `udea-audio` keeps the SPI, the mixer and the cue drain - all of which still run here,
-         * so cues are still routed, panned, attenuated and counted - but nothing on the Kool side
-         * opens an output stream yet, and this module must not grow one: a device belongs behind
-         * `AudioDevice` in `udea-audio`, not in the game.
-         *
-         * So the branch on [RenderMode] is gone rather than softened. It used to read "silent in
-         * Headless, real otherwise", and leaving it that way would name a device that does not
-         * exist. When `udea-audio` gains a multiplatform device this becomes the branch again,
-         * and `MobaAudioTest`'s counters are what will say the routing survived.
-         */
-        public fun forHost(host: GameHost): MobaAudio = of(host, AudioDevice.Silent)
 
         /** Audio for [host] that drains the queue and plays nothing. What CI and an agent run. */
         public fun silent(host: GameHost): MobaAudio = of(host, AudioDevice.Silent)

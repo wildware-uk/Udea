@@ -239,7 +239,7 @@ public object MobaClient {
             MobaLaunch.wireInput(host, MobaLaunch.keyboard(rendering), extra = scripted)
             val limit = System.getProperty(FRAMES_PROPERTY)?.trim()?.toLongOrNull() ?: 0L
             var audioBuilt: MobaAudio? = null
-            rendering.onRenderThread { audioBuilt = MobaAudio.forHost(host) }
+            rendering.onRenderThread { audioBuilt = MobaDesktopAudio.forHost(host) }
             val audio = checkNotNull(audioBuilt) { "MobaAudio was not built on the render thread" }
             val sink = DatagramSink { _, buffer, offset, length ->
                 client.onPacket(buffer, offset, length)
@@ -499,7 +499,7 @@ public object MobaClient {
             MobaLaunch.wireInput(host, MobaLaunch.keyboard(rendering))
             val intent = host.ctx[IntentState.KEY]
             var audioBuilt: MobaAudio? = null
-            rendering.onRenderThread { audioBuilt = MobaAudio.forHost(host) }
+            rendering.onRenderThread { audioBuilt = MobaDesktopAudio.forHost(host) }
             val audio = checkNotNull(audioBuilt) { "MobaAudio was not built on the render thread" }
             var frames = 0L
             MobaLaunch.Attachment(
@@ -556,7 +556,7 @@ public object MobaClient {
             MobaLaunch.follow(rendering, player)
             println("[moba.client] you are net id ${player.raw}; WASD to walk, Space to swing")
             var built: MobaAudio? = null
-            rendering.onRenderThread { built = MobaAudio.forHost(host) }
+            rendering.onRenderThread { built = MobaDesktopAudio.forHost(host) }
             val audio = checkNotNull(built) { "MobaAudio was not built on the render thread" }
             audio.listenTo(player)
             // A restart is a scene swap, and a swap resets the id allocator without resetting the

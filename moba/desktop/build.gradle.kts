@@ -285,6 +285,9 @@ tasks.register<JavaExec>("runClient") {
     description = "moba.client: a visible window. Modes: local | listen | host [port] | join <host[:port]>."
     mainClass.set("dev.wildware.moba.entry.MobaClient")
     classpath = sourceSets.main.get().runtimeClasspath
+    // Where `MobaDesktopAudio` reads the `.ogg` files from: `AssetPackCli` writes no blob sections,
+    // so the sounds are not in the `.udeapak` and the device opens them from the game's own tree.
+    systemProperty("udea.assets.root", gameAssetRoot.asFile.absolutePath)
     // `JavaExec` forks, so a `-D` on the Gradle command line reaches the daemon and stops there.
     // `MobaClient`'s knobs are how a two-window run is *checked* rather than watched - a bounded
     // frame count and a scripted axis are what turn two windows into two transcripts - so a task
@@ -302,11 +305,10 @@ tasks.register<JavaExec>("runClient") {
     }
 }
 
-// `runAudio` was here, and it is gone with LibGDX. It ran `MobaAudioProbe`, whose only reason to
-// exist was to build a `GdxAudioDevice` - the one `AudioDevice` in the tree that made a noise -
-// and there is no device behind `MobaAudio` on this branch (see `MobaAudio.forHost`). A task that
-// launched a client to listen to silence would be a task that passes while proving nothing, so it
-// is deleted rather than left pointing at a deleted main. It comes back with the device.
+// `runAudio` was here, and it is gone with LibGDX. It ran `MobaAudioProbe`, a second main whose
+// only reason to exist was to build a `GdxAudioDevice`. `runClient` plays sound itself now, through
+// `MobaDesktopAudio` and `udea-render`'s `koolAudioDevice` (issue #221), so there is nothing left
+// for a separate probe to do.
 
 /**
  * Where a test that reads this project's own tree finds it.

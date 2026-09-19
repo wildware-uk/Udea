@@ -54,9 +54,8 @@ public data class LightingConfig(
 /**
  * The UI skin a game declares, when it has one.
  *
- * Carried over from the retired tree, whose UI toolkit read it. Nothing in the engine reads it
- * since the UI layer became ComposeGL (issues #187-#189); the field stays so existing game configs
- * still decode.
+ * Carried over from the retired tree, whose UI toolkit used it. The asset codec still decodes it,
+ * and nothing in the engine uses it since the UI layer became ComposeGL (issues #187-#189).
  */
 public data class UiConfig(public val defaultSkin: ResPath? = null)
 

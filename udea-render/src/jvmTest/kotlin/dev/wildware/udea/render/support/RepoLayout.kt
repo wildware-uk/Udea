@@ -41,7 +41,8 @@ internal object RepoLayout {
      * Every `.class` file [module] compiled for [sourceSet], across every language directory
      * (`build/classes/kotlin/main`, `build/classes/java/main`, ...) - or, for a multiplatform
      * module, across every target that compiles to bytecode (`build/classes/kotlin/jvm/main`,
-     * `build/classes/kotlin/android/main`).
+     * `build/classes/kotlin/android/main`). An Android application's main bytecode is its release
+     * variant's Kotlin output instead, which AGP writes outside `build/classes` altogether.
      *
      * One layout or the other, chosen from the module's sources rather than from what happens to
      * be under `build/`: a module converted to multiplatform keeps its old

@@ -96,7 +96,8 @@ class ClearingLevelTest {
         // later - from the editor, mid-play - is the case where seeding must restore the clock, not
         // only the entities. The game that saves it is empty: since #246 `RenderModule` gives every
         // `Transform3D` a render-only `Interp3D` at its first tick end, which no level can hold, so
-        // a clearing that has run a tick cannot be saved as it stands.
+        // a clearing that has run a tick cannot be saved as it stands. #246 is reopened for that;
+        // when its fix lands, this saves the running clearing instead.
         val playing = HollowGame.host(RenderMode.Headless, level = ByteArray(0))
         playing.run(SAVED_AFTER_TICKS)
         val savedAt = playing.tick

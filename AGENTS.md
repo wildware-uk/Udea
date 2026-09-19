@@ -209,8 +209,9 @@ The pieces a newcomer meets first, each with the issue that made it so.
 
 - **Drawing is Kool, inside `udea-render`, on one thread.** Sprites and 3D models both:
   `Transform3D` (`udea-core`) places an entity in 3D - Z is up, a 2D position is the point on
-  the ground plane, it is saved in levels, and it is `@Replicated` with every field `@Sim` so the
-  editor's tools can write it while no delta packet ever carries it (#237) - and `ModelRenderer`
+  the ground plane, it is saved in levels, and it is `@Replicated` so the editor's tools can write it
+  (#237), with every field `@Net` so a client sees it move, drawn between ticks at the render
+  alpha (#246) - and `ModelRenderer`
   (`udea-render`) draws a built-in mesh or a glTF/GLB model imported as a typed asset (#240).
   A skinned model is posed from its entity's `Animator` - clip, time and crossfade, read at the
   tick plus the interpolation alpha - and skinned on the GPU; the pose is the renderer's alone,

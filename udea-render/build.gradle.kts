@@ -180,6 +180,52 @@ val udeaVerifyHeadless = tasks.register<Test>("udeaVerifyHeadless") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
+// --- udeaVerifyNoLibGdx (issue #189) -----------------------------------------------------
+//
+// The bytecode half of `UDEA-MG-009`: no module's main bytecode may name LibGDX, scene2d above
+// all. `UDEA-MG-009` matches artifact coordinates, so it cannot see a LibGDX class that arrived
+// without one - vendored source, a `files(...)` jar - and this reads the class files instead.
+// Unlike `udeaVerifyHeadless` it covers every project, `udea-render` included: `LibGdxScan`.
+
+/**
+ * Every project with a build script, as a repository-relative directory: `udea-*` and the game.
+ * `UdeaVerifyNoLibGdxTest` checks it against `settings.gradle.kts`, so a module cannot drop out.
+ */
+val libGdxScanModules: List<String> = rootProject.subprojects
+    .filter { it.projectDir.resolve("build.gradle.kts").isFile }
+    .map { it.path.removePrefix(":").replace(':', '/') }
+    .sorted()
+
+/** Must equal `LibGdxScan.MODULES_PROPERTY`; a mismatch throws rather than scanning nothing. */
+val libGdxModulesProperty = "udea.libgdx.modules"
+
+val libGdxGateTestClass = "dev.wildware.udea.render.libgdx.UdeaVerifyNoLibGdxTest"
+
+val udeaVerifyNoLibGdx = tasks.register<Test>("udeaVerifyNoLibGdx") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Fails if any module's bytecode references LibGDX, scene2d included " +
+        "(bytecode extension of UDEA-MG-009)."
+
+    testClassesDirs = jvmTestCompilation.output.classesDirs
+    classpath = jvmTestRuntime
+    useJUnitPlatform()
+    filter { includeTestsMatching(libGdxGateTestClass) }
+    systemProperty(libGdxModulesProperty, libGdxScanModules.joinToString(","))
+
+    dependsOn(libGdxScanModules.map { ":${it.replace('/', ':')}:${ModuleGraphRules.MAIN_BYTECODE_TASK}" })
+    inputs.files(
+        libGdxScanModules.map { module ->
+            fileTree(rootDir.resolve("$module/build")) {
+                include("classes/*/main/**", "classes/*/jvm/main/**", "classes/*/android/main/**")
+                include("tmp/kotlin-classes/release/**")
+            }
+        },
+    ).withPropertyName("libGdxScanClasses").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(rootDir.resolve("settings.gradle.kts"))
+        .withPropertyName("settings")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 val glTestPackage = "dev.wildware.udea.render.gl"
 
 /** The retired game's asset tree, not a project: the imported-model test and shot read its models. */
@@ -189,6 +235,7 @@ val exampleModels: Directory = exampleAssets.dir("models")
 tasks.named<Test>("jvmTest") {
     // The gate is `udeaVerifyHeadless`'s job; running it twice per `check` buys nothing.
     filter { excludeTestsMatching(gateTestClass) }
+    filter { excludeTestsMatching(libGdxGateTestClass) }
 
     // The GL tests belong to `udeaGlTest`, in JVMs of their own - see that task.
     filter { excludeTestsMatching("$glTestPackage.*") }
@@ -249,7 +296,7 @@ val udeaGlTest = tasks.register<Test>("udeaGlTest") {
 }
 
 tasks.named("check") {
-    dependsOn(udeaVerifyHeadless, udeaGlTest)
+    dependsOn(udeaVerifyHeadless, udeaVerifyNoLibGdx, udeaGlTest)
 }
 
 // --- runModelShot ------------------------------------------------------------------------

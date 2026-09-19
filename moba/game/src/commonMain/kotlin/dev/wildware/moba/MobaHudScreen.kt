@@ -35,8 +35,8 @@ import dev.wildware.udea.render.ui.UiScreen
  * ## What it replaced
  *
  * A painter that drew every string with `udea-render`'s 5x7 `BitmapFont2D` and every box with the
- * sprite batch, placing each by hand (issue #212's stand-in for the scene2d HUD, which left with
- * LibGDX). The words, the colours and where each thing sits came across; the arithmetic that placed
+ * sprite batch, placing each by hand (issue #212's stand-in for the LibGDX widget HUD, which left
+ * with LibGDX). The words, the colours and where each thing sits came across; the arithmetic that placed
  * them did not, because a composition lays itself out. The typeface is the visible difference: real
  * glyphs from a `.ttf`, which is the whole of what the owner's parity rule for this port allows to
  * differ - every number [HudState] carries is still on screen.

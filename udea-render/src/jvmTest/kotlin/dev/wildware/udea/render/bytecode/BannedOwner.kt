@@ -36,31 +36,51 @@ internal data class BannedOwner(
 
 /**
  * The GL banned-owner table (spec 4, "no GL on the compile classpath"; spec 3.5,
- * `RenderMode.Headless` means "no GL context at all").
+ * `RenderMode.Headless` means "no GL context at all"), read by `HeadlessScan` over the headless
+ * modules.
  *
- * Each entry is a namespace a headless module has no business naming. `UDEA-MG-002` and
- * `UDEA-MG-009` ban the same things at the dependency level, and are checked first; this table is
- * what catches a type that reaches a headless module some other way, such as inside a jar those
- * rules allow.
+ * Each entry is a namespace a headless module has no business naming. `UDEA-MG-002` bans the same
+ * things at the dependency level, and is checked first; this table is what catches a type that
+ * reaches a headless module some other way, such as inside a jar that rule allows.
  *
- * Until issue #213 the LibGDX part of this table was a set of carve-outs - `graphics/`, `Gdx`,
- * `utils/viewport/` and `backends/` banned, `math/` and the `utils` collections legal - because
- * `com.badlogicgames.gdx:gdx` was an allowed jar that carried both. LibGDX has left the tree and
- * `UDEA-MG-009` bans every artifact of it from every project, so there is no allowed half left to
- * carve out, and the whole namespace is one entry.
+ * LibGDX is not in it, for the reason `UDEA-MG-002` does not name LibGDX either: it is banned from
+ * every module, not only the headless ones, and [LIBGDX_BANNED_OWNERS] is that table. One
+ * reference, one diagnostic.
  */
 internal val GL_BANNED_OWNERS: List<BannedOwner> = listOf(
     BannedOwner(
         "org/lwjgl/",
         "LWJGL is the native GL/GLFW binding; nothing outside udea-render may name it",
     ),
+)
+
+/**
+ * The LibGDX banned-owner table, read by `LibGdxScan` over **every** module, `udea-render`, the
+ * editor and the game included (issue #189).
+ *
+ * It is the bytecode half of `UDEA-MG-009`, which bans every LibGDX artifact by coordinate. A
+ * coordinate check cannot see a LibGDX class that arrived without one: source vendored into the
+ * tree under LibGDX's own package, a jar added with `files(...)`, or a shaded jar republished under
+ * another group. Whatever the route, the class file names the owner, and this reads the owner.
+ *
+ * Order matters: the first entry that matches gives the reason, so scene2d comes before the
+ * namespace that contains it and a scene2d reference is told what replaced it.
+ */
+internal val LIBGDX_BANNED_OWNERS: List<BannedOwner> = listOf(
+    BannedOwner(
+        "com/badlogic/gdx/scenes/scene2d/",
+        "scene2d is LibGDX's GL-backed widget toolkit, and the UI layer that replaced it is " +
+            "ComposeGL: udea-render's UiLayer for menus and panels, CapturedUi for a HUD " +
+            "(issues #187, #188, #189)",
+    ),
     BannedOwner(
         "com/badlogic/",
-        "LibGDX left the tree in issue #213; its graphics, backends and natives are GL, and " +
+        "LibGDX left the tree in issue #213; rendering is Kool inside udea-render, and " +
             "UDEA-MG-009 bans every artifact of it",
     ),
     BannedOwner(
         "box2dLight/",
-        "box2dlights renders shadows through GL and pulls a native backend with it",
+        "box2dlights is a LibGDX extension that renders shadows through GL; UDEA-MG-009 bans " +
+            "its artifact with the rest of LibGDX",
     ),
 )

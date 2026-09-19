@@ -1,0 +1,30 @@
+worldHash=ace4dd33751828cf
+netId=0/0 team=orc kind=4 player=true x=-28.83331 (0xc1e6aa9e) y=-27.917236 (0xc1df5680) hp=500.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Inventory,Motion,Player,Position,Respawn,Wallet
+netId=1/0 team=soldier kind=1 player=false x=9.651418 (0x411a6c35) y=-34.9683 (0xc20bdf8a) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=2/0 team=soldier kind=5 player=false x=-32.77708 (0xc2031bbb) y=-21.350594 (0xc1aace04) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=3/0 team=orc kind=2 player=false x=-21.05833 (0xc1a87776) y=24.61233 (0x41c4e60d) hp=150.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=4/0 team=orc kind=2 player=false x=-33.969532 (0xc207e0cd) y=17.254776 (0x418a09c8) hp=150.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=5/0 team=orc kind=2 player=false x=-36.012077 (0xc2100c5e) y=6.0157905 (0x40c0815b) hp=150.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=6/0 team=orc kind=2 player=false x=-86.70548 (0xc2ad6935) y=-13.008897 (0xc1502471) hp=150.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=7/0 team=undead kind=3 player=false x=114.615555 (0x42e53b2a) y=9.415247 (0x4116a4da) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=8/0 team=undead kind=3 player=false x=98.69654 (0x42c564a1) y=-17.347532 (0xc18ac7bf) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=9/0 team=undead kind=3 player=false x=78.12243 (0x429c3eaf) y=12.196258 (0x414323df) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=10/0 team=undead kind=3 player=false x=82.78981 (0x42a59462) y=33.183445 (0x4204bbd9) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=11/0 team=undead kind=3 player=false x=125.301315 (0x42fa9a46) y=-35.6794 (0xc20eb7b5) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=12/0 team=undead kind=3 player=false x=68.416214 (0x4288d51a) y=38.56887 (0x421a4686) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=13/0 team=undead kind=3 player=false x=76.36207 (0x4298b961) y=0.5558804 (0x3f0e4e2e) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=14/0 team=undead kind=3 player=false x=113.36907 (0x42e2bcf7) y=-24.912846 (0xc1c74d82) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=15/0 team=undead kind=3 player=false x=95.60545 (0x42bf35fe) y=13.423502 (0x4156c6aa) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=16/0 team=undead kind=3 player=false x=108.56794 (0x42d922c9) y=2.534107 (0x40222ecf) hp=50.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=17/0 team=soldier kind=0 player=false x=29.788599 (0x41ee4f0d) y=-70.64932 (0xc28d4c74) hp=100.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=18/0 team=soldier kind=0 player=false x=8.572066 (0x4109272f) y=-17.586388 (0xc18cb0ec) hp=100.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=19/0 team=soldier kind=0 player=false x=-3.449516 (0xc05cc4df) y=-59.498894 (0xc26dfede) hp=100.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=20/0 team=soldier kind=0 player=false x=-31.192333 (0xc1f989e6) y=-48.825916 (0xc2434dbd) hp=100.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=21/0 team=soldier kind=0 player=false x=-4.9872055 (0xc09f9730) y=-52.293884 (0xc2512cf0) hp=100.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=22/0 team=soldier kind=0 player=false x=-13.500179 (0xc15800bc) y=-84.69528 (0xc2a963fc) hp=100.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=23/0 team=soldier kind=0 player=false x=-18.752636 (0xc1960566) y=-56.50646 (0xc262069d) hp=100.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=24/0 team=soldier kind=0 player=false x=10.878016 (0x412e0c5b) y=-83.78026 (0xc2a78f7e) hp=100.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=25/0 team=soldier kind=0 player=false x=-32.14768 (0xc2009739) y=-78.46519 (0xc29cee2d) hp=100.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=26/0 team=soldier kind=0 player=false x=-14.060549 (0xc160f802) y=-21.932436 (0xc1af75a1) hp=100.0 components=Abilities,Attributes,CharacterView,Combatant,GameUnit,GameplayEffects,Motion,Position
+netId=27/0 team=- kind=- player=false components=LaneState
+netId=30/0 team=- kind=- player=false components=MatchState

@@ -268,6 +268,25 @@ tasks.register<JavaExec>("runLevelShot") {
     systemProperty("udea.levelshot.dir", levelShotDir)
 }
 
+// Issue #192's one-off conversion. Saves the world `assets/level/test_level.udea.kts` builds as
+// `moba/game/levels/test_level.udealevel`, and writes the roster `TestLevelRosterTest` holds a boot
+// to. It lives for one commit: the next one deletes the script, so to regenerate the level, check
+// this commit out and run it. See `TestLevelConversion`.
+tasks.register<JavaExec>("udeaConvertTestLevel") {
+    group = "udea"
+    description = "Issue #192: saves the world test_level.udea.kts builds to moba/game/levels/test_level.udealevel."
+    mainClass.set("dev.wildware.moba.level.TestLevelConversion")
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty(
+        "udea.testlevel.out",
+        project(":moba:game").layout.projectDirectory.file("levels/test_level.udealevel").asFile.absolutePath,
+    )
+    systemProperty(
+        "udea.testlevel.roster",
+        layout.projectDirectory.file("src/test/resources/levels/test_level.roster.txt").asFile.absolutePath,
+    )
+}
+
 /**
  * `moba.netproof`: one server, two clients, the real level, and three hashes that must agree. Run
  * by name rather than wired into `check`, because it prints a transcript that is the point of

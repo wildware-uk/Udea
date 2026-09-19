@@ -444,7 +444,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
-## Wave 13 (2026-09-19): in flight
+## Wave 13 (2026-09-19): done
 
 - Baseline `5821d25`: FULLY GREEN, 928 tasks.
 - Dispatched (4, owner "wip up to 4"): dev-195 (#195 save to .kts: patcher in :moba:desktop editor source set, Save
@@ -478,6 +478,14 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   only on :moba:desktop agent/editor classpaths, not runtime. Hot reload works (AssetHotReload on kmp; #91 closed
   NOT_PLANNED). Cards: `$` string saves as ${'$'} and reads back read-only; editor keys "has it now" on `applied` not
   `pushedToGame`. Worktree kept `.claude/worktrees/agent-ad11f31c6132f037c`.
+- **#196 MERGED `6efd35b`**, round 2 PASS (trial onto #195 green: build 958, editorTest, GL). editor.play/stop tools;
+  Play = CBOR bytes via LevelService.saveNow + undo-history copy + commit open sessions; Stop = cancel sessions,
+  LevelService.loadNow (1), afterRestore hook (2) for #238 Keep. Pre-Play undo during Play refused (`undo_before_play`);
+  Stop reclaims pre-Play delete NetIds (NetIdIndex.reclaim). LevelService.apply truncates the rewind ring
+  (TimeTravel.forgetAfter) on every load. Standalone = separate MobaAgent JVM on editor classpath. Card: score
+  bar/camera one tick stale after Stop. Worktree kept `.claude/worktrees/agent-adaebd966d17e4337`.
+- **WAVE 13 DONE: #188, physics2d, #195, #196 merged. Baseline `6efd35b`, 958 tasks.**
+- **Epic #199: only #214 left** (plus #223/#226 shelved by the owner).
 - Held: #241 A2 (asset compiler clip gen collides with #195), gizmo G2 #233 / G3 #234 (udea-editor busy), #189.
 - Remaining for #214: #195, #196 (then docs + kmp -> master). Shelved #223/#226 stay open (owner's shelving).
 

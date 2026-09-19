@@ -6,6 +6,7 @@ import dev.wildware.udea.assets.Model
 import dev.wildware.udea.assets.ResPath
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.spatial.Transform3D
 import dev.wildware.udea.generated.CoreUdeaRegistry
@@ -55,7 +56,7 @@ import kotlin.test.assertTrue
  * 1. **Centred, at the configured distance.** The followed entity is a red ball whose centre is the
  *    rig's focus. It is moved about the world; in every captured frame the red pixels' centroid is the
  *    middle of the picture, and their area is the size a ball of that radius has at the configured
- *    distance through the camera's field of view. Doubling the distance halves it.
+ *    distance through the camera's field of view. Twice the distance draws it the size predicted there.
  * 2. **The mouse turns the view.** Raw GLFW cursor moves go in through Kool's own callback - the entry
  *    point a real mouse uses - and travel Kool's `PointerInput`, its `InputStack` and `KoolPointer`
  *    to the rig. Moving right turns the view right: a fixed blue marker ahead and to the right swings
@@ -190,8 +191,8 @@ class GlThirdPersonRigTest {
     }
 
     /**
-     * The fox on the checkered ground with three crates for landmarks, photographed from behind as it faces
-     * [FIRST_YAW] and then [SECOND_YAW], and in six steps of the mouse turning the view round it.
+     * The fox on the checkered ground with crates for landmarks, photographed from behind as it faces
+     * [FIRST_YAW] and then [SECOND_YAW], and in [TURN_STEPS] steps of the mouse turning the view round it.
      */
     private fun photographTheFox(backend: KoolBackend, host: GameHost, rig: ThirdPersonRig, slot: FrameCaptureSlot, remove: List<Entity>) {
         val world = host.world
@@ -306,7 +307,7 @@ class GlThirdPersonRigTest {
     }
 
     /** The index the rig resolves its target through: the definition's own, as a game hands it over. */
-    private lateinit var definitionNetIds: dev.wildware.udea.core.identity.NetIdIndex
+    private lateinit var definitionNetIds: NetIdIndex
 
     private fun withRig(block: (KoolBackend, GameHost, ThirdPersonRig) -> Unit) {
         val definition = UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList())

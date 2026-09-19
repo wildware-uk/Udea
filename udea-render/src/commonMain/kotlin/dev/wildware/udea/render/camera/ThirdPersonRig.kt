@@ -302,6 +302,9 @@ public class ThirdPersonRig(
         /** Straight up or down: the pitch limits stay strictly inside it. */
         const val MAX_PITCH_LIMIT: Float = 90f
 
-        fun radians(degrees: Float): Float = (degrees * PI / 180.0).toFloat()
+        /** Degrees in the half turn that is [PI] radians. */
+        const val HALF_TURN_DEGREES: Double = 180.0
+
+        fun radians(degrees: Float): Float = (degrees * PI / HALF_TURN_DEGREES).toFloat()
     }
 }

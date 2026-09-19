@@ -22,6 +22,9 @@ import dev.wildware.udea.render.ui.UiLayer
  * val source = DeviceIntent(game.bindings, keyboard, pointer = pointer)
  * ```
  *
+ * It is also the mouse's motion ([PointerMotion], issue #248), which a camera turns by: summed every
+ * frame, and spent by that camera rather than by the tick.
+ *
  * ## Held back until the interface has judged it
  *
  * A key is offered to the interface and answered before it is recorded. A pointer cannot be: the

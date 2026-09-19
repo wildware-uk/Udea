@@ -216,6 +216,9 @@ The pieces a newcomer meets first, each with the issue that made it so.
   An `.fbx` is a model too: the asset build converts it to `.glb` with Assimp, textures
   embedded, and a broken one fails with `UDEA0039`; the converter is build-time only
   (`UDEA-MG-013`) (#244).
+  A 3D game's camera is `ThirdPersonRig` (`udea-render`, #248): behind and above a followed
+  `Transform3D`, turned by the mouse through `PointerMotion`, eased in seconds, writing nothing
+  into the world; it reports its ground-plane facing as plain floats for camera-relative movement.
   Everything that touches the scene or the ComposeGL toolkit runs on the Kool render thread
   (#224); `docs/engineering-standards.md` section 2 states the rule.
 - **Interface is ComposeGL, in two places that answer opposite questions.** A `UiLayer` is a

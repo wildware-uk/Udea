@@ -5,7 +5,6 @@ import de.fabmax.kool.math.MutableVec3f
 import de.fabmax.kool.math.Vec2i
 import de.fabmax.kool.math.Vec3f
 import de.fabmax.kool.math.deg
-import de.fabmax.kool.math.rad
 import de.fabmax.kool.modules.gltf.GltfLoadConfig
 import de.fabmax.kool.modules.gltf.GltfMaterialConfig
 import de.fabmax.kool.modules.ksl.KslPbrShader
@@ -212,12 +211,7 @@ internal class ModelStage(
         pose: ClipPose,
     ) {
         // Translate, then turn about Z, Y, X - so X is applied to the model first - then scale.
-        matrix.setIdentity()
-            .translate(x, y, z)
-            .rotate(rotationZ.rad, Vec3f.Z_AXIS)
-            .rotate(rotationY.rad, Vec3f.Y_AXIS)
-            .rotate(rotationX.rad, Vec3f.X_AXIS)
-            .scale(axisScale.set(scaleX, scaleY, scaleZ))
+        matrix.place(x, y, z, rotationX, rotationY, rotationZ, axisScale.set(scaleX, scaleY, scaleZ))
         when (source) {
             is MeshModel -> {
                 val run = runFor(source.mesh, source.material)
@@ -384,9 +378,6 @@ internal class ModelStage(
     private companion object {
         /** Texels along each side of the shadow map: sharp shadow edges at a modest memory cost. */
         const val SHADOW_MAP_SIZE = 2048
-
-        /** A quarter turn about X takes a glTF file's +Y, its up, to the world's +Z. */
-        val Y_UP_TO_Z_UP = 90f.deg
     }
 }
 

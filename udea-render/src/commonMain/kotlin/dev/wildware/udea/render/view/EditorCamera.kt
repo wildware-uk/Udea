@@ -213,6 +213,18 @@ public class EditorCamera(
             out.y = projection.pixelY(y)
             return true
         }
+        return projectOrbit(x, y, z, out)
+    }
+
+    /**
+     * Writes into [out] the view pixel world point ([x], [y], [z]) is drawn at through the 3D orbit,
+     * whichever camera [dimension] names: a Scene view draws its models through the orbit in 2D as
+     * well as in 3D, so picking a model (issue #235) projects its box through here.
+     *
+     * @return false when the point is behind the eye, or nearer than [near], and so drawn nowhere.
+     */
+    public fun projectOrbit(x: Float, y: Float, z: Float, out: ViewPoint): Boolean {
+        checkFitted()
         frame()
         val rx = x - eyeX
         val ry = y - eyeY
@@ -226,6 +238,16 @@ public class EditorCamera(
         out.x = (ndcX + 1f) / 2f * width
         out.y = (ndcY + 1f) / 2f * height
         return true
+    }
+
+    /**
+     * How far in front of the 3D eye world point ([x], [y], [z]) is, along the line of sight: the
+     * depth that decides which of two models under the pointer is in front (issue #235). Negative
+     * behind the eye.
+     */
+    public fun depthOf(x: Float, y: Float, z: Float): Float {
+        frame()
+        return (x - eyeX) * forwardX + (y - eyeY) * forwardY + (z - eyeZ) * forwardZ
     }
 
     /** Writes into [out] the ground-plane world point under view pixel ([viewX], [viewY]), in 2D. */

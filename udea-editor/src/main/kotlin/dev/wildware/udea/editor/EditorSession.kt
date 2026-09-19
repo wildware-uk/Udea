@@ -40,11 +40,17 @@ internal enum class EditorTab { Scene, Game }
  * its pointer is the editor's ([SceneNavigation]). The panels are drawn into the window, never into
  * either view, so no screenshot ever contains them.
  *
+ * ## Selecting (issue #235)
+ *
+ * A click in the Scene tab picks what the view's render systems report under the pointer
+ * ([ScenePicker]), and every change to the selection is an `editor.select` call ([EditorSelection]).
+ * The Inspector lists what the selection has in common, and what is typed into it is written to all
+ * of them as one edit ([EditorInspector]).
+ *
  * ## What it does not do
  *
  * It does not pause the world: a launcher starts the editor paused, before the first frame, so no
- * tick runs between boot and the window appearing (issue #194). It does not pick or select anything
- * in the Scene tab: that is epic #231's.
+ * tick runs between boot and the window appearing (issue #194).
  *
  * @param tick the simulation's tick, read once a frame for the status line and the viewport.
  * @param paused whether the simulation is paused, read once a frame for the status line.
@@ -70,8 +76,22 @@ public class EditorSession(
     /** The Game tab's picture. */
     internal val gameState: SceneViewState = SceneViewState()
 
-    /** The Scene tab's pointer: gizmos, then the editor camera. */
-    internal val navigation: SceneNavigation = SceneNavigation(views.scene)
+    /** Whether Shift is held: the window hears every key event, and the pointer's carry no modifiers. */
+    internal val keys: EditorKeys = EditorKeys()
+
+    /** The editor author's selection, as `editor.select` and `editor.selection` answer it. */
+    internal val selection: EditorSelection = EditorSelection(tools) { problem = it }
+
+    private val picker = ScenePicker(views.scene)
+
+    /** Click, Shift-click and box select in the Scene tab. */
+    internal val picking: ScenePicking = ScenePicking(picker, selection)
+
+    /** The Scene tab's pointer: gizmo handles, then entities, then the editor camera. */
+    internal val navigation: SceneNavigation = SceneNavigation(views.scene, picking) { keys.shift }
+
+    /** The Inspector panel: what the selection shares, written to all of it at once. */
+    internal val inspector: EditorInspector = EditorInspector(tools, selection)
 
     /** Which tab is showing. The Scene tab first: an editor opens on the editor's view. */
     internal var tab: EditorTab by mutableStateOf(EditorTab.Scene)
@@ -101,14 +121,9 @@ public class EditorSession(
 
     private val redraw = ViewportRedraw()
 
-    /** The id of the latest `editor.history` read this session sent, or `null` before the first. */
-    private var historyRead: Long? = null
-
     private var historyPending = false
 
     private var historyStale = true
-
-    private var seenCompleted = Long.MIN_VALUE
 
     /** Frames the Scene tab is still drawn again for after its camera moved: see [SCENE_MOVED_FRAMES]. */
     private var sceneMoved = 0
@@ -120,6 +135,12 @@ public class EditorSession(
     private var seenGameHeight = 0
 
     /** The window: menus, docked panels, the viewport and the status line. Show it on a `UiLayer`. */
+    init {
+        // The Scene view's layer draws the selection over the world, then whatever gizmo handles a
+        // launcher had already put there, which a press still reaches first.
+        views.scene.gizmos = SceneOverlay(picker, selection, picking, handles = views.scene.gizmos)
+    }
+
     public val window: UiScreen = object : UiScreen {
         @Composable
         override fun content() {
@@ -131,22 +152,27 @@ public class EditorSession(
      * Keeps the window current. Once per frame, on the render thread, after the frame's commands have
      * run - in a launcher, right after `AgentGameLoop.pump`.
      *
-     * Delivers answers, re-reads the history when any command other than its own read has completed
-     * since the last one (the editor's edits and an agent's alike), invalidates the viewport when the
-     * world may have changed ([ViewportRedraw]), and rewrites the status line.
+     * Delivers answers; re-reads the history, the selection and the Inspector's fields when any
+     * command other than the editor's own reads has completed since the last frame (the editor's
+     * edits and an agent's alike); invalidates the viewport when the world may have changed
+     * ([ViewportRedraw]); and rewrites the status line.
      */
     public fun frame() {
         tools.frame()
         val completed = tools.completed
-        if (completed != seenCompleted) {
-            if (completed != historyRead) historyStale = true
-            seenCompleted = completed
-        }
+        val changed = tools.consumeChanged()
+        if (changed) historyStale = true
         if (historyStale && !historyPending) readHistory()
+        selection.frame(changed)
+        inspector.frame(changed, tick())
         // Both asked every frame: each keeps what it last saw.
         val resized = resized()
         val due = redraw.due(tick(), completed) || resized
-        if (navigation.consumeMoved()) sceneMoved = SCENE_MOVED_FRAMES
+        // Each asked every frame, not short-circuited: each forgets what it reports.
+        val cameraMoved = navigation.consumeMoved()
+        val selected = selection.consumeChanged()
+        val boxed = picking.consumeChanged()
+        if (cameraMoved || selected || boxed) sceneMoved = SCENE_MOVED_FRAMES
         if (due || sceneMoved > 0) sceneState.invalidate()
         if (due) gameState.invalidate()
         if (sceneMoved > 0) sceneMoved--
@@ -253,7 +279,7 @@ public class EditorSession(
     private fun readHistory() {
         historyPending = true
         historyStale = false
-        historyRead = tools.call(HISTORY, mapOf("limit" to HISTORY_LIMIT.toString())) { answer ->
+        tools.read(HISTORY, mapOf("limit" to HISTORY_LIMIT.toString())) { answer ->
             historyPending = false
             when (answer) {
                 is AgentResult.Ok -> history = HistoryEntry.parse(answer.json)

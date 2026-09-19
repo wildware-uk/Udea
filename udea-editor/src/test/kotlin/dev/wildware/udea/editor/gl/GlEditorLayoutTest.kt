@@ -12,6 +12,7 @@ import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.editor.EditorTab
 import dev.wildware.udea.editor.EditorTags
 import dev.wildware.udea.editor.EditorViews
+import dev.wildware.udea.editor.InspectorTags
 import dev.wildware.udea.editor.editorFonts
 import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.OffscreenTarget
@@ -20,7 +21,6 @@ import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
-import dev.wildware.udea.render.ScreenTarget
 import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.camera.CameraRig
@@ -30,13 +30,10 @@ import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.kool.KoolPointer
 import dev.wildware.udea.render.ui.UiLayer
 import dev.wildware.udea.render.view.EditorCamera
-import org.lwjgl.opengl.GL11
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.nio.ByteBuffer
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -156,7 +153,7 @@ class GlEditorLayoutTest {
             ui.settle()
             val view = ui.node(if (tab == EditorTab.Scene) EditorTags.SCENE_VIEW else EditorTags.GAME_VIEW).boundsInRoot
             val panels = ArrayList<Rect>()
-            for (id in listOf(EditorTags.CREATE_PANEL, EditorTags.ASSET_PANEL, EditorTags.HISTORY_PANEL)) {
+            for (id in listOf(EditorTags.CREATE_PANEL, EditorTags.ASSET_PANEL, EditorTags.HISTORY_PANEL, InspectorTags.PANEL)) {
                 panels += ui.node("debugwindow:$id").boundsInRoot
             }
             ui.root.forEach { node -> if (node.testTag?.startsWith("debugwindow:divider:") == true) panels += node.boundsInRoot }
@@ -236,48 +233,6 @@ class GlEditorLayoutTest {
             batch.begin(rig.projection)
             batch.fill(-EXTENT, -EXTENT, 2f * EXTENT, 2f * EXTENT, Rgba.of(1f, 0f, 1f))
             batch.end()
-        }
-    }
-
-    /**
-     * Reads the whole window back once, when asked. An overlay, so it runs at a defined point in the
-     * frame; the default framebuffer then holds the previous frame fully drawn, interface included,
-     * which is why [read] waits for frames after arming it. `glReadPixels` through LWJGL, as
-     * `udea-render`'s `BackbufferProbe` does, because it reads whatever framebuffer is bound: the
-     * window's.
-     */
-    private class WindowProbe : OverlaySystem {
-        private val armed = AtomicBoolean(false)
-
-        @Volatile
-        private var last: BufferedImage? = null
-
-        override fun render(target: ScreenTarget, dtSeconds: Float) {
-            if (!armed.compareAndSet(true, false)) return
-            val width = target.width
-            val height = target.height
-            val pixels = ByteBuffer.allocateDirect(width * height * 4)
-            GL11.glReadPixels(0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels)
-            val image = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
-            for (y in 0 until height) for (x in 0 until width) {
-                // GL's rows count up from the bottom.
-                val i = ((height - 1 - y) * width + x) * 4
-                image.setRGB(
-                    x,
-                    y,
-                    ((pixels.get(i).toInt() and 0xFF) shl 16) or ((pixels.get(i + 1).toInt() and 0xFF) shl 8) or (pixels.get(i + 2).toInt() and 0xFF),
-                )
-            }
-            last = image
-        }
-
-        /** The window as it stands a few frames from now. */
-        fun read(frames: FrameProbe): BufferedImage {
-            last = null
-            awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
-            armed.set(true)
-            awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
-            return checkNotNull(last) { "the window was not read back" }
         }
     }
 

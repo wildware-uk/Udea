@@ -39,8 +39,11 @@ class EditorAssetsTest {
 
     private fun drain(): List<AgentCommand> = ArrayList<AgentCommand>().also { bridge.drain(it) }
 
-    /** Everything the window sent, minus its own History reads, which are `EditorSessionTest`'s. */
-    private fun sent(): List<AgentCommand> = drain().filter { it.name != "editor.history" }
+    /**
+     * Everything the window sent, minus the reads it makes by itself - the History panel's, which are
+     * `EditorSessionTest`'s, and the selection's, which are `ScenePickingTest`'s.
+     */
+    private fun sent(): List<AgentCommand> = drain().filter { it.name != "editor.history" && it.name != "editor.selection" }
 
     private fun answer(command: AgentCommand, result: AgentResult, ui: UiTest) {
         bridge.complete(command.id, result)

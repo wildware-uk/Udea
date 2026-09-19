@@ -17,7 +17,7 @@ import java.io.File
 public object MobaLaunchLevel {
 
     /** The system property naming a level file. Unset or blank means the bundled test level. */
-    public const val PROPERTY: String = "moba.level"
+    internal const val PROPERTY: String = "moba.level"
 
     /**
      * The launch level's bytes: the file [named] names, or the bundled test level.

@@ -32,10 +32,10 @@ public object MobaLevel {
     public val SCENE_ID: SceneId = SceneId("level")
 
     /** Where the launch level's bytes are published on a built game's context. */
-    public val KEY: ServiceKey<LaunchLevel> = serviceKey("moba.level")
+    internal val KEY: ServiceKey<LaunchLevel> = serviceKey("moba.level")
 
     /** The bundled default, as a resource path. `moba/game/build.gradle.kts` packages `levels/`. */
-    public const val DEFAULT_RESOURCE: String = "levels/test_level.udealevel"
+    internal const val DEFAULT_RESOURCE: String = "levels/test_level.udealevel"
 
     /**
      * The bundled test level's bytes.
@@ -50,9 +50,9 @@ public object MobaLevel {
  * The launch level's bytes, published on the context under [MobaLevel.KEY] so the entry point that
  * boots a built game loads the same level its restart scene was registered with.
  */
-public class LaunchLevel(
+internal class LaunchLevel(
     /** The `.udealevel` file's contents. Never written to. */
-    public val bytes: ByteArray,
+    val bytes: ByteArray,
 ) {
     override fun toString(): String = "LaunchLevel(${bytes.size} bytes)"
 }

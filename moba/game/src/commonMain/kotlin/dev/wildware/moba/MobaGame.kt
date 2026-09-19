@@ -2,7 +2,6 @@ package dev.wildware.moba
 
 import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.GameUnitReplicator
-import dev.wildware.moba.level.LaunchLevel
 import dev.wildware.moba.level.MobaLevel
 import dev.wildware.moba.ability.CharacterAttributes
 import dev.wildware.moba.ability.Combatant
@@ -93,7 +92,7 @@ public object MobaGame {
         level: ByteArray = MobaLevel.bundledBytes(),
     ): UdeaGameDef {
         val combat = MobaAbilityModule()
-        val module = MobaModule(combat, LaunchLevel(level))
+        val module = MobaModule(combat, level)
         val definition = UdeaGameDef(
             // Generated from this module's resolved runtime classpath (issue #202), so a level
             // saved from any mode can hold every component the game's modules declare, and a

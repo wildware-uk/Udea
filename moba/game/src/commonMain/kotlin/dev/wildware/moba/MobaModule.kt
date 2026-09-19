@@ -60,9 +60,11 @@ import dev.wildware.udea.render.input.IntentState
 public class MobaModule(
     /** This game's combat. Contributed to the definition by [MobaGame], not by this module. */
     public val combat: MobaAbilityModule,
-    /** The level this game plays, published under [MobaLevel.KEY] for the entry point that boots it. */
-    public val level: LaunchLevel,
+    /** The `.udealevel` this game plays, published under [MobaLevel.KEY] for the entry point that boots it. */
+    level: ByteArray,
 ) : UdeaModule {
+
+    private val level: LaunchLevel = LaunchLevel(level)
 
     override val name: String get() = "moba"
 

@@ -163,12 +163,13 @@ class MobaPlayKeepPanelTest {
     }
 
     /**
-     * More play edits than one answer can carry to the window: the bridge swaps an answer over
-     * `AgentBridge.MAX_DELIVERABLE_RESULT_CHARS` for a handle to it, so the window cannot read the
-     * list. It says so, and goes on working, rather than throwing on the render thread.
+     * More play edits than one answer can carry over HTTP: the bridge swaps an answer over
+     * `AgentBridge.MAX_DELIVERABLE_RESULT_CHARS` for a handle to it, and `/state` gets the handle. The
+     * window reads the answer whole in the same process (issue #237), so it lists every edit with its
+     * Keep toggle, and the Inspector still pins the field the play changed.
      */
     @Test
-    fun `a list of play edits too long for one answer is named as such, and the window carries on`() {
+    fun `the panel lists every play edit even when the list is too long for one HTTP answer, and the inspector still pins`() {
         runUntilTowers()
         val tower = hostileTower()
         val (_, editor) = editorOn(tower)
@@ -176,16 +177,26 @@ class MobaPlayKeepPanelTest {
         uiTest { editor.window.content() }.use { ui ->
             frames(ui, editor)
             click(ui, editor, PlaybackTags.PLAY)
+            asAnAgent("editor.select", "entities" to "${tower.raw}")
             repeat(MANY_EDITS) { step ->
                 asAnAgent("editor.set_field", "id" to "${tower.raw}", "component" to "Tower", "field" to "attackRange", "value" to "${160 + step}")
             }
-            val answer = asAnAgent("editor.play_edits")
-            assertTrue("\"resultTooLarge\":true" in answer, "$MANY_EDITS edits fit one answer, so this is not the case: $answer")
+            val (overHttp, whole) = asAnAgentBothWays("editor.play_edits")
+            assertTrue("\"resultTooLarge\":true" in overHttp, "$MANY_EDITS edits fit one HTTP answer, so this is not the case: $overHttp")
+            val editIds = Json.parseToJsonElement(whole).jsonObject.getValue("edits").jsonArray
+                .map { it.jsonObject.getValue("editId").jsonPrimitive.long }
+            assertEquals(MANY_EDITS, editIds.size, "the whole answer does not hold every play edit: $whole")
             frames(ui, editor)
 
-            assertTrue("too long" in ui.text(PlayEditTags.LIST), "the panel shows \"${ui.text(PlayEditTags.LIST)}\"")
+            // Every play edit has its row and its Keep toggle.
+            editIds.forEach { ui.assertExists(PlayEditTags.keep(it)) }
+            ui.assertExists(PlayEditTags.pin(RANGE))
+
+            // The last row is past the bottom of the docked window: scrolled to, as a person would.
+            scrollTo(ui, PlayEditTags.keep(editIds.last()))
+            click(ui, editor, PlayEditTags.keep(editIds.last()))
             click(ui, editor, PlaybackTags.STOP)
-            assertTrue(host.time.paused, "the window stopped working after the long list")
+            assertEquals(160f + MANY_EDITS - 1, rangeOf(tower), "the kept last edit is not the stopped world's range")
         }
     }
 
@@ -260,6 +271,17 @@ class MobaPlayKeepPanelTest {
         frames(ui, editor)
     }
 
+    /** Turns the wheel over the "Changes during Play" window until [tag] is inside what it shows. */
+    private fun scrollTo(ui: UiTest, tag: String) {
+        repeat(MAX_SCROLLS) {
+            val body = ui.node(PLAY_EDITS_BODY).boundsInRoot
+            val row = ui.node(tag).boundsInRoot
+            if (row.top >= body.top && row.bottom <= body.bottom) return
+            ui.scroll(PLAY_EDITS_BODY, Offset(0f, if (row.top < body.top) -SCROLL_STEP else SCROLL_STEP))
+        }
+        error("#$tag never scrolled into the window's view:\n${ui.dump()}")
+    }
+
     private fun frames(ui: UiTest, editor: EditorSession) {
         repeat(FRAMES) {
             session.loop.pump(1f / 60f)
@@ -276,8 +298,11 @@ class MobaPlayKeepPanelTest {
         Json.parseToJsonElement(asAnAgent("editor.history", "limit" to "20")).jsonObject.getValue("edits").jsonArray
             .map { it.jsonObject.getValue("tool").jsonPrimitive.content }
 
-    /** [tool] as an outside agent calls it, under the editor's author. */
-    private fun asAnAgent(tool: String, vararg args: Pair<String, String>): String {
+    /** [tool] as an outside agent calls it, under the editor's author, answered as HTTP answers it. */
+    private fun asAnAgent(tool: String, vararg args: Pair<String, String>): String = asAnAgentBothWays(tool, *args).first
+
+    /** [tool] called once as [asAnAgent] calls it: its answer as HTTP gets it, and as the window reads it. */
+    private fun asAnAgentBothWays(tool: String, vararg args: Pair<String, String>): Pair<String, String> {
         val command = AgentCommand(tool, args.toMap(), session = wiring.sessions.intern(MobaEditor.AUTHOR))
         wiring.bridge.submit(command)
         var pumps = 0
@@ -285,16 +310,22 @@ class MobaPlayKeepPanelTest {
             check(pumps++ < MAX_PUMPS) { "$tool did not complete in $MAX_PUMPS frames" }
             session.loop.pump(1f / 60f)
         }
-        val answer = wiring.bridge.commandResults().single { it.id == command.id }.result
-        check(answer is AgentResult.Ok) { "$tool failed: $answer" }
-        return answer.json
+        val overHttp = wiring.bridge.commandResults().single { it.id == command.id }.result
+        val whole = wiring.bridge.wholeCommandResults().single { it.id == command.id }.result
+        check(overHttp is AgentResult.Ok && whole is AgentResult.Ok) { "$tool failed: $overHttp" }
+        return overHttp.json to whole.json
     }
 
     private companion object {
         const val RANGE = "Tower.attackRange"
 
-        /** Play edits whose list is longer than one answer the bridge hands the window. */
+        /** Play edits whose list is longer than one answer the bridge hands an HTTP caller. */
         const val MANY_EDITS = 12
+
+        /** The scrolling body ComposeGL's docking gives the "Changes during Play" window. */
+        const val PLAY_EDITS_BODY = "debugwindow:editor-play-edits:body"
+        const val SCROLL_STEP = 40f
+        const val MAX_SCROLLS = 100
         const val VIEW_WIDTH = 640
         const val VIEW_HEIGHT = 360
 

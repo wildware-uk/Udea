@@ -1,8 +1,12 @@
 import dev.wildware.udea.build.UdeaVerifyAgentsMdTask
 import dev.wildware.udea.build.UdeaVerifyTrelloMapTask
+import dev.wildware.udea.build.UdeaVerifyWikiTask
+import dev.wildware.udea.build.WikiCheck
 
 /**
- * Registers `udeaVerifyAgentsMd` and `udeaVerifyTrelloMap`, and wires both into `check`.
+ * Registers `udeaVerifyAgentsMd`, `udeaVerifyTrelloMap` and `udeaVerifyWiki`, and wires them into
+ * `check`. `udeaVerifyWiki` holds `docs/wiki/` to the tree the same way: every page, path and
+ * project a wiki page names has to exist.
  *
  * Applied to the **root** project, not to each module: both gates ask whether a document still
  * describes the tree as a whole - `AGENTS.md` against `settings.gradle.kts`, and the Trello map
@@ -35,6 +39,15 @@ val udeaVerifyTrelloMap by tasks.registering(UdeaVerifyTrelloMapTask::class) {
     report.set(layout.buildDirectory.file("reports/udea/trello-map.txt"))
 }
 
+val udeaVerifyWiki by tasks.registering(UdeaVerifyWikiTask::class) {
+    group = "verification"
+    description = "Fails if a docs/wiki page links to a page, repository path or Gradle project that does not exist."
+    repoRoot.set(layout.projectDirectory)
+    wikiDirectory.set(layout.projectDirectory.dir(WikiCheck.WIKI_DIRECTORY))
+    settingsScript.set(layout.projectDirectory.file("settings.gradle.kts"))
+    report.set(layout.buildDirectory.file("reports/udea/wiki.txt"))
+}
+
 tasks.named("check") {
-    dependsOn(udeaVerifyAgentsMd, udeaVerifyTrelloMap)
+    dependsOn(udeaVerifyAgentsMd, udeaVerifyTrelloMap, udeaVerifyWiki)
 }

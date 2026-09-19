@@ -31,16 +31,13 @@ public fun interface StandaloneLauncher {
  *
  * Play and Stop are `editor.play` and `editor.stop`, and Step is `time.step` with one tick - the same
  * calls an agent makes. The world is never touched from here. What the toolbar says is read from the
- * answers: [status] is the last one's outcome, and [playing] follows `editor.play` and `editor.stop`.
+ * answers: [status] is the last one's outcome. It keeps no copy of whether a play is under way, because
+ * an agent can start or stop one without the window knowing.
  */
 internal class PlayControls(
     private val tools: EditorTools,
     private val standalone: StandaloneLauncher?,
 ) {
-
-    /** Whether the last answered Play or Stop left a play under way. */
-    var playing: Boolean by mutableStateOf(false)
-        private set
 
     /** One line about what the toolbar last did. */
     var status: String by mutableStateOf(EDITING)
@@ -53,7 +50,6 @@ internal class PlayControls(
         tools.call(PLAY) { answer ->
             when (answer) {
                 is AgentResult.Ok -> {
-                    playing = true
                     val fields = fields(answer)
                     val returnsTo = fields["stopReturnsTo"] ?: fields["tick"]
                     status = "Playing - Stop returns to tick ${returnsTo?.jsonPrimitive?.content}"
@@ -66,10 +62,7 @@ internal class PlayControls(
     fun stop() {
         tools.call(STOP) { answer ->
             when (answer) {
-                is AgentResult.Ok -> {
-                    playing = false
-                    status = "$EDITING - back at tick ${fields(answer)["tick"]?.jsonPrimitive?.content}"
-                }
+                is AgentResult.Ok -> status = "$EDITING - back at tick ${fields(answer)["tick"]?.jsonPrimitive?.content}"
                 is AgentResult.Failed -> status = "$STOP refused: ${answer.error}"
             }
         }
@@ -110,7 +103,7 @@ internal class PlayControls(
     private fun fields(answer: AgentResult.Ok): JsonObject = json.parseToJsonElement(answer.json) as? JsonObject
         ?: throw IllegalArgumentException("a tool answered something that is not an object: ${answer.json}")
 
-    override fun toString(): String = "PlayControls(playing=$playing)"
+    override fun toString(): String = "PlayControls($status)"
 
     internal companion object {
         const val PLAY = "editor.play"

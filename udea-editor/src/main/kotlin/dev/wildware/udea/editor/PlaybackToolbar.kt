@@ -3,6 +3,7 @@ package dev.wildware.udea.editor
 import androidx.compose.runtime.Composable
 import dev.wildware.composegl.ui.layout.Arrangement
 import dev.wildware.composegl.ui.layout.Row
+import dev.wildware.composegl.ui.layout.VerticalAlignment
 import dev.wildware.composegl.ui.modifier.Modifier
 import dev.wildware.composegl.ui.modifier.fillMaxWidth
 import dev.wildware.composegl.ui.modifier.padding
@@ -39,7 +40,7 @@ public object PlaybackTags {
  */
 @Composable
 internal fun PlaybackToolbar(controls: PlayControls) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = GAP, vertical = GAP / 2), Arrangement.spacedBy(GAP)) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = GAP, vertical = GAP / 2), Arrangement.spacedBy(GAP), VerticalAlignment.Centre) {
         Button("Play", onClick = { controls.play() }, modifier = Modifier.testTag(PlaybackTags.PLAY))
         Button("Stop", onClick = { controls.stop() }, modifier = Modifier.testTag(PlaybackTags.STOP))
         Button("Step", onClick = { controls.step() }, modifier = Modifier.testTag(PlaybackTags.STEP))

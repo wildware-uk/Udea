@@ -462,6 +462,13 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   rule); tracked by comment on #199. dev-model, branch `model-textured-example`, new files in udea-render
   (3D mesh + texture + Kool PBR material, Kool-free API), xvfb shot + GL test (texture and lighting
   mutations red). 4th developer (owner "wip up to 4"); told to check `free -g` before full builds.
+- **Owner, 2D/3D + physics (dashboard, 2026-09-19):** separate Transform2D/Transform3D components (plain floats,
+  no vector objects; one copy step per library in the engine), one renderer; 3D model system also lifts 2D
+  positions onto the ground plane. Physics 2D = Box2D 3 (owner). Lead advice: use `de.fabmax.box2d-jni:box2d-jni`
+  1.0.0 (Box2D 3.3.1, Kool-free) in a `udea-physics2d` module behind udea-core's `PhysicsWorld`, NOT
+  `kool-physics-2d` (pulls kool-core into simulation/headless, UDEA-MG-002). 3D: Kool uses PhysX (physx-jni
+  2.7.1); Box3D (erincatto, MIT, v0.1.0) has no JVM/KMP binding yet. No physics backend exists today (#213
+  confirmed gdx-box2d unused). Asked owner whether to queue the physics module next wave.
 - Held: #194 (settings.gradle.kts + AGENTS.md table collide with #213), #188 (moba HUD beside #228),
   #189 (after #188; may be mostly done by #213), #195/#196 (need #194), #214 last.
 

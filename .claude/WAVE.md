@@ -468,7 +468,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   1.0.0 (Box2D 3.3.1, Kool-free) in a `udea-physics2d` module behind udea-core's `PhysicsWorld`, NOT
   `kool-physics-2d` (pulls kool-core into simulation/headless, UDEA-MG-002). 3D: Kool uses PhysX (physx-jni
   2.7.1); Box3D (erincatto, MIT, v0.1.0) has no JVM/KMP binding yet. No physics backend exists today (#213
-  confirmed gdx-box2d unused). Asked owner whether to queue the physics module next wave.
+  confirmed gdx-box2d unused). **Owner: "sounds good" - `udea-physics2d` (box2d-jni) QUEUED FOR WAVE 12** (commented on #199, no issue).
 - Held: #194 (settings.gradle.kts + AGENTS.md table collide with #213), #188 (moba HUD beside #228),
   #189 (after #188; may be mostly done by #213), #195/#196 (need #194), #214 last.
 

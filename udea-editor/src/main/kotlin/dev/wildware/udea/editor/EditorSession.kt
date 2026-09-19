@@ -44,8 +44,8 @@ internal enum class EditorTab { Scene, Game }
  *
  * A click in the Scene tab picks what the view's render systems report under the pointer
  * ([ScenePicker]), and every change to the selection is an `editor.select` call ([EditorSelection]).
- * The Inspector lists what the selection has in common and sets it on all of them as one edit
- * ([EditorInspector]).
+ * The Inspector lists what the selection has in common, and what is typed into it is written to all
+ * of them as one edit ([EditorInspector]).
  *
  * ## What it does not do
  *
@@ -90,7 +90,7 @@ public class EditorSession(
     /** The Scene tab's pointer: gizmo handles, then entities, then the editor camera. */
     internal val navigation: SceneNavigation = SceneNavigation(views.scene, picking) { keys.shift }
 
-    /** The Inspector panel: what the selection shares, set on all of it at once. */
+    /** The Inspector panel: what the selection shares, written to all of it at once. */
     internal val inspector: EditorInspector = EditorInspector(tools, selection)
 
     /** Which tab is showing. The Scene tab first: an editor opens on the editor's view. */

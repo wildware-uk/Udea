@@ -1,24 +1,23 @@
 package dev.wildware.udea.editor
 
 import androidx.compose.runtime.Composable
+import dev.wildware.composegl.ui.layout.Box
 import dev.wildware.composegl.ui.layout.Column
-import dev.wildware.composegl.ui.layout.Row
 import dev.wildware.composegl.ui.modifier.Modifier
 import dev.wildware.composegl.ui.modifier.fillMaxWidth
+import dev.wildware.composegl.ui.modifier.onFocusWithin
 import dev.wildware.composegl.ui.modifier.padding
 import dev.wildware.composegl.ui.modifier.testTag
-import dev.wildware.composegl.ui.modifier.weight
-import dev.wildware.composegl.ui.widget.Button
 import dev.wildware.composegl.ui.widget.Text
 import dev.wildware.composegl.ui.widget.TextField
 
 /**
  * The Inspector panel (issue #235): what the selected entities have in common, and a box per field
- * to set it on all of them at once.
+ * that writes to all of them at once.
  *
  * A field they agree on shows its value; one they disagree on shows an empty box that says
- * **Mixed**, and typing a value there and pressing Enter or Set gives every one of them that value,
- * as one undoable edit.
+ * **Mixed**. Typing into a box writes the value to every one of them as it is typed, and Enter or
+ * leaving the box keeps it as one undoable edit ([EditorInspector.edit]).
  */
 @Composable
 internal fun InspectorPanel(inspector: EditorInspector) {
@@ -38,18 +37,21 @@ private fun FieldRow(inspector: EditorInspector, field: InspectorField) {
     // The name on a line of its own: a docked panel is narrow, and `GameUnit.targetRaw` beside a box
     // wraps mid-word.
     Text(field.key, Modifier.fillMaxWidth())
-    Row(Modifier.fillMaxWidth().padding(bottom = GAP / 2f)) {
-        if (field.readOnly) {
-            Text(field.value.orEmpty(), Modifier.weight(1f).testTag(InspectorTags.field(field.key)))
-        } else {
+    val box = Modifier.fillMaxWidth().padding(bottom = GAP / 2f).testTag(InspectorTags.field(field.key))
+    if (field.readOnly) {
+        Text(field.value.orEmpty(), box)
+    } else {
+        // No Set button (the owner's ruling on #235): typing writes, Enter or leaving the box keeps it.
+        // The focus handler is on a box around the field because ComposeGL tells a node's ancestors
+        // that focus left it, never the node itself.
+        Box(Modifier.fillMaxWidth().onFocusWithin { focused -> if (!focused) inspector.commit(field) }) {
             TextField(
                 inspector.textOf(field),
                 { inspector.edit(field, it) },
-                Modifier.weight(1f).testTag(InspectorTags.field(field.key)),
+                box,
                 placeholder = if (field.mixed) MIXED else "",
-                onSubmit = { inspector.set(field) },
+                onSubmit = { inspector.commit(field) },
             )
-            Button("Set", onClick = { inspector.set(field) }, modifier = Modifier.testTag(InspectorTags.set(field.key)))
         }
     }
 }
@@ -68,7 +70,7 @@ private const val GAP: Float = 8f
 
 /**
  * The test tags on the Inspector panel's parts: how a test - and `MobaInspectorTest`, in the game that
- * launches the window - finds a field to read and the button that sets it.
+ * launches the window - finds a field to read and type into.
  */
 public object InspectorTags {
 
@@ -86,7 +88,4 @@ public object InspectorTags {
 
     /** The box for one shared field, by its `Component.field`. */
     public fun field(key: String): String = "editor:inspector-field:$key"
-
-    /** The Set button beside it. */
-    public fun set(key: String): String = "editor:inspector-set:$key"
 }

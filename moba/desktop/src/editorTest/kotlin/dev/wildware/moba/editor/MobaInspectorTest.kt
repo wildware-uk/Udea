@@ -1,6 +1,7 @@
 package dev.wildware.moba.editor
 
 import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.composegl.ui.input.Key
 import dev.wildware.composegl.ui.testing.UiTest
 import dev.wildware.composegl.ui.testing.uiTest
 import dev.wildware.moba.MobaGame
@@ -30,8 +31,8 @@ import kotlin.test.assertTrue
 
 /**
  * The Inspector (issue #235) against the real `EditorToolset`, in a real `moba` world: two units on
- * different teams show **Mixed** for `GameUnit.team`, and one Set gives both the same team as one
- * edit, which one Undo takes back from both.
+ * different teams show **Mixed** for `GameUnit.team`; typing a team into it gives both that team
+ * while it is typed, Enter files it as one edit, and one Undo takes it back from both.
  *
  * `InspectorTest` in `udea-editor` answers the panel's calls by hand; this is the other half, wired
  * as `runEditor` wires it, with the frame loop pumped by hand as `MobaEditorTest` pumps it. The two
@@ -51,13 +52,13 @@ class MobaInspectorTest {
     }
 
     @Test
-    fun `two units on different teams show Mixed for their team, and one Set gives both one team as one undoable edit`() {
+    fun `two units on different teams show Mixed for their team, and typing one team gives it to both as one undoable edit`() {
         val editor = MobaEditor.session(host, session)
         val (first, second) = unitsOnTwoTeams()
         val firstTeam = teamOf(first)
         val secondTeam = teamOf(second)
         assertNotEquals(firstTeam, secondTeam, "the level has no two units on different teams to select")
-        // A team neither has, so the one Set changes both and the one undo has both to put back.
+        // A team neither has, so the one edit changes both and the one undo has both to put back.
         val shared = (0..TEAMS).first { it != firstTeam && it != secondTeam }
 
         uiTest { editor.window.content() }.use { ui ->
@@ -69,14 +70,19 @@ class MobaInspectorTest {
 
             assertTrue(ui.click(InspectorTags.field(TEAM)), "no box for $TEAM:\n${ui.dump()}")
             ui.type("$shared")
-            assertTrue(ui.click(InspectorTags.set(TEAM)), "no Set button for $TEAM")
             frames(ui, editor)
+            // Live while typing: both units hold the typed team before anything is committed.
+            assertEquals(shared, teamOf(first), "typing did not change the first unit")
+            assertEquals(shared, teamOf(second), "typing did not change the second unit")
+            assertEquals(editsBefore, historyAsAnAgent(), "typing filed an edit before it was committed")
 
-            assertEquals(shared, teamOf(first), "the Set did not change the first unit")
-            assertEquals(shared, teamOf(second), "the Set did not change the second unit")
+            ui.key(Key.Enter)
+            frames(ui, editor)
+            assertEquals(shared, teamOf(first), "Enter lost the first unit's team")
+            assertEquals(shared, teamOf(second), "Enter lost the second unit's team")
             assertEquals(listOf("$shared"), ui.texts(InspectorTags.field(TEAM)), "the field does not show the one team they now share")
             val edits = historyAsAnAgent()
-            assertEquals(listOf("editor.set_field") + editsBefore, edits, "one Set is not one edit in the editor's history")
+            assertEquals(listOf("editor.commit_edit") + editsBefore, edits, "one typed value is not one edit in the editor's history")
 
             assertTrue(ui.click(EditorTags.UNDO), "the undo button took no click")
             frames(ui, editor)

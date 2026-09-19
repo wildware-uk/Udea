@@ -56,8 +56,9 @@ class CharacterMoverBudgetTest {
             MoverState(x = -18f + index * 0.2f, y = 1.2f + (index % 7) * 0.1f)
         }
 
-        // Warm up: the budget is about steady-state cost, and a cold JIT measures the interpreter.
-        repeat(5) { runFrame(mover, states, intent, config, geometry) }
+        // Warm up: the budget is about steady-state cost, and a JIT that has not finished measures
+        // the interpreter. See [WARMUP_FRAMES] for how long "finished" takes.
+        repeat(WARMUP_FRAMES) { runFrame(mover, states, intent, config, geometry) }
 
         val samples = LongArray(ATTEMPTS)
         for (attempt in 0 until ATTEMPTS) {
@@ -133,6 +134,25 @@ class CharacterMoverBudgetTest {
 
     private companion object {
         const val BUDGET_MS: Double = 4.0
+
+        /**
+         * Two hundred frames of warm-up, and it was five until issue #214 measured what five buys.
+         *
+         * On a four-core `windows-latest` runner the JIT had not finished with the move path five
+         * frames in. Printed frame by frame (run 35427097692), the first timed frames ran two to
+         * five times slower than the ones after them, with outliers far above that, and then fell
+         * within a few frames to a flat steady state that did not move again. On the slowest runner
+         * that drop came more than thirty frames in, so every one of [ATTEMPTS] samples landed
+         * before it: the gate failed at a best of 4.5ms while the same JVM, moments later, moved
+         * the same movers in 1.8-2.2ms. With two hundred frames (run 35427618170), eight runners
+         * across both images gave a best of 1.91-2.46ms and a worst of 2.55ms. That is the steady
+         * state the class KDoc says the budget is about; the frames this skips are the JIT's, not
+         * `CharacterMover`'s.
+         *
+         * It does not change what a regression does, for the reason [ATTEMPTS] gives: more work
+         * per `move` call is more work in every frame after the warm-up too.
+         */
+        const val WARMUP_FRAMES = 200
 
         /** The task that measures this, and the one to re-run alone before believing a red. */
         const val TASK = ":udea-core:udeaBenchCharacterMover"

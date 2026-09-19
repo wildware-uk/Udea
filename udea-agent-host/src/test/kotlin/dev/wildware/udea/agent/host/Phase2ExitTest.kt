@@ -41,11 +41,13 @@ import kotlin.test.assertTrue
  *
  * The clock starts when the HTTP request is *sent* and stops when a later HTTP request reports
  * the new number, so JSON, the socket, the bridge queue, the barrier and the tick boundary are
- * all inside the measurement. The daemon is warmed first with one `assets.validate`, because the
+ * all inside the measurement. The daemon is warmed first with `assets.validate`, because the
  * first script compile in a JVM pays for classloading the whole scripting host - measured on this
  * machine at roughly 2.3 seconds - and spec 6's claim is about the warm editing loop, not about
- * process start-up. That warm-up is stated here rather than hidden: a cold first edit does not
- * meet this budget and nothing in this repository claims it does.
+ * process start-up; the apply test also makes untimed patches first (`warmPatches`), because the
+ * first reload pays for the half of the pipeline a validate never loads. That warm-up is stated
+ * here rather than hidden: a cold first edit does not meet this budget and nothing in this
+ * repository claims it does.
  */
 class Phase2ExitTest {
 
@@ -55,6 +57,7 @@ class Phase2ExitTest {
 
         instance { game ->
             warm(game)
+            warmPatches(game)
 
             val began = System.nanoTime()
             val patch = command(
@@ -144,6 +147,40 @@ class Phase2ExitTest {
             "port 0 must bind"
         }
         game.use(body)
+    }
+
+    /**
+     * [PATCH_WARMUPS] untimed round trips of the same patch the apply test times, each one waited
+     * for in the running world, so the timed patch is not the JVM's first reload.
+     *
+     * Added by issue #214, with the numbers. [warm] validates, and a validate compiles; it does not
+     * pack, classify, push to the game or cross the barrier, so the first *patch* still paid for
+     * loading and compiling that half. Run 35427618170 timed nine patches in a row on each of eight
+     * runners, six `windows-latest` and two `ubuntu-latest`: the first took 569-907ms against this
+     * test's 1000ms, and every later one on every runner took 260ms or less. Earlier `windows-latest`
+     * runs of this test, which times a first patch, reported 1048ms (run 35390467276) and 1478ms
+     * (run 35415510928). The apply budget is spec 6's warm editing loop, the same claim the
+     * validates are warmed for, so the patch half is warmed too.
+     * Each round trip ends back at scale 0.02, so the timed patch below finds the text it expects.
+     */
+    private fun warmPatches(game: Phase2Instance) {
+        repeat(PATCH_WARMUPS) {
+            patchScale(game, from = "0.02f", to = "0.08f")
+            assertTrue(await(PROBE_TIMEOUT_MS) { hp(game) == 8.0 }, "warm-up patch never landed; hp is ${hp(game)}")
+            patchScale(game, from = "0.08f", to = "0.02f")
+            assertTrue(await(PROBE_TIMEOUT_MS) { hp(game) == 2.0 }, "warm-up revert never landed; hp is ${hp(game)}")
+        }
+    }
+
+    private fun patchScale(game: Phase2Instance, from: String, to: String) {
+        val patch = command(
+            game,
+            "assets.patch",
+            "path" to "character/orc.udea.kts",
+            "find" to "scale = $from",
+            "replace" to "scale = $to",
+        )
+        assertTrue("\"applied\":true" in patch, patch)
     }
 
     /**
@@ -277,6 +314,9 @@ class Phase2ExitTest {
 
         /** Spec 6, Phase 2: "reflects it in under a second". */
         const val BUDGET_APPLY_MS = 1_000L
+
+        /** Untimed patch round trips before the timed one; see [warmPatches]. */
+        const val PATCH_WARMUPS = 2
 
         /** Spec 6, Phase 2: "rejected in under 300ms". */
         const val BUDGET_REJECT_MS = 300L

@@ -395,7 +395,7 @@ internal fun gltfLoadConfig(model: ImportedModel, shadowMaps: List<ShadowMap>): 
  * skinned because the mesh has a skin - and the pass makes a shader per mesh from it. The cull
  * method is the one the shared shader would have used: the mesh's own material's.
  */
-internal fun KoolModel.withOwnShadowSkins(): KoolModel = apply {
+private fun KoolModel.withOwnShadowSkins(): KoolModel = apply {
     for (mesh in meshes.values) {
         if (mesh.skin == null || mesh.depthShaderConfig != null) continue
         val cull = (mesh.shader as? KslShader)?.pipelineConfig?.cullMethod ?: CullMethod.CULL_BACK_FACES

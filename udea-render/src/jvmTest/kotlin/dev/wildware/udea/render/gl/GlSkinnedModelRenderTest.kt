@@ -73,9 +73,9 @@ import kotlin.test.assertTrue
  * whichever skinned model was drawn after it - a running fox beside a standing one cast a standing
  * shadow. A fox on its own was never wrong, so the last part draws two.
  *
- * It puts a blue floor under the fox, turns the camera to look down on it from the far side and
- * lets a light from the camera's side throw the fox's side-on silhouette across the floor, then
- * stands a second fox in its bind pose behind it, made after it so it is drawn after it. The
+ * It puts a blue floor under the fox, turns the camera to look down on it from one side and lets a
+ * light from the other side throw the fox's side-on silhouette across the floor towards the camera,
+ * then stands a second fox in its bind pose behind it, made after it so it is drawn after it. The
  * measure is the floor's shadow: a pixel is floor when it is blue, which no part of either fox is,
  * and in shadow when its blue is dark. The first fox in its bind pose and the same fox mid-stride in
  * Run must throw different shadows on the pixels that are floor in both frames - so a leg moving
@@ -255,18 +255,10 @@ class GlSkinnedModelRenderTest {
     private fun isFox(pixel: Int): Boolean =
         ((pixel ushr 16) and 0xFF) > BACKGROUND || ((pixel ushr 8) and 0xFF) > BACKGROUND || (pixel and 0xFF) > BACKGROUND
 
-    private fun silhouette(image: BufferedImage): Int {
-        var n = 0
-        for (y in 0 until image.height) for (x in 0 until image.width) if (isFox(image.getRGB(x, y))) n++
-        return n
-    }
+    private fun silhouette(image: BufferedImage): Int = count(image, ::isFox)
 
     /** Pixels that are fox in one image and not in the other. */
-    private fun moved(a: BufferedImage, b: BufferedImage): Int {
-        var n = 0
-        for (y in 0 until a.height) for (x in 0 until a.width) if (isFox(a.getRGB(x, y)) != isFox(b.getRGB(x, y))) n++
-        return n
-    }
+    private fun moved(a: BufferedImage, b: BufferedImage): Int = count(a, b) { pa, pb -> isFox(pa) != isFox(pb) }
 
     /** The floor is blue, and no part of the fox is: a lit floor, or one in shadow. */
     private fun isFloor(pixel: Int): Boolean {
@@ -278,20 +270,23 @@ class GlSkinnedModelRenderTest {
 
     private fun isShadow(pixel: Int): Boolean = isFloor(pixel) && (pixel and 0xFF) < SHADOW_BLUE
 
-    private fun shadowed(image: BufferedImage): Int {
+    private fun shadowed(image: BufferedImage): Int = count(image, ::isShadow)
+
+    /** Pixels that are floor in both images, in shadow in one and lit in the other. */
+    private fun shadowMoved(a: BufferedImage, b: BufferedImage): Int =
+        count(a, b) { pa, pb -> isFloor(pa) && isFloor(pb) && isShadow(pa) != isShadow(pb) }
+
+    /** Pixels of [image] that pass [test]. */
+    private fun count(image: BufferedImage, test: (Int) -> Boolean): Int {
         var n = 0
-        for (y in 0 until image.height) for (x in 0 until image.width) if (isShadow(image.getRGB(x, y))) n++
+        for (y in 0 until image.height) for (x in 0 until image.width) if (test(image.getRGB(x, y))) n++
         return n
     }
 
-    /** Pixels that are floor in both images, in shadow in one and lit in the other. */
-    private fun shadowMoved(a: BufferedImage, b: BufferedImage): Int {
+    /** Pixels at which [a] and [b], the same size, pass [test] together. */
+    private fun count(a: BufferedImage, b: BufferedImage, test: (Int, Int) -> Boolean): Int {
         var n = 0
-        for (y in 0 until a.height) for (x in 0 until a.width) {
-            val pa = a.getRGB(x, y)
-            val pb = b.getRGB(x, y)
-            if (isFloor(pa) && isFloor(pb) && isShadow(pa) != isShadow(pb)) n++
-        }
+        for (y in 0 until a.height) for (x in 0 until a.width) if (test(a.getRGB(x, y), b.getRGB(x, y))) n++
         return n
     }
 

@@ -464,6 +464,13 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   UiLayer/overlay/editor stay out (structural). DejaVu Sans font in moba:desktop with licence beside it. runMatchShot
   checks HUD panels in all 7 PNGs (+ dead.png). HeadlessHostTest 6863/6864 = load flake (udea-core). Card: licence
   header text copied from udea-editor names the wrong module. Worktree kept `.claude/worktrees/agent-a80b8fdec32c67256`.
+- **udea-physics2d MERGED `8de7cf5`**, round 1 PASS, no findings. box2d-jni 1.0.0 (native reports **Box2D 3.1.1**, README's
+  3.3.1 wrong; owner corrected). jvm+android via new `udea.kotlin-multiplatform-jvm-android` convention, shared
+  src/box2dMain + typealiases. Physics components now @Replicated all-@Sim (ids 22-26 appended), new
+  `udea-core/net-protocol.lock` (by task), net-components.lock appended by hand (sorted-list gate checks it). Rewind:
+  restore == rebuild-at-tick exactly; != unrewound run once bodies touch/spin (warm-start lost); only reachable via
+  time.rewind+step and no game installs physics yet. Static chains ok; changed chain throws. Card: Physics2DModule KDoc
+  should name the rewind limit. Worktree kept `.claude/worktrees/agent-afe076be56583b1e7`.
 - Held: #241 A2 (asset compiler clip gen collides with #195), gizmo G2 #233 / G3 #234 (udea-editor busy), #189.
 - Remaining for #214: #195, #196 (then docs + kmp -> master). Shelved #223/#226 stay open (owner's shelving).
 

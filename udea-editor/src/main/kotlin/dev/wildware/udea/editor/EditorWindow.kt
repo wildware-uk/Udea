@@ -20,6 +20,7 @@ import dev.wildware.composegl.ui.modifier.Modifier
 import dev.wildware.composegl.ui.modifier.background
 import dev.wildware.composegl.ui.modifier.fillMaxSize
 import dev.wildware.composegl.ui.modifier.fillMaxWidth
+import dev.wildware.composegl.ui.modifier.height
 import dev.wildware.composegl.ui.modifier.onSizeChanged
 import dev.wildware.composegl.ui.modifier.padding
 import dev.wildware.composegl.ui.modifier.testTag
@@ -107,7 +108,8 @@ private fun Panels(session: EditorSession) {
 @Composable
 private fun ViewTabs(session: EditorSession) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = GAP, vertical = GAP / 2),
+        // One height for both tabs' switches, so changing tab does not move the page under the pointer.
+        Modifier.fillMaxWidth().height(TAB_ROW_HEIGHT).padding(horizontal = GAP, vertical = GAP / 2),
         horizontalArrangement = Arrangement.spacedBy(GAP / 2),
         verticalAlignment = VerticalAlignment.Centre,
     ) {
@@ -175,6 +177,9 @@ private fun TabHeading(title: String, tab: EditorTab, session: EditorSession, ta
 
 /** The window's backdrop, and the letterbox bars around the world. */
 private val Background: Colour = Colour.rgb(0x1B1F27)
+
+/** The Scene and Game headings' row, in design units: a button and its padding. */
+private const val TAB_ROW_HEIGHT: Float = 44f
 
 /** The space between a panel's parts, in design units. */
 private const val GAP: Float = 8f

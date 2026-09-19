@@ -14,7 +14,9 @@ import kotlin.math.pow
  * - **Otherwise a drag moves the camera.** In 2D any button pans, the world following the pointer.
  *   In 3D the primary button orbits round the centre - across turns about Z, up and down raises and
  *   lowers the eye - and the middle or secondary button pans the centre across the view.
- * - **The wheel zooms** about the point under the pointer in 2D, and moves the eye in or out in 3D.
+ * - **The wheel zooms** about the point under the pointer in 2D, and moves the eye in or out in 3D:
+ *   turned away from the user it zooms in. ComposeGL reports that turn as a negative `delta.y` (its
+ *   positive is "scroll the content up", the wheel pulled back).
  *
  * Every event over the picture is taken, so none reaches the game: the Scene tab's pointer is the
  * editor's. The Game tab has no handler at all, which is what hands its pointer to the game.
@@ -70,7 +72,7 @@ internal class SceneNavigation(private val view: WorldViewport) {
             is PointerEvent.Release, is PointerEvent.Cancel -> drag = Drag.None
 
             is PointerEvent.Scroll -> if (onView && event.delta.y != 0f) {
-                camera.zoomAt(ZOOM_STEP.pow(-event.delta.y), at.x, at.y)
+                camera.zoomAt(ZOOM_STEP.pow(event.delta.y), at.x, at.y)
                 moved = true
             }
 

@@ -23,7 +23,8 @@ import dev.wildware.udea.render.view.EditorCamera
  *
  * The same process `:moba:desktop:run -Peditor=true` starts - the same game, the same loop, every
  * agent toolset including `editor.*`, and the HTTP surface when `-PdebugPort=N` is passed - with the
- * editor window shown over it: docked panels, and the world drawn by Kool in a ComposeGL `SceneView`.
+ * editor window shown over it: docked panels, and the world drawn by Kool in its Scene and Game tabs
+ * (issue #234), each a ComposeGL `SceneView`. `editor.screenshot` captures either tab.
  *
  * ## Why it is in an `editor` source set
  *
@@ -33,7 +34,7 @@ import dev.wildware.udea.render.view.EditorCamera
  *
  * ## It starts paused
  *
- * The world is paused before the first frame, so what the viewport shows is the level as it loaded
+ * The world is paused before the first frame, so what the tabs show is the level as it loaded
  * and nothing moves until someone asks it to: Play and Step in the window's toolbar (issue #196), or
  * `editor.play`, `time.resume` and `time.step` from an agent.
  */

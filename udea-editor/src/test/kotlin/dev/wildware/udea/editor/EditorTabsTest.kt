@@ -92,7 +92,8 @@ class EditorTabsTest {
             assertNear(before.y - moved, after.y, "a drag down did not carry the world down with it")
 
             val zoom = camera.camera2D.zoom
-            ui.scroll(EditorTags.SCENE_VIEW, Offset(0f, 1f))
+            // Turned away from the user: ComposeGL's negative, the opposite of "scroll the content up".
+            ui.scroll(EditorTags.SCENE_VIEW, Offset(0f, -1f))
             assertTrue(camera.camera2D.zoom < zoom, "the wheel turned forward did not zoom in: ${camera.camera2D.zoom}")
         }
     }

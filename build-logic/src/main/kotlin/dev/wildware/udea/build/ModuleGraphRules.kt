@@ -377,8 +377,9 @@ public object ModuleGraphRules {
      * game's `editor` source set (`:moba:desktop`'s), whose classpaths are `editor*Classpath` and so
      * not among [CONFIGURATIONS]. So the rule can be as blunt as "no scanned classpath of any
      * project resolves it": on `:moba:desktop` that is the release runtime classpath, and on an
-     * engine module it is an arrow pointing up the module table. Epic #231's gizmo gate (G2) is
-     * meant to extend this rule rather than add a parallel one.
+     * engine module it is an arrow pointing up the module table. A class that reaches a release
+     * classpath with no dependency edge - a gizmo, an editor source set's output - is
+     * [EditorReleaseRules]' `UDEA-MG-012`, which reads classes where this reads the graph.
      */
     public val NO_EDITOR_ON_A_SHIPPED_CLASSPATH: DependencyRule = DependencyRule(
         id = RuleId("UDEA-MG-010"),

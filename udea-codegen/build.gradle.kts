@@ -54,6 +54,12 @@ dependencies {
     // Nothing in src/main depends on udea-agent, so this adds no edge to the module graph.
     testImplementation(project(":udea-agent"))
 
+    // Test-only, and the same seam once more (issue #233): the generated gizmos implement
+    // udea-editor's own `Gizmo`, `GizmoScope` and `GizmoRegistry`, and GeneratedGizmoTest runs them
+    // against hand-written twins through the real API. The fixture source set plays a game's
+    // `editor` source set here, which is the one kind of classpath allowed to see udea-editor.
+    testImplementation(project(":udea-editor"))
+
     // KSP2's standalone runner. ProcessorLoggingTest and ProcessorFailureTest drive the
     // processor directly over throwaway sources, which is the only way to observe a build
     // that must FAIL. Version comes from the catalog, never a literal.
@@ -102,6 +108,9 @@ ksp {
     arg("udea.toolModuleService", "dev.wildware.udea.agent.ToolModule")
     arg("udea.stateModuleService", "dev.wildware.udea.agent.StateModule")
     arg(UdeaNetComponents.KSP_OPTION, projectComponents.get())
+    // Issue #233: this run is also an editor run, so the fixtures' handle annotations become real
+    // generated gizmos and a `CodegenFixturesGizmoRegistry`, compiled under -Werror like the rest.
+    arg(UdeaModuleRegistry.GIZMO_REGISTRY_OPTION, MODULE_NAME)
 }
 
 // The drift check, from `build-logic` so that it is the same gate for every module that emits

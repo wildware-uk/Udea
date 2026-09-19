@@ -607,6 +607,7 @@ class ModuleGraphRulesTest {
             assertTrue(rule.id.value in text, "${rule.id} is not documented in docs/module-graph.md")
         }
         assertTrue(ReleaseRules.ARTIFACT_RULE_ID.value in text, "${ReleaseRules.ARTIFACT_RULE_ID} is not documented")
+        assertTrue(EditorReleaseRules.RULE_ID.value in text, "${EditorReleaseRules.RULE_ID} is not documented")
         assertTrue(ReleaseRules.CLASSPATH_RULE.id.value in text, "${ReleaseRules.CLASSPATH_RULE.id} is not documented")
         ReleaseRules.DEFAULT_BANNED_PREFIXES.forEach {
             assertTrue(it in text, "banned release prefix '$it' is not documented in docs/module-graph.md")

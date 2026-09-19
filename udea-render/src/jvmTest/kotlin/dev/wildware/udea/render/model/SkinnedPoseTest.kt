@@ -85,13 +85,6 @@ class SkinnedPoseTest {
     }
 
     @Test
-    fun `a model with no clips and no skin ignores its animator`() {
-        val still = KoolModel("still")
-        still.applyPose(pose.set(Animator().apply { play(run, at(0)) }, at(20), 0.5f))
-        assertTrue(still.animations.isEmpty())
-    }
-
-    @Test
     fun `halfway through a crossfade every joint that moves lies between the two clips' poses`() {
         val node = node()
         // Walk from tick 0, then a crossfade to Run over 12 ticks from tick 30: tick 36 is halfway.

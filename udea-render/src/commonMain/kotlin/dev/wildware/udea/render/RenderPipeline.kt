@@ -123,6 +123,10 @@ public class RenderPipeline internal constructor(
         capture?.collect()
         for (index in viewports.indices) viewports[index].captures?.collect()
 
+        // After the reads, which read last frame's pictures at last frame's sizes, and before
+        // anything draws this frame.
+        applyViewSizes()
+
         targets.surface.begin()
 
         // `finally`, so a renderer that throws still leaves the window with a presented frame and
@@ -198,6 +202,27 @@ public class RenderPipeline internal constructor(
     internal fun closeCaptures() {
         capture?.close()
         for (index in viewports.indices) viewports[index].captures?.close()
+    }
+
+    /**
+     * Gives each editor view the size it asked for (`WorldViewport.resizeTo`), and the capturable
+     * frame a Game view's size (issue #234): the Game tab is the frame, so the game is drawn at the
+     * size of the tab. A game with no editor open never has a view, and its frame never changes size.
+     */
+    private fun applyViewSizes() {
+        for (index in viewports.indices) {
+            val view = viewports[index]
+            if (!view.wantsResize) continue
+            if (view.camera == null) resizeFrame(view.wantedWidth, view.wantedHeight)
+            view.applySize()
+        }
+    }
+
+    private fun resizeFrame(width: Int, height: Int) {
+        val frame = targets.offscreen
+        if (frame.width == width && frame.height == height) return
+        targets.surface.resize(width, height)
+        targets.offscreen = OffscreenTarget(width, height)
     }
 
     /**

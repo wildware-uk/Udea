@@ -53,6 +53,11 @@ internal class ViewportPass(
         scene.addOffscreenPass(pass)
     }
 
+    /** Makes the picture [width] x [height] pixels from the next time Kool draws it. */
+    fun resize(width: Int, height: Int) {
+        pass.resize(width, height)
+    }
+
     /** Draws this pass after [other]. */
     fun dependsOn(other: OffscreenPass) {
         pass.dependsOn(other)

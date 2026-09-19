@@ -47,7 +47,11 @@ public class RenderResources internal constructor(
      * (issue #234); it never reaches a pass the other way round.
      */
     public val batch: SpriteBatch2D,
-    /** The capturable surface this pipeline draws into, so a system can size itself to it. */
+    /**
+     * The capturable surface this pipeline draws into, as it was when the pipeline was built, so a
+     * system can size itself to it. An editor's Game tab can resize the frame later (issue #234): a
+     * system that keeps a size reads the target it is handed in `RenderSystem.render` each frame.
+     */
     public val offscreen: OffscreenTarget,
     /**
      * Where a system adds a render pass of its own (the 3D model pass), or `null` when there is no
@@ -91,8 +95,6 @@ public class RenderResources internal constructor(
         CapturedUi(
             checkNotNull(passes) { "a captured interface needs a Kool surface to draw into; this pipeline has none" },
             fonts,
-            offscreen.width,
-            offscreen.height,
         ),
     )
 

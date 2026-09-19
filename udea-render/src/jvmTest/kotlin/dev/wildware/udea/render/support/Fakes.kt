@@ -178,6 +178,10 @@ internal class RecordingSurface(private val log: FrameLog) : FrameSurface {
     override fun endAndPresent(screen: ScreenTarget) {
         log.record("surface:endAndPresent")
     }
+
+    override fun resize(width: Int, height: Int) {
+        log.record("surface:resize ${width}x$height")
+    }
 }
 
 /** A [PixelSource] that returns a recognisable byte per request and records what it was asked. */

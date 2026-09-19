@@ -64,8 +64,6 @@ import dev.wildware.composegl.kool.KoolBackend as ComposeGlBackend
 public class CapturedUi internal constructor(
     private val passes: ScenePasses,
     fonts: UiFonts,
-    width: Int,
-    height: Int,
 ) : RenderResource {
 
     /** The toolkit's frame time. Presentation only: nothing here animates, and nothing simulates. */
@@ -82,12 +80,11 @@ public class CapturedUi internal constructor(
 
     /**
      * The capture's own pixels as the design size, one to one: a HUD is laid out in the pixels an
-     * agent's screenshot has, whatever the window was dragged to.
+     * agent's screenshot has, whatever the window was dragged to. Made again when the capture's size
+     * changes, which only an editor's Game tab does (issue #234), so the HUD is laid out in the frame
+     * it is drawn into.
      */
-    private val viewport = Viewport(
-        design = Size(width.toFloat(), height.toFloat()),
-        physical = Size(width.toFloat(), height.toFloat()),
-    )
+    private var viewport = viewportOf(passes.frameWidth, passes.frameHeight)
 
     private val view: RenderPass.View
 
@@ -103,6 +100,9 @@ public class CapturedUi internal constructor(
 
     /** One frame, with the capturable pass bound. Render thread only: Kool calls it. */
     private fun draw() {
+        val width = passes.frameWidth.toFloat()
+        val height = passes.frameHeight.toFloat()
+        if (viewport.design.width != width || viewport.design.height != height) viewport = viewportOf(passes.frameWidth, passes.frameHeight)
         renderer.render(viewport, clock.nanoTime())
     }
 
@@ -117,5 +117,10 @@ public class CapturedUi internal constructor(
 
     private companion object {
         const val VIEW_NAME: String = "udea-captured-ui"
+
+        fun viewportOf(width: Int, height: Int) = Viewport(
+            design = Size(width.toFloat(), height.toFloat()),
+            physical = Size(width.toFloat(), height.toFloat()),
+        )
     }
 }

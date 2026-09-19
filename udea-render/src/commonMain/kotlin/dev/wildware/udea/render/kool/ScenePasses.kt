@@ -16,6 +16,12 @@ import de.fabmax.kool.pipeline.RenderPass
  */
 internal interface ScenePasses {
 
+    /** The capturable pass's width now, in pixels: an editor's Game tab can change it (issue #234). */
+    val frameWidth: Int
+
+    /** The capturable pass's height now, in pixels. */
+    val frameHeight: Int
+
     /** Puts [pass] on the scene, drawn before the capturable pass reads it. Render thread only. */
     fun addBeforeCapture(pass: OffscreenPass)
 

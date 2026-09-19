@@ -82,6 +82,7 @@ public class ModelRenderSystem(
             stage.imageFor(view, camera)
         } else {
             drawnCount = 0
+            stage.fit(target.width, target.height)
             stage.begin(camera, light)
             with(bound.world) {
                 bound.models.forEach { entity -> draw(entity, alpha) }

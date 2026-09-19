@@ -24,12 +24,15 @@ import dev.wildware.udea.render.ScreenTarget
 import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.camera.CameraRig
+import dev.wildware.udea.render.capture.CaptureRequest
+import dev.wildware.udea.render.capture.capture
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.kool.KoolPointer
 import dev.wildware.udea.render.ui.UiLayer
 import dev.wildware.udea.render.view.EditorCamera
 import org.lwjgl.opengl.GL11
 import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
@@ -48,14 +51,14 @@ import kotlin.test.assertTrue
  *
  * - under every docked panel and every divider there is **no** world-tinted pixel - on the base this
  *   ticket started from, the world shows through the panels' translucent bodies;
- * - in the view there is world, and it runs from the view's left edge to its right, so nothing is
- *   drawn over the view's edges either - an opaque divider over the view hides the world rather than
- *   showing it, which the first check alone would miss;
+ * - the view is all world, edge to edge: no bars, though the gap is nothing like the game's launch
+ *   shape, and nothing drawn over the view's edges either - an opaque divider over the view hides the
+ *   world rather than showing it, which the first check alone would miss;
  * - and nowhere outside the view is there any, a margin allowed at its edge for the headless twin the
  *   rectangles are read from (below).
  *
- * Both tabs, the Scene tab through its editor camera and the Game tab as the game's own frame. Then the
- * input half, in the Game tab where the pointer is the game's: a click just inside the view's edge
+ * Both tabs, the Scene tab through its editor camera and the Game tab as the game's own frame, which
+ * `render.screenshot` then reads at the tab's size. Then the input half, in the Game tab where the pointer is the game's: a click just inside the view's edge
  * reaches the game, and a click just outside it, on the panel, does not.
  *
  * Where the panels and the view are is read from the same window laid out with no GL at the same size,
@@ -91,9 +94,14 @@ class GlEditorLayoutTest {
         val fonts = editorFonts()
         try {
             val host = GameHost(RenderMode.Offscreen, UdeaGameDef(registry = CoreUdeaRegistry, modules = emptyList()), backend)
-            backend.drive(host)
             val views = EditorViews(backend.openSceneView(EditorCamera()), backend.openGameView())
             val session = glEditorSession(views)
+            // As a launcher drives an editor: the game's frame, then the editor's, which draws a tab
+            // again when its view has taken the tab's size.
+            backend.drive { delta ->
+                host.frame(delta)
+                session.frame()
+            }
             val ui = UiLayer(fonts, Size(WIDTH.toFloat(), HEIGHT.toFloat()))
             backend.show(ui)
             ui.show(session.window)
@@ -107,6 +115,11 @@ class GlEditorLayoutTest {
             awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
             val game = layout(EditorTab.Game)
             assertSelfContained("Game", window.read(frames), game)
+
+            // The Game tab is the game's own frame, so render.screenshot is the tab's size now.
+            val capture = ImageIO.read(ByteArrayInputStream(backend.pipeline!!.capture!!.capture(CaptureRequest()).bytes))
+            assertEquals(game.view.width, capture.width.toFloat(), MARGIN_ACROSS, "render.screenshot is not the Game tab's width")
+            assertEquals(game.view.height, capture.height.toFloat(), 2 * MARGIN_DOWN, "render.screenshot is not the Game tab's height")
 
             // The Game tab's pointer is the game's: just inside the view it arrives, just outside it
             // is the History panel's.
@@ -152,17 +165,20 @@ class GlEditorLayoutTest {
         }
         assertTrue(count(shot, layout.view.shrunkBy(MARGIN_ACROSS, MARGIN_DOWN)) > 0, "the $tab tab drew no world in its view at ${layout.view}")
 
-        // Nothing covers the view either: across its middle, the world runs from its left edge to its
-        // right. That holds because the gap is narrower than the frame's shape, so the frame is fitted
-        // to the view's width with bars above and below - checked first, or the edges prove nothing.
-        assertTrue(
-            layout.view.width / layout.view.height < WIDTH.toFloat() / HEIGHT,
-            "the view ${layout.view} is wider than the frame's shape, so the world would not reach its sides",
-        )
+        // The view is all world: no bars, whatever the gap's shape against the game's launch size,
+        // and nothing drawn over its edges. Across its middle row and down its middle column the
+        // world runs from edge to edge.
+        val inner = layout.view.shrunkBy(MARGIN_ACROSS, MARGIN_DOWN)
+        val area = (inner.right.toInt() - inner.left.toInt()) * (inner.bottom.toInt() - inner.top.toInt())
+        assertEquals(area, count(shot, inner), "the $tab tab's view at ${layout.view} is not all world: it has bars, or something over it")
         val row = layout.view.centre.y.toInt()
         val columns = (0 until shot.width).filter { isWorld(shot.getRGB(it, row)) }
         assertEquals(layout.view.left, columns.first().toFloat(), EDGE, "something covers the $tab tab's left edge: the world starts at ${columns.first()}")
         assertEquals(layout.view.right, columns.last() + 1f, EDGE, "something covers the $tab tab's right edge: the world ends at ${columns.last()}")
+        val column = layout.view.centre.x.toInt()
+        val rows = (0 until shot.height).filter { isWorld(shot.getRGB(column, it)) }
+        assertEquals(layout.view.top, rows.first().toFloat(), MARGIN_DOWN, "the $tab tab's world does not reach its top edge: it starts at ${rows.first()}")
+        assertEquals(layout.view.bottom, rows.last() + 1f, MARGIN_DOWN, "the $tab tab's world does not reach its bottom edge: it ends at ${rows.last()}")
         var outside = 0
         for (y in 0 until shot.height) for (x in 0 until shot.width) {
             if (!margin.contains(x + 0.5f, y + 0.5f) && isWorld(shot.getRGB(x, y))) outside++

@@ -28,21 +28,31 @@ internal fun PlayEditsPanel(playEdits: EditorPlayEdits) {
     }
 }
 
+/**
+ * One edit: its Keep toggle first, labelled with the edit, so a short panel still shows every toggle's
+ * box; then the values it left, or why it cannot be kept.
+ */
 @Composable
 private fun PlayEditRowView(playEdits: EditorPlayEdits, row: PlayEditRow) {
-    Text("#${row.editId}  ${row.author}  ${row.tool}  #${row.netId}", Modifier.fillMaxWidth())
-    for (value in row.values) Text("  ${value.key} = ${value.value}", Modifier.fillMaxWidth())
-    if (row.keepable) {
-        Checkbox(
-            checked = row.kept,
-            onCheckedChange = { playEdits.setKept(row, it) },
-            label = "Keep",
-            modifier = Modifier.padding(bottom = GAP).testTag(PlayEditTags.keep(row.editId)),
-        )
-    } else {
-        Text("Can't keep: ${row.reason.orEmpty()}", Modifier.fillMaxWidth().padding(bottom = GAP))
+    val title = "#${row.editId}  ${row.tool.removePrefix(TOOL_PREFIX)}  #${row.netId}  by ${row.author}"
+    Column(Modifier.fillMaxWidth().padding(bottom = GAP)) {
+        if (row.keepable) {
+            Checkbox(
+                checked = row.kept,
+                onCheckedChange = { playEdits.setKept(row, it) },
+                label = "Keep $title",
+                modifier = Modifier.testTag(PlayEditTags.keep(row.editId)),
+            )
+        } else {
+            Text(title, Modifier.fillMaxWidth())
+        }
+        for (value in row.values) Text("  ${value.key} = ${value.value}", Modifier.fillMaxWidth())
+        if (!row.keepable) Text("  Can't keep: ${row.reason.orEmpty()}", Modifier.fillMaxWidth())
     }
 }
+
+/** What every editor tool's name starts with, left off a row's title to save the panel's width. */
+private const val TOOL_PREFIX: String = "editor."
 
 /**
  * The Inspector's Keep pin on field [key] of the [selected] entities: shown only when a play edit

@@ -85,8 +85,9 @@ private fun Panels(session: EditorSession) {
         windows.dockToScreen(EditorTags.HISTORY_PANEL, DockSide.Right)
         windows.dockToScreen(EditorTags.ASSET_PANEL, DockSide.Right)
         windows.dockWith(InspectorTags.PANEL, EditorTags.HISTORY_PANEL, DockSide.Bottom)
-        windows.dockWith(PlayEditTags.PANEL, EditorTags.ASSET_PANEL, DockSide.Bottom)
         if (session.animation != null) windows.dockToScreen(EditorTags.ANIMATION_PANEL, DockSide.Left)
+        // Under History, beside what it is about: History is what Stop puts back, this is what it keeps.
+        windows.dockWith(PlayEditTags.PANEL, EditorTags.HISTORY_PANEL, DockSide.Bottom)
     }
     val area = remember { ViewArea() }
     DebugWindowHost(Modifier.fillMaxSize().onPlaced(area.host), state = windows) {

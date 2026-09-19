@@ -46,9 +46,11 @@ class EditorSessionTest {
 
     /**
      * What the simulation would have been sent since the last call, less the selection's own reads
-     * (issue #235), which `ScenePickingTest` answers: this suite is about the History panel.
+     * (issue #235), which `ScenePickingTest` answers, and the play edits' (issue #238), which
+     * `MobaPlayKeepPanelTest` does: this suite is about the History panel.
      */
-    private fun drainHistoryAndEdits(): List<AgentCommand> = drain().filter { it.name != "editor.selection" }
+    private fun drainHistoryAndEdits(): List<AgentCommand> =
+        drain().filter { it.name != "editor.selection" && it.name != "editor.play_edits" }
 
     @Test
     fun `the spawn button calls editor spawn at the configured point, filed under the editor's author`() {
@@ -116,11 +118,12 @@ class EditorSessionTest {
         open().use {
             drain()
             session.frame()
-            // The first frame reads the History panel's list and the selection, once each.
+            // The first frame reads the History panel's list, the selection and the play edits, once each.
             val first = drain()
-            assertEquals(listOf("editor.history", "editor.selection"), first.map { it.name })
+            assertEquals(listOf("editor.history", "editor.selection", "editor.play_edits"), first.map { it.name })
             bridge.complete(first[0].id, AgentResult.Ok("""{"author":"editor","size":0,"edits":[]}"""))
             bridge.complete(first[1].id, AgentResult.Ok("""{"you":"editor","authors":[]}"""))
+            bridge.complete(first[2].id, AgentResult.Ok("""{"playing":false,"edits":[]}"""))
             repeat(IDLE_FRAMES) { session.frame() }
             assertEquals(emptyList(), drain().map { it.name }, "an idle editor kept calling tools")
         }

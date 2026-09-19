@@ -134,10 +134,10 @@ public object NetStateProbe {
      * claim depend on a prop. The count of such entities is folded first, so a client that never
      * received the animated entity at all differs here rather than agreeing about nothing.
      */
-    public fun animatedHash(fields: WorldFieldStore): Long = hashOfRowsWith(fields, Animator::class, ALL)
+    internal fun animatedHash(fields: WorldFieldStore): Long = hashOfRowsWith(fields, Animator::class, ALL)
 
     /** How many entities in [fields] carry an [Animator]. */
-    public fun animatedCount(fields: WorldFieldStore): Int {
+    internal fun animatedCount(fields: WorldFieldStore): Int {
         val animator = indexOf(fields.registry, Animator::class)
         return (0 until fields.rowCount).count { fields.isPresent(it, animator) }
     }

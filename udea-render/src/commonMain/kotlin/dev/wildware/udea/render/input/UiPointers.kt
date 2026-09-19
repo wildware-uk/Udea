@@ -3,8 +3,7 @@ package dev.wildware.udea.render.input
 /**
  * One of the backend's pointers: the mouse, or one finger.
  *
- * The backend's own number, the way [KeyStroke.keycode] is the backend's own key code: on Kool it is
- * `Pointer.id`, and the mouse is `PointerInput.MOUSE_POINTER_ID`. A finger's number is reused once it
+ * The backend's own number: on Kool it is `Pointer.id`, and the mouse is `PointerInput.MOUSE_POINTER_ID`. A finger's number is reused once it
  * lifts, so an id names a pointer only for as long as the backend keeps listing it.
  */
 @JvmInline

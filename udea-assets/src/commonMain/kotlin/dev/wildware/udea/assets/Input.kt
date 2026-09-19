@@ -27,13 +27,15 @@ public data class Axis2D(override val id: AssetId) : AssetData
  * type whose job is to say which button was meant. Here it says which button was meant; the input
  * system in `udea-core` reads devices.
  *
- * Key and button codes are ints because that is what every backend speaks. They are validated at
- * build time against the backend's code table, which is a validator rule, not a range check.
+ * A key is an [InputKey] - a name, never a backend's number (issue #228). The renderer owns the table
+ * from a name to whatever code its backend reports, so the same asset means the same key on every
+ * target. A mouse button is still an index: `0` is the primary button on every backend this engine
+ * draws with.
  */
 public sealed interface BindingInput {
 
-    /** A keyboard key, by backend key code. */
-    public data class Key(public val code: Int) : BindingInput
+    /** A keyboard key, by name. `udea-render`'s `KoolKeyTable` is what turns it into a backend code. */
+    public data class Key(public val key: InputKey) : BindingInput
 
     /** A mouse button, by backend button code. */
     public data class MouseButton(public val code: Int) : BindingInput

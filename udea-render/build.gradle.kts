@@ -16,11 +16,21 @@ plugins {
 }
 
 kotlin {
+    androidLibrary {
+        // `AndroidKeyTableTest` reads Kool's Android key map out of `PlatformInputAndroid`, whose
+        // static initialiser also builds a `MotionEvent.PointerCoords`. Android's mockable jar throws
+        // from every framework method by default; returning defaults lets that class load, and the
+        // map it builds is plain Kotlin (issue #228).
+        compilations.withType<com.android.build.api.dsl.KotlinMultiplatformAndroidHostTestCompilation>()
+            .configureEach { isReturnDefaultValues = true }
+    }
     sourceSets {
         commonMain {
             dependencies {
                 api(project(":udea-core"))
-                implementation(project(":udea-assets"))
+                // `api` since issue #228: a binding names its keys with the asset model's `InputKey`
+                // (`ActionBinding.keys`, `KeyboardState.isKeyDown`), so a caller needs the type.
+                api(project(":udea-assets"))
 
                 // The `AudioDevice` SPI `KoolAudioDevice` implements (issue #221). `udea-audio`
                 // owns the drain, the routing and the SPI and names no Kool type (UDEA-MG-002 bans

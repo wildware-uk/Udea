@@ -1,5 +1,7 @@
 package dev.wildware.udea.render.input
 
+import dev.wildware.udea.assets.InputKey
+
 /**
  * Which way a key event is going, or that it is a character rather than a key at all.
  *
@@ -30,13 +32,13 @@ public enum class KeyPhase {
  * then the game - can be driven by a test with no window, no context and no toolkit. `KoolKeyboard`
  * translates Kool's events into these, and `UiLayer` translates these into the toolkit's.
  *
- * @param keycode the backend's own key code, the same table [KeyboardState.isKeyDown] and
- *   [ActionBinding.keys] speak. Not the toolkit's numbering and not a bare number with no table:
- *   whichever backend this build draws with decides it, and there is exactly one per build.
+ * @param key which key, by name - the vocabulary [KeyboardState.isKeyDown] and [ActionBinding.keys]
+ *   speak, translated from the backend's code by `KoolKeyTable` (issue #228). `null` for a key the
+ *   table does not name, and for a [KeyPhase.Character] event, which is a character and not a key.
  * @param character the committed character, and only when [phase] is [KeyPhase.Character].
  */
 public class KeyStroke(
-    public val keycode: Int,
+    public val key: InputKey?,
     public val phase: KeyPhase,
     public val character: Char = NO_CHARACTER,
     public val shift: Boolean = false,
@@ -45,7 +47,7 @@ public class KeyStroke(
     public val meta: Boolean = false,
 ) {
 
-    override fun toString(): String = "KeyStroke($keycode, $phase)"
+    override fun toString(): String = "KeyStroke($key, $phase)"
 
     public companion object {
 

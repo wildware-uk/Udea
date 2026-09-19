@@ -5,6 +5,7 @@ import dev.wildware.udea.assets.Axis2D
 import dev.wildware.udea.assets.BindingInput
 import dev.wildware.udea.assets.Binding
 import dev.wildware.udea.assets.Control
+import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.render.input.ActionBinding
 import dev.wildware.udea.render.input.Axis2DBinding
 import dev.wildware.udea.render.input.InputBindings
@@ -35,7 +36,7 @@ import dev.wildware.udea.assets.Axis2DBinding as AuthoredAxis2DBinding
  *
  * ## What still comes from code, stated rather than hidden
  *
- * **Gamepads.** `BindingInput` is a two-case sealed interface - a key code or a mouse button -
+ * **Gamepads.** `BindingInput` is a two-case sealed interface - a named key or a mouse button -
  * and there is no case for a pad button and no stick index on the authored `Axis2DBinding`. The
  * runtime types have all three ([ActionBinding.buttons], [Axis2DBinding.gamepadAxisX],
  * [Axis2DBinding.gamepadAxisY]), so the pad half of every binding is supplied here from
@@ -130,14 +131,14 @@ public object MobaControlAssets {
         controls: Map<String, String>,
         bindings: List<Binding>,
     ): List<ActionBinding> {
-        val keys = HashMap<String, MutableList<Int>>()
+        val keys = HashMap<String, MutableList<InputKey>>()
         for (binding in bindings) {
             val target = binding.control.id.value
             check(target in controls) {
                 "`${binding.id.value}` binds a control the graph does not hold: '$target'"
             }
             when (val input = binding.input) {
-                is BindingInput.Key -> keys.getOrPut(target) { ArrayList() } += input.code
+                is BindingInput.Key -> keys.getOrPut(target) { ArrayList() } += input.key
                 is BindingInput.MouseButton -> error(
                     "`${binding.id.value}` binds mouse button ${input.code}, and `ActionBinding` " +
                         "has no mouse field - see `MobaControlAssets`. Refused rather than " +
@@ -148,7 +149,7 @@ public object MobaControlAssets {
         return controls.entries.sortedBy { it.key }.map { (id, name) ->
             ActionBinding(
                 name = name,
-                keys = (keys[id] ?: emptyList<Int>()).toIntArray(),
+                keys = keys[id] ?: emptyList(),
                 buttons = GAMEPAD_BUTTONS[name] ?: IntArray(0),
             )
         }
@@ -166,17 +167,17 @@ public object MobaControlAssets {
         axes: Map<String, String>,
         bindings: List<AuthoredAxis2DBinding>,
     ): List<Axis2DBinding> {
-        val negativeX = HashMap<String, Int>()
-        val positiveX = HashMap<String, Int>()
-        val negativeY = HashMap<String, Int>()
-        val positiveY = HashMap<String, Int>()
+        val negativeX = HashMap<String, InputKey>()
+        val positiveX = HashMap<String, InputKey>()
+        val negativeY = HashMap<String, InputKey>()
+        val positiveY = HashMap<String, InputKey>()
         for (binding in bindings) {
             val target = binding.axis.id.value
             check(target in axes) {
                 "`${binding.id.value}` binds an axis the graph does not hold: '$target'"
             }
-            val code = when (val input = binding.input) {
-                is BindingInput.Key -> input.code
+            val key = when (val input = binding.input) {
+                is BindingInput.Key -> input.key
                 is BindingInput.MouseButton -> error(
                     "`${binding.id.value}` drives an axis from mouse button ${input.code}; " +
                         "`Axis2DBinding` is four keys and a stick - see `MobaControlAssets`.",
@@ -194,32 +195,18 @@ public object MobaControlAssets {
                         "to go in. Refused rather than rounded.",
                 )
             }
-            slot[target] = code
+            slot[target] = key
         }
         return axes.entries.sortedBy { it.key }.map { (id, name) ->
             Axis2DBinding(
                 name = name,
-                negativeX = negativeX[id] ?: Axis2DBinding.UNBOUND,
-                positiveX = positiveX[id] ?: Axis2DBinding.UNBOUND,
-                negativeY = negativeY[id] ?: Axis2DBinding.UNBOUND,
-                positiveY = positiveY[id] ?: Axis2DBinding.UNBOUND,
+                negativeX = negativeX[id],
+                positiveX = positiveX[id],
+                negativeY = negativeY[id],
+                positiveY = positiveY[id],
                 gamepadAxisX = MOVE_STICK_X,
                 gamepadAxisY = MOVE_STICK_Y,
             )
         }
     }
-
-    /**
-     * The key codes this game's asset writes, for a test that wants to name one.
-     *
-     * [MobaControls.Keys] is referenced here and nowhere in the asset - a control script compiles
-     * against the asset model alone, so it writes bare integers with a comment saying why.
-     * This is the one place the two spellings meet.
-     */
-    public val EXPECTED_KEYS: Map<String, Int> = mapOf(
-        MobaControls.ATTACK to MobaControls.Keys.SPACE,
-        MobaControls.ATTACK_2 to MobaControls.Keys.Q,
-        MobaControls.ITEM_1 to MobaControls.Keys.E,
-        MobaControls.ITEM_2 to MobaControls.Keys.R,
-    )
 }

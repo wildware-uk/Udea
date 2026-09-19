@@ -444,13 +444,14 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
-## Wave 16 (2026-09-19): in flight
+## Wave 16 (2026-09-19): done
 
 - #235: merged, round 1 PASS (no findings). Merged tree == reviewed tree. Left button selects (gizmo first), right button orbits/pans; public PickBounds in udea-render (sprites, models, moba units by body); EditorInspector with Mixed, no Set button (owner): G1 edit session per field, commit on Enter/focus loss, cancel on refused value. Cards: AnimationRenderSystem not pickable; G1 30s idle cancel reverts an un-entered value; inspector text boxes only; selection outline re-queries pick sources per redraw.
 - #243: merged, round 1 PASS (no findings). Merged tree == reviewed tree. Animation panel follows selection; clip choice is one edit session (undoable); scrub preview is WorldViewport.modelPreview via ModelStage per-view drawFilter, capture filters preview nodes, world hash unchanged; bone overlay public-API only (added GizmoScope.mark, Mark, Gizmo.marks, GizmoCanvas.line); joint parents from glTF node tree. Cards: GizmoMarkLayer draw line untested alone; selection outline stays on hidden fox during model preview. dev-243 once killed an unread Xvfb pid (disclosed).
 - #236: merged, round 1 PASS (no findings). Merged tree == reviewed tree; lead re-ran runUdpProof on it (2 tests green). Public GizmoScope moveHandles/sizeHandles/rotationHandle/radiusHandle/rangeHandle over internal HandlePainter; drags are G1 edit sessions; snapping and axes in gitignored <project>/.udea/editor-preferences.properties; moba TowerRangeGizmo (public API only). Tower gains @Sim attackRange (default TOWER_RANGE): moba net-protocol.lock protoHash 0xc67b -> 0xfbba, ids unchanged; replay fixtures regenerated. Folded #243's line/mark API. Cards: handle layer drawing its under-layer untested; held box corner not visibly lit.
 - #238: merged, round 1 PASS (no findings). Merged tree == reviewed tree. editor.play_edits/keep/unkeep in EditorToolset; PlaySession records NetIds live at Play; Stop runs #196 restore then re-applies kept field edits (final value) as normal undoable edits; spawn/delete/spawned-entity edits not keepable. Changes during Play panel + inspector Keep pins. Past ~7 edits the list says "too long to list" until #237's whole-answer fix lands. Cards: Inspector pins vanish past ~7 edits (until #237).
-- #237 G6 3D gizmos in review (carries the bridge whole-answer fix and Transform3D @Replicated, udea-core protoHash 0xa328 -> 0x35f2).
+- #237: merged via fold branch issue-237-238-fold (r1 PASS on #237 itself, fold r1 PASS; merged tree == reviewed tree). 3D arrows/planes/rings/scale boxes via EditorCamera.ray; Transform3D @Replicated all-@Sim (id 28, udea-core protoHash 0xa328 -> 0x35f2, netMask empty); bridge keeps whole answers beside capped copies, in-process EditorTools.frame reads wholeCommandResults (HTTP unchanged). Fold removed #238's unreachable "too long" fallback; new test lists 12 play edits past the cap.
+- **Gizmo epic #231 complete (G1-G7).** Wave 16 done.
 
 ## Wave 15 (2026-09-19): in flight, WIP 5 (owner)
 

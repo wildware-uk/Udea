@@ -79,7 +79,7 @@ public object AssetPipeline {
         // author with the consequence and not the defect.
         val sink = DiagnosticSink()
         sink.reportAll(scan.diagnostics)
-        sink.reportAll(result.diagnostics)
+        sink.reportAll(result.diagnostics.notAlreadyIn(scan.diagnostics))
         sink.reportAll(validated.diagnostics)
         val report = sink.build()
         return Compiled(

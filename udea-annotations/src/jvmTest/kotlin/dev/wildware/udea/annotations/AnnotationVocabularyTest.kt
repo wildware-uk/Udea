@@ -34,6 +34,8 @@ class AnnotationVocabularyTest {
         // Agent-only, and deliberately not part of the Replicator field space: see AgentState's
         // KDoc. It shares this table because the targeting and retention contract is the same.
         "dev.wildware.udea.annotations.AgentState" to setOf(AnnotationTarget.PROPERTY),
+        // Issue #192: the asset DSL's once-only lambda promise, read by the K2 loop checker.
+        "dev.wildware.udea.annotations.AssetDsl" to setOf(AnnotationTarget.FUNCTION),
     )
 
     private val expectedEnums = setOf("Authority", "Lifetime", "Visibility")

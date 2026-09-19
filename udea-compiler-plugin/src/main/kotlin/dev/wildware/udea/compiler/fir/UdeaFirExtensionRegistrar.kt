@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.fir.analysis.extensions.FirAdditionalCheckersExtensi
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
+import org.jetbrains.kotlin.fir.expressions.FirLoop
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
 
 /**
@@ -52,8 +53,8 @@ internal class UdeaFirExtensionRegistrar(
 /**
  * The Udea FIR checker set.
  *
- * [UdeaProbeChecker] answers "is the plugin loaded at all"; the other two are the real rules
- * (issue #38). Every id they can raise is registered in `udea-diagnostics`' `UdeaRules`, which
+ * [UdeaProbeChecker] answers "is the plugin loaded at all"; the rest are the real rules. Every
+ * id they can raise is registered in `udea-diagnostics`' `UdeaRules`, which
  * `UdeaRuleParityTest` asserts by walking [UdeaDiagnostics.factories].
  */
 internal class UdeaFirAdditionalCheckers(
@@ -79,6 +80,10 @@ internal class UdeaFirAdditionalCheckers(
      */
     override val expressionCheckers: ExpressionCheckers = object : ExpressionCheckers() {
         override val functionCallCheckers: Set<FirExpressionChecker<FirFunctionCall>> =
-            setOf(UdeaAssetReferenceChecker(catalog))
+            setOf(UdeaAssetReferenceChecker(catalog), UdeaAssetLoopChecker.Calls)
+
+        /** Issue #192: loops in a `.udea.kts`. [UdeaAssetLoopChecker] is silent in any other file. */
+        override val loopExpressionCheckers: Set<FirExpressionChecker<FirLoop>> =
+            setOf(UdeaAssetLoopChecker.Loops)
     }
 }

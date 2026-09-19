@@ -23,6 +23,17 @@ dependencies {
     // back down - the same arrangement `udea-codegen` already has.
     implementation(libs.kotlinpoet)
 
+    // The loop ban's guarantee (issue #192). `runtimeOnly`, never `implementation`: spec 7 says
+    // the K2 plugin is never required for anything to compile, and `PluginOptionalTest` fails on a
+    // production reference to one of its types. So this module names no plugin type. The jar
+    // rides along on every classpath this module is on - the forked pipeline's, `udeaAssetScript`,
+    // the daemon's - and `AssetCompiler` finds it there by artifact name and passes it to each
+    // script compile with `-Xplugin`. Take it off the classpath and scripts still compile, with
+    // pass 1's syntactic check as the only loop check.
+    runtimeOnly(project(":udea-compiler-plugin"))
+    // `@AssetDsl`, the asset DSL's once-only lambda promise the plugin's loop checker trusts.
+    implementation(project(":udea-annotations"))
+
     implementation(libs.kotlin.compiler.embeddable)
     implementation(libs.kotlin.scripting.common)
     implementation(libs.kotlin.scripting.jvm)

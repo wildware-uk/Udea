@@ -1,5 +1,6 @@
 package dev.wildware.udea.assets.compiler.daemon
 
+import dev.wildware.udea.assets.compiler.pipeline.notAlreadyIn
 import dev.wildware.udea.assets.AssetData
 import dev.wildware.udea.assets.AssetId
 import dev.wildware.udea.assets.Blueprint
@@ -279,8 +280,8 @@ public class AssetDaemon(
         target[file] = result.graph.assets.values.toList()
         // Pass 1's own diagnostics first, as `AssetPipeline.compileAndValidate` reports them: a
         // script the build refuses in its syntactic pass - a loop (issue #192) - must not be one
-        // the live daemon applies.
-        return scan.diagnostics + result.diagnostics
+        // the live daemon applies. A loop both passes found is reported once, at pass 1's span.
+        return scan.diagnostics + result.diagnostics.notAlreadyIn(scan.diagnostics)
     }
 
     /**

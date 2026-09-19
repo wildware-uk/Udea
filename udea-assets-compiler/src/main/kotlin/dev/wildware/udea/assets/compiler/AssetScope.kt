@@ -1,5 +1,6 @@
 package dev.wildware.udea.assets.compiler
 
+import dev.wildware.udea.annotations.AssetDsl
 import dev.wildware.udea.assets.Ability
 import dev.wildware.udea.assets.Axis2D
 import dev.wildware.udea.assets.Axis2DBinding
@@ -375,6 +376,7 @@ public class AssetScope(
      *   here because the pack format holds data; the class that *interprets* the names is the
      *   game's.
      */
+    @AssetDsl
     public fun character(
         name: String,
         size: Float = 1f,
@@ -428,6 +430,7 @@ public class AssetScope(
      * deliberately **not** defaulted: two overloads that are both applicable to `blueprint(name
      * = "x")` would be an ambiguity at every call site that omits components.
      */
+    @AssetDsl
     public fun blueprint(
         name: String = defaultName,
         parent: Ref? = null,
@@ -459,6 +462,7 @@ public class AssetScope(
      * `GraphPacker` has to invent an `EntityDefinition.name` from the index for them. Here the
      * author names each entity. [entities] is required for the reason [blueprint]'s is.
      */
+    @AssetDsl
     public fun level(
         name: String = defaultName,
         systems: List<String> = emptyList(),
@@ -877,6 +881,7 @@ public class EntityScope internal constructor() {
      * both kinds are `SpawnRecipe`s. This is the one stamp that decides whether a migrated level
      * packs with its entities or with twenty-seven dropped references.
      */
+    @AssetDsl
     public fun entity(
         name: String,
         blueprint: Ref? = null,

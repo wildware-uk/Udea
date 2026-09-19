@@ -292,8 +292,8 @@ class TranspilerParityTest {
         val results = transpiler().transpileAll(Fixtures.scripts())
         val sounds = results.single { it.source.endsWith("sounds/sounds.udea.kts") }
         val code = assertNotNull(sounds.code)
-        assertTrue("""listOf("hit", "swoosh").forEach { kind ->""" in code, code)
         assertTrue("scope.soundCue(" in code, code)
+        assertTrue(""""melee_swoosh"""" in code, code)
         assertTrue("""override val idPrefix: String = "sounds"""" in code, code)
     }
 }

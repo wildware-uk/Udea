@@ -31,6 +31,7 @@ class UdeaAnnotationsTest {
         "dev.wildware.udea.annotations.Net" to UdeaAnnotations.NET,
         "dev.wildware.udea.annotations.Sim" to UdeaAnnotations.SIM,
         "dev.wildware.udea.annotations.Q" to UdeaAnnotations.Q,
+        "dev.wildware.udea.annotations.AssetDsl" to UdeaAnnotations.ASSET_DSL,
     )
 
     @Test

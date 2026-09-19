@@ -100,10 +100,9 @@ class WorkerTest {
         assets.createDirectories()
         assets.resolve("hog.udea.kts").writeText(
             """
-            val hog = mutableListOf<ByteArray>()
-            while (true) {
-                hog.add(ByteArray(4 * 1024 * 1024))
-            }
+            // One allocation four times the worker's heap. Not a loop that grows a list, as this
+            // was: an asset may not loop (issue #192), and the compiler refuses one before it runs.
+            val hog = ByteArray(256 * 1024 * 1024)
             """.trimIndent(),
         )
 

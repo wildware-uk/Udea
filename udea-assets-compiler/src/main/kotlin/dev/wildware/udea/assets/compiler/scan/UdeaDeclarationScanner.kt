@@ -403,6 +403,13 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
         /**
          * Every loop in the file, wherever it is nested, as [UdeaRules.LOOP_IN_ASSET] (issue #192).
          *
+         * **Early feedback, not the guarantee.** This pass resolves nothing, so it can only match
+         * spelling, and it runs before anything compiles - which is what makes it fast enough for
+         * the editor's live path. The guarantee is `udea-compiler-plugin`'s K2 loop checker inside
+         * pass 2, which refuses by resolved symbol: a `forEach`, a script's own looping helper or
+         * a recursive function are refused there and not here. When both see the same loop,
+         * `notAlreadyIn` reports it once.
+         *
          * A whole-file sweep for the reason [collectReferences] is one: a loop inside a
          * declaration's lambda, a helper function or a `val` initializer is still a loop. Over PSI
          * and not over text, so a loop keyword in a comment or a string literal is not a loop.

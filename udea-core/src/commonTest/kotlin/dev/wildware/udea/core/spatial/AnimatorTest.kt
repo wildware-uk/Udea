@@ -51,7 +51,7 @@ class AnimatorTest {
     }
 
     @Test
-    fun `before its start a clip reads zero, not a negative time`() {
+    fun `before its start a clip reads zero and not a negative time`() {
         val animator = Animator()
         animator.play(walk, start)
 
@@ -159,7 +159,7 @@ class AnimatorTest {
     }
 
     @Test
-    fun `the clip faded out keeps its own clock, so it does not jump back to its first frame`() {
+    fun `the clip faded out keeps its own clock so it does not jump back to its first frame`() {
         val animator = Animator()
         animator.play(walk, start)
         animator.crossfade(run, at(10), over = 6.ticks)
@@ -178,7 +178,7 @@ class AnimatorTest {
     }
 
     @Test
-    fun `a crossfade from nothing is a play, with nothing to blend from`() {
+    fun `a crossfade from nothing is a play with nothing to blend from`() {
         val animator = Animator()
         animator.crossfade(run, at(10), over = 6.ticks)
 
@@ -218,7 +218,7 @@ class AnimatorTest {
     }
 
     @Test
-    fun `a clip of no length reads zero, and played once it is finished as soon as it starts`() {
+    fun `a clip of no length reads zero and played once it is finished as soon as it starts`() {
         val still = AnimationClip(index = 3, name = "Still", length = 0.ticks)
         val animator = Animator()
 

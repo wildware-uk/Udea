@@ -88,6 +88,9 @@ class EditorLayoutTest {
             val floated = ui.node(EditorTags.SCENE_VIEW).boundsInRoot
             assertEquals(create.left, floated.left, 1f, "the view did not take the room the floated panel left")
             assertEquals(before.right, floated.right, 1f, "floating the Create panel moved the view's right edge")
+            // The floating panel is over the view now, as a floating window is, and takes no room.
+            assertEquals(before.top, floated.top, 1f, "the floating Create panel took room from the view's top")
+            assertEquals(before.bottom, floated.bottom, 1f, "the floating Create panel took room from the view's bottom")
 
             assertTrue(ui.key(Key.Down, Modifiers.Primary + Modifiers.Alt), "the Create panel did not dock along the bottom")
             ui.settle()

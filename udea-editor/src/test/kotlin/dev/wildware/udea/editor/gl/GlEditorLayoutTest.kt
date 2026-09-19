@@ -48,7 +48,9 @@ import kotlin.test.assertTrue
  *
  * - under every docked panel and every divider there is **no** world-tinted pixel - on the base this
  *   ticket started from, the world shows through the panels' translucent bodies;
- * - in the view there is world;
+ * - in the view there is world, and it runs from the view's left edge to its right, so nothing is
+ *   drawn over the view's edges either - an opaque divider over the view hides the world rather than
+ *   showing it, which the first check alone would miss;
  * - and nowhere outside the view is there any, a margin allowed at its edge for the headless twin the
  *   rectangles are read from (below).
  *
@@ -149,6 +151,18 @@ class GlEditorLayoutTest {
             assertEquals(0, under, "the $tab tab's world shows through the panel or divider at $panel")
         }
         assertTrue(count(shot, layout.view.shrunkBy(MARGIN_ACROSS, MARGIN_DOWN)) > 0, "the $tab tab drew no world in its view at ${layout.view}")
+
+        // Nothing covers the view either: across its middle, the world runs from its left edge to its
+        // right. That holds because the gap is narrower than the frame's shape, so the frame is fitted
+        // to the view's width with bars above and below - checked first, or the edges prove nothing.
+        assertTrue(
+            layout.view.width / layout.view.height < WIDTH.toFloat() / HEIGHT,
+            "the view ${layout.view} is wider than the frame's shape, so the world would not reach its sides",
+        )
+        val row = layout.view.centre.y.toInt()
+        val columns = (0 until shot.width).filter { isWorld(shot.getRGB(it, row)) }
+        assertEquals(layout.view.left, columns.first().toFloat(), EDGE, "something covers the $tab tab's left edge: the world starts at ${columns.first()}")
+        assertEquals(layout.view.right, columns.last() + 1f, EDGE, "something covers the $tab tab's right edge: the world ends at ${columns.last()}")
         var outside = 0
         for (y in 0 until shot.height) for (x in 0 until shot.width) {
             if (!margin.contains(x + 0.5f, y + 0.5f) && isWorld(shot.getRGB(x, y))) outside++
@@ -261,6 +275,9 @@ class GlEditorLayoutTest {
          */
         const val MARGIN_DOWN = 8f
         const val MARGIN_ACROSS = 1f
+
+        /** How far the world's first and last column may sit from the view's edge: rounding, and a blended pixel. */
+        const val EDGE = 2f
 
         /** ComposeGL's divider between two docked panes, in pixels at this window's scale. */
         const val DIVIDER = 6f

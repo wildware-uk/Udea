@@ -44,6 +44,12 @@ class EditorSessionTest {
     /** What the simulation would have been sent since the last call. */
     private fun drain(): List<AgentCommand> = ArrayList<AgentCommand>().also { bridge.drain(it) }
 
+    /**
+     * What the simulation would have been sent since the last call, less the selection's own reads
+     * (issue #235), which `ScenePickingTest` answers: this suite is about the History panel.
+     */
+    private fun drainHistoryAndEdits(): List<AgentCommand> = drain().filter { it.name != "editor.selection" }
+
     @Test
     fun `the spawn button calls editor spawn at the configured point, filed under the editor's author`() {
         open().use { ui ->
@@ -61,11 +67,11 @@ class EditorSessionTest {
         open().use { ui ->
             drain()
             ui.click(EditorTags.SPAWN)
-            val spawn = drain().single()
+            val spawn = drainHistoryAndEdits().single()
             bridge.complete(spawn.id, AgentResult.Ok("""{"id":42}"""))
             session.frame()
 
-            val history = drain().single()
+            val history = drainHistoryAndEdits().single()
             assertEquals("editor.history", history.name)
             assertEquals(author, history.session, "a history read under any other author lists someone else's edits")
             bridge.complete(
@@ -93,7 +99,7 @@ class EditorSessionTest {
             bridge.complete(agentsEdit.id, AgentResult.Ok("{}"))
             session.frame()
 
-            val history = drain().single()
+            val history = drainHistoryAndEdits().single()
             assertEquals("editor.history", history.name)
             bridge.complete(
                 history.id,
@@ -106,12 +112,15 @@ class EditorSessionTest {
     }
 
     @Test
-    fun `its own history read does not trigger another, so an idle window sends nothing`() {
+    fun `its own reads do not trigger more, so an idle window sends nothing`() {
         open().use {
             drain()
             session.frame()
-            val first = drain().single()
-            bridge.complete(first.id, AgentResult.Ok("""{"author":"editor","size":0,"edits":[]}"""))
+            // The first frame reads the History panel's list and the selection, once each.
+            val first = drain()
+            assertEquals(listOf("editor.history", "editor.selection"), first.map { it.name })
+            bridge.complete(first[0].id, AgentResult.Ok("""{"author":"editor","size":0,"edits":[]}"""))
+            bridge.complete(first[1].id, AgentResult.Ok("""{"you":"editor","authors":[]}"""))
             repeat(IDLE_FRAMES) { session.frame() }
             assertEquals(emptyList(), drain().map { it.name }, "an idle editor kept calling tools")
         }
@@ -134,7 +143,7 @@ class EditorSessionTest {
         open().use { ui ->
             drain()
             ui.click(EditorTags.SPAWN)
-            val spawn = drain().single()
+            val spawn = drainHistoryAndEdits().single()
             bridge.complete(spawn.id, AgentResult.failed(NO_SPAWNER, "this editor was given no spawner"))
             session.frame()
             ui.settle()

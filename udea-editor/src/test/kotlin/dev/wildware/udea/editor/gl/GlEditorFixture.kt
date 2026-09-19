@@ -63,7 +63,7 @@ internal fun KoolBackend.click(frames: FrameProbe, pointer: KoolPointer, at: Off
  * Moves the mouse on Kool's own GLFW cursor callback, twice, as `GlKoolPointerTest` does and for its
  * reason: Kool holds back the move that starts a drag.
  */
-private fun KoolBackend.moveTo(x: Double, y: Double) = onRenderThread {
+internal fun KoolBackend.moveTo(x: Double, y: Double) = onRenderThread {
     val window = currentWindow()
     val callback = checkNotNull(GLFW.glfwSetCursorPosCallback(window, null)) {
         "Kool installed no GLFW cursor callback, so this test would be moving nothing"
@@ -77,7 +77,7 @@ private fun KoolBackend.moveTo(x: Double, y: Double) = onRenderThread {
 }
 
 /** Presses or releases a mouse button on Kool's own GLFW callback. */
-private fun KoolBackend.button(button: Int, action: Int) = onRenderThread {
+internal fun KoolBackend.button(button: Int, action: Int) = onRenderThread {
     val window = currentWindow()
     val callback = checkNotNull(GLFW.glfwSetMouseButtonCallback(window, null)) {
         "Kool installed no GLFW mouse button callback, so this test would be clicking nothing"

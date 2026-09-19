@@ -8,12 +8,16 @@ import dev.wildware.udea.render.view.WorldViewport
 import kotlin.math.pow
 
 /**
- * What a pointer does in the Scene tab (issue #234): gizmos first, then the editor camera.
+ * What a pointer does in the Scene tab (issues #234 and #235): gizmo handles first, then entities,
+ * then the editor camera.
  *
- * - **A press on a gizmo** is the gizmo's, and the drag that follows moves nothing here.
- * - **Otherwise a drag moves the camera.** In 2D any button pans, the world following the pointer.
- *   In 3D the primary button orbits round the centre - across turns about Z, up and down raises and
- *   lowers the eye - and the middle or secondary button pans the centre across the view.
+ * - **A primary press on a gizmo handle** is the gizmo's, and the drag that follows moves nothing
+ *   here.
+ * - **Otherwise the primary button selects** ([ScenePicking]): a click picks the entity under the
+ *   pointer, Shift-click toggles it, and a drag from empty space box-selects.
+ * - **The other buttons move the camera.** In 2D the secondary and middle buttons pan, the world
+ *   following the pointer. In 3D the secondary button orbits round the centre - across turns about Z,
+ *   up and down raises and lowers the eye - and the middle button pans the centre across the view.
  * - **The wheel zooms** about the point under the pointer in 2D, and moves the eye in or out in 3D:
  *   turned away from the user it zooms in. ComposeGL reports that turn as a negative `delta.y` (its
  *   positive is "scroll the content up", the wheel pulled back).
@@ -24,8 +28,15 @@ import kotlin.math.pow
  * Positions arrive as a `SceneView` reports them - the picture's own pixels, from its top left - and
  * are mapped through the view's letterbox into view pixels from the bottom left before anything reads
  * them.
+ *
+ * @param shift whether Shift is held, read at each press: ComposeGL's pointer events carry no
+ *   modifiers, so the window keeps it from its key events ([EditorKeys]).
  */
-internal class SceneNavigation(private val view: WorldViewport) {
+internal class SceneNavigation(
+    private val view: WorldViewport,
+    private val picking: ScenePicking,
+    private val shift: () -> Boolean,
+) {
 
     private val camera = checkNotNull(view.camera) { "$view is the Game tab, which the editor does not navigate" }
 
@@ -52,24 +63,37 @@ internal class SceneNavigation(private val view: WorldViewport) {
                 drag = when {
                     !onView -> Drag.None
                     event.button == PointerButton.Primary && view.pressGizmo(at.x, at.y) -> Drag.Gizmo
-                    camera.dimension == ViewDimension.ThreeD && event.button == PointerButton.Primary -> Drag.Orbit
+                    event.button == PointerButton.Primary -> Drag.Select.also { picking.press(at.x, at.y, shift()) }
+                    camera.dimension == ViewDimension.ThreeD && event.button == PointerButton.Secondary -> Drag.Orbit
                     else -> Drag.Pan
                 }
                 lastX = at.x
                 lastY = at.y
             }
 
-            is PointerEvent.Move -> if (drag == Drag.Pan || drag == Drag.Orbit) {
-                // Mapped even off the view: a drag that leaves the picture keeps arriving.
-                val dx = at.x - lastX
-                val dy = at.y - lastY
-                lastX = at.x
-                lastY = at.y
-                if (drag == Drag.Pan) camera.pan(dx, dy) else camera.orbit(-dx * ORBIT_DEGREES_PER_PIXEL, -dy * ORBIT_DEGREES_PER_PIXEL)
-                moved = true
+            // Mapped even off the view: a drag that leaves the picture keeps arriving.
+            is PointerEvent.Move -> when (drag) {
+                Drag.Pan, Drag.Orbit -> {
+                    val dx = at.x - lastX
+                    val dy = at.y - lastY
+                    lastX = at.x
+                    lastY = at.y
+                    if (drag == Drag.Pan) camera.pan(dx, dy) else camera.orbit(-dx * ORBIT_DEGREES_PER_PIXEL, -dy * ORBIT_DEGREES_PER_PIXEL)
+                    moved = true
+                }
+                Drag.Select -> picking.drag(at.x, at.y)
+                Drag.None, Drag.Gizmo -> Unit
             }
 
-            is PointerEvent.Release, is PointerEvent.Cancel -> drag = Drag.None
+            is PointerEvent.Release -> {
+                if (drag == Drag.Select) picking.release(at.x, at.y)
+                drag = Drag.None
+            }
+
+            is PointerEvent.Cancel -> {
+                if (drag == Drag.Select) picking.cancel()
+                drag = Drag.None
+            }
 
             is PointerEvent.Scroll -> if (onView && event.delta.y != 0f) {
                 camera.zoomAt(ZOOM_STEP.pow(event.delta.y), at.x, at.y)
@@ -92,7 +116,7 @@ internal class SceneNavigation(private val view: WorldViewport) {
 
     override fun toString(): String = "SceneNavigation($view, $drag)"
 
-    private enum class Drag { None, Gizmo, Pan, Orbit }
+    private enum class Drag { None, Gizmo, Select, Pan, Orbit }
 
     private companion object {
 

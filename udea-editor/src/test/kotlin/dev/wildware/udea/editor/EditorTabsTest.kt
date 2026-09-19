@@ -77,13 +77,14 @@ class EditorTabsTest {
     }
 
     @Test
-    fun `a drag in the Scene tab pans the world with the pointer, and the wheel zooms`() {
+    fun `a secondary drag in the Scene tab pans the world with the pointer, and the wheel zooms`() {
         open().use { ui ->
             val before = origin()
             val from = ui.offCentre(EditorTags.SCENE_VIEW)
-            assertTrue(ui.press(from), "the Scene tab took no press")
+            // The secondary button: the primary one selects (issue #235), `ScenePickingTest`'s.
+            assertTrue(ui.press(from, PointerButton.Secondary), "the Scene tab took no press")
             ui.dragTo(Offset(from.x + DRAG, from.y + DRAG))
-            ui.release()
+            ui.release(PointerButton.Secondary)
 
             val after = origin()
             val moved = DRAG * viewPerScreen(ui)
@@ -120,7 +121,7 @@ class EditorTabsTest {
     }
 
     @Test
-    fun `in 3D a drag orbits the editor camera and leaves the 2D camera where it was`() {
+    fun `in 3D a secondary drag orbits the editor camera and leaves the 2D camera where it was`() {
         open().use { ui ->
             assertTrue(ui.click(EditorTags.DIMENSION), "the 2D / 3D switch took no click")
             ui.settle()
@@ -130,9 +131,9 @@ class EditorTabsTest {
             val pitch = camera.pitchDegrees
             val x = camera.camera2D.position.x
             val from = ui.offCentre(EditorTags.SCENE_VIEW)
-            ui.press(from)
+            ui.press(from, PointerButton.Secondary)
             ui.dragTo(Offset(from.x + DRAG, from.y + DRAG))
-            ui.release()
+            ui.release(PointerButton.Secondary)
             assertTrue(abs(camera.yawDegrees - yaw) > 1f, "a drag across did not turn the orbit: ${camera.yawDegrees}")
             assertTrue(camera.pitchDegrees > pitch, "a drag down did not raise the eye: ${camera.pitchDegrees}")
             assertEquals(x, camera.camera2D.position.x, "a 3D drag moved the 2D camera")

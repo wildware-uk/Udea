@@ -55,11 +55,59 @@ public class EditorTools(
     internal fun call(tool: String, args: Map<String, String> = emptyMap(), onAnswer: (AgentResult) -> Unit): Long {
         val command = AgentCommand(tool, args, session = author)
         lastSent = command.id
+        if (firstSent == 0L) firstSent = command.id
         when (val submitted = bridge.submit(command)) {
             is AgentSubmission.Accepted -> waiting[submitted.commandId] = onAnswer
             is AgentSubmission.Rejected -> onAnswer(AgentResult.Failed(submitted.error))
         }
         return command.id
+    }
+
+    /** The ids of this editor's own reads ([read]) not yet passed by [consumeChanged]. */
+    private val reads = HashSet<Long>()
+
+    /** The highest completed command id [consumeChanged] has looked past. */
+    private var changesSeen: Long = 0L
+
+    /** The id of the first command this editor sent, or 0 before it has sent any. */
+    private var firstSent: Long = 0L
+
+    /**
+     * [call] for a tool that only reads - `editor.history`, `editor.selection`,
+     * `editor.common_fields` - so that its completing is not taken for a change ([consumeChanged]).
+     * Without that, two panels that each re-read on every completed command would each wake the
+     * other for ever.
+     */
+    internal fun read(tool: String, args: Map<String, String> = emptyMap(), onAnswer: (AgentResult) -> Unit): Long =
+        call(tool, args, onAnswer).also { reads += it }
+
+    /**
+     * True when a command other than this editor's own [read]s has completed since the last call:
+     * an edit, the editor's or an agent's, or anything else that may have changed what the panels
+     * show. Command ids are one counter for every caller, so each id passed that is not one of this
+     * editor's reads is somebody's command.
+     *
+     * Nothing before this editor's first call counts: a command with a lower id ran before that call
+     * did, so the first read of every panel already saw what it changed.
+     */
+    internal fun consumeChanged(): Boolean {
+        val now = bridge.completedCommandId()
+        if (firstSent == 0L) {
+            changesSeen = now
+            return false
+        }
+        var changed = false
+        var id = maxOf(changesSeen, firstSent - 1) + 1
+        while (id <= now) {
+            if (id !in reads) {
+                changed = true
+                break
+            }
+            id++
+        }
+        reads.removeAll { it <= now }
+        changesSeen = now
+        return changed
     }
 
     /**

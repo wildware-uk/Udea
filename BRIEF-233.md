@@ -98,7 +98,15 @@ Configuration cache entry reused.
 exit 0
 ```
 
-The first attempt (`build1.log`) ended in `Gradle build daemon disappeared unexpectedly (it may have been killed or may have crashed)`, with no failed task before it. Other worktrees' Gradle builds and xvfb GL runs were on the box at the time (from `pgrep` samples taken just before and after). The re-run above was green. Within that re-run, `udeaVerifyEditorAbsent` ran in every covered project, as did `:udea-render:udeaVerifyNoLibGdx` from #189.
+The first attempt (`build1.log`) ended in `Gradle build daemon disappeared unexpectedly (it may have been killed or may have crashed)`, with no failed task before it. A Gradle daemon (`GradleDaemon 8.13`, `-Xmx2g -XX:MaxMetaspaceSize=1g`) left a crash log in this worktree's root at 10:58:33 (kept as `scratchpad/issue233/hs_err_pid668289.log`, not committed). It shows a native allocation failure, not a Java heap or metaspace one:
+
+```
+# Native memory allocation (mmap) failed to map 65536 bytes. Error detail: committing reserved memory.
+[...]
+Memory: 4k page, physical 32805840k(13131156k free), swap 8388604k(4423364k free)
+```
+
+Other worktrees' Gradle builds and xvfb GL runs were on the box at the time (from `pgrep` samples taken just before and after). The re-run above was green. Within that re-run, `udeaVerifyEditorAbsent` ran in every covered project, as did `:udea-render:udeaVerifyNoLibGdx` from #189.
 
 ### GL tests under xvfb
 

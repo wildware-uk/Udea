@@ -9,7 +9,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -73,6 +75,14 @@ internal class EditorPlayEdits(
     var edits: List<PlayEditRow> by mutableStateOf(emptyList())
         private set
 
+    /**
+     * How many characters the last answer ran to when it was too long for the bridge to hand this
+     * window (`AgentBridge.MAX_DELIVERABLE_RESULT_CHARS`), which then gave a handle to it in its
+     * place; `null` when the list arrived. The panel says so rather than showing a partial list.
+     */
+    var tooLong: Int? by mutableStateOf(null)
+        private set
+
     private var stale = true
     private var pending = false
 
@@ -87,8 +97,11 @@ internal class EditorPlayEdits(
             when (answer) {
                 is AgentResult.Ok -> {
                     val root = json.parseToJsonElement(answer.json).jsonObject
-                    playing = root.getValue("playing").jsonPrimitive.boolean
-                    edits = parse(answer.json)
+                    val spilled = root["resultTooLarge"]?.jsonPrimitive?.booleanOrNull == true
+                    // Only a list of edits outgrows an answer, and there are edits only during a play.
+                    playing = spilled || root.getValue("playing").jsonPrimitive.boolean
+                    tooLong = if (spilled) root["resultChars"]?.jsonPrimitive?.intOrNull ?: 0 else null
+                    edits = if (spilled) emptyList() else parse(answer.json)
                 }
                 is AgentResult.Failed -> refused("$PLAY_EDITS refused: ${answer.error}")
             }

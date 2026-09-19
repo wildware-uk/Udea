@@ -162,6 +162,33 @@ class MobaPlayKeepPanelTest {
         }
     }
 
+    /**
+     * More play edits than one answer can carry to the window: the bridge swaps an answer over
+     * `AgentBridge.MAX_DELIVERABLE_RESULT_CHARS` for a handle to it, so the window cannot read the
+     * list. It says so, and goes on working, rather than throwing on the render thread.
+     */
+    @Test
+    fun `a list of play edits too long for one answer is named as such, and the window carries on`() {
+        runUntilTowers()
+        val tower = hostileTower()
+        val (_, editor) = editorOn(tower)
+
+        uiTest { editor.window.content() }.use { ui ->
+            frames(ui, editor)
+            click(ui, editor, PlaybackTags.PLAY)
+            repeat(MANY_EDITS) { step ->
+                asAnAgent("editor.set_field", "id" to "${tower.raw}", "component" to "Tower", "field" to "attackRange", "value" to "${160 + step}")
+            }
+            val answer = asAnAgent("editor.play_edits")
+            assertTrue("\"resultTooLarge\":true" in answer, "$MANY_EDITS edits fit one answer, so this is not the case: $answer")
+            frames(ui, editor)
+
+            assertTrue("too long" in ui.text(PlayEditTags.LIST), "the panel shows \"${ui.text(PlayEditTags.LIST)}\"")
+            click(ui, editor, PlaybackTags.STOP)
+            assertTrue(host.time.paused, "the window stopped working after the long list")
+        }
+    }
+
     // --- fixture ----------------------------------------------------------------------------------
 
     /** What the game was doing after one frame of the drag. */
@@ -265,6 +292,9 @@ class MobaPlayKeepPanelTest {
 
     private companion object {
         const val RANGE = "Tower.attackRange"
+
+        /** Play edits whose list is longer than one answer the bridge hands the window. */
+        const val MANY_EDITS = 12
         const val VIEW_WIDTH = 640
         const val VIEW_HEIGHT = 360
 

@@ -875,7 +875,7 @@ public class EditorToolset(
         )
         val reason = whyNotKeepable(edit, running)
         if (keep && reason != null) {
-            return AgentResult.failed(NOT_KEEPABLE, "$tool: your ${edit.tool} (#$editId) cannot be kept: $reason")
+            return AgentResult.failed(NOT_KEEPABLE, "$tool: ${label(edit.author)}'s ${edit.tool} (#$editId) cannot be kept: $reason")
         }
         val id = PlayEditId(editId)
         if (keep) running.kept.add(id) else running.kept.remove(id)

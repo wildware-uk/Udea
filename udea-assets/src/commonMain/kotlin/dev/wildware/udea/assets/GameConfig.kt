@@ -51,14 +51,19 @@ public data class LightingConfig(
     }
 }
 
-/** The Scene2D skin a game's UI uses, when it has one. */
+/**
+ * The UI skin a game declares, when it has one.
+ *
+ * Carried over from the retired tree, whose UI toolkit used it. The asset codec still decodes it,
+ * and nothing in the engine uses it since the UI layer became ComposeGL (issues #187-#189).
+ */
 public data class UiConfig(public val defaultSkin: ResPath? = null)
 
 /**
  * The game's own top-level settings: what to load first, and how the engine is configured for it.
  *
  * Its sub-configurations are plain data classes and not assets. In the old tree `Lighting`,
- * `Network`, `Physics` and `Scene2D` each extended `Asset<T>`, which gave four things with no
+ * `Network`, `Physics` and the UI config each extended `Asset<T>`, which gave four things with no
  * identity an `AssetId`, a `path`, a `name` and a place in the global map, purely so that the DSL
  * generator would produce builders for them. Nothing referenced them, and nothing could: they were
  * reachable only through the `GameConfig` that owned them, which is what "not an asset" means.

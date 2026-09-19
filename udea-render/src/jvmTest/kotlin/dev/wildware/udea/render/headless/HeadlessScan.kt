@@ -1,14 +1,9 @@
 package dev.wildware.udea.render.headless
 
 import dev.wildware.udea.diagnostics.DiagnosticReport
-import dev.wildware.udea.diagnostics.DiagnosticSink
-import dev.wildware.udea.diagnostics.Severity
-import dev.wildware.udea.diagnostics.SourceSpan
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
-import dev.wildware.udea.render.bytecode.BannedOwner
-import dev.wildware.udea.render.bytecode.ClassRefScanner
+import dev.wildware.udea.render.bytecode.BytecodeBan
 import dev.wildware.udea.render.bytecode.GL_BANNED_OWNERS
-import dev.wildware.udea.render.bytecode.TypeUse
 import dev.wildware.udea.render.support.RepoLayout
 import java.io.File
 
@@ -81,20 +76,16 @@ internal object HeadlessScan {
      * @throws IllegalStateException when the property is missing or empty. A scan with no
      *   modules passes forever, so a broken hand-off has to be louder than a green tick.
      */
-    val HEADLESS_MODULES: List<String> by lazy {
-        val raw = System.getProperty(MODULES_PROPERTY)
-        checkNotNull(raw) {
-            "-D$MODULES_PROPERTY was not set. The designated headless modules come from " +
-                "ModuleGraphRules.HEADLESS_PROJECTS via udea-render's build script; run this " +
-                "through Gradle (`:udea-render:udeaVerifyHeadless`) or set the property. A " +
-                "scan that defaulted to a list written down here is the drift this replaced."
-        }
-        val modules = raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-        check(modules.isNotEmpty()) {
-            "-D$MODULES_PROPERTY was set to '$raw', which names no modules. The gate is broken, " +
-                "not the tree: a scan of nothing passes forever."
-        }
-        modules
+    val HEADLESS_MODULES: List<String> by lazy { BytecodeBan.modulesFrom(MODULES_PROPERTY, GATE_TASK) }
+
+    private const val GATE_TASK: String = "udeaVerifyHeadless"
+
+    private val ban = BytecodeBan(RULE_ID, GATE_TASK, GL_BANNED_OWNERS) { module, use, entry ->
+        "$module is a headless module, but ${use.className}.${use.member} references " +
+            "${BytecodeBan.referenced(use)} -- ${entry.why}. Move the code to udea-render (spec 4: " +
+            "it is the only module that touches GL). Reported under $RULE_ID, the bytecode " +
+            "extension of UDEA-MG-002, which is the configuration-level rule owned by " +
+            "udeaVerifyModuleGraph."
     }
 
     /**
@@ -129,67 +120,18 @@ internal object HeadlessScan {
      *
      * @throws IllegalStateException if a module contributed no class files at all. An empty
      *   scan is a broken gate, not a clean module: it would pass forever while the module
-     *   quietly grew GL. (The same reasoning as `DependencyRules.vacuity`.)
+     *   quietly grew GL.
      */
     fun run(
         modules: List<String> = HEADLESS_MODULES,
-        banned: List<BannedOwner> = GL_BANNED_OWNERS,
         classFilesOf: (String) -> List<File> = { RepoLayout.classFiles(it) },
         excused: Map<String, List<String>> = EXCUSED,
-    ): DiagnosticReport {
-        val sink = DiagnosticSink()
-        for (module in modules) {
-            val classFiles = classFilesOf(module)
-            check(classFiles.isNotEmpty()) {
-                "$module contributed no compiled classes to udeaVerifyHeadless. The gate is " +
-                    "broken, not the module: a scan of nothing passes forever. Build the " +
-                    "module before running the gate."
-            }
-            sink.reportAll(violations(module, classFiles, banned, excused[module].orEmpty()))
-        }
-        return sink.build()
-    }
+    ): DiagnosticReport = ban.run(modules, classFilesOf, excused)
 
     /**
      * Every banned reference in [classFiles], as diagnostics attributed to [module], except a
      * reference into one of the [excused] namespaces.
      */
-    fun violations(
-        module: String,
-        classFiles: List<File>,
-        banned: List<BannedOwner> = GL_BANNED_OWNERS,
-        excused: List<String> = emptyList(),
-    ): List<UdeaDiagnostic> = classFiles
-        .flatMap { file -> ClassRefScanner.scan(file) }
-        .filterNot { use -> excused.any { use.owner.startsWith(it) } }
-        .mapNotNull { use -> banned.firstOrNull { it.matches(use.owner) }?.let { use to it } }
-        .map { (use, entry) -> diagnostic(module, use, entry) }
-
-    private fun diagnostic(module: String, use: TypeUse, banned: BannedOwner): UdeaDiagnostic =
-        UdeaDiagnostic(
-            severity = Severity.Error,
-            ruleId = RULE_ID,
-            message = message(module, use, banned),
-            span = span(module, use),
-        )
-
-    private fun message(module: String, use: TypeUse, banned: BannedOwner): String {
-        val referenced = use.ownerMember?.let { "${use.owner}.$it" } ?: use.owner
-        return "$module is a headless module, but ${use.className}.${use.member} references " +
-            "$referenced -- ${banned.why}. Move the code to udea-render (spec 4: it is the " +
-            "only module that touches GL). Reported under $RULE_ID, the bytecode extension " +
-            "of UDEA-MG-002, which is the configuration-level rule owned by " +
-            "udeaVerifyModuleGraph."
-    }
-
-    /**
-     * Where the offending class was compiled from, or `null` when the source cannot be found
-     * -- a generated class, or one compiled from a language directory this does not know
-     * about. A span invented for such a class would point at a file that does not exist.
-     */
-    private fun span(module: String, use: TypeUse): SourceSpan? {
-        val source = RepoLayout.sourceFileOf(module, use.className, use.sourceFile) ?: return null
-        val line = use.line
-        return SourceSpan(RepoLayout.relativePath(source), line, 0, line, 0)
-    }
+    fun violations(module: String, classFiles: List<File>, excused: List<String> = emptyList()): List<UdeaDiagnostic> =
+        ban.violations(module, classFiles, excused)
 }

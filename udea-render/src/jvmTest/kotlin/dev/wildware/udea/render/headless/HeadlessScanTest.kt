@@ -127,10 +127,9 @@ class HeadlessScanTest {
     fun `every banned owner in the table is matched by the scan`() {
         // Guards against an entry that can never fire -- a typo in a pattern, or a package
         // that moved. Each entry is checked against a name it must match.
+        // LibGDX is `LIBGDX_BANNED_OWNERS`, read over every module by `LibGdxScan` (issue #189).
         val samples = mapOf(
             "org/lwjgl/" to "org/lwjgl/glfw/GLFW",
-            "com/badlogic/" to "com/badlogic/gdx/graphics/Texture",
-            "box2dLight/" to "box2dLight/RayHandler",
         )
 
         assertEquals(samples.keys.sorted(), GL_BANNED_OWNERS.map { it.pattern }.sorted())

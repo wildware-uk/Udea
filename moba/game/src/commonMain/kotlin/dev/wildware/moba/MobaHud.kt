@@ -340,8 +340,8 @@ public class MobaHudModel(
  * `HealthbarRenderSystem` rails are stacked into unreadable stripes in the middle of an eleven-unit
  * melee and are the *world's* information, not the player's.
  *
- * Then a scene2d `Stage`, then - once LibGDX left in issue #211 - a painter drawing `BitmapFont2D`
- * glyphs through the sprite batch as a stand-in. Issue #188 is this: the drawing half is a ComposeGL
+ * Then LibGDX's widget toolkit, then - once LibGDX left in issue #211 - a painter drawing
+ * `BitmapFont2D` glyphs through the sprite batch as a stand-in. Issue #188 is this: the drawing half is a ComposeGL
  * screen, and [HudState] and [MobaHudModel] did not change, so what `MobaHudTest` asserts on is still
  * exactly what a player reads.
  *

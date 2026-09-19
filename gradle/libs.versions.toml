@@ -32,7 +32,7 @@ junit5 = "5.13.4"
 # (Phase 7) will share the same visitor. Never a runtime dependency of a shipped module.
 asm = "9.6"
 junitPlatform = "1.13.4"
-# ComposeGL: the Compose-based UI toolkit that replaces scene2d (issues #185-#189). Every
+# ComposeGL: the Compose-based UI toolkit, which replaced LibGDX's (issues #185-#189). Every
 # published release declares `kotlin-stdlib:2.4.20` and its jars carry `@Metadata(mv = [2, 4, 0])`,
 # which is why `kotlin` above had to move to 2.4.20 before any of this could be on the classpath
 # at all.

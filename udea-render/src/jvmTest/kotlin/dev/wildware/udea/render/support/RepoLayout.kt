@@ -41,7 +41,8 @@ internal object RepoLayout {
      * Every `.class` file [module] compiled for [sourceSet], across every language directory
      * (`build/classes/kotlin/main`, `build/classes/java/main`, ...) - or, for a multiplatform
      * module, across every target that compiles to bytecode (`build/classes/kotlin/jvm/main`,
-     * `build/classes/kotlin/android/main`).
+     * `build/classes/kotlin/android/main`). An Android application's main bytecode is its release
+     * variant's Kotlin output instead, which AGP writes outside `build/classes` altogether.
      *
      * One layout or the other, chosen from the module's sources rather than from what happens to
      * be under `build/`: a module converted to multiplatform keeps its old
@@ -53,6 +54,7 @@ internal object RepoLayout {
      * pass while it did.
      */
     fun classFiles(module: String, sourceSet: String = "main"): List<File> {
+        if (sourceSet == "main" && isAndroidApplication(module)) return androidApplicationClassFiles(module)
         val classesRoot = moduleDir(module).resolve("build/classes")
         val languageDirs = classesRoot.listFiles()?.filter { it.isDirectory }.orEmpty()
         val multiplatform = isMultiplatform(module)
@@ -68,6 +70,27 @@ internal object RepoLayout {
             .flatMap { root -> root.walkTopDown().filter { it.isFile && it.extension == "class" } }
             .sortedBy { it.invariantSeparatorsPath }
     }
+
+    /**
+     * True when [module] is an Android application (`:moba:android`): an AGP app, not a
+     * multiplatform library, so its bytecode is not under `build/classes` at all.
+     */
+    private fun isAndroidApplication(module: String): Boolean =
+        !isMultiplatform(module) && moduleDir(module).resolve("src/main/AndroidManifest.xml").isFile
+
+    /**
+     * An Android application's main bytecode: the release variant's Kotlin output, which is what
+     * its APK ships and what its `udeaMainBytecode` task compiles (`udea.android-application`).
+     */
+    private fun androidApplicationClassFiles(module: String): List<File> =
+        moduleDir(module).resolve("build/tmp/kotlin-classes/$ANDROID_SHIPPED_VARIANT")
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "class" }
+            .sortedBy { it.invariantSeparatorsPath }
+            .toList()
+
+    /** The variant whose bytecode an Android application ships. */
+    private const val ANDROID_SHIPPED_VARIANT = "release"
 
     /**
      * True when [module] keeps its sources in multiplatform source sets (`src/commonMain`,

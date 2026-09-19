@@ -63,7 +63,7 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 - `udea-assets-compiler` → any Gradle type. The daemon and CI must run identical code.
 - `udea-audio` → Kool or LibGDX. It is a designated headless module, so `UDEA-MG-002` bans
   `de.fabmax.kool:*` on its classpath, `UDEA-MG-009` bans LibGDX there as everywhere, and
-  `UDEA-MG-002-BYTECODE` bans the `com/badlogic/` namespace in its classes. The class that turns a path into a
+  `UDEA-MG-009-BYTECODE` bans the `com/badlogic/` namespace in its classes. The class that turns a path into a
   noise is `udea-render`'s `KoolAudioDevice` (issue #221), behind this module's `AudioDevice`
   interface: the same shape as `Presentation`, which `udea-core` holds without owning a renderer.
   `moba`'s own `GdxAudioDevice` went with LibGDX in issue #212, and `moba` now plays through
@@ -210,10 +210,12 @@ It exists because a configuration check structurally cannot see two cases:
 The second case is how the old tree lost the property: `SpriteRenderer.kt` imported
 `com.badlogic.gdx.graphics.Texture` into a component the world tick touched, and nothing
 failed. `UDEA-MG-002` is checked first, because "you added `lwjgl-opengl` to `udea-core`" is
-a better message than forty class-level ones. The banned namespaces are `org/lwjgl/`,
-`com/badlogic/` and `box2dLight/`; the LibGDX carve-outs this table used to need (gdx-math and
-the `utils` collections legal, `graphics/`, `backends/` and viewports banned) went with LibGDX. There is no per-module
-allowlist: the fix is always to move the code to `udea-render`.
+a better message than forty class-level ones. The banned namespace is `org/lwjgl/`. LibGDX
+(`com/badlogic/`, `box2dLight/`) was in this table until issue #189 moved it to
+`UDEA-MG-009-BYTECODE`, which reads every module rather than the headless ones; the LibGDX
+carve-outs it used to need (gdx-math and the `utils` collections legal, `graphics/`, `backends/`
+and viewports banned) went with LibGDX in issue #213. There is no per-module allowlist: the fix
+is always to move the code to `udea-render`.
 
 ## `UDEA-MG-009` — no project resolves LibGDX
 
@@ -236,6 +238,20 @@ in through any other one, and being allowed GL is not being allowed a second ren
 took the first reason away — the game draws through `udea-render`, which draws with Kool — and
 spec D4 takes the second: Box2D leaves with LibGDX, and `MobaPhysicsModule` was never installed.
 Issue #212 removes both and this is what keeps them removed.
+
+### `UDEA-MG-009-BYTECODE` — LibGDX in any module's classes
+
+A coordinate is only one way for a LibGDX class to arrive. Source vendored into the tree under
+LibGDX's own package has none, a `files(...)` jar resolves as `file:<name>` rather than as a
+`com.badlogicgames` coordinate, and a shaded jar republished under another group has the wrong
+one; each compiles a LibGDX reference with this rule green. `udeaVerifyNoLibGdx` — a task in
+`udea-render`, backed by `LibGdxScan` — reads the main bytecode of **every** project
+`settings.gradle.kts` includes, `udea-render`, the editor and the game included, and fails if
+one names `com/badlogic/` or `box2dLight/` (issue #189). A scene2d reference
+(`com/badlogic/gdx/scenes/scene2d/`) gets its own reason: the UI layer is ComposeGL, through
+`udea-render`'s `UiLayer` and `CapturedUi`. The module list comes from the build, and
+`UdeaVerifyNoLibGdxTest` checks it against `settings.gradle.kts`, so a module cannot drop out of
+the scan unnoticed.
 
 
 ## `UDEA-MG-010` — no compile or runtime classpath resolves `udea-editor`

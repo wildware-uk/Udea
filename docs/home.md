@@ -6,7 +6,7 @@ Udea is a high-level 2D game engine built on **LibGDX** and the **Fleks ECS** fr
 *   **Data-Driven Assets:** Define blueprints, abilities, and animations in `.udea.kts` scripts.
 *   **Gameplay Ability System (GAS):** A modular system for attributes, status effects (Gameplay Effects), and abilities.
 *   **Integrated Physics:** Seamless Box2D integration within the ECS.
-*   **Modular UI:** Screen-based UI management using Scene2D.
+*   **Modular UI:** Screen-based UI in ComposeGL: `UiLayer` for menus and panels, `CapturedUi` for a HUD a screenshot sees.
 
 > **Two trees live in this repository right now.** Everything below this box describes the
 > **old** engine, which is being replaced module by module and deleted at the Phase 6 exit.

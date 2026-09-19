@@ -1,4 +1,5 @@
 import com.android.build.api.dsl.ApplicationExtension
+import dev.wildware.udea.build.ModuleGraphRules
 import dev.wildware.udea.build.UdeaMultiplatform
 import dev.wildware.udea.build.udeaCatalog
 
@@ -51,6 +52,14 @@ extensions.configure<ApplicationExtension> {
             isMinifyEnabled = false
         }
     }
+}
+
+// The bytecode an app ships, for the gates that read every module's (`udeaVerifyNoLibGdx`, issue
+// #189): the release variant's, since that is what the APK carries. AGP creates the task after
+// this script runs, so it is named rather than looked up.
+tasks.register(ModuleGraphRules.MAIN_BYTECODE_TASK) {
+    description = "Compiles the bytecode this app's release variant ships."
+    dependsOn("compileReleaseKotlin")
 }
 
 /** A `[versions]` entry of the catalog as an `Int`, failing loudly when it is absent. */

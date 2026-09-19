@@ -25,12 +25,12 @@ import dev.wildware.udea.audio.SoundHandle
  *
  * ## Volume, pitch and pan
  *
- * Kool 0.19.0's `AudioClip` has a volume and nothing else: no playback rate and no pan, on any of
- * its three backends. So [play] honours `volume` and cannot honour `pitch` or `pan`. It does not
+ * Kool 0.19.0's `AudioClip` has a volume and nothing else: no playback rate and no pan, in the
+ * desktop, Android and JS artifacts alike. So [play] honours `volume` and cannot honour `pitch` or `pan`. It does not
  * approximate them - a pan faked as a volume drop is a quieter sound in the wrong place, not a
  * sound on the left. `CueAudio` still computes both, and a backend that has them gets them.
  *
- * ## Two things about Kool's clip this class exists to get right
+ * ## What this class does about Kool's clip
  *
  * - A clip drops any `play()` within `minIntervalMs` (150ms by default) of the last one on that
  *   clip, silently. `CueAudio` already caps voices per cue per frame, and a second cap underneath

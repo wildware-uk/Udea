@@ -106,7 +106,9 @@ public class EditorLevelStore(
  * those bytes back through the level load path, so the world after Stop is the world before Play
  * (issue #196). Every edit is allowed while playing, and every edit made while playing is thrown
  * away at Stop together with its undo entry: each author's history goes back to what it was at
- * Play. Edit sessions are closed at both ends, the same way every time: Play commits every open
+ * Play. While a play is under way an edit from before it cannot be undone (`undo_before_play`):
+ * Stop brings the world back with that edit in it, and it is undoable again from there. Edit
+ * sessions are closed at both ends, the same way every time: Play commits every open
  * one, so a drag begun before Play is kept as an edit to the world Stop comes back to; Stop cancels
  * every open one, because a commit would record an undo entry against play-time values Stop is
  * about to throw away.
@@ -580,7 +582,8 @@ public class EditorToolset(
         name = "editor.undo",
         description = "Undo your newest editor edit. Refused, naming the author, if another " +
             "author has since changed what it wrote; call again with overwrite=true to undo " +
-            "anyway. Only your own history is undone, so send the same session= every call.",
+            "anyway. Only your own history is undone, so send the same session= every call. " +
+            "While playing, an edit made before editor.play waits for editor.stop.",
     )
     public fun undo(
         context: AgentContext,
@@ -593,7 +596,21 @@ public class EditorToolset(
         overwrite: Boolean,
     ): AgentResult = journaled(context) {
         val author = context.command.session
-        when (val edit = history.newest(author)) {
+        val edit = history.newest(author)
+        val running = playing
+        if (edit != null && running != null && running.history.predates(edit)) {
+            // Refused rather than done: an undone delete hands the world the very component objects
+            // the history holds, the running game would change them, and after Stop the history
+            // would hold play-time values for an edit that belongs to the world Stop puts back.
+            // Stop restores the world as it was, this edit included, so nothing is lost by waiting.
+            return@journaled AgentResult.failed(
+                UNDO_BEFORE_PLAY,
+                "refused to undo your ${edit.tool}: it was made before editor.play, and a play " +
+                    "keeps the edits from before it. Call editor.stop first; this edit is still " +
+                    "yours to undo after it.",
+            )
+        }
+        when (edit) {
             null -> AgentResult.failed(
                 NOTHING_TO_UNDO,
                 "${label(author)} has nothing to undo; editor.history lists what an author can undo, " +
@@ -731,8 +748,11 @@ public class EditorToolset(
         play.time.pause()
         forEachOpenEdit(::cancel)
 
-        // 1. The world as it was at Play, from the bytes, through the level load path.
+        // 1. The world as it was at Play, from the bytes, through the level load path. A level
+        // records the id a pre-play delete is holding for its undo as free; take each back, so
+        // that undo still brings the entity back under the same id.
         play.levels.loadNow(level)
+        for (delete in running.history.deletes()) netIds.reclaim(delete.netId)
         playing = null
         // 2. What becomes of the edits made while playing.
         val discarded = afterRestore(running)
@@ -1129,6 +1149,9 @@ public class EditorToolset(
 
         /** `editor.play` or `editor.stop` in an editor given no [EditorPlay]. */
         internal val NO_PLAY: AgentErrorKind = AgentErrorKind("no_play")
+
+        /** `editor.undo` of an edit made before the play under way. */
+        internal val UNDO_BEFORE_PLAY: AgentErrorKind = AgentErrorKind("undo_before_play")
 
         /** `editor.stop` with no play under way. */
         internal val NOT_PLAYING: AgentErrorKind = AgentErrorKind("not_playing")

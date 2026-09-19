@@ -59,6 +59,14 @@ public interface TimeTravel {
     public fun restoreNearestAtOrBefore(target: Tick): RestoreOutcome
 
     /**
+     * Forgets every snapshot newer than [tick], because the world has just been put back to it by
+     * something other than a rewind - a level load (`LevelService`). Those snapshots record a future
+     * that no longer happens: kept, a rewind could land in it, and the next capture, older than the
+     * newest held, would be refused.
+     */
+    public fun forgetAfter(tick: Tick)
+
+    /**
      * Whether the asset graph changed between [since] and now.
      *
      * An agent that rewinds past a hot-reload is looking at a world whose blueprints have

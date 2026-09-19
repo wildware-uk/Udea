@@ -170,6 +170,78 @@ class MobaEditorPlayTest {
         }
     }
 
+    /**
+     * Review round 1's repro: delete, Play, undo, ticks, Stop, undo. An undone delete hands the
+     * world the very component objects the history held; had the undo during play been allowed, the
+     * running game would have changed those objects and the unit would come back after Stop with
+     * play-time values.
+     */
+    @Test
+    fun `a delete from before play comes back after stop exactly as it was deleted`() {
+        uiTest { editor.window.content() }.use { ui ->
+            frames(ui)
+            val unit = someUnit()
+            val beforeDelete = worldHash()
+            agent("editor.delete", "id" to "${unit.raw}")
+
+            click(ui, PlaybackTags.PLAY)
+            val duringPlay = run(AgentCommand("editor.undo", emptyMap(), session = wiring.sessions.intern(MobaEditor.AUTHOR)))
+            frames(ui, FIGHT_FRAMES)
+            click(ui, PlaybackTags.STOP)
+            agent("editor.undo")
+
+            assertEquals(beforeDelete, worldHash(), "the unit deleted before Play came back after Stop with values it did not have")
+            val refused = assertIs<AgentResult.Failed>(duringPlay, "an undo of an edit from before Play ran while playing")
+            assertEquals("undo_before_play", refused.error.kind.id)
+        }
+    }
+
+    /**
+     * Review round 1: Stop moves the clock back past everything the snapshot ring captured during
+     * play. A step after it must not be refused by the ring for being older than its newest frame,
+     * and the ring must no longer offer a frame from the play Stop threw away.
+     */
+    @Test
+    fun `steps after stopping a long play run, and the ring holds nothing newer than the tick stop returned to`() {
+        uiTest { editor.window.content() }.use { ui ->
+            frames(ui)
+            val start = host.ctx.clock.tick
+            click(ui, PlaybackTags.PLAY)
+            frames(ui, FIGHT_FRAMES)
+            click(ui, PlaybackTags.STOP)
+
+            repeat(3) { click(ui, PlaybackTags.STEP) }
+
+            assertEquals(start + 3, host.ctx.clock.tick, "three Steps after Stop")
+            val newest = host.time.listSnapshots().maxOfOrNull { it.tick }
+            assertTrue(newest == null || newest <= start + 3, "the ring still holds $newest, from the play Stop discarded")
+        }
+    }
+
+    /**
+     * Review round 1: play, stop, play again, rewind. The second play must capture its own frames,
+     * so a rewind lands in the second play's world and not in a frame the first play left behind.
+     */
+    @Test
+    fun `a rewind during a second play lands in that play and not in the one before it`() {
+        uiTest { editor.window.content() }.use { ui ->
+            frames(ui)
+            click(ui, PlaybackTags.PLAY)
+            frames(ui, FIGHT_FRAMES)
+            click(ui, PlaybackTags.STOP)
+
+            click(ui, PlaybackTags.PLAY)
+            // A different second play: the player walks, so the two plays' worlds part at once.
+            agent("editor.set_field", "id" to "${session.player.raw}", "component" to "Position", "field" to "x", "value" to "123")
+            agent("time.step", "ticks" to "$SECOND_PLAY_TICKS")
+            val mark = worldHash()
+            agent("time.step", "ticks" to "$REWIND_TICKS")
+            agent("time.rewind", "ticks" to "$REWIND_TICKS")
+
+            assertEquals(mark, worldHash(), "the rewind landed in a world other than this play's")
+        }
+    }
+
     /** Clicks [tag] and pumps until the click's call has run and been answered. */
     private fun click(ui: UiTest, tag: String) {
         assertTrue(ui.click(tag), "$tag took no click:\n${ui.dump()}")
@@ -211,10 +283,27 @@ class MobaEditorPlayTest {
         return assertIs<AgentResult.Ok>(answer, "$tool failed: $answer").json
     }
 
+    /**
+     * Submits [command] and pumps until it has completed. More than one pump only for the tools that
+     * answer after the tick (`time.step`, `time.rewind`), and never more than [MAX_PUMPS].
+     */
     private fun run(command: AgentCommand): AgentResult {
         wiring.bridge.submit(command)
-        session.loop.pump(1f / 60f)
+        var pumps = 0
+        while (wiring.bridge.completedCommandId() < command.id) {
+            check(pumps++ < MAX_PUMPS) { "${command.name} did not complete in $MAX_PUMPS frames" }
+            session.loop.pump(1f / 60f)
+        }
         return wiring.bridge.commandResults().single { it.id == command.id }.result
+    }
+
+    /** A live unit that is not the player, so deleting it leaves the match and the HUD alone. */
+    private fun someUnit(): NetId {
+        var found: NetId? = null
+        host.ctx[CoreModule.NET_IDS].forEachLive { id, entity ->
+            if (found == null && id != session.player && with(host.world) { entity.getOrNull(Position) } != null) found = id
+        }
+        return checkNotNull(found) { "the level has no unit but the player" }
     }
 
     private fun positionOrNull(id: NetId): Position? {
@@ -231,5 +320,14 @@ class MobaEditorPlayTest {
 
         /** A little play: enough for the world to have moved on. */
         const val PLAY_FRAMES = 60
+
+        /** How far the second play of the rewind test runs before its mark. */
+        const val SECOND_PLAY_TICKS = 150
+
+        /** How far past the mark it runs, and rewinds. */
+        const val REWIND_TICKS = 60
+
+        /** Frames [run] waits for a command before calling the wiring broken. */
+        const val MAX_PUMPS = 10
     }
 }

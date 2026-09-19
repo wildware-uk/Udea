@@ -35,8 +35,9 @@ internal actual fun openBox2D(settings: Physics2DSettings, tickRate: Int): Solve
  * after every step the solver's result is copied back into that same `PhysicsBody` - position,
  * angle, velocities and whether it is awake - so the rest of the game reads plain floats and
  * never a Box2D type. The copy happens inside [stepOneTick], once per tick, and it is the only
- * write in that direction. The other direction has exactly two doors: [reconcile], which builds
- * bodies from components before the step, and [teleport].
+ * write in that direction. The doors in the other direction are [reconcile], which builds bodies
+ * from components before the step, [teleport], and [moveKinematicTo], which sets the velocity that
+ * carries a kinematic body to a target pose in one step.
  *
  * ## Determinism
  *
@@ -95,6 +96,7 @@ internal class Box2DPhysicsWorld(
     private val vecA = allocate(B2Vec2.b2Vec2())
     private val vecB = allocate(B2Vec2.b2Vec2())
     private val rot = allocate(B2Rot.b2Rot())
+    private val transform = allocate(B2Transform.b2Transform())
     private val bodyDef = allocate(B2BodyDef.b2BodyDef())
     private val shapeDef = allocate(B2ShapeDef.b2ShapeDef())
     private val polygon = allocate(B2Polygon.b2Polygon())
@@ -473,6 +475,18 @@ internal class Box2DPhysicsWorld(
         B2Body.setTransform(body, vec(vecA, pose.x, pose.y), rot)
     }
 
+    override fun moveKinematicTo(handle: BodyHandle, x: Float, y: Float, angle: Float) {
+        val slot = requireSlot(handle)
+        require(kinds[slot] == BodyKind.Kinematic.ordinal) { "$handle is not a kinematic body" }
+        B2RotMath.makeRot(angle, rot)
+        B2Transform.setP(transform, vec(vecA, x, y))
+        B2Transform.setQ(transform, rot)
+        // Box2D's own "reach this transform in this time step": the velocity from the body's
+        // current pose to the target, over one tick, and a wake only if that velocity is above the
+        // sleep threshold - so a kinematic body standing still stays asleep.
+        B2Body.setTargetTransform(bodyIds[slot], transform, tickSeconds)
+    }
+
     override fun setAwake(handle: BodyHandle, awake: Boolean) {
         B2Body.setAwake(bodyIds[requireSlot(handle)], awake)
     }
@@ -574,6 +588,7 @@ internal class Box2DPhysicsWorld(
         free(vecA, B2Vec2::destroy)
         free(vecB, B2Vec2::destroy)
         free(rot, B2Rot::destroy)
+        free(transform, B2Transform::destroy)
         free(bodyDef, B2BodyDef::destroy)
         free(shapeDef, B2ShapeDef::destroy)
         free(polygon, B2Polygon::destroy)

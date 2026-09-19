@@ -1,11 +1,15 @@
-6019569
+312bd31
 
 # BRIEF-192: boot moba from a saved level file, and ban loops in asset scripts
 
 Branch `issue-192-binary-test-level-kmp`, worktree
 `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a359f0d7330f3ae2d`. It branched from
-`origin/kmp` at `407123a` and has `origin/kmp` `322dde9` (#213, the old tree deleted) merged in
-at `6019569`. The SHA above is that merge, the last code commit. This brief is committed on top of
+`origin/kmp` at `407123a`. `origin/kmp` is merged in twice:
+- `322dde9` (#213, the old tree deleted) at `6019569`;
+- `7d73496` (#228, named keys) at `312bd31`, with the replay fixtures regenerated inside that
+  merge.
+
+The SHA above is the second merge, the last code commit. This brief is committed on top of
 it and changes no code.
 
 Scratch artefacts quoted below are in
@@ -38,25 +42,25 @@ What each part holds:
 - `LoopInAssetTest` and `AssetDaemonTest` cover the loop rule, in the build and in the live
   editor path. This is AC2's rule.
 
-**Green on the merged state `6019569`**, from `$S/evidence-merged.log` and the JUnit XML it left
+**Green on the merged state `312bd31`**, from `$S/evidence-merged-228.log` and the JUnit XML it left
 (the timestamps show the tests ran in this invocation):
 
 ```
 BUILD SUCCESSFUL in 15s
 ```
 ```
-<testsuite name="dev.wildware.udea.core.level.LevelSceneTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:18:10.001Z"
-<testsuite name="dev.wildware.moba.level.TestLevelRosterTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:18:10.673Z"
-<testsuite name="dev.wildware.moba.level.MobaLevelLaunchTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:18:10.175Z"
-<testsuite name="dev.wildware.udea.assets.compiler.scan.LoopInAssetTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:18:15.637Z"
-<testsuite name="dev.wildware.udea.assets.compiler.daemon.AssetDaemonTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:18:07.517Z"
+<testsuite name="dev.wildware.udea.core.level.LevelSceneTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:27:13.003Z"
+<testsuite name="dev.wildware.moba.level.TestLevelRosterTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:27:13.521Z"
+<testsuite name="dev.wildware.moba.level.MobaLevelLaunchTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:27:13.075Z"
+<testsuite name="dev.wildware.udea.assets.compiler.scan.LoopInAssetTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:27:21.085Z"
+<testsuite name="dev.wildware.udea.assets.compiler.daemon.AssetDaemonTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:27:12.985Z"
 ```
 
 **Red when the feature is reverted.** I ran each mutation below against this command before the
 merge, and restored it afterwards. Each diff is the literal `git diff` I saved at the time, and
 the failing tests are spliced from that run's log. The `index` line of each diff names the
 mutated file's starting blob. Each of those blobs is the same at `a0a9c1b`, `adee707` and
-`6019569`, so every mutation applies unchanged to the SHA above.
+`312bd31`, so every mutation applies unchanged to the SHA above.
 
 **mut1: boot no longer loads the level** (`$S/mut1.diff`, `$S/mut1.log`)
 ```diff
@@ -231,9 +235,14 @@ I looked for any other asset script with a loop in it. The search covered the te
 The same file's blob (`5681886`) is at `moba/levels/` in `5e53e31` and at `moba/game/levels/`
 here, which is the byte-identity claim above.
 
-**Merge.** The merge had one textual conflict: a comment in the compiler fixture
-`test_level.udea.kts` that named the corpus path #213 moved. I resolved it to the new
-`example-assets/` path.
+**Merges.**
+- The #213 merge had one textual conflict: a comment in the compiler fixture
+  `test_level.udea.kts` that named the corpus path #213 moved. I resolved it to the new
+  `example-assets/` path.
+- The #228 merge had three conflicts.
+  - An import block in `MigratedCorpusBundleTest`. I kept #228's `InputKey` and dropped `Level`,
+    which this branch no longer uses.
+  - The two replay fixtures. I regenerated them rather than merging them (section 6).
 
 `example-assets/level/test_level.udea.kts` still has three `repeat` loops. That tree is the
 retired game's corpus: `ExampleScanTest` reads it, and its golden records declarations, not
@@ -241,21 +250,22 @@ diagnostics. It is not a moba asset, so it is outside AC3, and I left it as hist
 
 ## 3. `sh gradlew build`
 
-Run alone on the box, on the merged state `6019569`: `sh gradlew build --continue`, with no `-x`.
-Spliced from `$S/build-merged.log`:
+Run alone on the box, on the merged state `312bd31`: `sh gradlew build --continue`, with no `-x`.
+Spliced from `$S/build-merged-228.log`:
 
 ```
-BUILD SUCCESSFUL in 3m 2s
-915 actionable tasks: 739 executed, 90 from cache, 86 up-to-date
+BUILD SUCCESSFUL in 1m 44s
+917 actionable tasks: 166 executed, 2 from cache, 749 up-to-date
 Configuration cache entry stored.
 ```
 
-915 tasks is the lead's stated baseline for `origin/kmp` `322dde9`, and the build is green.
+The same build on the #213-only merge `6019569` was also green: 915 tasks, the lead's stated
+baseline for `322dde9` (`$S/build-merged.log`). The count moved to 917 with the #228 merge.
 
 The build before this one (`$S/build-full.log`, at `adee707`, before the merge) failed only
 `:udea-agent:udeaAssetTools`. That was the `AssetsToolsetTest` case in section 2.
 
-**GL, run for real** (`$S/gl-merged.log`). The branch touches no `udea-render` code, but the level
+**GL, run for real**, on `312bd31` (`$S/gl-merged-228.log`). The branch touches no `udea-render` code, but the level
 shots open a Kool context, so I ran the GL suites under xvfb:
 
 ```
@@ -265,24 +275,25 @@ xvfb-run -a -s "-screen 0 1280x720x24" env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVE
 ```
 > Task :udea-agent-host:udeaAgentGlTest
 > Task :udea-render:udeaGlTest
-BUILD SUCCESSFUL in 1m 12s
+BUILD SUCCESSFUL in 58s
 ```
 The JUnit XML shows every GL suite ran, and none was skipped:
 ```
-<testsuite name="dev.wildware.udea.render.gl.GlCaptureDeterminismTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:18:39.661Z"
-<testsuite name="dev.wildware.udea.render.gl.GlCaptureTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:18:42.585Z"
-<testsuite name="dev.wildware.udea.render.gl.GlKoolInputTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:18:47.860Z"
-<testsuite name="dev.wildware.udea.render.gl.GlKoolPointerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:19:01.508Z"
-<testsuite name="dev.wildware.udea.render.gl.GlModelRenderTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:19:08.992Z"
-<testsuite name="dev.wildware.udea.render.gl.GlOverlayIsolationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:19:17.740Z"
-<testsuite name="dev.wildware.udea.render.gl.GlUiLayerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:19:25.808Z"
-<testsuite name="dev.wildware.udea.render.gl.KoolThreadShutdownTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:19:30.718Z"
-<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendExplodingCaptureTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:19:33.855Z"
-<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendSecondCreateTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:19:36.563Z"
-<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendShutdownTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:19:38.027Z"
-<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:19:40.507Z"
-<testsuite name="dev.wildware.udea.agent.host.gl.OffscreenRenderToolsTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:18:39.346Z"
-<testsuite name="dev.wildware.udea.agent.host.gl.OverlayCaptureIsolationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:18:44.339Z"
+<testsuite name="dev.wildware.udea.render.gl.GlCaptureDeterminismTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:27:36.714Z"
+<testsuite name="dev.wildware.udea.render.gl.GlCaptureTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:27:39.588Z"
+<testsuite name="dev.wildware.udea.render.gl.GlKoolInputTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:27:45.564Z"
+<testsuite name="dev.wildware.udea.render.gl.GlKoolKeyTableTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:27:53.927Z"
+<testsuite name="dev.wildware.udea.render.gl.GlKoolPointerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:28:01.688Z"
+<testsuite name="dev.wildware.udea.render.gl.GlModelRenderTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:28:06.019Z"
+<testsuite name="dev.wildware.udea.render.gl.GlOverlayIsolationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:28:10.180Z"
+<testsuite name="dev.wildware.udea.render.gl.GlUiLayerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:28:14.444Z"
+<testsuite name="dev.wildware.udea.render.gl.KoolThreadShutdownTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:28:16.677Z"
+<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendExplodingCaptureTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:28:18.610Z"
+<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendSecondCreateTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:28:20.740Z"
+<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendShutdownTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:28:21.905Z"
+<testsuite name="dev.wildware.udea.render.gl.OffscreenBackendTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:28:23.876Z"
+<testsuite name="dev.wildware.udea.agent.host.gl.OffscreenRenderToolsTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:27:35.943Z"
+<testsuite name="dev.wildware.udea.agent.host.gl.OverlayCaptureIsolationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-19T02:27:40.717Z"
 ```
 
 ## 4. Images
@@ -299,7 +310,8 @@ All four are in `/srv/ssd1/workspace/Udea/build/debug-screenshots/` and on the d
   The log is `$S/shot-before.log`.
 - `issue192-after-udealevel-boot.png`: the same shot, booted from `test_level.udealevel`. `cmp`
   says it is **byte-identical** to the "before" picture. I retook it on the merged state and it is
-  still identical (`$S/shot-boot-merged.log`: "booted the bundled test level: 27 units at tick 1").
+  still identical on `312bd31` (`$S/shot-boot-merged-228.log`: "booted the bundled test level: 27 units
+  at tick 1").
 - `issue192-before-after-boot.png`: the two, side by side.
 - `issue192-plevel-midfight-level-boot.png`: `runLevelShotBoot -Plevel=.../match.udealevel`, a
   level saved mid-fight at tick 420, booted through `-Plevel`. It shows the fight, not the
@@ -320,7 +332,8 @@ All four are in `/srv/ssd1/workspace/Udea/build/debug-screenshots/` and on the d
 
 **AC2: adding `repeat(2) { }` to any asset fails the build with the new rule id, pointing at that
 line.** I appended `repeat(2) { }` as line 16 of `moba/game/assets/config.udea.kts` and ran
-`sh gradlew :moba:game:assemble`. Spliced from `$S/ac2-red.log`:
+`sh gradlew :moba:game:assemble`, before the merges. The merges did not change the scanner, and
+`LoopInAssetTest` is green on `312bd31`. Spliced from `$S/ac2-red.log`:
 
 ```
 > Task :moba:game:udeaScanAssets FAILED
@@ -376,31 +389,60 @@ Not exercised:
 ## 6. Regenerated files
 
 - **`moba/desktop/src/test/resources/fixtures/moba-3600.udearep` and `moba-36000.udearep`**,
-  regenerated with `:moba:desktop:udeaWriteReplayFixture` (`$S/regen-fixtures.log`). The starting
-  point was `origin/kmp` `407123a`, whose fixture header has asset graph hash `064c663e...`. The
-  regenerated header has `86976f01...`, because `level/test_level` and `gameConfig.defaultLevel`
-  left the bundle. The two headers agree on `protoHash`, the input schema hash and the seed.
-  `MobaReplayEqualityTest` refuses a fixture whose asset graph hash differs from the bundle's. It runs
-  in `:moba:desktop:test`, which is in the green build on the merged state, so #213 did not move
-  the hash again.
-  This is not a re-baseline. The comparison of old and new, from `$S/fixture-compare.txt`:
+  regenerated with `:moba:desktop:udeaWriteReplayFixture`. This happened twice: once on the branch
+  (`$S/regen-fixtures.log`), and again inside the #228 merge (`$S/regen-fixtures-228.log`). For
+  the second, I took #228's files only as a placeholder in the conflict and then overwrote them.
+  Nothing was text-merged.
+
+  **Starting hashes.** Each fixture header carries an asset graph hash:
+
+  | Fixture set | Asset graph hash |
+  |---|---|
+  | `origin/kmp` `407123a`, where the branch started | `064c663e...` |
+  | #228's regeneration, on `origin/kmp` `7d73496` | `7bf327c4...` |
+  | Regenerated here, at `312bd31` | `d240e7a5...` |
+
+  The hash moves here because `level/test_level` and `gameConfig.defaultLevel` left the bundle.
+  `MobaReplayEqualityTest` refuses a fixture whose asset graph hash differs from the bundle's. It
+  runs in `:moba:desktop:test`, in the green build.
+
+  **This is not a re-baseline.** I compared against both earlier sets, and the two comparisons
+  come out the same.
+
+  Against #228's fixtures (`$S/fixture-compare-228.txt`):
   ```
 fixture moba-3600
-  asset graph hash: base 064c663e186e52c8..., branch 86976f010f259e07...
+  asset graph hash: base 7bf327c4dfc0c6fd..., branch d240e7a584c3492c...
   firstTick base=1 branch=1, ticks base=3600 branch=3600, peers 1/1
   input frames identical: True (30599 bytes)
   per-tick world hashes equal for the first 2081 ticks; first differing index 2081 = tick t2082
   ticks whose hash differs: 1519 of 3600
 fixture moba-36000
-  asset graph hash: base 064c663e186e52c8..., branch 86976f010f259e07...
+  asset graph hash: base 7bf327c4dfc0c6fd..., branch d240e7a584c3492c...
+  firstTick base=1 branch=1, ticks base=36000 branch=36000, peers 1/1
+  input frames identical: True (302728 bytes)
+  per-tick world hashes equal for the first 2081 ticks; first differing index 2081 = tick t2082
+  ticks whose hash differs: 33919 of 36000
+  ```
+  Against `407123a`'s fixtures (`$S/fixture-compare-407-vs-merged.txt`):
+  ```
+fixture moba-3600
+  asset graph hash: base 064c663e186e52c8..., branch d240e7a584c3492c...
+  firstTick base=1 branch=1, ticks base=3600 branch=3600, peers 1/1
+  input frames identical: True (30599 bytes)
+  per-tick world hashes equal for the first 2081 ticks; first differing index 2081 = tick t2082
+  ticks whose hash differs: 1519 of 3600
+fixture moba-36000
+  asset graph hash: base 064c663e186e52c8..., branch d240e7a584c3492c...
   firstTick base=1 branch=1, ticks base=36000 branch=36000, peers 1/1
   input frames identical: True (302728 bytes)
   per-tick world hashes equal for the first 2081 ticks; first differing index 2081 = tick t2082
   ticks whose hash differs: 33919 of 36000
   ```
   The recorded inputs are identical, and the first 2081 recorded hashes are equal, which covers
-  all of match one. A replay probe (`$S/probe.log`, run against the regenerated fixture, so its
-  `hashMatchesRecording` says nothing about the old one) shows where match one ends:
+  all of match one. A replay probe (`$S/probe.log`, run before the merges against that day's
+  regenerated fixture, so its `hashMatchesRecording` says nothing about the old one) shows where
+  match one ends:
   ```
     ISSUE192 end of t2081 match=1 phase=Ended hashMatchesRecording=true
     ISSUE192 end of t2082 match=1 phase=Restarting hashMatchesRecording=true
@@ -411,10 +453,7 @@ fixture moba-36000
   I did not work out whether those two labels are off by one against each other. Either way,
   the conclusion stands: nothing before the restart moved. That is the restart decision in
   section 2. Match two onward starts from the saved layout rather than a fresh scatter, so every
-  later tick differs.
-
-  If #228 lands first, its fixtures conflict with these. The fix is to regenerate, not to merge
-  the text.
+  later tick differs. #228 did not change any of that. It moved only the asset hash.
 - **`net-protocol.lock` did not move.** No replicated component changed. `udeaCheckProtocolLock`
   runs in the green build.
 - **`expected-generated-hashes.txt` did not move.**

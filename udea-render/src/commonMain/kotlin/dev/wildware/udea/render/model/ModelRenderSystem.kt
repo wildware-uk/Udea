@@ -8,7 +8,6 @@ import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.identity.NetId
-import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.core.spatial.Transform3D
@@ -18,6 +17,8 @@ import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.interp.Pose
 import dev.wildware.udea.render.interp.PoseSource
+import dev.wildware.udea.render.view.PickBounds
+import dev.wildware.udea.render.view.PickSink
 import dev.wildware.udea.render.view.WorldViewport
 
 /**
@@ -54,6 +55,11 @@ import dev.wildware.udea.render.view.WorldViewport
  * batch, full frame, at this system's place in the phase order. So a background drawn before it
  * shows behind the models, sprites drawn after it are on top, and a capture holds all of it.
  *
+ * ## Pickable
+ *
+ * It reports each model's world box to an editor ([PickBounds], issue #235), placed by the same
+ * transform it is drawn with: see [ModelBounds] for what the box covers.
+ *
  * @param lift where an entity with no `Transform3D` stands, or `null` to draw only entities that
  *   have one.
  * @throws IllegalStateException from the constructor if [resources] has no Kool scene behind it -
@@ -64,7 +70,7 @@ public class ModelRenderSystem(
     private val camera: ModelCamera,
     private val light: ModelLight,
     private val lift: PoseSource? = null,
-) : RenderSystem {
+) : RenderSystem, PickBounds {
 
     private val stage: ModelStage = resources.own(
         ModelStage(
@@ -84,12 +90,21 @@ public class ModelRenderSystem(
     /** Reused: each entity's clips this frame, one for the whole frame. */
     private val clips = ClipPose()
 
+    /** Reused: where the entity being drawn or reported stands. */
+    private val placed = Placement()
+
+    /** Each model's world box, for [reportPickBounds]. */
+    private val bounds = ModelBounds()
+
+    /** The alpha the most recent frame drew at: where [reportPickBounds] places each model. */
+    private var lastAlpha = 0f
+
     /** Models drawn by the most recent frame. What `GlModelRenderTest` counts. */
     internal var drawnCount: Int = 0
         private set
 
     override fun onBind(world: World, ctx: GameContext) {
-        bound = Bound(world, world.family { all(ModelRenderer) }, ctx.clock, ctx[CoreModule.NET_IDS])
+        bound = Bound(world, ctx, world.family { all(ModelRenderer) }, ctx.clock)
     }
 
     /**
@@ -106,7 +121,7 @@ public class ModelRenderSystem(
      */
     public fun skeletonOf(entity: NetId, view: WorldViewport?, out: ModelSkeleton): Boolean {
         val bound = this.bound
-        val live = bound?.netIds?.resolveOrNull(entity)
+        val live = bound?.ctx?.get(CoreModule.NET_IDS)?.resolveOrNull(entity)
         if (live == null) {
             out.clear()
             return false
@@ -123,6 +138,7 @@ public class ModelRenderSystem(
             stage.imageFor(view, camera, previewedEntity(bound, view))
         } else {
             drawnCount = 0
+            lastAlpha = alpha
             stage.fit(target.width, target.height)
             stage.begin(camera, light)
             val now = bound.clock.tick
@@ -144,35 +160,92 @@ public class ModelRenderSystem(
     /** The Fleks id of the entity [view]'s scrub preview is of, or -1 for none (issue #243). */
     private fun previewedEntity(bound: Bound, view: WorldViewport): Int {
         val preview = view.modelPreview as? ModelPreview.Pose ?: return NO_PREVIEW
-        return bound.netIds.resolveOrNull(preview.entity)?.id ?: NO_PREVIEW
+        return bound.ctx[CoreModule.NET_IDS].resolveOrNull(preview.entity)?.id ?: NO_PREVIEW
     }
 
     private fun World.draw(entity: Entity, now: Tick, alpha: Float) {
-        val model = entity[ModelRenderer].model
-        val transform = entity.getOrNull(Transform3D)
-        if (transform != null) {
-            stage.add(
-                model,
-                transform.x, transform.y, transform.z,
-                transform.rotationX, transform.rotationY, transform.rotationZ,
-                transform.scaleX, transform.scaleY, transform.scaleZ,
-                clips.set(entity.getOrNull(Animator), now, alpha),
-                entity.id,
-            )
-        } else {
-            val lift = lift ?: return
-            if (!lift.poseOf(this, entity, alpha, pose)) return
-            stage.add(
-                model, pose.x, pose.y, 0f, 0f, 0f, pose.angle, 1f, 1f, 1f,
-                clips.set(entity.getOrNull(Animator), now, alpha),
-                entity.id,
-            )
-        }
+        if (!place(entity, alpha)) return
+        val at = placed
+        stage.add(
+            entity[ModelRenderer].model,
+            at.x, at.y, at.z, at.rotationX, at.rotationY, at.rotationZ, at.scaleX, at.scaleY, at.scaleZ,
+            clips.set(entity.getOrNull(Animator), now, alpha),
+            entity.id,
+        )
         drawnCount++
     }
 
+    /** Each model's world box, as it was placed by the most recent frame. */
+    override fun reportPickBounds(out: PickSink) {
+        val bound = this.bound ?: return
+        // Resolved here rather than at bind: a pipeline built for an ordering test binds a context
+        // with no core module, and never picks.
+        val netIds = bound.ctx[CoreModule.NET_IDS]
+        with(bound.world) {
+            bound.models.forEach { entity ->
+                val id = netIds.netIdOf(entity)
+                if (!id.isNone && place(entity, lastAlpha)) {
+                    val at = placed
+                    bounds.report(
+                        id, entity[ModelRenderer].model,
+                        at.x, at.y, at.z, at.rotationX, at.rotationY, at.rotationZ, at.scaleX, at.scaleY, at.scaleZ,
+                        out,
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Writes where [entity] stands into [placed]: its `Transform3D`, or its [lift]ed 2D pose on the
+     * ground plane at scale 1. False when it has neither, and is not drawn.
+     */
+    private fun World.place(entity: Entity, alpha: Float): Boolean {
+        val transform = entity.getOrNull(Transform3D)
+        if (transform != null) {
+            placed.set(
+                transform.x, transform.y, transform.z,
+                transform.rotationX, transform.rotationY, transform.rotationZ,
+                transform.scaleX, transform.scaleY, transform.scaleZ,
+            )
+            return true
+        }
+        val lift = lift ?: return false
+        if (!lift.poseOf(this, entity, alpha, pose)) return false
+        placed.set(pose.x, pose.y, 0f, 0f, 0f, pose.angle, 1f, 1f, 1f)
+        return true
+    }
+
+    /** Where one model stands: a `Transform3D`'s nine numbers. Reused, like [Pose]. */
+    private class Placement {
+        var x = 0f
+        var y = 0f
+        var z = 0f
+        var rotationX = 0f
+        var rotationY = 0f
+        var rotationZ = 0f
+        var scaleX = 1f
+        var scaleY = 1f
+        var scaleZ = 1f
+
+        @Suppress("LongParameterList") // A transform, field for field.
+        fun set(x: Float, y: Float, z: Float, rotationX: Float, rotationY: Float, rotationZ: Float, scaleX: Float, scaleY: Float, scaleZ: Float) {
+            this.x = x
+            this.y = y
+            this.z = z
+            this.rotationX = rotationX
+            this.rotationY = rotationY
+            this.rotationZ = rotationZ
+            this.scaleX = scaleX
+            this.scaleY = scaleY
+            this.scaleZ = scaleZ
+        }
+
+        override fun toString(): String = "Placement($x, $y, $z)"
+    }
+
     /** Everything resolved at bind time. */
-    private class Bound(val world: World, val models: Family, val clock: SimClock, val netIds: NetIdIndex)
+    private class Bound(val world: World, val ctx: GameContext, val models: Family, val clock: SimClock)
 
     private companion object {
         /** No entity is previewed: what `ModelStage.imageFor` matches against no node. */

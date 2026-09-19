@@ -103,6 +103,14 @@ public class WorldViewport internal constructor(
             field = value
         }
 
+    /**
+     * The render systems this view draws that can say where their entities are ([PickBounds]), in
+     * the order the view draws them (issue #235): what the editor picks from. Set by the pipeline
+     * when it opens the view; empty for a Game view, which the editor never picks in.
+     */
+    public var pickBounds: List<PickBounds> = emptyList()
+        internal set
+
     /** Width of the picture, in pixels. */
     public val width: Int get() = target.width
 
@@ -247,9 +255,15 @@ public class WorldViewport internal constructor(
          * A view with no render context behind it: [camera] is fitted to [width] x [height], a
          * pointer maps and a press reaches [gizmos] exactly as on a live view, but no pass draws it,
          * [drawInto] shows nothing and [capture] fails. What an editor window is built on when there
-         * is no GL - its headless tests, and a launcher's own.
+         * is no GL - its headless tests, and a launcher's own. [pickBounds] stands in for the render
+         * systems a live view's pipeline would hand it.
          */
-        public fun detached(camera: EditorCamera?, width: Int, height: Int): WorldViewport {
+        public fun detached(
+            camera: EditorCamera?,
+            width: Int,
+            height: Int,
+            pickBounds: List<PickBounds> = emptyList(),
+        ): WorldViewport {
             val record = SpriteRecord()
             val view = WorldViewport(
                 camera = camera,
@@ -262,6 +276,8 @@ public class WorldViewport internal constructor(
             )
             camera?.fit(width, height)
             view.canvas.prepare(width, height, null)
+            require(camera != null || pickBounds.isEmpty()) { "a Game view is never picked in, so it takes no pick bounds" }
+            view.pickBounds = pickBounds
             return view
         }
     }

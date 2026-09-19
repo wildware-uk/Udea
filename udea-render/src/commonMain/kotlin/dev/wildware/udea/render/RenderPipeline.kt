@@ -4,6 +4,7 @@ import dev.wildware.udea.core.loop.Presentation
 import dev.wildware.udea.render.camera.CameraRig
 import dev.wildware.udea.render.capture.FrameCaptureSlot
 import dev.wildware.udea.render.view.EditorCamera
+import dev.wildware.udea.render.view.PickBounds
 import dev.wildware.udea.render.view.ViewCursor
 import dev.wildware.udea.render.view.WorldViewport
 
@@ -93,6 +94,9 @@ public class RenderPipeline internal constructor(
      * [resizables]: a `filterIsInstance` per frame is a per-frame scan.
      */
     private val rigs: List<CameraRig> = systems.filterIsInstance<CameraRig>()
+
+    /** The systems a Scene view draws that can say where their entities are, in drawing order (issue #235). */
+    private val pickBounds: List<PickBounds> = viewSystems.filterIsInstance<PickBounds>()
 
     private var disposed: Boolean = false
 
@@ -191,6 +195,7 @@ public class RenderPipeline internal constructor(
      */
     internal fun open(view: WorldViewport) {
         check(!disposed) { "RenderPipeline has been disposed and cannot open $view" }
+        if (view.camera != null) view.pickBounds = pickBounds
         viewports += view
         view.onClose { viewports.remove(view) }
     }

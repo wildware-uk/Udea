@@ -17,25 +17,29 @@ import dev.wildware.udea.render.view.ViewPoint
  *
  * A [GizmoLayer], so what it draws goes into the view's own pass and never into a capture: set on
  * the Scene tab it is drawn there, and on the Game tab only while that tab's gizmo toggle is on. It
- * takes no press - a mark has nothing to grab - so a click on one goes on to the camera.
+ * goes over the layer the view already had ([under]): that is drawn first and gets every press, since
+ * a mark has nothing to grab.
  *
  * Handles are not drawn here: drawing them, and dragging them, is the interactive layer's
  * (epic #231, issue #236). Both read the same public [Gizmo] declarations.
  *
  * @param selection the entities to draw for, read once a frame: the editor author's selection.
  * @param gizmos every gizmo on offer; each is drawn for a selected entity that carries its component.
+ * @param under the view's layer before this one - a launcher's handles - or `null`.
  */
 internal class GizmoMarkLayer(
     private val world: World,
     private val netIds: NetIdIndex,
     private val selection: () -> List<NetId>,
     private val gizmos: List<Gizmo<*>>,
+    private val under: GizmoLayer? = null,
 ) : GizmoLayer {
 
     private val from = ViewPoint()
     private val to = ViewPoint()
 
     override fun draw(canvas: GizmoCanvas) {
+        under?.draw(canvas)
         for (id in selection()) {
             val entity = netIds.resolveOrNull(id) ?: continue
             // Every component the entity carries, once: Fleks reads one by a reified type, which a
@@ -95,7 +99,9 @@ internal class GizmoMarkLayer(
         canvas.fill(x - DOT_SIZE / 2f, y - DOT_SIZE / 2f, DOT_SIZE, DOT_SIZE, MARK_COLOUR)
     }
 
-    override fun toString(): String = "GizmoMarkLayer(${gizmos.size} gizmos)"
+    override fun press(canvas: GizmoCanvas, viewX: Float, viewY: Float): Boolean = under?.press(canvas, viewX, viewY) ?: false
+
+    override fun toString(): String = "GizmoMarkLayer(${gizmos.size} gizmos, under=$under)"
 
     internal companion object {
         /** What a mark is drawn in: a warm yellow that no sprite or model in `moba` is. */

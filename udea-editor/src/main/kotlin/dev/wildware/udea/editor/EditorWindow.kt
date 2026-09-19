@@ -23,6 +23,7 @@ import dev.wildware.composegl.ui.modifier.fillMaxWidth
 import dev.wildware.composegl.ui.modifier.height
 import dev.wildware.composegl.ui.modifier.offset
 import dev.wildware.composegl.ui.modifier.onPlaced
+import dev.wildware.composegl.ui.modifier.onShortcutKey
 import dev.wildware.composegl.ui.modifier.onSizeChanged
 import dev.wildware.composegl.ui.modifier.padding
 import dev.wildware.composegl.ui.modifier.size
@@ -48,7 +49,7 @@ import dev.wildware.udea.render.view.ViewDimension
 @Composable
 internal fun EditorWindow(session: EditorSession) {
     PopupHost {
-        Column(Modifier.fillMaxSize().background(Background)) {
+        Column(Modifier.fillMaxSize().background(Background).onShortcutKey(session.keys)) {
             MenuBar(Modifier.fillMaxWidth()) {
                 Menu("&File") {
                     Item("&Save", shortcut = KeyShortcut(Key.S, Modifiers(Modifiers.CONTROL))) { session.assets.save() }
@@ -78,6 +79,7 @@ private fun Panels(session: EditorSession) {
         windows.dockToScreen(EditorTags.CREATE_PANEL, DockSide.Left)
         windows.dockToScreen(EditorTags.HISTORY_PANEL, DockSide.Right)
         windows.dockToScreen(EditorTags.ASSET_PANEL, DockSide.Right)
+        windows.dockWith(InspectorTags.PANEL, EditorTags.HISTORY_PANEL, DockSide.Bottom)
         if (session.animation != null) windows.dockToScreen(EditorTags.ANIMATION_PANEL, DockSide.Left)
     }
     val area = remember { ViewArea() }
@@ -90,6 +92,9 @@ private fun Panels(session: EditorSession) {
         }
         DebugWindow("Create", id = EditorTags.CREATE_PANEL, modifier = Modifier.onPlaced(area.pane(EditorTags.CREATE_PANEL))) {
             Button(session.spawnLabel, onClick = { session.spawn() }, modifier = Modifier.fillMaxWidth().testTag(EditorTags.SPAWN))
+        }
+        DebugWindow("Inspector", id = InspectorTags.PANEL, modifier = Modifier.onPlaced(area.pane(InspectorTags.PANEL))) {
+            InspectorPanel(session.inspector)
         }
         DebugWindow("Asset", id = EditorTags.ASSET_PANEL, modifier = Modifier.onPlaced(area.pane(EditorTags.ASSET_PANEL))) {
             AssetPanel(session.assets)

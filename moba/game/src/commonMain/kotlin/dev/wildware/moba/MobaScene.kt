@@ -15,6 +15,8 @@ import dev.wildware.udea.gas.Abilities
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.core.identity.NetIdIndex
+import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.moba.lane.LaneRenderSystem
@@ -30,6 +32,8 @@ import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteBatch2D
 import dev.wildware.udea.render.draw.SpriteRegion
 import dev.wildware.udea.render.ui.UiFonts
+import dev.wildware.udea.render.view.PickBounds
+import dev.wildware.udea.render.view.PickSink
 
 /**
  * What `moba` draws, and the control surface an agent steers it through.
@@ -294,11 +298,16 @@ public class MobaScene private constructor(
  * **paused** world and `render.compare_artifacts` measures the difference between two captures,
  * so a wall-timed playhead would make two screenshots of an identical, paused, unmutated world
  * differ by however long the agent spent thinking. `ctx.clock` is read, never written.
+ *
+ * ## A unit is picked where it was drawn
+ *
+ * It implements [PickBounds], as any game's render system can, so a click on a unit in the editor's
+ * Scene tab selects it (issue #235): each unit's body, as the last frame drew it. See [DrawnUnits].
  */
 internal class CharacterRenderSystem(
     private val resources: RenderResources,
     private val camera: CameraRig,
-) : RenderSystem {
+) : RenderSystem, PickBounds {
 
     private var world: World? = null
 
@@ -306,6 +315,15 @@ internal class CharacterRenderSystem(
 
     /** Read in [render] for the frame index. Never written. See the class KDoc. */
     private var clock: SimClock? = null
+
+    /**
+     * Names each unit drawn, for [drawn]. `null` in a context with no core module - a shot or a test
+     * that binds its own - which draws exactly the same and has no editor to pick in.
+     */
+    private var netIds: NetIdIndex? = null
+
+    /** Where the last frame drew each unit, for [reportPickBounds]. */
+    private val drawn = DrawnUnits()
 
     /** The live graph. The values behind the slots below are read fresh every frame. */
     private val registry = MobaAssets.registry
@@ -369,6 +387,7 @@ internal class CharacterRenderSystem(
     override fun onBind(world: World, ctx: GameContext) {
         this.world = world
         this.clock = ctx.clock
+        netIds = ctx.getOrNull(CoreModule.NET_IDS)
         units = world.family { all(Position, CharacterView) }
     }
 
@@ -378,6 +397,7 @@ internal class CharacterRenderSystem(
         val clock = this.clock ?: return
         drawnCount = 0
         specialCount = 0
+        drawn.begin()
         val now = clock.tick.value
         val tickRate = clock.tickRate
         val batch = resources.batch
@@ -460,8 +480,14 @@ internal class CharacterRenderSystem(
         if (player) {
             markers.chevron(batch, position.x, position.y + CHEVRON_TIP_Y, CHEVRON_WIDTH, PLAYER_COLOUR, PLAYER_ALPHA)
         }
+        netIds?.let { drawn.add(it.netIdOf(entity), position.x, position.y, height) }
         drawnCount++
         if (special != null) specialCount++
+    }
+
+    /** Each unit's body as the last frame drew it, back to front. */
+    override fun reportPickBounds(out: PickSink) {
+        drawn.report(out)
     }
 
     /** The footprint under one unit, and the ring instead of it when the unit is the player. */

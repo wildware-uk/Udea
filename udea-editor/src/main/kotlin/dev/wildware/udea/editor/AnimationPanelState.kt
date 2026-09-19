@@ -38,12 +38,14 @@ import kotlinx.serialization.json.jsonPrimitive
  *   preview is the same wherever it runs.
  * - **The bone overlay is a gizmo.** The panel puts a [GizmoMarkLayer] with the [BoneOverlayGizmo]
  *   on the Scene tab, so the selection's skeleton is drawn there, in the preview's pose while one is
- *   on. It replaces whatever layer the Scene view had. Not on the Game tab: a gizmo there is placed
+ *   on. It goes over whatever layer the Scene view had, which it draws and passes every press to.
+ *   Not on the Game tab: a gizmo there is placed
  *   through the game's 2D camera (`GizmoCanvas`), and a model is drawn through its own 3D one, so
  *   the joints would be drawn somewhere the model is not.
  *
- * The selection is `editor.selection`'s for the editor's author ([EditorSelection]): the panel
- * follows whatever selected the entity - a click, or an agent's `editor.select`.
+ * The selection is the session's ([EditorSelection], issue #235), the editor author's as the tool
+ * surface holds it: the panel follows whatever selected the entity - a click in the Scene tab, or an
+ * agent's `editor.select`. The session redraws the Scene tab when it changes.
  *
  * Selecting a model in the panel's model list previews that model on its own, turning at the Scene
  * tab's centre ([ModelPreview.Asset]), with its clips.
@@ -52,14 +54,11 @@ internal class AnimationPanelState(
     private val animation: EditorAnimation,
     private val tools: EditorTools,
     private val views: EditorViews,
+    /** The editor author's selection; the session keeps it current. */
+    private val selection: EditorSelection,
     /** Says the Scene tab's picture has changed without the world changing: a preview moved. */
     private val sceneChanged: () -> Unit,
 ) {
-
-    private val selection = EditorSelection(tools)
-
-    /** The selection the Scene tab last drew the bone overlay for. */
-    private var drawnSelection: List<NetId> = emptyList()
 
     /** The selected entity the panel shows: the first one drawn with an animated model. */
     var target: NetId? by mutableStateOf(null)
@@ -106,19 +105,14 @@ internal class AnimationPanelState(
         val renderer = animation.renderer
         if (renderer != null) {
             val bones = BoneOverlayGizmo(modelSkeletons(renderer, views.scene))
-            views.scene.gizmos = GizmoMarkLayer(animation.world, animation.netIds, selection = { selection.ids }, gizmos = listOf(bones))
+            views.scene.gizmos = GizmoMarkLayer(
+                animation.world, animation.netIds, selection = { selection.ids }, gizmos = listOf(bones), under = views.scene.gizmos,
+            )
         }
     }
 
-    /** Once per frame, after [EditorTools.frame]. */
+    /** Once per frame, after the session's selection has read its answers. */
     fun frame() {
-        selection.frame()
-        // The Scene tab draws only when something says its picture changed, and the bone overlay
-        // draws the selection: a new one is a new picture.
-        if (selection.ids != drawnSelection) {
-            drawnSelection = selection.ids
-            sceneChanged()
-        }
         follow()
         if (playing) {
             val clip = previewClip

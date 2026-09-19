@@ -444,6 +444,11 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
+## Wave 16 (2026-09-19): in flight
+
+- #235: merged, round 1 PASS (no findings). Merged tree == reviewed tree. Left button selects (gizmo first), right button orbits/pans; public PickBounds in udea-render (sprites, models, moba units by body); EditorInspector with Mixed, no Set button (owner): G1 edit session per field, commit on Enter/focus loss, cancel on refused value. Cards: AnimationRenderSystem not pickable; G1 30s idle cancel reverts an un-entered value; inspector text boxes only; selection outline re-queries pick sources per redraw.
+- #243 animation panel (dev-243) in flight.
+
 ## Wave 15 (2026-09-19): in flight, WIP 5 (owner)
 
 - Integration branch is now `master` (port done). Developers and reviewers are subagents only (owner).

@@ -5,6 +5,7 @@ import dev.wildware.composegl.ui.geometry.Rect
 import dev.wildware.composegl.ui.geometry.Size
 import dev.wildware.composegl.ui.input.Key
 import dev.wildware.composegl.ui.input.Modifiers
+import dev.wildware.composegl.ui.input.PointerButton
 import dev.wildware.composegl.ui.testing.UiTest
 import dev.wildware.composegl.ui.testing.uiTest
 import dev.wildware.udea.agent.AgentBridge
@@ -113,15 +114,16 @@ class EditorLayoutTest {
             val onPanel = Offset(view.left - DIVIDER - EDGE, view.centre.y)
             val inView = Offset(view.left + EDGE, view.centre.y)
 
+            // The secondary button: it is the one that pans in 2D, the primary one selects (issue #235).
             val x = camera.position.x
-            ui.press(onPanel)
+            ui.press(onPanel, PointerButton.Secondary)
             ui.dragTo(Offset(onPanel.x - DRAG, onPanel.y))
-            ui.release()
+            ui.release(PointerButton.Secondary)
             assertEquals(x, camera.position.x, "a drag on the Create panel moved the Scene tab's camera")
 
-            assertTrue(ui.press(inView), "a press just inside the Scene tab's left edge was not taken")
+            assertTrue(ui.press(inView, PointerButton.Secondary), "a press just inside the Scene tab's left edge was not taken")
             ui.dragTo(Offset(inView.x + DRAG, inView.y))
-            ui.release()
+            ui.release(PointerButton.Secondary)
             assertTrue(abs(camera.position.x - x) > 0.01f, "a drag just inside the Scene tab did not move its camera")
         }
     }

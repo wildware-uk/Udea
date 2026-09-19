@@ -127,8 +127,9 @@ public class MobaScene private constructor(
          * World units kept visible across the wider axis.
          *
          * Framed on `level/test_level` rather than on a number that once suited one drifting
-         * unit: the level's four clearings span about two hundred and thirty world units after
-         * `TestLevelScene.SCATTER` is applied at both ends, and a camera narrower than the field
+         * unit: the level's four clearings span about two hundred and thirty world units from the
+         * furthest unit on one side to the furthest on the other (`MobaSceneTest` reads that off
+         * the level file), and a camera narrower than the field
          * makes a screenshot of a battle a screenshot of an empty corner of one.
          */
         public const val WORLD_WIDTH: Float = 320f

@@ -1,10 +1,17 @@
 package dev.wildware.moba.lane
 
+import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.moba.MobaGame
+import dev.wildware.moba.Position
 import dev.wildware.moba.ability.DeathSystem
+import dev.wildware.moba.level.GameUnit
+import dev.wildware.moba.level.MobaLevel
 import dev.wildware.moba.level.Team
 import dev.wildware.moba.level.UnitBattleSystem
 import dev.wildware.moba.match.MatchRules
 import dev.wildware.udea.core.SimClock
+import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.core.loop.barrier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -29,15 +36,21 @@ class LaneRulesTest {
     /**
      * The lane is further from the brawl than anything in the brawl can see.
      *
-     * `UnitBattleSystem.AGGRO_RADIUS` is how far a unit looks for an enemy. The authored level's
-     * northernmost cluster centre is the priest at `y = 0`, scattered by up to
-     * `TestLevelScene.SCATTER`. If the closest point of the lane were inside that radius, the
+     * `UnitBattleSystem.AGGRO_RADIUS` is how far a unit looks for an enemy, and the brawl's
+     * northernmost unit is read off the launch level as it loads - the level is a saved file since
+     * issue #192, so its positions are exact values and not a centre plus a scatter radius. If the
+     * closest point of the lane were inside that radius, the
      * soldier line would abandon the camp and walk four hundred units north at a creep - which is
      * exactly the open-field blob this wave exists to stop being.
      */
     @Test
     fun `the lane is outside the brawl's aggro radius`() {
-        val northernmostBrawlUnit = 0f + dev.wildware.moba.level.TestLevelScene.SCATTER
+        val host = MobaGame.host(RenderMode.Headless)
+        host.ctx.scenes.requestScene(MobaLevel.SCENE_ID)
+        host.ctx.barrier.drain(host.world, host.ctx)
+        val units = host.world.family { all(GameUnit, Position) }.entities
+        assertTrue(units.size > 0, "the launch level put no units in the world")
+        val northernmostBrawlUnit = with(host.world) { units.map { it[Position].y } }.max()
         val closestLanePoint = LaneGeometry.LANE_Y
         val gap = closestLanePoint - northernmostBrawlUnit
         assertTrue(

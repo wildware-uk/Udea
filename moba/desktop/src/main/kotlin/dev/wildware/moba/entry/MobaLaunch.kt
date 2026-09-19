@@ -182,7 +182,7 @@ public object MobaLaunch {
         // The three `StartupTrace` brackets are the phase breakdown issue #94 requires, and they
         // are here rather than inside `MobaBench` for the reason that gate exists: a benchmark that
         // instruments a *copy* of the boot sequence measures the copy.
-        val definition = StartupTrace.world { MobaGame.definition(extraModules) }
+        val definition = StartupTrace.world { MobaGame.definition(extraModules, MobaLaunchLevel.bytes()) }
         val scene = StartupTrace.world { MobaEntry.scene(definition) }
         // Registered before `start`, because `KoolBackend.start` builds the pipeline out of the
         // registry and a registration after that point reaches nothing.

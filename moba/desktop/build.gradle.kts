@@ -268,23 +268,15 @@ tasks.register<JavaExec>("runLevelShot") {
     systemProperty("udea.levelshot.dir", levelShotDir)
 }
 
-// Issue #192's one-off conversion. Saves the world `assets/level/test_level.udea.kts` builds as
-// `moba/game/levels/test_level.udealevel`, and writes the roster `TestLevelRosterTest` holds a boot
-// to. It lives for one commit: the next one deletes the script, so to regenerate the level, check
-// this commit out and run it. See `TestLevelConversion`.
-tasks.register<JavaExec>("udeaConvertTestLevel") {
-    group = "udea"
-    description = "Issue #192: saves the world test_level.udea.kts builds to moba/game/levels/test_level.udealevel."
-    mainClass.set("dev.wildware.moba.level.TestLevelConversion")
-    classpath = sourceSets.test.get().runtimeClasspath
-    systemProperty(
-        "udea.testlevel.out",
-        project(":moba:game").layout.projectDirectory.file("levels/test_level.udealevel").asFile.absolutePath,
-    )
-    systemProperty(
-        "udea.testlevel.roster",
-        layout.projectDirectory.file("src/test/resources/levels/test_level.roster.txt").asFile.absolutePath,
-    )
+// Issue #192: `-Plevel=<path>` names the `.udealevel` every task in this project that launches the
+// game boots, instead of the bundled `levels/test_level.udealevel`. A relative path is resolved
+// against the repository root, which is where the wrapper is run. Forwarded as `-Dmoba.level`
+// because `JavaExec` forks and a Gradle property stops at the daemon; `MobaLaunchLevel` reads it.
+// Read through `providers` so the configuration cache records it as an input.
+val launchLevel: Provider<String> = providers.gradleProperty("level")
+    .map { rootProject.layout.projectDirectory.file(it).asFile.absolutePath }
+tasks.withType<JavaExec>().configureEach {
+    launchLevel.orNull?.let { systemProperty("moba.level", it) }
 }
 
 /**

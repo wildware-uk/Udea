@@ -79,7 +79,8 @@ class MigratedCorpusGapTest {
                 // and a corpus that quietly stopped using one would make the assertion above pass
                 // for the wrong reason.
                 "item",
-                "level",
+                // No `level`: the game's one level is a saved `.udealevel` file since issue #192,
+                // not a script, so the corpus no longer declares one.
                 "soundCue",
                 "spriteAnimation",
                 "spriteAnimationSet",

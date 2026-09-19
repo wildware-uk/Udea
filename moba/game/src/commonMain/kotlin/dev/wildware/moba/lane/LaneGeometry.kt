@@ -7,11 +7,11 @@ import dev.wildware.moba.level.Team
  *
  * ## Why the lane is Kotlin and not an authored asset
  *
- * `assets/level/test_level.udea.kts` is the authored roster and it is load-bearing - deleting an
- * entity from it removes a unit from the game with nothing recompiled. A **lane** is not a list
+ * `levels/test_level.udealevel` is the roster, and it is load-bearing - deleting an entity from
+ * that level removes a unit from the game with nothing recompiled. A **lane** is not a list
  * of entities: it is a polyline that two spawners walk in opposite directions, and the asset DSL
  * has no `polyline` kind. Authoring one is an `AssetScope` change (`udea-assets`), not a game's,
- * so the geometry is written here, once, as constants a test can name - and the level asset keeps
+ * so the geometry is written here, once, as constants a test can name - and the level file keeps
  * owning the roster it already owns.
  *
  * ## Where it is, and why it is up there

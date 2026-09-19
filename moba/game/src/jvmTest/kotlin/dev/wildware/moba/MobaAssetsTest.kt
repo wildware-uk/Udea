@@ -37,11 +37,11 @@ class MobaAssetsTest {
         val ids = bundle.registry.ids.map { it.value }
         // Containment rather than the whole sorted list: the art tree next to this one grows a
         // character at a time, and a test that pinned every id would fail on an addition that
-        // broke nothing. What the *game* cannot boot without is named exactly - the level, and
-        // the six blueprints its twenty-seven entities point at.
+        // broke nothing. What the *game* cannot boot without is named exactly - the six
+        // characters the level's twenty-seven units are dressed from. The level itself is not in
+        // the bundle: it is a saved `.udealevel` file since issue #192 (see `MobaLevel`).
         val required = listOf(
             "config",
-            "level/test_level",
             "character/soldier",
             "character/priest",
             "character/orc",
@@ -50,33 +50,6 @@ class MobaAssetsTest {
             "character/skeleton",
         )
         assertTrue(ids.containsAll(required), "the bundle is missing ${required - ids.toSet()}: $ids")
-    }
-
-    /**
-     * The packed level is the roster the old game had, entity for entity.
-     *
-     * The count is the whole point of the port: twenty-seven units over three sides is what
-     * `example/.../level/test_level.udea.kts` spawned, and it is what
-     * `TestLevelScene` walks. Delete a `repeat(10)` from the asset and this fails here rather
-     * than as a battle that is quietly one side short.
-     */
-    @Test
-    fun `the packed level carries the whole roster`() {
-        val level = MobaAssets.registry[GameAssets.level.testLevel]
-        assertEquals(27, level.entities.size, "the roster: ${level.entities.map { it.name }}")
-        val byBlueprint = level.entities.groupingBy { it.blueprint?.id?.value }.eachCount()
-        assertEquals(10, byBlueprint["character/soldier"], "the soldier line")
-        assertEquals(1, byBlueprint["character/priest"])
-        assertEquals(1, byBlueprint["character/wizard"], "the sixth character, on the field at last")
-        // Four orcs and one elite. The player *is* the elite - `blueprint/player` inherited
-        // `orc_elite` in the old game - so `Team.ORC` still fields five bodies while
-        // `blueprint/orc` names four of them. `MobaLevelTest` counts the team, which is why that
-        // test is unchanged by a recomposition this one has to be told about.
-        assertEquals(4, byBlueprint["character/orc"])
-        assertEquals(1, byBlueprint["character/orc_elite"], "the player, and the only unit granted the spin")
-        assertEquals(10, byBlueprint["character/skeleton"])
-        // Every entity carries a cluster centre; the scatter around it is the Spawn stream's.
-        assertTrue(level.entities.all { it.position != null }, "an entity has no authored position")
     }
 
     /**

@@ -131,6 +131,7 @@ public class UdeaGameDef(
         val levels = LevelService(world, ctx, core.netIds, levelHooks) {
             LevelComponentModule.of(this@UdeaGameDef.registry)
         }
+        core.scenes.levels = levels
 
         return UdeaGame(ctx, world, WorldSimulation(ctx, world, travel = travel), manifest, levels)
     }

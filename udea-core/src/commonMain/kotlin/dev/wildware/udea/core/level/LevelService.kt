@@ -11,6 +11,7 @@ import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.loop.BarrierAction
 import dev.wildware.udea.core.loop.SimBarrier
 import dev.wildware.udea.core.rng.CapturableRng
+import dev.wildware.udea.core.scene.SceneScope
 import kotlinx.serialization.SerializationException
 
 /**
@@ -171,6 +172,20 @@ public class LevelService internal constructor(
         // components in one deterministic pass, after every component is in place.
         ctx.physics.rebuildFrom(world, netIds)
         for (section in level.sections) section.load(world)
+    }
+
+    /**
+     * Puts [level]'s entities into the world a scene swap has just emptied. See [LevelScene].
+     *
+     * Ids are allocated in the level's saved `NetId` order rather than bound to the saved ids, so
+     * they come from the allocator [scope] was handed - reset by the swap, with generations that
+     * carry on - and not from the level's own allocator state.
+     */
+    internal fun populate(level: Level, scope: SceneScope) {
+        val document = level.document
+        scope.world.loadSnapshot(document.world)
+        for (binding in document.netIds.sortedBy { it.netId.index }) scope.netIds.allocate(binding.entity)
+        ctx.physics.rebuildFrom(scope.world, scope.netIds)
     }
 
     private fun saveable(format: LevelFormat, entity: Entity, snapshot: Snapshot): Snapshot {

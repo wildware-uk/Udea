@@ -11,6 +11,7 @@ import dev.wildware.moba.PlayerControlSystem
 import dev.wildware.moba.PlayerIntents
 import dev.wildware.moba.entry.MobaEntry
 import dev.wildware.moba.level.MobaBlueprints
+import dev.wildware.moba.level.MobaLevel
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
@@ -150,10 +151,13 @@ public class MobaHostSession(
      * for exactly that reason.
      */
     public val championSight: Float = DEFAULT_CHAMPION_SIGHT,
+
+    /** The `.udealevel` this server plays. The bundled test level unless a launcher names one. */
+    level: ByteArray = MobaLevel.bundledBytes(),
 ) : AutoCloseable {
 
     /** The authoritative simulation. Headless: a dedicated server draws nothing. */
-    public val host: GameHost = MobaGame.host(RenderMode.Headless)
+    public val host: GameHost = MobaGame.host(RenderMode.Headless, level = level)
 
     /**
      * The level's authored champion. The first client to join claims it.
@@ -647,7 +651,7 @@ public class MobaHostSession(
         /**
          * How far a champion sees by default, in world units.
          *
-         * Chosen against this level rather than picked: `test_level.udea.kts` puts the orc
+         * Chosen against this level rather than picked: `test_level` puts the orc
          * clearing at `(-50, 0)`, the priest post at `(0, 0)`, the soldier camp at `(0, -50)` and
          * the skeleton camp at `(100, 0)`. Sixty units means a champion in one cluster sees its
          * neighbours and never the far camp - so fog is visibly doing something, which a radius

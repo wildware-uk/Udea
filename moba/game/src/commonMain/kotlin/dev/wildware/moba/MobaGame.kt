@@ -2,7 +2,8 @@ package dev.wildware.moba
 
 import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.GameUnitReplicator
-import dev.wildware.moba.level.TestLevelScene
+import dev.wildware.moba.level.LaunchLevel
+import dev.wildware.moba.level.MobaLevel
 import dev.wildware.moba.ability.CharacterAttributes
 import dev.wildware.moba.ability.Combatant
 import dev.wildware.moba.ability.CombatantReplicator
@@ -26,6 +27,7 @@ import dev.wildware.udea.core.blueprint.BlueprintSpawner
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.PresentationFactory
 import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.core.level.LevelScene
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.module.UdeaModule
 import dev.wildware.udea.core.snapshot.ComponentRegistry
@@ -83,10 +85,15 @@ public object MobaGame {
      *   a hook on `GameHost` because a module's `context` hook is the only place a decorator can
      *   see the value it is decorating, and appending is what puts this one last. The default is
      *   empty, so `MobaServer`, `MobaClient` and every test build the identical simulation.
+     * @param level the `.udealevel` this game plays - see [MobaLevel]. The default is the bundled
+     *   test level; a desktop launcher passes the file `-Plevel` names.
      */
-    public fun definition(extraModules: List<UdeaModule> = emptyList()): UdeaGameDef {
+    public fun definition(
+        extraModules: List<UdeaModule> = emptyList(),
+        level: ByteArray = MobaLevel.bundledBytes(),
+    ): UdeaGameDef {
         val combat = MobaAbilityModule()
-        val module = MobaModule(combat)
+        val module = MobaModule(combat, LaunchLevel(level))
         val definition = UdeaGameDef(
             // Generated from this module's resolved runtime classpath (issue #202), so a level
             // saved from any mode can hold every component the game's modules declare, and a
@@ -192,8 +199,8 @@ public object MobaGame {
         // barrier action, and submitting one here would queue work against a world that does not
         // exist until `definition.build()`. `MobaEntry.seed` is what asks for it, once, in every
         // entry point - so a scene an agent later swaps away from and back to is the same object
-        // this line named.
-        definition.core.scenes.register(TestLevelScene())
+        // this line named, over the same level bytes `MobaModule` publishes.
+        definition.core.scenes.register(LevelScene(MobaLevel.SCENE_ID, level))
         return definition
     }
 
@@ -204,12 +211,14 @@ public object MobaGame {
      *   [RenderMode.Windowed]. Ignored - never even invoked - in [RenderMode.Headless], which is
      *   `GameHost`'s own rule rather than a branch here.
      * @param extraModules see [definition].
+     * @param level see [definition].
      */
     public fun host(
         mode: RenderMode,
         presentation: PresentationFactory? = null,
         extraModules: List<UdeaModule> = emptyList(),
-    ): GameHost = GameHost(mode, definition(extraModules), presentation)
+        level: ByteArray = MobaLevel.bundledBytes(),
+    ): GameHost = GameHost(mode, definition(extraModules, level), presentation)
 
     /**
      * **Everything a live entity carries**, so a rewind restores a world and not a silhouette.

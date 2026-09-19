@@ -6,6 +6,7 @@ import dev.wildware.udea.core.SceneId
 import dev.wildware.udea.core.SceneManager
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.identity.NetIdIndex
+import dev.wildware.udea.core.level.LevelService
 import dev.wildware.udea.core.loop.BarrierAction
 import dev.wildware.udea.core.loop.SimBarrier
 
@@ -70,6 +71,14 @@ public class BarrierSceneManager(
     private val known = LinkedHashMap<SceneId, Scene>()
 
     private val listeners = ArrayList<(SceneId, Tick) -> Unit>()
+
+    /**
+     * The built game's level files, handed to every populate so a `LevelScene` can read one.
+     *
+     * Assigned once, by `UdeaGameDef.build()`, and not a constructor argument: this manager is
+     * created with the kernel's module, before the world a `LevelService` needs exists.
+     */
+    internal var levels: LevelService? = null
 
     /**
      * The scene the world currently holds, or `null` when it holds no scene at all.
@@ -233,7 +242,7 @@ public class BarrierSceneManager(
 
                 for (step in afterClear) step.tearDown(world, ctx)
 
-                scene.populate(SceneScope(world, ctx, netIds, scene.seed))
+                scene.populate(SceneScope(world, ctx, netIds, scene.seed, levels))
             } catch (failure: Throwable) {
                 empty(world, ctx)
                 failedSwapCount++

@@ -52,11 +52,10 @@ import dev.wildware.udea.gas.GasCueQueue
  *
  * ## Determinism
  *
- * Wave scatter is two draws from [RngStream.Wave] per creep, always, in a fixed order - the same
- * discipline `TestLevelScene` applies to [RngStream.Spawn], and for the same reason: a creep that
+ * Wave scatter is two draws from [RngStream.Wave] per creep, always, in a fixed order: a creep that
  * took its draws conditionally would make every later creep's position depend on whether an
- * earlier one had spawned. `RngStream.Wave` and not `Spawn`, so that a change to how a wave is
- * laid out cannot move where the *level* placed its twenty-seven units.
+ * earlier one had spawned. A stream of its own, so that a change to how a wave is laid out cannot
+ * shift the draws any other system makes.
  *
  * Allocation per tick is one `SpawnOverrides` per creep on the tick a wave goes out - six objects
  * every six hundred ticks - and nothing at all on the other five hundred and ninety-nine.
@@ -685,9 +684,9 @@ public class BountySystem(
  *
  * ## Why a system and not a blueprint
  *
- * The champion is `level/test_level`'s authored `player` entity, dressed by a `SpawnOverrides`
- * that adds a `Player` and nothing else, and that override lives in `TestLevelScene` - a file
- * this wave does not own. Granting here also means an agent that spawns a second champion with
+ * The champion is the level's `player` unit, and the level file is content: nothing lane-specific
+ * belongs in it, and a level saved before the lane existed would have no wallet to load. Granting
+ * here also means an agent that spawns a second champion with
  * `world.spawn_blueprint` gets a working wallet without knowing this package exists, and a match
  * restart re-grants a fresh one because the entity carrying the old one was destroyed with the
  * scene.

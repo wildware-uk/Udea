@@ -1,8 +1,11 @@
 package dev.wildware.moba
 
+import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.moba.entry.MobaLaunch
-import dev.wildware.moba.level.TestLevelScene
+import dev.wildware.moba.level.GameUnit
+import dev.wildware.moba.level.MobaLevel
 import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.core.loop.barrier
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -32,18 +35,26 @@ class MobaSceneTest {
      * `render.compare_artifacts` reports as `identical:true` for every pair - indistinguishable
      * from a broken renderer without booting an instance.
      *
-     * Widen `TestLevelScene.SCATTER` past the margin, or move a cluster centre, and this fails
-     * by name before anybody takes a capture.
+     * Move a unit in the level file past the margin and this fails by name before anybody takes
+     * a capture. The bounds are the units' own saved positions, read off the level as it loads and
+     * before any tick has moved them, rather than a cluster centre plus a scatter radius: the level
+     * has been a saved file since issue #192, and a file holds exact values.
      */
     @Test
     fun `the level sits inside the camera`() {
         val halfWidth = MobaScene.WORLD_WIDTH / 2f
         val halfHeight = MobaScene.WORLD_HEIGHT / 2f
-        val scatter = TestLevelScene.SCATTER
-        val left = TestLevelScene.ORC_CLEARING_X - scatter
-        val right = TestLevelScene.SKELETON_CAMP_X + scatter
-        val bottom = TestLevelScene.SOLDIER_CAMP_Y - scatter
-        val top = scatter
+        val host = MobaGame.host(RenderMode.Headless)
+        host.ctx.scenes.requestScene(MobaLevel.SCENE_ID)
+        host.ctx.barrier.drain(host.world, host.ctx)
+        val units = host.world.family { all(GameUnit, Position) }.entities
+        assertTrue(units.size > 0, "the launch level put no units in the world")
+        val xs = with(host.world) { units.map { it[Position].x } }
+        val ys = with(host.world) { units.map { it[Position].y } }
+        val left = xs.min()
+        val right = xs.max()
+        val bottom = ys.min()
+        val top = ys.max()
         assertTrue(
             left > MobaScene.CAMERA_X - halfWidth,
             "the orc clearing is off the left of the camera: $left",

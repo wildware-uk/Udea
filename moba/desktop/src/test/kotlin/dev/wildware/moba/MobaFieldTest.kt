@@ -56,15 +56,6 @@ class MobaFieldTest {
         )
     }
 
-    /** The level names both of the ids that used to have no blueprint behind them. */
-    @Test
-    fun `the authored level puts the elite orc and the wizard on the field`() {
-        val level = MobaAssets.registry[GameAssets.level.testLevel]
-        val named = level.entities.mapNotNull { it.blueprint?.id?.value }.toSet()
-        assertTrue("character/orc_elite" in named, "the level names: $named")
-        assertTrue("character/wizard" in named, "the level names: $named")
-    }
-
     /**
      * Spawning the level really produces one of each, counted off the world.
      *

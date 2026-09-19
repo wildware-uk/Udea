@@ -6,7 +6,7 @@ import com.github.quillraven.fleks.World
 import dev.wildware.moba.ability.Combatant
 import dev.wildware.moba.level.GameUnit
 import dev.wildware.moba.level.Team
-import dev.wildware.moba.level.TestLevelScene
+import dev.wildware.moba.level.MobaLevel
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.RngStream
 import dev.wildware.udea.core.SimSystem
@@ -47,12 +47,13 @@ import dev.wildware.udea.core.rng.DefaultRngService
  *
  * ## Where the next match's layout comes from
  *
- * `TestLevelScene` scatters each unit with two draws from `RngStream.Spawn`. Left alone, a
- * second populate would simply continue that stream - a different layout, but one no number in
- * the world describes. So [restart] seeds the spawn stream from a draw on `RngStream.Wave` and
- * records the value in [MatchState.seed]. Two consequences, both wanted: a match is reproducible
- * from its recorded seed, and the choice of layout cannot perturb combat rolls, because
- * `RngStream.Wave` is a stream nothing else in this game draws from.
+ * The level file. The launch level is a saved `.udealevel` (issue #192) holding every unit's exact
+ * position, and the swap puts those positions back, so every match starts from the same layout and
+ * differs only in how the fight goes. [restart] still seeds `RngStream.Spawn` from a draw on
+ * `RngStream.Wave` and records it in [MatchState.seed]; that was the layout seed while the level was
+ * a script that scattered units from the `Spawn` stream, and nothing in this game lays units out
+ * from that stream now. It stays because [MatchState.seed] is a replicated field, and removing it
+ * moves the wire protocol, which is a change of its own.
  *
  * The seed is applied by writing it into the stream directly, which needs the concrete
  * [DefaultRngService] rather than the `RngService` interface - the interface has draws on it and
@@ -142,9 +143,8 @@ public class MatchSystem(
     private fun begin(): MatchState? {
         if (units.entities.size == 0) return null
         // The seed the spawn stream was *actually* built with, out of the same derivation
-        // `DefaultRngService`'s constructor uses. Reseeding with it and reloading the scene
-        // reproduces this match's layout exactly, which is the property `MatchState.seed`
-        // promises and would not hold if this line wrote the root seed instead.
+        // `DefaultRngService`'s constructor uses, so the recorded seed describes the stream this
+        // match really had. See the class KDoc for why nothing lays units out from it any more.
         val seed = DefaultRngService.streamSeed(rng.rootSeed, RngStream.Spawn.ordinal)
         return install(matchNumber = 1, seed = seed, world = world, ctx = ctx)
     }
@@ -205,8 +205,8 @@ public class MatchSystem(
      *
      * Three steps, and the order is the whole of it:
      *
-     * 1. the spawn stream is seeded **now**, inside this tick, so it is already carrying the new
-     *    seed when the swap action populates the level at the top of the next one;
+     * 1. the spawn stream is seeded **now**, inside this tick, so the seed [MatchState.seed]
+     *    records is the one the stream carries into the next match;
      * 2. `requestScene` submits the swap;
      * 3. [BeginMatch] is submitted after it, so it runs after the swap has emptied the world and
      *    finds a populated level to mint a match over.
@@ -220,7 +220,7 @@ public class MatchSystem(
         val seed = rng.nextLong(RngStream.Wave)
         rng.stream(RngStream.Spawn).seed(seed)
         state.phase = MatchPhase.Restarting
-        ctx.scenes.requestScene(TestLevelScene.ID)
+        ctx.scenes.requestScene(MobaLevel.SCENE_ID)
         ctx.barrier.submit(BeginMatch(matchNumber = state.matchNumber + 1, seed = seed))
         restarts++
     }

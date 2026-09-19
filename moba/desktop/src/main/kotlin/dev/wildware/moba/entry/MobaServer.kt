@@ -65,7 +65,11 @@ public object MobaServer {
         val lossy = System.getProperty(LOSSY_PROPERTY)?.toBoolean() ?: false
         val conditions = if (lossy) NetConditions.TRELLO_8 else NetConditions.PERFECT
 
-        val session = MobaLoopbackSession(clientCount = clients, conditions = conditions)
+        val session = MobaLoopbackSession(
+            clientCount = clients,
+            conditions = conditions,
+            level = MobaLaunchLevel.bytes(),
+        )
         println(
             "[moba.server] ${MobaGame.NAME} ${MobaGame.VERSION} authoritative; " +
                 "$clients client(s); proto ${session.server.protocol.protoHash}; " +

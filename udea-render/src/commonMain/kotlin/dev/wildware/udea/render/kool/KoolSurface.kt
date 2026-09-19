@@ -238,7 +238,7 @@ internal class KoolSurface(
      */
     override fun resize(width: Int, height: Int) {
         if (width == this.width && height == this.height) return
-        pass.resize(width, height)
+        pass.setSize(width, height)
         this.width = width
         this.height = height
     }

@@ -31,7 +31,6 @@ import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteRegion
 import dev.wildware.udea.render.draw.SpriteTexture
 import dev.wildware.udea.render.kool.ScenePasses
-import dev.wildware.udea.render.kool.resize
 import dev.wildware.udea.render.view.WorldViewport
 
 /**
@@ -136,7 +135,7 @@ internal class ModelStage(
      */
     fun fit(width: Int, height: Int) {
         if (width == this.width && height == this.height) return
-        pass.resize(width, height)
+        pass.setSize(width, height)
         this.width = width
         this.height = height
     }
@@ -358,7 +357,7 @@ internal class ModelStage(
         /** Makes the pass [width] x [height], the view's size, if it is not already. */
         fun fit(width: Int, height: Int) {
             if (width == this.width && height == this.height) return
-            pass.resize(width, height)
+            pass.setSize(width, height)
             this.width = width
             this.height = height
         }

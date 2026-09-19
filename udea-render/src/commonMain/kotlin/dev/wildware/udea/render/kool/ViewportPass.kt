@@ -55,7 +55,7 @@ internal class ViewportPass(
 
     /** Makes the picture [width] x [height] pixels from the next time Kool draws it. */
     fun resize(width: Int, height: Int) {
-        pass.resize(width, height)
+        pass.setSize(width, height)
     }
 
     /** Draws this pass after [other]. */

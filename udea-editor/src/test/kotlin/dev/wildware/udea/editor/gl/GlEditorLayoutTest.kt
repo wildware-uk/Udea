@@ -58,7 +58,8 @@ import kotlin.test.assertTrue
  *   rectangles are read from (below).
  *
  * Both tabs, the Scene tab through its editor camera and the Game tab as the game's own frame, which
- * `render.screenshot` then reads at the tab's size. Then the input half, in the Game tab where the pointer is the game's: a click just inside the view's edge
+ * `render.screenshot` reads at the tabs' size whichever tab is showing - the Scene tab first, so the
+ * Game view is sized before anyone has looked at it. Then the input half, in the Game tab where the pointer is the game's: a click just inside the view's edge
  * reaches the game, and a click just outside it, on the panel, does not.
  *
  * Where the panels and the view are is read from the same window laid out with no GL at the same size,
@@ -110,16 +111,16 @@ class GlEditorLayoutTest {
 
             val scene = layout(EditorTab.Scene)
             assertSelfContained("Scene", window.read(frames), scene)
+            // The two tabs share one rectangle, and the Game view is the game's frame: an agent's
+            // screenshot is that rectangle's size while a person looks at the Scene tab too.
+            assertCaptureFits("Scene", backend, scene.view)
 
             backend.onRenderThread { session.show(EditorTab.Game) }
             awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
             val game = layout(EditorTab.Game)
             assertSelfContained("Game", window.read(frames), game)
 
-            // The Game tab is the game's own frame, so render.screenshot is the tab's size now.
-            val capture = ImageIO.read(ByteArrayInputStream(backend.pipeline!!.capture!!.capture(CaptureRequest()).bytes))
-            assertEquals(game.view.width, capture.width.toFloat(), MARGIN_ACROSS, "render.screenshot is not the Game tab's width")
-            assertEquals(game.view.height, capture.height.toFloat(), 2 * MARGIN_DOWN, "render.screenshot is not the Game tab's height")
+            assertCaptureFits("Game", backend, game.view)
 
             // The Game tab's pointer is the game's: just inside the view it arrives, just outside it
             // is the History panel's.
@@ -134,6 +135,13 @@ class GlEditorLayoutTest {
             backend.close()
             fonts.close()
         }
+    }
+
+    /** `render.screenshot` is [view]'s size: the Game view, and so the game's frame, is the tabs' rectangle. */
+    private fun assertCaptureFits(tab: String, backend: KoolBackend, view: Rect) {
+        val capture = ImageIO.read(ByteArrayInputStream(backend.pipeline!!.capture!!.capture(CaptureRequest()).bytes))
+        assertEquals(view.width, capture.width.toFloat(), MARGIN_ACROSS, "render.screenshot is not the $tab tab's width")
+        assertEquals(view.height, capture.height.toFloat(), 2 * MARGIN_DOWN, "render.screenshot is not the $tab tab's height")
     }
 
     // --- fixture -------------------------------------------------------------------------

@@ -37,10 +37,15 @@ import kotlin.test.assertTrue
  * Issue #234, reopened: **an editor view shown in a `SceneView` takes the `SceneView`'s size, and is
  * still shown once it has.** Read from the window, where a person sees it.
  *
- * The view opens at the frame's size and is shown in a `SceneView` of another shape; the first draw
- * asks for the view to be that shape, the pipeline resizes the view's pass, and every draw after
- * copies the resized picture - to the panel's edges, with no bars, because the picture is now the
- * panel's shape.
+ * The view opens at the frame's size, which is smaller than the `SceneView` it is shown in and of
+ * another shape; the first draw asks for the view to be the `SceneView`'s shape, the pipeline resizes
+ * the view's pass, and every draw after copies the resized picture - to the panel's edges, with no
+ * bars, because the picture is now the panel's shape.
+ *
+ * Smaller, because a pass that grows is where a resize can go half wrong: new, larger attachments
+ * with the old viewport draw the world into one corner of them. The world is red with a blue square
+ * in its top-right corner, which is at the panel's top-right corner only if the pass draws into the
+ * whole of the new picture.
  */
 class GlViewResizeTest {
 
@@ -55,7 +60,13 @@ class GlViewResizeTest {
 
         val backend = KoolBackend.start(
             RenderMode.Offscreen,
-            WindowConfig(title = "udea-view-resize", windowWidth = WIDTH, windowHeight = HEIGHT, renderWidth = WIDTH, renderHeight = HEIGHT),
+            WindowConfig(
+                title = "udea-view-resize",
+                windowWidth = WIDTH,
+                windowHeight = HEIGHT,
+                renderWidth = FRAME_WIDTH,
+                renderHeight = FRAME_HEIGHT,
+            ),
             registry,
         )
         val fonts = DesktopFonts()
@@ -92,6 +103,8 @@ class GlViewResizeTest {
                 val pixel = probe.pixelAt(x, y)
                 assertEquals(RED, pixel, "the resized view is not shown at ($x, $y): ${"#%06X".format(pixel)}")
             }
+            val corner = probe.pixelAt(PANEL_X + PANEL_WIDTH - 1 - INSET, PANEL_Y + INSET)
+            assertEquals(BLUE, corner, "the world's top-right corner is not at the panel's: ${"#%06X".format(corner)}")
             assertTrue(state.draws >= 2, "the SceneView drew once, so it never showed the view after its resize")
         } finally {
             backend.close()
@@ -113,12 +126,15 @@ class GlViewResizeTest {
         File(dir, "view-resize-$name").writeBytes(png)
     }
 
-    /** Red over the whole target it is handed, whatever its size. */
+    /** Red over the whole target it is handed, whatever its size, with a blue square in its top-right corner. */
     private class RedWorld(private val resources: RenderResources) : RenderSystem {
         override fun render(target: OffscreenTarget, alpha: Float) {
             val batch = resources.batch
+            val width = target.width.toFloat()
+            val height = target.height.toFloat()
             batch.beginPixels()
-            batch.fill(0f, 0f, target.width.toFloat(), target.height.toFloat(), Rgba.of(1f, 0f, 0f, 1f))
+            batch.fill(0f, 0f, width, height, Rgba.of(1f, 0f, 0f, 1f))
+            batch.fill(width - MARK, height - MARK, MARK.toFloat(), MARK.toFloat(), Rgba.of(0f, 0f, 1f, 1f))
             batch.end()
         }
     }
@@ -143,6 +159,10 @@ class GlViewResizeTest {
         const val WIDTH = 640
         const val HEIGHT = 360
 
+        /** The frame's size, which the view opens at: smaller than the panel both ways. */
+        const val FRAME_WIDTH = 160
+        const val FRAME_HEIGHT = 120
+
         const val PANEL_X = 100
         const val PANEL_Y = 40
         const val PANEL_WIDTH = 200
@@ -151,6 +171,9 @@ class GlViewResizeTest {
         /** Pixels in from the panel's edge a colour is read at. */
         const val INSET = 3
 
+        /** The side of the world's corner square, in the view's pixels. */
+        const val MARK = 24
+
         const val FONT = "udea-test"
         const val FONT_SIZE = 16
 
@@ -158,6 +181,7 @@ class GlViewResizeTest {
         const val DEADLINE_SECONDS = 20L
 
         const val RED = 0xFF0000
+        const val BLUE = 0x0000FF
         const val GREY = 0x505050
     }
 }

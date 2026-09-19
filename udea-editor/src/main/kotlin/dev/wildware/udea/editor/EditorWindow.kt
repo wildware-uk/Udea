@@ -187,7 +187,7 @@ private fun TabHeading(title: String, tab: EditorTab, session: EditorSession, ta
     )
 }
 
-/** The window's backdrop, and the letterbox bars around the world. */
+/** The window's backdrop, and what a tab shows around the world for the one frame before its view takes the tab's size. */
 private val Background: Colour = Colour.rgb(0x1B1F27)
 
 /** The Scene and Game headings' row, in design units: a button and its padding. */

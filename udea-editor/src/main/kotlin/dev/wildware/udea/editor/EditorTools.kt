@@ -121,7 +121,9 @@ public class EditorTools(
     internal fun frame() {
         if (waiting.isEmpty()) return
         if (waiting.keys.none { it <= bridge.completedCommandId() }) return
-        val results = bridge.commandResults()
+        // Whole, not as `/state` carries them: an answer too big for an outside agent's inline copy
+        // is still this process's to read (issue #237).
+        val results = bridge.wholeCommandResults()
         val answers = results.associateBy { it.id }
         val oldestKept = results.minOfOrNull { it.id } ?: return
         for (id in waiting.keys.toList()) {

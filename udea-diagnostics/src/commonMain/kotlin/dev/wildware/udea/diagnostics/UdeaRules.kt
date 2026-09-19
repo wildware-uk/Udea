@@ -319,9 +319,10 @@ public object UdeaRules {
     /**
      * A gizmo handle annotation (issue #233) that names a field the component cannot be dragged
      * through: a field it does not have, one that is a `val`, or one that is not a `Float` - or an
-     * annotation on a class that is not a Fleks component with a `ComponentType` companion.
+     * annotation on a class that is not a Fleks component with a `ComponentType` companion, or a
+     * `@RotationHandle` naming one of `aboutX` and `aboutY` without the other (issue #237).
      *
-     * `@PositionHandle`, `@SizeHandle` and `@RotationHandle` name their fields as strings, because a
+     * `@PositionHandle`, `@SizeHandle`, `@RotationHandle` and `@ScaleHandle` name their fields as strings, because a
      * Kotlin annotation cannot hold a property reference, so a misspelling is invisible to the
      * compiler. `udea-codegen`'s KSP processor checks every name and reports this at the annotation,
      * with the did-you-mean spec section 5 makes mandatory; unchecked, the generated gizmo would

@@ -133,6 +133,29 @@ class InspectorTest {
         }
     }
 
+    /**
+     * A selection with more in common than the bridge carries inline to an outside agent: a moba
+     * character, once its `Transform3D` is editable (issue #237), answers `editor.common_fields` with
+     * about 1500 characters. The bridge hands an outside caller a handle for an answer that size;
+     * the Inspector is in this process, reads it whole, and lists every field.
+     */
+    @Test
+    fun `a selection with more fields in common than an outside agent gets inline still lists every one`() {
+        val rows = (0 until MANY).joinToString(",") { index ->
+            """{"component":"Transform3D","field":"field$index","mixed":false,"value":$index.5}"""
+        }
+        val answer = """{"entities":2,"fields":[$rows]}"""
+        assertTrue(answer.length > AgentBridge.MAX_DELIVERABLE_RESULT_CHARS, "the answer fits inline after all: ${answer.length} characters")
+        open().use { ui ->
+            selectTwo(ui, answer)
+
+            for (index in 0 until MANY) {
+                val field = "Transform3D.field$index"
+                assertEquals(listOf("$index.5"), ui.texts(InspectorTags.field(field)), "the Inspector does not show $field:\n${ui.dump()}")
+            }
+        }
+    }
+
     /** Clicks the team box, types [text], and answers the edit session it opens. */
     private fun typeAndAnswer(ui: UiTest, text: String) {
         assertTrue(ui.click(InspectorTags.field(TEAM)), "the team box took no click")
@@ -152,7 +175,7 @@ class InspectorTest {
      * Opens on a selection of entities 3 and 5, as `editor.selection` answers it, which disagree on
      * `GameUnit.team` and agree that `Position.x` is 4.5.
      */
-    private fun selectTwo(ui: UiTest) {
+    private fun selectTwo(ui: UiTest, fields: String = TWO_FIELDS) {
         session.frame()
         for (command in drain()) {
             when (command.name) {
@@ -164,14 +187,7 @@ class InspectorTest {
         session.frame()
         val read = drain().single { it.name == "editor.common_fields" }
         assertEquals(mapOf("entities" to "3,5"), read.args, "the Inspector read another selection's fields")
-        bridge.complete(
-            read.id,
-            AgentResult.Ok(
-                """{"entities":2,"fields":[""" +
-                    """{"component":"GameUnit","field":"team","mixed":true},""" +
-                    """{"component":"Position","field":"x","mixed":false,"value":4.5}]}""",
-            ),
-        )
+        bridge.complete(read.id, AgentResult.Ok(fields))
         session.frame()
         ui.settle()
     }
@@ -179,5 +195,13 @@ class InspectorTest {
     private companion object {
         const val TEAM = "GameUnit.team"
         const val X = "Position.x"
+
+        /** `editor.common_fields` for entities 3 and 5: they disagree on the team, and agree on x. */
+        const val TWO_FIELDS = """{"entities":2,"fields":[""" +
+            """{"component":"GameUnit","field":"team","mixed":true},""" +
+            """{"component":"Position","field":"x","mixed":false,"value":4.5}]}"""
+
+        /** Fields enough that `editor.common_fields` answers above the inline ceiling. */
+        const val MANY = 24
     }
 }

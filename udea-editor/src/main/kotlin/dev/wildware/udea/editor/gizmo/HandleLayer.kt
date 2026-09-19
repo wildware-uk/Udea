@@ -8,7 +8,8 @@ import dev.wildware.udea.render.view.GizmoLayer
  * a press on a handle taken before the editor picks any entity under it.
  *
  * Every shape is drawn and hit-tested by one [HandlePainter], the built-ins' and a game's alike. Where
- * two handles overlap, the one declared later is drawn on top and is the one a press takes.
+ * two handles overlap, the one declared later is drawn on top and is the one a press takes - except
+ * that a ring takes a press only where no other handle does.
  *
  * @param under the view's layer before this one - the bone overlay's, a launcher's - or `null`. It
  *   is drawn first, and a press no handle takes goes on to it.
@@ -39,10 +40,14 @@ internal class HandleLayer(
 
     override fun press(canvas: GizmoCanvas, viewX: Float, viewY: Float): Boolean {
         val handles = frame().handles
-        pressedIndex = handles.indices.lastOrNull { index ->
+        val hit = handles.indices.filter { index ->
             val handle = handles[index]
             painter.hits(canvas, handle.at, handle.shape, handle.axes, viewX, viewY)
-        } ?: NONE
+        }
+        // A ring gives way to any other handle it crosses (issue #237): seen from an angle a 3D ring is
+        // a thin ellipse that cuts across the arrows and squares inside it, and it can be taken
+        // anywhere else round its rim, where they cannot.
+        pressedIndex = hit.lastOrNull { handles[it].shape !is HandleShape.Ring } ?: hit.lastOrNull() ?: NONE
         pressed = handles.getOrNull(pressedIndex)
         return pressed != null || under?.press(canvas, viewX, viewY) == true
     }

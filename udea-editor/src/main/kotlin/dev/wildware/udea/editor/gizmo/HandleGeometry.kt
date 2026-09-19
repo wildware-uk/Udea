@@ -67,6 +67,14 @@ public sealed interface HandleShape {
     /** A small square lying in [plane]: moves across it. */
     public data class PlaneSquare(val plane: Plane) : HandleShape
 
+    /**
+     * A small square lying in [plane], set off from the handle's point into the corner between the
+     * plane's two axes and drawn in perspective (issue #237): so three of them - one per plane - sit
+     * round one point without covering it or each other, the way a 3D move handle shows them. Moves
+     * across [plane]. Its size and its offset are in view pixels.
+     */
+    public data class PlaneTab(val plane: Plane) : HandleShape
+
     /** A ring around [normal]: turns about it. */
     public data class Ring(val normal: Axis) : HandleShape
 
@@ -81,6 +89,15 @@ public sealed interface HandleShape {
 
     /** A ball: a free grip in 3D. */
     public data object Sphere : HandleShape
+
+    /**
+     * A small box out along [axis], beyond the arrows and the rings, on a thin stalk from the handle's
+     * point (issue #237): scales along [axis].
+     */
+    public data class ScaleBox(val axis: Axis) : HandleShape
+
+    /** A box on the handle's point itself (issue #237): scales every axis at once. */
+    public data object UniformBox : HandleShape
 
     /**
      * A circle of world [radius] about the point, square to [normal] - a range, a reach, drawn at the
@@ -100,10 +117,15 @@ public sealed interface HandleShape {
  *
  * @property start where the drag began.
  * @property at where the drag is now.
+ * @property unitsPerPixel how many world units one view pixel covered at the handle when the drag
+ *   began (issue #237): for a response that measures a drag against the handle's size on screen
+ *   rather than against the world - the uniform scale box doubles a size for a drag as long as the
+ *   axis boxes stand off, however big the world's units are. One when nothing measured it.
  */
 public data class Drag(
     val start: WorldPoint,
     val at: WorldPoint,
+    val unitsPerPixel: Float = 1f,
 ) {
     /** How far the drag has moved along X. */
     public val dx: Float get() = at.x - start.x
@@ -144,6 +166,27 @@ public data class Drag(
             turn <= -PI_F -> turn + 2f * PI_F
             else -> turn
         }
+    }
+
+    /**
+     * The angle in radians the drag has turned about the line through [centre] along the unit
+     * [axis], right-handed - anticlockwise looking back down [axis] - the short way round (issue
+     * #237): what a ring about any axis turns by. Each end of the drag is measured where it lies
+     * across the plane square to [axis], so a drag along the axis is no turn at all.
+     */
+    public fun turnAbout(centre: WorldPoint, axis: WorldPoint): Float {
+        val ax = start.x - centre.x
+        val ay = start.y - centre.y
+        val az = start.z - centre.z
+        val bx = at.x - centre.x
+        val by = at.y - centre.y
+        val bz = at.z - centre.z
+        // (a x b) . axis is sin times both lengths across the plane; a . b less its part along the axis is cos.
+        val sine = (ay * bz - az * by) * axis.x + (az * bx - ax * bz) * axis.y + (ax * by - ay * bx) * axis.z
+        val alongA = ax * axis.x + ay * axis.y + az * axis.z
+        val alongB = bx * axis.x + by * axis.y + bz * axis.z
+        val cosine = ax * bx + ay * by + az * bz - alongA * alongB
+        return atan2(sine, cosine)
     }
 
     /** How far [point] is from [centre] along [direction]. */

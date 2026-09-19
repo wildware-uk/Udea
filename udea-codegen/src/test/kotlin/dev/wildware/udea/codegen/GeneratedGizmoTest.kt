@@ -12,8 +12,16 @@ import dev.wildware.udea.codegen.fixtures.CratePositionGizmo
 import dev.wildware.udea.codegen.fixtures.CrateHeadingTwin
 import dev.wildware.udea.codegen.fixtures.CrateRotationGizmo
 import dev.wildware.udea.codegen.fixtures.CrateSizeGizmo
+import dev.wildware.udea.codegen.fixtures.Drone
+import dev.wildware.udea.codegen.fixtures.DronePositionGizmo
+import dev.wildware.udea.codegen.fixtures.DronePositionTwin
+import dev.wildware.udea.codegen.fixtures.DroneRotationGizmo
+import dev.wildware.udea.codegen.fixtures.DroneRotationTwin
+import dev.wildware.udea.codegen.fixtures.DroneScaleGizmo
+import dev.wildware.udea.codegen.fixtures.DroneScaleTwin
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.editor.gizmo.Axis
+import dev.wildware.udea.editor.gizmo.AxisFrame
 import dev.wildware.udea.editor.gizmo.Drag
 import dev.wildware.udea.editor.gizmo.DragConstraint
 import dev.wildware.udea.editor.gizmo.FieldName
@@ -85,6 +93,21 @@ class GeneratedGizmoTest {
     }
 
     @Test
+    fun `the generated 3D gizmos and their hand-written twins show and write the same, in world and local axes`() {
+        val drone = Drone(px = 1f, py = -2f, pz = 3f, roll = 0.2f, pitch = -0.3f, yaw = 0.9f, wide = 2f, deep = 0.5f, tall = 1.5f)
+        for (axes in listOf(AxisFrame.WORLD, AxisFrame.euler(0.2f, -0.3f, 0.9f))) {
+            val target = GizmoTarget(entity, drone, origin = WorldPoint(1f, -2f, 3f), axes = axes)
+
+            assertEquals(behaviour(DronePositionTwin, target), behaviour(DronePositionGizmo, target))
+            assertEquals(behaviour(DroneRotationTwin, target), behaviour(DroneRotationGizmo, target))
+            assertEquals(behaviour(DroneScaleTwin, target), behaviour(DroneScaleGizmo, target))
+        }
+        // Real output on both sides: six translate handles, three rings, four scale boxes.
+        val target = GizmoTarget(entity, drone, origin = WorldPoint(1f, -2f, 3f))
+        assertEquals(listOf(6, 3, 4), listOf(DronePositionGizmo, DroneRotationGizmo, DroneScaleGizmo).map { it.handles(target).size })
+    }
+
+    @Test
     fun `twins are compared on real output, so a gizmo that writes nothing could not pass`() {
         // The comparison above would pass for two gizmos that both declare nothing. These are the
         // two sides' non-empty answers, so an emitter that dropped the handle is a red test.
@@ -122,21 +145,61 @@ class GeneratedGizmoTest {
     }
 
     @Test
-    fun `a 3D position handle drives the fields the annotation names, in the plane facing the view`() {
+    fun `a 3D position is the built-in translate on the fields the annotation names, each arrow moving its own`() {
         val crate = Crate(px = 1f, py = 2f, pz = 3f)
-        val handle = CratePositionGizmo.handles(GizmoTarget(entity, crate, WorldPoint(1f, 2f, 3f))).single()
+        val handles = CratePositionGizmo.handles(GizmoTarget(entity, crate, WorldPoint(1f, 2f, 3f)))
 
-        assertEquals(WorldPoint(1f, 2f, 3f), handle.at)
-        assertEquals(HandleShape.Sphere, handle.shape)
-        assertEquals(DragConstraint.ViewPlane, handle.constraint)
+        // Three arrows and three plane squares (issue #237), all on the entity.
         assertEquals(
             listOf(
-                FieldWrite(entity, Crate, FieldName("px"), 2f),
-                FieldWrite(entity, Crate, FieldName("py"), 0f),
-                FieldWrite(entity, Crate, FieldName("pz"), 7f),
+                HandleShape.Arrow(Axis.X), HandleShape.Arrow(Axis.Y), HandleShape.Arrow(Axis.Z),
+                HandleShape.PlaneTab(Plane.XY), HandleShape.PlaneTab(Plane.YZ), HandleShape.PlaneTab(Plane.XZ),
             ),
-            handle.drag(dragFrom(handle.at, 1f, -2f, 4f)),
+            handles.map { it.shape },
         )
+        assertTrue(handles.all { it.at == WorldPoint(1f, 2f, 3f) }, "a translate handle is not on the entity")
+        assertEquals(
+            listOf(FieldWrite(entity, Crate, FieldName("pz"), 7f, Snap.Grid)),
+            handles[2].drag(dragFrom(handles[2].at, 1f, -2f, 4f)),
+            "the Z arrow moves pz alone",
+        )
+        assertEquals(
+            listOf(
+                FieldWrite(entity, Crate, FieldName("py"), 0f, Snap.Grid),
+                FieldWrite(entity, Crate, FieldName("pz"), 7f, Snap.Grid),
+            ),
+            handles[4].drag(dragFrom(handles[4].at, 1f, -2f, 4f)),
+            "the YZ square moves py and pz",
+        )
+    }
+
+    @Test
+    fun `a three-angle rotation is a ring per angle, each writing its own field`() {
+        val drone = Drone(roll = 0.1f, pitch = 0.2f, yaw = 0.3f)
+        val handles = DroneRotationGizmo.handles(GizmoTarget(entity, drone, WorldPoint(0f, 0f, 0f)))
+
+        assertEquals(listOf(HandleShape.Ring(Axis.X), HandleShape.Ring(Axis.Y), HandleShape.Ring(Axis.Z)), handles.map { it.shape })
+        assertEquals(
+            listOf("roll", "pitch", "yaw"),
+            handles.map { ring -> ring.drag(Drag(ring.at, ring.at)).single().field.value },
+        )
+    }
+
+    @Test
+    fun `a scale handle is a box per factor and one for all three`() {
+        val drone = Drone(wide = 2f, deep = 3f, tall = 4f)
+        val handles = DroneScaleGizmo.handles(GizmoTarget(entity, drone, WorldPoint(0f, 0f, 0f)))
+
+        assertEquals(
+            listOf(HandleShape.ScaleBox(Axis.X), HandleShape.ScaleBox(Axis.Y), HandleShape.ScaleBox(Axis.Z), HandleShape.UniformBox),
+            handles.map { it.shape },
+        )
+        // Pulled from 1 out along X to 2: twice as wide, and nothing else.
+        assertEquals(
+            listOf(FieldWrite(entity, Drone, FieldName("wide"), 4f)),
+            handles[0].drag(Drag(WorldPoint(1f, 0f, 0f), WorldPoint(2f, 0f, 0f))),
+        )
+        assertEquals(listOf("wide", "deep", "tall"), handles[3].drag(Drag(handles[3].at, handles[3].at)).map { it.field.value })
     }
 
     @Test
@@ -207,7 +270,17 @@ class GeneratedGizmoTest {
                 "CratePositionGizmo",
                 "CrateRotationGizmo",
                 "CrateSizeGizmo",
-            ).map { "dev.wildware.udea.codegen.fixtures.$it" },
+                "DronePositionGizmo",
+                "DronePositionTwin",
+                "DroneRotationGizmo",
+                "DroneRotationTwin",
+                "DroneScaleGizmo",
+                "DroneScaleTwin",
+            ).map { "dev.wildware.udea.codegen.fixtures.$it" } +
+                // `udea-core` is on this classpath too, and its registry indexes `Transform3D`'s handles
+                // (issue #237), so its three gizmos are generated here as in any game's editor run.
+                listOf("Transform3DPositionGizmo", "Transform3DRotationGizmo", "Transform3DScaleGizmo")
+                    .map { "dev.wildware.udea.core.spatial.$it" },
             CodegenFixturesGizmoRegistry.gizmos.map { it.javaClass.name },
         )
         // A hand-written object is listed as itself; only a class is constructed.

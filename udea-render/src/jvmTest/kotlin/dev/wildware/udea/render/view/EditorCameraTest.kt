@@ -157,6 +157,56 @@ class EditorCameraTest {
         assertNear(14.142136f, camera.distance, "the orbit does not start at the game's distance")
     }
 
+    @Test
+    fun `the 3D ray through a pixel passes through every world point drawn at that pixel`() {
+        val camera = orbitCamera().apply {
+            yawDegrees = -60f
+            pitchDegrees = 25f
+        }
+        val ray = ViewRay()
+        for ((x, y, z) in listOf(Triple(1f, 2f, 0f), Triple(3f, -1f, 2f), Triple(-2f, 4f, -1f))) {
+            val at = ViewPoint()
+            assertTrue(camera.project(x, y, z, at))
+            camera.ray(at.x, at.y, ray)
+            // The point's distance from the line the ray runs along.
+            val t = (x - ray.originX) * ray.directionX + (y - ray.originY) * ray.directionY + (z - ray.originZ) * ray.directionZ
+            val offX = ray.originX + ray.directionX * t - x
+            val offY = ray.originY + ray.directionY * t - y
+            val offZ = ray.originZ + ray.directionZ * t - z
+            assertTrue(t > 0f, "the point ($x, $y, $z) is behind the ray's origin")
+            assertNear(0f, kotlin.math.sqrt(offX * offX + offY * offY + offZ * offZ), "the ray misses ($x, $y, $z)")
+            assertNear(1f, kotlin.math.sqrt(ray.directionX * ray.directionX + ray.directionY * ray.directionY + ray.directionZ * ray.directionZ), "the direction is not a unit")
+        }
+    }
+
+    @Test
+    fun `the 2D ray is straight down onto the ground point under the pixel`() {
+        val camera = EditorCamera(worldWidth = 32f, worldHeight = 18f).apply { fit(WIDTH, HEIGHT) }
+        val ground = ViewPoint()
+        camera.unproject(200f, 100f, ground)
+        val ray = ViewRay()
+
+        camera.ray(200f, 100f, ray)
+        assertEquals(listOf(ground.x, ground.y, 0f), listOf(ray.originX, ray.originY, ray.originZ))
+        assertEquals(listOf(0f, 0f, -1f), listOf(ray.directionX, ray.directionY, ray.directionZ))
+    }
+
+    @Test
+    fun `a pixel covers as many world units as a one-pixel step on screen measures, in 2D and at a 3D point's depth`() {
+        val flat = EditorCamera(worldWidth = 32f, worldHeight = 18f).apply { fit(WIDTH, HEIGHT) }
+        assertNear(1f, flat.unitsPerPixelAt(5f, 5f, 0f) * pixelsPerUnit(flat), "2D, as a share of the measured step")
+
+        val orbit = orbitCamera()
+        // At the orbit's centre, one world unit across the view is this many pixels.
+        val a = ViewPoint()
+        val b = ViewPoint()
+        orbit.project(1f, 2f, 0f, a)
+        // Straight across the view from -90 yaw: along world X.
+        orbit.project(2f, 2f, 0f, b)
+        assertNear(1f, orbit.unitsPerPixelAt(1f, 2f, 0f) * (b.x - a.x), "3D at the centre, as a share of the measured step")
+        assertTrue(orbit.unitsPerPixelAt(1f, 12f, 0f) > orbit.unitsPerPixelAt(1f, 2f, 0f), "a pixel further away covers no more world")
+    }
+
     private fun orbitCamera(): EditorCamera = EditorCamera().apply {
         dimension = ViewDimension.ThreeD
         targetX = 1f

@@ -33,6 +33,7 @@ class GizmoProcessorTest {
         import dev.wildware.udea.annotations.RadiusHandle
         import dev.wildware.udea.annotations.RangeHandle
         import dev.wildware.udea.annotations.RotationHandle
+        import dev.wildware.udea.annotations.ScaleHandle
         import dev.wildware.udea.annotations.SizeHandle
 
         $annotations
@@ -122,6 +123,37 @@ class GizmoProcessorTest {
         assertTrue(run.errors.all { it.startsWith(UdeaRules.GIZMO_HANDLE_FIELD.id) }, "${run.errors}")
         assertTrue(run.errors.any { "width" in it && "names no field" in it }, "${run.errors}")
         assertTrue(run.errors.any { "'w'" in it && "twice" in it }, "${run.errors}")
+    }
+
+    @Test
+    fun `a 3D rotation naming one of its two extra angles without the other is UDEA0017, and generates nothing`(
+        @TempDir workDir: File,
+    ) {
+        val source = component(
+            "Drone",
+            "var roll: Float = 0f, var pitch: Float = 0f, var yaw: Float = 0f",
+            "@RotationHandle(rotation = \"yaw\", aboutX = \"roll\")",
+        )
+        val run = ProcessorHarness.run(workDir, mapOf("Drone.kt" to source), editorRun)
+
+        val message = run.errors.single()
+        assertTrue(message.startsWith(UdeaRules.GIZMO_HANDLE_FIELD.id), message)
+        assertTrue("aboutX" in message && "aboutY" in message, "the error must name both angles: $message")
+        assertEquals(emptyList(), run.generatedFiles, "a component with a bad handle must generate nothing")
+    }
+
+    @Test
+    fun `a misspelled scale factor is UDEA0017 with a did-you-mean`(@TempDir workDir: File) {
+        val source = component(
+            "Drone",
+            "var scaleX: Float = 1f, var scaleY: Float = 1f, var scaleZ: Float = 1f",
+            "@ScaleHandle(z = \"scaleZZ\")",
+        )
+        val run = ProcessorHarness.run(workDir, mapOf("Drone.kt" to source), editorRun)
+
+        val message = run.errors.single()
+        assertTrue(message.startsWith(UdeaRules.GIZMO_HANDLE_FIELD.id), message)
+        assertTrue("@ScaleHandle(z = \"scaleZZ\")" in message && "did you mean 'scaleZ'?" in message, message)
     }
 
     @Test
@@ -279,7 +311,7 @@ class GizmoProcessorTest {
         @TempDir workDir: File,
     ) {
         // `CodegenFixturesModuleRegistry` is compiled into this test classpath by `kspTest`, with an
-        // index naming `fixtures.Beacon` and `fixtures.Crate`: exactly the shape of `:moba:game`'s
+        // index naming `fixtures.Beacon`, `fixtures.Crate` and `fixtures.Drone`: exactly the shape of `:moba:game`'s
         // registry as `:moba:desktop`'s editor source set sees it.
         val run = ProcessorHarness.run(
             workDir,
@@ -296,6 +328,9 @@ class GizmoProcessorTest {
                 "CratePositionGizmo.kt",
                 "CrateRotationGizmo.kt",
                 "CrateSizeGizmo.kt",
+                "DronePositionGizmo.kt",
+                "DroneRotationGizmo.kt",
+                "DroneScaleGizmo.kt",
                 "HarnessGizmoRegistry.kt",
             ),
             run.generatedFiles.map { it.name }.sorted(),

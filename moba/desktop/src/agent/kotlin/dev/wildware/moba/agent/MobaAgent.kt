@@ -71,6 +71,8 @@ import dev.wildware.udea.core.loop.barrier
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.core.spatial.AnimatorReplicator
+import dev.wildware.udea.core.spatial.Transform3D
+import dev.wildware.udea.core.spatial.Transform3DReplicator
 import dev.wildware.udea.generated.MobaUdeaRegistry
 import dev.wildware.udea.render.OverlayResources
 import dev.wildware.udea.render.OverlaySystem
@@ -359,7 +361,7 @@ public object MobaAgent {
 
         val position = positionAccess()
         val components = AgentComponentIndex(
-            listOf(position, unitAccess(), matchAccess(), inventoryAccess(), animatorAccess(), towerAccess()),
+            listOf(position, unitAccess(), matchAccess(), inventoryAccess(), animatorAccess(), towerAccess(), transformAccess()),
         )
         val worldTools = WorldToolset(
             world = host.world,
@@ -594,6 +596,18 @@ public object MobaAgent {
         name = "Tower",
         replicator = TowerReplicator,
         componentType = Tower,
+    )
+
+    /**
+     * `Transform3D`, so the editor's 3D gizmos can move, turn and scale a model (issue #237), and an
+     * agent can read where one is. `moba` draws no model itself; the editor's Fox is the one there is.
+     *
+     * Nothing here is agent-writable, for `unitAccess`'s reason; the editor's edit sessions do not ask.
+     */
+    private fun transformAccess(): AgentComponentType = agentComponent(
+        name = "Transform3D",
+        replicator = Transform3DReplicator,
+        componentType = Transform3D,
     )
 
     /**

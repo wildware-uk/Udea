@@ -74,6 +74,26 @@ class OversizedResultTest {
         assertTrue("\"resultRef\":null" in rendered, rendered)
     }
 
+    /**
+     * The handle is for a caller across a transport; a caller in the same process reads the answer
+     * itself. The editor is one (issue #237): its inspector reads `editor.common_fields` through
+     * this bridge, and a selection with enough fields in common answers above the ceiling. Handed
+     * the handle, the inspector has no fields to show and no way to follow it.
+     */
+    @Test
+    fun `a caller in the same process reads an oversized answer whole`() {
+        val bridge = AgentBridge(resultSpill = { "cap_0001" })
+        val answer = oversized()
+        bridge.complete(3L, answer)
+
+        val whole = bridge.wholeCommandResults().single()
+        assertEquals(3L, whole.id)
+        assertEquals(answer.json, (whole.result as AgentResult.Ok).json)
+        // What travels is still the handle: reading whole takes nothing from the document.
+        val delivered = bridge.commandResults().single().result as AgentResult.Ok
+        assertTrue("\"resultRef\":\"cap_0001\"" in delivered.json, delivered.json)
+    }
+
     private fun oversized(): AgentResult.Ok = AgentResult.ok {
         put("filler", "x".repeat(AgentBridge.MAX_DELIVERABLE_RESULT_CHARS + 1))
     }

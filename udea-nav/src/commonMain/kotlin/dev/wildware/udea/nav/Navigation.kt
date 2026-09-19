@@ -38,8 +38,14 @@ public class Navigation internal constructor(grid: NavGrid) {
 
     private var nextField = 0
 
-    /** How many flow fields have been swept since the grid was last rebuilt. A diagnostic. */
-    public var fieldSweeps: Int = 0
+    /**
+     * How many flow fields have been swept since the grid was last rebuilt.
+     *
+     * `internal` because nothing outside this module has a use for it: it exists so
+     * `NavigationCacheTest` can tell a field that was swept from one that came out of the cache,
+     * which is the difference a stale cache hides.
+     */
+    internal var fieldSweeps: Int = 0
         private set
 
     // The direct-mapped A* hop cache: the key's three parts beside the answer, one slot each.

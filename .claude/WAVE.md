@@ -469,6 +469,10 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `kool-physics-2d` (pulls kool-core into simulation/headless, UDEA-MG-002). 3D: Kool uses PhysX (physx-jni
   2.7.1); Box3D (erincatto, MIT, v0.1.0) has no JVM/KMP binding yet. No physics backend exists today (#213
   confirmed gdx-box2d unused). **Owner: "sounds good" - `udea-physics2d` (box2d-jni) QUEUED FOR WAVE 12** (commented on #199, no issue).
+- **Owner brainstorm: editor gizmos (2026-09-19).** Spec `docs/superpowers/specs/2026-09-19-editor-gizmos-design.md`
+  (`24c9fa4`, pushed). Owner explicitly asked for issues (overrides no-new-issues for this): epic **#231**, G1 #232
+  (edit sessions/selection tools, udea-agent, needs #193 only: READY next wave), G2 #233 + G3 #234 (need #194), G4
+  #235, G5 #236, G6 #237 (needs textured-model work), G7 #238 (needs #196). NOT part of #199, does not block #214.
 - Held: #194 (settings.gradle.kts + AGENTS.md table collide with #213), #188 (moba HUD beside #228),
   #189 (after #188; may be mostly done by #213), #195/#196 (need #194), #214 last.
 

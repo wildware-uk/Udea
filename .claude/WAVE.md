@@ -444,6 +444,16 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
+## Wave 12 (2026-09-19): in flight
+
+- Baseline `9d6629f`: FULLY GREEN, 917 tasks.
+- Dispatched: dev-194 (#194 editor window: new udea-editor, settings, AGENTS.md, :moba:desktop editor source set,
+  udea-render SceneView binding, new release-classpath MG rule), dev-232 (#232 gizmo G1: udea-agent editor toolset),
+  dev-240 (#240 animated A1: glTF import; udea-render/model + model asset kind + Fox CC-BY sample). Three devs.
+- Held: udea-physics2d (settings/AGENTS.md collide with #194), #188 HUD (udea-render UI beside #194), #195/#196 (need
+  #194), gizmo G2/G3 (need #194), A2 (needs #240).
+- Contracts refreshed for wave 12: `scratchpad/lead/dev-contract.md`, `rev-contract-w11.md` (addenda updated).
+
 ## Wave 11 (2026-09-19): done
 
 - Baseline `6a7a9b1`: FULLY GREEN. Any red on a branch is the branch's.

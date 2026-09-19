@@ -51,6 +51,7 @@ import dev.wildware.udea.render.ui.UiLayer
 import dev.wildware.udea.render.view.EditorCamera
 import dev.wildware.udea.render.view.ViewDimension
 import dev.wildware.udea.render.view.ViewPoint
+import dev.wildware.udea.render.view.ViewRay
 import org.lwjgl.glfw.GLFW
 import java.awt.image.BufferedImage
 import java.nio.file.Path
@@ -163,14 +164,21 @@ class GlGizmo3DDragTest {
             }
             val aim = GizmoAim(::drawnAt)
             val slack = backend.onRenderThread { camera.unitsPerPixelAt(0f, 0f, 0f) } * SCREEN_TOLERANCE
-            // Puts the Fox's angles back to [x] and [y], facing its heading: the world is this test's to set.
-            fun tilt(x: Float, y: Float) {
+            // Puts the Fox's angles back to [x], [y] and [heading], at its own size, and the orbit back over
+            // wherever the drags so far have moved it to: the world and the view are this test's to set.
+            fun tilt(x: Float, y: Float, heading: Float = FOX_HEADING) {
                 backend.onRenderThread {
                     with(host.world) {
                         checkNotNull(netIds.resolveOrNull(id))[Transform3D].apply {
                             rotationX = x
                             rotationY = y
-                            rotationZ = FOX_HEADING
+                            rotationZ = heading
+                            scaleX = FOX_SCALE
+                            scaleY = FOX_SCALE
+                            scaleZ = FOX_SCALE
+                            camera.targetX = this.x
+                            camera.targetY = this.y
+                            camera.targetZ = this.z + LOOK_AT_Z
                         }
                     }
                 }
@@ -238,20 +246,33 @@ class GlGizmo3DDragTest {
             assertEquals(listOf(FOX_SCALE, FOX_SCALE), listOf(stretched.scaleX, stretched.scaleY), "the Z box scaled another axis")
             assertEquals(List(++edits) { COMMIT }, history(), "a scale box drag is not one undo entry")
 
-            // The middle box: up and to the right on screen, as far as the axis boxes stand off, doubles all three.
+            // The middle box: up and to the right on screen, as far as the axis boxes stand off. The box is
+            // held in the plane facing the press, and grows the Fox by how far the pointer goes there along
+            // world X and Z together, a reach's worth doubling it; the view's tilt makes that a little less
+            // than a straight hundred pixels, so the answer comes from the camera's own rays.
             val middle = drawnAt(centre)
             val upRight = HandlePainter.SCALE_REACH / sqrt(2f)
-            // Held in the plane facing the press: a pixel's step there is what the camera says it is.
+            val released = ViewPoint(middle.x + upRight, middle.y + upRight)
+            val expected = backend.onRenderThread {
+                val pressed = ViewRay().also { camera.ray(middle.x, middle.y, it) }
+                val to = ViewRay().also { camera.ray(released.x, released.y, it) }
+                val facing = WorldPoint(pressed.directionX, pressed.directionY, pressed.directionZ)
+                val along = WorldPoint(to.directionX, to.directionY, to.directionZ)
+                val from = WorldPoint(to.originX, to.originY, to.originZ)
+                val hit = from.plus(along, dot(centre.minus(from), facing) / dot(along, facing))
+                val upAndRight = WorldPoint(1f / sqrt(2f), 0f, 1f / sqrt(2f))
+                1f + dot(hit.minus(centre), upAndRight) /
+                    (HandlePainter.SCALE_REACH * camera.unitsPerPixelAt(centre.x, centre.y, centre.z))
+            }
             val uniformFrom = transform()
-            backend.drag(
-                frames,
-                screenOfView(views, view, middle),
-                screenOfView(views, view, ViewPoint(middle.x + upRight, middle.y + upRight)),
-            ) { shot("scale-uniform-box") }
+            backend.drag(frames, screenOfView(views, view, middle), screenOfView(views, view, released)) {
+                shot("scale-uniform-box")
+            }
             val grown = transform()
             val factor = grown.scaleX / uniformFrom.scaleX
-            println("GlGizmo3DDragTest: the middle box scaled by $factor for a drag of ${HandlePainter.SCALE_REACH} pixels up and right")
-            assertTrue(factor in UNIFORM_GROWN, "the middle box did not about double the Fox for a drag up and right: $factor")
+            println("GlGizmo3DDragTest: the middle box scaled by $factor, the camera's rays say $expected")
+            assertTrue(expected > UNIFORM_AT_LEAST, "the drag up and right should grow the Fox well past its size: $expected")
+            assertNear(expected, factor, "the middle box did not grow the Fox by the drag", expected * STRETCH_TOLERANCE)
             assertNear(factor, grown.scaleY / uniformFrom.scaleY, "the middle box scaled Y by another factor", TOLERANCE)
             assertNear(factor, grown.scaleZ / uniformFrom.scaleZ, "the middle box scaled Z by another factor", TOLERANCE)
             assertEquals(List(++edits) { COMMIT }, history(), "a middle box drag is not one undo entry")
@@ -283,6 +304,7 @@ class GlGizmo3DDragTest {
             }
 
             // --- snapping, and Ctrl to bypass it ----------------------------------------------------------
+            tilt(TILT_X, TILT_Y)
             backend.onRenderThread {
                 preferences.gridSnap = true
                 preferences.gridStep = GRID
@@ -318,6 +340,8 @@ class GlGizmo3DDragTest {
                 preferences.angleSnap = false
                 preferences.axes = GizmoAxes.Local
             }
+            // Turned so its own X is well off the world's, and not end-on to the view.
+            tilt(TILT_X, TILT_Y, LOCAL_HEADING)
             val turned = transform()
             val local = AxisFrame.euler(turned.rotationX, turned.rotationY, turned.rotationZ)
             val localGrip = aim.pixelsOut(turned.position(), local.x, ARROW_GRIP)
@@ -403,6 +427,9 @@ class GlGizmo3DDragTest {
         const val TILT_X = 0.3f
         const val TILT_Y = -0.25f
 
+        /** The Fox's heading for the local axes drag, in radians: its X is half way between the world's X and Y. */
+        val LOCAL_HEADING = (PI / 4).toFloat()
+
         /** The Z ring's place among the rings the gizmo declares: X's, Y's, Z's. */
         const val Z_RING = 2
 
@@ -412,11 +439,8 @@ class GlGizmo3DDragTest {
         /** A scale box pulled by whole pixels lands within this share of its factor. */
         const val STRETCH_TOLERANCE = 0.05f
 
-        /**
-         * What the middle box multiplies the Fox by for its drag: two, give or take what the view's tilt
-         * does to "up and to the right" - world X and Z together - and the pixels lost to rounding.
-         */
-        val UNIFORM_GROWN = 1.8f..2.2f
+        /** Less than the middle box's drag up and right grows the Fox by from this view: nearly two. */
+        const val UNIFORM_AT_LEAST = 1.5f
 
         const val GRID = 0.25f
         const val ANGLE_STEP = 15f

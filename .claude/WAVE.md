@@ -452,6 +452,12 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   hook point for #238 Keep), dev-physics (udea-physics2d over box2d-jni 1.0.0, no issue, tracked on #199), dev-188 (#188
   HUD on ComposeGL). **Known overlap:** #195 and #196 both add to udea-editor - told new files + minimal hooks; expect a
   trial-merge for the second one. physics and #188 may each add one libs.versions.toml hunk.
+- **#196 r1 FAIL (2 findings):** (1) pre-Play undo of a delete puts shared Fleks Snapshot objects back live
+  (EditorToolset.kt:848, EditorHistory.mark shares edits) -> play-time values after Stop; (2) Stop leaves snapshot-ring
+  frames newer than the restored tick -> rewind lands in discarded play, and >120-tick play then Step x2 throws from
+  SnapshotRing.kt:187 require. Relayed verbatim. **Ledger (passed r1):** build 928 green; evidence 5/5, M1 red 2/5;
+  Stop between ticks (AgentGameLoop.pump drains before host.frame); standalone honest (separate MobaAgent JVM, UNDEAD
+  11); public API used cross-module. Out of scope: stale score bar/camera after Stop.
 - Held: #241 A2 (asset compiler clip gen collides with #195), gizmo G2 #233 / G3 #234 (udea-editor busy), #189.
 - Remaining for #214: #195, #196 (then docs + kmp -> master). Shelved #223/#226 stay open (owner's shelving).
 

@@ -8,7 +8,9 @@ import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.SimPhase
 import dev.wildware.udea.core.module.SimRegistry
 import dev.wildware.udea.core.module.UdeaModule
+import dev.wildware.udea.core.module.after
 import dev.wildware.udea.core.module.before
+import dev.wildware.udea.core.physics.BodyHandle
 import dev.wildware.udea.core.physics.PhysicsStepSystem
 import dev.wildware.udea.core.physics.PhysicsWorld
 
@@ -30,6 +32,18 @@ import dev.wildware.udea.core.physics.PhysicsWorld
  * 3. `Physics`: `PhysicsStepSystem` advances Box2D one tick and copies every body's pose,
  *    velocity and sleep state back into its `PhysicsBody`. That copy happens once per tick,
  *    inside the solver's own step, and is the only way a solver result reaches the components.
+ *
+ * ## 3D entities: `Transform3D` on the ground plane
+ *
+ * An entity that also carries a `Transform3D` (issue #247) is placed by it and, if dynamic, moves
+ * it. Three more `Physics` systems wrap the ones above: [Transform3DSeedSystem] before step 2
+ * builds a new body where `Transform3D.x/y/rotationZ` says; [BodyFollowsTransform3DSystem] between
+ * steps 2 and 3 carries each kinematic body to its `Transform3D` in one step, pushing what it meets,
+ * and teleports a static one whose `Transform3D` moved; and [Transform3DFromBodySystem] after step 3
+ * copies each dynamic body's solved pose into its `Transform3D`. `z` and the other rotations and the
+ * scale stay the game's. So a 3D game moves a dynamic body the way a 2D one does - velocity, or a
+ * `Teleport` - and moves a kinematic or static one by writing its `Transform3D`. An entity with no
+ * `Transform3D` is untouched by all three.
  *
  * Add `PhysicsSnapshotTypes.all()` to the game's `ComponentRegistry` as well, or a rewind cannot
  * see a body at all.
@@ -62,12 +76,26 @@ public class Physics2DModule(
     }
 
     override fun simulation(registry: SimRegistry) {
+        registry.add(SimPhase.Physics, { Transform3DSeedSystem() }) {
+            before<PhysicsReconcileSystem>()
+        }
         registry.add(SimPhase.Physics, { ctx ->
-            PhysicsReconcileSystem(checkNotNull(backend) { "context runs before simulation" }, ctx[CoreModule.NET_IDS])
+            PhysicsReconcileSystem(openedBackend(), ctx[CoreModule.NET_IDS])
         }) {
             before<PhysicsStepSystem>()
         }
+        registry.add(SimPhase.Physics, { ctx ->
+            BodyFollowsTransform3DSystem(openedBackend(), ctx[CoreModule.NET_IDS])
+        }) {
+            after<PhysicsReconcileSystem>()
+            before<PhysicsStepSystem>()
+        }
+        registry.add(SimPhase.Physics, { Transform3DFromBodySystem() }) {
+            after<PhysicsStepSystem>()
+        }
     }
+
+    private fun openedBackend(): SolverBackend = checkNotNull(backend) { "context runs before simulation" }
 
     /** Frees the native world. Safe to call twice, and before the game was ever built. */
     override fun close() {
@@ -103,6 +131,12 @@ internal interface SolverBackend : PhysicsWorld, AutoCloseable {
      * [StaticGeometryChangedException] if a `Chain` changed.
      */
     fun reconcile(world: World, netIds: NetIdIndex)
+
+    /**
+     * Gives the kinematic body [handle] the linear and angular velocity that carries it to
+     * ([x], [y], [angle]) in exactly one step, waking it if it must move.
+     */
+    fun moveKinematicTo(handle: BodyHandle, x: Float, y: Float, angle: Float)
 }
 
 /** Opens the Box2D world for this target. */

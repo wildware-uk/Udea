@@ -23,6 +23,7 @@ internal typealias B2Capsule = box2d.b2Capsule.Raw
 internal typealias B2Segment = box2d.b2Segment.Raw
 internal typealias B2Vec2 = box2d.b2Vec2.Raw
 internal typealias B2Rot = box2d.b2Rot.Raw
+internal typealias B2Transform = box2d.b2Transform.Raw
 internal typealias B2RotMath = box2d.B2_Rot.Raw
 internal typealias B2ContactEvents = box2d.b2ContactEvents.Raw
 internal typealias B2ContactBegin = box2d.b2ContactBeginTouchEvent.Raw

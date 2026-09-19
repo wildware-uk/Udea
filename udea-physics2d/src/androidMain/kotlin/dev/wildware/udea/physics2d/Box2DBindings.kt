@@ -23,6 +23,7 @@ internal typealias B2Capsule = box2dandroid.b2Capsule.Raw
 internal typealias B2Segment = box2dandroid.b2Segment.Raw
 internal typealias B2Vec2 = box2dandroid.b2Vec2.Raw
 internal typealias B2Rot = box2dandroid.b2Rot.Raw
+internal typealias B2Transform = box2dandroid.b2Transform.Raw
 internal typealias B2RotMath = box2dandroid.B2_Rot.Raw
 internal typealias B2ContactEvents = box2dandroid.b2ContactEvents.Raw
 internal typealias B2ContactBegin = box2dandroid.b2ContactBeginTouchEvent.Raw

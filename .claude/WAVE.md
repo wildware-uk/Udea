@@ -444,6 +444,12 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
+## Wave 17 (2026-09-19): in flight - Hollow (owner: "Create a feature rich 3D game to test out the engine")
+
+- Spec docs/superpowers/specs/2026-09-19-hollow-3d-game-design.md; epic #245; tickets E1 #246, E2 #247, E3 #248, H1 #249, H2 #250 .. H7 #255 (created at the owner's request).
+- In flight: dev-246 (Transform3D @Net + 3D interp: udea-core, udea-render/interp), dev-247 (physics drives Transform3D: udea-physics2d), dev-248 (third-person camera: udea-render/camera), dev-249 (hollow scaffold + settings/AGENTS.md/module graph).
+- Common contract: scratchpad/lead/common-w17.md. H2 needs H1+E2+E3; H3..H5 serial in :hollow:game; H6 needs H5+E1; H7 needs H1 (can run beside H3-H5).
+
 ## Wave 16 (2026-09-19): done
 
 - #235: merged, round 1 PASS (no findings). Merged tree == reviewed tree. Left button selects (gizmo first), right button orbits/pans; public PickBounds in udea-render (sprites, models, moba units by body); EditorInspector with Mixed, no Set button (owner): G1 edit session per field, commit on Enter/focus loss, cancel on refused value. Cards: AnimationRenderSystem not pickable; G1 30s idle cancel reverts an un-entered value; inspector text boxes only; selection outline re-queries pick sources per redraw.

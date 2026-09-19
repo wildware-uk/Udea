@@ -71,7 +71,7 @@ object GameModelShot {
         val human = loadModel(convertedRoot, humanModel)
         val fox = loadModel(assetRoot, foxModel)
 
-        val camera = ModelCamera().apply { lookAt(0.6f, -5.2f, 2.2f, 0.6f, 0f, 0.95f) }
+        val camera = ModelCamera().apply { lookAt(0.55f, -3.9f, 1.7f, 0.55f, 0f, 0.9f) }
         val light = ModelLight(directionX = -1f, directionY = 0.6f, directionZ = -0.8f, intensity = 3.2f, ambient = Rgba.of(0.1f, 0.1f, 0.12f))
         val registry = RenderRegistry()
         registry.register(RenderPhase.PreRender, ::SkySystem)
@@ -110,7 +110,7 @@ object GameModelShot {
                     it += ModelRenderer(model = human)
                 }
                 world.entity {
-                    it += Transform3D(x = 1.7f, y = 0.4f, rotationZ = FOX_HEADING, scaleX = FOX_SCALE, scaleY = FOX_SCALE, scaleZ = FOX_SCALE)
+                    it += Transform3D(x = 1.4f, y = 0.3f, rotationZ = FOX_HEADING, scaleX = FOX_SCALE, scaleY = FOX_SCALE, scaleZ = FOX_SCALE)
                     it += ModelRenderer(model = fox)
                 }
             }
@@ -150,8 +150,11 @@ object GameModelShot {
     private const val TURN_STEPS = 4
     private const val FRAME_BUDGET = 240
 
-    /** Found by drawing it: the converted character is about this many units tall per metre. */
-    private const val HUMAN_SCALE = 1f
+    /**
+     * The converted character is about 553 units tall: its mesh is 8 units, under a node scaled by
+     * 69.18 in the FBX. This makes it 1.8 tall.
+     */
+    private const val HUMAN_SCALE = 0.00325f
 
     /** Three-quarters on to the camera. */
     private const val HUMAN_HEADING = -0.5f

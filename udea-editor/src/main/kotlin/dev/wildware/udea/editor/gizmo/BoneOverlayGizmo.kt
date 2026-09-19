@@ -56,8 +56,8 @@ public data class SkeletonJoint(val at: WorldPoint, val parent: Int) {
 
 /**
  * The joints [models] draws, as [view] shows them: `ModelRenderSystem.skeletonOf` read into
- * [SkeletonJoint]s. The Scene tab passes itself, so its overlay follows its scrub preview; the Game
- * tab passes `null`, the capturable frame's simulated pose.
+ * [SkeletonJoint]s. The Scene tab passes itself, so its overlay follows its scrub preview; `null`
+ * reads the capturable frame's simulated pose.
  */
 public fun modelSkeletons(models: ModelRenderSystem, view: WorldViewport?): SkeletonSource = ModelSkeletons(models, view)
 

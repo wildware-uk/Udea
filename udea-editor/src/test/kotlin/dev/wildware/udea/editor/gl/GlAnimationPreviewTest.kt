@@ -176,6 +176,11 @@ class GlAnimationPreviewTest {
             val moved = moved(bare.getValue(first), bare.getValue(last))
             println("GlAnimationPreviewTest: $moved fox pixels moved in the Scene tab between clip ticks $first and $last")
             assertTrue(moved >= MIN_MOVED_PIXELS, "scrubbing did not move the fox in the Scene tab: $moved pixels")
+            // The preview stands in for the simulated fox rather than beside it: where the simulated
+            // pose stood and the previewed one does not, the background shows.
+            val uncovered = uncovered(simulated.scene, bare.getValue(last))
+            println("GlAnimationPreviewTest: $uncovered pixels of the simulated fox uncovered at clip tick $last")
+            assertTrue(uncovered >= MIN_MOVED_PIXELS, "the simulated fox is still drawn under the preview: $uncovered pixels uncovered")
             for ((at, pose) in poses) {
                 assertContentEquals(pixels(simulated.capture), pixels(pose.capture), "scrubbing to $at changed the capturable frame")
             }
@@ -306,6 +311,13 @@ class GlAnimationPreviewTest {
     private fun moved(a: BufferedImage, b: BufferedImage): Int {
         var n = 0
         for (y in 0 until a.height) for (x in 0 until a.width) if (isFox(a.getRGB(x, y)) != isFox(b.getRGB(x, y))) n++
+        return n
+    }
+
+    /** Pixels that are fox in [before] and background in [after]. */
+    private fun uncovered(before: BufferedImage, after: BufferedImage): Int {
+        var n = 0
+        for (y in 0 until before.height) for (x in 0 until before.width) if (isFox(before.getRGB(x, y)) && !isFox(after.getRGB(x, y))) n++
         return n
     }
 

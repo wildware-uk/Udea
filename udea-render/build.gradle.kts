@@ -196,7 +196,7 @@ val udeaVerifyHeadless = tasks.register<Test>("udeaVerifyHeadless") {
 // Unlike `udeaVerifyHeadless` it covers every project, `udea-render` included: `LibGdxScan`.
 
 /**
- * Every project with a build script, as a repository-relative directory: `udea-*` and the game.
+ * Every project with a build script, as a repository-relative directory: `udea-*` and the games.
  * `UdeaVerifyNoLibGdxTest` checks it against `settings.gradle.kts`, so a module cannot drop out.
  */
 val libGdxScanModules: List<String> = rootProject.subprojects

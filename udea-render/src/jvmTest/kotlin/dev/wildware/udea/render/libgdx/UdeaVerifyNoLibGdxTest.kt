@@ -40,12 +40,12 @@ class UdeaVerifyNoLibGdxTest {
         // the whole of the rule (issue #189): a module left off is a module scene2d can return to.
         val settings = RepoLayout.repoRoot.resolve("settings.gradle.kts")
         assertTrue(settings.isFile, "settings.gradle.kts not found at $settings")
-        val included = Regex("""^include\("((?:udea-|moba:)[a-z0-9:-]+)"\)""", RegexOption.MULTILINE)
+        val included = Regex("""^include\("((?:udea-|moba:|hollow:)[a-z0-9:-]+)"\)""", RegexOption.MULTILINE)
             .findAll(settings.readText())
             .map { it.groupValues[1].replace(':', '/') }
             .toSortedSet()
         assertTrue(
-            included.containsAll(listOf("udea-core", "udea-render", "moba/game", "moba/android")),
+            included.containsAll(listOf("udea-core", "udea-render", "moba/game", "moba/android", "hollow/game")),
             "the settings scan found only $included - the regex has stopped matching, so this " +
                 "test would be comparing against nothing",
         )

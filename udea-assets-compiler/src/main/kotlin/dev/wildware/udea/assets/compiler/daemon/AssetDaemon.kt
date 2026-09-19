@@ -277,7 +277,10 @@ public class AssetDaemon(
         val scan = scanner.scanFiles(listOf(file))
         val result = compiler.compile(listOf(file), scan.referenceSpanIndex())
         target[file] = result.graph.assets.values.toList()
-        return result.diagnostics
+        // Pass 1's own diagnostics first, as `AssetPipeline.compileAndValidate` reports them: a
+        // script the build refuses in its syntactic pass - a loop (issue #192) - must not be one
+        // the live daemon applies.
+        return scan.diagnostics + result.diagnostics
     }
 
     /**

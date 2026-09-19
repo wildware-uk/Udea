@@ -5,18 +5,24 @@ import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
 import dev.wildware.udea.assets.compiler.AssetCompilerRules
 import dev.wildware.udea.diagnostics.SourceSpan
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
+import dev.wildware.udea.diagnostics.UdeaRules
 import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtDoWhileExpression
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtForExpression
 import org.jetbrains.kotlin.psi.KtLambdaArgument
 import org.jetbrains.kotlin.psi.KtLambdaExpression
+import org.jetbrains.kotlin.psi.KtLoopExpression
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.KtQualifiedExpression
 import org.jetbrains.kotlin.psi.KtScriptInitializer
 import org.jetbrains.kotlin.psi.KtSimpleNameStringTemplateEntry
 import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.KtValueArgument
+import org.jetbrains.kotlin.psi.KtWhileExpression
 import java.nio.file.Path
 import java.security.MessageDigest
 import kotlin.io.path.isRegularFile
@@ -262,6 +268,7 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
             collectFileConstants(statements)
             statements.forEach { visitStatement(it, emptyMap()) }
             collectReferences(ktFile)
+            collectLoops(ktFile)
         }
 
         /**
@@ -393,6 +400,46 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
             }
         }
 
+        /**
+         * Every loop in the file, wherever it is nested, as [UdeaRules.LOOP_IN_ASSET] (issue #192).
+         *
+         * A whole-file sweep for the reason [collectReferences] is one: a loop inside a
+         * declaration's lambda, a helper function or a `val` initializer is still a loop. Over PSI
+         * and not over text, so a loop keyword in a comment or a string literal is not a loop.
+         *
+         * `repeat` is matched as an unqualified call. `"-".repeat(3)` is `String.repeat` on a
+         * receiver, which builds a string rather than running a body, so it is left alone. A
+         * script's own function named `repeat` would be refused too - the honest cost of a pass
+         * that resolves nothing, the same one `DeterminismValidator` states.
+         */
+        private fun collectLoops(ktFile: KtFile) {
+            val loops = ArrayList<Pair<PsiElement, String>>()
+            for (loop in PsiTreeUtil.collectElementsOfType(ktFile, KtLoopExpression::class.java)) {
+                val keyword = when (loop) {
+                    is KtForExpression -> "for"
+                    is KtDoWhileExpression -> "do-while"
+                    is KtWhileExpression -> "while"
+                    else -> continue
+                }
+                loops += loop to keyword
+            }
+            for (call in PsiTreeUtil.collectElementsOfType(ktFile, KtCallExpression::class.java)) {
+                if (call.calleeExpression?.text != REPEAT_CALLEE) continue
+                val qualified = call.parent as? KtQualifiedExpression
+                if (qualified != null && qualified.selectorExpression === call) continue
+                loops += call to REPEAT_CALLEE
+            }
+            for ((element, keyword) in loops.sortedBy { it.first.textRange.startOffset }) {
+                diagnostics += UdeaRules.LOOP_IN_ASSET.diagnostic(
+                    message = "`$keyword` loop in an asset script. Assets may not contain loops: the " +
+                        "editor saves an exact value back to the line it came from, and a value a " +
+                        "loop produces has no single line. Write each declaration out, or keep a " +
+                        "level's units in a `.udealevel` file.",
+                    span = spanOf(element),
+                )
+            }
+        }
+
         // --- constant folding, syntactic only ------------------------------------------
 
         /**
@@ -464,6 +511,9 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
     public companion object {
         /** The extension every asset script carries. */
         public const val SCRIPT_SUFFIX: String = ".udea.kts"
+
+        /** The standard library's counted loop, refused by `collectLoops`. */
+        private const val REPEAT_CALLEE: String = "repeat"
 
         /**
          * IntelliJ PSI documents are LF-only, and a carriage return reaching the parser is

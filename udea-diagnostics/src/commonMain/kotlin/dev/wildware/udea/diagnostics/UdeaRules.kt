@@ -274,6 +274,25 @@ public object UdeaRules {
             "build cannot read, so no reference is validated",
     )
 
+    /**
+     * A `.udea.kts` contains a loop: `repeat`, `for`, `while` or `do`-`while` (issue #192).
+     *
+     * An error, raised by the asset compiler's first, syntactic pass at the loop itself. The
+     * editor's Save writes an exact value back into the script it came from, and a value produced
+     * inside a loop has no single place in the file to write it to - so a loop in an asset is a
+     * value the editor can show and never save. Levels, which is where loops used to live, are
+     * saved `.udealevel` files now.
+     *
+     * Registered here rather than in the asset compiler's own reserved band because the id space
+     * is shared, as this object's KDoc says; only the asset compiler raises it today.
+     */
+    public val LOOP_IN_ASSET: UdeaRule = UdeaRule(
+        id = "UDEA0015",
+        defaultSeverity = Severity.Error,
+        description = "a .udea.kts contains a repeat, for, while or do-while loop, so a value it " +
+            "produces has no single place in the file an editor can save it to",
+    )
+
     /** Every registered rule, in id order. */
     public val all: List<UdeaRule> = listOf(
         NET_ON_VAL,
@@ -290,6 +309,7 @@ public object UdeaRules {
         AGENT_NAME_COLLISION,
         REFERENCE_KIND_MISMATCH,
         ASSET_INDEX_FORMAT,
+        LOOP_IN_ASSET,
     ).sortedBy { it.id }
 
     private val byId: Map<String, UdeaRule> = all.associateBy { it.id }

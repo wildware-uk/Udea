@@ -61,16 +61,22 @@ class ClipPoseTest {
     }
 
     @Test
-    fun `between ticks the clip time never runs backwards, at a speed that is not whole`() {
-        val animator = Animator().apply { play(run, at(0), loop = Loop.Once, speed = 1.5f) }
+    fun `between ticks the clip time is continuous, at a speed that is not whole`() {
+        // At speed 1.5 the simulation's whole clip ticks go 0, 1, 3, 4, 6: adding alpha to those
+        // would skip a clip tick at every other tick boundary. The picture must not.
+        val speed = 1.5f
+        val animator = Animator().apply { play(run, at(0), loop = Loop.Once, speed = speed) }
         val pose = ClipPose()
-        var last = -1.0
-        for (tick in 0L..60L) {
-            for (step in 0 until 4) {
-                pose.set(animator, at(tick), step / 4f)
-                assertTrue(pose.currentTicks >= last, "tick $tick step $step went back: ${pose.currentTicks} < $last")
-                last = pose.currentTicks
-            }
+        for (tick in 0L..40L) {
+            pose.set(animator, at(tick), LATE_ALPHA)
+            val late = pose.currentTicks
+            pose.set(animator, at(tick + 1), 0f)
+            val next = pose.currentTicks
+            assertTrue(next >= late, "tick $tick: the clip ran backwards, $late then $next")
+            assertTrue(
+                next - late <= (1f - LATE_ALPHA) * speed + 1e-6,
+                "tick $tick: the clip jumped from $late at alpha $LATE_ALPHA to $next at the next tick",
+            )
         }
     }
 
@@ -168,5 +174,10 @@ class ClipPoseTest {
         pose.set(null, at(1), 0f)
         pose.set(animator, at(24), 0.3f)
         assertEquals(first, listOf(pose.current, pose.currentTicks, pose.previous, pose.previousTicks, pose.weight))
+    }
+
+    private companion object {
+        /** An alpha just short of the next tick. */
+        const val LATE_ALPHA = 0.999f
     }
 }

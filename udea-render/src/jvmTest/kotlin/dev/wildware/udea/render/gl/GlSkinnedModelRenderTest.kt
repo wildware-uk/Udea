@@ -127,7 +127,7 @@ class GlSkinnedModelRenderTest {
             val foxPixels = silhouette(stepA.capture)
             println("GlSkinnedModelRenderTest: fox $foxPixels px; $moved px moved in the capture, $movedInView in the Scene view")
             assertTrue(foxPixels >= MIN_FOX_PIXELS, "the fox is not drawn: $foxPixels pixels")
-            assertTrue(moved >= MIN_MOVED_PIXELS, "Walk ticks $tickA and ${tickA.value + QUARTER_STRIDE}: only $moved pixels of the fox moved")
+            assertTrue(moved >= MIN_MOVED_PIXELS, "Walk ticks ${tickA.value} and ${tickA.value + QUARTER_STRIDE}: only $moved pixels of the fox moved")
             assertTrue(movedInView >= MIN_MOVED_PIXELS, "the Scene view did not see the pose change: $movedInView pixels moved")
 
             // 3. The same clip time again, from a later tick: Walk started over, a quarter of a

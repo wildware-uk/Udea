@@ -24,18 +24,14 @@ import dev.wildware.udea.core.identity.NetIdIndex
  * implementation in from its module's `context` hook. A dedicated server, a CI run and a
  * benchmark all want a `ctx.physics` that is present and cheap.
  *
- * ## It is also, today, the *only* implementation
+ * ## What "no solver" means for a caller
  *
- * There is no Box2D backend in this tree — no module imports `com.badlogic.gdx.physics.box2d`,
- * and none is planned for Phase 0. So "physics" in a udea build currently means: bodies are
- * tracked, handles resolve, rebuilds are deterministic, and **nothing ever moves under its own
- * forces, nothing collides, no raycast hits and no contact fires**. A test that asserts a body
- * fell, bounced or overlapped is asserting against a solver that is not there.
+ * Bodies are tracked, handles resolve, rebuilds are deterministic, and **nothing ever moves
+ * under its own forces, nothing collides, no raycast hits and no contact fires**. A test that
+ * asserts a body fell, bounced or overlapped needs `udea-physics2d`'s Box2D world, not this one.
  *
  * That is deliberate and it is not a placeholder for correctness: a game whose movement is
- * `CharacterMover`'s job (spec 3.4) needs no solver for anything a player controls. It *is* a
- * placeholder for debris, server-only projectiles and sensor queries, which will not work until
- * a real backend lands.
+ * `CharacterMover`'s job (spec 3.4) needs no solver for anything a player controls.
  *
  * Not thread-safe: like the rest of the kernel it belongs to one simulation on one thread.
  */

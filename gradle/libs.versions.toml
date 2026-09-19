@@ -92,6 +92,15 @@ cryptography = "0.6.0"
 # exists. `udea-render` only: UDEA-MG-002 bans `de.fabmax.kool:*` from every headless module.
 kool = "0.19.0"
 
+# box2d-jni: Box2D 3.1.1 (MIT, Erin Catto) behind JNI bindings (MIT, Max Thiele), the same Box2D
+# Kool's `kool-physics-2d` wraps, taken directly so `udea-physics2d` carries no Kool (UDEA-MG-002).
+# 3.1.1 is what the native library reports (`b2GetVersion`, pinned by `Box2DPhysicsWorldTest`) and
+# the tag box2d-jni's build fetches; its README says "3.3.1", which is not a Box2D release.
+# The JVM artifact holds the `box2d.*` classes and each desktop platform's native library is a
+# classified jar beside it (`natives-linux`, `natives-macos`, ...). Android is a separate AAR with the
+# same API under `box2dandroid.*`. No iOS and no Wasm artifact exists.
+box2dJni = "1.0.0"
+
 # kotlinx-io: how `udea-assets` reads a `.udeapak` from a file on every target (issue #205, spec
 # section 6: "kotlinx-io everywhere; on Wasm, a 'file' is an HTTP fetch or an in-memory buffer").
 kotlinxIo = "0.9.1"
@@ -130,6 +139,8 @@ composegl-lwjgl3 = { module = "dev.wildware.composegl:composegl-lwjgl3", version
 # Kool's multiplatform core. Gradle's variant matching picks `kool-core-desktop` for the JVM
 # target and `kool-core-android` for the Android one.
 kool-core = { module = "de.fabmax.kool:kool-core", version.ref = "kool" }
+box2d-jni = { module = "de.fabmax.box2d-jni:box2d-jni", version.ref = "box2dJni" }
+box2d-jni-android = { module = "de.fabmax.box2d-jni:box2d-jni-android", version.ref = "box2dJni" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerialization" }
 kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "atomicfu" }
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }

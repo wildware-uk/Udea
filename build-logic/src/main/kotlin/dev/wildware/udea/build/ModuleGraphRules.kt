@@ -123,6 +123,9 @@ public object ModuleGraphRules {
         ":udea-gas",
         ":udea-gradle",
         ":udea-net",
+        // Box2D is native, but it is a solver and not a renderer: the simulation steps it on a
+        // dedicated server and in CI, where there is no display.
+        ":udea-physics2d",
         ":udea-replay",
     )
 

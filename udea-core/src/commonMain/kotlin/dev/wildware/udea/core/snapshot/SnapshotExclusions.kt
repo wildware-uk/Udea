@@ -43,10 +43,10 @@ public enum class SnapshotExclusion(
     CameraSmoothing("camera smoothing filters recent positions, which a rewind invalidates"),
 
     /**
-     * Untouched. Scene2d holds a widget tree with its own focus and animation state, none of
-     * it simulated. Rewinding it would close the agent's own inspector mid-call.
+     * Untouched. The ComposeGL UI holds a composition with its own focus and animation state,
+     * none of it simulated. Rewinding it would close the agent's own inspector mid-call.
      */
-    Scene2dUi("UI state is not simulated and rewinding it would disrupt the observer"),
+    Ui("UI state is not simulated and rewinding it would disrupt the observer"),
 
     /**
      * Untouched. A socket is a live connection to another process, which did not rewind.

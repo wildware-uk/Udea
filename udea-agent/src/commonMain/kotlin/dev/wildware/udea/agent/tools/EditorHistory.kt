@@ -19,28 +19,47 @@ internal sealed class EditorEdit(
     val author: AgentSessionId,
     /** The tool that made it, as an agent would call it. */
     val tool: String,
-    /** The entity it was made to. */
-    val netId: NetId,
 ) {
+
+    /** The entity it was made to; the first one, for an edit made to several. */
+    abstract val netId: NetId
 
     /** Whether this edit wrote field [fieldIndex] of [component] on [id]. */
     open fun touches(id: NetId, component: AgentComponentType, fieldIndex: Int): Boolean = false
 
-    /** `editor.set_field` and `editor.move`: fields written, with what each held either side. */
+    /** Whether this edit was made to [id] at all. */
+    open fun touchesEntity(id: NetId): Boolean = id == netId
+
+    /**
+     * `editor.set_field`, `editor.move` and a committed edit session: fields written, on one entity
+     * or several, with what each held either side. One edit however many entities it names, so
+     * one undo puts every one of them back.
+     */
     class Fields(
         sequence: Long,
         author: AgentSessionId,
         tool: String,
-        netId: NetId,
         val changes: List<FieldChange>,
-    ) : EditorEdit(sequence, author, tool, netId) {
+    ) : EditorEdit(sequence, author, tool) {
+
+        init {
+            require(changes.isNotEmpty()) { "$tool recorded an edit that wrote nothing" }
+        }
+
+        override val netId: NetId get() = changes[0].netId
+
+        /** Every entity this edit wrote to, in the order it wrote them. */
+        val netIds: List<NetId> = changes.map { it.netId }.distinct()
+
         override fun touches(id: NetId, component: AgentComponentType, fieldIndex: Int): Boolean =
-            id == netId && changes.any { it.component === component && it.fieldIndex == fieldIndex }
+            changes.any { it.netId == id && it.component === component && it.fieldIndex == fieldIndex }
+
+        override fun touchesEntity(id: NetId): Boolean = changes.any { it.netId == id }
     }
 
     /** `editor.spawn`: undone by removing the entity and giving its id back. */
-    class Spawn(sequence: Long, author: AgentSessionId, netId: NetId) :
-        EditorEdit(sequence, author, "editor.spawn", netId)
+    class Spawn(sequence: Long, author: AgentSessionId, override val netId: NetId) :
+        EditorEdit(sequence, author, "editor.spawn")
 
     /**
      * `editor.delete`: the removed entity's components, held so an undo can put them back.
@@ -50,12 +69,13 @@ internal sealed class EditorEdit(
      * back the very objects the delete took away. The id stays an outstanding reservation in the
      * `NetIdIndex` for as long as this edit is in a history; see `NetIdIndex.detach`.
      */
-    class Delete(sequence: Long, author: AgentSessionId, netId: NetId, val removed: Snapshot) :
-        EditorEdit(sequence, author, "editor.delete", netId)
+    class Delete(sequence: Long, author: AgentSessionId, override val netId: NetId, val removed: Snapshot) :
+        EditorEdit(sequence, author, "editor.delete")
 }
 
-/** One field an edit wrote: which, what it held before, and what the edit left in it. */
+/** One field an edit wrote: on which entity, which field, what it held before, and what the edit left in it. */
 internal class FieldChange(
+    val netId: NetId,
     val component: AgentComponentType,
     val fieldIndex: Int,
     val before: Any?,

@@ -90,6 +90,19 @@ class ClearingLevelTest {
         assertTrue(nearest >= STONE_CLEARANCE, "a stone stands $nearest m from the middle")
     }
 
+    @Test
+    fun `a level saved mid-game resumes at the tick it was saved on`() {
+        // The bundled clearing is saved at tick 0, where a fresh clock already stands; a level saved
+        // later - from the editor, mid-play - is the case where seeding must restore the clock, not
+        // only the entities.
+        host.run(SAVED_AFTER_TICKS)
+        val savedAt = host.tick
+        val resumed = HollowGame.host(RenderMode.Headless, level = host.game.levels.saveNow()).also(HollowGame::seed)
+        // `seed` runs one tick to apply what it queued.
+        assertEquals(savedAt + 1L, resumed.tick)
+        resumed.stop()
+    }
+
     private companion object {
         /** Trees enough to read as a ring rather than a few trees. */
         const val RING_MINIMUM = 24
@@ -101,5 +114,7 @@ class ClearingLevelTest {
 
         /** Metres from the middle kept clear of stones. */
         const val STONE_CLEARANCE = 6f
+
+        const val SAVED_AFTER_TICKS = 50
     }
 }

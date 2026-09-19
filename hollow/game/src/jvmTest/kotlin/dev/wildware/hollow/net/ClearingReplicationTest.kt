@@ -110,11 +110,13 @@ class ClearingReplicationTest {
             assertEquals(1L, client.applier.entitiesCreated, "${client.peer} created")
         }
 
+        val withSpawn = clients.map { it.host.world.numEntities }
         server.host.world -= spawned
         serverIds.free(id)
         harness.step(SETTLE_TICKS)
-        for (client in clients) {
+        for ((index, client) in clients.withIndex()) {
             assertNull(client.host.ctx[CoreModule.NET_IDS].resolveOrNull(id), "${client.peer} still has $id")
+            assertEquals(withSpawn[index] - 1, client.host.world.numEntities, "${client.peer}'s world kept the entity")
             assertEquals(1L, client.applier.entitiesDestroyed, "${client.peer} destroyed")
         }
     }

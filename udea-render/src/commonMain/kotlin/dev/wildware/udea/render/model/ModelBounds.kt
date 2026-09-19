@@ -141,3 +141,9 @@ internal fun MutableMat4f.place(
 
 /** A quarter turn about X takes a glTF file's +Y, its up, to the world's +Z. */
 internal val Y_UP_TO_Z_UP: AngleF = 90f.deg
+
+/**
+ * The way back: what takes a place *inside* a drawn model out of the file's frame and into the
+ * world's, so a socket reads the way `Transform3D` and `ModelNode` do (issue #260).
+ */
+internal val Z_UP_TO_Y_UP: AngleF = (-90f).deg

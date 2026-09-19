@@ -5,6 +5,7 @@ import dev.wildware.udea.compiler.testing.TestSource
 import dev.wildware.udea.compiler.testing.UdeaCompileTesting
 import dev.wildware.udea.compiler.testing.source
 import dev.wildware.udea.diagnostics.Severity
+import dev.wildware.udea.diagnostics.UdeaRule
 import dev.wildware.udea.diagnostics.UdeaRules
 import org.jetbrains.kotlin.cli.common.ExitCode
 import java.io.File
@@ -14,46 +15,64 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
- * A misspelled clip name fails the build with a did-you-mean (issue #241).
+ * A misspelled clip name, or a misspelled socket, fails the build with a did-you-mean
+ * (issues #241, #260).
  *
  * `Fox.Clips.Rnu` does not compile whether or not this plugin runs - Kotlin's own unresolved
  * reference sees to that. What the checker adds is the part spec section 5 makes mandatory: the
  * clip the author meant, under a stable rule id. So every case below that expects the rule also
  * expects the compilation to fail, and every case that expects silence expects nothing from this
- * rule rather than a clean compile.
+ * rule rather than a clean compile. `Chassis.Nodes.socket_rooof` is the same bargain for the
+ * nodes a part is mounted on, and it is checked here rather than in a file of its own so that
+ * the two cannot quietly come to behave differently.
  *
  * ### Why two modules
  *
- * The clips arrive the way they do in a game: `AnimationClip` from `udea-core` and the clip object
- * from generated code, both already compiled and on the classpath. So the upstream fixture is
- * compiled once with the plugin off, and each case compiles against its class output - the shape a
- * Gradle project dependency has - exactly as [UdeaAssetReferenceCheckerTest] does for asset ids.
+ * The clips and nodes arrive the way they do in a game: `AnimationClip` and `ModelNode` from
+ * `udea-core` and the generated objects from the asset build, all already compiled and on the
+ * classpath. So the upstream fixture is compiled once with the plugin off, and each case
+ * compiles against its class output - the shape a Gradle project dependency has - exactly as
+ * [UdeaAssetReferenceCheckerTest] does for asset ids.
  */
-class UdeaAnimationClipCheckerTest {
+class UdeaGeneratedMemberCheckerTest {
 
-    /** Stands in for `udea-core`'s `AnimationClip`: the checker keys on this class's name. */
+    /** Stands in for `udea-core`'s types: the checker keys on these class names. */
     private val clipApi: TestSource = source(
         "AnimationClip.kt",
         """
         package dev.wildware.udea.core.spatial
 
         class AnimationClip(val index: Int, val name: String)
+
+        class ModelNode(val index: Int, val name: String)
         """,
     )
 
-    /** Stands in for the accessor generator's output for `Fox.glb`, plus an object that is not clips. */
+    /**
+     * Stands in for the accessor generator's output for `Fox.glb` and a chassis with sockets,
+     * plus an object that holds neither.
+     */
     private val generated: TestSource = source(
         "Fox.kt",
         """
         package dev.wildware.udea.generated
 
         import dev.wildware.udea.core.spatial.AnimationClip
+        import dev.wildware.udea.core.spatial.ModelNode
 
         object Fox {
             object Clips {
                 val Survey: AnimationClip = AnimationClip(0, "Survey")
                 val Walk: AnimationClip = AnimationClip(1, "Walk")
                 val Run: AnimationClip = AnimationClip(2, "Run")
+            }
+        }
+
+        object Chassis {
+            object Nodes {
+                val socket_roof: ModelNode = ModelNode(0, "socket_roof")
+                val socket_left: ModelNode = ModelNode(1, "socket_left")
+                val muzzle: ModelNode = ModelNode(2, "muzzle")
             }
         }
 
@@ -206,6 +225,109 @@ class UdeaAnimationClipCheckerTest {
         assertEquals(emptyList(), run.diagnostics, run.describe())
     }
 
+    // ---- the nodes a part is mounted on (issue #260) -----------------------------------------
+
+    @Test
+    fun `a misspelled socket is an error at the name, with a did-you-mean`() {
+        val run = downstream(
+            """
+            package udea.game
+
+            import dev.wildware.udea.generated.Chassis
+
+            val socket = Chassis.Nodes.socket_rooof
+            """,
+        )
+
+        val diagnostic = run.assertOneError(UdeaRules.UNRESOLVED_MODEL_NODE)
+        assertEquals(Severity.Error, diagnostic.severity)
+        assertTrue("Did you mean 'socket_roof'?" in diagnostic.message, diagnostic.message)
+        assertTrue("Nodes has no node 'socket_rooof'" in diagnostic.message, diagnostic.message)
+        val span = requireNotNull(diagnostic.span) { "no span:\n" + run.describe() }
+        // `val socket = Chassis.Nodes.` is 27 characters, so the typo starts at column 28.
+        assertEquals(5, span.startLine, run.describe())
+        assertEquals(28, span.startColumn, "the squiggle must sit on the node name:\n" + run.describe())
+    }
+
+    @Test
+    fun `a name like no node at all lists the nodes the model has`() {
+        val run = downstream(
+            """
+            package udea.game
+
+            import dev.wildware.udea.generated.Chassis
+
+            val socket = Chassis.Nodes.turret_hardpoint
+            """,
+        )
+
+        val message = run.assertOneError(UdeaRules.UNRESOLVED_MODEL_NODE).message
+        assertTrue("Did you mean" !in message, message)
+        assertTrue("muzzle, socket_left, socket_roof" in message, "the nodes on offer, sorted: $message")
+    }
+
+    @Test
+    fun `correctly spelled sockets compile clean`() {
+        val run = downstream(
+            """
+            package udea.game
+
+            import dev.wildware.udea.generated.Chassis
+
+            val sockets = listOf(Chassis.Nodes.socket_roof, Chassis.Nodes.muzzle)
+            """,
+        )
+
+        assertEquals(emptyList(), run.diagnostics, run.describe())
+        assertEquals(emptyList(), run.otherMessages, run.describe())
+    }
+
+    @Test
+    fun `Suppress by the node rule id silences the did-you-mean but not the compile error`() {
+        val run = downstream(
+            """
+            package udea.game
+
+            import dev.wildware.udea.generated.Chassis
+
+            @Suppress("UDEA0018")
+            val socket = Chassis.Nodes.socket_rooof
+            """,
+        )
+
+        assertNotEquals(ExitCode.OK, run.exitCode, run.describe())
+        assertEquals(emptyList(), run.diagnostics, run.describe())
+    }
+
+    /**
+     * The two rules do not answer for each other: a missing clip is never reported as a missing
+     * node, and the suppression of one does not reach the other.
+     */
+    @Test
+    fun `a missing clip is the clip rule and a missing node is the node rule`() {
+        val clip = downstream(
+            """
+            package udea.game
+
+            import dev.wildware.udea.generated.Fox
+
+            val clip = Fox.Clips.Rnu
+            """,
+        )
+        val node = downstream(
+            """
+            package udea.game
+
+            import dev.wildware.udea.generated.Chassis
+
+            val socket = Chassis.Nodes.socket_rooof
+            """,
+        )
+
+        assertEquals(listOf(UdeaRules.UNRESOLVED_ANIMATION_CLIP.id), clip.diagnostics.map { it.ruleId }, clip.describe())
+        assertEquals(listOf(UdeaRules.UNRESOLVED_MODEL_NODE.id), node.diagnostics.map { it.ruleId }, node.describe())
+    }
+
     // ---- plumbing -------------------------------------------------------------------------
 
     private fun downstream(code: String): CheckerRun =
@@ -215,18 +337,20 @@ class UdeaAnimationClipCheckerTest {
         )
 
     /**
-     * Exactly one diagnostic, under the clip rule, in a compilation that failed.
+     * Exactly one diagnostic, under [rule], in a compilation that failed.
      *
      * Kotlin's own unresolved-reference error is expected in [CheckerRun.otherMessages] and is
      * not asserted away: the failure is the part that must never depend on this plugin.
      */
-    private fun CheckerRun.assertOneClipError() = run {
-        assertNotEquals(ExitCode.OK, exitCode, "a misspelled clip must fail the compile:\n" + describe())
+    private fun CheckerRun.assertOneError(rule: UdeaRule) = run {
+        assertNotEquals(ExitCode.OK, exitCode, "a misspelled name must fail the compile:\n" + describe())
         assertEquals(
-            listOf(UdeaRules.UNRESOLVED_ANIMATION_CLIP.id),
+            listOf(rule.id),
             diagnostics.map { it.ruleId },
-            "expected exactly one ${UdeaRules.UNRESOLVED_ANIMATION_CLIP.id}:\n" + describe(),
+            "expected exactly one ${rule.id}:\n" + describe(),
         )
         diagnostics.single()
     }
+
+    private fun CheckerRun.assertOneClipError() = assertOneError(UdeaRules.UNRESOLVED_ANIMATION_CLIP)
 }

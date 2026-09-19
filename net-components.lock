@@ -74,6 +74,14 @@
 # Issue #246 made every one of its fields `@Net`, so a client sees a 3D entity move; that changed
 # no id and no field order here, only which fields a delta may carry.
 #
+# `dev.wildware.udea.core.spatial.AttachedTo` (issue #260) is the part mounted on a named node of
+# another entity's model - a turret in a chassis's roof socket. It is here because the mount is
+# state a client, a snapshot and a replay all have to hold: a client that did not receive it would
+# draw a turret standing where it was spawned while the chassis drove away, and a rewind that did
+# not restore it would resurrect an assembly as loose parts. It sorts between `spatial.Animator`
+# and `spatial.Transform3D`, so `Transform3D` alone moves up by one. Nothing has shipped against
+# that id.
+#
 dev.wildware.moba.CharacterView
 dev.wildware.moba.Player
 dev.wildware.moba.Position
@@ -102,4 +110,5 @@ dev.wildware.udea.core.physics.Circle
 dev.wildware.udea.core.physics.PhysicsBody
 dev.wildware.udea.core.physics.Teleport
 dev.wildware.udea.core.spatial.Animator
+dev.wildware.udea.core.spatial.AttachedTo
 dev.wildware.udea.core.spatial.Transform3D

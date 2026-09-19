@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
  * `.Run` at build time, each carrying its length in ticks (issue #241).
  *
  * The path it takes: pass 1 records the `file` literal beside the declaration, the scan document
- * carries it to the accessors task, [ModelClipSource] reads the file's clips, and
+ * carries it to the accessors task, [ModelFileSource] reads the file's clips, and
  * [AccessorGenerator] emits one object per animated model. Each step is checked here, and the
  * emitted text against a committed golden.
  */
@@ -75,7 +75,7 @@ class ModelClipAccessorsTest {
     @Test
     fun `the clips of every model are read from the file its declaration names`() {
         val root = tree("read")
-        val read = ModelClipSource.read(root, scan(root))
+        val read = ModelFileSource.read(root, scan(root))
 
         assertEquals(emptyList(), read.diagnostics)
         assertEquals(listOf("Survey", "Walk", "Run"), read.clips.getValue("models/fox").map { it.name })
@@ -84,7 +84,7 @@ class ModelClipAccessorsTest {
     @Test
     fun `a model whose file is missing fails with a did-you-mean`() {
         val root = tree("missing", script = """model(name = "fox", file = "models/fox/Fx.glb")""" + "\n")
-        val diagnostic = ModelClipSource.read(root, scan(root)).diagnostics.single()
+        val diagnostic = ModelFileSource.read(root, scan(root)).diagnostics.single()
 
         assertEquals(AssetCompilerRules.MODEL_CLIPS.id, diagnostic.ruleId)
         assertEquals("models/fox", diagnostic.assetId)
@@ -98,7 +98,7 @@ class ModelClipAccessorsTest {
             "computed",
             script = "val where = \"models/fox\"\nmodel(name = \"fox\", file = where.plus(\"/Fox.glb\"))\n",
         )
-        val diagnostic = ModelClipSource.read(root, scan(root)).diagnostics.single()
+        val diagnostic = ModelFileSource.read(root, scan(root)).diagnostics.single()
 
         assertEquals(AssetCompilerRules.MODEL_CLIPS.id, diagnostic.ruleId)
         assertTrue("literal" in diagnostic.message, diagnostic.message)
@@ -109,7 +109,7 @@ class ModelClipAccessorsTest {
         val root = tree("broken", withFox = false)
         root.resolve("models/fox").createDirectories()
         root.resolve("models/fox/Fox.glb").writeText("not a model")
-        val diagnostic = ModelClipSource.read(root, scan(root)).diagnostics.single()
+        val diagnostic = ModelFileSource.read(root, scan(root)).diagnostics.single()
 
         assertTrue("not a binary glTF 2.0 file" in diagnostic.message, diagnostic.message)
     }
@@ -131,7 +131,7 @@ class ModelClipAccessorsTest {
     fun `an fbx model's clips are read from the glb it converts to, and generate typed clips`() {
         val root = fbxTree("fbx")
         val declarations = scan(root)
-        val read = ModelClipSource.read(root, declarations)
+        val read = ModelFileSource.read(root, declarations)
 
         assertEquals(emptyList(), read.diagnostics)
         val text = AccessorGenerator.generate(declarations, read.clips)
@@ -144,7 +144,7 @@ class ModelClipAccessorsTest {
     @Test
     fun `an fbx that does not convert fails the accessors pass with the converter's rule, not this one`() {
         val root = fbxTree("fbx-no-texture", withTexture = false)
-        val diagnostic = ModelClipSource.read(root, scan(root)).diagnostics.single()
+        val diagnostic = ModelFileSource.read(root, scan(root)).diagnostics.single()
 
         assertEquals("UDEA0039", diagnostic.ruleId)
         assertEquals("models/bender", diagnostic.assetId)
@@ -155,15 +155,17 @@ class ModelClipAccessorsTest {
 
     /**
      * The golden. Everything a game compiles against is in it: the object's name from the id,
-     * each clip as a property named from the file's own name, and the index and length each one
-     * carries. On a difference the actual text is written beside the build output, so a
-     * deliberate change is a copy rather than a hand transcription.
+     * each clip as a property named from the file's own name with the index and length it
+     * carries, and each named node with the place it sits at rest (issue #260). On a difference
+     * the actual text is written beside the build output, so a deliberate change is a copy
+     * rather than a hand transcription.
      */
     @Test
     fun `the fox generates the golden Fox object`() {
         val root = tree("golden")
         val declarations = scan(root)
-        val generated = AccessorGenerator.generate(declarations, ModelClipSource.read(root, declarations).clips)
+        val read = ModelFileSource.read(root, declarations)
+        val generated = AccessorGenerator.generate(declarations, read.clips, read.nodes)
         val actual = assertNotNull(generated.singleOrNull { it.path == "dev/wildware/udea/generated/Fox.kt" }).text
 
         val golden = GoldenResource.read(FOX_GOLDEN)
@@ -197,11 +199,69 @@ class ModelClipAccessorsTest {
     }
 
     @Test
-    fun `a model with no clips generates no object, and adds nothing else`() {
+    fun `a model with neither clips nor nodes generates no object, and adds nothing else`() {
         val declaration = Declaration("model", "props/crate", "crate", SPAN, "props/crate.glb")
-        val with = AccessorGenerator.generate(listOf(declaration), mapOf("props/crate" to emptyList()))
+        val with = AccessorGenerator.generate(
+            listOf(declaration),
+            mapOf("props/crate" to emptyList()),
+            mapOf("props/crate" to emptyList()),
+        )
 
         assertEquals(AccessorGenerator.generate(listOf(declaration)), with)
+    }
+
+    // ---- the nodes a part is mounted on (issue #260) -------------------------------------------
+
+    @Test
+    fun `a model with nodes and no clips still gets an object, with its nodes and no Clips`() {
+        val declaration = Declaration("model", "units/chassis", "chassis", SPAN, "units/chassis.glb")
+        val node = GltfNode(
+            index = 4, name = "socket_roof",
+            x = 0f, y = 0f, z = 1.25f,
+            qx = 0f, qy = 0f, qz = 0f, qw = 1f,
+            scaleX = 1f, scaleY = 1f, scaleZ = 1f,
+        )
+        val text = AccessorGenerator.generate(
+            listOf(declaration),
+            clips = emptyMap(),
+            nodes = mapOf("units/chassis" to listOf(node)),
+        ).single { it.path.endsWith("/Chassis.kt") }.text
+            // KotlinPoet wraps a long initializer after its `=`; the words are what is asserted.
+            .replace(Regex("\\s+"), " ")
+
+        assertTrue("public object Nodes" in text, text)
+        assertTrue("public object Clips" !in text, "a file with no animations gets no Clips: $text")
+        assertTrue(
+            "public val socket_roof: ModelNode = ModelNode(index = 4, name = \"socket_roof\", x = 0.0f, " +
+                "y = 0.0f, z = 1.25f, qx = 0.0f, qy = 0.0f, qz = 0.0f, qw = 1.0f, scaleX = 1.0f, " +
+                "scaleY = 1.0f, scaleZ = 1.0f)" in text,
+            text,
+        )
+        assertTrue("public val all: List<ModelNode> = listOf(socket_roof)" in text, text)
+    }
+
+    @Test
+    fun `a node name that cannot be an identifier is made into one, and a clash is numbered`() {
+        val declaration = Declaration("model", "units/chassis", "chassis", SPAN, "units/chassis.glb")
+        fun node(index: Int, name: String) = GltfNode(index, name, 0f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f)
+        val text = AccessorGenerator.generate(
+            listOf(declaration),
+            clips = emptyMap(),
+            nodes = mapOf(
+                "units/chassis" to listOf(
+                    node(0, "socket roof"),
+                    node(1, "socket_roof"),
+                    node(2, "2_wheel"),
+                    node(3, "all"),
+                ),
+            ),
+        ).single { it.path.endsWith("/Chassis.kt") }.text.replace(Regex("\\s+"), " ")
+
+        assertTrue("public val socket_roof: ModelNode = ModelNode(index = 0, name = \"socket roof\"" in text, text)
+        assertTrue("public val socket_roof2: ModelNode = ModelNode(index = 1" in text, text)
+        assertTrue("public val _2_wheel: ModelNode = ModelNode(index = 2" in text, text)
+        assertTrue("public val all2: ModelNode = ModelNode(index = 3" in text, text)
+        assertTrue("public val all: List<ModelNode> = listOf(" in text, "the list keeps the name `all`: $text")
     }
 
     private companion object {

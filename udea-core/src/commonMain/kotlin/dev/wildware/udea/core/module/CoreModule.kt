@@ -15,6 +15,7 @@ import dev.wildware.udea.core.rng.DefaultRngService
 import dev.wildware.udea.core.scene.BarrierSceneManager
 import dev.wildware.udea.core.scene.ClearCueQueue
 import dev.wildware.udea.core.serviceKey
+import dev.wildware.udea.core.spatial.AttachmentSystem
 
 /**
  * The kernel's own module: the services every simulation needs, and the systems it owns.
@@ -102,6 +103,10 @@ public class CoreModule(
             // teleport quietly taking effect a tick late.
             after<TeleportSystem>()
         }
+        // After everything that moves a parent this tick - intent, movement, the solver - and
+        // before `Gameplay` reads a socket (issue #260). Its dependency is this module's own id
+        // index, so it names it in its constructor rather than reaching through the context.
+        registry.add(SimPhase.PostPhysics, { _ -> AttachmentSystem(netIds) })
     }
 
     public companion object {

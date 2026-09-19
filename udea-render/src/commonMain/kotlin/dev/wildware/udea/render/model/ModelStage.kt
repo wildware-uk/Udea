@@ -1,5 +1,6 @@
 package dev.wildware.udea.render.model
 
+import de.fabmax.kool.math.Mat4f
 import de.fabmax.kool.math.MutableMat4f
 import de.fabmax.kool.math.MutableVec3f
 import de.fabmax.kool.math.Vec2i
@@ -252,6 +253,29 @@ internal class ModelStage(
         return placed.writeSkeleton(out)
     }
 
+    /**
+     * Writes into [out] where node [node] of the model drawn this frame for Fleks entity [entity]
+     * is, in the world's frame, and answers true; false, leaving [out] alone, when that entity
+     * drew no imported model this frame or the model has no such node (issue #260).
+     *
+     * This is the *live* node: an animated bone or a turning mount is where the animation has put
+     * it this frame, so a part mounted on it follows the animation - which the simulation, which
+     * has the rest pose and no keyframes, cannot do. Kool computes model matrices when it next
+     * updates the scene, so the node's are brought up to this frame's placement first.
+     *
+     * Render thread, after the parent's own [add] this frame.
+     */
+    fun socket(entity: Int, node: Int, out: MutableMat4f): Boolean {
+        if (node < 0) return false
+        val placed = drawnFor(entity) ?: return false
+        val koolNode = placed.nodeAt(node) ?: return false
+        placed.refreshMatrices()
+        // The node's matrix is in the file's frame, which is drawn a quarter turn about X; turning
+        // it back is what makes a socket read the way `Transform3D` does.
+        out.set(koolNode.modelMatF).rotate(Z_UP_TO_Y_UP, Vec3f.X_AXIS)
+        return true
+    }
+
     /** The node [add] showed for [entity] this frame, or `null`. A scan: once per preview per frame. */
     private fun drawnFor(entity: Int): Placed? {
         if (entity == NO_ENTITY) return null
@@ -282,6 +306,20 @@ internal class ModelStage(
     ) {
         // Translate, then turn about Z, Y, X - so X is applied to the model first - then scale.
         matrix.place(x, y, z, rotationX, rotationY, rotationZ, axisScale.set(scaleX, scaleY, scaleZ))
+        show(source, pose, entity)
+    }
+
+    /**
+     * Draws [source] at [world] this frame, in [pose]: [add] with the transform already built,
+     * which is what a part mounted on a socket has (issue #260). Render thread only.
+     */
+    fun addAt(source: ModelSource, world: Mat4f, pose: ClipPose, entity: Int = NO_ENTITY) {
+        matrix.set(world)
+        show(source, pose, entity)
+    }
+
+    /** Draws [source] at whatever [matrix] holds, in [pose], for Fleks entity [entity]. */
+    private fun show(source: ModelSource, pose: ClipPose, entity: Int) {
         when (source) {
             is MeshModel -> {
                 val run = runFor(source.mesh, source.material)
@@ -367,6 +405,7 @@ internal class ModelStage(
             placed.node.transform.setMatrix(transform)
             placed.node.applyPose(pose)
             placed.node.isVisible = true
+            placed.placed()
             return placed
         }
 
@@ -387,6 +426,37 @@ internal class ModelStage(
         /** The skin's joints, read the first time a skeleton is asked for: most nodes never are. */
         private val joints: List<SkinJoint> by lazy { skinJointsOf(node, model.gltf) }
 
+        /**
+         * The file's node index to Kool's node, looked up once each: Kool keys its nodes by name,
+         * and the file's index is what an `AttachedTo` carries, so the name is read off the parsed
+         * file. A miss is remembered too - a node with no name, or one Kool did not keep - so a
+         * mount on a node that is not there costs one map lookup a frame rather than a scan.
+         */
+        private val nodesByIndex = HashMap<Int, Node?>()
+
+        /** Whether Kool's model matrices are older than this node's current placement. */
+        private var matricesStale = true
+
+        /** Kool's node for the file's node [index], or `null` if this model has none. */
+        fun nodeAt(index: Int): Node? {
+            if (index in nodesByIndex) return nodesByIndex[index]
+            val found = model.gltf.nodes.getOrNull(index)?.name?.let { node.nodes[it] }
+            nodesByIndex[index] = found
+            return found
+        }
+
+        /** Says this node has just been placed, so its model matrices are a frame behind. */
+        fun placed() {
+            matricesStale = true
+        }
+
+        /** Brings Kool's model matrices up to this frame's placement, at most once per placement. */
+        fun refreshMatrices() {
+            if (!matricesStale) return
+            node.updateModelMatRecursive()
+            matricesStale = false
+        }
+
         fun setAmbient() {
             for (index in shaders.indices) shaders[index].ambientFactor = ambient
         }
@@ -397,7 +467,7 @@ internal class ModelStage(
             if (joints.isEmpty()) return false
             // Kool computes model matrices when it next updates the scene, so until then they are
             // last frame's; this frame's transform was set by `show`, so bring them up to it.
-            node.updateModelMatRecursive()
+            refreshMatrices()
             for (index in joints.indices) {
                 val joint = joints[index]
                 jointPosition.set(joint.bindOrigin)
@@ -639,6 +709,11 @@ internal fun gltfLoadConfig(model: ImportedModel, shadowMaps: List<ShadowMap>): 
     loadAnimations = true,
     applySkins = true,
     applyMorphTargets = false,
+    // A socket is an empty node - a Blender Empty, a bone tip - and Kool's loader drops every
+    // node that has no mesh and no children unless it is told not to (`removeEmptyNodes`
+    // defaults to true in 0.19.0). Dropping them would delete every mounting point in the file
+    // before anything could be mounted on one (issue #260).
+    removeEmptyNodes = false,
     assetLoader = model.loader,
     // The file's material, with the same uniform ambient light the built-in shapes get; its
     // strength is set every frame from the `ModelLight`.

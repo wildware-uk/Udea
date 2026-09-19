@@ -83,9 +83,12 @@ internal class UdeaFirAdditionalCheckers(
         override val functionCallCheckers: Set<FirExpressionChecker<FirFunctionCall>> =
             setOf(UdeaAssetReferenceChecker(catalog), UdeaAssetLoopChecker.Calls)
 
-        /** Issue #241: `Fox.Clips.Rnu` gets a did-you-mean. Silent on every name that is not a clip. */
+        /**
+         * Issues #241 and #260: `Fox.Clips.Rnu` and `Chassis.Nodes.socket_rooof` get a
+         * did-you-mean. Both are silent on a name that is neither a clip nor a node.
+         */
         override val propertyAccessExpressionCheckers: Set<FirExpressionChecker<FirPropertyAccessExpression>> =
-            setOf(UdeaAnimationClipChecker)
+            setOf(UdeaGeneratedMemberChecker.Clips, UdeaGeneratedMemberChecker.Nodes)
 
         /** Issue #192: loops in a `.udea.kts`. [UdeaAssetLoopChecker] is silent in any other file. */
         override val loopExpressionCheckers: Set<FirExpressionChecker<FirLoop>> =

@@ -317,6 +317,22 @@ public object UdeaRules {
     )
 
     /**
+     * A member of a model's generated node object that the model has no node for (issue #260),
+     * such as `Chassis.Nodes.socket_rooof`.
+     *
+     * The sibling of [UNRESOLVED_ANIMATION_CLIP], for the nodes a part is mounted on: the asset
+     * build generates one property per named node in the model's file, so a socket the file does
+     * not have is a name that does not compile, and this rule carries the did-you-mean spec
+     * section 5 makes mandatory. Raised by the same K2 checker, which recognises a node object by
+     * its members being typed `ModelNode`.
+     */
+    public val UNRESOLVED_MODEL_NODE: UdeaRule = UdeaRule(
+        id = "UDEA0018",
+        defaultSeverity = Severity.Error,
+        description = "a model's nodes are asked for a node the model's file does not have",
+    )
+
+    /**
      * A gizmo handle annotation (issue #233) that names a field the component cannot be dragged
      * through: a field it does not have, one that is a `val`, or one that is not a `Float` - or an
      * annotation on a class that is not a Fleks component with a `ComponentType` companion, or a
@@ -353,6 +369,7 @@ public object UdeaRules {
         ASSET_INDEX_FORMAT,
         LOOP_IN_ASSET,
         UNRESOLVED_ANIMATION_CLIP,
+        UNRESOLVED_MODEL_NODE,
         GIZMO_HANDLE_FIELD,
     ).sortedBy { it.id }
 

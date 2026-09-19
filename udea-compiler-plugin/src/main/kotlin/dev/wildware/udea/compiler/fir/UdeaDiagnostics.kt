@@ -103,10 +103,18 @@ internal object UdeaDiagnostics : KtDiagnosticsContainer() {
     )
 
     /**
-     * [UdeaRules.UNRESOLVED_ANIMATION_CLIP], from [UdeaAnimationClipChecker]. `DEFAULT`
+     * [UdeaRules.UNRESOLVED_ANIMATION_CLIP], from [UdeaGeneratedMemberChecker]. `DEFAULT`
      * positioning on the unresolved name itself, so the span is the typo's.
      */
     val UNRESOLVED_ANIMATION_CLIP: KtDiagnosticFactory1<String> by error1<PsiElement, String>(
+        SourceElementPositioningStrategies.DEFAULT,
+    )
+
+    /**
+     * [UdeaRules.UNRESOLVED_MODEL_NODE], from the same checker, positioned the same way: the
+     * socket's sibling of the clip rule above (issue #260).
+     */
+    val UNRESOLVED_MODEL_NODE: KtDiagnosticFactory1<String> by error1<PsiElement, String>(
         SourceElementPositioningStrategies.DEFAULT,
     )
 
@@ -127,6 +135,7 @@ internal object UdeaDiagnostics : KtDiagnosticsContainer() {
         UdeaRules.ASSET_INDEX_FORMAT to ASSET_INDEX_FORMAT,
         UdeaRules.LOOP_IN_ASSET to LOOP_IN_ASSET,
         UdeaRules.UNRESOLVED_ANIMATION_CLIP to UNRESOLVED_ANIMATION_CLIP,
+        UdeaRules.UNRESOLVED_MODEL_NODE to UNRESOLVED_MODEL_NODE,
     )
 
     /**

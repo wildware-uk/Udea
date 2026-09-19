@@ -226,8 +226,11 @@ class MobaEditorPlayTest {
     fun `a rewind during a second play lands in that play and not in the one before it`() {
         uiTest { editor.window.content() }.use { ui ->
             frames(ui)
+            // A first play short enough for the ring to keep every frame it captured, so the
+            // second play's ticks are ones the ring already holds. (A long one would have the
+            // second play refused by the ring outright; the test above is that case.)
             click(ui, PlaybackTags.PLAY)
-            frames(ui, FIGHT_FRAMES)
+            frames(ui, PLAY_FRAMES)
             click(ui, PlaybackTags.STOP)
 
             click(ui, PlaybackTags.PLAY)
@@ -321,11 +324,11 @@ class MobaEditorPlayTest {
         /** A little play: enough for the world to have moved on. */
         const val PLAY_FRAMES = 60
 
-        /** How far the second play of the rewind test runs before its mark. */
-        const val SECOND_PLAY_TICKS = 150
+        /** How far the second play of the rewind test runs before its mark: inside the first play's ticks. */
+        const val SECOND_PLAY_TICKS = 30
 
         /** How far past the mark it runs, and rewinds. */
-        const val REWIND_TICKS = 60
+        const val REWIND_TICKS = 15
 
         /** Frames [run] waits for a command before calling the wiring broken. */
         const val MAX_PUMPS = 10

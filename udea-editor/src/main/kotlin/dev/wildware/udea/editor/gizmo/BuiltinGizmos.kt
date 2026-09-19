@@ -1,6 +1,7 @@
 package dev.wildware.udea.editor.gizmo
 
 import com.github.quillraven.fleks.Component
+import kotlin.math.abs
 import kotlin.reflect.KMutableProperty1
 
 /*
@@ -22,8 +23,12 @@ import kotlin.reflect.KMutableProperty1
 
 /**
  * Moves an entity on the ground plane: an arrow along each of the target's X and Y, which holds the
- * drag to that line, and a square between them for a free drag. Each writes [x] and [y] by exactly
- * how far the drag moved, snapped to the grid.
+ * drag to that line, and a square between them for a free drag. Each moves the entity by exactly how
+ * far the drag moved, snapped to the grid.
+ *
+ * An arrow writes only the fields its line can change: with the world's axes the X arrow writes [x]
+ * alone, so snapping the drag never nudges [y] sideways onto the grid. An arrow turned with the entity
+ * runs across both, and writes both.
  */
 public fun <C : Component<C>> GizmoScope<C>.moveHandles(
     target: GizmoTarget<C>,
@@ -33,14 +38,20 @@ public fun <C : Component<C>> GizmoScope<C>.moveHandles(
     y0: Float,
 ) {
     val at = WorldPoint(x0, y0, 0f)
-    val move: DragScope<C>.(Drag) -> Unit = { drag ->
-        write(x, x0 + drag.dx, Snap.Grid)
-        write(y, y0 + drag.dy, Snap.Grid)
+    fun move(acrossX: Boolean, acrossY: Boolean): DragScope<C>.(Drag) -> Unit = { drag ->
+        if (acrossX) write(x, x0 + drag.dx, Snap.Grid)
+        if (acrossY) write(y, y0 + drag.dy, Snap.Grid)
     }
-    handle(at, HandleShape.Arrow(Axis.X), DragConstraint.Along(Axis.X), target.axes, move)
-    handle(at, HandleShape.Arrow(Axis.Y), DragConstraint.Along(Axis.Y), target.axes, move)
-    handle(at, HandleShape.PlaneSquare(Plane.XY), DragConstraint.Across(Plane.XY), target.axes, move)
+    for (axis in listOf(Axis.X, Axis.Y)) {
+        val direction = target.axes.direction(axis)
+        val arrow = move(abs(direction.x) > ACROSS, abs(direction.y) > ACROSS)
+        handle(at, HandleShape.Arrow(axis), DragConstraint.Along(axis), target.axes, arrow)
+    }
+    handle(at, HandleShape.PlaneSquare(Plane.XY), DragConstraint.Across(Plane.XY), target.axes, move(acrossX = true, acrossY = true))
 }
+
+/** Less of a world axis than this in an arrow's direction, and a drag along the arrow does not change it. */
+private const val ACROSS: Float = 1e-6f
 
 /**
  * Resizes a box centred on the target's origin, [width] along the target's X and [height] along its

@@ -238,6 +238,11 @@ The pieces a newcomer meets first, each with the issue that made it so.
   field fails the build with `UDEA0017` and a did-you-mean. A drag answers field writes and never
   mutates the world. `UDEA-MG-012` (`udeaVerifyEditorAbsent`, on `check`) fails the build when a
   `udea-editor` class or a `Gizmo` is on a release classpath.
+  In the Scene tab a gizmo's handles are dragged with the mouse (#236): the built-in move, resize,
+  rotate, radius and range handles (`moveHandles`, `sizeHandles`, ... on `GizmoScope`, which the
+  generated gizmos call too), each drag one `editor.begin_edit` session and so one undo entry, Escape
+  cancelling it. Snapping and world/local axes are per-project editor preferences in
+  `<project>/.udea/editor-preferences.properties`, never committed; Ctrl bypasses snapping.
 - **Replays are `.udearep` format 2**, which adds the recorded editor edits (#232). A recording
   with no edits is still written as format 1, and this build reads both.
 - **Web is shelved** (#223, #226, owner decision of 2026-09-18). Kool 0.19.0 publishes no wasmJs

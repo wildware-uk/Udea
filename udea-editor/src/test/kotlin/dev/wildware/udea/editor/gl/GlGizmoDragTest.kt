@@ -122,8 +122,8 @@ class GlGizmoDragTest {
                 )
             }
             val plain = place(-SPREAD, 0f)
-            val crate = place(0f, 0f, box = Box(halfWidth = 1.5f, halfHeight = 1f))
-            val ball = place(SPREAD, 0f, circle = Circle(radius = 2f))
+            val crate = place(0f, 0f, box = Box(halfWidth = 3f, halfHeight = 2f))
+            val ball = place(SPREAD, 0f, circle = Circle(radius = 1.5f))
             backend.onRenderThread { checkNotNull(bodies).of = { host.world.bodies(netIds, listOf(plain, crate, ball)) } }
 
             val ui = UiLayer(fonts, Size(WIDTH.toFloat(), HEIGHT.toFloat()))
@@ -131,6 +131,11 @@ class GlGizmoDragTest {
             ui.show(session.window)
             val pointer = backend.onRenderThread { KoolPointer(ui) }
             backend.onRenderThread { KoolKeyboard(ui) }
+            awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
+
+            // Zoomed in twice over the game camera's view, which the Scene tab takes on its first frame,
+            // so the bodies are drawn at a size beside which the handles read.
+            backend.onRenderThread { views.camera.zoomAt(ZOOM, views.scene.width / 2f, views.scene.height / 2f) }
             awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
 
             val view = sceneViewOn(WIDTH, HEIGHT)
@@ -160,10 +165,10 @@ class GlGizmoDragTest {
             // --- move: the X arrow, held to X ---------------------------------------------------------
             select(listOf(plain))
             val from = body(plain)
-            backend.drag(frames, screen(from.x, from.y, ARROW_GRIP), screen(from.x, from.y, ARROW_GRIP + 60f, 25f)) {
+            backend.drag(frames, screen(from.x, from.y, ARROW_GRIP), screen(from.x, from.y, ARROW_GRIP + 40f, 25f)) {
                 saveReport("issue236-gl-move-x-arrow.png", window.read(frames))
             }
-            assertNear(from.x + 60f * unitsPerPixel, body(plain).x, "the X arrow did not move the body by the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
+            assertNear(from.x + 40f * unitsPerPixel, body(plain).x, "the X arrow did not move the body by the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
             assertEquals(from.y, body(plain).y, "the X arrow moved the body off X")
             assertEquals(List(++edits) { COMMIT }, history(), "a move is not one undo entry")
 
@@ -180,21 +185,23 @@ class GlGizmoDragTest {
             assertEquals(List(++edits) { COMMIT }, history(), "a turn is not one undo entry")
 
             // --- resize: a box corner -------------------------------------------------------------------------
+            // The fixture's gizmo hands the box's half extents to the built-in as its width and height,
+            // so the corner it puts at +X +Y is half of each out: (1.5, 1).
             select(listOf(crate))
             val corner = screen(1.5f, 1f)
-            backend.drag(frames, corner, Offset(corner.x + 40f * view.width / views.scene.width, corner.y)) {
+            backend.drag(frames, corner, Offset(corner.x + 20f * view.width / views.scene.width, corner.y)) {
                 saveReport("issue236-gl-resize-corner.png", window.read(frames))
             }
-            assertNear(1.5f + 40f * unitsPerPixel, box(crate).first, "the corner did not widen the box by twice its move", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
-            assertNear(1f, box(crate).second, "a sideways corner drag changed the height", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
+            assertNear(3f + 2f * 20f * unitsPerPixel, box(crate).first, "the corner did not widen the box by twice its move", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
+            assertNear(2f, box(crate).second, "a sideways corner drag changed the height", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
             assertEquals(List(++edits) { COMMIT }, history(), "a resize is not one undo entry")
 
             // --- radius: the rim grip -------------------------------------------------------------------------
             select(listOf(ball))
-            backend.drag(frames, screen(SPREAD + 2f, 0f), screen(SPREAD + 2f, 0f, 50f)) {
+            backend.drag(frames, screen(SPREAD + 1.5f, 0f), screen(SPREAD + 1.5f, 0f, 25f)) {
                 saveReport("issue236-gl-radius-rim.png", window.read(frames))
             }
-            assertNear(2f + 50f * unitsPerPixel, radius(ball), "the rim did not follow the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
+            assertNear(1.5f + 25f * unitsPerPixel, radius(ball), "the rim did not follow the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
             assertEquals(List(++edits) { COMMIT }, history(), "a radius drag is not one undo entry")
 
             // --- Escape mid-drag -------------------------------------------------------------------------
@@ -215,13 +222,13 @@ class GlGizmoDragTest {
             val left = body(plain)
             val right = body(ball)
             val centre = Pair((left.x + right.x) / 2f, (left.y + right.y) / 2f)
-            backend.drag(frames, screen(centre.first, centre.second), screen(centre.first, centre.second, 30f, 60f)) {
+            backend.drag(frames, screen(centre.first, centre.second), screen(centre.first, centre.second, 20f, -40f)) {
                 saveReport("issue236-gl-two-selected-move.png", window.read(frames))
             }
-            assertNear(left.x + 30f * unitsPerPixel, body(plain).x, "the first body did not move with the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
-            assertNear(left.y + 60f * unitsPerPixel, body(plain).y, "the first body did not move with the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
-            assertNear(right.x + 30f * unitsPerPixel, body(ball).x, "the second body did not move with the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
-            assertNear(right.y + 60f * unitsPerPixel, body(ball).y, "the second body did not move with the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
+            assertNear(left.x + 20f * unitsPerPixel, body(plain).x, "the first body did not move with the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
+            assertNear(left.y - 40f * unitsPerPixel, body(plain).y, "the first body did not move with the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
+            assertNear(right.x + 20f * unitsPerPixel, body(ball).x, "the second body did not move with the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
+            assertNear(right.y - 40f * unitsPerPixel, body(ball).y, "the second body did not move with the drag", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
             assertEquals(List(++edits) { COMMIT }, history(), "a drag of two is not one undo entry")
 
             // --- grid snapping, and Ctrl to bypass it ---------------------------------------------------------
@@ -236,10 +243,13 @@ class GlGizmoDragTest {
                 saveReport("issue236-gl-grid-snap.png", window.read(frames))
             }
             val snapped = body(plain).x
+            assertEquals(unsnapped.y, body(plain).y, "the X arrow snapped the body's y as well")
             assertNear(round((unsnapped.x + 37f * unitsPerPixel) / GRID) * GRID, snapped, "the move was not rounded to the grid step", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
             assertNear(round(snapped / GRID) * GRID, snapped, "the snapped position is not on the grid")
             backend.holding(frames, GLFW.GLFW_KEY_LEFT_CONTROL) {
-                backend.drag(frames, screen(snapped, unsnapped.y, ARROW_GRIP), screen(snapped, unsnapped.y, ARROW_GRIP + 37f))
+                backend.drag(frames, screen(snapped, body(plain).y, ARROW_GRIP), screen(snapped, body(plain).y, ARROW_GRIP + 37f)) {
+                    saveReport("issue236-gl-grid-ctrl-bypass.png", window.read(frames))
+                }
             }
             assertNear(snapped + 37f * unitsPerPixel, body(plain).x, "Ctrl did not write the move exactly", tolerance = SCREEN_TOLERANCE * unitsPerPixel)
             edits += 2
@@ -277,7 +287,8 @@ class GlGizmoDragTest {
         val box = entity.getOrNull(Box)
         val circle = entity.getOrNull(Circle)
         val half = when {
-            box != null -> Pair(box.halfWidth, box.halfHeight)
+            // As wide and tall as the fixture's gizmo says: it treats the half extents as the sizes.
+            box != null -> Pair(box.halfWidth / 2f, box.halfHeight / 2f)
             circle != null -> Pair(circle.radius * INSCRIBED, circle.radius * INSCRIBED)
             else -> Pair(BODY_HALF, BODY_HALF)
         }
@@ -316,10 +327,13 @@ class GlGizmoDragTest {
         const val WORLD_WIDTH = 32f
         const val WORLD_HEIGHT = 18f
 
-        /** How far apart the bodies stand, in world units. */
-        const val SPREAD = 7f
+        /** How much of the game camera's world the Scene tab shows: half of it, each way. */
+        const val ZOOM = 0.5f
 
-        const val BODY_HALF = 0.8f
+        /** How far apart the bodies stand, in world units. */
+        const val SPREAD = 5f
+
+        const val BODY_HALF = 0.6f
         const val NUB = 0.25f
 
         /** How much of a circle's radius the square drawn for it reaches: it sits inside the rim. */

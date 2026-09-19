@@ -88,11 +88,13 @@ class BuiltinGizmosTest {
             handles.map { it.constraint },
         )
         assertTrue(handles.all { it.at == WorldPoint(4f, -2f) }, "a move handle is not on the entity: ${handles.map { it.at }}")
-        // Grabbed off-centre and dragged 3 right, 5 up: the entity moves by exactly that.
-        for (handle in handles) {
-            val grabbed = offset(handle.at, 0.4f, -0.3f)
-            assertEquals(mapOf("x" to 7f, "y" to 3f), handle.writes(grabbed, offset(grabbed, 3f, 5f)), "$handle")
-        }
+        // Grabbed off-centre and dragged 3 right, 5 up: the entity moves by exactly that, and an arrow
+        // writes only its own axis, so snapping it never moves the other one.
+        val (alongX, alongY, free) = handles
+        val grabbed = offset(alongX.at, 0.4f, -0.3f)
+        assertEquals(mapOf("x" to 7f), alongX.writes(grabbed, offset(grabbed, 3f, 5f)))
+        assertEquals(mapOf("y" to 3f), alongY.writes(grabbed, offset(grabbed, 3f, 5f)))
+        assertEquals(mapOf("x" to 7f, "y" to 3f), free.writes(grabbed, offset(grabbed, 3f, 5f)))
         assertTrue(handles.flatMap { it.drag(Drag(it.at, it.at)) }.all { it.snap == Snap.Grid }, "a position snaps to the grid")
     }
 
@@ -102,6 +104,9 @@ class BuiltinGizmosTest {
         val handles = Move.handles(GizmoTarget(entity, Crate(), WorldPoint(0f, 0f), axes = quarter))
 
         assertTrue(handles.all { it.axes == quarter }, "a move handle ignored the target's axes")
+        // Turned an eighth, each arrow runs across both world axes, so each writes both fields.
+        val eighth = Move.handles(GizmoTarget(entity, Crate(), WorldPoint(0f, 0f), axes = AxisFrame.heading((PI / 4).toFloat())))
+        assertTrue(eighth.all { handle -> handle.drag(Drag(handle.at, handle.at)).map { it.field.value } == listOf("x", "y") })
     }
 
     // --- size -----------------------------------------------------------------------------------

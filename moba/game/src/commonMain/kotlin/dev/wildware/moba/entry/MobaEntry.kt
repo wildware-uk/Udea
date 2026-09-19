@@ -9,6 +9,7 @@ import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.loop.barrier
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.render.ui.UiFonts
 
 /**
  * What every entry point does in common, so the launchers differ only where spec 3.5 says they may.
@@ -35,7 +36,8 @@ public object MobaEntry {
      * registry makes that demo's image diff structurally incapable of showing anything: every
      * capture is the same cleared framebuffer whatever the simulation is doing.
      */
-    public fun scene(definition: UdeaGameDef): MobaScene = MobaScene.build(definition)
+    public fun scene(definition: UdeaGameDef, hudFonts: () -> UiFonts): MobaScene =
+        MobaScene.build(definition, hudFonts)
 
     /**
      * Loads the launch level (see [MobaLevel]) and runs the tick that applies it.

@@ -114,6 +114,30 @@ internal class EditorHistory(
         if (stack.size > capacity) onDrop(stack.removeFirst())
     }
 
+    /** Every author's history as it stands, for [restore] to put back. What `editor.play` keeps. */
+    fun mark(): HistoryMark = HistoryMark(Array(stacks.size) { author -> stacks[author]?.toList() }, lastSequence)
+
+    /**
+     * Puts every author's history back to [mark], and answers the edits that were in a history now
+     * and are not in the mark - the ones made since, newest last.
+     *
+     * An edit undone since the mark would come back with it, because the world it is restored
+     * alongside (`editor.stop`'s) is one in which that edit still stands; `editor.undo` refuses an
+     * edit that predates a play while the play is under way, so Stop never meets one. [onDrop] is not told about the
+     * answered edits: what they held belongs to a world that no longer exists.
+     */
+    fun restore(mark: HistoryMark): List<EditorEdit> {
+        val since = ArrayList<EditorEdit>()
+        for (author in stacks.indices) {
+            val kept = mark.stacks[author]
+            val newestKept = kept?.lastOrNull()?.sequence ?: Long.MIN_VALUE
+            stacks[author]?.let { stack -> stack.filterTo(since) { it.sequence > newestKept } }
+            stacks[author] = kept?.let(::ArrayDeque)
+        }
+        since.sortBy(EditorEdit::sequence)
+        return since
+    }
+
     /** [author]'s newest edit, or `null` when there is nothing to undo. */
     fun newest(author: AgentSessionId): EditorEdit? = stackOf(author)?.lastOrNull()
 
@@ -153,4 +177,18 @@ internal class EditorHistory(
         }
         return stacks[author.raw]
     }
+}
+
+/** Every author's history at one moment, from [EditorHistory.mark]. The lists are copies; the edits are shared. */
+internal class HistoryMark(
+    val stacks: Array<List<EditorEdit>?>,
+    /** The last sequence number handed out when the mark was taken: every edit at or below it predates the mark. */
+    val lastSequence: Long,
+) {
+
+    /** Whether [edit] was made before the mark was taken. */
+    fun predates(edit: EditorEdit): Boolean = edit.sequence <= lastSequence
+
+    /** Every `editor.delete` in the marked histories, whoever made it. */
+    fun deletes(): List<EditorEdit.Delete> = stacks.flatMap { it.orEmpty() }.filterIsInstance<EditorEdit.Delete>()
 }

@@ -128,7 +128,7 @@ public class UdeaGameDef(
 
         val levelHooks = LevelHooks()
         for (module in allModules) module.level(levelHooks)
-        val levels = LevelService(world, ctx, core.netIds, levelHooks) {
+        val levels = LevelService(world, ctx, core.netIds, levelHooks, travel) {
             LevelComponentModule.of(this@UdeaGameDef.registry)
         }
         core.scenes.levels = levels

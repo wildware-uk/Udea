@@ -24,6 +24,7 @@ import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.blueprint.BlueprintSpawner
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
+import dev.wildware.udea.core.level.LevelFormatException
 import dev.wildware.udea.core.level.LevelSaveException
 import dev.wildware.udea.core.level.LevelService
 import kotlinx.io.buffered
@@ -99,6 +100,19 @@ public class EditorLevelStore(
  * is asked for, and the cancel itself is an ordinary call, applied between ticks and kept in the
  * [journal] like any other.
  *
+ * ## Play and Stop
+ *
+ * [play] encodes the whole world as level bytes and sets it running; [stop] pauses it and decodes
+ * those bytes back through the level load path, so the world after Stop is the world before Play
+ * (issue #196). Every edit is allowed while playing, and every edit made while playing is thrown
+ * away at Stop together with its undo entry: each author's history goes back to what it was at
+ * Play. While a play is under way an edit from before it cannot be undone (`undo_before_play`):
+ * Stop brings the world back with that edit in it, and it is undoable again from there. Edit
+ * sessions are closed at both ends, the same way every time: Play commits every open
+ * one, so a drag begun before Play is kept as an edit to the world Stop comes back to; Stop cancels
+ * every open one, because a commit would record an undo entry against play-time values Stop is
+ * about to throw away.
+ *
  * ## The journal: what a replay of an editing session needs
  *
  * Every call that changed the world or an edit session is kept in [journal] with the tick it was
@@ -132,6 +146,8 @@ public class EditorToolset(
     private val spawner: BlueprintSpawner? = null,
     /** Where [save] writes, or `null` when this host has none; [save] then refuses. */
     private val levels: EditorLevelStore? = null,
+    /** What [play] and [stop] run and put back, or `null` when this host has none; both then refuse. */
+    private val play: EditorPlay? = null,
     /** What an edit session's idle time is measured on. The platform clock unless a test moves its own. */
     private val idleClock: AgentClock = AgentClock.System,
 ) {
@@ -141,6 +157,9 @@ public class EditorToolset(
     private val openEdits = EditSessionTable(sessions.capacity)
 
     private val selections = Selections(sessions.capacity)
+
+    /** The play under way, or `null` while editing. */
+    private var playing: PlaySession? = null
 
     /** Every call that changed the world or an edit session, in order. */
     public val journal: EditorJournal = EditorJournal()
@@ -563,7 +582,8 @@ public class EditorToolset(
         name = "editor.undo",
         description = "Undo your newest editor edit. Refused, naming the author, if another " +
             "author has since changed what it wrote; call again with overwrite=true to undo " +
-            "anyway. Only your own history is undone, so send the same session= every call.",
+            "anyway. Only your own history is undone, so send the same session= every call. " +
+            "While playing, an edit made before editor.play waits for editor.stop.",
     )
     public fun undo(
         context: AgentContext,
@@ -576,7 +596,21 @@ public class EditorToolset(
         overwrite: Boolean,
     ): AgentResult = journaled(context) {
         val author = context.command.session
-        when (val edit = history.newest(author)) {
+        val edit = history.newest(author)
+        val running = playing
+        if (edit != null && running != null && running.history.predates(edit)) {
+            // Refused rather than done: an undone delete hands the world the very component objects
+            // the history holds, the running game would change them, and after Stop the history
+            // would hold play-time values for an edit that belongs to the world Stop puts back.
+            // Stop restores the world as it was, this edit included, so nothing is lost by waiting.
+            return@journaled AgentResult.failed(
+                UNDO_BEFORE_PLAY,
+                "refused to undo your ${edit.tool}: it was made before editor.play, and a play " +
+                    "keeps the edits from before it. Call editor.stop first; this edit is still " +
+                    "yours to undo after it.",
+            )
+        }
+        when (edit) {
             null -> AgentResult.failed(
                 NOTHING_TO_UNDO,
                 "${label(author)} has nothing to undo; editor.history lists what an author can undo, " +
@@ -650,6 +684,104 @@ public class EditorToolset(
         return AgentResult.ok {
             put("path", SystemFileSystem.resolve(file).toString())
             put("bytes", bytes.size)
+        }
+    }
+
+    // --- play ----------------------------------------------------------------------------
+
+    @AgentTool(
+        name = "editor.play",
+        description = "Save the whole world in memory and set the simulation running, so the " +
+            "level can be tried out. Edits made while playing are allowed and thrown away by " +
+            "editor.stop, which puts back the world as it was here. While already playing, " +
+            "resumes a paused play and keeps the world first saved.",
+    )
+    public fun play(context: AgentContext): AgentResult = journaled(context) {
+        val play = requirePlay(PLAY)
+        val running = playing
+        if (running != null) {
+            play.time.resume()
+            return@journaled AgentResult.ok {
+                put("playing", true)
+                put("resumed", true)
+                put("tick", clock.tick.value)
+                put("stopReturnsTo", running.tick.value)
+            }
+        }
+        val level = try {
+            play.levels.saveNow()
+        } catch (refused: LevelSaveException) {
+            return@journaled AgentResult.failed(LEVEL_NOT_SAVEABLE, refused.message ?: "the world cannot be saved as a level")
+        }
+        // After the save, so a refused Play leaves every session open exactly as it was.
+        forEachOpenEdit(::commit)
+        val session = PlaySession(level, clock.tick, history.mark())
+        playing = session
+        play.time.resume()
+        bridge.event("editor_play:${session.tick.value}", clock.tick.value)
+        AgentResult.ok {
+            put("playing", true)
+            put("resumed", false)
+            put("tick", session.tick.value)
+            put("bytes", level.size)
+        }
+    }
+
+    @AgentTool(
+        name = "editor.stop",
+        description = "End a play started by editor.play: pause, and put back the world, the tick " +
+            "and every author's undo history exactly as they were when Play was pressed. Edits " +
+            "made while playing are thrown away, and any open edit session is cancelled.",
+    )
+    public fun stop(context: AgentContext): AgentResult = journaled(context) {
+        val play = requirePlay(STOP)
+        val running = playing ?: return@journaled AgentResult.failed(
+            NOT_PLAYING,
+            "$STOP: nothing is playing; editor.play starts a play for editor.stop to end",
+        )
+        // Read before anything is touched: bytes this build cannot load leave the play running.
+        val level = try {
+            play.levels.read(running.level)
+        } catch (unreadable: LevelFormatException) {
+            return@journaled AgentResult.failed(LEVEL_NOT_LOADABLE, unreadable.message ?: "the world saved at Play cannot be loaded")
+        }
+        play.time.pause()
+        forEachOpenEdit(::cancel)
+
+        // 1. The world as it was at Play, from the bytes, through the level load path. A level
+        // records the id a pre-play delete is holding for its undo as free; take each back, so
+        // that undo still brings the entity back under the same id.
+        play.levels.loadNow(level)
+        for (delete in running.history.deletes()) netIds.reclaim(delete.netId)
+        playing = null
+        // 2. What becomes of the edits made while playing.
+        val discarded = afterRestore(running)
+
+        bridge.event("editor_stop:${running.tick.value}", clock.tick.value)
+        AgentResult.ok {
+            put("playing", false)
+            put("tick", clock.tick.value)
+            put("discardedEdits", discarded.size)
+        }
+    }
+
+    /**
+     * Stop's second step, after the world is back: every author's undo history goes back to Play's,
+     * and the edits made while playing are answered. Thrown away today; the one place a "keep these"
+     * step (epic #231's Keep) would re-apply them to the world just put back.
+     */
+    private fun afterRestore(ended: PlaySession): List<EditorEdit> = history.restore(ended.history)
+
+    private fun requirePlay(tool: String): EditorPlay = play ?: throw AgentToolException(
+        NO_PLAY,
+        "$tool: this editor was started with no way to play the level; the host names one when it " +
+            "builds the editor toolset",
+    )
+
+    /** Runs [close] on every open edit session, in author order, so the order never depends on who opened first. */
+    private inline fun forEachOpenEdit(close: (EditSession) -> Unit) {
+        for (raw in 0 until sessions.capacity) {
+            openEdits.of(AgentSessionId(raw))?.let(close)
         }
     }
 
@@ -1015,6 +1147,18 @@ public class EditorToolset(
         /** A save refused because the world holds something a level cannot carry. Names it. */
         internal val LEVEL_NOT_SAVEABLE: AgentErrorKind = AgentErrorKind("level_not_saveable")
 
+        /** `editor.play` or `editor.stop` in an editor given no [EditorPlay]. */
+        internal val NO_PLAY: AgentErrorKind = AgentErrorKind("no_play")
+
+        /** `editor.undo` of an edit made before the play under way. */
+        internal val UNDO_BEFORE_PLAY: AgentErrorKind = AgentErrorKind("undo_before_play")
+
+        /** `editor.stop` with no play under way. */
+        internal val NOT_PLAYING: AgentErrorKind = AgentErrorKind("not_playing")
+
+        /** `editor.stop` could not decode the world `editor.play` saved. Names why. */
+        internal val LEVEL_NOT_LOADABLE: AgentErrorKind = AgentErrorKind("level_not_loadable")
+
         /** A session call naming a session that is not open: committed, cancelled or timed out. */
         internal val NO_SUCH_EDIT: AgentErrorKind = AgentErrorKind("no_such_edit")
 
@@ -1034,6 +1178,8 @@ public class EditorToolset(
         private const val CANCEL_EDIT = "editor.cancel_edit"
         private const val SELECT = "editor.select"
         private const val COMMON_FIELDS = "editor.common_fields"
+        private const val PLAY = "editor.play"
+        private const val STOP = "editor.stop"
 
         /** `cancel_edit`'s argument, as the idle sweep sends it. */
         private const val SESSION_ID = "sessionId"

@@ -37,6 +37,7 @@ import dev.wildware.udea.render.ui.UiScreen
  * @param tick the simulation's tick, read once a frame for the status line and the viewport.
  * @param paused whether the simulation is paused, read once a frame for the status line.
  * @param viewport draws the world into the viewport's picture, after it has been cleared.
+ * @param standalone starts a separate game on a saved level, for Play standalone.
  */
 public class EditorSession(
     private val tools: EditorTools,
@@ -44,7 +45,12 @@ public class EditorSession(
     private val paused: () -> Boolean,
     private val spawn: EditorSpawn,
     private val viewport: SceneDrawScope.() -> Unit,
+    /** What Play standalone hands the saved level to; `null` leaves that button out (issue #196). */
+    standalone: StandaloneLauncher? = null,
 ) {
+
+    /** The toolbar's Play, Stop, Step and Play standalone. */
+    internal val playback: PlayControls = PlayControls(tools, standalone)
 
     /** The viewport's picture. Held here rather than remembered, because [frame] invalidates it. */
     internal val viewportState: SceneViewState = SceneViewState()

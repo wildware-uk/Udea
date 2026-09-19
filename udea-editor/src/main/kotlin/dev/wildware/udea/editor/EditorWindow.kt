@@ -47,6 +47,7 @@ internal fun EditorWindow(session: EditorSession) {
                     Item("&Undo", shortcut = KeyShortcut(Key.Z, Modifiers(Modifiers.CONTROL))) { session.undo() }
                 }
             }
+            PlaybackToolbar(session.playback)
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 Panels(session)
             }

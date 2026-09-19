@@ -51,6 +51,7 @@ import dev.wildware.udea.agent.state.StateDigest
 import dev.wildware.udea.agent.tools.BlueprintCatalog
 import dev.wildware.udea.agent.tools.DiagToolset
 import dev.wildware.udea.agent.tools.EditorLevelStore
+import dev.wildware.udea.agent.tools.EditorPlay
 import dev.wildware.udea.agent.tools.EditorToolset
 import dev.wildware.udea.agent.tools.EngineToolModules
 import dev.wildware.udea.agent.tools.EventsToolset
@@ -379,6 +380,9 @@ public object MobaAgent {
                 catalog = BlueprintCatalog.of(host.ctx[MobaBlueprints.KEY].all),
                 spawner = host.ctx.blueprints,
                 levels = EditorLevelStore(host.game.levels, LevelDirectory("build", "editor-levels")),
+                // `editor.play` and `editor.stop` (issue #196): the same level encoder, and the
+                // same `TimeControl` `time.*` drives.
+                play = EditorPlay(host.game.levels, host.time),
             )
         } else {
             null

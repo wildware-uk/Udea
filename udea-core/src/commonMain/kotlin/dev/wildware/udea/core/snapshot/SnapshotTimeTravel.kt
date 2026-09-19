@@ -194,6 +194,10 @@ public class SnapshotTimeTravel(
         return RestoreOutcome.Restored(restoredTick)
     }
 
+    override fun forgetAfter(tick: Tick) {
+        ring.dropAfter(tick)
+    }
+
     override fun toString(): String = "SnapshotTimeTravel(tick=$currentTick, ring=$ring)"
 }
 

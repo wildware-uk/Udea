@@ -193,6 +193,54 @@ class NetIdReservationTest {
         assertEquals(0, index.reservedCount)
     }
 
+    /**
+     * [NetIdIndex.reclaim]: the editor's Stop (issue #196) loads a level saved while a delete was
+     * undoable. The level records the detached id as free; reclaiming it must give back exactly the
+     * index that was saved, a free queue in the order it had, and an id `attach` accepts.
+     */
+    @Test
+    fun `a detached id recorded as free by a save is reclaimed as the same reservation with the free queue intact`() {
+        val index = NetIdIndex(capacity = 8, entityCapacity = 8)
+        val ids = List(5) { index.allocate(Entity(it, version = 0u)) }
+        // A free queue that is not in index order, with the detached index in the middle of it.
+        index.free(ids[3])
+        val detached = ids[2]
+        index.detach(detached)
+        index.free(ids[0])
+        val before = HandleState().also(index::saveInto)
+        val saved = HandleState().also(index::saveInto)
+
+        index.restoreFrom(saved)
+        assertFalse(index.isOutstandingReservation(detached), "a restore kept the reservation, so this test proves nothing")
+
+        assertTrue(index.reclaim(detached))
+
+        assertTrue(index.isOutstandingReservation(detached))
+        val after = HandleState().also(index::saveInto)
+        assertEquals(before.toString(), after.toString())
+        assertEquals(
+            List(before.freeCount) { before.freeIndexAt(it) to before.freeGenerationAt(it) },
+            List(after.freeCount) { after.freeIndexAt(it) to after.freeGenerationAt(it) },
+            "the free queue after the reclaim is not the one the save recorded",
+        )
+        val back = Entity(7, version = 0u)
+        index.attach(back, detached)
+        assertEquals(back, index.resolveOrNull(detached))
+    }
+
+    @Test
+    fun `reclaiming a live id - or one whose index was handed out again - changes nothing`() {
+        val index = NetIdIndex(capacity = 1, entityCapacity = 8)
+        val first = index.allocate(Entity(1, version = 0u))
+        index.free(first)
+        val second = index.allocate(Entity(2, version = 0u))
+
+        assertFalse(index.reclaim(second), "a live id was reclaimed")
+        assertFalse(index.reclaim(first), "an id whose index is live again was reclaimed")
+        assertEquals(0, index.reservedCount)
+        assertEquals(1, index.liveCount)
+    }
+
     @Test
     fun `detaching an id that does not resolve changes nothing`() {
         val index = NetIdIndex(capacity = 8, entityCapacity = 8)

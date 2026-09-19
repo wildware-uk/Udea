@@ -71,6 +71,8 @@ internal class ToolsetHarness(
     levelDirectory: Path? = null,
     /** What the editor's idle timeout reads. The platform clock unless a test moves its own. */
     editorClock: AgentClock = AgentClock.System,
+    /** Whether `editor.play` and `editor.stop` are given this game's levels and time to run. */
+    withPlay: Boolean = false,
 ) {
 
     val bridge: AgentBridge = AgentBridge()
@@ -179,6 +181,7 @@ internal class ToolsetHarness(
                 catalog = BlueprintCatalog.of(listOf(GruntBlueprint, ChampionBlueprint)),
                 spawner = spawner,
                 levels = levelDirectory?.let { EditorLevelStore(host.game.levels, it) },
+                play = if (withPlay) EditorPlay(host.game.levels, host.time) else null,
                 idleClock = editorClock,
             )
         } else {

@@ -197,6 +197,69 @@ public class NetIdIndex(
     }
 
     /**
+     * Makes [netId] an outstanding reservation again after a restore recorded it as free.
+     *
+     * [saveInto] records an outstanding reservation as a free index with its generation bumped,
+     * appended to the free queue, so a restore from that state has no reservation left and the
+     * index waits to be recycled at the bumped generation. For a reservation made by [detach] -
+     * the editor's undoable delete - that loses the id the undo would bring the entity back
+     * under. This takes the index back out of the free queue, at the generation [netId] carries,
+     * with no entity behind it: exactly the state [detach] left, so [attach] can complete it and
+     * [free] can still give it up. The free queue keeps its order otherwise, which is the order it
+     * had before the reservation was recorded into it.
+     *
+     * Called by the editor's `editor.stop`, which loads a level saved while a delete was undoable
+     * (issue #196).
+     *
+     * The index cannot tell a reservation a save recorded as free from an id [free]d for good at
+     * the same generation - both are a free index one generation on - so the caller names only
+     * ids it knows were detached when the save was taken.
+     *
+     * @return true if [netId] is a reservation again; false, changing nothing, when its index is
+     *   not free at the generation after [netId]'s - live, or handed out again since.
+     */
+    public fun reclaim(netId: NetId): Boolean {
+        if (netId.isNone) return false
+        val index = netId.index
+        if (index >= capacity || liveFlags[index]) return false
+        if (generations[index] != ((netId.generation + 1) and NetId.GENERATION_MASK)) return false
+        if (!removeFromFreeQueue(index)) return false
+        generations[index] = netId.generation
+        liveFlags[index] = true
+        entities[index] = null
+        liveCount++
+        reservedCount++
+        if (index >= highWater) highWater = index + 1
+        return true
+    }
+
+    /** Takes [index] out of the free queue wherever it is, keeping the others in order. */
+    private fun removeFromFreeQueue(index: Int): Boolean {
+        var found = -1
+        var position = freeHead
+        for (offset in 0 until freeSize) {
+            if (freeRing[position] == index) {
+                found = offset
+                break
+            }
+            position++
+            if (position == capacity) position = 0
+        }
+        if (found < 0) return false
+        // Shift every later entry one slot towards the head.
+        var from = position
+        for (offset in found until freeSize - 1) {
+            var next = from + 1
+            if (next == capacity) next = 0
+            freeRing[from] = freeRing[next]
+            from = next
+        }
+        freeTail = from
+        freeSize--
+        return true
+    }
+
+    /**
      * True if [netId] is a [reserve]d index that no entity has been [attach]ed to yet.
      *
      * The predicate form of what [attach] checks, so a caller holding a reservation from an

@@ -10,6 +10,7 @@ import dev.wildware.udea.core.identity.HandleState
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.loop.BarrierAction
 import dev.wildware.udea.core.loop.SimBarrier
+import dev.wildware.udea.core.loop.TimeTravel
 import dev.wildware.udea.core.rng.CapturableRng
 import dev.wildware.udea.core.scene.SceneScope
 import kotlinx.serialization.SerializationException
@@ -50,6 +51,11 @@ public class LevelService internal constructor(
     private val ctx: GameContext,
     private val netIds: NetIdIndex,
     private val hooks: LevelHooks,
+    /**
+     * The game's snapshot history, or `null` for one that keeps none. A load forgets every
+     * snapshot newer than the tick it puts the clock on; see [apply].
+     */
+    private val travel: TimeTravel? = null,
     modules: () -> List<LevelComponentModule>,
 ) {
 
@@ -160,12 +166,30 @@ public class LevelService internal constructor(
     public fun load(level: Level, barrier: SimBarrier): LevelAction<Level> =
         LevelAction("load level saved at ${level.tick}") { level.also(::apply) }.also(barrier::submit)
 
+    /**
+     * Replaces the world with [level] now, on the calling thread.
+     *
+     * For a caller that is **already** inside a [SimBarrier] drain - the editor's `editor.stop`
+     * (issue #196), which puts back the world Play saved - and is therefore at the boundary [load]
+     * queues for. The same split, and for the same reason, as [saveNow]: queued from there, the
+     * load would land on the *next* drain, after a tick of the world it is meant to replace had run.
+     */
+    public fun loadNow(level: Level) {
+        apply(level)
+    }
+
     internal fun apply(level: Level) {
         val document = level.document
         world.loadSnapshot(document.world)
         netIds.restoreFrom(document.handles.toHandleState())
         for (binding in document.netIds) netIds.bind(binding.entity, binding.netId)
         ctx.clock.moveTo(document.tick)
+        // A load can move the clock backwards - the editor's Stop always does (issue #196) - and
+        // the snapshot ring would then hold frames from a future that no longer happens. Kept,
+        // a rewind could land in one, and the first capture after the load, older than the
+        // ring's newest, would be refused from inside `Simulation.step`. Frames at or before the
+        // tick stay: for Stop they are the history of the very world just put back.
+        travel?.forgetAfter(document.tick)
         streams.restoreFrom(document.rng, 0)
         // Box2D bodies are never level content, exactly as they are never snapshot content: a
         // body's handle is `@Transient` and the bodies come back from `PhysicsBody` and the shape

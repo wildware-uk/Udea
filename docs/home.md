@@ -31,11 +31,9 @@ Udea is a high-level 2D game engine built on **LibGDX** and the **Fleks ECS** fr
 > frozen contracts. The rewrite of this tree is scheduled for Phase 6.
 
 #### Core Modules:
-- **`udea-*`**: The engine being built. See `AGENTS.md`.
+- **`udea-*`**: The engine. See `AGENTS.md`.
 - **`moba`**: The 5v5 MOBA the engine is built against.
-- **`common`**: Old engine core, ECS systems and network synchronization. Deleted in Phase 6.
-- **`gradle-plugin`**: Old code generation for DSL and networking. Deleted in Phase 6.
-- **`example`**: Old example game. Replaced by `moba`, deleted in Phase 6.
 
-The level editor, the IDEA plugin and `compose-ui` were deleted in Phase 0: the MCP tool
-surface is the editor, so nothing replaces them. `docs/migration/ledger.md` has the order.
+The previous engine - `common`, `gradle-plugin` and the `example` game - was deleted in issue
+#213. The level editor, the IDEA plugin and `compose-ui` were deleted in Phase 0: the MCP tool
+surface is the editor, so nothing replaces them.

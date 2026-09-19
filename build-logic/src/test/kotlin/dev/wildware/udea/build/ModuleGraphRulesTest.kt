@@ -47,28 +47,35 @@ class ModuleGraphRulesTest {
         val violations = violate(
             ":udea-core",
             "compileClasspath",
-            graph(":udea-core", "com.badlogicgames.gdx:gdx-backend-lwjgl3", "org.lwjgl:lwjgl-opengl"),
+            graph(":udea-core", "de.fabmax.kool:kool-core-desktop", "org.lwjgl:lwjgl-opengl"),
         )
         assertEquals(
-            listOf("com.badlogicgames.gdx:gdx-backend-lwjgl3", "org.lwjgl:lwjgl-opengl"),
+            listOf("de.fabmax.kool:kool-core-desktop", "org.lwjgl:lwjgl-opengl"),
             violations.map { it.coordinate },
         )
         assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-002") })
     }
 
     @Test
-    fun `UDEA-MG-002 allows gdx itself - the ban is on GL and natives, not on maths`() {
-        assertTrue(violate(":udea-core", "compileClasspath", graph(":udea-core", "com.badlogicgames.gdx:gdx")).isEmpty())
-    }
-
-    @Test
-    fun `UDEA-MG-002 fails a native platform artifact`() {
-        val violations = violate(
-            ":udea-gas",
-            "runtimeClasspath",
-            graph(":udea-gas", "com.badlogicgames.gdx:gdx-box2d-platform"),
+    fun `UDEA-MG-009 fails every LibGDX artifact on every project, gdx-math included`() {
+        // Issue #213 deleted LibGDX from the tree. `com.badlogicgames.gdx:gdx` used to be legal on
+        // a headless module for `Vector2`; nothing needs it now, and a ban scoped to the modules
+        // that last had it would let it back in through any other one. The two exempt from
+        // UDEA-MG-002 are here on purpose: being allowed GL is not being allowed LibGDX.
+        val libgdx = listOf(
+            "com.badlogicgames.box2dlights:box2dlights",
+            "com.badlogicgames.gdx:gdx",
+            "com.badlogicgames.gdx:gdx-backend-lwjgl3",
+            "com.badlogicgames.gdx:gdx-box2d",
+            "com.badlogicgames.gdx:gdx-box2d-platform",
+            "dev.wildware.composegl:composegl-gdx",
         )
-        assertEquals(listOf("com.badlogicgames.gdx:gdx-box2d-platform"), violations.map { it.coordinate })
+        listOf(":udea-core", ":udea-gas", ":udea-assets-compiler", ":udea-render", ":udea-agent-host", ":moba:game")
+            .forEach { project ->
+                val violations = violate(project, "runtimeClasspath", graph(project, *libgdx.toTypedArray()))
+                assertEquals(libgdx, violations.map { it.coordinate }, "$project is not guarded")
+                assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-009") }, "$project: $violations")
+            }
     }
 
     @Test
@@ -92,25 +99,6 @@ class ModuleGraphRulesTest {
             violations.map { it.coordinate },
         )
         assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-002") })
-    }
-
-    @Test
-    fun `UDEA-MG-008 fails LibGDX anywhere on udea-render's classpaths`() {
-        val violations = violate(
-            ":udea-render",
-            "runtimeClasspath",
-            graph(
-                ":udea-render",
-                "de.fabmax.kool:kool-core",
-                "com.badlogicgames.gdx:gdx",
-                "dev.wildware.composegl:composegl-gdx",
-            ),
-        )
-        assertEquals(
-            listOf("com.badlogicgames.gdx:gdx", "dev.wildware.composegl:composegl-gdx"),
-            violations.map { it.coordinate },
-        )
-        assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-008") })
     }
 
     @Test
@@ -243,15 +231,16 @@ class ModuleGraphRulesTest {
                 "org.jetbrains.kotlin:kotlin-scripting-jvm-host",
             ),
         )
+        // LibGDX is also UDEA-MG-009's, which bans it everywhere; this rule's own answer is the
+        // allow list, and gdx is outside it whatever any other rule says.
         assertEquals(
             listOf(
                 "com.badlogicgames.gdx:gdx",
                 "com.fasterxml.jackson.core:jackson-databind",
                 "org.jetbrains.kotlin:kotlin-scripting-jvm-host",
             ),
-            violations.map { it.coordinate },
+            violations.filter { it.ruleId == RuleId("UDEA-MG-006") }.map { it.coordinate },
         )
-        assertTrue(violations.all { it.ruleId == RuleId("UDEA-MG-006") })
     }
 
     @Test
@@ -453,7 +442,7 @@ class ModuleGraphRulesTest {
         val violations = violate(
             ":udea-core",
             "compileClasspath",
-            graph(":udea-core", "com.badlogicgames.gdx:gdx-backend-lwjgl3"),
+            graph(":udea-core", "org.lwjgl:lwjgl-opengl"),
         )
         assertEquals(RuleId("UDEA-MG-002"), violations.single().ruleId)
     }
@@ -470,7 +459,7 @@ class ModuleGraphRulesTest {
             violate(
                 ":udea-agent-host",
                 "compileClasspath",
-                graph(":udea-agent-host", "com.badlogicgames.gdx:gdx-backend-lwjgl3"),
+                graph(":udea-agent-host", "org.lwjgl:lwjgl-opengl"),
             ).isEmpty(),
         )
         // ...and it is still refused a release build, which is what makes the exemption safe.
@@ -494,11 +483,11 @@ class ModuleGraphRulesTest {
     @Test
     fun `UDEA-MG-002 covers the modules that were previously in neither gate`() {
         // Each of these was outside both the dependency rule and the bytecode scan, so
-        // `implementation(libs.gdx.backend.lwjgl3)` on any of them stayed green twice over.
+        // a GL backend on any of them stayed green twice over.
         // `:udea-agent-host` was in this list too and is now deliberately exempt - see
         // `the debug agent host may see GL, because it owns the render toolset`.
         listOf(":udea-diagnostics", ":udea-gradle", ":udea-compiler-plugin").forEach {
-            val violations = violate(it, "compileClasspath", graph(it, "com.badlogicgames.gdx:gdx-backend-lwjgl3"))
+            val violations = violate(it, "compileClasspath", graph(it, "org.lwjgl:lwjgl-opengl"))
             assertEquals(RuleId("UDEA-MG-002"), violations.single().ruleId, "$it is not guarded")
         }
     }
@@ -545,7 +534,6 @@ class ModuleGraphRulesTest {
         ModuleGraphRules.ALL.forEach { rule ->
             assertTrue(rule.id.value in text, "${rule.id} is not documented in docs/module-graph.md")
         }
-        assertTrue(LegacyDependencyRules.ID.value in text, "${LegacyDependencyRules.ID} is not documented")
         assertTrue(ReleaseRules.ARTIFACT_RULE_ID.value in text, "${ReleaseRules.ARTIFACT_RULE_ID} is not documented")
         assertTrue(ReleaseRules.CLASSPATH_RULE.id.value in text, "${ReleaseRules.CLASSPATH_RULE.id} is not documented")
         ReleaseRules.DEFAULT_BANNED_PREFIXES.forEach {

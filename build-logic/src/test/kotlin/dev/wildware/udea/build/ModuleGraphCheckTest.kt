@@ -42,14 +42,14 @@ class ModuleGraphCheckTest {
 
     @Test
     fun `UDEA-MG-002 fails a GL backend on the kernel`(@TempDir root: File) {
-        val fixture = GradleFixture(root).publish("com.badlogicgames.gdx:gdx-backend-lwjgl3:1.13.5")
+        val fixture = GradleFixture(root).publish("de.fabmax.kool:kool-core-desktop:0.19.0")
         fixture.project(
             "udea-core",
             gatedProject(
                 gate,
                 """
                 ${fixture.repositoryBlock()}
-                dependencies { implementation("com.badlogicgames.gdx:gdx-backend-lwjgl3:1.13.5") }
+                dependencies { implementation("de.fabmax.kool:kool-core-desktop:0.19.0") }
                 """.trimIndent(),
             ),
         )
@@ -57,7 +57,7 @@ class ModuleGraphCheckTest {
         val result = fixture.buildAndFail(":udea-core:udeaVerifyModuleGraph")
 
         assertTrue("UDEA-MG-002" in result.output, result.output)
-        assertTrue("com.badlogicgames.gdx:gdx-backend-lwjgl3" in result.output, result.output)
+        assertTrue("de.fabmax.kool:kool-core-desktop" in result.output, result.output)
         assertTrue(":udea-core" in result.output, result.output)
     }
 
@@ -87,7 +87,7 @@ class ModuleGraphCheckTest {
     }
 
     @Test
-    fun `UDEA-MG-002 allows gdx itself on the kernel - the ban is GL, not maths`(
+    fun `UDEA-MG-009 fails gdx itself on the kernel - LibGDX is gone, maths included`(
         @TempDir root: File,
     ) {
         val fixture = GradleFixture(root).publish("com.badlogicgames.gdx:gdx:1.13.5")
@@ -102,8 +102,11 @@ class ModuleGraphCheckTest {
             ),
         )
 
-        val result = fixture.build(":udea-core:udeaVerifyModuleGraph")
+        val result = fixture.buildAndFail(":udea-core:udeaVerifyModuleGraph")
 
+        // Issue #213. It was legal here for `Vector2` until LibGDX left the tree.
+        assertTrue("UDEA-MG-009" in result.output, result.output)
+        assertTrue("com.badlogicgames.gdx:gdx" in result.output, result.output)
         assertFalse("UDEA-MG-002" in result.output, result.output)
     }
 

@@ -19,10 +19,10 @@ import java.util.zip.ZipOutputStream
  */
 object AssetIndexFixtures {
 
-    /** Real ids, from `example/src/main/resources/assets`. */
+    /** Real ids, from `example-assets`. */
     const val ORC: String = "character/orc"
 
-    /** Real id, from `example/src/main/resources/assets/blueprint/arrow.udea.kts`. */
+    /** Real id, from `example-assets/blueprint/arrow.udea.kts`. */
     const val ARROW: String = "blueprint/arrow"
 
     /** Kinds the checker fixtures declare, so the subtype question has an answer. */

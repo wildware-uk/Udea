@@ -196,6 +196,12 @@ section 2.0 re-read.
 > below will have to become. That is issue #211's tree and neither #212 nor this note closes it:
 > until it is written, this section documents the risk the *old* renderer carried and nothing
 > about the new one.
+>
+> **Issue #213, 2026-09-19: LibGDX is out of the tree entirely.** The old tree is deleted, the
+> version catalog has no `com.badlogicgames` coordinate left, `UDEA-MG-009` now bans LibGDX from
+> every project rather than only `moba`, and `determinism-allowlist.txt` no longer pins `gdx`,
+> because there is no resolved version for these rows to drift from. The rows stay as the record
+> of what the old renderer exposed simulation to.
 
 **The declared simulation scopes of `:udea-core`, `:udea-gas` and `:udea-net` reference no
 `com.badlogic.gdx` member at all.** That was checked twice: `grep -rn "^import com.badlogic"`

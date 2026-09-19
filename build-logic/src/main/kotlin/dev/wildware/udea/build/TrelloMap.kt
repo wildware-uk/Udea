@@ -63,10 +63,10 @@ public object TrelloMap {
         spec: String,
         map: String,
         mapPath: String = "docs/migration/trello-map.md",
-    ): List<MigrationFinding> {
+    ): List<GateFinding> {
         val mapped = cardsInMap(map).toSet()
         return cardsInSpec(spec).filterNot { it in mapped }.map {
-            MigrationFinding(
+            GateFinding(
                 rule = UNMAPPED_CARD,
                 path = mapPath,
                 line = 1,
@@ -76,4 +76,13 @@ public object TrelloMap {
             )
         }
     }
+
+    /** The failure message for [findings] from the gate [taskName], or null when there are none. */
+    internal fun report(taskName: String, findings: List<GateFinding>): String? =
+        gateFailureReport(
+            taskName,
+            findings,
+            "docs/migration/trello-map.md must give every Trello card spec section 9 names a " +
+                "row whose first cell is that card's id.",
+        )
 }

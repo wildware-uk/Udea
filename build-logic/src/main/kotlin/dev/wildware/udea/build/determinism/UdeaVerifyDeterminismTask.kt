@@ -117,7 +117,12 @@ public abstract class UdeaVerifyDeterminismTask : DefaultTask() {
         /** The manual Fleks/LibGDX audit (issue #151), at the repository root. */
         public const val AUDIT_FILE: String = "determinism-audit.md"
 
-        /** Catalog aliases the `@version` pins must cover. */
-        public val PINNED_ALIASES: List<String> = listOf("fleks", "gdx")
+        /**
+         * Catalog aliases the `@version` pins must cover.
+         *
+         * `gdx` was the second until issue #213 removed LibGDX from the catalog: no project
+         * resolves it, so there is no version left for its rows of the audit to drift from.
+         */
+        public val PINNED_ALIASES: List<String> = listOf("fleks")
     }
 }

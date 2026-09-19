@@ -3,15 +3,10 @@ package dev.wildware.udea.build
 /**
  * The structural invariants of the module graph (spec 4, spec 6), as data.
  *
- * Each of these is cheap to enforce now, while it passes trivially, and expensive to
- * retrofit once a module violates it — `UDEA-MG-005` in particular is a ratchet placed
- * before `moba` has any content, because `common/build.gradle.kts` shows exactly what
- * happens without it: five `kotlin-scripting-*` artifacts and `org.reflections:reflections`
- * on a shipped classpath.
- *
- * The `common` ban is deliberately *not* here. It is [LegacyDependencyRules], run by its
- * own task, because the two answer different questions and a single failure that could mean
- * either is a worse message than two that cannot.
+ * Each of these is cheap to enforce while it passes trivially, and expensive to retrofit
+ * once a module violates it — `UDEA-MG-005` in particular was a ratchet placed before `moba`
+ * had any content, because the old `common` module showed exactly what happens without it:
+ * five `kotlin-scripting-*` artifacts and `org.reflections:reflections` on a shipped classpath.
  *
  * Every id is documented in `docs/module-graph.md`; [ALL] is asserted against that document
  * by `ModuleGraphRulesTest`, so a rule cannot be added without explaining itself.
@@ -19,19 +14,28 @@ package dev.wildware.udea.build
 public object ModuleGraphRules {
 
     /**
-     * Classpaths scanned. Same set as [LegacyDependencyRules.CONFIGURATIONS] — a rule
-     * narrows it through [DependencyRule.configurations] rather than by being invisible on
-     * a classpath nobody looked at.
+     * Classpaths scanned. A rule narrows this set through [DependencyRule.configurations]
+     * rather than by being invisible on a classpath nobody looked at.
+     *
+     * The Kotlin plugin's own tool classpaths (`ksp`, `kotlinCompilerPluginClasspath`) are
+     * deliberately excluded: what they carry is the compiler's business, not the module's
+     * API, and nothing on them reaches shipped code.
      */
-    public val CONFIGURATIONS: Set<String> = LegacyDependencyRules.CONFIGURATIONS
+    public val CONFIGURATIONS: Set<String> = setOf(
+        "compileClasspath",
+        "runtimeClasspath",
+        "testCompileClasspath",
+        "testRuntimeClasspath",
+        "testFixturesCompileClasspath",
+        "testFixturesRuntimeClasspath",
+    )
 
     /**
      * The two modules that are allowed to see GL, and the whole of the exception list.
      *
      * - **`:udea-render`** is spec 4's "the only module that touches GL" — it owns the
-     *   backend, the targets, the pipeline and the capture. It applies
-     *   `udea.kotlin-library-gl`, which is the visible marker, and `RenderModuleGraphTest`
-     *   asserts it is the only module that does.
+     *   backend, the targets, the pipeline and the capture. `RenderModuleGraphTest` asserts
+     *   no other engine module takes the render convention it is on.
      * - **`:udea-agent-host`** is here as of the Phase 1 follow-up, by a controller ruling,
      *   and the reason is that the previous arrangement was a contradiction rather than a
      *   trade-off. Spec 4 gives this module "the toolsets that need a render context or live
@@ -43,9 +47,8 @@ public object ModuleGraphRules {
      *   `render.*` tool answered `no_render_context` on a real run and the overlay was drawn
      *   only by tests.
      *
-     * It does **not** apply `udea.kotlin-library-gl`: it takes `:udea-render` as a plain
-     * `implementation` dependency, so its GL surface is exactly what that module chooses to
-     * expose plus the gdx types it names on that one line of its build script.
+     * It is on the plain JVM convention: it takes `:udea-render` as an `implementation`
+     * dependency, so its GL surface is exactly what that module chooses to expose.
      *
      * ## What is not weakened by this
      *
@@ -164,9 +167,8 @@ public object ModuleGraphRules {
     )
 
     /**
-     * The headless-kernel rule. Note what is *not* banned: `com.badlogicgames.gdx:gdx`
-     * carries `Vector2` and the rest of gdx-math, which is headless. The ban is on GL and
-     * on native loaders, not on maths.
+     * The headless-kernel rule: no renderer, no GL binding and no native loader outside the two
+     * modules that own them. LibGDX is not named here; [NO_LIBGDX] bans it from every project.
      */
     public val NO_GL_OUTSIDE_RENDER: DependencyRule = DependencyRule(
         id = RuleId("UDEA-MG-002"),
@@ -176,8 +178,7 @@ public object ModuleGraphRules {
             "on the compile classpath, a static initialiser or a context reference gets written and " +
             "the headless path is gone. Kool and the ComposeGL backends are the renderer after the " +
             "port (spec section 3: no Kool and no ComposeGL backend outside udea-render); " +
-            "composegl-ui, the toolkit with no backend in it, stays legal. gdx-math " +
-            "(com.badlogicgames.gdx:gdx) is still allowed - Vector2 is not GL. udea-render and " +
+            "composegl-ui, the toolkit with no backend in it, stays legal. udea-render and " +
             "udea-agent-host are the two exempt modules; see ModuleGraphRules.GL_ALLOWED_PROJECTS " +
             "for why the debug HTTP host is one of them and why udea-core's guarantee is untouched by it.",
         specSection = "4, 3.5; kool port 3",
@@ -186,34 +187,10 @@ public object ModuleGraphRules {
         banned = listOf(
             CoordinatePattern("de.fabmax.kool:*"),
             CoordinatePattern("dev.wildware.composegl:composegl-kool*"),
-            CoordinatePattern("dev.wildware.composegl:composegl-gdx*"),
             CoordinatePattern("dev.wildware.composegl:composegl-lwjgl3*"),
             CoordinatePattern("dev.wildware.composegl:composegl-webgl*"),
             CoordinatePattern("dev.wildware.composegl:composegl-android*"),
-            CoordinatePattern("com.badlogicgames.gdx:gdx-backend-lwjgl3"),
             CoordinatePattern("org.lwjgl:*"),
-            CoordinatePattern("com.badlogicgames.gdx:*-platform"),
-        ),
-    )
-
-    /**
-     * `udea-render` draws with Kool (spec section 4, issue #211), and LibGDX left it in the same
-     * change. A gdx artifact back on its classpath - directly, or through `composegl-gdx` - is two
-     * renderers in one module, which is the parallel-renderer arrangement spec D9 rejected.
-     */
-    public val RENDER_HAS_NO_LIBGDX: DependencyRule = DependencyRule(
-        id = RuleId("UDEA-MG-008"),
-        summary = "udea-render resolves no LibGDX artifact and no LibGDX ComposeGL backend",
-        rationale = "udea-render draws with Kool (spec section 4, issue #211). LibGDX on its " +
-            "classpath would be a second renderer in the one module that owns rendering, which is " +
-            "the parallel-renderers migration spec D9 rejected, and composegl-gdx drags gdx in " +
-            "transitively. The rule covers every target classpath the module has.",
-        specSection = "kool port 4, D9",
-        projects = setOf(":udea-render"),
-        configurations = setOf("compileClasspath", "runtimeClasspath"),
-        banned = listOf(
-            CoordinatePattern("com.badlogicgames.gdx:*"),
-            CoordinatePattern("dev.wildware.composegl:composegl-gdx*"),
         ),
     )
 
@@ -266,8 +243,8 @@ public object ModuleGraphRules {
     public val NO_SCRIPTING_OR_REFLECTION_IN_THE_GAME: DependencyRule = DependencyRule(
         id = RuleId("UDEA-MG-005"),
         summary = "the shipped game carries no Kotlin scripting host and no classpath scanner",
-        rationale = "common pulls in five kotlin-scripting-* artifacts and org.reflections:" +
-            "reflections today, which is both a startup cost and the mechanism behind the " +
+        rationale = "The old common module pulled in five kotlin-scripting-* artifacts and org.reflections:" +
+            "reflections, which is both a startup cost and the mechanism behind the " +
             "reflection-on-hot-paths smell the rewrite exists to kill. Asset scripts are compiled " +
             "at build time; discovery is a generated registry, not classpath scanning.",
         specSection = "6 (Phase 2 exit), 3.6",
@@ -350,29 +327,32 @@ public object ModuleGraphRules {
     )
 
     /**
-     * The game draws with Kool too, because it draws through `udea-render` (issue #212).
+     * LibGDX is gone from the tree (issue #213), and this is what keeps it gone.
      *
-     * `moba` was the last project in the rewrite tree with LibGDX on it: it named `libs.gdx` to
-     * write a `RenderSystem` against `Batch`, and `gdx-box2d` plus its desktop natives for a
-     * physics world spec D4 retires with LibGDX. Both are gone with the split, and this is what
-     * stops either coming back through a nested project nobody thought to check.
+     * It was removed in three steps: `udea-render` moved to Kool (issue #211), `moba` followed it
+     * (issue #212), and #213 deleted the old tree and every `com.badlogicgames` coordinate from
+     * the version catalog. Each step had a rule scoped to the project it had just cleaned -
+     * `UDEA-MG-008` for `udea-render`, then this id for `moba` - and a ban scoped to the modules
+     * that last had LibGDX lets it back in through any other one. So it governs every project,
+     * the two exempt from [NO_GL_OUTSIDE_RENDER] included: being allowed GL is not being allowed
+     * a second renderer. `UDEA-MG-008` is retired into this rule rather than reused.
      *
-     * Every `:moba:*` project, not only the one that used to name it: `:moba:desktop` and
-     * `:moba:android` each resolve `:moba:game`, so a gdx artifact reintroduced on any of them
-     * reaches the shipped game the same way.
+     * The patterns are the LibGDX groups, `com.badlogicgames.gdx` and the extensions published
+     * beside it such as `com.badlogicgames.box2dlights`, and ComposeGL's LibGDX backend, which
+     * drags gdx in transitively without a build script naming it.
      */
-    public val MOBA_HAS_NO_LIBGDX: DependencyRule = DependencyRule(
+    public val NO_LIBGDX: DependencyRule = DependencyRule(
         id = RuleId("UDEA-MG-009"),
-        summary = "no moba project resolves a LibGDX artifact",
-        rationale = "moba draws through udea-render, which draws with Kool (issue #211). LibGDX " +
-            "on a moba classpath is a second renderer in the shipped game - the parallel-renderer " +
-            "arrangement spec D9 rejected - and it is how the Box2D world spec D4 retires would " +
-            "come back. The rule covers every target classpath each nested project has.",
+        summary = "no project resolves a LibGDX artifact",
+        rationale = "LibGDX was deleted from the tree (issue #213): udea-render and moba draw with " +
+            "Kool (issues #211, #212), and the old tree that depended on it is gone. A LibGDX " +
+            "artifact back on any classpath is a second renderer - the parallel-renderer " +
+            "arrangement spec D9 rejected - or the Box2D world spec D4 retires, and on a headless " +
+            "module it is a GL-carrying jar. The rule covers every target classpath of every project.",
         specSection = "kool port 3, 4, D4, D9, D12",
-        projects = MOBA_PROJECTS,
         configurations = setOf("compileClasspath", "runtimeClasspath"),
         banned = listOf(
-            CoordinatePattern("com.badlogicgames.gdx:*"),
+            CoordinatePattern("com.badlogicgames.*:*"),
             CoordinatePattern("dev.wildware.composegl:composegl-gdx*"),
         ),
     )
@@ -386,12 +366,19 @@ public object ModuleGraphRules {
         NO_SCRIPTING_OR_REFLECTION_IN_THE_GAME,
         ASSETS_MODEL_IS_A_LEAF,
         VENDORED_FLEKS_IS_A_LEAF,
-        RENDER_HAS_NO_LIBGDX,
-        MOBA_HAS_NO_LIBGDX,
+        NO_LIBGDX,
     )
 
-    /** True when [projectPath] is part of the rewrite tree and therefore subject to [ALL]. */
-    public fun governs(projectPath: String): Boolean = LegacyDependencyRules.governs(projectPath)
+    /**
+     * True when [projectPath] is an engine module or part of the game, and so subject to [ALL].
+     *
+     * `:moba:` as a prefix and not `:moba` alone, because issue #212 split the game into nested
+     * projects (spec D12): `:moba:game`, `:moba:desktop` and `:moba:android`. Matching the parent
+     * path only would leave every one of them ungoverned - silently, because an ungoverned project
+     * is not reported as skipped. The compiler-plugin wiring asks the same question through here.
+     */
+    public fun governs(projectPath: String): Boolean =
+        projectPath.startsWith(":udea-") || projectPath == ":moba" || projectPath.startsWith(":moba:")
 
     /** Every violation visible on [configuration] of [projectPath]. */
     public fun violations(

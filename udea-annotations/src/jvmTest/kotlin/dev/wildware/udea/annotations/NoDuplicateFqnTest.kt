@@ -2,52 +2,28 @@ package dev.wildware.udea.annotations
 
 import java.io.File
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
  * Regression guard for the defect this module exists to remove.
  *
- * `dev.wildware.udea.network.UdeaNetworked` is declared twice in the old tree - in
- * `common/src/main/kotlin/dev/wildware/udea/network/packets.kt` and in
- * `gradle-plugin/src/main/kotlin/dev/wildware/udea/network/annotations.kt` - and
- * `common/build.gradle.kts` puts both on one compile classpath, so which one the
- * reflective scan binds against depends on classpath ordering. `udea-annotations` is the
- * single home for the rewrite's annotations; this test fails if any FQN it declares also
- * appears in either old tree, which is what would let the duplicate come back.
+ * `dev.wildware.udea.network.UdeaNetworked` was declared twice in the old tree - once in
+ * `common` and once in `gradle-plugin` - and both landed on one compile classpath, so which one
+ * a reflective scan bound against depended on classpath ordering. `udea-annotations` is the
+ * single home for the annotations; this test fails if it carries that FQN forward.
  *
- * The old trees are deleted at the Phase 6 exit (spec 6); when they are gone this test
- * still asserts that this module declares the vocabulary, and simply has nothing to
- * collide with.
+ * Until issue #213 it also scanned the two old trees for any FQN declared here. Both trees are
+ * deleted, so there is nothing left for a declaration here to collide with.
  */
 class NoDuplicateFqnTest {
 
     @Test
-    fun `no FQN declared here is also declared in the old common or gradle-plugin trees`() {
+    fun `this module does not reuse the FQN of either old UdeaNetworked declaration`() {
         val ours = typeFqnsIn(File("src/commonMain/kotlin"))
         assertTrue(
             ours.isNotEmpty(),
             "scanned no declarations in udea-annotations - the scanner is broken, not the tree",
         )
-
-        for (oldTree in listOf(File("../common/src"), File("../gradle-plugin/src"))) {
-            if (!oldTree.isDirectory) continue
-            val theirs = typeFqnsIn(oldTree)
-            assertTrue(
-                theirs.isNotEmpty(),
-                "scanned no declarations in ${oldTree.path} - the scanner is broken, not the tree",
-            )
-            assertEquals(
-                emptySet(),
-                ours intersect theirs,
-                "udea-annotations must be the single home for these FQNs, but ${oldTree.path} also declares them",
-            )
-        }
-    }
-
-    @Test
-    fun `this module does not reuse the FQN of either old UdeaNetworked declaration`() {
-        val ours = typeFqnsIn(File("src/commonMain/kotlin"))
         assertTrue(
             ours.none { it == "dev.wildware.udea.network.UdeaNetworked" },
             "the duplicated FQN must not be carried forward; the replacement is @Replicated/@Net",

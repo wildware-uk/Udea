@@ -15,7 +15,7 @@
 # translate this in either direction", which is what a byte comparison needs, and it is what
 # `udea-diagnostics/.gitattributes` and `.github/conformance/.gitattributes` (issue #171) already
 # say for the same reason. A repository-wide `* text=auto eol=lf` would additionally rewrite
-# `example/`'s asset corpus, which is committed CRLF on purpose - see the KDoc on
+# `example-assets/`, the retired game's asset corpus, which is committed CRLF on purpose - see the KDoc on
 # `UdeaDeclarationScanner.normalizeLineEndings`, which found that the whole corpus is CRLF and
 # that pass 1 is wrong on it without normalising.
 #

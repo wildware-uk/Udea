@@ -1,23 +1,12 @@
 [versions]
-# libraries
-junit = "4.13.2"
-opentest4j = "1.3.0"
-libgdx = "1.13.1"
-
-# plugins
-changelog = "2.2.1"
-intelliJPlatform = "2.5.0"
 kotlin = "2.4.20"
-kover = "0.9.1"
-qodana = "2024.3.4"
-junitJupiter = "5.8.1"
 
-# --- udea-* rewrite (Phase 0). Every new module takes its versions from here. ---
+# Every module takes its versions from here.
 # `kotlin` above is the single authoritative Kotlin version: udea-compiler-plugin and
 # udea-assets-compiler are pinned to it exactly (spec 7), and build-logic's
 # UdeaVersions.KOTLIN is asserted equal to it by a test.
 # It does NOT by itself control the kotlin-stdlib that resolves: Gradle takes the highest
-# requested version, and kotlinpoet and fleks below each request a newer one. Modules on
+# requested version, and libraries such as kotlinpoet below request a newer one. Modules on
 # the `udea.kotlin-build-tool` convention - the jars loaded inside the compiler - pin the
 # resolved stdlib back to `kotlin` and prove it with `udeaVerifyKotlinPin`. Everything
 # else deliberately takes the higher stdlib, which is the supported direction.
@@ -37,15 +26,6 @@ kotlinpoet = "2.3.0"
 # for the engine. `udeaVerifyDeterminism` stamps it, with a digest of the vendored source, as the
 # version `determinism-audit.md` describes; change it only when re-vendoring.
 fleks = "2.14"
-# libGDX. Moved 1.13.5 -> 1.14.2 with the ComposeGL move (issue #186), and not for its own
-# sake: `composegl-gdx:0.5.0` depends on `com.badlogicgames.gdx:gdx:1.14.2`, so Gradle upgraded
-# `gdx` to 1.14.2 on `udea-render` and `moba` while `gdx-backend-lwjgl3` and the
-# `gdx-platform`/`gdx-box2d-platform` **native** loaders stayed on 1.13.5 from this entry. A gdx
-# core at one version and its desktop natives at another is the skew that fails inside
-# `Lwjgl3Application`'s own constructor, and it would have been invisible: `:udea-render:dependencies`
-# printed `gdx:1.13.5 -> 1.14.2` while this file still said 1.13.5. One version here keeps core,
-# backend, natives and box2d on the same release and leaves `composegl-gdx` with nothing to upgrade.
-gdx = "1.14.2"
 junit5 = "5.13.4"
 # ASM is a build/test-time class-file reader: udea-render's udeaVerifyHeadless scans the
 # compiled bytecode of the headless modules for GL references, and udeaVerifyDeterminism
@@ -55,7 +35,7 @@ junitPlatform = "1.13.4"
 # ComposeGL: the Compose-based UI toolkit that replaces scene2d (issues #185-#189). Every
 # published release declares `kotlin-stdlib:2.4.20` and its jars carry `@Metadata(mv = [2, 4, 0])`,
 # which is why `kotlin` above had to move to 2.4.20 before any of this could be on the classpath
-# at all. `composegl-gdx` is a GL backend, so it is `udea-render`-only by UDEA-MG-002.
+# at all.
 #
 # 0.7.0-SNAPSHOT is the first release carrying `composegl-kool`, the Kool frontend `udea-render`
 # hosts its interface on (issue #224). A snapshot rather than a release because there is no 0.7.0
@@ -117,11 +97,6 @@ kool = "0.19.0"
 kotlinxIo = "0.9.1"
 
 [libraries]
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-opentest4j = { group = "org.opentest4j", name = "opentest4j", version.ref = "opentest4j" }
-junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junitJupiter" }
-
-# --- udea-* rewrite ---
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -136,35 +111,10 @@ kotlin-scripting-jvm-host = { module = "org.jetbrains.kotlin:kotlin-scripting-jv
 kotlin-scripting-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable", version.ref = "kotlin" }
 ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
 kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
-# The old tree's Fleks, from Maven. Only `common` names it: every `udea-*` module has Fleks' source
-# through `udea-fleks` (issue #215), and this entry goes when `common` does.
-fleks = { module = "io.github.quillraven.fleks:Fleks", version.ref = "fleks" }
-gdx = { module = "com.badlogicgames.gdx:gdx", version.ref = "gdx" }
-gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", version.ref = "gdx" }
-# The gdx desktop native library (gdx64.dll / libgdx64.so / libgdx64.dylib). Consumed with a
-# `natives-desktop` classifier, which a version catalog cannot express, so udea-render asks
-# for the variant explicitly. Runtime-only and udea-render-only: it is a native loader, and
-# UDEA-MG-002 bans `com.badlogicgames.gdx:*-platform` from every headless module for exactly
-# that reason.
-gdx-platform = { module = "com.badlogicgames.gdx:gdx-platform", version.ref = "gdx" }
-# FreeType's desktop natives. `composegl-gdx` brings the Java binding (`gdx-freetype`)
-# transitively and not this, so a game that registers a `.ttf` through `GdxFonts` needs it
-# selected here; `udea-render/build.gradle.kts` says why at the call site. A `*-platform`
-# artifact, so UDEA-MG-002 keeps it out of every headless module.
-gdx-freetype-platform = { module = "com.badlogicgames.gdx:gdx-freetype-platform", version.ref = "gdx" }
-# Box2D. `gdx-box2d` is the Java binding and is headless in the sense UDEA-MG-002 cares about -
-# it names no GL type - but it is useless without `gdx-box2d-platform`, which is a
-# `*-platform` native loader and therefore banned from every designated headless module. Both are
-# consumed by `:moba`, which is a game and not one of those modules.
-gdx-box2d = { module = "com.badlogicgames.gdx:gdx-box2d", version.ref = "gdx" }
-gdx-box2d-platform = { module = "com.badlogicgames.gdx:gdx-box2d-platform", version.ref = "gdx" }
 asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
 # The toolkit: nodes, modifiers, layout, widgets, input, and `HeadlessBackend`/`uiTest`, which is
 # how a composable is composed and asserted on with no window (see ComposeGlLinkTest).
 composegl-ui = { module = "dev.wildware.composegl:composegl-ui", version.ref = "composegl" }
-# The libGDX backend: it draws a ComposeGL tree through a gdx `Batch`, so it names GL types and
-# may only ever be a dependency of `udea-render`.
-composegl-gdx = { module = "dev.wildware.composegl:composegl-gdx", version.ref = "composegl" }
 # The Kool backend: it draws a ComposeGL tree inside Kool's frame, through Kool's own GL context,
 # so like every other frontend it may only ever be a dependency of `udea-render` (UDEA-MG-002).
 composegl-kool = { module = "dev.wildware.composegl:composegl-kool", version.ref = "composegl" }
@@ -197,9 +147,6 @@ cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", ver
 cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "cryptography" }
 
 [plugins]
-changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }
-intelliJPlatform = { id = "org.jetbrains.intellij.platform", version.ref = "intelliJPlatform" }
-kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 # The Compose compiler plugin. `version.ref = "kotlin"` is not a convenience: since Kotlin 2.0
 # this plugin ships out of the Kotlin repository and is released in lockstep with the compiler,
 # so any other version is a version that cannot load. Applied to `udea-render` only.
@@ -208,5 +155,3 @@ composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "k
 # repository in lockstep with the compiler, so `version.ref = "kotlin"` is the only version that
 # loads. Applied to the modules whose components a level file saves: udea-core, udea-gas, moba.
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
-qodana = { id = "org.jetbrains.qodana", version.ref = "qodana" }

@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 /**
  * The merge, the lookup and the did-you-mean.
  *
- * Ids are the real ones from `example/src/main/resources/assets`, because a fixture invented
+ * Ids are the real ones from `example-assets`, because a fixture invented
  * for a test proves the algorithm and not the thing an author will actually type.
  */
 class AssetCatalogTest {

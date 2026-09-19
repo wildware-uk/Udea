@@ -119,7 +119,7 @@ jobs:
       - name: Build and verify the module graph
         shell: bash
         run: >-
-          ./gradlew build udeaVerifyNoLegacyDependencies udeaVerifyModuleGraph
+          ./gradlew build udeaVerifyModuleGraph
           -Pudea.render.requireGl=false
           --stacktrace
 
@@ -196,7 +196,7 @@ jobs:
       # `tick-loop.json` is no longer among them: since issue #175 the wall-clock budgets are
       # measured by the `latency-budgets` job, and that job uploads them under its own artifact
       # name. What this step still collects is every other `reports/udea` file a full build
-      # writes - the stdlib pin, the compiler-plugin scan, the legacy ledger, the determinism
+      # writes - the stdlib pin, the compiler-plugin scan, the agent-brief check, the determinism
       # report, the release scan, `moba`'s startup json - which is why `if-no-files-found:
       # error` is still the right setting here rather than a lie waiting to happen.
       - name: Upload measured budgets
@@ -522,24 +522,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  legacy-ledger:
-    # Issues #136 and #146. Two questions the rest of CI cannot answer: is every old-tree file
-    # still accounted for, and has anything in the new tree been copied out of the old one
-    # without a current review?
+  build-logic:
+    # The gate rules' own tests. `build-logic` is an included build, so the root `build` compiles
+    # it and never runs its tests; this job is the only place CI does.
     #
-    # Spec section 7 rates two coexisting module trees as the highest-impact insidious risk on
-    # the project - the globals leak back and headless silently breaks, with the symptom
-    # appearing far from the cause. `udeaVerifyNoLegacyDependencies` catches the *classpath*
-    # half of that. This catches the half a classpath check cannot see: a file copied forward
-    # by hand.
-    #
-    # **This job must be a required status check on `master`.** That is a repository setting,
-    # not something a workflow file can assert.
-    #
-    # Both tasks are also on `check`, so the `build` job above already runs them. Naming them
-    # here as well is deliberate: this leg finishes in under a minute and says *which* rule
-    # broke, where a red `build` on two operating systems says only that something did.
-    name: migration ledger
+    # Until issue #213 this job was `legacy-ledger` ("migration ledger") and also ran
+    # `udeaLegacyReport` and `udeaVerifyMigration`, which policed the old tree. The old tree is
+    # deleted and so are they; this step was the half of the job that still guarded something.
+    name: build-logic tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -557,25 +547,20 @@ jobs:
         shell: bash
         run: chmod +x ./gradlew
 
-      # `build-logic` is an included build, so its tests are NOT run by the root `build`.
-      # Without this step every rule behind every Phase 0 gate - the module graph, the legacy
-      # classpath, the release scan and both migration gates - would be verified only by the
-      # gates themselves passing on a tree that happens to be clean, which proves nothing about
-      # whether they can still fail.
+      # Without this step every rule behind every Phase 0 gate - the module graph, the release
+      # scan, the agent brief and the determinism scan - would be verified only by the gates
+      # themselves passing on a tree that happens to be clean, which proves nothing about whether
+      # they can still fail.
       - name: The gate rules' own test suite
         shell: bash
         run: ./gradlew -p build-logic check --stacktrace
 
-      - name: Every old-tree file is in the ledger, and no copy is unreviewed
-        shell: bash
-        run: ./gradlew udeaLegacyReport udeaVerifyMigration --stacktrace
-
-      - name: Upload the reports
+      - name: Upload the test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: udea-migration-reports
-          path: build/reports/udea/**
+          name: build-logic-test-reports
+          path: build-logic/build/reports/tests/**
           if-no-files-found: error
           retention-days: 7
 

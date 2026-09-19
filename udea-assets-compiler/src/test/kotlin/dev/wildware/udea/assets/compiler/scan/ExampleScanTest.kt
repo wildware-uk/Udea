@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 /**
  * Pass 1 against the real example tree (issue #85).
  *
- * The corpus is `example/src/main/resources/assets`: the nineteen `.udea.kts` files issue #93
+ * The corpus is `example-assets`: the nineteen `.udea.kts` files issue #93
  * migrates. Real files rather than fixtures on purpose — a scanner tested only against shapes
  * its author thought of is a scanner that discovers the tree on migration day. It found two
  * things on first contact that no fixture would have: the whole corpus is CRLF (see
@@ -95,7 +95,7 @@ class ExampleScanTest {
             assertEquals("orc_elite", character.name)
             assertEquals(14, character.span.startLine)
             assertEquals(5, character.span.startColumn)
-            assertEquals("example/src/main/resources/assets/character/orc_elite.udea.kts", character.span.path)
+            assertEquals("example-assets/character/orc_elite.udea.kts", character.span.path)
 
             // A file at the asset root gets a bare id, and a kind with no `name` argument is
             // named for its file.
@@ -122,7 +122,7 @@ class ExampleScanTest {
             val dangling = report.references.map { it.target }.toSet() - report.ids
             assertEquals(setOf("ability/wizard_heal"), dangling)
             assertEquals(
-                "example/src/main/resources/assets/character/wizard.udea.kts",
+                "example-assets/character/wizard.udea.kts",
                 index.spanFor("ability/wizard_heal")?.path,
             )
         }
@@ -151,7 +151,7 @@ class ExampleScanTest {
     @OptIn(ExperimentalPathApi::class)
     @Test
     fun `two checkouts produce byte-identical json`(@TempDir tmp: Path) {
-        val relative = "example/src/main/resources/assets"
+        val relative = "example-assets"
         val outputs = listOf("a", "a-much-longer-checkout-directory-name").map { name ->
             val checkout = tmp.resolve(name)
             val assets = checkout.resolve(relative)

@@ -10,9 +10,14 @@ import dev.wildware.udea.render.view.GizmoLayer
  * Every shape is drawn and hit-tested by one [HandlePainter], the built-ins' and a game's alike. Where
  * two handles overlap, the one declared later is drawn on top and is the one a press takes.
  *
+ * @param under the view's layer before this one - the bone overlay's, a launcher's - or `null`. It
+ *   is drawn first, and a press no handle takes goes on to it.
  * @param frame this frame's handles and marks, asked for each time the view draws or is pressed.
  */
-internal class HandleLayer(private val frame: () -> GizmoFrame) : GizmoLayer {
+internal class HandleLayer(
+    private val under: GizmoLayer? = null,
+    private val frame: () -> GizmoFrame,
+) : GizmoLayer {
 
     private val painter = HandlePainter()
 
@@ -24,8 +29,9 @@ internal class HandleLayer(private val frame: () -> GizmoFrame) : GizmoLayer {
     private var pressedIndex = NONE
 
     override fun draw(canvas: GizmoCanvas) {
+        under?.draw(canvas)
         val shown = frame()
-        for (mark in shown.marks) painter.draw(canvas, mark)
+        painter.draw(canvas, shown.marks)
         shown.handles.forEachIndexed { index, handle ->
             painter.draw(canvas, handle.at, handle.shape, handle.axes, lit = index == pressedIndex)
         }
@@ -38,7 +44,7 @@ internal class HandleLayer(private val frame: () -> GizmoFrame) : GizmoLayer {
             painter.hits(canvas, handle.at, handle.shape, handle.axes, viewX, viewY)
         } ?: NONE
         pressed = handles.getOrNull(pressedIndex)
-        return pressed != null
+        return pressed != null || under?.press(canvas, viewX, viewY) == true
     }
 
     /** The drag on [pressed] is over: nothing is held, and nothing is drawn lit. */
@@ -47,7 +53,7 @@ internal class HandleLayer(private val frame: () -> GizmoFrame) : GizmoLayer {
         pressedIndex = NONE
     }
 
-    override fun toString(): String = "HandleLayer(pressed=$pressed)"
+    override fun toString(): String = "HandleLayer(pressed=$pressed, under=$under)"
 
     private companion object {
         const val NONE: Int = -1

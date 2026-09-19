@@ -9,6 +9,7 @@ import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.CoreModule
+import dev.wildware.udea.editor.EditorAnimation
 import dev.wildware.udea.editor.EditorGizmos
 import dev.wildware.udea.editor.EditorSession
 import dev.wildware.udea.editor.EditorSpawn
@@ -79,18 +80,25 @@ public object MobaEditor {
             "the editor is a window, and RenderMode.Headless has none; run :moba:desktop:run -Peditor=true " +
                 "for the editor.* tools with no window"
         }
-        MobaAgent.runWithGl(mode, MobaAgent.Wiring(), editor = true) { host, rendering, session ->
-            open(host, rendering, session)
+        val models = MobaEditorModels.fromProperties()
+        MobaAgent.runWithGl(mode, MobaAgent.Wiring(), editor = true, renderers = { models?.register(it) }) { host, rendering, session ->
+            open(host, rendering, session, models)
         }
     }
 
     /** Puts the window over the world, paused. Before the first frame. */
-    private fun open(host: GameHost, rendering: MobaLaunch.Rendering, session: MobaAgent.Session): MobaAgent.Screen {
+    private fun open(
+        host: GameHost,
+        rendering: MobaLaunch.Rendering,
+        session: MobaAgent.Session,
+        models: MobaEditorModels?,
+    ): MobaAgent.Screen {
         val views = EditorViews(rendering.sceneView(EditorCamera()), rendering.gameView())
         session.editorViews(views.scene, views.game)
         // Kept in the file `runEditor` names; for the run only when started some other way.
         val preferences = System.getProperty(PREFERENCES_PROPERTY)?.let { GizmoPreferences.load(Path.of(it)) } ?: GizmoPreferences()
-        val editor = session(host, session, views, standalone = MobaStandalone(), preferences = preferences)
+        val animation = models?.animation(host, session.player)
+        val editor = session(host, session, views, standalone = MobaStandalone(), animation = animation, preferences = preferences)
         val fonts = editorFonts()
         val layer = UiLayer(fonts, DESIGN)
         rendering.show(layer)
@@ -101,14 +109,16 @@ public object MobaEditor {
     /**
      * The editor over a wired agent [session] on [host]: everything except the window's pixels, so a
      * test can press its buttons with no GL context. Pauses [host] first: the editor starts paused.
-     * [standalone] is what Play standalone launches; `null` leaves the button out. [preferences] are
-     * the Scene tab's snapping and axes, for the run alone unless a file backs them.
+     * [standalone] is what Play standalone launches; `null` leaves the button out. [animation] is the
+     * Animation panel's models; `null` leaves the panel out. [preferences] are the Scene tab's
+     * snapping and axes, for the run alone unless a file backs them.
      */
     internal fun session(
         host: GameHost,
         session: MobaAgent.Session,
         views: EditorViews = EditorViews.detached(),
         standalone: StandaloneLauncher? = null,
+        animation: EditorAnimation? = null,
         preferences: GizmoPreferences = GizmoPreferences(),
     ): EditorSession {
         host.time.pause()
@@ -119,6 +129,7 @@ public object MobaEditor {
             spawn = spawnBeside(host, session.player),
             views = views,
             standalone = standalone,
+            animation = animation,
             gizmos = EditorGizmos(
                 MobaGizmoRegistry,
                 host.world,

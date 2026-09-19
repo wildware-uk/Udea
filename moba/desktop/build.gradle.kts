@@ -307,11 +307,15 @@ tasks.register<JavaExec>("runEditor") {
     // `-Pudea.render.mode=Offscreen` says otherwise: the editor is a window a person looks at.
     val port = providers.gradleProperty("debugPort")
     val mode = providers.gradleProperty("udea.render.mode")
+    // `-PeditorFox=true` puts an animated Fox beside the player when the editor opens (issue #243):
+    // `moba`'s level has no animated entity for the Animation panel to show. See `MobaEditorModels`.
+    val fox = providers.gradleProperty("editorFox")
     jvmArgumentProviders.add(
         CommandLineArgumentProvider {
             listOfNotNull(
                 port.orNull?.let { "-Dudea.agent.port=$it" },
                 mode.orNull?.let { "-Dudea.render.mode=$it" },
+                fox.orNull?.let { "-Dmoba.editor.fox=$it" },
             )
         },
     )

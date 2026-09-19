@@ -2,6 +2,8 @@ package dev.wildware.udea.render.model
 
 import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.Tick
+import dev.wildware.udea.core.Ticks
+import dev.wildware.udea.core.spatial.AnimationClip
 import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.core.spatial.ClipPlayback
 import dev.wildware.udea.core.spatial.Loop
@@ -75,6 +77,19 @@ internal class ClipPose {
         } else {
             clearPrevious()
         }
+        return this
+    }
+
+    /**
+     * [clip] held at [at] into it, with nothing fading: the pose an editor's scrub preview shows
+     * ([ModelPreview], issue #243). [at] is clamped to the clip, so a scrubber at either end shows
+     * the clip's first or last frame rather than wrapping.
+     */
+    fun hold(clip: AnimationClip, at: Ticks): ClipPose {
+        current = clip.index
+        currentTicks = at.count.coerceIn(0L, clip.length.count).toDouble()
+        clearPrevious()
+        weight = 1f
         return this
     }
 

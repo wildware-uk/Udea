@@ -34,22 +34,39 @@ internal class HandlePainter {
     // --- drawing -------------------------------------------------------------------------------
 
     /**
-     * Draws [mark], thin, in the guide colour: a line to its far end, a circle at its world size, and
-     * any other shape as a dot - a mark is a place to look, and an arrow's direction means nothing to
-     * a hand that cannot grab it.
+     * Draws [mark] in the mark colour with a dark edge: a line to its far end, a circle at its world
+     * size, and any other shape as a dot - a mark is a place to look, and an arrow's direction means
+     * nothing to a hand that cannot grab it. The one way a mark is drawn, the bone overlay's included.
      */
     fun draw(canvas: GizmoCanvas, mark: Mark) {
         when (val shape = mark.shape) {
             is HandleShape.Line -> if (canvas.project(mark.at, from) && canvas.project(shape.to, to)) {
-                canvas.line(from.x, from.y, to.x, to.y, GUIDE_WIDTH, GUIDE)
+                markLine(canvas, from.x, from.y, to.x, to.y)
             }
             is HandleShape.Circle -> ring(canvas, mark.at, AxisFrame.WORLD, shape.normal, shape.radius) { x0, y0, x1, y1 ->
-                canvas.line(x0, y0, x1, y1, GUIDE_WIDTH, GUIDE)
+                markLine(canvas, x0, y0, x1, y1)
             }
             HandleShape.Point, HandleShape.BoxCorner, HandleShape.Sphere,
             is HandleShape.Arrow, is HandleShape.PlaneSquare, is HandleShape.Ring, is HandleShape.BoxEdge,
-            -> if (canvas.project(mark.at, from)) grip(canvas, from.x, from.y, MARK_DOT, GUIDE)
+            -> if (canvas.project(mark.at, from)) {
+                val outer = MARK_DOT + 2f * MARK_EDGE
+                canvas.fill(from.x - outer / 2f, from.y - outer / 2f, outer, outer, MARK_OUTLINE)
+                canvas.fill(from.x - MARK_DOT / 2f, from.y - MARK_DOT / 2f, MARK_DOT, MARK_DOT, MARK)
+            }
         }
+    }
+
+    /** Draws [marks]: every line and circle first, so each dot sits on top of the lines that meet at it. */
+    fun draw(canvas: GizmoCanvas, marks: List<Mark>) {
+        for (mark in marks) if (mark.shape.isStroke()) draw(canvas, mark)
+        for (mark in marks) if (!mark.shape.isStroke()) draw(canvas, mark)
+    }
+
+    private fun HandleShape.isStroke(): Boolean = this is HandleShape.Line || this is HandleShape.Circle
+
+    private fun markLine(canvas: GizmoCanvas, x0: Float, y0: Float, x1: Float, y1: Float) {
+        canvas.line(x0, y0, x1, y1, MARK_LINE + 2f * MARK_EDGE, MARK_OUTLINE)
+        canvas.line(x0, y0, x1, y1, MARK_LINE, MARK)
     }
 
     /** Draws a handle of [shape] at [at], its axes [axes]; [lit] when it is the one being dragged. */
@@ -235,12 +252,17 @@ internal class HandlePainter {
         /** A 3D ball's side, in view pixels. */
         const val SPHERE: Float = 12f
 
-        /** A mark drawn as a dot, in view pixels: smaller than any grip, since nothing grabs it. */
-        const val MARK_DOT: Float = 5f
+        /** A mark drawn as a dot - a joint - in view pixels. */
+        const val MARK_DOT: Float = 7f
+
+        /** A mark's line - a bone, a box's outline, a range - in view pixels. */
+        const val MARK_LINE: Float = 2f
+
+        /** The dark edge round every mark, in view pixels. */
+        const val MARK_EDGE: Float = 1f
 
         const val STROKE: Float = 2.5f
         const val EDGE_WIDTH: Float = 1f
-        const val GUIDE_WIDTH: Float = 1.5f
 
         /** An arrowhead's strokes: this long, at this angle either side of the shaft. */
         const val HEAD_LENGTH: Float = 10f
@@ -263,7 +285,12 @@ internal class HandlePainter {
         val PLANE_FILL: Rgba = Rgba.of(1f, 0.9f, 0.2f, 0.35f)
         val GRIP: Rgba = Rgba.of(1f, 0.9f, 0.2f)
         val BOX: Rgba = Rgba.of(0.95f, 0.95f, 0.95f)
-        val GUIDE: Rgba = Rgba.of(0.6f, 0.85f, 1f, 0.8f)
+
+        /** What a mark is drawn in: a warm yellow that no sprite or model in `moba` is. */
+        val MARK: Rgba = Rgba.of(1f, 0.82f, 0.1f, 1f)
+
+        /** The dark edge round every mark, so it reads over a light model and a dark floor alike. */
+        val MARK_OUTLINE: Rgba = Rgba.of(0.05f, 0.05f, 0.08f, 1f)
         val LIT: Rgba = Rgba.of(1f, 1f, 1f)
         val LIT_FILL: Rgba = Rgba.of(1f, 1f, 1f, 0.45f)
         val SHADOW: Rgba = Rgba.of(0f, 0f, 0f, 0.55f)

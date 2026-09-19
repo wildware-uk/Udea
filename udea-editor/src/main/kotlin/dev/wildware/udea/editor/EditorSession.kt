@@ -74,6 +74,9 @@ public class EditorSession(
     internal val views: EditorViews,
     /** What Play standalone hands the saved level to; `null` leaves that button out (issue #196). */
     standalone: StandaloneLauncher? = null,
+    /** The Animation panel's models and renderer; `null` leaves the panel out (issue #243). */
+    animation: EditorAnimation? = null,
+    /** The gizmos the Scene tab shows for the selection and drags (issue #236); `null` shows none. */
     gizmos: EditorGizmos? = null,
 ) {
 
@@ -100,8 +103,22 @@ public class EditorSession(
     /** Click, Shift-click and box select in the Scene tab. */
     internal val picking: ScenePicking = ScenePicking(picker, selection)
 
-    /** The gizmos' handles and marks for the selection, drawn over it; `null` with no gizmos. */
-    private val handles: HandleLayer? = gizmos?.let { offered -> HandleLayer { offered.frameFor(selection.ids) } }
+    /**
+     * The Animation panel, the scrub preview and the bone overlay, when the game has animated models
+     * (issue #243). Made before [handles] and [init] wrap the Scene view's gizmo layer: the bone overlay goes on
+     * over whatever layer a launcher set, passing it every press, and the selection outline wraps both.
+     */
+    internal val animation: AnimationPanelState? =
+        animation?.let { AnimationPanelState(it, tools, views, selection, sceneChanged = { navigation.markMoved() }) }
+
+    /**
+     * The gizmos' handles and marks for the selection, drawn over it; `null` with no gizmos. Over the
+     * layer the view already has - the bone overlay's, a launcher's - which gets every press no
+     * handle takes.
+     */
+    private val handles: HandleLayer? = gizmos?.let { offered ->
+        HandleLayer(under = views.scene.gizmos) { offered.frameFor(selection.ids) }
+    }
 
     /** A drag on one of [handles], as an edit session. */
     private val gizmoDrag: GizmoDrag? = gizmos?.let { offered ->
@@ -189,6 +206,7 @@ public class EditorSession(
         if (historyStale && !historyPending) readHistory()
         selection.frame(changed)
         inspector.frame(changed, tick())
+        animation?.frame()
         // Both asked every frame: each keeps what it last saw.
         val resized = resized()
         val due = redraw.due(tick(), completed) || resized

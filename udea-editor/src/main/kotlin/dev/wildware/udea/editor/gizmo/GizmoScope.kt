@@ -51,7 +51,7 @@ public class GizmoScope<C : Component<C>> internal constructor(
      * one that declares marks and no handles.
      *
      * Like a handle it keeps its size on screen; a [HandleShape.Line] runs to its far end in world
-     * space.
+     * space, and a [HandleShape.Circle] is drawn at its world radius (issue #236).
      */
     public fun mark(at: WorldPoint, shape: HandleShape) {
         marked += Mark(at, shape)

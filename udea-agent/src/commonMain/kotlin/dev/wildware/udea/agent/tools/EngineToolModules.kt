@@ -131,7 +131,7 @@ public object EngineToolModules {
 
     /**
      * `editor.*`: set any field, move, spawn, delete, save, one undo history per author, edit
-     * sessions, selection and the fields a multi-selection shares.
+     * sessions, selection, the fields a multi-selection shares, and play and stop.
      *
      * Its own module, and one a host registers **only when it was started as an editor**: these
      * tools write fields `world.set_component_field` refuses, which is right while authoring a
@@ -148,11 +148,13 @@ public object EngineToolModules {
             EditorToolsetHistoryTool,
             EditorToolsetLeaveTool,
             EditorToolsetMoveTool,
+            EditorToolsetPlayTool,
             EditorToolsetSaveTool,
             EditorToolsetSelectTool,
             EditorToolsetSelectionTool,
             EditorToolsetSetFieldTool,
             EditorToolsetSpawnTool,
+            EditorToolsetStopTool,
             EditorToolsetUndoTool,
             EditorToolsetUpdateEditTool,
         ),

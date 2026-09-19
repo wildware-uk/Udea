@@ -224,6 +224,32 @@ class LevelServiceTest {
         assertEquals(original.tick + 1, fresh.tick, "the load landed at the top of the step, which then ran")
     }
 
+    /**
+     * The editor's Stop (issue #196): the same world, saved, then changed in place and moved on,
+     * then put back from the bytes by a caller already at a tick boundary.
+     */
+    @Test
+    fun `loadNow puts the same world back at once - after it moved on and was changed in place`() {
+        val host = host()
+        val saved = populated(host)
+        val levels = levels(host, extra = arrayOf(linkComponent))
+        val bytes = save(host, levels)
+        val tick = host.tick
+
+        // What Play does to a world: the running game changes the very component objects the
+        // world holds, spawns, and moves the clock and the streams on.
+        with(host.world) { saved.anonymous[MoverState].x = 500f }
+        host.ctx[CoreModule.NET_IDS].allocate(host.world.entity { it += MoverState(x = 3f) })
+        host.run(20)
+        host.ctx.rng.nextLong(RngStream.Combat)
+
+        levels.loadNow(levels.read(bytes))
+
+        assertEquals(tick, host.tick, "the clock was not put back")
+        with(host.world) { assertEquals(9f, saved.anonymous[MoverState].x, "a component changed in place was not put back") }
+        assertContentEquals(bytes, save(host, levels), "the world put back is not the world that was saved")
+    }
+
     @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun `a level from another format version is refused by number - before anything else is read`() {

@@ -160,6 +160,18 @@ public class LevelService internal constructor(
     public fun load(level: Level, barrier: SimBarrier): LevelAction<Level> =
         LevelAction("load level saved at ${level.tick}") { level.also(::apply) }.also(barrier::submit)
 
+    /**
+     * Replaces the world with [level] now, on the calling thread.
+     *
+     * For a caller that is **already** inside a [SimBarrier] drain - the editor's `editor.stop`
+     * (issue #196), which puts back the world Play saved - and is therefore at the boundary [load]
+     * queues for. The same split, and for the same reason, as [saveNow]: queued from there, the
+     * load would land on the *next* drain, after a tick of the world it is meant to replace had run.
+     */
+    public fun loadNow(level: Level) {
+        apply(level)
+    }
+
     internal fun apply(level: Level) {
         val document = level.document
         world.loadSnapshot(document.world)

@@ -13,6 +13,7 @@ import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.editor.EditorSession
 import dev.wildware.udea.editor.EditorSpawn
 import dev.wildware.udea.editor.EditorTools
+import dev.wildware.udea.editor.StandaloneLauncher
 import dev.wildware.udea.editor.editorFonts
 import dev.wildware.udea.render.ui.UiLayer
 
@@ -32,8 +33,8 @@ import dev.wildware.udea.render.ui.UiLayer
  * ## It starts paused
  *
  * The world is paused before the first frame, so what the viewport shows is the level as it loaded
- * and nothing moves until someone asks it to: `time.resume` or `time.step`, from an agent today and
- * from Play and Step in the window once issue #196 adds them.
+ * and nothing moves until someone asks it to: Play and Step in the window's toolbar (issue #196), or
+ * `editor.play`, `time.resume` and `time.step` from an agent.
  */
 public object MobaEditor {
 
@@ -70,7 +71,7 @@ public object MobaEditor {
     /** Puts the window over the world, paused. Before the first frame. */
     private fun open(host: GameHost, rendering: MobaLaunch.Rendering, session: MobaAgent.Session): MobaAgent.Screen {
         val world = rendering.world()
-        val editor = session(host, session, viewport = { world.drawInto(this) })
+        val editor = session(host, session, viewport = { world.drawInto(this) }, standalone = MobaStandalone())
         val fonts = editorFonts()
         val layer = UiLayer(fonts, DESIGN)
         rendering.show(layer)
@@ -81,8 +82,14 @@ public object MobaEditor {
     /**
      * The editor over a wired agent [session] on [host]: everything except the window's pixels, so a
      * test can press its buttons with no GL context. Pauses [host] first: the editor starts paused.
+     * [standalone] is what Play standalone launches; `null` leaves the button out.
      */
-    internal fun session(host: GameHost, session: MobaAgent.Session, viewport: SceneDrawScope.() -> Unit): EditorSession {
+    internal fun session(
+        host: GameHost,
+        session: MobaAgent.Session,
+        viewport: SceneDrawScope.() -> Unit,
+        standalone: StandaloneLauncher? = null,
+    ): EditorSession {
         host.time.pause()
         return EditorSession(
             tools = EditorTools(session.wiring.bridge, session.wiring.sessions.intern(AUTHOR)),
@@ -90,6 +97,7 @@ public object MobaEditor {
             paused = { host.time.paused },
             spawn = spawnBeside(host, session.player),
             viewport = viewport,
+            standalone = standalone,
         )
     }
 

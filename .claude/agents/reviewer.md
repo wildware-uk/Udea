@@ -70,10 +70,11 @@ is a finding**, and it is on the list below.
 `:moba:desktop:runUdpProof` has been green since #219, lossy leg included. It is wall-clock across
 three OS processes, so a red run is re-run alone before anyone believes it.
 
-`:moba:desktop:runUdpProof`, `:moba:desktop:runLaneShot` and the `udeaVerify*` verifiers are deliberately **outside
-`check`**, each for a reason stated in its own KDoc — wall-clock timing across forked JVMs, or a GL
+`:moba:desktop:runUdpProof` and `:moba:desktop:runLaneShot` are deliberately **outside `check`**,
+each for a reason stated in its own KDoc — wall-clock timing across forked JVMs, or a GL
 driver CI may not have. A branch that wires one of them into `check` has done the wrong thing; a
-branch that leaves them out has not.
+branch that leaves them out has not. `udeaVerifyModuleGraph`, `udeaVerifyAgentsMd` and
+`udeaVerifyContracts` are the other way round: they run on `check`.
 
 ## The evidence command
 

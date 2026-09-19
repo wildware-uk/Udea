@@ -38,9 +38,10 @@ does not run, and where it runs instead:
   `-Pudea.render.requireGl=true`; the `gl tests (xvfb)` CI job runs them for real.
 - **The wall-clock budgets.** `udeaLatencyBudgets`, in the `latency budgets` CI job, with the
   runner to itself.
-- **Three gates run by name**, each out of `check` for the reason in its own KDoc:
-  `:moba:desktop:runUdpProof` (three OS processes over real UDP), `:moba:desktop:runLaneShot`
-  (lane PNGs on a real GL context), and `udeaVerifyModuleGraph udeaVerifyAgentsMd`.
+- **Gates run by name**, each out of `check` for the reason in its own KDoc:
+  `:moba:desktop:runUdpProof` (three OS processes over real UDP) and
+  `:moba:desktop:runLaneShot` (lane PNGs on a real GL context). The verifiers
+  (`udeaVerifyModuleGraph`, `udeaVerifyAgentsMd`, `udeaVerifyContracts`) are on `check`.
 
 ## What the port left for later, on purpose
 

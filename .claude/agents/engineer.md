@@ -138,14 +138,15 @@ opens a context, run them for real and put the command and its output in `BRIEF.
 A green `sh gradlew build` is not evidence about GL. Saying it is, is the exact shape of error the
 rest of this file is about.
 
-### Three gates outside `check`
+### Gates outside `check`
 
 Each is deliberately excluded, for a reason stated in its own KDoc — wall-clock timing across forked
 JVMs, or a GL driver CI may not have. **Do not "fix" that by wiring them into `check`.**
 
     sh gradlew :moba:desktop:runUdpProof     # three OS processes, real UDP
     sh gradlew :moba:desktop:runLaneShot     # lane PNGs, needs a real GL context
-    sh gradlew udeaVerifyModuleGraph udeaVerifyAgentsMd
+
+`udeaVerifyModuleGraph` and `udeaVerifyAgentsMd` are not among them: both run on `check`.
 
 **`:moba:desktop:runUdpProof` has been green since #219, lossy leg included.** It is wall-clock
 across three OS processes, so re-run a red one alone before believing it; a red that survives that

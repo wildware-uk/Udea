@@ -421,13 +421,15 @@ of `udea-agent-host`, `udea-editor`, or anything that opens a context, run them 
 and put that command and its output in BRIEF.md. A green `sh gradlew build` is
 not evidence about GL.
 
-THREE GATES OUTSIDE `check`, run by name, each deliberately excluded for a
+GATES OUTSIDE `check`, run by name, each deliberately excluded for a
 reason stated in its own KDoc - wall-clock timing across forked JVMs, or a GL
 driver CI may not have. Do NOT "fix" that by wiring them into `check`:
 
     sh gradlew :moba:desktop:runUdpProof     # three OS processes, real UDP
     sh gradlew :moba:desktop:runLaneShot     # lane PNGs, needs a real GL context
-    sh gradlew udeaVerifyModuleGraph udeaVerifyAgentsMd
+
+(`udeaVerifyModuleGraph` and `udeaVerifyAgentsMd` run on `check`; they are not
+among these.)
 
 `:moba:desktop:runUdpProof` has been green since #219, lossy leg included. It is
 wall-clock across three processes, so re-run a red one alone before believing it;

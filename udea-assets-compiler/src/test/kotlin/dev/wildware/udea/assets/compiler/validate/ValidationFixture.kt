@@ -63,6 +63,26 @@ internal object ValidationFixture {
     ): ValidationContext =
         built.computeIfAbsent(name) { build(it, art = false, scripts = scripts, fox = true, prepare = prepare) }
 
+    /**
+     * A tree of scripts with the FBX test fixture - `Bender.fbx` and the `checker.png` it links -
+     * copied to `models/bender/`, then [prepare] run over the asset root (issue #244).
+     */
+    @OptIn(ExperimentalPathApi::class)
+    fun withFbx(
+        name: String,
+        vararg scripts: Pair<String, String>,
+        prepare: (assets: Path) -> Unit = {},
+    ): ValidationContext =
+        built.computeIfAbsent(name) {
+            build(it, art = false, scripts = scripts) { assets ->
+                val target = assets.resolve("models").resolve("bender")
+                target.createDirectories()
+                TestPaths.repoRoot.resolve("udea-assets-compiler/src/test/resources/fbx/bender")
+                    .copyToRecursively(target, followLinks = false, overwrite = true)
+                prepare(assets)
+            }
+        }
+
     /** The pipeline's verdict on a fixture. */
     fun report(context: ValidationContext) = AssetValidatorPipeline().validate(context)
 

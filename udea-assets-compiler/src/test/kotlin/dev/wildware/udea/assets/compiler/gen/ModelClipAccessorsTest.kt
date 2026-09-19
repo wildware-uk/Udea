@@ -114,6 +114,43 @@ class ModelClipAccessorsTest {
         assertTrue("not a binary glTF 2.0 file" in diagnostic.message, diagnostic.message)
     }
 
+    // ---- an .fbx (issue #244) -----------------------------------------------------------------
+
+    /** An asset tree holding the FBX fixture at `models/bender/`, declared by a script. */
+    private fun fbxTree(name: String, withTexture: Boolean = true): Path {
+        val root = TestPaths.scratch("model-clips-$name")
+        val folder = root.resolve("models/bender").createDirectories()
+        val fixture = TestPaths.repoRoot.resolve("udea-assets-compiler/src/test/resources/fbx/bender")
+        fixture.resolve("Bender.fbx").copyTo(folder.resolve("Bender.fbx"))
+        if (withTexture) fixture.resolve("checker.png").copyTo(folder.resolve("checker.png"))
+        root.resolve("models/bender.udea.kts").writeText("model(name = \"bender\", file = \"models/bender/Bender.fbx\")\n")
+        return root
+    }
+
+    @Test
+    fun `an fbx model's clips are read from the glb it converts to, and generate typed clips`() {
+        val root = fbxTree("fbx")
+        val declarations = scan(root)
+        val read = ModelClipSource.read(root, declarations)
+
+        assertEquals(emptyList(), read.diagnostics)
+        val text = AccessorGenerator.generate(declarations, read.clips)
+            .single { it.path == "dev/wildware/udea/generated/Bender.kt" }.text
+            .replace(Regex("\\s+"), " ")
+        assertTrue("public val Bend: AnimationClip = AnimationClip(index = 0, name = \"Bend\", length = Ticks(60L))" in text, text)
+        assertTrue("public val Twist: AnimationClip = AnimationClip(index = 1, name = \"Twist\", length = Ticks(38L))" in text, text)
+    }
+
+    @Test
+    fun `an fbx that does not convert fails the accessors pass with the converter's rule, not this one`() {
+        val root = fbxTree("fbx-no-texture", withTexture = false)
+        val diagnostic = ModelClipSource.read(root, scan(root)).diagnostics.single()
+
+        assertEquals("UDEA0039", diagnostic.ruleId)
+        assertEquals("models/bender", diagnostic.assetId)
+        assertTrue("`models/bender/checker.png`" in diagnostic.message, diagnostic.message)
+    }
+
     // ---- the generated source -----------------------------------------------------------------
 
     /**

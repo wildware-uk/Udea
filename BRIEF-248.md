@@ -1,6 +1,54 @@
-31b4fc3
+9c4ebc2
 
 (The code under review. This brief is committed on top of it; nothing else changed after it.)
+
+## Round 2 delta: following #246's interpolated pose
+
+The lead asked for this after #246 merged. The first review round was on `c70488a`. After it:
+
+- `bdcd12d` merges `origin/master` at `6186ef6`, which brings in #246.
+- `9c4ebc2` is the one-function change. `ThirdPersonRig.targetPosition` now reads the target through
+  `ModelPlacer` at the frame's alpha, instead of reading `Transform3D` directly. `ModelPlacer` is
+  #246's internal placer, and `ModelRenderSystem` draws with it too, so the camera centres on the
+  exact pose the model is drawn at. The rig binds its own `ModelPlacer(lift = null)` in `onBind`;
+  `follow` passes `alpha` through. Nothing else in the rig changed.
+- New test, `ThirdPersonRigTest`'s `the camera follows the interpolated pose the model is drawn at`.
+  It steps a walking target twice with `Interp3DSnapshotSystem` in the world, renders at alpha 0.5,
+  and expects the focus midway between the two ticks. It was run on the raw-`Transform3D` rig
+  first, and failed there (`scratchpad/issue248/interp-red.log`:
+  `ThirdPersonRigTest[jvm] > the camera follows the interpolated pose the model is drawn at()[jvm] FAILED`,
+  `57 tests completed, 1 failed`). Then it passed on `9c4ebc2` (`interp-green.log`, 14 of 14
+  `ThirdPersonRigTest` tests).
+
+The lead asked for the change first and the merge second. I merged first, because the change needs
+#246's code to compile. The change is still its own commit, and
+`git diff bdcd12d 9c4ebc2 -- udea-render/src/commonMain` shows the whole production delta. It is
+saved as `scratchpad/issue248/interp-commit.diff`.
+
+On `9c4ebc2` (the tails of `scratchpad/issue248/build-3.log` and `glall-3.log`):
+
+```
+BUILD SUCCESSFUL in 1m 49s
+984 actionable tasks: 159 executed, 96 from cache, 729 up-to-date
+Configuration cache entry stored.
+EXIT 0
+DONE
+```
+```
+BUILD SUCCESSFUL in 2m 14s
+126 actionable tasks: 12 executed, 114 up-to-date
+Configuration cache entry stored.
+EXIT 0
+DONE
+```
+
+The GL command was `udeaGlTest --rerun udeaAgentGlTest --rerun udeaEditorGlTest --rerun`. Counts
+from `glcount.py` after it: `udeaGlTest` 24 classes, 25 tests, which now include #246's
+`GlModelInterpolationTest`. `udeaAgentGlTest` ran 2 tests and `udeaEditorGlTest` 6. All three had
+0 skipped, 0 failures and 0 errors. The evidence command's measurements match those quoted below
+line for line, and the gallery images were regenerated from this run.
+
+The build and GL sections below describe round 1, on `c7baf93` and `31b4fc3`.
 
 # #248 Hollow E3: a third-person 3D camera rig in `udea-render`
 
@@ -150,9 +198,9 @@ old callers use them. The GL mouse helper moved from `GlKoolPointerTest` (privat
   held back for the UI's verdict. `turnButton` is the UI escape. It defaults to `null`: the mouse
   turns the view whenever it moves, which suits a captured cursor. To change that, set the default
   to `1` (right button), one line.
-- The rig reads `Transform3D` as it stands, in one private function (`targetPosition`). That is
-  exactly where `ModelRenderSystem` draws today. dev-246 (#246) is adding an internal
-  `Interpolator3D`. Whichever of us merges second switches `targetPosition` to it. I rejected
+- The rig reads its target in one private function (`targetPosition`). In round 1 it read
+  `Transform3D` as it stands, which is where `ModelRenderSystem` drew then. Since round 2 it reads
+  the interpolated pose through #246's `ModelPlacer`: see "Round 2 delta" above. I rejected
   inventing a 3D pose interface here, because it would collide with #246.
 - `ThirdPersonRig` takes `RenderResources` in its constructor. It needs `resources.viewing` to skip
   the editor's second run. `ModelRenderSystem` does the same. The KDoc shows the wiring.

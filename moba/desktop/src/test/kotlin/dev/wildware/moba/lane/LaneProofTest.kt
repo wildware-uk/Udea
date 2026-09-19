@@ -374,6 +374,31 @@ class LaneProofTest {
     }
 
     /**
+     * A tower shoots as far as its own `attackRange` and no further (issue #236).
+     *
+     * The range is a field on the tower rather than a constant so the editor's range ring can drag
+     * it; this is the half of that which is the game's: the field is what the targeting reads. The
+     * same creep as the kill test, in the same place - well inside the range every tower is built
+     * with - is left alone by towers whose range has been cut to a stride, and shot once it is put
+     * back.
+     */
+    @Test
+    fun `a tower shoots only as far as its own attack range`() {
+        val game = boot()
+        game.runUntil(TOWER_BUDGET, "the towers to be placed") { game.towers().size >= 2 }
+        fun reach(range: Float) = with(game.host.world) { game.towers().forEach { it[Tower].attackRange = range } }
+        fun shots() = with(game.host.world) { game.towers().sumOf { it[Tower].shots } }
+        reach(SHORT_RANGE)
+        game.spawnCreep(team = Team.UNDEAD, x = LaneGeometry.PATH_X[1], y = LaneGeometry.PATH_Y[1], waypoint = 0)
+
+        game.host.run(SILENT_TICKS)
+        assertEquals(0, shots(), "a tower fired at a creep beyond its own attack range")
+
+        reach(LaneGeometry.TOWER_RANGE)
+        game.runUntil(TOWER_KILL_BUDGET, "a tower back at its built range to fire") { shots() > 0 }
+    }
+
+    /**
      * A champion that lands the killing blow is paid, through the key a human presses.
      *
      * The activation goes through [InjectedIntent], which is an ordinary `IntentSource`, so
@@ -604,6 +629,16 @@ class LaneProofTest {
          * thing on that half of the lane for the whole of it.
          */
         const val TOWER_KILL_BUDGET: Int = 200
+
+        /** An attack range too short to reach anything but the tower's own footing. */
+        const val SHORT_RANGE: Float = 1f
+
+        /**
+         * Ticks a tower with its range cut is watched for. A ready tower fires on the first tick a
+         * target is in range, so one second is ample - and short enough that the marching creep is
+         * still well inside the range the tower is then given back.
+         */
+        const val SILENT_TICKS: Int = 60
 
         /** How far the marching test runs: two lines 600 apart closing at 0.7 a tick, and a fight. */
         const val MARCH_TICKS: Int = 700

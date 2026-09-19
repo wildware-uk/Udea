@@ -79,7 +79,8 @@ public object LaneGeometry {
     public const val TOWER_Y: Float = 440f
 
     /**
-     * How far a tower shoots, in world units.
+     * How far a tower shoots as it is built, in world units: every `Tower.attackRange` starts here,
+     * and the editor's range ring drags it from there (issue #236).
      *
      * Larger than the distance from either tower to the middle waypoint (141.4), so the wave
      * fight at mid happens under fire from both towers rather than out of reach of either -

@@ -11,8 +11,8 @@ import kotlin.math.pow
  * What a pointer does in the Scene tab (issues #234 and #235): gizmo handles first, then entities,
  * then the editor camera.
  *
- * - **A primary press on a gizmo handle** is the gizmo's, and the drag that follows moves nothing
- *   here.
+ * - **A primary press on a gizmo handle** is the gizmo's, and the drag that follows is its
+ *   [GizmoDrag]: one edit session from press to release (issue #236).
  * - **Otherwise the primary button selects** ([ScenePicking]): a click picks the entity under the
  *   pointer, Shift-click toggles it, and a drag from empty space box-selects.
  * - **The other buttons move the camera.** In 2D the secondary and middle buttons pan, the world
@@ -31,11 +31,13 @@ import kotlin.math.pow
  *
  * @param shift whether Shift is held, read at each press: ComposeGL's pointer events carry no
  *   modifiers, so the window keeps it from its key events ([EditorKeys]).
+ * @param gizmos what a drag on a handle does, or `null` in an editor with no gizmos.
  */
 internal class SceneNavigation(
     private val view: WorldViewport,
     private val picking: ScenePicking,
     private val shift: () -> Boolean,
+    private val gizmos: GizmoDrag? = null,
 ) {
 
     private val camera = checkNotNull(view.camera) { "$view is the Game tab, which the editor does not navigate" }
@@ -62,7 +64,11 @@ internal class SceneNavigation(
             is PointerEvent.Press -> {
                 drag = when {
                     !onView -> Drag.None
-                    event.button == PointerButton.Primary && view.pressGizmo(at.x, at.y) -> Drag.Gizmo
+                    event.button == PointerButton.Primary && view.pressGizmo(at.x, at.y) -> Drag.Gizmo.also {
+                        gizmos?.press(at.x, at.y)
+                        // The pressed handle is drawn lit.
+                        moved = true
+                    }
                     event.button == PointerButton.Primary -> Drag.Select.also { picking.press(at.x, at.y, shift()) }
                     camera.dimension == ViewDimension.ThreeD && event.button == PointerButton.Secondary -> Drag.Orbit
                     else -> Drag.Pan
@@ -82,16 +88,25 @@ internal class SceneNavigation(
                     moved = true
                 }
                 Drag.Select -> picking.drag(at.x, at.y)
-                Drag.None, Drag.Gizmo -> Unit
+                Drag.Gizmo -> gizmos?.move(at.x, at.y)
+                Drag.None -> Unit
             }
 
             is PointerEvent.Release -> {
-                if (drag == Drag.Select) picking.release(at.x, at.y)
+                when (drag) {
+                    Drag.Select -> picking.release(at.x, at.y)
+                    Drag.Gizmo -> gizmos?.release().also { moved = true }
+                    Drag.None, Drag.Pan, Drag.Orbit -> Unit
+                }
                 drag = Drag.None
             }
 
             is PointerEvent.Cancel -> {
-                if (drag == Drag.Select) picking.cancel()
+                when (drag) {
+                    Drag.Select -> picking.cancel()
+                    Drag.Gizmo -> gizmos?.cancel().also { moved = true }
+                    Drag.None, Drag.Pan, Drag.Orbit -> Unit
+                }
                 drag = Drag.None
             }
 

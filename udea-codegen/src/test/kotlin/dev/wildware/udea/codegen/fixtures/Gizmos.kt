@@ -7,18 +7,17 @@ import dev.wildware.udea.annotations.RadiusHandle
 import dev.wildware.udea.annotations.RangeHandle
 import dev.wildware.udea.annotations.RotationHandle
 import dev.wildware.udea.annotations.SizeHandle
-import dev.wildware.udea.editor.gizmo.Axis
-import dev.wildware.udea.editor.gizmo.DragConstraint
 import dev.wildware.udea.editor.gizmo.Gizmo
 import dev.wildware.udea.editor.gizmo.GizmoScope
 import dev.wildware.udea.editor.gizmo.GizmoTarget
-import dev.wildware.udea.editor.gizmo.HandleShape
-import dev.wildware.udea.editor.gizmo.Plane
-import dev.wildware.udea.editor.gizmo.WorldPoint
+import dev.wildware.udea.editor.gizmo.moveHandles
+import dev.wildware.udea.editor.gizmo.radiusHandle
+import dev.wildware.udea.editor.gizmo.rotationHandle
 
 /*
  * The gizmo fixtures (issue #233): components carrying every handle annotation, and hand-written
- * gizmos that are twins of three of the gizmos `kspTest` generates from them.
+ * gizmos that are twins of three of the gizmos `kspTest` generates from them. Each twin calls the
+ * editor's public built-in for its handle (issue #236), as a person writing that gizmo by hand would.
  *
  * This test source set plays both halves a game is split into. Its KSP run is a module's
  * (`udea.moduleName`), so it lists these components on `CodegenFixturesModuleRegistry`'s
@@ -67,12 +66,7 @@ public class BeaconPositionTwin : Gizmo<Beacon> {
     override val component: ComponentType<Beacon> = Beacon
 
     override fun GizmoScope<Beacon>.build(target: GizmoTarget<Beacon>) {
-        val x = target.component.x
-        val y = target.component.y
-        handle(WorldPoint(x, y, 0f), HandleShape.PlaneSquare(Plane.XY), DragConstraint.Across(Plane.XY)) { drag ->
-            write(Beacon::x, x + drag.dx)
-            write(Beacon::y, y + drag.dy)
-        }
+        moveHandles(target, Beacon::x, target.component.x, Beacon::y, target.component.y)
     }
 }
 
@@ -81,11 +75,7 @@ public object BeaconReachTwin : Gizmo<Beacon> {
     override val component: ComponentType<Beacon> = Beacon
 
     override fun GizmoScope<Beacon>.build(target: GizmoTarget<Beacon>) {
-        val origin = target.origin
-        val reach = target.component.reach
-        handle(WorldPoint(origin.x + reach, origin.y, origin.z), HandleShape.Point, DragConstraint.Along(Axis.X)) { drag ->
-            write(Beacon::reach, maxOf(0f, reach + drag.stretchFrom(origin)))
-        }
+        radiusHandle(target, Beacon::reach, target.component.reach)
     }
 }
 
@@ -94,10 +84,6 @@ public object CrateHeadingTwin : Gizmo<Crate> {
     override val component: ComponentType<Crate> = Crate
 
     override fun GizmoScope<Crate>.build(target: GizmoTarget<Crate>) {
-        val origin = target.origin
-        val heading = target.component.heading
-        handle(origin, HandleShape.Ring(Axis.Z), DragConstraint.Across(Plane.XY)) { drag ->
-            write(Crate::heading, heading + drag.turnAbout(origin))
-        }
+        rotationHandle(target, Crate::heading, target.component.heading)
     }
 }

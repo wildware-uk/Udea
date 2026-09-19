@@ -49,11 +49,12 @@ public sealed interface DragConstraint {
 }
 
 /**
- * What the editor draws for a handle.
+ * What the editor draws for a handle or a [Mark].
  *
- * **Every shape keeps a constant size on screen.** None of them carries a world size, so zooming the
- * camera out cannot shrink a handle past being grabbed; the editor sizes each in view pixels. The
- * one world-space dimension is [Line]'s far end, which is a place rather than a size.
+ * **Every shape but [Circle] keeps a constant size on screen.** They carry no world size, so zooming
+ * the camera out cannot shrink a handle past being grabbed; the editor sizes each in view pixels.
+ * [Line]'s far end is a world place rather than a size. [Circle] is the exception on purpose: it
+ * shows how big something is, so it is drawn at that size.
  */
 public sealed interface HandleShape {
 
@@ -72,11 +73,21 @@ public sealed interface HandleShape {
     /** A box corner: resizes. */
     public data object BoxCorner : HandleShape
 
+    /** The middle of a box's side that faces along [axis]: resizes along that axis alone. */
+    public data class BoxEdge(val axis: Axis) : HandleShape
+
     /** A line from the handle to [to], a world point: a radius spoke, a tether. */
     public data class Line(val to: WorldPoint) : HandleShape
 
     /** A ball: a free grip in 3D. */
     public data object Sphere : HandleShape
+
+    /**
+     * A circle of world [radius] about the point, square to [normal] - a range, a reach, drawn at the
+     * size it is (issue #236), so zooming changes it as it changes the world. What a range gizmo marks
+     * round its grip; as a handle it is grabbed on its rim.
+     */
+    public data class Circle(val radius: Float, val normal: Axis = Axis.Z) : HandleShape
 }
 
 /**
@@ -106,12 +117,18 @@ public data class Drag(
     /** How much further from [centre] the drag is now than when it began: a radius's change. */
     public fun stretchFrom(centre: WorldPoint): Float = at.distanceTo(centre) - start.distanceTo(centre)
 
+    /** How far the drag has moved along [direction], a unit direction such as [AxisFrame.direction]. */
+    public fun along(direction: WorldPoint): Float = dx * direction.x + dy * direction.y + dz * direction.z
+
     /**
-     * How much a box centred on [centre] grows along [axis] when its corner follows this drag: twice
-     * the change in the corner's distance from the centre on that axis, because both faces move.
+     * How much a box centred on [centre] grows along [axis] of [axes] when its corner follows this
+     * drag: twice the change in the corner's distance from the centre along that axis, because both
+     * faces move. [axes] is the box's own frame; the world's by default.
      */
-    public fun spread(axis: Axis, centre: WorldPoint): Float =
-        2f * (abs(on(axis, at) - on(axis, centre)) - abs(on(axis, start) - on(axis, centre)))
+    public fun spread(axis: Axis, centre: WorldPoint, axes: AxisFrame = AxisFrame.WORLD): Float {
+        val direction = axes.direction(axis)
+        return 2f * (abs(offset(at, centre, direction)) - abs(offset(start, centre, direction)))
+    }
 
     /**
      * The angle in radians the drag has turned about the up axis through [centre], anticlockwise
@@ -129,11 +146,9 @@ public data class Drag(
         }
     }
 
-    private fun on(axis: Axis, point: WorldPoint): Float = when (axis) {
-        Axis.X -> point.x
-        Axis.Y -> point.y
-        Axis.Z -> point.z
-    }
+    /** How far [point] is from [centre] along [direction]. */
+    private fun offset(point: WorldPoint, centre: WorldPoint, direction: WorldPoint): Float =
+        (point.x - centre.x) * direction.x + (point.y - centre.y) * direction.y + (point.z - centre.z) * direction.z
 
     private companion object {
         const val PI_F: Float = PI.toFloat()

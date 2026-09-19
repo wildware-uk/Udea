@@ -402,7 +402,7 @@ public class TowerSystem(
             val position = candidate[Position]
             if (position.hp <= 0f) continue
             val distance = length(position.x - from.x, position.y - from.y)
-            if (distance > LaneGeometry.TOWER_RANGE) continue
+            if (distance > tower.attackRange) continue
             val team = candidate[GameUnit].team
             if (Team.isHostile(tower.team, team)) {
                 if (LaneCreep in candidate) {
@@ -422,7 +422,7 @@ public class TowerSystem(
             val attackerPosition = attacker[Position]
             val attackerDistance =
                 length(attackerPosition.x - from.x, attackerPosition.y - from.y)
-            if (attackerDistance > LaneGeometry.TOWER_RANGE) continue
+            if (attackerDistance > tower.attackRange) continue
             if (attackerDistance < aggressorDistance) {
                 aggressorDistance = attackerDistance
                 aggressor = attacker

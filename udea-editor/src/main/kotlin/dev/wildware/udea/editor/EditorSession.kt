@@ -10,6 +10,7 @@ import dev.wildware.composegl.ui.widget.SceneDrawScope
 import dev.wildware.composegl.ui.widget.SceneViewState
 import dev.wildware.udea.agent.AgentResult
 import dev.wildware.udea.core.Tick
+import dev.wildware.udea.editor.gizmo.HandleLayer
 import dev.wildware.udea.render.ui.UiScreen
 import dev.wildware.udea.render.view.ViewDimension
 
@@ -47,6 +48,13 @@ internal enum class EditorTab { Scene, Game }
  * The Inspector lists what the selection has in common, and what is typed into it is written to all
  * of them as one edit ([EditorInspector]).
  *
+ * ## Gizmos (issue #236)
+ *
+ * Given [gizmos], the Scene tab draws the handles of every gizmo the selection shares, and a drag on
+ * one is an edit session ([GizmoDrag]): live while it moves, one undo entry when it is let go, and put
+ * back by Escape. The toolbar over the Scene tab sets snapping and the world/local axes
+ * ([GizmoPreferences]).
+ *
  * ## What it does not do
  *
  * It does not pause the world: a launcher starts the editor paused, before the first frame, so no
@@ -56,6 +64,7 @@ internal enum class EditorTab { Scene, Game }
  * @param paused whether the simulation is paused, read once a frame for the status line.
  * @param views the Scene and Game tabs' views of the world.
  * @param standalone starts a separate game on a saved level, for Play standalone.
+ * @param gizmos the game's gizmos over its world; `null` draws none.
  */
 public class EditorSession(
     private val tools: EditorTools,
@@ -67,6 +76,8 @@ public class EditorSession(
     standalone: StandaloneLauncher? = null,
     /** The Animation panel's models and renderer; `null` leaves the panel out (issue #243). */
     animation: EditorAnimation? = null,
+    /** The gizmos the Scene tab shows for the selection and drags (issue #236); `null` shows none. */
+    gizmos: EditorGizmos? = null,
 ) {
 
     /** The toolbar's Play, Stop, Step and Play standalone. */
@@ -78,8 +89,11 @@ public class EditorSession(
     /** The Game tab's picture. */
     internal val gameState: SceneViewState = SceneViewState()
 
-    /** Whether Shift is held: the window hears every key event, and the pointer's carry no modifiers. */
-    internal val keys: EditorKeys = EditorKeys()
+    /**
+     * Whether Shift and Ctrl are held - the window hears every key event, and the pointer's carry no
+     * modifiers - and Escape, which cancels a gizmo drag.
+     */
+    internal val keys: EditorKeys = EditorKeys(escape = { gizmoDrag?.takeIf { it.holding }?.cancel() != null })
 
     /** The editor author's selection, as `editor.select` and `editor.selection` answer it. */
     internal val selection: EditorSelection = EditorSelection(tools) { problem = it }
@@ -89,19 +103,36 @@ public class EditorSession(
     /** Click, Shift-click and box select in the Scene tab. */
     internal val picking: ScenePicking = ScenePicking(picker, selection)
 
-    /** The Scene tab's pointer: gizmo handles, then entities, then the editor camera. */
-    internal val navigation: SceneNavigation = SceneNavigation(views.scene, picking) { keys.shift }
-
-    /** The Inspector panel: what the selection shares, written to all of it at once. */
-    internal val inspector: EditorInspector = EditorInspector(tools, selection)
-
     /**
      * The Animation panel, the scrub preview and the bone overlay, when the game has animated models
-     * (issue #243). Made before [init] wraps the Scene view's gizmo layer: the bone overlay goes on
+     * (issue #243). Made before [handles] and [init] wrap the Scene view's gizmo layer: the bone overlay goes on
      * over whatever layer a launcher set, passing it every press, and the selection outline wraps both.
      */
     internal val animation: AnimationPanelState? =
         animation?.let { AnimationPanelState(it, tools, views, selection, sceneChanged = { navigation.markMoved() }) }
+
+    /**
+     * The gizmos' handles and marks for the selection, drawn over it; `null` with no gizmos. Over the
+     * layer the view already has - the bone overlay's, a launcher's - which gets every press no
+     * handle takes.
+     */
+    private val handles: HandleLayer? = gizmos?.let { offered ->
+        HandleLayer(under = views.scene.gizmos) { offered.frameFor(selection.ids) }
+    }
+
+    /** A drag on one of [handles], as an edit session. */
+    private val gizmoDrag: GizmoDrag? = gizmos?.let { offered ->
+        GizmoDrag(tools, offered, checkNotNull(handles), views.camera, ctrl = { keys.ctrl }) { problem = it }
+    }
+
+    /** The Scene tab's snapping and axes, for its toolbar; `null` with no gizmos, and no toolbar. */
+    internal val preferences: GizmoPreferences? = gizmos?.preferences
+
+    /** The Scene tab's pointer: gizmo handles, then entities, then the editor camera. */
+    internal val navigation: SceneNavigation = SceneNavigation(views.scene, picking, { keys.shift }, gizmoDrag)
+
+    /** The Inspector panel: what the selection shares, written to all of it at once. */
+    internal val inspector: EditorInspector = EditorInspector(tools, selection)
 
     /** Which tab is showing. The Scene tab first: an editor opens on the editor's view. */
     internal var tab: EditorTab by mutableStateOf(EditorTab.Scene)
@@ -146,9 +177,9 @@ public class EditorSession(
 
     /** The window: menus, docked panels, the viewport and the status line. Show it on a `UiLayer`. */
     init {
-        // The Scene view's layer draws the selection over the world, then whatever gizmo handles a
-        // launcher had already put there, which a press still reaches first.
-        views.scene.gizmos = SceneOverlay(picker, selection, picking, handles = views.scene.gizmos)
+        // The Scene view's layer draws the selection over the world, then the gizmos' handles - or
+        // whatever handle layer a launcher had already put there - which a press still reaches first.
+        views.scene.gizmos = SceneOverlay(picker, selection, picking, handles = handles ?: views.scene.gizmos)
     }
 
     public val window: UiScreen = object : UiScreen {
@@ -238,6 +269,12 @@ public class EditorSession(
         views.game.showGizmos = show
         gameGizmos = show
         gameState.invalidate()
+    }
+
+    /** The toolbar's world/local switch: redraws the Scene tab with its handles turned. */
+    internal fun switchAxes(axes: GizmoAxes) {
+        preferences?.axes = axes
+        navigation.markMoved()
     }
 
     /** The Scene tab's 2D / 3D switch. */

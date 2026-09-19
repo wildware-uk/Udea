@@ -1,9 +1,7 @@
 package dev.wildware.udea.editor.gl
 
 import dev.wildware.composegl.ui.geometry.Offset
-import dev.wildware.composegl.ui.geometry.Rect
 import dev.wildware.composegl.ui.geometry.Size
-import dev.wildware.composegl.ui.testing.uiTest
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.blueprint.BlueprintId
 import dev.wildware.udea.core.host.GameHost
@@ -13,7 +11,6 @@ import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.editor.EditorSession
 import dev.wildware.udea.editor.EditorSpawn
-import dev.wildware.udea.editor.EditorTags
 import dev.wildware.udea.editor.EditorToolLoop
 import dev.wildware.udea.editor.EditorTools
 import dev.wildware.udea.editor.EditorViews
@@ -34,7 +31,6 @@ import dev.wildware.udea.render.ui.UiLayer
 import dev.wildware.udea.render.view.EditorCamera
 import dev.wildware.udea.render.view.PickBounds
 import dev.wildware.udea.render.view.PickSink
-import dev.wildware.udea.render.view.ViewPoint
 import org.lwjgl.glfw.GLFW
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -116,8 +112,8 @@ class GlScenePickingTest {
             backend.onRenderThread { KoolKeyboard(ui) }
             awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
 
-            val view = sceneView()
-            fun screen(x: Float, y: Float): Offset = backend.onRenderThread { screenOf(views, view, x, y) }
+            val view = sceneViewOn(WIDTH, HEIGHT)
+            fun screen(x: Float, y: Float): Offset = backend.onRenderThread { screenOfWorld(views, view, x, y) }
             fun selection(): Set<NetId> = backend.onRenderThread { loop.selection() }.toSet()
             val empty = screen(-SPREAD, -SPREAD)
 
@@ -131,12 +127,12 @@ class GlScenePickingTest {
             saveReport("issue235-gl-click-selects-red.png", window.read(frames))
 
             // Shift-click adds, and Shift-click on a selected square takes it out.
-            backend.withShift(frames) { backend.click(frames, pointer, screen(SPREAD, 0f)) }
+            backend.holding(frames, GLFW.GLFW_KEY_LEFT_SHIFT) { backend.click(frames, pointer, screen(SPREAD, 0f)) }
             assertEquals(setOf(left, right), selection(), "Shift-click on the green square did not add it")
             saveReport("issue235-gl-shift-click-adds-green.png", window.read(frames))
-            backend.withShift(frames) { backend.click(frames, pointer, empty) }
+            backend.holding(frames, GLFW.GLFW_KEY_LEFT_SHIFT) { backend.click(frames, pointer, empty) }
             assertEquals(setOf(left, right), selection(), "a Shift-click on nothing changed the selection")
-            backend.withShift(frames) { backend.click(frames, pointer, screen(-SPREAD, 0f)) }
+            backend.holding(frames, GLFW.GLFW_KEY_LEFT_SHIFT) { backend.click(frames, pointer, screen(-SPREAD, 0f)) }
             assertEquals(setOf(right), selection(), "Shift-click on the selected red square did not take it out")
 
             // A box over nothing selects nothing; a box over two squares selects those two.
@@ -154,70 +150,6 @@ class GlScenePickingTest {
     }
 
     // --- fixture -------------------------------------------------------------------------
-
-    /**
-     * The Scene tab's rectangle on the screen, read from the same window laid out with no GL at the
-     * same size, as `GlEditorTabsTest` reads it: exact across, off down by the few pixels the bundled
-     * font's line height differs from the headless one's, where each square is far bigger than that.
-     */
-    private fun sceneView(): Rect {
-        val twin = glEditorSession(EditorViews.detached())
-        return uiTest(Size(WIDTH.toFloat(), HEIGHT.toFloat())) { twin.window.content() }.use { ui ->
-            ui.settle()
-            ui.node(EditorTags.SCENE_VIEW).boundsInRoot
-        }
-    }
-
-    /** Where world point ([x], [y]) is on the screen: through the editor camera into the view, then onto [view]. */
-    private fun screenOf(views: EditorViews, view: Rect, x: Float, y: Float): Offset {
-        val at = ViewPoint()
-        views.camera.project(x, y, 0f, at)
-        return Offset(view.left + at.x * view.width / views.scene.width, view.bottom - at.y * view.height / views.scene.height)
-    }
-
-    /** Holds Shift, on Kool's own GLFW key callback, for the length of [block]. */
-    private fun KoolBackend.withShift(frames: FrameProbe, block: () -> Unit) {
-        key(GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_PRESS)
-        awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
-        try {
-            block()
-        } finally {
-            key(GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_RELEASE)
-            awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
-        }
-    }
-
-    /** Presses the left button at [from], drags it to [to], runs [during] with the button held, and lets go. */
-    private fun KoolBackend.drag(frames: FrameProbe, from: Offset, to: Offset, during: () -> Unit = {}) {
-        moveTo(from.x.toDouble(), from.y.toDouble())
-        awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
-        button(GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_PRESS)
-        awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
-        // In steps, as a hand drags: one jump would be one move event.
-        for (step in 1..DRAG_STEPS) {
-            val t = step.toFloat() / DRAG_STEPS
-            moveTo((from.x + (to.x - from.x) * t).toDouble(), (from.y + (to.y - from.y) * t).toDouble())
-            awaitFrames(frames, frames.count.get() + 1)
-        }
-        awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
-        during()
-        button(GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_RELEASE)
-        awaitFrames(frames, frames.count.get() + SETTLE_FRAMES)
-    }
-
-    /** A key on Kool's own GLFW key callback, as `udea-render`'s `GlKeys` presses one. */
-    private fun KoolBackend.key(glfwKey: Int, action: Int) = onRenderThread {
-        val window = GLFW.glfwGetCurrentContext()
-        check(window != 0L) { "no GLFW window is current on the render thread" }
-        val callback = checkNotNull(GLFW.glfwSetKeyCallback(window, null)) {
-            "Kool installed no GLFW key callback, so this test would be pressing nothing"
-        }
-        try {
-            callback.invoke(window, glfwKey, NO_SCANCODE, action, NO_MODIFIERS)
-        } finally {
-            GLFW.glfwSetKeyCallback(window, callback)
-        }
-    }
 
     /** One entity drawn as a square [HALF] world units either side of ([x], [y]). */
     private class Tile(val entity: NetId, val x: Float, val y: Float, val colour: Rgba)
@@ -255,12 +187,6 @@ class GlScenePickingTest {
 
         /** Half a square's side, in world units. */
         const val HALF = 1.2f
-
-        /** Moves a drag is made of. */
-        const val DRAG_STEPS = 6
-
-        const val NO_SCANCODE = 0
-        const val NO_MODIFIERS = 0
 
         val RED: Rgba = Rgba.of(0.85f, 0.2f, 0.2f)
         val GREEN: Rgba = Rgba.of(0.2f, 0.75f, 0.3f)

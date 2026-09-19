@@ -26,7 +26,7 @@ import dev.wildware.udea.editor.EditorSession
 import dev.wildware.udea.editor.EditorSpawn
 import dev.wildware.udea.editor.EditorTools
 import dev.wildware.udea.editor.EditorViews
-import dev.wildware.udea.editor.gizmo.GizmoMarkLayer
+import dev.wildware.udea.editor.gizmo.HandlePainter
 import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
@@ -360,9 +360,9 @@ class GlAnimationPreviewTest {
     private fun isFox(pixel: Int): Boolean =
         ((pixel ushr 16) and 0xFF) > BACKGROUND || ((pixel ushr 8) and 0xFF) > BACKGROUND || (pixel and 0xFF) > BACKGROUND
 
-    /** The overlay's yellow, `GizmoMarkLayer.MARK_COLOUR`, and nothing on the fox. */
+    /** The overlay's yellow, `HandlePainter.MARK` - every mark's colour - and nothing on the fox. */
     private fun isMark(pixel: Int): Boolean {
-        val expected = GizmoMarkLayer.MARK_COLOUR
+        val expected = HandlePainter.MARK
         val r = (pixel ushr 16) and 0xFF
         val g = (pixel ushr 8) and 0xFF
         val b = pixel and 0xFF

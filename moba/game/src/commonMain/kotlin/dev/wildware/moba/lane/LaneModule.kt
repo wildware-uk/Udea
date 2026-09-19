@@ -214,7 +214,7 @@ public class LaneModule(
                 ComponentSchema.of(
                     TowerReplicator,
                     "Tower",
-                    listOf(FieldKind.Long, FieldKind.Int, FieldKind.Int, FieldKind.Int),
+                    listOf(FieldKind.Float, FieldKind.Long, FieldKind.Int, FieldKind.Int, FieldKind.Int),
                 ),
                 Tower,
             ) { Tower() },

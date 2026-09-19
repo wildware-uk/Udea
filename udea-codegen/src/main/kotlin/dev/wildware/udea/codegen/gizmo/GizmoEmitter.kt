@@ -6,20 +6,25 @@ import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.LIST
+import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.STAR
 import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.joinToCode
 import dev.wildware.udea.codegen.registry.RegistryEmitter
 
 /**
  * Emits one `Gizmo` object per handle annotation, and a game's `<Game>GizmoRegistry` (issue #233).
  *
- * A generated gizmo is written exactly as a person would write it against the public API - the same
- * `handle(...)` call, the same `write(Component::field, ...)` - which is the point: an annotation is
- * shorthand, and `GeneratedGizmoTest` holds each kind to a hand-written twin. Every field is read by
- * direct property access and named by a property reference, so nothing is looked up by name at run
- * time, and the whole file is KotlinPoet.
+ * A generated gizmo is written exactly as a person would write it against the public API, which is
+ * the point: an annotation is shorthand, and `GeneratedGizmoTest` holds each kind to a hand-written
+ * twin. A 2D handle is one call to the editor's built-in for it (issue #236) - `moveHandles`,
+ * `sizeHandles`, `rotationHandle`, `radiusHandle`, `rangeHandle` - the public functions a
+ * hand-written gizmo calls too, so a generated gizmo and a built-in cannot differ. A 3D position or
+ * size is still written out here, as issue #233 wrote it, until the 3D built-ins exist (issue #237).
+ * Every field is read by direct property access and named by a property reference, so nothing is
+ * looked up by name at run time, and the whole file is KotlinPoet.
  *
  * Every drag response computes a change from what [build] read when it declared the handle, because
  * the editor keeps the pressed handle for the whole drag while the drag itself changes the component.
@@ -94,97 +99,69 @@ internal object GizmoEmitter {
         is HandleModel.Reach -> reach(model)
     }
 
-    /** At the fields' point; moved by the drag. On the ground plane in 2D, in the view's plane in 3D. */
+    /** At the fields' point; moved by the drag. The built-in on the ground plane in 2D; in the view's plane in 3D. */
     private fun position(model: HandleModel.Position): CodeBlock {
         val c = model.component
-        val z = model.z
+        val z = model.z ?: return builtin(EditorNames.MOVE_HANDLES, c, model.x, model.y)
         return CodeBlock.builder()
             .addStatement("val x0 = target.component.%N", model.x)
             .addStatement("val y0 = target.component.%N", model.y)
-            .apply { if (z != null) addStatement("val z0 = target.component.%N", z) }
-            .beginControlFlow(
-                "handle(%T(x0, y0, %L), %L, %L) { drag ->",
-                EditorNames.WORLD_POINT,
-                if (z != null) "z0" else "0f",
-                if (z != null) sphere() else CodeBlock.of("%T.PlaneSquare(%T.XY)", EditorNames.HANDLE_SHAPE, EditorNames.PLANE),
-                constraint(threeD = z != null),
-            )
+            .addStatement("val z0 = target.component.%N", z)
+            .beginControlFlow("handle(%T(x0, y0, z0), %L, %L) { drag ->", EditorNames.WORLD_POINT, sphere(), viewPlane())
             .addStatement("write(%T::%N, x0 + drag.dx)", c, model.x)
             .addStatement("write(%T::%N, y0 + drag.dy)", c, model.y)
-            .apply { if (z != null) addStatement("write(%T::%N, z0 + drag.dz)", c, z) }
+            .addStatement("write(%T::%N, z0 + drag.dz)", c, z)
             .endControlFlow()
             .build()
     }
 
-    /** The box corner of a size centred on the entity; the size follows the corner, never below zero. */
+    /**
+     * A size centred on the entity; the size follows a corner, never below zero. The built-in's corners
+     * and sides in 2D; one corner dragged in the view's plane in 3D.
+     */
     private fun size(model: HandleModel.Size): CodeBlock {
         val c = model.component
-        val depth = model.depth
+        val depth = model.depth ?: return builtin(EditorNames.SIZE_HANDLES, c, model.width, model.height)
         return CodeBlock.builder()
             .addStatement("val origin = target.origin")
             .addStatement("val width0 = target.component.%N", model.width)
             .addStatement("val height0 = target.component.%N", model.height)
-            .apply { if (depth != null) addStatement("val depth0 = target.component.%N", depth) }
+            .addStatement("val depth0 = target.component.%N", depth)
             .beginControlFlow(
-                "handle(%T(origin.x + width0 / 2f, origin.y + height0 / 2f, %L), %T.BoxCorner, %L) { drag ->",
+                "handle(%T(origin.x + width0 / 2f, origin.y + height0 / 2f, origin.z + depth0 / 2f), %T.BoxCorner, %L) { drag ->",
                 EditorNames.WORLD_POINT,
-                if (depth != null) "origin.z + depth0 / 2f" else "origin.z",
                 EditorNames.HANDLE_SHAPE,
-                constraint(threeD = depth != null),
+                viewPlane(),
             )
             .addStatement("write(%T::%N, maxOf(0f, width0 + drag.spread(%T.X, origin)))", c, model.width, EditorNames.AXIS)
             .addStatement("write(%T::%N, maxOf(0f, height0 + drag.spread(%T.Y, origin)))", c, model.height, EditorNames.AXIS)
-            .apply {
-                if (depth != null) {
-                    addStatement("write(%T::%N, maxOf(0f, depth0 + drag.spread(%T.Z, origin)))", c, depth, EditorNames.AXIS)
-                }
-            }
+            .addStatement("write(%T::%N, maxOf(0f, depth0 + drag.spread(%T.Z, origin)))", c, depth, EditorNames.AXIS)
             .endControlFlow()
             .build()
     }
 
-    /** A ring about the up axis at the entity; the field turns by the angle the drag turned. */
+    /** A ring about the up axis at the entity: the built-in. */
     private fun rotation(model: HandleModel.Rotation): CodeBlock =
-        CodeBlock.builder()
-            .addStatement("val origin = target.origin")
-            .addStatement("val rotation0 = target.component.%N", model.field)
-            .beginControlFlow(
-                "handle(origin, %T.Ring(%T.Z), %L) { drag ->",
-                EditorNames.HANDLE_SHAPE,
-                EditorNames.AXIS,
-                constraint(threeD = false),
-            )
-            .addStatement("write(%T::%N, rotation0 + drag.turnAbout(origin))", model.component, model.field)
-            .endControlFlow()
-            .build()
+        builtin(EditorNames.ROTATION_HANDLE, model.component, model.field)
 
-    /** On the rim along +X; the field follows the distance from the entity, never below zero. */
+    /** A grip on the rim of a circle of the field's size: the built-in for its kind. */
     private fun reach(model: HandleModel.Reach): CodeBlock =
-        CodeBlock.builder()
-            .addStatement("val origin = target.origin")
-            .addStatement("val value0 = target.component.%N", model.field)
-            .beginControlFlow(
-                "handle(%T(origin.x + value0, origin.y, origin.z), %L, %T.Along(%T.X)) { drag ->",
-                EditorNames.WORLD_POINT,
-                when (model.kind) {
-                    ReachKind.Radius -> CodeBlock.of("%T.Point", EditorNames.HANDLE_SHAPE)
-                    ReachKind.Range -> CodeBlock.of("%T.Line(origin)", EditorNames.HANDLE_SHAPE)
-                },
-                EditorNames.DRAG_CONSTRAINT,
-                EditorNames.AXIS,
-            )
-            .addStatement("write(%T::%N, maxOf(0f, value0 + drag.stretchFrom(origin)))", model.component, model.field)
-            .endControlFlow()
+        builtin(model.kind.builtin, model.component, model.field)
+
+    /**
+     * One call to a built-in, `builtin(target, C::a, target.component.a, ...)`: each field named by a
+     * reference for its write, and read directly for where the handles go.
+     */
+    private fun builtin(function: MemberName, component: ClassName, vararg fields: String): CodeBlock {
+        val arguments = fields.map { field -> CodeBlock.of("%T::%N, target.component.%N", component, field, field) }
+        return CodeBlock.builder()
+            .addStatement("%M(target, %L)", function, arguments.joinToCode())
             .build()
+    }
 
     private fun sphere(): CodeBlock = CodeBlock.of("%T.Sphere", EditorNames.HANDLE_SHAPE)
 
-    /** Across the ground plane in 2D; across the plane facing the view in 3D. */
-    private fun constraint(threeD: Boolean): CodeBlock =
-        if (threeD) {
-            CodeBlock.of("%T.ViewPlane", EditorNames.DRAG_CONSTRAINT)
-        } else {
-            CodeBlock.of("%T.Across(%T.XY)", EditorNames.DRAG_CONSTRAINT, EditorNames.PLANE)
-        }
+    /** Across the plane facing the view: a free drag in 3D. */
+    private fun viewPlane(): CodeBlock = CodeBlock.of("%T.ViewPlane", EditorNames.DRAG_CONSTRAINT)
 
 }

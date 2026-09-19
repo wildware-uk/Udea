@@ -10,6 +10,10 @@ build/
 allure-results/
 .attach_pid*
 
+# A person's editor preferences for a project - the Scene tab's grid, angle step and axes (issue
+# #236). Editor settings, not game data, so never committed.
+.udea/
+
 # The Android SDK location for this machine (issue #201). AGP reads `sdk.dir` from it when
 # `ANDROID_HOME` is unset; it is a path on one developer's disk and never belongs in a commit.
 local.properties

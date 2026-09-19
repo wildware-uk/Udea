@@ -144,6 +144,14 @@ public class Tower(
     @Sim public var targetRaw: Int = NetId.NONE.raw,
     /** Whose tower. A [Team] constant. `@Net` because a client colours it before it draws it. */
     @Net(lifetime = Lifetime.OnCreate) public var team: Int = Team.NONE,
+    /**
+     * How far it shoots, in world units: [LaneGeometry.TOWER_RANGE] as it is built.
+     *
+     * A field rather than the constant so a designer can drag it in the editor (issue #236), and
+     * `@Sim` so it is in the snapshot a rewind restores and in the `Replicator` the editor's tools
+     * write through. Never sent: a client does not target, so it has no use for the number.
+     */
+    @Sim public var attackRange: Float = LaneGeometry.TOWER_RANGE,
 ) : Component<Tower> {
 
     /** Whether this tower is holding a target. */

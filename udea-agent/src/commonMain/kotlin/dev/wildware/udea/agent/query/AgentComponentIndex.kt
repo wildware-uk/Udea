@@ -1,5 +1,6 @@
 package dev.wildware.udea.agent.query
 
+import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.agent.AgentErrorKind
 import dev.wildware.udea.agent.AgentToolException
 
@@ -78,6 +79,13 @@ public class AgentComponentIndex(
     /** The component named [name], case-insensitively, or `null`. */
     public fun findByName(name: String): AgentComponentType? =
         ordered.firstOrNull { it.name.equals(name, ignoreCase = true) }
+
+    /**
+     * The component registered for Fleks type [type], or `null` when none is. A scan, made once per
+     * editor drag rather than per tick or per entity (issue #236).
+     */
+    public fun findByType(type: ComponentType<*>): AgentComponentType? =
+        ordered.firstOrNull { it.componentType == type }
 
     /**
      * The component named [name].

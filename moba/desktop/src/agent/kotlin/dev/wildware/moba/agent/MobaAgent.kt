@@ -14,6 +14,8 @@ import dev.wildware.moba.level.MobaBlueprints
 import dev.wildware.moba.level.Team
 import dev.wildware.moba.item.Inventory
 import dev.wildware.moba.item.InventoryReplicator
+import dev.wildware.moba.lane.Tower
+import dev.wildware.moba.lane.TowerReplicator
 import dev.wildware.moba.match.MatchState
 import dev.wildware.moba.match.MatchStateReplicator
 import dev.wildware.moba.entry.MobaEntry
@@ -357,7 +359,7 @@ public object MobaAgent {
 
         val position = positionAccess()
         val components = AgentComponentIndex(
-            listOf(position, unitAccess(), matchAccess(), inventoryAccess(), animatorAccess()),
+            listOf(position, unitAccess(), matchAccess(), inventoryAccess(), animatorAccess(), towerAccess()),
         )
         val worldTools = WorldToolset(
             world = host.world,
@@ -495,7 +497,7 @@ public object MobaAgent {
         shutdown
             .onClose("frame-loop") { loop.stop() }
             .onClose("agent-host") { agentHost?.stop() }
-        return Session(loop = loop, shutdown = shutdown, player = player, wiring = wiring, views = editorViews)
+        return Session(loop = loop, shutdown = shutdown, player = player, wiring = wiring, components = components, views = editorViews)
     }
 
     /** [Position], with x and y writable and `hp` not - so `field_not_writable` is reachable. */
@@ -580,6 +582,21 @@ public object MobaAgent {
     )
 
     /**
+     * `Tower`, so the editor's range ring can edit a tower's `attackRange` (issue #236), and an agent
+     * can read what every tower is doing.
+     *
+     * Nothing here is agent-writable, for `unitAccess`'s reason: `world.set_component_field` is a
+     * running game's tool, and a caller that could set a tower's target or its cooldown would make
+     * every later reading of the lane a statement about that write. The editor's `editor.*` edits are
+     * authoring, filed with an undo, and do not ask this.
+     */
+    private fun towerAccess(): AgentComponentType = agentComponent(
+        name = "Tower",
+        replicator = TowerReplicator,
+        componentType = Tower,
+    )
+
+    /**
      * The loop and the teardown, so one `close` runs the same steps whoever asked for it.
      *
      * The steps used to be two lines in this class's `close`, which meant the `close` **tool**
@@ -595,6 +612,8 @@ public object MobaAgent {
         val player: dev.wildware.udea.core.identity.NetId,
         /** The bridge and session table the toolsets were wired over. */
         val wiring: Wiring,
+        /** Every component the tools can address, by name: what the editor's gizmos name theirs by. */
+        val components: AgentComponentIndex,
         /** `editor.screenshot`'s toolset, on an editor instance; `null` on any other. */
         private val views: EditorViewToolset? = null,
     ) {

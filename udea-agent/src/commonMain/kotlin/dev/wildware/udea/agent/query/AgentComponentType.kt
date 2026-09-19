@@ -39,6 +39,12 @@ public interface AgentComponentType {
     public val replicator: Replicator<*>
 
     /**
+     * The Fleks type this describes. How the editor names the component a gizmo's field write is
+     * for (issue #236): a gizmo holds a `ComponentType`, and an edit session is addressed by [name].
+     */
+    public val componentType: ComponentType<*>
+
+    /**
      * Whether `set_component_field` may write field [fieldIndex].
      *
      * `false` by default, because spec 5 makes `agentWritable = false` the default on `@Net`: an
@@ -126,12 +132,16 @@ public inline fun <reified T> agentComponent(
     val codec = replicator
     val writable = agentWritableFields.toSet()
     val componentName = name
+    // Named apart from the `componentType` property below, so a reader need not know which one wins.
+    val fleksType: ComponentType<*> = componentType
 
     return object : AgentComponentType {
 
         override val name: String get() = componentName
 
         override val replicator: Replicator<*> get() = codec
+
+        override val componentType: ComponentType<*> get() = fleksType
 
         override fun isAgentWritable(fieldIndex: Int): Boolean = fieldIndex in writable
 

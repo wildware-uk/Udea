@@ -1,6 +1,7 @@
 package dev.wildware.udea.codegen.gizmo
 
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.MemberName
 
 /**
  * The `udea-editor` gizmo API generated code implements, and the Fleks type it names a component by.
@@ -18,9 +19,15 @@ internal object EditorNames {
     val GIZMO_REGISTRY: ClassName = ClassName(GIZMO, "GizmoRegistry")
     val WORLD_POINT: ClassName = ClassName(GIZMO, "WorldPoint")
     val AXIS: ClassName = ClassName(GIZMO, "Axis")
-    val PLANE: ClassName = ClassName(GIZMO, "Plane")
     val HANDLE_SHAPE: ClassName = ClassName(GIZMO, "HandleShape")
     val DRAG_CONSTRAINT: ClassName = ClassName(GIZMO, "DragConstraint")
+
+    /** The built-in 2D gizmos (issue #236): what a generated gizmo calls, as a hand-written one would. */
+    val MOVE_HANDLES: MemberName = MemberName(GIZMO, "moveHandles")
+    val SIZE_HANDLES: MemberName = MemberName(GIZMO, "sizeHandles")
+    val ROTATION_HANDLE: MemberName = MemberName(GIZMO, "rotationHandle")
+    val RADIUS_HANDLE: MemberName = MemberName(GIZMO, "radiusHandle")
+    val RANGE_HANDLE: MemberName = MemberName(GIZMO, "rangeHandle")
 
     /** Fleks' handle on a component type: what `Gizmo.component` answers. */
     val COMPONENT_TYPE: ClassName = ClassName("com.github.quillraven.fleks", "ComponentType")
@@ -95,12 +102,12 @@ internal sealed interface HandleModel {
 }
 
 /** The two one-field handles, which drag identically and look different. */
-internal enum class ReachKind(val annotationFqn: String, val annotation: String, val suffix: String) {
+internal enum class ReachKind(val annotationFqn: String, val annotation: String, val suffix: String, val builtin: MemberName) {
     /** A body's own size: a dot on its rim. */
-    Radius(dev.wildware.udea.codegen.AnnotationNames.RADIUS_HANDLE, "RadiusHandle", "Radius"),
+    Radius(dev.wildware.udea.codegen.AnnotationNames.RADIUS_HANDLE, "RadiusHandle", "Radius", EditorNames.RADIUS_HANDLE),
 
     /** A reach: a spoke from its rim back to the entity. */
-    Range(dev.wildware.udea.codegen.AnnotationNames.RANGE_HANDLE, "RangeHandle", "Range"),
+    Range(dev.wildware.udea.codegen.AnnotationNames.RANGE_HANDLE, "RangeHandle", "Range", EditorNames.RANGE_HANDLE),
 }
 
 /**

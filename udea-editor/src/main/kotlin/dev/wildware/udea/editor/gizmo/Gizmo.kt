@@ -71,11 +71,15 @@ internal fun <C : Component<C>> Gizmo<C>.built(target: GizmoTarget<C>): GizmoSco
  *   [DragScope.write], and nothing else may change it.
  * @property origin the entity's position in the world, from whatever places it. A gizmo whose
  *   component is not itself a position - a radius, a range, a size - draws around this point.
+ * @property axes the axes the editor wants handles aligned to (issue #236): the world's, or the
+ *   entity's own when the editor's axes switch is on local. A gizmo hands it to
+ *   [GizmoScope.handle]; one that does not is aligned to the world whatever the switch says.
  */
 public class GizmoTarget<C : Component<C>>(
     public val entity: NetId,
     public val component: C,
     public val origin: WorldPoint,
+    public val axes: AxisFrame = AxisFrame.WORLD,
 ) {
     override fun toString(): String = "GizmoTarget($entity at $origin)"
 }

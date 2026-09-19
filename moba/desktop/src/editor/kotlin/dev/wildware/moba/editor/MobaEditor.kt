@@ -10,14 +10,18 @@ import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.editor.EditorAnimation
+import dev.wildware.udea.editor.EditorGizmos
 import dev.wildware.udea.editor.EditorSession
 import dev.wildware.udea.editor.EditorSpawn
 import dev.wildware.udea.editor.EditorTools
 import dev.wildware.udea.editor.EditorViews
+import dev.wildware.udea.editor.GizmoPreferences
 import dev.wildware.udea.editor.StandaloneLauncher
 import dev.wildware.udea.editor.editorFonts
 import dev.wildware.udea.render.ui.UiLayer
+import dev.wildware.udea.generated.MobaGizmoRegistry
 import dev.wildware.udea.render.view.EditorCamera
+import java.nio.file.Path
 
 /**
  * `sh gradlew :moba:desktop:runEditor`: `moba` in the editor window (issue #194).
@@ -32,6 +36,13 @@ import dev.wildware.udea.render.view.EditorCamera
  * So that no release classpath carries it. `udea-editor` is on this source set's classpath and on no
  * other in the project, and `UDEA-MG-010` fails the build if `:moba:desktop`'s `runtimeClasspath` -
  * the one its jar runs on - ever resolves it. `jar` packages `main` alone.
+ *
+ * ## Gizmos
+ *
+ * The Scene tab draws the gizmos `MobaGizmoRegistry` lists for whatever is selected (issue #236):
+ * `Position`'s move handles, generated from its `@PositionHandle`, and a tower's [TowerRangeGizmo].
+ * Snapping and the axes switch are kept in `.udea/editor-preferences.properties` under this project,
+ * which `runEditor` names with [PREFERENCES_PROPERTY] and git ignores: a person's grid, not game data.
  *
  * ## It starts paused
  *
@@ -54,6 +65,9 @@ public object MobaEditor {
      * spawned exactly there would be hidden under it.
      */
     internal const val SPAWN_OFFSET_X: Float = 48f
+
+    /** The system property naming the file the Scene tab's snapping and axes are kept in. */
+    internal const val PREFERENCES_PROPERTY: String = "udea.editor.preferences"
 
     /** The size the window's interface is laid out at, fitted to whatever the window is. */
     private val DESIGN = Size(1280f, 720f)
@@ -81,8 +95,10 @@ public object MobaEditor {
     ): MobaAgent.Screen {
         val views = EditorViews(rendering.sceneView(EditorCamera()), rendering.gameView())
         session.editorViews(views.scene, views.game)
+        // Kept in the file `runEditor` names; for the run only when started some other way.
+        val preferences = System.getProperty(PREFERENCES_PROPERTY)?.let { GizmoPreferences.load(Path.of(it)) } ?: GizmoPreferences()
         val animation = models?.animation(host, session.player)
-        val editor = session(host, session, views, standalone = MobaStandalone(), animation = animation)
+        val editor = session(host, session, views, standalone = MobaStandalone(), animation = animation, preferences = preferences)
         val fonts = editorFonts()
         val layer = UiLayer(fonts, DESIGN)
         rendering.show(layer)
@@ -94,7 +110,8 @@ public object MobaEditor {
      * The editor over a wired agent [session] on [host]: everything except the window's pixels, so a
      * test can press its buttons with no GL context. Pauses [host] first: the editor starts paused.
      * [standalone] is what Play standalone launches; `null` leaves the button out. [animation] is the
-     * Animation panel's models; `null` leaves the panel out.
+     * Animation panel's models; `null` leaves the panel out. [preferences] are the Scene tab's
+     * snapping and axes, for the run alone unless a file backs them.
      */
     internal fun session(
         host: GameHost,
@@ -102,6 +119,7 @@ public object MobaEditor {
         views: EditorViews = EditorViews.detached(),
         standalone: StandaloneLauncher? = null,
         animation: EditorAnimation? = null,
+        preferences: GizmoPreferences = GizmoPreferences(),
     ): EditorSession {
         host.time.pause()
         return EditorSession(
@@ -112,6 +130,14 @@ public object MobaEditor {
             views = views,
             standalone = standalone,
             animation = animation,
+            gizmos = EditorGizmos(
+                MobaGizmoRegistry,
+                host.world,
+                host.ctx[CoreModule.NET_IDS],
+                session.components,
+                MobaPlacement,
+                preferences,
+            ),
         )
     }
 

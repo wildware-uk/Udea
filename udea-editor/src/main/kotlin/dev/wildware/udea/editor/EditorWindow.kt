@@ -1,7 +1,10 @@
 package dev.wildware.udea.editor
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import dev.wildware.composegl.debug.DebugWindow
 import dev.wildware.composegl.debug.DebugWindowHost
 import dev.wildware.composegl.debug.DockSide
@@ -29,12 +32,14 @@ import dev.wildware.composegl.ui.modifier.padding
 import dev.wildware.composegl.ui.modifier.size
 import dev.wildware.composegl.ui.modifier.testTag
 import dev.wildware.composegl.ui.modifier.weight
+import dev.wildware.composegl.ui.modifier.width
 import dev.wildware.composegl.ui.widget.Button
 import dev.wildware.composegl.ui.widget.Checkbox
 import dev.wildware.composegl.ui.widget.MenuBar
 import dev.wildware.composegl.ui.widget.PopupHost
 import dev.wildware.composegl.ui.widget.SceneView
 import dev.wildware.composegl.ui.widget.Text
+import dev.wildware.composegl.ui.widget.TextField
 import dev.wildware.udea.render.view.ViewDimension
 
 /**
@@ -146,6 +151,7 @@ private fun ViewTabs(session: EditorSession) {
                     onClick = { session.switchDimension(next) },
                     modifier = Modifier.testTag(EditorTags.DIMENSION),
                 )
+                session.preferences?.let { preferences -> GizmoToolbar(session, preferences) }
             }
 
             EditorTab.Game -> Checkbox(
@@ -187,6 +193,52 @@ private fun ViewPage(session: EditorSession) {
     }
 }
 
+/**
+ * The Scene tab's gizmo settings (issue #236): grid snapping and its step in world units, angle
+ * snapping and its step in degrees, and the world/local axes switch. What is set here is kept in the
+ * project's editor preferences ([GizmoPreferences]).
+ */
+@Composable
+private fun GizmoToolbar(session: EditorSession, preferences: GizmoPreferences) {
+    Checkbox(
+        checked = preferences.gridSnap,
+        onCheckedChange = { preferences.gridSnap = it },
+        label = "Grid",
+        modifier = Modifier.testTag(EditorTags.GRID_SNAP),
+    )
+    StepField(preferences.gridStep, EditorTags.GRID_STEP) { preferences.gridStep = it }
+    Checkbox(
+        checked = preferences.angleSnap,
+        onCheckedChange = { preferences.angleSnap = it },
+        label = "Angle",
+        modifier = Modifier.testTag(EditorTags.ANGLE_SNAP),
+    )
+    StepField(preferences.angleStepDegrees, EditorTags.ANGLE_STEP) { preferences.angleStepDegrees = it }
+    val local = preferences.axes == GizmoAxes.Local
+    Button(
+        if (local) "Local" else "World",
+        onClick = { session.switchAxes(if (local) GizmoAxes.World else GizmoAxes.Local) },
+        modifier = Modifier.testTag(EditorTags.AXES),
+    )
+}
+
+/**
+ * A box for a snapping step. What is typed is kept as typed, and set as the step once it reads as a
+ * number above zero; anything else leaves the step as it was, so half-typed text never snaps to it.
+ */
+@Composable
+private fun StepField(step: Float, tag: String, set: (Float) -> Unit) {
+    var text by remember { mutableStateOf(step.toString()) }
+    TextField(
+        text,
+        { typed ->
+            text = typed
+            typed.trim().toFloatOrNull()?.takeIf { it > 0f && it.isFinite() }?.let(set)
+        },
+        Modifier.width(STEP_WIDTH).testTag(tag),
+    )
+}
+
 /** One tab's heading: the chosen one drawn as selected. */
 @Composable
 private fun TabHeading(title: String, tab: EditorTab, session: EditorSession, tag: String) {
@@ -203,6 +255,9 @@ private val Background: Colour = Colour.rgb(0x1B1F27)
 
 /** The Scene and Game headings' row, in design units: a button and its padding. */
 private const val TAB_ROW_HEIGHT: Float = 44f
+
+/** A snapping step's box, in design units: wide enough for a number like `22.5`. */
+private const val STEP_WIDTH: Float = 64f
 
 /** The space between a panel's parts, in design units. */
 private const val GAP: Float = 8f

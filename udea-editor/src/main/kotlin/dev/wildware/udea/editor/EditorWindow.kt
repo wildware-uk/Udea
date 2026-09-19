@@ -85,7 +85,7 @@ private fun Panels(session: EditorSession) {
         windows.dockToScreen(EditorTags.HISTORY_PANEL, DockSide.Right)
         windows.dockToScreen(EditorTags.ASSET_PANEL, DockSide.Right)
         windows.dockWith(InspectorTags.PANEL, EditorTags.HISTORY_PANEL, DockSide.Bottom)
-        windows.dockWith(PlayEditTags.PANEL, EditorTags.CREATE_PANEL, DockSide.Bottom)
+        windows.dockWith(PlayEditTags.PANEL, EditorTags.ASSET_PANEL, DockSide.Bottom)
         if (session.animation != null) windows.dockToScreen(EditorTags.ANIMATION_PANEL, DockSide.Left)
     }
     val area = remember { ViewArea() }

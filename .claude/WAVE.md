@@ -2,7 +2,7 @@
 
 ## kmp baseline
 
-**SHA `1c5b681`** (kmp after #228, merged tree == reviewed tree `c102932` + WAVE.md; reviewer build 917 tasks green). Before that `72b949d` (kmp after #213; merged tree == trial tree `/tmp/trial-213`, which merged #213 onto `fdb82b9`
+**SHA `d22fcac`** (kmp after #192, merged tree == reviewed tree `3442bf5` + WAVE.md; reviewer build --no-configuration-cache 917 tasks green). Before: kmp after #228, merged tree == reviewed tree `c102932` + WAVE.md; reviewer build 917 tasks green). Before that `72b949d` (kmp after #213; merged tree == trial tree `/tmp/trial-213`, which merged #213 onto `fdb82b9`
 = kmp with the textured-model example). Trial, 2026-09-19:
 `ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue`
 
@@ -444,7 +444,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
-## Wave 11 (2026-09-19): in flight
+## Wave 11 (2026-09-19): done
 
 - Baseline `6a7a9b1`: FULLY GREEN. Any red on a branch is the branch's.
 - Dispatched: dev-228 (#228 symbolic keys; udea-render input + moba controls), dev-192 (#192 binary
@@ -508,6 +508,15 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   UDEA0015 new id, span at loop; AC1 roster captured pre-deletion; boot shots byte-identical; missing -Plevel fails
   loudly; AssetDaemon keeps pass-1 diagnostics (forced by AC2), AssetsToolsetTest assertion unchanged; build 917 green;
   runNetProof identical to origin/kmp.
+- **#192 MERGED `d22fcac`**, round 2 PASS (r1 FAIL: qualified/aliased repeat bypass). moba boots from
+  `moba/game/levels/test_level.udealevel` via udea-core `LevelScene` + #191 `LevelService.load`; `-Plevel=<path>` on every
+  `:moba:desktop` JavaExec. Restart reloads saved layout (re-scatter gone; replay fixtures regenerated, match one identical).
+  Loop ban **UDEA0015**: pass-1 text check (early feedback) + **K2 `UdeaAssetLoopChecker`** in udea-compiler-plugin, run
+  inside the asset scripting host (runtimeOnly dep; host loads plugins from classpath; K2-only host). Refuses loops,
+  lambdas passed to callees not `@AssetDsl` (new, udea-annotations) without EXACTLY_ONCE/AT_MOST_ONCE contract, and direct
+  recursion. Plugin-disabled switch turns the resolved check off (pass 1 remains) - ruled honest. Out of scope: script
+  `fun interface` invoked twice by a helper; mutual recursion. Worktree kept `.claude/worktrees/agent-a359f0d7330f3ae2d`.
+- **WAVE 11 DONE: #213, textured model, #228, #192 merged. In flight: 0.**
 - Held: #194 (settings.gradle.kts + AGENTS.md table collide with #213), #188 (moba HUD beside #228),
   #189 (after #188; may be mostly done by #213), #195/#196 (need #194), #214 last.
 

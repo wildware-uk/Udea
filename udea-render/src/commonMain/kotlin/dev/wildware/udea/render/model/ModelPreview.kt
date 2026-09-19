@@ -38,9 +38,11 @@ public sealed interface ModelPreview {
     ) : ModelPreview
 
     /**
-     * [model] on its own at the view's centre, turned [turnDegrees] about the up axis and scaled
-     * to fill about half the view's height, posed at [at] into [clip] - or in its bind pose when
-     * [clip] is `null`: a model asset's preview.
+     * [model] on its own at the view's centre, turned [turnDegrees] about the up axis, scaled so
+     * its largest side is three quarters of the view's height, and posed at [at] into [clip] - or
+     * in its bind pose when [clip] is `null`: a model asset's preview. Every other model is left out
+     * of the view while it shows; what other render systems draw into the view, a 2D game's
+     * sprites, is not.
      */
     public data class Asset(
         val model: ImportedModel,

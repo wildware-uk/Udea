@@ -260,6 +260,35 @@ class GlAnimationPreviewTest {
             assertEquals(null, backend.onRenderThread { views.scene.modelPreview })
             assertContentEquals(pixels(simulatedWithBones.scene), pixels(after.scene), "leaving the preview did not bring back the simulated pose")
             assertEquals(hash, worldHash(), "the preview changed the world")
+
+            // 4. The model on its own: the Fox asset alone in the Scene tab, whole, at its middle,
+            // at a size to look at, turning; the capture and the world untouched.
+            backend.onRenderThread {
+                views.scene.showGizmos = false
+                panel.showModel(panel.models.single())
+            }
+            editorFrames(backend, session, bridge, id)
+            val shown = frame(backend, slot, views)
+            editorFrames(backend, session, bridge, id)
+            val turned = frame(backend, slot, views)
+            save(shown.scene, "animation-preview-model.png")
+            save(turned.scene, "animation-preview-model-turned.png")
+            val box = foxBox(shown.scene)
+            println("GlAnimationPreviewTest: the model preview covers $box of ${shown.scene.width}x${shown.scene.height}")
+            assertTrue(box.left > 0 && box.top > 0 && box.right < WIDTH - 1 && box.bottom < HEIGHT - 1, "the model preview is cut off by the view's edge: $box")
+            val tallest = maxOf(box.width.toFloat() / WIDTH, box.height.toFloat() / HEIGHT)
+            assertTrue(tallest in MODEL_SHARE, "the model preview fills $tallest of the view")
+            val centreX = (box.left + box.right) / 2f / WIDTH
+            val centreY = (box.top + box.bottom) / 2f / HEIGHT
+            assertTrue(abs(centreX - 0.5f) < MODEL_OFF_CENTRE && abs(centreY - 0.5f) < MODEL_OFF_CENTRE, "the model preview is off the view's middle: $box")
+            assertTrue(moved(shown.scene, turned.scene) >= MIN_MOVED_PIXELS, "the model preview does not turn")
+            // The entity's own fox is not drawn with it: where that fox stood and the model does not,
+            // the background shows.
+            val alone = uncovered(simulated.scene, shown.scene)
+            println("GlAnimationPreviewTest: $alone pixels of the entity's fox uncovered by the model preview")
+            assertTrue(alone >= MIN_MOVED_PIXELS, "the entity's fox is drawn under the model preview: $alone pixels uncovered")
+            assertContentEquals(pixels(simulated.capture), pixels(shown.capture), "the model preview changed the capturable frame")
+            assertEquals(hash, worldHash(), "the model preview changed the world")
         } finally {
             backend.close()
         }
@@ -347,6 +376,29 @@ class GlAnimationPreviewTest {
         return n
     }
 
+    /** The smallest rectangle holding every fox pixel of [image]. */
+    private fun foxBox(image: BufferedImage): Box {
+        var left = image.width
+        var top = image.height
+        var right = -1
+        var bottom = -1
+        for (y in 0 until image.height) for (x in 0 until image.width) {
+            if (!isFox(image.getRGB(x, y))) continue
+            left = minOf(left, x)
+            top = minOf(top, y)
+            right = maxOf(right, x)
+            bottom = maxOf(bottom, y)
+        }
+        check(right >= 0) { "no fox in the picture" }
+        return Box(left, top, right, bottom)
+    }
+
+    /** A rectangle of pixels, its edges inclusive, from the top left. */
+    private data class Box(val left: Int, val top: Int, val right: Int, val bottom: Int) {
+        val width: Int get() = right - left + 1
+        val height: Int get() = bottom - top + 1
+    }
+
     /** Pixels that are fox in [before] and background in [after]. */
     private fun uncovered(before: BufferedImage, after: BufferedImage): Int {
         var n = 0
@@ -383,6 +435,12 @@ class GlAnimationPreviewTest {
     }
 
     private companion object {
+        /** The model preview's larger side, as a share of the view's: seen whole, and not a speck. */
+        val MODEL_SHARE = 0.25f..0.9f
+
+        /** How far the model preview's middle may sit from the view's, as a share of the view. */
+        const val MODEL_OFF_CENTRE = 0.15f
+
         const val WIDTH = 480
         const val HEIGHT = 320
 

@@ -25,6 +25,7 @@ import de.fabmax.kool.scene.Model as KoolModel
 import de.fabmax.kool.scene.Node
 import de.fabmax.kool.scene.PerspectiveCamera
 import de.fabmax.kool.scene.VertexLayouts
+import de.fabmax.kool.math.spatial.BoundingBoxF
 import de.fabmax.kool.util.Color
 import de.fabmax.kool.util.MutableColor
 import de.fabmax.kool.util.MutableStructBufferView
@@ -446,12 +447,22 @@ internal class ModelStage(
         /** The entity [preview] stands in for, or [NO_ENTITY] for an asset preview or none. */
         private var previewEntity = NO_ENTITY
 
+        /** Whether [preview] is a model shown on its own ([showAsset]), with every other model hidden. */
+        private var showingAsset = false
+
         private val placing = MutableMat4f()
+
+        /** The preview node's extent at rest in its own frame, measured when it is made. */
+        private val previewRest = BoundingBoxF()
         private val scaling = MutableVec3f()
 
         init {
             // Everything but the node this view hides, and no preview node but its own.
-            pass.defaultView.drawFilter = { node -> node !== hidden && (node === preview?.node || node !in previewNodes) }
+            // A model shown on its own is shown alone: every other model under the draw node is left out.
+            pass.defaultView.drawFilter = { node ->
+                node === preview?.node ||
+                    (node !== hidden && node !in previewNodes && !(showingAsset && node.parent === drawNode))
+            }
             pass.dependsOn(shadow)
             passes.addBeside(pass)
             view.dependsOn(pass)
@@ -474,6 +485,7 @@ internal class ModelStage(
             preview?.node?.isVisible = false
             hidden = null
             previewEntity = NO_ENTITY
+            showingAsset = false
         }
 
         /** Stands a node of this view's own in for [real], drawn for [entity], in [pose]. */
@@ -484,23 +496,23 @@ internal class ModelStage(
             shown.node.isVisible = true
             hidden = real.node
             previewEntity = entity
+            showingAsset = false
         }
 
         /**
          * Shows [model] on its own at [orbit]'s centre, turned [turnDegrees] about Z, in [pose],
-         * scaled so its largest side is about half the view's height at the orbit's distance.
+         * scaled so its largest side is [ASSET_FILL] of the view's height at the orbit's distance.
          */
         fun showAsset(model: ImportedModel, pose: ClipPose, turnDegrees: Float, orbit: ModelCamera) {
             val shown = previewNode(model)
-            // Kool's bounds of the node's own geometry, in the file's units, from its last update;
-            // empty on the first frame a node exists, which shows it at the file's own size once.
-            val bounds = shown.node.bounds
+            val bounds = previewRest
             val largest = if (bounds.isEmpty) 0f else maxOf(bounds.size.x, bounds.size.y, bounds.size.z)
             val dx = orbit.eyeX - orbit.targetX
             val dy = orbit.eyeY - orbit.targetY
             val dz = orbit.eyeZ - orbit.targetZ
             val distance = sqrt(dx * dx + dy * dy + dz * dz)
-            val wanted = distance * tan(orbit.fovYDegrees.deg.rad / 2f)
+            // The view is 2 d tan(fov / 2) high at the orbit's distance d.
+            val wanted = ASSET_FILL * 2f * distance * tan(orbit.fovYDegrees.deg.rad / 2f)
             val scale = if (largest > 0f) wanted / largest else 1f
             placing.setIdentity()
                 .translate(orbit.targetX, orbit.targetY, orbit.targetZ)
@@ -513,6 +525,7 @@ internal class ModelStage(
             shown.node.isVisible = true
             hidden = null
             previewEntity = NO_ENTITY
+            showingAsset = true
         }
 
         fun setPreviewAmbient() {
@@ -528,6 +541,7 @@ internal class ModelStage(
             dropPreview()
             val made = Placed(model, model.gltf.makeModel(importsFor(model).config).withOwnShadowSkins())
             made.setAmbient()
+            restBoundsOf(made.node, previewRest)
             previewNodes += made.node
             drawNode.addNode(made.node)
             preview = made
@@ -573,8 +587,44 @@ internal class ModelStage(
 
         /** Room for this many imported nodes a frame before the entity list grows. */
         const val INITIAL_DRAWN = 16
+
+        /** A model shown on its own has its largest side this share of the view's height. */
+        const val ASSET_FILL = 0.75f
     }
 }
+
+/**
+ * Writes into [out] the extent of [node]'s meshes at rest, in [node]'s own frame: each mesh's
+ * geometry bounds through the node tree below [node], with [node] itself unplaced.
+ *
+ * Not Kool's own `Node.bounds`: read on a view's preview node it stayed empty frame after frame, so
+ * the preview was drawn at the file's own size (issue #243). Nor a glTF mesh's `geometryBounds` as
+ * it comes: empty on the Fox's mesh, so each is computed from its vertices here, once per node.
+ */
+internal fun restBoundsOf(node: KoolModel, out: BoundingBoxF) {
+    out.clear()
+    node.updateModelMatRecursive()
+    val toNode = MutableMat4f()
+    node.modelMatF.invert(toNode)
+    val meshToNode = MutableMat4f()
+    val corner = MutableVec3f()
+    for (mesh in node.meshes.values) {
+        mesh.updateGeometryBounds()
+        val bounds = mesh.geometryBounds
+        if (bounds.isEmpty) continue
+        meshToNode.set(toNode).mul(mesh.modelMatF)
+        for (index in 0 until BOX_CORNERS) {
+            corner.set(
+                if (index and 1 == 0) bounds.min.x else bounds.max.x,
+                if (index and 2 == 0) bounds.min.y else bounds.max.y,
+                if (index and 4 == 0) bounds.min.z else bounds.max.z,
+            )
+            out.add(meshToNode.transform(corner, 1f))
+        }
+    }
+}
+
+private const val BOX_CORNERS = 8
 
 /**
  * How [ModelStage] makes a scene node from [model]'s file: its materials on Kool's PBR shader,

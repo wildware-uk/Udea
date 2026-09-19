@@ -209,6 +209,9 @@ The pieces a newcomer meets first, each with the issue that made it so.
   `Transform3D` (`udea-core`) places an entity in 3D - Z is up, a 2D position is the point on
   the ground plane, it is saved in levels and never replicated - and `ModelRenderer`
   (`udea-render`) draws a built-in mesh or a glTF/GLB model imported as a typed asset (#240).
+  A skinned model is posed from its entity's `Animator` - clip, time and crossfade, read at the
+  tick plus the interpolation alpha - and skinned on the GPU; the pose is the renderer's alone,
+  and a clip's time becomes seconds only there (#242).
   An `.fbx` is a model too: the asset build converts it to `.glb` with Assimp, textures
   embedded, and a broken one fails with `UDEA0039`; the converter is build-time only
   (`UDEA-MG-013`) (#244).

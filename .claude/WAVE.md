@@ -490,6 +490,12 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   Lead removed untracked leftovers of deleted modules in the main checkout (common/, gradle-plugin/, example/ build
   dirs, stale moba/assets/ staged art). Worktree kept `.claude/worktrees/agent-a56d33c250e95b123`.
 - **#194 now unblocked** (settings/AGENTS.md collision gone).
+- **Owner: imported animated models (dashboard, 2026-09-19), asked for issues.** Epic **#239**: A1 #240 glTF import
+  (Khronos Fox, CC-BY 4.0; READY next wave), A2 #241 Animator + typed clips (sim, ticks, replicated), A3 #242 GPU
+  skinning in udea-render, A4 #243 editor panel/scrub/bone gizmo (needs #194, #233, #234), A5 #244 FBX -> glTF at
+  asset-build time. Not part of #199.
+- **Wave 12 candidates:** #232 (G1, udea-agent), `udea-physics2d` (box2d-jni, no issue), #240 (A1, udea-render model +
+  assets), #194 (editor window; now unblocked), #188 (HUD). Check module overlap before picking.
 - Held: #194 (settings.gradle.kts + AGENTS.md table collide with #213), #188 (moba HUD beside #228),
   #189 (after #188; may be mostly done by #213), #195/#196 (need #194), #214 last.
 

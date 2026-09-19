@@ -207,6 +207,14 @@ source, the checksums of the published files and the whole change. `udea-assets-
 test fixture, `src/test/resources/fbx/bender/`, is made by `make_bender.py` beside it, for this
 repository, under its own licence.
 
+`hollow/game/assets/models/nature/` holds the trees, stones, logs, fence and ground cover of
+Hollow's forest clearing (issue #249), from **Kenney's Nature Kit (2.1)**, CC0 1.0. The published
+files are unlit and mint-coloured; `prepare.py` beside them makes each material a lit PBR surface
+in forest colours and changes nothing else, and `NOTICE.md` there has the download, the checksum of
+every published file and the change. The clearing's floor, `hollow/game/assets/models/ground/ground.glb`,
+is not third-party: `make_ground.py` beside it writes the whole file, texture included, from a fixed
+seed, under this repository's licence.
+
 ## Committed art in `example-assets`
 
 `example-assets/sprites/` holds 64 committed image files from the same **Tiny

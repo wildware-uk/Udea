@@ -87,6 +87,8 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `moba:game` | The example game: a 5v5 three-lane MOBA. A library - components, systems, assets and what it draws - with no entry point in it |
 | `moba:desktop` | The desktop launcher: `run`, `runServer`, `runClient`, the shot mains, the proofs and the agent surface. JVM |
 | `moba:android` | The Android launcher. One activity, and it boots the simulation headless because `udea-render` has no Android Kool backend yet |
+| `hollow:game` | The 3D example game (epic #245): a third-person co-op survival arena in a lit forest clearing. A library like `moba:game` - components, CC0 models, the `clearing.udealevel` level and what it draws |
+| `hollow:desktop` | Hollow's desktop launcher: `run` (a window on the clearing, `-Plevel=<path>`) and `runShot`. JVM. No Android launcher in this epic |
 
 Three rules that are cheap to break and expensive to find:
 
@@ -100,7 +102,7 @@ Three rules that are cheap to break and expensive to find:
   interface is ComposeGL (#189).
 
 Enforced by `./gradlew udeaVerifyModuleGraph`, applied automatically to every `udea-*` project
-and every `moba` project. Rule ids and rationale: `docs/module-graph.md`.
+and every `moba` and `hollow` project. Rule ids and rationale: `docs/module-graph.md`.
 
 **Multiplatform (the Kool/KMP port, issue #201).** A runtime module moves to KMP by applying
 `udea.kotlin-multiplatform` (`jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64`);
@@ -225,8 +227,8 @@ The pieces a newcomer meets first, each with the issue that made it so.
 - **Controls name keys.** A controls asset binds an `InputKey`, and `udea-render` owns the one
   table per backend that turns a platform key into it (#228). A key or a click the interface
   took never becomes an intent (#227, #230).
-- **Levels are saved files.** `.udealevel` (#191, #192), under `moba/game/levels/`; a launcher
-  takes `-Plevel=<path>`.
+- **Levels are saved files.** `.udealevel` (#191, #192), under `moba/game/levels/` and
+  `hollow/game/levels/`; a launcher takes `-Plevel=<path>`.
 - **Assets hold no loops.** A `.udea.kts` with a loop, a lambda something may run more than once,
   or a function that calls itself fails with `UDEA0015`: the K2 checker in the asset compile is
   the guarantee and a syntactic first pass is the early warning (#192). The editor's Save writes

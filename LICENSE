@@ -83,6 +83,12 @@ the MIT licence above:
     The FBX is modified by relink.py next to it; NOTICE.md there has the source,
     the checksums and the change.
 
+  * hollow/game/assets/models/nature/*.glb — from Kenney's "Nature Kit" (2.1),
+    released under Creative Commons Zero 1.0 Universal (public domain),
+    https://creativecommons.org/publicdomain/zero/1.0/. Each file's materials are
+    modified by prepare.py next to them; NOTICE.md there has the source, the
+    checksums of the published files and the change.
+
 If you fork, vendor or redistribute this repository, you must supply your own
 art and audio. See docs/art-assets.md for the current status of these files and
 the options for resolving the committed ones.

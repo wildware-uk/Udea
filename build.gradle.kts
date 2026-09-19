@@ -1,3 +1,4 @@
+import dev.wildware.udea.build.ModuleGraphRules
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -85,27 +86,34 @@ allprojects {
 // which is the wrong person to be able to switch off the rule that governs the module.
 
 /**
- * Gradle paths of the engine and the game: everything the Phase 0 gates apply to.
+ * Gradle paths of the engine and the games: everything the Phase 0 gates apply to.
+ *
+ * Which projects those are is `ModuleGraphRules.governs`, the one answer the rules themselves and
+ * the compiler-plugin wiring use, so a game the rules cover is a game these gates run on: Hollow
+ * (issue #249) joined by being added there, and a list written out here as well would be a second
+ * thing to forget.
  *
  * `buildFile.exists()` is not a nicety. `:moba` is a container since issue #212 - it holds
  * `:moba:game`, `:moba:desktop` and `:moba:android` and has no build script, no plugins and no
- * configurations of its own - and both gates refuse a project they would inspect nothing of:
- * *"matched none of the configurations [...], so udeaVerifyModuleGraph inspected nothing. A gate
- * with no input passes forever"*. That refusal is right, so the container is excluded here rather
- * than the message being softened there.
+ * configurations of its own, and `:hollow` is the same - and both gates refuse a project they
+ * would inspect nothing of: *"matched none of the configurations [...], so udeaVerifyModuleGraph
+ * inspected nothing. A gate with no input passes forever"*. That refusal is right, so the
+ * container is excluded here rather than the message being softened there.
  */
-val rewriteProjects = subprojects.filter {
-    (it.path.startsWith(":udea-") || it.path.startsWith(":moba:")) && it.buildFile.exists()
-}
+val rewriteProjects = subprojects.filter { ModuleGraphRules.governs(it.path) && it.buildFile.exists() }
+
+/**
+ * The projects that ship a runnable process, and so get the release gate: each game's desktop
+ * launcher. A game's library has no entry point in it, and the classpath `UDEA-REL-002` is about
+ * is the one a player's or an agent's process runs on.
+ */
+val launcherProjects = listOf(":moba:desktop", ":hollow:desktop")
 
 subprojects {
     if (this in rewriteProjects) {
         apply(plugin = "udea.module-graph-check")
     }
-    // The release gate lives on the project that actually ships a runnable process. That is the
-    // desktop launcher now (issue #212): `:moba:game` is a library with no entry point in it, and
-    // the classpath `UDEA-REL-002` is about is the one a player's or an agent's process runs on.
-    if (path == ":moba:desktop") {
+    if (path in launcherProjects) {
         apply(plugin = "udea.release-check")
     }
 }
@@ -117,14 +125,14 @@ subprojects {
  */
 val udeaVerifyModuleGraph by tasks.registering {
     group = "verification"
-    description = "Runs udeaVerifyModuleGraph on every udea-* project and every moba project."
+    description = "Runs udeaVerifyModuleGraph on every udea-* project and every game project."
     dependsOn(rewriteProjects.map { "${it.path}:udeaVerifyModuleGraph" })
 }
 
 val udeaVerifyRelease by tasks.registering {
     group = "verification"
-    description = "Runs the release artifact scan on the shipping project."
-    dependsOn(":moba:desktop:udeaVerifyRelease")
+    description = "Runs the release artifact scan on every shipping project."
+    dependsOn(launcherProjects.map { "$it:udeaVerifyRelease" })
 }
 
 /**
@@ -134,11 +142,19 @@ val udeaVerifyRelease by tasks.registering {
  * introduced so the budget would not measure the old tree - `common` and `example` resolving
  * KryoNet, Box2D natives and five `kotlin-scripting-*` artifacts - and it stays after issue #213
  * deleted that tree, because the clean-build-budget CI job names this task.
+ *
+ * It is the engine and `moba`, and not Hollow (issue #249): that job compares this task's clean
+ * build on a branch with the same task on its base, and a second game in it would read as the
+ * engine's build slowing down on the branch that added the game.
  */
 val udeaAssemble by tasks.registering {
     group = "build"
     description = "Assembles every udea-* project and every moba project."
-    dependsOn(rewriteProjects.map { "${it.path}:assemble" })
+    dependsOn(
+        rewriteProjects
+            .filter { it.path.startsWith(":udea-") || it.path.startsWith(":moba:") }
+            .map { "${it.path}:assemble" },
+    )
 }
 
 // --- the wall-clock latency budgets (issue #175) ----------------------------------------------

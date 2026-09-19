@@ -78,7 +78,7 @@ public object TrelloMap {
     }
 
     /** The failure message for [findings] from the gate [taskName], or null when there are none. */
-    public fun report(taskName: String, findings: List<GateFinding>): String? =
+    internal fun report(taskName: String, findings: List<GateFinding>): String? =
         gateFailureReport(
             taskName,
             findings,

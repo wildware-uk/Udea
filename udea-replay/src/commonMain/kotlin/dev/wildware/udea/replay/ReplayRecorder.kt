@@ -67,6 +67,8 @@ public class ReplayRecorder(
     public var firstTick: Tick? = null
         private set
 
+    private val edits = ArrayList<ReplayEdit>()
+
     /** True once [seal] has run. A sealed recorder refuses further ticks. */
     public var sealed: Boolean = false
         private set
@@ -116,6 +118,33 @@ public class ReplayRecorder(
     }
 
     /**
+     * Appends one call made between ticks - an editor edit - to be applied again before its tick.
+     *
+     * Record a tick's edits before [record] records the tick itself: an edit is applied at the top
+     * of its tick, so one stamped with a tick already recorded could never be put back where it
+     * happened, and is refused. Edits arrive in the order they were applied.
+     *
+     * @throws IllegalStateException if this recorder is sealed, if [edit]'s tick has already been
+     *   recorded, or if it is earlier than the edit before it.
+     */
+    public fun recordEdit(edit: ReplayEdit) {
+        check(!sealed) { "this recorder was sealed; it is append-only, and sealing ends the appending" }
+        val next = nextTick
+        check(next == null || edit.tick >= next) {
+            "an edit on ${edit.tick} arrived after that tick was recorded; the next tick is $next, " +
+                "and an edit is applied before the tick it is stamped with"
+        }
+        val previous = edits.lastOrNull()
+        check(previous == null || previous.tick <= edit.tick) {
+            "edits are recorded in the order they were applied, and ${edit.tick} came after ${previous?.tick}"
+        }
+        check(edits.size < ReplayFormat.MAX_EDITS) {
+            "a recording may carry at most ${ReplayFormat.MAX_EDITS} edits and this one is full"
+        }
+        edits.add(edit)
+    }
+
+    /**
      * Seals the log and hands back the recording.
      *
      * @throws IllegalStateException on an empty recorder. A zero-tick recording is never what
@@ -146,6 +175,8 @@ public class ReplayRecorder(
             frameBytes = frames.toByteArray(),
             frameOffsets = index,
             hashes = hashes.copyOf(tickCount),
+            // An edit stamped past the last recorded tick is refused here, by the recording.
+            edits = edits.toList(),
         )
     }
 

@@ -32,6 +32,8 @@ public class ReplayRecording internal constructor(
     private val frameBytes: ByteArray,
     private val frameOffsets: IntArray,
     private val hashes: LongArray,
+    /** Every call made between ticks, in the order applied. See [ReplayEdit]. */
+    public val edits: List<ReplayEdit>,
 ) {
 
     init {
@@ -43,6 +45,35 @@ public class ReplayRecording internal constructor(
             "the hash stream must have exactly one entry per tick: expected " +
                 "${header.tickCount}, got ${hashes.size}"
         }
+        for ((index, edit) in edits.withIndex()) {
+            require(header.indexOf(edit.tick) >= 0) {
+                "an edit on ${edit.tick} is outside this recording, which runs $firstTick until $endTick"
+            }
+            require(index == 0 || edits[index - 1].tick <= edit.tick) {
+                "edits are kept in the order they were applied, and ${edit.tick} follows ${edits[index - 1].tick}"
+            }
+        }
+    }
+
+    /** `editStarts[i]` is the index in [edits] of the first edit on tick `firstTick + i`. */
+    private val editStarts: IntArray = IntArray(header.tickCount + 1).also { starts ->
+        var edit = 0
+        for (index in 0..header.tickCount) {
+            while (edit < edits.size && header.indexOf(edits[edit].tick) < index) edit++
+            starts[index] = edit
+        }
+    }
+
+    /**
+     * The edits applied at the top of [tick], before any system ran on it, in the order applied.
+     *
+     * Empty for every tick of a recording nobody edited, without allocating.
+     */
+    public fun editsAt(tick: Tick): List<ReplayEdit> {
+        val index = checkedIndex(tick)
+        val start = editStarts[index]
+        val end = editStarts[index + 1]
+        return if (start == end) emptyList() else edits.subList(start, end)
     }
 
     /** The vocabulary the samples are written in. */
@@ -114,11 +145,15 @@ public class ReplayRecording internal constructor(
     /** Fresh sample slots, one per peer. A replay allocates these once and reuses them. */
     public fun newSampleSlots(): Array<InputSample> = Array(peerCount) { InputSample(schema) }
 
-    /** The whole file, ready to write. Deterministic: the same recording encodes to the same bytes. */
+    /**
+     * The whole file, ready to write. Deterministic: the same recording encodes to the same bytes.
+     *
+     * Format 1 when nobody edited the world, format 2 when somebody did; see [ReplayFormat].
+     */
     public fun encode(): ByteArray {
         val sink = ByteSink(ReplayFormat.PREAMBLE_BYTES + frameBytes.size + hashes.size * 8 + 512)
         sink.raw(ReplayFormat.MAGIC)
-        sink.u16(ReplayFormat.FORMAT_VERSION)
+        sink.u16(if (edits.isEmpty()) ReplayFormat.EDITLESS_FORMAT_VERSION else ReplayFormat.FORMAT_VERSION)
         val lengthAt = sink.size
         sink.i32(0)
         val headerStart = sink.size
@@ -126,6 +161,7 @@ public class ReplayRecording internal constructor(
         sink.patchI32(lengthAt, sink.size - headerStart)
         sink.raw(frameBytes)
         for (hash in hashes) sink.i64(hash)
+        if (edits.isNotEmpty()) writeEdits(sink)
         sink.i32(ReplayFormat.crc32(sink.backing(), sink.size).toInt())
         return sink.toByteArray()
     }
@@ -138,6 +174,20 @@ public class ReplayRecording internal constructor(
             "$tick is outside this recording, which runs $firstTick until $endTick"
         }
         return index
+    }
+
+    private fun writeEdits(sink: ByteSink) {
+        sink.i32(edits.size)
+        for (edit in edits) {
+            sink.i64(edit.tick.value)
+            sink.string(edit.author)
+            sink.string(edit.tool)
+            sink.u16(edit.args.size)
+            for (name in edit.args.keys.sorted()) {
+                sink.string(name)
+                sink.text(edit.args.getValue(name))
+            }
+        }
     }
 
     private fun writeHeader(sink: ByteSink) {
@@ -184,11 +234,11 @@ public class ReplayRecording internal constructor(
                 )
             }
             val version = source.u16()
-            if (version != ReplayFormat.FORMAT_VERSION) {
+            if (version !in ReplayFormat.EDITLESS_FORMAT_VERSION..ReplayFormat.FORMAT_VERSION) {
                 throw ReplayFormatException(
-                    "this recording is .udearep format $version and this build reads format " +
-                        "${ReplayFormat.FORMAT_VERSION}; no field of it can be trusted, so it " +
-                        "is refused before any other check",
+                    "this recording is .udearep format $version and this build reads formats " +
+                        "${ReplayFormat.EDITLESS_FORMAT_VERSION} to ${ReplayFormat.FORMAT_VERSION}; " +
+                        "no field of it can be trusted, so it is refused before any other check",
                 )
             }
             verifyCrc(bytes)
@@ -220,8 +270,9 @@ public class ReplayRecording internal constructor(
             val frameBytes = bytes.copyOfRange(frameStart, source.position)
 
             val hashes = LongArray(header.tickCount) { source.i64() }
-            source.expectRemaining(CRC_BYTES, "after the hash stream")
-            return ReplayRecording(header, frameBytes, offsets, hashes)
+            val edits = if (version >= ReplayFormat.FORMAT_VERSION) readEdits(source) else emptyList()
+            source.expectRemaining(CRC_BYTES, if (version >= ReplayFormat.FORMAT_VERSION) "after the edits" else "after the hash stream")
+            return ReplayRecording(header, frameBytes, offsets, hashes, edits)
         }
 
         /** Bytes the trailing CRC32 occupies. */
@@ -242,6 +293,33 @@ public class ReplayRecording internal constructor(
                     "this recording's CRC32 is 0x${Hex.int(stored, 8)} and its $end bytes " +
                         "hash to 0x${Hex.int(expected, 8)}; the file is damaged",
                 )
+            }
+        }
+
+        private fun readEdits(source: ByteSource): List<ReplayEdit> {
+            val count = source.i32()
+            if (count < 1 || count > ReplayFormat.MAX_EDITS) {
+                // Zero is refused too: a recording with no edits is written as format 1.
+                throw ReplayFormatException(
+                    "the edits section declares $count edits, outside 1..${ReplayFormat.MAX_EDITS}",
+                )
+            }
+            return List(count) {
+                val tick = Tick(source.i64())
+                val author = source.string()
+                val tool = source.string()
+                val argCount = source.u16()
+                if (argCount > ReplayFormat.MAX_EDIT_ARGS) {
+                    throw ReplayFormatException(
+                        "an edit by $tool declares $argCount arguments, past the ${ReplayFormat.MAX_EDIT_ARGS} cap",
+                    )
+                }
+                val args = LinkedHashMap<String, String>(argCount)
+                repeat(argCount) {
+                    val name = source.string()
+                    args[name] = source.text()
+                }
+                ReplayEdit(tick, author, tool, args)
             }
         }
 

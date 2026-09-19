@@ -12,7 +12,6 @@ import dev.wildware.udea.agent.harness.SimHarness
 import dev.wildware.udea.agent.query.AgentComponentIndex
 import dev.wildware.udea.agent.query.agentComponent
 import dev.wildware.udea.agent.state.StateDigest
-import dev.wildware.udea.agent.tools.EditorJournalEntry
 import dev.wildware.udea.agent.tools.EditorToolset
 import dev.wildware.udea.agent.tools.EngineToolModules
 import dev.wildware.udea.core.SimSystem
@@ -43,6 +42,7 @@ import dev.wildware.udea.core.snapshot.fleksComponentType
 import dev.wildware.udea.generated.CoreUdeaRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -50,76 +50,103 @@ import kotlin.test.assertTrue
 /**
  * A recorded editing session replays into the same world, tick for tick (issue #232).
  *
- * The recording is the two halves an edited match has: a `.udearep` - this game's input, which is
- * none, and the world hash every tick produced - and the `editor.*` journal, each call with the
- * tick whose barrier drain applied it. The replay builds a fresh game, submits each journaled call
- * through the bridge before the tick it was stamped with, steps, and lets [ReplayVerifier] - the
- * same verifier every `.udearep` goes through - compare its hashes with the recorded ones.
+ * The recording is one `.udearep`: this game's input, which is none, the world hash every tick
+ * produced, and - format 2 - every `editor.*` call that changed something, with the tick whose
+ * barrier drain applied it, taken from the editor's journal as the match is recorded. The replay
+ * is [ReplayVerifier]'s, the same verifier every `.udearep` goes through: it builds a fresh game,
+ * hands each tick's edits to [ReplayWorld.applyEdits] before the tick, steps, and compares hashes.
+ * Nothing but the decoded file reaches the replay.
  *
  * [Drifter] moves by its velocity every tick, so *when* an edit lands is visible in every later
  * hash: an edit applied one tick late is a different world from that tick on. The script covers
  * every kind of editing call that changes something - a session begun, updated across ticks and
- * committed; a multi-entity `set_field`; an undo; a session left idle until the sweep cancels it
- * on the wall clock; and a session cancelled by `editor.leave`.
+ * committed; a multi-entity `set_field`; an undo; a session cancelled by `editor.leave`; and a
+ * session left idle until the sweep cancels it on the recording's wall clock.
  */
 class EditingSessionReplayTest {
 
     @Test
     fun `a recorded editing session replays bit-identically, with every edit applied between ticks`() {
-        val (recording, journal) = record()
+        val recording = ReplayRecording.decode(record().encode())
 
-        val verification = ReplayVerifier.verify(recording, replaying(journal), IDENTITY)
+        val verification = ReplayVerifier.verify(recording, replaying(), IDENTITY)
 
-        println("[edit-replay] ${journal.size} journaled calls over ${recording.tickCount} ticks: ${verification.describe()}")
+        println("[edit-replay] ${recording.edits.size} recorded edits over ${recording.tickCount} ticks: ${verification.describe()}")
         assertTrue(verification.isBitExact, verification.describe())
         assertEquals(TICKS, verification.ticksCompared)
     }
 
     @Test
-    fun `the journal holds the idle sweep's cancel as an ordinary cancel_edit, so a replay needs no clock`() {
-        val (_, journal) = record()
+    fun `an edited recording is format 2 and carries every edit, and the idle cancel is one of them`() {
+        val bytes = record().encode()
+        val recording = ReplayRecording.decode(bytes)
 
-        val expired = journal.single { it.tool == "editor.cancel_edit" && it.author == "alice" }
-
-        assertEquals(Tick(EXPIRY_TICK), expired.tick, "the idle cancel was not applied on the tick after the clock passed 30 seconds")
+        assertEquals(ReplayFormat.FORMAT_VERSION, bytes[ReplayFormat.MAGIC.size].toInt())
+        assertEquals(SCRIPT.values.sumOf { it.size } + 1, recording.edits.size, recording.edits.joinToString("\n"))
+        // The sweep's cancel is an ordinary cancel_edit, stamped with the tick it landed on, so a
+        // replay needs no clock to make it.
+        val expired = recording.edits.single { it.tool == "editor.cancel_edit" && it.author == "alice" }
+        assertEquals(Tick(IDLE_TICK), expired.tick)
+        assertEquals(listOf(expired), recording.editsAt(Tick(IDLE_TICK)))
     }
 
     /**
-     * The proof bites: the same recording replayed without its journal diverges on the first tick
-     * an edit changed the world. Without this, a world the edits never touched would pass the test
-     * above just as well.
+     * The proof bites: the same file replayed by a world that drops its edits diverges on the first
+     * tick an edit changed the world. Without this, a world the edits never touched would pass the
+     * test above just as well.
      */
     @Test
-    fun `replaying the input without the edit journal diverges on the first edited tick`() {
-        val (recording, _) = record()
+    fun `a replay that ignores the recorded edits diverges on the first edited tick`() {
+        val recording = ReplayRecording.decode(record().encode())
 
-        val verification = ReplayVerifier.verify(recording, replaying(emptyList()), IDENTITY)
+        val verification = ReplayVerifier.verify(recording, replaying { edits, _ -> edits.clear() }, IDENTITY)
 
-        println("[edit-replay] without the journal: ${verification.describe()}")
+        println("[edit-replay] edits ignored: ${verification.describe()}")
         assertFalse(verification.isBitExact)
         assertEquals(Tick(FIRST_WRITE_TICK), verification.firstDivergentTick)
     }
 
     /** And an edit applied one tick later than recorded is a different world from that tick on. */
     @Test
-    fun `replaying every edit one tick late diverges on the first edited tick`() {
-        val (recording, journal) = record()
-        val late = journal.map { EditorJournalEntry(it.tick + 1L, it.author, it.tool, it.args) }
+    fun `a replay that applies each edit one tick late diverges on the first edited tick`() {
+        val recording = ReplayRecording.decode(record().encode())
+        val held = ArrayList<ReplayEdit>()
 
-        val verification = ReplayVerifier.verify(recording, replaying(late), IDENTITY)
+        val verification = ReplayVerifier.verify(
+            recording,
+            replaying { edits, _ ->
+                val now = edits.toList()
+                edits.clear()
+                edits.addAll(held.map { it.copy(tick = it.tick + 1L) })
+                held.clear()
+                held.addAll(now)
+            },
+            IDENTITY,
+        )
 
         println("[edit-replay] one tick late: ${verification.describe()}")
         assertEquals(Tick(FIRST_WRITE_TICK), verification.firstDivergentTick)
     }
 
+    @Test
+    fun `a replay world that cannot apply edits refuses an edited recording rather than diverging`() {
+        val recording = ReplayRecording.decode(record().encode())
+        val inputOnly = ReplayWorldFactory { InputOnlyWorld(EditGame(ManualClock())) }
+
+        val refused = assertFailsWith<IllegalStateException> { ReplayVerifier.verify(recording, inputOnly, IDENTITY) }
+
+        assertTrue(refused.message!!.contains("cannot apply edits"), refused.message)
+    }
+
     // --- recording ---------------------------------------------------------------------------
 
-    /** Plays [SCRIPT] into a fresh game, recording each tick's hash and the editor's journal. */
-    private fun record(): Pair<ReplayRecording, List<EditorJournalEntry>> {
+    /** Plays [SCRIPT] into a fresh game, recording each tick's edits and hash into one `.udearep`. */
+    private fun record(): ReplayRecording {
         val clock = ManualClock()
         val game = EditGame(clock)
         val recorder = ReplayRecorder(IDENTITY, SCHEMA, peerCount = 1, gameId = "edit-replay", gameVersion = "1")
         val slots = recorder.newSampleSlots()
+        var journaled = 0
         repeat(TICKS) {
             val tick = game.sim.tick
             if (tick.value == IDLE_TICK) clock.nanos += 31_000_000_000L
@@ -128,35 +155,64 @@ class EditingSessionReplayTest {
                 assertIs<AgentResult.Ok>(answer, "$tool at $tick: $answer")
             }
             game.sim.step(1)
+            // Everything the editor journaled since the last tick was applied before this one.
+            val journal = game.editor.journal.entries
+            while (journaled < journal.size) {
+                val entry = journal[journaled++]
+                recorder.recordEdit(ReplayEdit(entry.tick, entry.author, entry.tool, entry.args))
+            }
             recorder.record(tick, slots, game.hash())
         }
-        // Through the file format and back, so what is replayed is what a `.udearep` carries.
-        return ReplayRecording.decode(recorder.seal().encode()) to game.editor.journal.entries.toList()
+        return recorder.seal()
     }
 
-    /** A fresh game per replay, fed [journal] before each tick. Its idle clock never moves. */
-    private fun replaying(journal: List<EditorJournalEntry>) = ReplayWorldFactory { firstTick ->
-        JournalReplayWorld(EditGame(ManualClock()), journal).also {
+    /**
+     * A fresh game per replay. Its idle clock never moves, so the only cancels are recorded ones.
+     *
+     * [tamper] may rewrite a tick's edits before they are made - what the two negative controls
+     * use to drop them or hold them back a tick.
+     */
+    private fun replaying(tamper: (MutableList<ReplayEdit>, Tick) -> Unit = { _, _ -> }) = ReplayWorldFactory { firstTick ->
+        EditingReplayWorld(EditGame(ManualClock()), tamper).also {
             check(it.tick == firstTick) { "the edit game starts at ${it.tick}, the recording at $firstTick" }
         }
     }
 
-    private class JournalReplayWorld(
+    /** Serves a recording's edits through the editor's own tools, as the recorded run made them. */
+    private class EditingReplayWorld(
         private val game: EditGame,
-        private val journal: List<EditorJournalEntry>,
+        private val tamper: (MutableList<ReplayEdit>, Tick) -> Unit,
     ) : ReplayWorld {
 
         override val tick: Tick get() = game.sim.tick
 
-        override fun applyInput(samples: Array<InputSample>) {
-            // This game reads no input; its tick's changes are the edits made before it.
-            for (entry in journal) {
-                if (entry.tick != tick) continue
-                val command = entry.command(game.sessions)
-                val answer = game.sim.call(command.name, command.args, command.session)
-                check(answer is AgentResult.Ok) { "replaying $entry was refused: $answer" }
+        override fun applyEdits(edits: List<ReplayEdit>) {
+            val made = edits.toMutableList()
+            tamper(made, tick)
+            for (edit in made) {
+                val answer = game.sim.call(edit.tool, edit.args, game.sessions.intern(edit.author))
+                check(answer is AgentResult.Ok) { "replaying $edit was refused: $answer" }
             }
         }
+
+        override fun applyInput(samples: Array<InputSample>) {
+            // This game reads no input: what changes it between ticks is the edits.
+        }
+
+        override fun step() {
+            game.sim.step(1)
+        }
+
+        override fun hash(): Long = game.hash()
+
+        override fun snapshot(): WorldSnapshot = game.capture()
+    }
+
+    /** A replay world that takes input only, as every game's did before format 2. */
+    private class InputOnlyWorld(private val game: EditGame) : ReplayWorld {
+        override val tick: Tick get() = game.sim.tick
+
+        override fun applyInput(samples: Array<InputSample>) {}
 
         override fun step() {
             game.sim.step(1)
@@ -224,9 +280,6 @@ class EditingSessionReplayTest {
 
         /** Where the recording's wall clock jumps past the idle timeout with alice's session open. */
         const val IDLE_TICK = 25L
-
-        /** The sweep runs in the pump that steps tick [IDLE_TICK], so its cancel lands on that tick. */
-        const val EXPIRY_TICK = IDLE_TICK
 
         /** The first call that changes the world: alice's first update. */
         const val FIRST_WRITE_TICK = 4L

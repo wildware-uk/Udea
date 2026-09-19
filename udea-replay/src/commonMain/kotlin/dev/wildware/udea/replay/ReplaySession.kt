@@ -152,8 +152,7 @@ public class ReplaySession private constructor(
         var stepped = 0
         while (live.tick.value < target.value) {
             val current = live.tick
-            recording.samplesInto(current, slots)
-            live.applyInput(slots)
+            live.feed(recording, current, slots)
             live.step()
             stepped++
             ticksRun++

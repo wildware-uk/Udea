@@ -1,7 +1,5 @@
 package dev.wildware.udea.agent.tools
 
-import dev.wildware.udea.agent.AgentCommand
-import dev.wildware.udea.agent.activity.AgentSessions
 import dev.wildware.udea.core.Tick
 
 /**
@@ -23,15 +21,6 @@ public class EditorJournalEntry(
     public val args: Map<String, String>,
 ) {
 
-    /**
-     * The same call again, from the same author, for a replay to submit.
-     *
-     * [sessions] is the replaying host's table: the author is interned there by label, so a
-     * replay run in a fresh process names the same author the recording did.
-     */
-    public fun command(sessions: AgentSessions): AgentCommand =
-        AgentCommand(tool, args, session = sessions.intern(author))
-
     override fun toString(): String = "$tick $author $tool $args"
 }
 
@@ -44,9 +33,11 @@ public class EditorJournalEntry(
  * reproduces a match by feeding the input back. An edit is not input - it arrives between ticks
  * through the `SimBarrier`, from an agent or the editor window - so a replay of the input alone
  * cannot reproduce a world somebody edited. This is the other half: each call with the tick it was
- * applied on, which a replay submits again through the same bridge, onto the same barrier, before
- * the same tick. An idle session's cancel is here too, as the `editor.cancel_edit` it was, so a
- * replay does not need the wall clock that decided when it happened.
+ * applied on. A host recording the session copies each entry into its `.udearep` as a
+ * `ReplayEdit` (format 2, `udea-replay`), and a replay submits each one again through the same
+ * tools, onto the same barrier, before the same tick. An idle session's cancel is here too, as the
+ * `editor.cancel_edit` it was, so a replay does not need the wall clock that decided when it
+ * happened.
  *
  * Only calls that succeeded are kept: a refused call changed nothing, and replaying it would
  * change nothing either. Reads (`history`, `selection`, `common_fields`), `save` and `select` are

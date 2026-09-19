@@ -214,6 +214,50 @@ class ReplayFormatTest {
         )
     }
 
+    @Test
+    fun `a recording with edits is format 2, and every edit comes back at its tick`() {
+        val recorder = recorder(peers = 1)
+        val slots = recorder.newSampleSlots()
+        val long = "x".repeat(ReplayFormat.MAX_STRING_BYTES * 3)
+        val first = ReplayEdit(FIRST + 1L, "alice", "editor.begin_edit", mapOf("fields" to "Drifter.x", "entities" to "0,1"))
+        val second = ReplayEdit(FIRST + 1L, "bob", "editor.update_edit", mapOf("sessionId" to "1", "values" to long))
+        val third = ReplayEdit(FIRST + 3L, "alice", "editor.undo", emptyMap())
+        for (index in 0 until 5) {
+            val tick = FIRST + index.toLong()
+            for (edit in listOf(first, second, third)) if (edit.tick == tick) recorder.recordEdit(edit)
+            recorder.record(tick, slots, index.toLong())
+        }
+
+        val bytes = recorder.seal().encode()
+        val decoded = ReplayRecording.decode(bytes)
+
+        assertEquals(ReplayFormat.FORMAT_VERSION, bytes[ReplayFormat.MAGIC.size].toInt())
+        assertEquals(listOf(first, second, third), decoded.edits)
+        assertEquals(listOf(first, second), decoded.editsAt(FIRST + 1L))
+        assertEquals(emptyList(), decoded.editsAt(FIRST + 2L))
+        assertEquals(listOf(third), decoded.editsAt(FIRST + 3L))
+        assertTrue(bytes.contentEquals(decoded.encode()), "an edited recording did not re-encode to its own bytes")
+    }
+
+    @Test
+    fun `a recording with no edits is written as format 1, which every earlier build reads`() {
+        val bytes = recorded().encode()
+
+        assertEquals(ReplayFormat.EDITLESS_FORMAT_VERSION, bytes[ReplayFormat.MAGIC.size].toInt())
+        assertEquals(emptyList(), ReplayRecording.decode(bytes).edits)
+    }
+
+    @Test
+    fun `an edit for a tick already recorded is refused, because it can no longer come before it`() {
+        val recorder = recorder(peers = 1)
+        val slots = recorder.newSampleSlots()
+        recorder.record(FIRST, slots, 1L)
+
+        assertFailsWith<IllegalStateException> {
+            recorder.recordEdit(ReplayEdit(FIRST, "alice", "editor.undo", emptyMap()))
+        }
+    }
+
     private companion object {
         /** Not zero: a recording starts after the scene loads, and the code must not assume 0. */
         val FIRST: Tick = Tick(1)

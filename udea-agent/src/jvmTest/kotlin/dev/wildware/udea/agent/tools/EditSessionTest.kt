@@ -1,6 +1,7 @@
 package dev.wildware.udea.agent.tools
 
 import dev.wildware.udea.agent.AgentClock
+import dev.wildware.udea.agent.AgentErrorKind
 import dev.wildware.udea.agent.AgentResult
 import dev.wildware.udea.agent.Health
 import dev.wildware.udea.agent.Transform
@@ -179,6 +180,30 @@ class EditSessionTest {
         assertEquals(1, historySize(designer), "a multi-entity set_field was not exactly one undo entry")
         edit(designer, "editor.undo")
         assertEquals(listOf(10f, 20f, 30f), listOf(health(a), health(b), health(c)))
+    }
+
+    @Test
+    fun `a malformed id in a list is refused by name, and nothing is written`() {
+        val a = harness.place(health = 10f)
+
+        val refused = assertIs<AgentResult.Failed>(harness.sim.call("editor.set_field", mapOf("id" to "${a.raw},4o", "component" to "Health", "field" to "current", "value" to "5"), harness.author("designer")))
+
+        assertEquals(AgentErrorKind.BAD_ARGUMENT, refused.error.kind)
+        assertTrue(refused.error.message.contains("id=4o"), refused.error.message)
+        assertEquals(10f, health(a), "a refused multi-entity set_field wrote the entity before the bad id")
+    }
+
+    @Test
+    fun `a set_field on one id answers exactly as it did before several ids were allowed`() {
+        val a = harness.place(health = 10f)
+
+        val answer = edit(harness.author("designer"), "editor.set_field", "id" to "${a.raw}", "component" to "Health", "field" to "current", "value" to "5")
+
+        assertEquals(
+            "{\"id\":${a.raw},\"component\":\"Health\",\"field\":\"current\",\"value\":5," +
+                "\"reverse\":{\"tool\":\"editor.set_field\",\"args\":{\"id\":\"${a.raw}\",\"component\":\"Health\",\"field\":\"current\",\"value\":\"10.0\"}}}",
+            answer,
+        )
     }
 
     @Test

@@ -46,7 +46,7 @@ class MobaAudioTest {
     }
 
     /**
-     * Records which *file* each play was for, without needing a `Gdx.audio`.
+     * Records which *file* each play was for, without opening a real audio output.
      *
      * Which slot matters and a bare count does not: this game binds four cues, and a test asserting
      * only that "something played" stays green when the melee hit stops playing and the deaths
@@ -306,11 +306,11 @@ class MobaAudioTest {
      * Where `:moba:game`'s `assets` directory is, from wherever the test JVM was started.
      *
      * Walking up is what makes the test survive being run from the repository root by an IDE as
-     * well as from `:moba:desktop`, which is where Gradle starts it. The sounds live in the game
-     * module and the test lives in the launcher, so neither end can assume the other's directory.
+     * well as from `:moba:game`, which is where Gradle starts it.
      *
      * It used to end at `GdxAudioDevice.DEFAULT_ASSET_ROOT`, which named where LibGDX resolved
-     * `internal` files. There is no device on this branch (see `MobaAudio.forHost`), so the
+     * `internal` files. That device went with LibGDX (issue #212); the one that plays these files
+     * now is `udea-render`'s `koolAudioDevice`, handed the same root by `:moba:desktop`. So the
      * directory is named here instead - and what the test asserts is unchanged, because it was
      * always about the files being on disk under the packed root rather than about the device.
      */

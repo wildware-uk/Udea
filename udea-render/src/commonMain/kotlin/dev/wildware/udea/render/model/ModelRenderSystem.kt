@@ -10,12 +10,10 @@ import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.spatial.Animator
-import dev.wildware.udea.core.spatial.Transform3D
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
 import dev.wildware.udea.render.draw.Rgba
-import dev.wildware.udea.render.interp.Pose
 import dev.wildware.udea.render.interp.PoseSource
 import dev.wildware.udea.render.view.PickBounds
 import dev.wildware.udea.render.view.PickSink
@@ -31,8 +29,9 @@ import dev.wildware.udea.render.view.WorldViewport
  *
  * ## Where an entity is drawn
  *
- * - With a `Transform3D`, there: position, rotation and scale, as they stand. A `Transform3D` is
- *   not interpolated, because nothing in the engine simulates one yet.
+ * - With a `Transform3D`, there: position and heading between where the last two ticks left it,
+ *   at the render alpha, when the world runs `RenderModule` (issue #246); pitch, roll and scale as
+ *   they stand. [ModelPlacer] has the rules.
  * - Without one, from [lift], if it was given one: a 2D pose `(x, y, angle)` is drawn at
  *   `(x, y, 0)` - on the ground plane - turned `angle` about Z, at scale 1. That is how a 2D game
  *   shows a 3D model without carrying 3D data: pass the same `PoseSource` its camera follows
@@ -84,14 +83,11 @@ public class ModelRenderSystem(
 
     private var bound: Bound? = null
 
-    /** Reused: the pose [lift] writes into, one for the whole frame. */
-    private val pose = Pose()
-
     /** Reused: each entity's clips this frame, one for the whole frame. */
     private val clips = ClipPose()
 
-    /** Reused: where the entity being drawn or reported stands. */
-    private val placed = Placement()
+    /** Where the entity being drawn or reported stands: interpolated, or [lift]ed. */
+    private val placer = ModelPlacer(lift)
 
     /** Each model's world box, for [reportPickBounds]. */
     private val bounds = ModelBounds()
@@ -105,6 +101,7 @@ public class ModelRenderSystem(
 
     override fun onBind(world: World, ctx: GameContext) {
         bound = Bound(world, ctx, world.family { all(ModelRenderer) }, ctx.clock)
+        placer.bind(world, ctx.clock)
     }
 
     /**
@@ -164,8 +161,8 @@ public class ModelRenderSystem(
     }
 
     private fun World.draw(entity: Entity, now: Tick, alpha: Float) {
-        if (!place(entity, alpha)) return
-        val at = placed
+        if (!placer.place(this, entity, alpha)) return
+        val at = placer.placed
         stage.add(
             entity[ModelRenderer].model,
             at.x, at.y, at.z, at.rotationX, at.rotationY, at.rotationZ, at.scaleX, at.scaleY, at.scaleZ,
@@ -184,8 +181,8 @@ public class ModelRenderSystem(
         with(bound.world) {
             bound.models.forEach { entity ->
                 val id = netIds.netIdOf(entity)
-                if (!id.isNone && place(entity, lastAlpha)) {
-                    val at = placed
+                if (!id.isNone && placer.place(bound.world, entity, lastAlpha)) {
+                    val at = placer.placed
                     bounds.report(
                         id, entity[ModelRenderer].model,
                         at.x, at.y, at.z, at.rotationX, at.rotationY, at.rotationZ, at.scaleX, at.scaleY, at.scaleZ,
@@ -194,54 +191,6 @@ public class ModelRenderSystem(
                 }
             }
         }
-    }
-
-    /**
-     * Writes where [entity] stands into [placed]: its `Transform3D`, or its [lift]ed 2D pose on the
-     * ground plane at scale 1. False when it has neither, and is not drawn.
-     */
-    private fun World.place(entity: Entity, alpha: Float): Boolean {
-        val transform = entity.getOrNull(Transform3D)
-        if (transform != null) {
-            placed.set(
-                transform.x, transform.y, transform.z,
-                transform.rotationX, transform.rotationY, transform.rotationZ,
-                transform.scaleX, transform.scaleY, transform.scaleZ,
-            )
-            return true
-        }
-        val lift = lift ?: return false
-        if (!lift.poseOf(this, entity, alpha, pose)) return false
-        placed.set(pose.x, pose.y, 0f, 0f, 0f, pose.angle, 1f, 1f, 1f)
-        return true
-    }
-
-    /** Where one model stands: a `Transform3D`'s nine numbers. Reused, like [Pose]. */
-    private class Placement {
-        var x = 0f
-        var y = 0f
-        var z = 0f
-        var rotationX = 0f
-        var rotationY = 0f
-        var rotationZ = 0f
-        var scaleX = 1f
-        var scaleY = 1f
-        var scaleZ = 1f
-
-        @Suppress("LongParameterList") // A transform, field for field.
-        fun set(x: Float, y: Float, z: Float, rotationX: Float, rotationY: Float, rotationZ: Float, scaleX: Float, scaleY: Float, scaleZ: Float) {
-            this.x = x
-            this.y = y
-            this.z = z
-            this.rotationX = rotationX
-            this.rotationY = rotationY
-            this.rotationZ = rotationZ
-            this.scaleX = scaleX
-            this.scaleY = scaleY
-            this.scaleZ = scaleZ
-        }
-
-        override fun toString(): String = "Placement($x, $y, $z)"
     }
 
     /** Everything resolved at bind time. */

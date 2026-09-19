@@ -91,15 +91,50 @@ class LoopInAssetTest {
         assertEquals(listOf(5), loops(scan).map { assertNotNull(it.span).startLine })
     }
 
+    @Test
+    fun `a repeat qualified with its package is still a repeat`(@TempDir root: Path) {
+        val scan = scan(
+            root,
+            """
+            gameConfig()
+            kotlin.repeat(2) { }
+            """.trimIndent(),
+        )
+
+        val diagnostic = loops(scan).single()
+        val span = assertNotNull(diagnostic.span)
+        assertEquals(2, span.startLine)
+        assertEquals(1, span.startColumn)
+        assertTrue("repeat" in diagnostic.message, diagnostic.message)
+    }
+
+    @Test
+    fun `an import of repeat is refused, and so is every call through its alias`(@TempDir root: Path) {
+        val scan = scan(
+            root,
+            """
+            import kotlin.repeat as times
+
+            gameConfig()
+            times(2) { }
+            """.trimIndent(),
+        )
+
+        assertEquals(listOf(1 to 1, 4 to 1), loops(scan).map { assertNotNull(it.span).let { s -> s.startLine to s.startColumn } })
+        assertTrue(loops(scan).all { "repeat" in it.message }, loops(scan).toString())
+    }
+
     /** The control: the words appear, the loops do not. A ban that fired on prose would fail here. */
     @Test
     fun `words that only look like loops are left alone`(@TempDir root: Path) {
         val scan = scan(
             root,
             """
+            import kotlin.math.max
             // repeat(2) { } in a comment is not a loop, and neither is for (x in y) or while (true)
             val label = "repeat(3) { for (i in 0..1) { } }"
             val dashes = "-".repeat(3)
+            val wider = max(1, 2)
             listOf("idle", "walk").forEach { pose ->
                 spriteSheet(name = "orc_${'$'}pose", spritePath = "/orc/${'$'}pose.png")
             }

@@ -407,10 +407,12 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
          * declaration's lambda, a helper function or a `val` initializer is still a loop. Over PSI
          * and not over text, so a loop keyword in a comment or a string literal is not a loop.
          *
-         * `repeat` is matched as an unqualified call. `"-".repeat(3)` is `String.repeat` on a
-         * receiver, which builds a string rather than running a body, so it is left alone. A
-         * script's own function named `repeat` would be refused too - the honest cost of a pass
-         * that resolves nothing, the same one `DeterminismValidator` states.
+         * `repeat` is matched by the names a script can reach it by: unqualified, as
+         * `kotlin.repeat(...)`, and through an `import kotlin.repeat` - the import itself is
+         * refused, and a call through its alias is a loop at the call. Any other receiver is left
+         * alone: `"-".repeat(3)` is `String.repeat`, which builds a string rather than running a
+         * body. A script's own function named `repeat` would be refused too - the honest cost of
+         * a pass that resolves nothing, the same one `DeterminismValidator` states.
          */
         private fun collectLoops(ktFile: KtFile) {
             val loops = ArrayList<Pair<PsiElement, String>>()
@@ -423,11 +425,20 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
                 }
                 loops += loop to keyword
             }
+            val repeatImports = ktFile.importDirectives.filter { it.importedFqName?.asString() == REPEAT_FQ_NAME }
+            for (directive in repeatImports) loops += directive to REPEAT_CALLEE
+            val repeatNames = setOf(REPEAT_CALLEE) + repeatImports.mapNotNull { it.aliasName }
             for (call in PsiTreeUtil.collectElementsOfType(ktFile, KtCallExpression::class.java)) {
-                if (call.calleeExpression?.text != REPEAT_CALLEE) continue
+                val callee = call.calleeExpression?.text ?: continue
+                if (callee !in repeatNames) continue
                 val qualified = call.parent as? KtQualifiedExpression
-                if (qualified != null && qualified.selectorExpression === call) continue
-                loops += call to REPEAT_CALLEE
+                if (qualified == null || qualified.selectorExpression !== call) {
+                    loops += call to REPEAT_CALLEE
+                } else if (qualified is KtDotQualifiedExpression && callee == REPEAT_CALLEE &&
+                    qualified.receiverExpression.text == REPEAT_PACKAGE
+                ) {
+                    loops += qualified to REPEAT_CALLEE
+                }
             }
             for ((element, keyword) in loops.sortedBy { it.first.textRange.startOffset }) {
                 diagnostics += UdeaRules.LOOP_IN_ASSET.diagnostic(
@@ -514,6 +525,11 @@ public class UdeaDeclarationScanner @JvmOverloads constructor(
 
         /** The standard library's counted loop, refused by `collectLoops`. */
         private const val REPEAT_CALLEE: String = "repeat"
+
+        /** The package `repeat` lives in, for `kotlin.repeat(...)` and `import kotlin.repeat`. */
+        private const val REPEAT_PACKAGE: String = "kotlin"
+
+        private const val REPEAT_FQ_NAME: String = "$REPEAT_PACKAGE.$REPEAT_CALLEE"
 
         /**
          * IntelliJ PSI documents are LF-only, and a carriage return reaching the parser is

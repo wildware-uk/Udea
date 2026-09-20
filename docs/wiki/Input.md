@@ -54,15 +54,15 @@ which is the one property this model exists to guarantee.
 A game binds **names**, and no key code appears in game code (issue #228).
 
 `InputCatalog` turns names into ids. `ActionId` and `AxisId` are array indices, assigned by sorted
-name across the whole game — so **namespace your names**: `moba/move`, not `move`. Two modules that
-both called an axis `move` would collide, and a collision means one silently addressing the other's
-axis.
+name across the whole game — so **namespace your names**: `"moba/move"`, not `"move"`. Two modules
+that both called an axis `move` would collide, and a collision means one silently addressing the
+other's axis.
 
 Two kinds of control:
 
-- An **action** is a button: `moba/attack`. `ActionBinding` lists the `InputKey`s, gamepad `buttons`
+- An **action** is a button: `"moba/attack"`. `ActionBinding` lists the `InputKey`s, gamepad `buttons`
   and `pointerButtons` that fire it.
-- An **axis** is a direction: `moba/move`. `Axis2DBinding` names four keys (`negativeX`, `positiveX`,
+- An **axis** is a direction: `"moba/move"`. `Axis2DBinding` names four keys (`negativeX`, `positiveX`,
   `negativeY`, `positiveY`), an optional gamepad stick (`gamepadAxisX`, `gamepadAxisY`,
   `invertGamepadY`) and a `deadzone`.
 

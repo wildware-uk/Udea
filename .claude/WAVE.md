@@ -1001,3 +1001,64 @@ replicated component, so neither regenerates a lock file. `dev-262` owns `model/
 **Parallel work exists outside this session.** Another agent filed #272 and opened PR #273 for the
 same 403, forty minutes before ours merged. Check `gh pr list` before starting anything - we both
 wrote the same fix.
+
+---
+
+## Wave 24 — 2026-09-20 late: shaders become an asset
+
+**`master` is `a1b3527`** (merge of the screen-shader branch, #266 + #259). Post-merge build
+`EXIT=0`, read off `pm266.marker`. That SHA is what this wave is cut from.
+
+**Merged and closed earlier today:** #257 (`713ebea`), the plugin namespace rename (`d1bf245`),
+the build-logic gate (`8cf72f0`), #262 (`a549816`), shader S1 (`a1b3527`). Issues closed: #257,
+#262, #272, #259, #266.
+
+**Published:** `dev.wildware.udea:*:0.1.0-SNAPSHOT` resolves from Central's snapshot repository —
+engine modules, convention plugins and `udea-version-catalog`. Verified by fetching coordinates,
+not by the workflow's tick. `udea.android-application.gradle.plugin` is **404 by design**: its
+marker group is outside the verified `dev.wildware` namespace and is deliberately suppressed.
+
+**In flight: `dev-shaderassets`**, branch `shader-assets`, **on a build hold**. It may not start a
+JVM until this file exists:
+
+    /tmp/claude-1000/-srv-ssd1-workspace-Udea/1ad8c5e6-2def-4055-91d2-72acdfe77daf/scratchpad/BOX_FREE
+
+The box is `melon-merge-31`'s while `dev-chaindecay` runs unit tests, an icon pack, a solo
+scenario and `-Pscenario=all`. They release **in words**; the file is what I write when they do.
+
+**What it is.** The owner read `docs/new-game.md:306` —
+`val source = checkNotNull(javaClass.getResource("/shaders/scanlines.frag")).readText()` — and
+called it disgusting. They are right, and it is worse than ugly: `javaClass` is a JVM property, so
+**that line cannot compile in `commonMain` at all**. The engine's own documented example breaks the
+engine's own multiplatform rule. A `.frag` becomes an asset like a model, declared in a `.udea.kts`
+and given a typed accessor, so a game writes `GameAssets.shaders.scanlines` and never a path. The
+string-and-path overload stays for runtime-generated GLSL and stops being what the docs show.
+
+No issue was created for it — the owner's rule. The decision record is a comment on #269:
+`gh issue view 269 --comments`, the one naming the alternative and what to change to overturn it.
+
+**Remaining shader tickets:** S2 (`UdeaMaterial` as data), S3 (a shader on an object), S4 (the
+editor's material inspector), S5 (`UdeaCompute`). Spec:
+`docs/superpowers/specs/2026-09-20-shader-api-design.md`.
+
+**The defect of the day, and it is a whole class.** Ten instances in one afternoon, every one *a
+check that reports success while measuring nothing*: a vacuous test comparing two constants, a
+truncated report that read as passing, a one-sided threshold, stale images, an empty secret, a
+stale JUnit XML, a stale marker, a false positive that named a real plugin, `pgrep` finding its own
+command line, and zsh refusing to glob `--include=*.kt` and answering with the words you hoped for.
+Three rules came out of it and they belong in every dispatch and every review prompt:
+
+1. **A threshold needs a demonstrated failing case on both sides.**
+2. **A mutation is faithful because its magnitude arrives**, not because something went red.
+3. **Before believing a zero, make the search return a non-zero on something you know is there.**
+   Any "X appears nowhere" finding needs a positive control printed beside it.
+
+I walked into the zsh one **twice**, ten minutes apart, having just written it up. Knowing about a
+trap does not change what you type; having the control ready does.
+
+**Still open and unassigned:** the two Windows reds (`VerifyEditorAbsentTest.kt:62`,
+`UdeaAgentPluginTest > a release build generates a flag that refuses to bind()`); CI's
+`cancel-in-progress: true` on `master`; #272 option 3 (publish `udea-version-catalog` from the root
+build). PR #273 is another session's to close or rebase.
+
+**Backlog:** robot-game #258, #261, #263, #267, #268, #269, #270, #271, #274. Hollow #251-#255.

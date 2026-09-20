@@ -329,10 +329,16 @@ The pieces a newcomer meets first, each with the issue that made it so.
   against **one pinned snapshot** - `udeaVersion` in its own `gradle.properties`, changed when
   the owner says so rather than when the engine moves - resolved from `mavenLocal()` first and
   then from Central's snapshots.
-  **Published so far:** the engine's modules, at `0.1.0-SNAPSHOT`, on Central's snapshot
-  repository - signed, and resolvable today. The convention plugins are **not** there: the first
-  snapshot run reached them and was refused 403, for the reason under "Naming a convention
-  plugin" below. No *release* has been made, only that snapshot.
+  **Published so far:** the engine's modules, the convention plugins and `udea-version-catalog`,
+  all at `0.1.0-SNAPSHOT`, on Central's snapshot repository - signed, and resolvable today. The
+  plugins were refused 403 on the *first* snapshot run, for the reason under "Naming a convention
+  plugin" below; the rename to `dev.wildware.udea.*` fixed it and the run after it went green.
+  Verified 2026-09-20 by fetching each coordinate: `dev.wildware.udea.game-gates`,
+  `.kotlin-library`, `.kotlin-multiplatform`, `.kotlin-multiplatform-render` and `.assets` all
+  answer 200, and `udea.android-application.gradle.plugin` answers **404 by design** - its marker
+  group is its own plugin id, which is outside the verified namespace, so it is deliberately
+  suppressed. A made-up coordinate answers 404 too, which is what makes those 200s mean anything.
+  No *release* has been made, only that snapshot.
   Building a game against an engine change you have not pushed is still
   `./gradlew publishToMavenLocal` and `./gradlew -p build-logic publishToMavenLocal`, which
   `mavenLocal()` resolves ahead of the network.

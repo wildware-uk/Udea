@@ -293,8 +293,12 @@ The pieces a newcomer meets first, each with the issue that made it so.
   tick; the renderer places the same part from the *live* Kool node instead, so a socket on an
   animated bone or a turning ring carries what is mounted on it. A node name that is not in the
   model fails the build with `UDEA0018` and a did-you-mean.
-- **Replays are `.udearep` format 2**, which adds the recorded editor edits (#232). A recording
-  with no edits is still written as format 1, and this build reads both.
+- **Replays are `.udearep` format 3**, which adds the pointer a player was aiming with (#262) to
+  format 2's recorded editor edits (#232). A recording is written as the **lowest** version that can
+  express it - no edits and no pointer is still format 1, byte for byte what every earlier build
+  wrote - and this build reads all three. What a sample carries is the **world** point presentation
+  computed, never a pixel: a screen coordinate in a recording would replay differently on another
+  window size.
 - **Web is shelved** (#223, #226, owner decision of 2026-09-18). Kool 0.19.0 publishes no wasmJs
   artifact, so `udea-render` and `moba:game` have no wasmJs target; the headless modules still
   build and test on wasmJs.

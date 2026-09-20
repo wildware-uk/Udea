@@ -45,7 +45,7 @@ package dev.wildware.udea.replay
  * tickCount * peerCount samples, tick-major, peers ascending. See InputSample.
  * --- hashes ----------------------------------------------------------------------
  * tickCount * i64  WorldHasher.hash(snapshot) at the END of each recorded tick
- * --- edits (format 2 only) --------------------------------------------------------
+ * --- edits (format 2 and later) ---------------------------------------------------
  * editCount      i32   calls made between ticks, in the order they were applied
  * each edit      tick i64, author string, tool string, argCount u16, then argCount
  *                pairs of name string and value text, names ascending. See ReplayEdit.
@@ -57,14 +57,25 @@ package dev.wildware.udea.replay
  * and at most [MAX_EDIT_TEXT_BYTES], for an argument value that can be long - an `update_edit`
  * writing every entity in a big selection.
  *
- * ## Two versions, and which one a file is
+ * ## Three versions, and which one a file is
  *
- * Format 2 is format 1 with the edits section (issue #232). A recording with **no** edits is
- * written as format 1, byte for byte what every earlier build wrote: a match recording is not
- * changed by this, and a build from before format 2 still reads it. A recording with edits is
- * written as format 2, which such a build refuses by its version number rather than misreading -
- * correctly, because replaying it without its edits would diverge on the first edited tick.
- * This build reads both.
+ * Format 2 is format 1 with the edits section (issue #232). Format 3 is format 2 with a pointer in
+ * a sample (issue #262) - **inside** the frame section, behind `InputSample`'s presence mask, so the
+ * layout above is unchanged and only what a sample may contain has grown.
+ *
+ * A recording is written as **the lowest version that can express it**, which is what keeps older
+ * builds able to read ordinary files:
+ *
+ * - no edits and no pointer: format 1, byte for byte what every earlier build wrote;
+ * - edits but no pointer: format 2, which a build from before #232 refuses by its version number
+ *   rather than misreading - correctly, because replaying it without its edits would diverge on the
+ *   first edited tick;
+ * - a pointer on any tick: format 3, refused the same way by a build from before #262, and for the
+ *   same reason - an RTS replayed without its pointer is a match in which nobody gave an order.
+ *
+ * This build reads all three. Note what that rule is *not*: it is not "the newest version this build
+ * knows", which would have made every recording ever made unreadable by yesterday's build for the
+ * sake of a section it does not contain.
  *
  * Little-endian throughout, because a format that mixed the two would be read wrong exactly
  * once, in the field.
@@ -84,12 +95,20 @@ public object ReplayFormat {
      * mismatch report a garbage value - "seed 7318349312 does not match 0" is a worse message
      * than "this file is format 2 and this build reads 1".
      */
-    public const val FORMAT_VERSION: Int = 2
+    public const val FORMAT_VERSION: Int = 3
 
     /**
-     * The version a recording with no edits is written as, and the oldest this build reads.
+     * The version a recording with edits but no pointer is written as.
      *
-     * See "Two versions" in the class KDoc: format 2 without its edits section is format 1.
+     * See "Three versions" in the class KDoc.
+     */
+    public const val EDITS_FORMAT_VERSION: Int = 2
+
+    /**
+     * The version a recording with no edits and no pointer is written as, and the oldest this build
+     * reads.
+     *
+     * See "Three versions" in the class KDoc: a later format without its later sections is this one.
      */
     public const val EDITLESS_FORMAT_VERSION: Int = 1
 

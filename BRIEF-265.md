@@ -1,13 +1,60 @@
 # BRIEF-265 — a game that builds and runs outside the Udea repository
 
-SHA: `b8b0ac9`
+SHA: PENDING-R2
 
 Branch `issue-265-outside-game`, off `origin/master` at `a45636c`.
 
-`b8b0ac9` is the tree everything below was measured on: `06843c6` is the work, `b8b0ac9` adds this
-brief, and the only commit after it fills in this SHA line and the paragraph you are reading —
-`git diff b8b0ac9 HEAD` shows nothing else. `git rev-parse --short HEAD` on the branch gives that
-last commit.
+History: `06843c6` the work, `b8b0ac9` this brief, `0b1d0df` its SHA line — that is the tree
+review-265-r1 was handed. §0 is the round-2 change on top of it, and the SHA above is the tree
+everything in this brief was last measured on.
+
+---
+
+## 0. Round 2 — a game builds against a pinned snapshot
+
+Owner follow-up: *"Use the same setup as composegl, we build against a snapshot release and only
+update the version when I say."* The publishing half already matched — `release.yml` has
+ComposeGL's `kind` choice with `snapshot`. What was missing was the consumer half: the template
+resolved the engine from `mavenLocal()` alone, which only works on a machine that has published
+it.
+
+Four edits, no production code touched:
+
+- **`templates/new-game/settings.gradle.kts`** declares Central's snapshot repository and the two
+  `oss.sonatype.org` fallbacks, in both `pluginManagement` and `dependencyResolutionManagement`,
+  copied from this repository's own root `build.gradle.kts`. `mavenLocal()` stays first in both,
+  so an engine published locally still wins — which is what the proof script relies on.
+- **`templates/new-game/gradle.properties`** keeps `udeaVersion=0.1.0-SNAPSHOT` and now says why
+  it is pinned: the number changes when the owner says a new snapshot is the one to build
+  against, not when the engine moves.
+- **`docs/new-game.md`** gains "Where the engine comes from, and which one" (the repository order,
+  as a table) and "Getting a newer engine" (the owner runs Release with `kind = snapshot`; the
+  game bumps `udeaVersion` in a commit of its own), plus the 24-hour snapshot cache and
+  `--refresh-dependencies` as the escape.
+- **`templates/new-game/README.md`** and the `AGENTS.md` bullet say the same in one line each.
+
+Nothing was published. The proof script still publishes to `mavenLocal()` only.
+
+Re-run on this tree:
+
+```
+$ sh scripts/outside-game-proof.sh
+=== PROOF GREEN
+a game outside this repository resolved the engine from a repository, built, ran, and
+inherited gates that fail when broken.
+
+$ sh gradlew build --continue --console=plain
+BUILD SUCCESSFUL in 13s
+994 actionable tasks: 19 executed, 975 up-to-date
+```
+
+19 tasks executed because this round changes a template, two documents and a properties file —
+the from-clean figures in §3 are the ones that measure the engine.
+
+**What this round does not prove:** that Central's snapshot repository actually serves
+`dev.wildware.udea:udea-core:0.1.0-SNAPSHOT`, because nothing has been published to it. The
+repository is declared and ordered correctly; the first `kind = snapshot` release is what will
+exercise it. The proof resolves from `mavenLocal()`, which is first in the list by design.
 
 ---
 

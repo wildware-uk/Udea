@@ -2,8 +2,11 @@
 
 A game built with Udea is a repository of its own, and it reaches the engine the way it reaches
 any other library: `dev.wildware.udea:udea-core` and friends, resolved from a Maven repository,
-at a version it picks. Nothing in your build names a path to a Udea checkout, and you do not need
-one.
+at **one pinned version** it names in `gradle.properties`. Nothing in your build names a path to a
+Udea checkout, and you do not need one.
+
+Until Udea's first release that version is a snapshot, and it is pinned anyway - see "Where the
+engine comes from, and which one" below, which is the section to read before the first build.
 
 `templates/new-game/` in this repository is a working game of that shape - copy it, rename it, and
 it builds. `scripts/outside-game-proof.sh` does exactly that on every run, from a directory
@@ -20,15 +23,36 @@ gradle wrapper --gradle-version 8.13      # a wrapper of your own, once
 The engine needs **JDK 21** to run Gradle (`JAVA_HOME`), and the Kotlin toolchain it asks for is
 provisioned by the foojay resolver the template's settings script applies.
 
-### Where the engine comes from today
+### Where the engine comes from, and which one
 
-**Udea has not been released yet.** Nothing has been published to Maven Central, and the version
-in the template - `0.1.0-SNAPSHOT` - exists only where somebody has built it. So until the first
-release, publish the engine to your own machine once:
+**You build against a pinned snapshot.** Udea has no release yet, so the engine is published as
+`X.Y.0-SNAPSHOT` to Central's snapshot repository, and the template names one version -
+`udeaVersion` in `gradle.properties`:
+
+```properties
+udeaVersion=0.1.0-SNAPSHOT
+```
+
+**That number changes when the owner says so, and not before.** A snapshot coordinate is mutable,
+which makes it tempting to think a game automatically gets the newest engine. It does not, and it
+should not: the engine's tip moves several times a day, and a game that followed it would break
+on somebody else's half-finished refactor. Pinning it means the only thing that changes what your
+game compiles against is you editing that line.
+
+The repositories the template declares, in the order it declares them:
+
+| Repository | What it is for |
+|---|---|
+| `mavenLocal()` | an engine you published yourself, which wins over everything below |
+| `mavenCentral()` | releases, once there are any, and every third-party dependency |
+| `central.sonatype.com/repository/maven-snapshots/` | Udea's snapshots, and ComposeGL's |
+| the two `oss.sonatype.org` hosts | Sonatype's older snapshot hosts, not yet retired |
+
+`mavenLocal()` first is deliberate: it is how you try an engine change without publishing it.
 
 ```sh
 cd <udea>
-./gradlew publishToMavenLocal              # the engine's modules
+./gradlew publishToMavenLocal                  # the engine's modules
 ./gradlew -p build-logic publishToMavenLocal   # the convention plugins and the version catalog
 ```
 
@@ -37,10 +61,30 @@ reach it. It is the half that carries `udea.game-gates`, `udea.kotlin-library` a
 `dev.wildware.udea.agent`, so without it a game can resolve every engine module and still not
 apply a single plugin.
 
-`mavenLocal()` is first in every repository list in the template for that reason, and it is the
-line to delete the day a release exists. `.github/workflows/release.yml` is how that release will
-be made: it uploads a deployment and stops, and a person presses publish in
-`central-publish.yml`.
+### Getting a newer engine
+
+Two steps, both deliberate, and neither happens on its own:
+
+1. **The owner publishes a snapshot.** In the Udea repository: Actions, "Release", "Run
+   workflow", `kind = snapshot`. That builds the engine, signs it, and pushes
+   `X.Y.0-SNAPSHOT` to Central's snapshot repository. No tag, nothing permanent - a snapshot can
+   be overwritten. (`patch`, `minor` and `major` make a real release instead: those *upload and
+   stop*, and a person presses publish in the separate `central-publish` workflow, because a
+   version on Central can never be deleted or replaced.)
+2. **The game bumps `udeaVersion`.** One line in `gradle.properties`, in a commit of its own, so
+   "we moved to a new engine" is a thing that appears in the game's history.
+
+**Gradle keeps a snapshot it has already resolved for 24 hours**, so step 2 is not always enough
+when the version number has not changed - you ask for `0.1.0-SNAPSHOT`, and you get the copy in
+the cache rather than the one published an hour ago. This surprises everybody once. The escape is
+one flag:
+
+```sh
+./gradlew build --refresh-dependencies
+```
+
+The engine's own build meets exactly this with ComposeGL, and `gradle/libs.versions.toml` says so
+where the ComposeGL version is declared.
 
 ---
 
@@ -95,11 +139,11 @@ repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
 The conventions declare `mavenCentral()` on each project they are applied to, and Gradle's default
 (`PREFER_PROJECT`) then uses *that* and ignores the settings block - so `mavenLocal()` and the
 snapshot repository declared in settings are never searched, and the failure names a missing
-artifact rather than a repository mode. The template declares a superset, and needs it twice over:
-`mavenLocal()` is where the unreleased engine is, and ComposeGL, which `udea-render` draws with,
-publishes only snapshots. Any game that reaches `udea-render` - including one that only uses the
-agent surface, since `udea-agent-host` depends on it - needs that snapshot repository or
-resolution fails.
+artifact rather than a repository mode. The template declares a superset, and needs every line of
+it: `mavenLocal()` and the snapshot hosts are where an unreleased engine is, and ComposeGL, which
+`udea-render` draws with, publishes only snapshots too. Any game that reaches `udea-render` -
+including one that only uses the agent surface, since `udea-agent-host` depends on it - needs
+those snapshot repositories or resolution fails.
 
 ### `build.gradle.kts` - what this build is
 

@@ -12,11 +12,16 @@ gradle wrapper --gradle-version 8.13
 ./gradlew run
 ```
 
-`udeaVersion` in `gradle.properties` says which engine release to build against, and everything
-else reads it - the plugin ids, the module coordinates, the compiler plugin. Upgrading is that one
-line.
+`udeaVersion` in `gradle.properties` says which engine to build against, and everything else reads
+it - the plugin ids, the module coordinates, the compiler plugin.
 
-**Udea has not been released yet**, so until it is, publish it to your own machine once:
+Udea has no release yet, so that is a pinned snapshot, resolved from `mavenLocal()` first and then
+from Central's snapshot repository. **It changes when the owner says a new snapshot is the one to
+build against** - a game does not follow the engine's tip. "Getting a newer engine" in the
+engine's `docs/new-game.md` has both steps, and the `--refresh-dependencies` flag you will need
+the first time Gradle's 24-hour snapshot cache surprises you.
+
+To build against an engine change you have not published, publish it to your own machine:
 
 ```sh
 cd <udea>
@@ -25,7 +30,8 @@ cd <udea>
 ```
 
 Two commands, because the second is a separate build: it is the one that carries the convention
-plugins and the version catalog this game applies.
+plugins and the version catalog this game applies. `mavenLocal()` is first in every repository
+list, so what you publish there wins.
 
 What you get, and what each piece is for, is in **`docs/new-game.md`** in the Udea repository.
 The short version:

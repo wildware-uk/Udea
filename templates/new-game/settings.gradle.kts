@@ -6,21 +6,31 @@
  * this build resolves them the way it resolves any other library. That is what makes a game a
  * repository of its own rather than a folder that has to sit next to the engine's.
  *
- * `udeaVersion` in `gradle.properties` says which release to build against. Override it per
- * machine in `~/.gradle/gradle.properties`, or for one invocation with `-PudeaVersion=...`.
+ * `udeaVersion` in `gradle.properties` says which engine to build against, and it is the only
+ * place any version of it appears. Until Udea's first release, that is a snapshot, and the
+ * repository lists below are ordered so it can come from either place: `mavenLocal()` first, so
+ * an engine you published yourself wins, then Central's snapshot repository, which is where the
+ * engine's own Release workflow puts one.
  *
- * Until Udea's first release is on Maven Central, the version is a snapshot and `mavenLocal()` is
- * where it comes from: run `./gradlew publishToMavenLocal` and `./gradlew -p build-logic
- * publishToMavenLocal` in the engine's checkout, and this build finds it. `mavenLocal()` is first
- * in every list below for exactly that reason, and can be deleted the day a release exists.
+ * **A game does not follow the engine's tip.** The snapshot version is pinned in
+ * `gradle.properties` and changes when the owner says so, not when the engine moves. See
+ * `docs/new-game.md` in the Udea repository, under "Getting a newer engine".
  */
 
 pluginManagement {
     val udeaVersion: String = providers.gradleProperty("udeaVersion").get()
 
     repositories {
+        // First, so an engine published with `publishToMavenLocal` wins over whatever snapshot
+        // is on the network. That is how you try an engine change without publishing it.
         mavenLocal()
         mavenCentral()
+        // Udea's snapshots. Sonatype moved its snapshot hosting to the first of these; the two
+        // `oss.sonatype.org` hosts below are the fallbacks it has not retired. The engine's own
+        // build declares the same list for the same reason, for ComposeGL.
+        maven("https://central.sonatype.com/repository/maven-snapshots/")
+        maven("https://oss.sonatype.org/content/repositories/snapshots/")
+        maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
         gradlePluginPortal()
         // The Android Gradle Plugin, which the multiplatform conventions put on the build
         // classpath, is published only here. A JVM-only game never resolves it, and the
@@ -53,17 +63,25 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
 
     repositories {
+        // Same order and the same list as `pluginManagement` above: a locally published engine
+        // first, then the release repository, then the snapshot hosts.
         mavenLocal()
         mavenCentral()
         google()
 
-        // ComposeGL, which `udea-render` draws its interface with, publishes snapshots and no
-        // release yet, and Sonatype moved snapshot hosting here.
+        // Udea's own snapshots, and ComposeGL's.
         //
-        // It is needed by any game that reaches `udea-render` - which includes a game that only
-        // uses the agent surface, since `udea-agent-host` depends on it. A game that drops both
-        // can drop this line, and will find out by resolution failing rather than silently.
+        // Udea publishes snapshots until its first release, so this is where `udeaVersion`
+        // resolves from on a machine that has not published the engine itself. ComposeGL, which
+        // `udea-render` draws its interface with, publishes only snapshots too - and it is needed
+        // by any game that reaches `udea-render`, which includes a game that only uses the agent
+        // surface, since `udea-agent-host` depends on it.
+        //
+        // Sonatype moved its snapshot hosting to the first of these; the two `oss.sonatype.org`
+        // hosts are the fallbacks it has not retired.
         maven("https://central.sonatype.com/repository/maven-snapshots/")
+        maven("https://oss.sonatype.org/content/repositories/snapshots/")
+        maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
     }
 
     versionCatalogs {

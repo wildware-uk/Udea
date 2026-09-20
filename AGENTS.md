@@ -261,9 +261,12 @@ The pieces a newcomer meets first, each with the issue that made it so.
   naming a path to this checkout. That plugin is how it gets the same module-graph,
   determinism, editor-absent and release checks `moba` gets; `moba` declares itself to those
   gates through the same `udeaGates { }` block, in the root build script, so there is one code
-  path. Publishing is `-PudeaVersion` plus `.github/workflows/release.yml`, which uploads a
-  deployment and stops - a person presses publish in `central-publish.yml`. **Nothing has been
-  published yet**, so an outside game resolves the engine from `mavenLocal()` after
+  path. Publishing is `-PudeaVersion` plus `.github/workflows/release.yml`: `kind = snapshot`
+  pushes `X.Y.0-SNAPSHOT` to Central's snapshot repository, and a real release uploads a
+  deployment and stops, for a person to press publish in `central-publish.yml`. A game builds
+  against **one pinned snapshot** - `udeaVersion` in its own `gradle.properties`, changed when
+  the owner says so rather than when the engine moves - resolved from `mavenLocal()` first and
+  then from Central's snapshots. **Nothing has been published yet**, so today that means
   `./gradlew publishToMavenLocal` and `./gradlew -p build-logic publishToMavenLocal`.
   `templates/new-game/` is a working game of that shape, `docs/new-game.md` is the guide, and
   `scripts/outside-game-proof.sh` publishes, builds it from outside the tree, runs it, and

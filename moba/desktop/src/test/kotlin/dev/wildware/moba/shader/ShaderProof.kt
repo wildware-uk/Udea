@@ -10,6 +10,7 @@ import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.backend.KoolBackend
 import dev.wildware.udea.render.backend.WindowConfig
 import dev.wildware.udea.render.capture.CaptureRequest
+import dev.wildware.udea.render.capture.FrameCaptureSlot
 import dev.wildware.udea.render.capture.capture
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteTexture
@@ -126,6 +127,12 @@ object ShaderProof {
             host.loop.paused = true
 
             // --- the control ---------------------------------------------------------------
+            //
+            // Settled first, which is a different thing: the opening frames of a graphics context
+            // are not the scene, and the very first capture of one comes back a long way from the
+            // next. `settle` gets past that; the control below is the assertion that what is left
+            // is steady, and every figure after it is measured against that zero.
+            settle(slot)
             val plain = decode(slot.capture(CaptureRequest()).bytes)
             val plainAgain = decode(slot.capture(CaptureRequest()).bytes)
             write(plain, out, "issue266-1-unprocessed.png")
@@ -144,6 +151,7 @@ object ShaderProof {
 
             // --- the palette ----------------------------------------------------------------
             paletteEffect.enabled = true
+            settle(slot)
             val paletted = decode(slot.capture(CaptureRequest()).bytes)
             write(paletted, out, "issue266-2-palette.png")
             val paletteOff = offPalette(paletted, palette)
@@ -161,6 +169,7 @@ object ShaderProof {
             // --- the outline ----------------------------------------------------------------
             paletteEffect.enabled = false
             outlineEffect.enabled = true
+            settle(slot)
             val outlined = decode(slot.capture(CaptureRequest()).bytes)
             write(outlined, out, "issue266-3-outline.png")
             val onBoxes = darkened(plain, outlined, BOXES_LEFT, BOXES_RIGHT, BOXES_TOP, BOXES_BOTTOM)
@@ -177,6 +186,7 @@ object ShaderProof {
 
             // --- both, in the order the game registered them ---------------------------------
             paletteEffect.enabled = true
+            settle(slot)
             val both = decode(slot.capture(CaptureRequest()).bytes)
             write(both, out, "issue266-4-palette-and-outline.png")
             say(
@@ -190,6 +200,7 @@ object ShaderProof {
             // --- off again --------------------------------------------------------------------
             paletteEffect.enabled = false
             outlineEffect.enabled = false
+            settle(slot)
             val restored = decode(slot.capture(CaptureRequest()).bytes)
             write(restored, out, "issue266-5-effects-off-again.png")
             val back = difference(plain, restored)
@@ -245,6 +256,31 @@ object ShaderProof {
         ),
         name,
     )
+
+    /**
+     * Captures until two in a row are identical, so what follows is measuring the scene.
+     *
+     * Not the control: this only gets past the frames a context draws before it has the world in
+     * it. The control is the pair captured *after* this returns.
+     */
+    /**
+     * Captures until two in a row are identical.
+     *
+     * Once at the start, to get past the frames a fresh graphics context draws before it has the
+     * world in it, and again after every change to an effect's `enabled`, because that flag is
+     * read on the render thread and a frame already in flight finishes with the old value. It
+     * hides nothing: an effect that draws nothing settles to the unprocessed frame, and every
+     * figure below it is a claim that the frame *changed*.
+     */
+    private fun settle(slot: FrameCaptureSlot) {
+        var previous = decode(slot.capture(CaptureRequest()).bytes)
+        repeat(SETTLE_TRIES) {
+            val next = decode(slot.capture(CaptureRequest()).bytes)
+            if (difference(previous, next) == 0f) return
+            previous = next
+        }
+        error("the scene never settled over $SETTLE_TRIES captures; it is not a still picture")
+    }
 
     private fun decode(png: ByteArray): BufferedImage = ImageIO.read(ByteArrayInputStream(png))
         ?: error("the captured bytes are not a decodable image")
@@ -313,6 +349,9 @@ object ShaderProof {
     private const val HEIGHT = 360
 
     private const val CHANNELS = 3
+
+    /** Captures allowed for the picture to stop changing. A still scene needs very few. */
+    private const val SETTLE_TRIES = 12
     private const val ROUNDING = 1
 
     /** Nearly every pixel of a lit scene is off a four-colour palette. */

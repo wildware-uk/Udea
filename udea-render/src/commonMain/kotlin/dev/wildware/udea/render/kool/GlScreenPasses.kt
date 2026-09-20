@@ -89,13 +89,17 @@ internal class GlScreenPasses(
     private var readIndex = 0
 
     /**
-     * `uDepth` and `uMask` when nothing published them: white, which is the far plane.
+     * `uDepth` and `uMask` when nothing published them: transparent black.
      *
-     * One texture for both, because both inputs are depth and both mean the same thing by `1.0` -
-     * nothing here. A game with no 3D in it reads the far plane everywhere rather than whatever
-     * the last frame left in a buffer nobody wrote.
+     * One texture for both, because that one value reads as empty in both conventions - alpha `0`
+     * is "no marked entity here" and red `0` is the far plane in the reversed depth this backend
+     * draws with. A game with no 3D in it reads that everywhere rather than whatever the last
+     * frame left in a buffer nobody wrote.
+     *
+     * A real texture rather than leaving the unit unbound: GL says an incomplete texture samples
+     * `(0, 0, 0, 1)`, and that alpha of `1` would mask the whole frame.
      */
-    private var farPlane: GlTexture? = null
+    private var empty: GlTexture? = null
 
     /**
      * The GL names this has already taken the depth comparison off. See [prepareInput].
@@ -201,7 +205,7 @@ internal class GlScreenPasses(
             program.bindDepth(depth)
             program.bindMask(mask)
             program.bindTextures { uniform -> textureOf(gl, uniform).handle }
-            gl.drawElements(gl.TRIANGLES, TRIANGLE_INDICES, gl.UNSIGNED_INT, 0)
+            gl.drawElements(gl.TRIANGLES, TRIANGLE_INDICES, gl.UNSIGNED_INT)
             units = maxOf(units, program.unitsUsed)
             if (!last) readIndex = 1 - readIndex
         }
@@ -237,8 +241,8 @@ internal class GlScreenPasses(
         vao = null
         indices?.let { gl.deleteBuffer(it) }
         indices = null
-        farPlane?.let { gl.deleteTexture(it) }
-        farPlane = null
+        empty?.let { gl.deleteTexture(it) }
+        empty = null
         prepared.clear()
         for (texture in uploaded.values) gl.deleteTexture(texture)
         uploaded.clear()
@@ -272,7 +276,7 @@ internal class GlScreenPasses(
             indices = buffer
             vao = array
         }
-        if (farPlane == null) farPlane = solid(gl, FAR, "udea-screen-far-plane")
+        if (empty == null) empty = solid(gl, EMPTY, "udea-screen-empty-input")
         return made
     }
 
@@ -299,10 +303,10 @@ internal class GlScreenPasses(
         return loaded.glTexture
     }
 
-    /** The GL name of [texture], or the far-plane stand-in when the 3D stage has not drawn yet. */
+    /** The GL name of [texture], or the empty stand-in when the 3D stage has not drawn yet. */
     private fun resolve(texture: Texture2d?): Int {
         val loaded = texture?.gpuTexture as? LoadedTextureGl
-        return loaded?.glTexture?.handle ?: farPlane?.handle ?: NO_TEXTURE.handle
+        return loaded?.glTexture?.handle ?: empty?.handle ?: NO_TEXTURE.handle
     }
 
     /**
@@ -310,10 +314,10 @@ internal class GlScreenPasses(
      *
      * A depth attachment may carry `GL_TEXTURE_COMPARE_MODE`, which makes a `sampler2D` read of it
      * undefined - a shadow map is sampled through `sampler2DShadow` and answers a comparison
-     * rather than a depth. A screen shader reads `uMask` as a plain depth, so the comparison has
-     * to be off. It is a no-op on a texture that never had it, and both inputs are the engine's
-     * own: nothing else samples the mask pass's depth, and the scene's depth reaches this as a
-     * single-channel colour copy that never had a comparison to take off.
+     * rather than a depth. A screen shader reads both inputs as plain colours, so the comparison
+     * has to be off. It is a no-op on a texture that never had it, which is what both of them are
+     * today: the mask is a colour attachment and the scene's depth reaches this as a
+     * single-channel colour copy, and neither ever had a comparison to take off.
      */
     private fun prepareInput(gl: GlApi, handle: Int): Int {
         if (handle == NO_TEXTURE.handle || !prepared.add(handle)) return handle
@@ -370,8 +374,8 @@ internal class GlScreenPasses(
         /** No texture. Sampling an unbound unit reads black, which is what an absent input means. */
         val NO_TEXTURE: GlTexture = GlTexture(0)
 
-        /** The far plane, in every channel: what both depth inputs read where nothing was drawn. */
-        const val FAR: Byte = -1
+        /** Zero in every channel: what both engine inputs read where nothing published one. */
+        const val EMPTY: Byte = 0
 
         /**
          * `GL_DRAW_FRAMEBUFFER_BINDING`, `GL_READ_FRAMEBUFFER_BINDING`, `GL_CURRENT_PROGRAM`,

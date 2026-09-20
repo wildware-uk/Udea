@@ -293,6 +293,95 @@ running `Offscreen`; `moba/desktop/src/agent` is the worked example.
 
 ---
 
+## Giving your game a look of its own
+
+A **screen effect** is a small graphics program that runs over the finished frame: a palette, an
+outline, a colour grade, a scanline. You write it in GLSL, in a `.frag` file of your own, and hand
+the engine its text. Nothing about it needs a graphics type from the engine's renderer, which is
+the point - `UDEA-MG-002` refuses `de.fabmax.kool:*` on your project, so a shader API that took
+one would be an API you could not call.
+
+```kotlin
+// game/src/main/resources/shaders/scanlines.frag, read however you like
+val source = checkNotNull(javaClass.getResource("/shaders/scanlines.frag")).readText()
+
+lateinit var strength: FloatUniform
+val scanlines = UdeaShader.fragment(path = "shaders/scanlines.frag", source = source) {
+    strength = float("uStrength", 0.25f)
+}
+
+registry.screenPass(scanlines)     // ordered: the first registered runs first
+```
+
+```glsl
+// shaders/scanlines.frag - no #version line: the engine writes it, per backend
+uniform float uStrength;
+
+vec4 udeaMain(vec2 uv) {
+    vec3 colour = texture(uColor, uv).rgb;
+    float line = mod(uv.y * uResolution.y, 2.0) < 1.0 ? 1.0 - uStrength : 1.0;
+    return vec4(colour * line, 1.0);
+}
+```
+
+You write one function, `vec4 udeaMain(vec2 uv)`. The engine writes everything around it.
+
+**What the engine gives you, which you declare nothing for:**
+
+| Name | What it is |
+|---|---|
+| `uColor` | the frame so far, as the previous effect in the list left it |
+| `uDepth` | how far away the 3D scene is: `0` at the near plane, `1` where nothing was drawn |
+| `uMask` | the same, for the entities you marked - see below |
+| `uResolution` | the frame in pixels; `uTexel` is `1.0 / uResolution` |
+| `uTime` | render seconds since the first frame. There is deliberately no way to read simulation time from here |
+| `udeaMasked(uv)` | `1` where a marked entity was drawn, `0` where none was |
+| `udeaOutline(uv, width)` | `1` on a pixel that is *not* marked but touches one that is |
+
+**The mask is how an outline knows what a unit is.** Set `mask = true` on the `ModelRenderer` of
+the things you want found - your units, not your ground - and the engine draws those, and only
+those, into `uMask`. Without it an outline would have to guess from brightness or from depth
+against the sky, and the ground would get one too.
+
+```kotlin
+it += ModelRenderer(mesh, material).apply { mask = true }
+```
+
+**Two are shipped ready-made**, and they are ordinary shaders registered the same way:
+
+```kotlin
+registry.screenPass(ScreenEffects.palette(listOf(ink, stone, sand, bone)))
+registry.screenPass(ScreenEffects.outline(Rgba.BLACK))
+```
+
+Order matters and is yours: in that order the outline is drawn in its own colour over an
+already-quantised picture; the other way round the outline is quantised too.
+
+**Three rules worth knowing before you write one:**
+
+- **Never write `#version`.** OpenGL and OpenGL ES disagree about that line and about which
+  `precision` qualifiers a fragment stage needs, so the engine writes it, from the same setting
+  Kool's own shaders use. `UdeaShader.fragment` refuses a source that states its own, with the
+  reason, rather than letting it work on your desk and fail on a phone.
+- **Every parameter is a plain value.** `float`, `int`, `vec2`, `color` and `texture`; each
+  declaration hands back a handle whose `value` you write whenever you like, including per frame.
+- **A shader that will not compile stops the game starting.** You get
+  `ScreenShaderException` with a rule id (`UDEA0019`), your `.frag`'s path, *your* line - the
+  engine subtracts its own header from what the driver reported - and the driver's message word
+  for word. A shader that failed quietly would draw nothing, and "nothing" and "subtle" look the
+  same in a screenshot.
+
+Effects run at the render resolution, before the picture is fitted to the window, and before your
+HUD is drawn - so a screenshot an agent takes shows exactly what a player sees, HUD unprocessed on
+top. Turning one off is `shader.enabled = false`, which is the ordinary way to offer it as a
+graphics setting.
+
+`ShaderProof` in `moba/desktop/src/test/kotlin/dev/wildware/moba/shader/` is the worked example:
+it registers both built-ins from a project the module graph refuses Kool on, and measures what
+they did.
+
+---
+
 ## What the template does not cover yet
 
 Stated rather than implied, because each is a real piece of work and none of it is broken:

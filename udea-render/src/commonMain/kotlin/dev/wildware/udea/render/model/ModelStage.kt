@@ -13,7 +13,6 @@ import de.fabmax.kool.modules.ksl.KslShader
 import de.fabmax.kool.pipeline.AttachmentConfig
 import de.fabmax.kool.pipeline.ClearColorFill
 import de.fabmax.kool.pipeline.CullMethod
-import de.fabmax.kool.pipeline.DepthMapPass
 import de.fabmax.kool.pipeline.FrameCopy
 import de.fabmax.kool.pipeline.OffscreenPass2d
 import de.fabmax.kool.pipeline.TexFormat
@@ -120,25 +119,26 @@ internal class ModelStage(
     private val depthCopy: FrameCopy = pass.copyOutput(isCopyColor = false, isCopyDepth = true)
 
     /**
-     * The object mask (issues #259, #266): the same models, drawn depth-only, filtered to the ones
-     * the game marked.
+     * The object mask (issues #259, #266): the same models, through the same camera, filtered to
+     * the ones the game marked.
      *
-     * A depth pass rather than a colour one because Kool already draws this node graph depth-only
-     * for the shadow map, skinned and instanced meshes included, so the mask costs no new shader
-     * and cannot disagree with the picture about where anything is. Its texture is `1` - the far
-     * plane - wherever no marked model was drawn, and the marked model's depth where one was;
-     * `udeaMasked` in the shader header is what turns that into the `0`/`1` an author wants.
+     * The same kind of pass as the picture - [modelPass], colour cleared to transparent - so what
+     * a screen shader reads is the **alpha** channel: `1` where a marked model was drawn and `0`
+     * everywhere else. `udeaMasked` in the shader header is that read, named.
+     *
+     * A depth-only `DepthMapPass` was the first shape of this and it did not work: Kool's
+     * `OffscreenPass2d` publishes a colour attachment as a sampleable texture, and the depth-only
+     * pass handed back nothing a screen shader could sample, so every mask came out empty and
+     * every outline drew nothing. A colour pass costs the marked models a second shading, which is
+     * the price of a mask that can actually be read.
      *
      * The draw node is shared with the capturable pass, so this pass neither updates nor releases
      * it: the stage's own pass does both, and two passes doing it would place every model twice a
      * frame and release it from under the other. `ViewPass` does the same for the same reason.
      */
-    private val maskPass: DepthMapPass = DepthMapPass(
-        drawNode,
-        initialSize = Vec2i(width, height),
-        name = "udea-model-mask",
-    ).apply {
+    private val maskPass: OffscreenPass2d = modelPass(drawNode, width, height, "udea-model-mask").apply {
         camera = this@ModelStage.perspective
+        lighting = this@ModelStage.pass.lighting
         isUpdateDrawNode = false
         isReleaseDrawNode = false
     }
@@ -149,6 +149,24 @@ internal class ModelStage(
      * stops asking is out of the mask on the very next frame.
      */
     private val maskedNodes = HashSet<Node>()
+
+    /**
+     * Whether [node] is one the game marked, or sits under one.
+     *
+     * Walking up rather than testing membership alone because [maskedNodes] holds what [show] was
+     * given - an instanced mesh, or the root node of an imported model - and an imported model's
+     * root is not the thing that draws: its meshes are, several levels down. A filter that only
+     * looked at the node it was handed would mask an instanced box and silently not mask a fox.
+     * The walk stops at [drawNode], so it is the depth of one model, not of the scene.
+     */
+    private fun isMasked(node: Node): Boolean {
+        var current: Node? = node
+        while (current != null && current !== drawNode) {
+            if (current in maskedNodes) return true
+            current = current.parent
+        }
+        return false
+    }
 
     /**
      * Every Scene view's preview node (issue #243): drawn by that view's pass and by no other. The
@@ -166,10 +184,9 @@ internal class ModelStage(
         pass.defaultView.drawFilter = { node -> node !in previewNodes }
         val castsShadow = shadow.defaultView.drawFilter
         shadow.defaultView.drawFilter = { node -> node !in previewNodes && castsShadow(node) }
-        val masks = maskPass.defaultView.drawFilter
-        maskPass.defaultView.drawFilter = { node -> node in maskedNodes && masks(node) }
+        maskPass.defaultView.drawFilter = { node -> node === drawNode || isMasked(node) }
         // Read through lambdas: Kool replaces both textures when the frame is resized (#234).
-        passes.setScreenInputs({ depthCopy.depthCopy2d }, { maskPass.depthTexture })
+        passes.setScreenInputs({ depthCopy.depthCopy2d }, { maskPass.colorTexture })
     }
 
     /** The pass's picture, for the 2D batch to draw into the capturable frame. */

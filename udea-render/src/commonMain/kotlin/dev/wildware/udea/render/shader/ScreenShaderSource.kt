@@ -65,15 +65,23 @@ internal object ScreenShaderSource {
      *
      * ## The two inputs besides the colour
      *
-     * `uDepth` and `uMask` are both **depth** pictures, and they read the same way: `1.0` is the
-     * far plane, which is also "nothing here", and anything less is how far away the nearest
-     * surface is. `uDepth` holds everything the 3D stage drew; `uMask` holds only the entities
-     * whose `ModelRenderer.mask` is set - the game's units, say, and not its ground. That is what
-     * lets a one-pixel outline be found without the scene being drawn a second time.
+     * They are different kinds of picture and they do not read the same way.
      *
-     * A game with no 3D in it, and a game that has marked nothing, gets `1.0` everywhere in the
-     * one it is missing, so a shader written against either reads "nothing here" rather than
-     * whatever the last frame left behind. [udeaMasked] is the `0`/`1` form most bodies want.
+     * `uMask` is the marked entities drawn on their own into a transparent frame, so its **alpha**
+     * is the mask: `1` where an entity whose `ModelRenderer.mask` is set was drawn, `0` everywhere
+     * else. [udeaMasked] is that read, named, and it is what a body should call.
+     *
+     * `uDepth` is the 3D stage's own depth buffer, resolved, in the **red** channel and in
+     * whatever convention the backend uses. Kool sets the GL depth range to zero-to-one and draws
+     * reversed, so on this backend `0` is the far plane and a nearer surface is a larger number -
+     * the opposite way round from the one a GLSL author usually expects. A body that only wants
+     * "is there anything here" should use `uMask`, which has one meaning on every backend; a body
+     * that compares two depths to each other is comparing numbers whose direction is the
+     * backend's.
+     *
+     * A game with no 3D in it, and a game that has marked nothing, gets a stand-in that reads as
+     * empty - alpha `0` for the mask, `0` for the depth - rather than whatever the last frame left
+     * behind.
      */
     val FRAGMENT_PREAMBLE: String = """
         precision highp float;
@@ -84,8 +92,8 @@ internal object ScreenShaderSource {
 
         // Supplied by the engine. A body reads these and declares none of them.
         uniform sampler2D uColor;   // the frame so far
-        uniform sampler2D uDepth;   // depth of the 3D scene; 1.0 where there is none
-        uniform sampler2D uMask;    // depth of the marked entities only; 1.0 where there are none
+        uniform sampler2D uDepth;   // .r: depth of the 3D scene, in the backend's own direction
+        uniform sampler2D uMask;    // .a: 1 where a marked entity was drawn, 0 where none was
         uniform vec2 uResolution;   // the frame, in pixels
         uniform vec2 uTexel;        // 1.0 / uResolution
         uniform float uTime;        // render seconds since the first frame
@@ -98,7 +106,7 @@ internal object ScreenShaderSource {
 
         // 1 where a marked entity was drawn, 0 where none was.
         float udeaMasked(vec2 uv) {
-            return step(texture(uMask, uv).r, 0.999999);
+            return step(0.5, texture(uMask, uv).a);
         }
 
         // 1 on a pixel that is not marked but touches one that is, within `width` pixels: the

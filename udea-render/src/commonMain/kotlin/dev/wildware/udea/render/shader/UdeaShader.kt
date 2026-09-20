@@ -2,6 +2,7 @@ package dev.wildware.udea.render.shader
 
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteTexture
+import kotlin.concurrent.Volatile
 
 /**
  * A fragment program a game writes, as GLSL text plus the parameters it reads.
@@ -72,7 +73,18 @@ public class UdeaShader internal constructor(
      * and because it is how a test compares a processed frame with the same frame unprocessed
      * without rebuilding a pipeline. A disabled shader costs one boolean per frame: the chain
      * skips it, and its program and textures stay compiled and ready.
+     *
+     * ## It takes effect on a later frame, not on this one
+     *
+     * Written from the game thread and read on the render thread, which is why it is `@Volatile`:
+     * without it the render thread may go on reading a stale value indefinitely. Volatile fixes
+     * *visibility*, not *timing* - the renderer is decoupled from the simulation, so a frame that
+     * had already begun when this was written finishes with the old value. Turning an effect on
+     * and immediately taking a screenshot can therefore hand back the frame before it. Anything
+     * measuring the change has to wait for the picture to settle rather than for the next frame,
+     * and both of this feature's own proofs do.
      */
+    @Volatile
     public var enabled: Boolean = true
 
     override fun toString(): String = "UdeaShader('$path', ${declared.size} uniforms, enabled=$enabled)"
@@ -214,7 +226,7 @@ public class ShaderUniforms internal constructor(private val path: String) {
  * into the location it resolved when the program linked. There is no name lookup on the drawing
  * path and no boxing: a `Float` written into a `var Float` is a `Float`.
  */
-public sealed class ShaderUniform internal constructor(
+public sealed class ShaderUniform(
     /** The identifier the body declares and reads. */
     public val name: String,
 ) {

@@ -37,7 +37,7 @@ platform's.
   skeletons. `UnitBattleSystem` decides who to go for, walks there and faces the right way;
   `udea-gas` owns health as an attribute, damage as an effect, cooldowns that rewind, the priest's
   heal and the soldier's arrow.
-- **A lane** (`moba/game/.../lane/`) — creeps, towers, gold, experience and levels, as a module of
+- **A lane** (`moba/game/src/commonMain/kotlin/dev/wildware/moba/lane/`) — creeps, towers, gold, experience and levels, as a module of
   its own. A definition assembled *without* it is the three-faction brawl the game was before, which
   is what a combat unit test wants and a player does not.
 - **A match** — spawning, respawn, the scoreboard, and an end condition.
@@ -126,7 +126,7 @@ and a level file never hold a model or a texture.
   `udea-physics2d`; the solver runs with no gravity, because the world is a ground plane seen from
   above and nothing falls across it.
 - **Controls are named keys**, `InputKey.W` and never `87`. Hollow declares its two bindings
-  (`hollow/move`, `hollow/run`) in Kotlin rather than in an asset, and `HollowControls`' own KDoc
+  (`"hollow/move"` and `"hollow/run"`) in Kotlin rather than in an asset, and `HollowControls`' own KDoc
   says why: the asset *reader* `moba` uses is two hundred lines inside `moba:game`, which
   `hollow:game` cannot depend on, and copying it would be the copy-pasted-logic smell the charter
   rejects.
@@ -176,16 +176,16 @@ Pick by what you are trying to do.
 
 | You want | Read |
 |---|---|
-| Replication, prediction, desync, the wire | `moba` — `moba/game/src/commonMain/kotlin/dev/wildware/moba/net/` |
-| Abilities, effects, attributes, cooldowns | `moba` — `moba/game/.../ability/` and `udea-gas` |
+| Replication, prediction, desync, the wire | `moba` — the `dev.wildware.moba.net` package |
+| Abilities, effects, attributes, cooldowns | `moba` — the `dev.wildware.moba.ability` package, and `udea-gas` |
 | A HUD, an item bar, a result screen | `moba` — `MobaHud`, `MobaHudScreen` |
 | Sound | `moba` — `MobaAudio`, `MobaCueSounds`, `MobaDesktopAudio` |
-| Wiring the agent surface | `moba/desktop/src/agent/.../MobaAgent.kt` |
+| Wiring the agent surface | `moba` — `MobaAgent`, in `moba/desktop/src/agent/` |
 | An editor entry point and a hand-written gizmo | `moba/desktop/src/editor/` |
-| 3D models, shadows, a lit scene | `hollow` — `hollow/game/.../render/` |
+| 3D models, shadows, a lit scene | `hollow` — the `dev.wildware.hollow.render` package |
 | A third-person camera and camera-relative input | `hollow` — `ThirdPersonRig`, `CameraRelativeIntent` |
 | Physics driving `Transform3D` | `hollow` — `Player`, `ClearingBodies` |
-| A server-authoritative game from the first commit | `hollow` — `hollow/game/.../net/` |
+| A server-authoritative game from the first commit | `hollow` — the `dev.wildware.hollow.net` package |
 | The smallest possible starting point | Neither — `templates/new-game/`, and [Tutorial: Make a Game](Tutorial-Make-a-Game) |
 
 ## A note on the art

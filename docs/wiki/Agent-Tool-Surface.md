@@ -248,7 +248,8 @@ val agentHost = AgentHost.startIfRequested(
 You wire only the toolsets you have the pieces for. `TimeToolset` needs the host alone, so every game
 can have it. `WorldToolset` needs an `AgentComponentIndex` over `@Replicated` components, a
 `NetIdIndex` and a `SimClock`; the template leaves it out and says so, and
-`moba/desktop/src/agent/.../MobaAgent.kt` is the worked example that wires it.
+`moba/desktop/src/agent/kotlin/dev/wildware/moba/agent/MobaAgent.kt`
+is the worked example that wires it.
 
 `ToolIndex.Builder.build` **refuses a tool whose toolset was never registered**, deliberately — a
 misconfigured host fails at start-up rather than answering `no_such_tool` weeks later.

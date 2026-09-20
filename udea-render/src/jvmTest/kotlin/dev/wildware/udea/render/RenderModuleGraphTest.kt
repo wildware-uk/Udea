@@ -85,6 +85,14 @@ class RenderModuleGraphTest {
         // `jvmTest {` (issue #224 added a jvmMain block between them). A slice that ran on to
         // `jvmTest {` would call a jvmMain dependency a shipped one - true today, and exactly the
         // kind of helper that quietly decides what an assertion is allowed to see.
+        //
+        // Issue #266 re-decided this rather than inheriting it. A screen shader the graphics
+        // driver refuses is an error a *game author* reads, so the obvious move was to hand out a
+        // real `UdeaDiagnostic` - which would have shipped this module inside every Udea game for
+        // ever, to carry a type a game can only read. `ScreenShaderException` carries the same
+        // four facts in plain fields instead, and `ScreenShaderRuleIdTest` pins its rule ids
+        // against `UdeaRules` so the two vocabularies cannot drift. Adding the richer type later
+        // is additive; un-shipping a dependency from released games is not.
         val commonMain = script.substringAfter("commonMain {").substringBefore("jvmMain {")
         assertTrue(
             ":udea-diagnostics" !in commonMain,

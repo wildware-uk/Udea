@@ -260,6 +260,20 @@ The pieces a newcomer meets first, each with the issue that made it so.
   menu or an editor panel: it draws into the window after the captured frame, so no screenshot
   sees it. A `CapturedUi` is a HUD: it draws into the captured frame, so an agent's screenshot
   sees the cooldown a player sees (#188).
+- **A game can write a screen shader** (#259, #266). `UdeaShader.fragment(path, source) { ... }`
+  takes GLSL a game authored and typed uniforms declared in Kotlin, and `RenderRegistry.screenPass`
+  puts it in an ordered list that runs over the finished frame at render resolution, before any
+  upscale, inside the captured frame and outside the editor's gizmo capture. The engine prepends
+  the `#version` and precision block for the backend - read from Kool's own `GlslGenerator` hints,
+  so an engine shader and a game shader are never compiled against different language versions -
+  and supplies `uColor`, `uDepth`, `uMask`, `uResolution`, `uTexel` and `uTime`. `uMask` is the
+  entities whose `ModelRenderer.mask` is set, drawn into a transparent pass of their own, so a
+  one-pixel outline needs no second drawing of the scene; `udeaMasked` and `udeaOutline` are the
+  helpers over it. `ScreenEffects.palette` and `ScreenEffects.outline` ship as built-ins. A driver
+  that refuses a shader raises `ScreenShaderException` with the rule id (`UDEA0019`, or `UDEA0040`
+  for a uniform the source never declares), the author's `.frag` path, the author's line and the
+  driver's own message - plain fields, not a `UdeaDiagnostic`, so `udea-diagnostics` stays off
+  every shipped game's runtime classpath.
 - **Controls name keys.** A controls asset binds an `InputKey`, and `udea-render` owns the one
   table per backend that turns a platform key into it (#228). A key or a click the interface
   took never becomes an intent (#227, #230).

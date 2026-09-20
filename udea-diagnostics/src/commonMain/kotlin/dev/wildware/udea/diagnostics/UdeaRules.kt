@@ -351,6 +351,46 @@ public object UdeaRules {
             "property of a Fleks component",
     )
 
+    /**
+     * A screen shader (issue #266) that the graphics driver refused to compile or link.
+     *
+     * The first rule in this registry raised by a *driver* rather than by a compiler or an asset
+     * build, and the reason it is a rule at all rather than an exception message: a GLSL compile
+     * error is the one failure in this engine whose text belongs to a third party, so the engine's
+     * job is to put a stable id, the author's file and the author's line in front of it and then
+     * quote it exactly. The line is the author's: the engine prepends a header, so the number the
+     * driver reports is shifted, and `ScreenShaderSource.fragmentLineOffset` is what shifts it
+     * back. An error the engine's own header caused is reported at line 0 of the author's file
+     * with the driver's text intact, because a header line has no line in a file anybody wrote.
+     *
+     * Raised when the shader is installed, which is while the pipeline is being built - before the
+     * first frame - so a shader that cannot compile stops the game starting instead of drawing
+     * nothing and leaving the author to guess which of their effects is missing.
+     */
+    public val SHADER_COMPILE_FAILED: UdeaRule = UdeaRule(
+        id = "UDEA0019",
+        defaultSeverity = Severity.Error,
+        description = "a shader failed to compile or link on this graphics backend",
+    )
+
+    /**
+     * A uniform declared in Kotlin whose name the shader's own source never declares (issue #266).
+     *
+     * Distinguished from a uniform the driver optimised away, which is legal and silent: a name
+     * that does not appear in the source at all is a misspelling on one side or the other, and
+     * without this rule its handle writes into location `-1` for the life of the game while the
+     * shader reads whatever the author actually spelled. That failure looks like "my parameter
+     * does nothing", which is the hardest kind of graphics defect to find.
+     *
+     * Carries the did-you-mean spec section 5 makes mandatory, over the uniform names the source
+     * does declare.
+     */
+    public val SHADER_UNIFORM_NOT_DECLARED: UdeaRule = UdeaRule(
+        id = "UDEA0040",
+        defaultSeverity = Severity.Error,
+        description = "a shader uniform declared in Kotlin is not declared in the shader source",
+    )
+
     /** Every registered rule, in id order. */
     public val all: List<UdeaRule> = listOf(
         NET_ON_VAL,
@@ -371,6 +411,8 @@ public object UdeaRules {
         UNRESOLVED_ANIMATION_CLIP,
         UNRESOLVED_MODEL_NODE,
         GIZMO_HANDLE_FIELD,
+        SHADER_COMPILE_FAILED,
+        SHADER_UNIFORM_NOT_DECLARED,
     ).sortedBy { it.id }
 
     private val byId: Map<String, UdeaRule> = all.associateBy { it.id }

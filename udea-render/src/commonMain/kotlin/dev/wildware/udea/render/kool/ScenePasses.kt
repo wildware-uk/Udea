@@ -2,6 +2,7 @@ package dev.wildware.udea.render.kool
 
 import de.fabmax.kool.pipeline.OffscreenPass
 import de.fabmax.kool.pipeline.RenderPass
+import de.fabmax.kool.pipeline.Texture2d
 
 /**
  * Lets a render system add a pass of its own that the capturable pass draws from.
@@ -49,4 +50,20 @@ internal interface ScenePasses {
 
     /** Takes a view [addOnTop] made off the pass, and releases its empty node. Render thread only. */
     fun removeOnTop(view: RenderPass.View)
+
+    /**
+     * Publishes the 3D stage's depth and object-mask pictures to the screen-effect chain (#266).
+     *
+     * The two engine-supplied inputs a screen shader reads besides the colour buffer, and the
+     * reason a one-pixel outline does not need the scene drawn a second time. They arrive as
+     * lambdas because Kool replaces both when the frame is resized (#234), so a texture captured
+     * once would be the one the previous size wrote.
+     *
+     * Called by `ModelStage`, which is the only thing that draws in 3D. A pipeline with no 3D in
+     * it never calls it, and a shader's `uDepth` is then the far plane everywhere and its `uMask`
+     * is empty - which is the truth about a frame with no models in it.
+     *
+     * Render thread only.
+     */
+    fun setScreenInputs(depth: () -> Texture2d?, mask: () -> Texture2d?)
 }

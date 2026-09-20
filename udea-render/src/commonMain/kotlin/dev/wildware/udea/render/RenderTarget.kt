@@ -2,6 +2,7 @@ package dev.wildware.udea.render
 
 import dev.wildware.udea.render.capture.PixelSource
 import dev.wildware.udea.render.draw.SpriteBatch2D
+import dev.wildware.udea.render.kool.GlScreenPasses
 import dev.wildware.udea.render.kool.ScenePasses
 
 /**
@@ -106,6 +107,11 @@ public class RenderTargets internal constructor(
     internal val owned: List<RenderResource> = emptyList(),
     /** Where a system adds a pass of its own, or `null` when there is no Kool scene behind this. */
     internal val passes: ScenePasses? = null,
+    /**
+     * The game's screen effects (issues #259, #266), or `null` when there is no Kool scene behind
+     * this pipeline - the ordering tests, which draw nothing and so have nothing to process.
+     */
+    internal val screenPasses: GlScreenPasses? = null,
 ) {
 
     /**

@@ -70,6 +70,19 @@ public class SpriteTexture private constructor(
     }
 
     /**
+     * The pixels, if this texture still has them, without consuming them the way [kool] does.
+     *
+     * For a reader that is not a Kool draw. A screen shader (issue #266) samples its textures
+     * through OpenGL directly, and Kool uploads a texture only when one of *its* draws first binds
+     * it - so a palette ramp that nothing else draws would never reach the graphics card at all.
+     * `null` once [kool] has taken them, and for a wrapped pass attachment, which never had any.
+     */
+    internal fun peekRgba(): ByteArray? = pixels
+
+    /** The Kool texture if one has been made, without making one. See [peekRgba]. */
+    internal fun koolOrNull(): Texture2d? = texture
+
+    /**
      * Releases the Kool texture if one was made. A wrapped pass colour attachment is the pass's to
      * release and is left alone.
      */

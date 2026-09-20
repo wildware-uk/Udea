@@ -404,6 +404,25 @@ tasks.register<JavaExec>("runLaneShot") {
     )
 }
 
+// Issue #266's evidence, and issue #259's. `ShaderProof` registers a palette and a one-pixel
+// outline as ordinary screen effects from *this* project - which `UDEA-MG-002` refuses Kool on, so
+// "a game writes a shader with no Kool type in its source" is a build gate rather than a claim -
+// captures the scene with each effect off and on, and fails unless every figure is what the effects
+// have to be worth, the unprocessed control included. Needs a GL driver, so run by name, as
+// `runMatchShot` is: wiring it into `check` would turn a missing driver into a skip.
+tasks.register<JavaExec>("runShaderProof") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.shaderproof: a game's own palette and outline screen effects, measured against an unprocessed control."
+    mainClass.set("dev.wildware.moba.shader.ShaderProof")
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty(
+        "udea.shaderproof.dir",
+        providers.gradleProperty("udea.shaderproof.dir").orNull
+            ?: layout.buildDirectory.dir("reports/udea/shader").get().asFile.absolutePath,
+    )
+}
+
 // Issue #191's pictures. `LevelShot` saves a real match to a level file in one JVM and loads it
 // into a fresh game in a second, photographing both from the same camera; the second run fails
 // unless the two pictures are pixel-identical. Two tasks because the two halves must not share a

@@ -23,9 +23,14 @@ import dev.wildware.udea.render.model.ModelMaterial
 import dev.wildware.udea.render.model.ModelMesh
 import dev.wildware.udea.render.model.ModelRenderSystem
 import dev.wildware.udea.render.model.ModelRenderer
+import dev.wildware.udea.render.shader.ColorUniform
+import dev.wildware.udea.render.shader.FloatUniform
+import dev.wildware.udea.render.shader.IntUniform
 import dev.wildware.udea.render.shader.ScreenEffects
 import dev.wildware.udea.render.shader.ScreenShaderException
+import dev.wildware.udea.render.shader.TextureUniform
 import dev.wildware.udea.render.shader.UdeaShader
+import dev.wildware.udea.render.shader.Vec2Uniform
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -85,7 +90,25 @@ class GlScreenShaderTest {
         val maskView = UdeaShader.fragment("shaders/mask-view.frag", MASK_VIEW).apply { enabled = false }
         val depthView = UdeaShader.fragment("shaders/depth-view.frag", DEPTH_VIEW).apply { enabled = false }
 
-        withScene(paletteShader, outlineShader, maskView, depthView) { backend, host ->
+        // One shader declaring every kind of uniform the API offers, so that each kind is proved
+        // to reach the GPU rather than merely to compile. Its body reads all five, so changing any
+        // one of them has to change the picture; scenario 7 changes them one at a time.
+        val rampA = SpriteTexture.fromRgba(RAMP_TEXELS, 1, RAMP_A, "screen-ramp-a")
+        val rampB = SpriteTexture.fromRgba(RAMP_TEXELS, 1, RAMP_B, "screen-ramp-b")
+        lateinit var amount: FloatUniform
+        lateinit var steps: IntUniform
+        lateinit var shift: Vec2Uniform
+        lateinit var tint: ColorUniform
+        lateinit var ramp: TextureUniform
+        val everyUniform = UdeaShader.fragment("shaders/every-uniform.frag", EVERY_UNIFORM) {
+            amount = float("uAmount", 0.5f)
+            steps = int("uSteps", 4)
+            shift = vec2("uShift", 0f, 0f)
+            tint = color("uTint", Rgba.of(1f, 0.6f, 0.2f, 1f))
+            ramp = texture("uRamp", rampA)
+        }.apply { enabled = false }
+
+        withScene(paletteShader, outlineShader, maskView, depthView, everyUniform) { backend, host ->
             val slot = backend.pipeline!!.capture!!
             // Paused, so nothing in the world moves between captures and a difference can only
             // have come from a shader. Frames keep being drawn, which is what a capture needs.
@@ -215,7 +238,47 @@ class GlScreenShaderTest {
                 "with every effect off the frame must be the one the control measured",
             )
 
-            // 7. A DRIVER'S REFUSAL, reported at the author's line.
+            // 7. EVERY UNIFORM KIND, one at a time.
+            //
+            // The ticket asks for typed uniforms - float, int, vector, colour, texture handle -
+            // and a shader that merely compiles proves none of them arrived. So each is changed on
+            // its own and the frame has to change with it. A kind whose upload was wrong or
+            // missing leaves the picture where the previous step left it, and the step naming that
+            // kind is the one that goes red.
+            everyUniform.enabled = true
+            settle(slot)
+            var previousStep = decode(slot.capture(CaptureRequest()).bytes)
+            assertTrue(
+                difference(plain, previousStep) > 0f,
+                "the every-uniform shader changed nothing at all, so no later step means anything",
+            )
+            val steps7 = listOf<Pair<String, () -> Unit>>(
+                "float uAmount" to { amount.value = 0.9f },
+                "int uSteps" to { steps.value = 2 },
+                "vec2 uShift" to { shift.x = SHIFT },
+                "colour uTint" to { tint.value = Rgba.of(0.1f, 0.9f, 0.4f, 1f) },
+                "texture uRamp" to { ramp.value = rampB },
+            )
+            for ((kind, change) in steps7) {
+                change()
+                settle(slot)
+                val next = decode(slot.capture(CaptureRequest()).bytes)
+                assertTrue(
+                    difference(previousStep, next) > 0f,
+                    "changing the $kind uniform left the frame exactly as it was, so that kind " +
+                        "is not reaching the shader",
+                )
+                previousStep = next
+            }
+            everyUniform.enabled = false
+            settle(slot)
+            assertEquals(
+                0f,
+                difference(plain, decode(slot.capture(CaptureRequest()).bytes)),
+                "the every-uniform shader left something behind when it was switched off",
+            )
+
+            // 8. A DRIVER'S REFUSAL, reported at the author's line.
             //
             // Compiled straight on the render thread rather than through a second pipeline,
             // because this JVM has one context and the fixture above is using it.
@@ -240,7 +303,7 @@ class GlScreenShaderTest {
                     "author's own file. Driver said: ${failure.message}",
             )
 
-            // 8. A UNIFORM THE SOURCE NEVER DECLARES, with the did-you-mean the contract requires.
+            // 9. A UNIFORM THE SOURCE NEVER DECLARES, with the did-you-mean the contract requires.
             val misspelled = UdeaShader.fragment(
                 path = "shaders/misspelled.frag",
                 source = MISSPELLED_SOURCE,
@@ -601,6 +664,37 @@ class GlScreenShaderTest {
                 return vec4(floor(d * 255.0) / 255.0, fract(d * 255.0), 0.0, 1.0);
             }
         """.trimIndent()
+
+        /**
+         * Reads every uniform kind the API offers, so that changing any one of them changes the
+         * picture. Deliberately not a nice-looking effect: it is a probe, not a style.
+         */
+        val EVERY_UNIFORM: String = """
+            uniform float uAmount;
+            uniform int uSteps;
+            uniform vec2 uShift;
+            uniform vec4 uTint;
+            uniform sampler2D uRamp;
+
+            vec4 udeaMain(vec2 uv) {
+                vec3 base = texture(uColor, uv + uShift).rgb;
+                vec3 stepped = floor(base * float(uSteps)) / float(uSteps);
+                vec3 band = texture(uRamp, vec2(uv.x, 0.5)).rgb;
+                return vec4(mix(stepped, uTint.rgb * band, uAmount), 1.0);
+            }
+        """.trimIndent()
+
+        /** Texels across each ramp the every-uniform shader samples. */
+        const val RAMP_TEXELS = 2
+
+        /** Two texels, RGBA: blue then white. */
+        val RAMP_A: ByteArray = byteArrayOf(0, 0, -1, -1, -1, -1, -1, -1)
+
+        /** Two texels, RGBA: green then red. A different picture from [RAMP_A] at every uv. */
+        val RAMP_B: ByteArray = byteArrayOf(0, -1, 0, -1, -1, 0, 0, -1)
+
+        /** A sixteenth of the frame, in uv: far enough that a lit gradient reads differently. */
+        const val SHIFT = 0.0625f
 
         val OUTLINE_COLOUR: Rgba = Rgba.of(0f, 0f, 0f, 1f)
 

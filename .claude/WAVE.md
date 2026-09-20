@@ -842,3 +842,66 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 1. Wave 4: #204, #205, #206, #209 in parallel (all need #203); #208 needs #202 and #203.
 3. #210 lives in `wildware-uk/composegl`; a separate `composegl-ef` session is active there. Check its state
    before dispatching.
+
+## Wave 22 — the isometric camera, and the signing key
+
+`master` is `7c62f50`. #257 merged at `713ebea` (reviewed at `9c8f2da`, PASS round 1, zero
+findings), hygiene commit on top.
+
+**#257 — orthographic isometric camera.** `ModelCamera` chooses a projection and publishes its
+view and projection as sixteen plain floats each; `ModelStage` keeps one perspective and one
+orthographic Kool camera for the stage's life and swaps the pass camera and the shadow map's
+scene camera together; `IsometricRig` sits beside `ThirdPersonRig` on a shared `CameraMath`.
+#262 un-projects through those matrices.
+
+**Three things this wave taught that are not about cameras.**
+
+1. **A check that measures nothing reports success.** Four instances in one afternoon: the
+   developer's first world-hash test hashed an empty snapshot because the fixture allocated no
+   `NetId`, so the equality compared two constants; the peer session's report writer truncated a
+   file so a partial report read as a passing one; images in the shared gallery were
+   indistinguishable from the run that supposedly produced them; and a size threshold had a
+   failing case on only one side. The fix is always the same - make the failing case exist.
+
+2. **A mutation is faithful because its magnitude comes through, not because something went
+   red.** Mutation 2 injected 10% and the cube went 2314px/52x57 to 1944px/48x52 -
+   `sqrt(2314/1944) = 1.091`. A red of the wrong magnitude is a red for a different reason and
+   passes every check a normal suite has. Ask the reviewer to prove the mutation faithful
+   *before* it trusts the red; untold, it reports "the mutation reds the suite" and you believe
+   a red that was right for reasons nobody checked.
+
+3. **A silent assertion can be correctly silent.** Mutation 2 does not red `assertOneSize`,
+   because all four cubes scale together and the ratio stays 1.0. Its failing case is a separate
+   control asserting the ratio must *exceed* 1.12, measuring 1.89, against a worst real case of
+   1.035. Record this kind of thing in the ledger or a later round reads it as a gap and widens
+   something.
+
+**`build/debug-screenshots/` in the main checkout is shared by every agent on this box**, written
+from their own worktrees, with nothing namespacing it. An image being there proves nothing about
+which run made it. Make the developer state the producing run per image in the brief. Our GL
+shots happen to be byte-identical across a rebuild, which means `cmp` proves "same bytes" and
+never "same run" - mtime is the only thing that answers that.
+
+**Scratchpad policy, decided this wave.** A ticket's `scratchpad/` keeps its mutation diffs and
+its measurements, which is what a later reader checks a claim against. Raw build logs and `.orig`
+copies of source files do not go in: the copies never update and a grep finds both.
+`scratchpad/**/*.log` and `*.orig` are gitignored as of `7c62f50`. Hygiene goes in its own commit,
+never by editing the merge - what was reviewed must be byte-for-byte what was merged.
+
+**Publishing.** All four org secrets are set on `wildware-uk` (private visibility):
+`MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`, `SIGNING_KEY`, `SIGNING_PASSWORD`. The key is
+`rsa4096/1BC2C0184273987F` "Wildware Ltd."; its passphrase and both armoured halves are in
+`~/wildware-signing/` with a README, written when the key was made on 2026-09-11. The passphrase
+was verified by signing a probe file before the secrets were set, not after.
+
+**A trap to know about:** `gh secret set` accepts empty stdin without complaint. A failed
+`gpg --armor --export-secret-keys | gh secret set` pipe stores an empty secret that looks set and
+signs nothing - `gh` never sees gpg's exit code. Export to a file, check the byte count, then set
+from the file. That is the same defect as everything in point 1, wearing a green tick.
+
+**Still open:** the public key is on `keys.openpgp.org` but not on `keyserver.ubuntu.com`.
+Snapshots do not need it; a real release does, and publishing to a keyserver is one-way, so it
+waits on the owner.
+
+**Box sharing:** see the memory note. Release explicitly, never on a lapsed timer, and a hold
+means the agent is told not to start a JVM rather than trusted to finish early.

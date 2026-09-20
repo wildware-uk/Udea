@@ -1,5 +1,5 @@
 plugins {
-    id("udea.gradle-plugin")
+    id("dev.wildware.udea.gradle-plugin")
 }
 
 dependencies {
@@ -12,7 +12,7 @@ dependencies {
  *
  * `java-gradle-plugin` would supply `pluginUnderTestMetadata` and `withPluginClasspath()` for
  * free, and it is deliberately not applied: it adds `gradleApi()` to the `api` configuration, and
- * the `udea.gradle-plugin` convention keeps `gradleApi()` `compileOnly` precisely so the whole
+ * the `dev.wildware.udea.gradle-plugin` convention keeps `gradleApi()` `compileOnly` precisely so the whole
  * Gradle API cannot reach a consumer's runtime classpath - the defect the old `gradle-plugin`
  * module shipped. So the classpath is handed over as a property and the tests build a
  * `buildscript { }` block from it.

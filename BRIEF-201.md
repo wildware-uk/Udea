@@ -67,13 +67,13 @@ The re-run straight after is the one quoted.
 **What.** Two convention plugins in `build-logic` for runtime modules, and the two leaf modules moved
 onto one of them.
 
-- `udea.kotlin-multiplatform`: Kotlin Multiplatform on `jvm`, `android`, `wasmJs` (Node),
-  `iosArm64`, `iosSimulatorArm64`. `udea.kotlin-multiplatform-render`: the same without iOS, no
+- `dev.wildware.udea.kotlin-multiplatform`: Kotlin Multiplatform on `jvm`, `android`, `wasmJs` (Node),
+  `iosArm64`, `iosSimulatorArm64`. `dev.wildware.udea.kotlin-multiplatform-render`: the same without iOS, no
   consumer yet (#211). Both call one `UdeaMultiplatform.configure(project, ios)`.
-- `udea.kotlin-base`: the policy `udea.kotlin-library` used to hold (explicit API, JDK 21 toolchain,
+- `dev.wildware.udea.kotlin-base`: the policy `dev.wildware.udea.kotlin-library` used to hold (explicit API, JDK 21 toolchain,
   stdlib pin + `udeaVerifyKotlinPin`, K2 plugin + `udeaVerifyCompilerPlugin`), now applied by the JVM
   convention and both multiplatform ones, so a module moving to KMP keeps every gate.
-- `udea.jvm-test-fixtures`: Gradle's `java-test-fixtures` cannot sit beside the KMP plugin, and JVM modules
+- `dev.wildware.udea.jvm-test-fixtures`: Gradle's `java-test-fixtures` cannot sit beside the KMP plugin, and JVM modules
   (`udea-agent`, `udea-agent-host`, `udea-assets-compiler`, `udea-core`) consume
   `testFixtures(project(":udea-diagnostics"))`. This publishes a `jvmTestFixtures`
   compilation under the same capability, so those consumers are unchanged.
@@ -117,7 +117,7 @@ test run first; the last was found by grepping for the same kind of scan.
 
 - Android via AGP's `com.android.kotlin.multiplatform.library` (AGP 8.13.2, which runs on
   Gradle 8.13): target `android`, tests `testAndroidHostTest`. Not `androidTarget()` / `testDebugUnitTest`.
-- `udea.jvm-test-fixtures` rather than moving `LatencyBudget` into `jvmMain` (it would ship) or into a
+- `dev.wildware.udea.jvm-test-fixtures` rather than moving `LatencyBudget` into `jvmMain` (it would ship) or into a
   new module.
 - Root stops forcing `java` rather than keeping a list of KMP modules to skip.
 - Every target's classpath is governed, not only `jvm`.
@@ -368,10 +368,10 @@ index 7f98967..d55fd51 100644
 `sh gradlew -p build-logic test --tests dev.wildware.udea.build.KotlinMultiplatformConventionTest`
 
 ```diff
-diff --git a/build-logic/src/main/kotlin/udea.jvm-test-fixtures.gradle.kts b/build-logic/src/main/kotlin/udea.jvm-test-fixtures.gradle.kts
+diff --git a/build-logic/src/main/kotlin/dev.wildware.udea.jvm-test-fixtures.gradle.kts b/build-logic/src/main/kotlin/dev.wildware.udea.jvm-test-fixtures.gradle.kts
 index 7dff672..3346c9a 100644
---- a/build-logic/src/main/kotlin/udea.jvm-test-fixtures.gradle.kts
-+++ b/build-logic/src/main/kotlin/udea.jvm-test-fixtures.gradle.kts
+--- a/build-logic/src/main/kotlin/dev.wildware.udea.jvm-test-fixtures.gradle.kts
++++ b/build-logic/src/main/kotlin/dev.wildware.udea.jvm-test-fixtures.gradle.kts
 @@ -75,7 +75,6 @@ fun fixturesVariant(name: String, usage: String, dependencyBuckets: List<String>
              attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, UdeaVersions.JVM_TOOLCHAIN)
              attribute(KotlinPlatformType.attribute, KotlinPlatformType.jvm)
@@ -561,5 +561,5 @@ BUILD SUCCESSFUL in 4s
 ```
 
 TDD order: `KotlinMultiplatformConventionTest` was written first and failed 4/4 with
-`Plugin [id: 'udea.kotlin-multiplatform'] was not found`; its two gate tests were added before the
+`Plugin [id: 'dev.wildware.udea.kotlin-multiplatform'] was not found`; its two gate tests were added before the
 role mapping and failed with `matched none of the configurations [...]`.

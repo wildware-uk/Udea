@@ -11,7 +11,7 @@ import dev.wildware.udea.assets.InputKey
  * disagree about which key was pressed. [platformKeyTable] is the table for the backend this
  * build draws with: `jvm` is Kool's desktop backend over GLFW, and `android` is Kool's Android
  * backend. There is no web table because there is no web target: Kool 0.19.0 publishes no wasmJs
- * artifact, and `udea.kotlin-multiplatform-render` builds `jvm` and `android` only.
+ * artifact, and `dev.wildware.udea.kotlin-multiplatform-render` builds `jvm` and `android` only.
  *
  * ## Two schemes in one number, which is why this is a table and not arithmetic
  *

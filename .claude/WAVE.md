@@ -45,7 +45,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - Dispatched: dev-215 (Udea worktree, branch issue-215-vendor-fleks), dev-210 (composegl-wt/kool-210, branch issue-210-composegl-kool).
 - #210: landed composegl master `1086a586`, round 1 PASS (no findings). Draft PR composegl#232 (CI only; composegl CI does not run on branch pushes) closed. Master CI 35183141663 green, snapshot release 35183678529 green: `dev.wildware.composegl:composegl-kool:0.7.0-SNAPSHOT`. Wiki pushed. Kool must start with `renderBackend = RenderBackendGl`. Worktree kept: `/srv/ssd1/workspace/composegl-wt/kool-210`. Next wave: #222 (composegl, Wasm/Android).
 - #215: merged `0befdec`, round 1 PASS (no findings). Fleks 2.14 vendored as `udea-fleks` (byte-identical to tag, reviewer diffed). iOS on: udea-fleks, core, gas, audio, replay (CI ios-tests 570 tests). udea-net + udea-agent stay no-iOS (expect with no native actual). UDEA-MG-007: udea-fleks deps stdlib + serialization-core only. Determinism pin = 2.14+sha256 of vendored source; DET002 flags Fleks random() picks. CI `clean build under budget` red once (1.636, accepted by lead, commented); merge push goes red once too, next kmp push should be green - CHECK. Worktree kept: `.claude/worktrees/agent-a5908c0877dd4f81f`.
-- Dropped cards: stale "Fleks requests stdlib 2.3.21" KDoc in udea.kotlin-base.
+- Dropped cards: stale "Fleks requests stdlib 2.3.21" KDoc in dev.wildware.udea.kotlin-base.
 
 ## Wave 8 (2026-09-17): done
 
@@ -568,7 +568,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   checks HUD panels in all 7 PNGs (+ dead.png). HeadlessHostTest 6863/6864 = load flake (udea-core). Card: licence
   header text copied from udea-editor names the wrong module. Worktree kept `.claude/worktrees/agent-a80b8fdec32c67256`.
 - **udea-physics2d MERGED `8de7cf5`**, round 1 PASS, no findings. box2d-jni 1.0.0 (native reports **Box2D 3.1.1**, README's
-  3.3.1 wrong; owner corrected). jvm+android via new `udea.kotlin-multiplatform-jvm-android` convention, shared
+  3.3.1 wrong; owner corrected). jvm+android via new `dev.wildware.udea.kotlin-multiplatform-jvm-android` convention, shared
   src/box2dMain + typealiases. Physics components now @Replicated all-@Sim (ids 22-26 appended), new
   `udea-core/net-protocol.lock` (by task), net-components.lock appended by hand (sorted-list gate checks it). Rewind:
   restore == rebuild-at-tick exactly; != unrewound run once bodies touch/spin (warm-start lost); only reachable via
@@ -662,7 +662,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   migration ledger, the three legacy gates (+ CI step), every com.badlogicgames coordinate (incl. gdx-box2d), the
   udea.kotlin-library-gl convention. Old asset tree moved (history kept, 107 renames) to `example-assets/` (not a
   project; staging reads example-assets/sprites; assets-compiler test corpus lives there). MG-009 now bans LibGDX from
-  EVERY project; MG-008 retired (not reused); MG-002 drops gdx patterns. `udea.migration-check` -> `udea.docs-check`.
+  EVERY project; MG-008 retired (not reused); MG-002 drops gdx patterns. `udea.migration-check` -> `dev.wildware.udea.docs-check`.
   udea-render jvmTest fixtures moved off gdx to LWJGL GL11. Owner-open (commented #213): moba/game/assets/sounds are
   byte copies of LICENSE's 24 unknown-provenance sounds; LICENSE never named that path (pre-existing). Out of scope:
   RenderModuleGraphTest never reads moba/game/build.gradle.kts; bytecode banned-owner table has no Kool entry.
@@ -745,7 +745,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 
 - Dispatched: #204 gas (dev-204), #205 assets (dev-205), #206 replay (dev-206), #209 net (dev-209). Disjoint modules.
 - #209 net: merged `dc6c708`, round 1 PASS (no findings). Conflicted with #206 (same three docs); dev-209 merged origin/kmp (75e3100). Ktor 3.6.0, coroutines 1.11.0, cryptography-kotlin 0.6.0. runUdpProof lossy fails more often (6/32 vs 1/26): reviewer ruled it exposes #219, not a branch defect. Filed #220 (UdpTransport reader stops silently). Worktree kept: `.claude/worktrees/agent-a4a820538f153b24b`.
-- Wave 5 note: stale `:udea-net:test` in udea-replay ReplayFixtures.kt:106 (after #209). docs/module-graph.md row for udea-assets still says `udea.kotlin-library` (stale after #205); hand the fix to the next ticket editing that file (#207 or #208).
+- Wave 5 note: stale `:udea-net:test` in udea-replay ReplayFixtures.kt:106 (after #209). docs/module-graph.md row for udea-assets still says `dev.wildware.udea.kotlin-library` (stale after #205); hand the fix to the next ticket editing that file (#207 or #208).
 - Wave 5 candidates: #216 (build-logic inputs, found wave 4), #218 (CI budget job base is retired example), #217 (determinism scanner misses TimeSource, found by dev-204).
 - #204 gas: merged `4ca994d` (+ BRIEF-204.md `c58cb75`), round 1 PASS. Trial + merged build green; build-logic check only #216. udea-core `KClass.runtimeName` now public; `roundHalfUp` replaces Math.round (roundToInt differs on Wasm). Worktree kept: `.claude/worktrees/agent-a8b2f894959c4489d`.
 - #206 replay: merged `236ad47`, round 1 PASS (no findings). First trial conflicted with #204 (ci.yml/AGENTS.md/module-graph.md, one sentence each); dev-206b merged origin/kmp into the branch (docs-only resolutions), second trial clean + green. KSP on kspJvm only until #208; pure-Kotlin CRC-32. Worktree kept: `.claude/worktrees/agent-a32c9ac76b37a1e7a`.
@@ -756,12 +756,12 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 - #205 touched shared build-logic: K2 plugin classpath transitive on Kotlin/Native compilations (iOS crash fix); UDEA-MG-006 allows kotlinx-io.
 - Held to wave 5: #208 (udea-agent `implementation`-depends on udea-assets, needs #205; commented), #207 (needs #205).
 - #206 ruling: udea-agent stays JVM until #208, so replay keeps agent-tool code in a JVM source set (commented).
-- #205 (assets) does not depend on udea-core, so it takes full `udea.kotlin-multiplatform` including iOS.
+- #205 (assets) does not depend on udea-core, so it takes full `dev.wildware.udea.kotlin-multiplatform` including iOS.
 
 ## Wave 3 (2026-09-16): done
 
 - #203 udea-core to KMP: merged `a634450`, round 1 PASS. jvm + android + wasmJs; **iOS OFF** because Fleks publishes
-  no iOS artifact (any version). Named convention `udea.kotlin-multiplatform-no-ios`; follow-up #215. Every module
+  no iOS artifact (any version). Named convention `dev.wildware.udea.kotlin-multiplatform-no-ios`; follow-up #215. Every module
   depending on udea-core inherits no-iOS until #215. udea-core not in CI `ios-tests`.
   `udeaVerifyDeterminism` now scans KMP jvm+android bytecode. Pin test `SimHarnessWorldHashPinTest` in udea-agent.
   Worktree kept: `.claude/worktrees/agent-aba51a45c03b91d81`.
@@ -778,8 +778,8 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
 
 - #200 Kool Offscreen spike: merged `d97517b`, round 1 PASS. Yes: Kool 0.19.0, GL on llvmpipe under xvfb.
   Needs an X11 GLFW-init workaround and a per-backend row flip; noted on #211. Code in `spikes/kool-offscreen/`.
-- #201 KMP convention plugin: merged `90b26fc`, round 1 PASS. Plugins `udea.kotlin-multiplatform`,
-  `udea.kotlin-multiplatform-render`, `udea.kotlin-base`, `udea.jvm-test-fixtures`.
+- #201 KMP convention plugin: merged `90b26fc`, round 1 PASS. Plugins `dev.wildware.udea.kotlin-multiplatform`,
+  `dev.wildware.udea.kotlin-multiplatform-render`, `dev.wildware.udea.kotlin-base`, `dev.wildware.udea.jvm-test-fixtures`.
 - Cards filed: none. Notes carried as comments on #211 (Kool workarounds) and #203 (`udeaVerifyDeterminism`
   layout; add module to CI `ios-tests`).
 
@@ -814,7 +814,7 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   scratchpad; nothing clobbered, all three told.)
 
 - New runtime module must call `udeaModule("Name")` in its build script, or codegen errors (#202 ruling).
-- Modules depending on udea-core cannot have iOS until #215 (Fleks); use `udea.kotlin-multiplatform-no-ios` (#203 ruling).
+- Modules depending on udea-core cannot have iOS until #215 (Fleks); use `dev.wildware.udea.kotlin-multiplatform-no-ios` (#203 ruling).
 - #207 (audio) needs #203 and #205 too, not only #201: it `api`-depends on core and uses assets.
 
 - **Every build command needs `ANDROID_HOME=$HOME/Android/Sdk`** since #201 (put it in developer, reviewer

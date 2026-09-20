@@ -7,7 +7,7 @@ plugins {
     // Kotlin Multiplatform on `jvm` and `android` (issue #211). The convention states why the
     // other two targets are missing: Kool has no iOS backend (spec D2) and publishes no wasmJs
     // artifact yet (issue #223).
-    id("udea.kotlin-multiplatform-render")
+    id("dev.wildware.udea.kotlin-multiplatform-render")
 
     // The interface is ComposeGL, so this module compiles `@Composable` (spec D5, issue #224).
     // Applied here and in no convention: this is the only module that hosts a UI backend, and a

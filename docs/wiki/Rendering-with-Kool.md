@@ -250,7 +250,7 @@ loudly rather than drawing into nothing.
 
 ## Platforms
 
-`udea-render` targets `jvm` and `android` (the `udea.kotlin-multiplatform-render` convention). Kool
+`udea-render` targets `jvm` and `android` (the `dev.wildware.udea.kotlin-multiplatform-render` convention). Kool
 has no iOS backend and publishes no wasmJs artifact, so nothing that draws has those targets.
 `moba`'s Android launcher boots the simulation headless, because `udea-render` has no Android Kool
 backend yet. See [Architecture](Architecture).

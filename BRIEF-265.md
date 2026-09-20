@@ -223,7 +223,7 @@ ComposeGL's root build configures it: `publishToMavenCentral(automaticRelease = 
 deployment is uploaded and left for a person to press publish on, `signAllPublications()` only
 when `signingInMemoryKey` is present, `coordinates(...)`, a POM block, and an error when a
 published module has no `description`. `build-logic` publishes alongside it — the convention
-plugins a game applies, and a version catalog — so an outside game can apply `udea.game-gates`
+plugins a game applies, and a version catalog — so an outside game can apply `dev.wildware.udea.game-gates`
 at all.
 
 **Nothing has been published from this branch, and nothing can be by accident.** The deliverable
@@ -232,7 +232,7 @@ is `publishToMavenLocal` working on this box and a CI path that stops short of C
 workflow, `central-publish.yml`, run by hand with a deployment id and a typed confirmation. No
 push, tag or merge publishes anything.
 
-**The gates are configuration, not a list of `:moba:*` paths.** `udea.game-gates` is the single
+**The gates are configuration, not a list of `:moba:*` paths.** `dev.wildware.udea.game-gates` is the single
 plugin a Udea build applies to get the module-graph, determinism, editor-absent and release
 checks. This repository's root build script and a game's own root build script apply the same
 plugin and write the same `udeaGates { }` block:
@@ -297,7 +297,7 @@ Each of these is also an issue comment on #265, so it is reviewable after this b
 4. **The Kotlin convention no longer sets `group` or `version`.** It set
    `dev.wildware.udea` / `1.0-SNAPSHOT`, which was harmless while it only reached this
    repository's modules and stops being harmless the moment it is published: a game applying
-   `udea.kotlin-library` would be given the engine's coordinates by a plugin it merely applied.
+   `dev.wildware.udea.kotlin-library` would be given the engine's coordinates by a plugin it merely applied.
    The root build script sets both, for this build's projects only. The version rule is
    `UdeaVersion.resolve`, ComposeGL's rule with `-PudeaVersion` in place of `-PcomposeglVersion`,
    so an ordinary build here is now `0.1.0-SNAPSHOT` rather than `1.0-SNAPSHOT`. Nothing in the

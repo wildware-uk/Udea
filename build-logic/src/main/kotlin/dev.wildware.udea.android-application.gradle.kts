@@ -11,7 +11,7 @@ import dev.wildware.udea.build.udeaCatalog
  * whole difference: it applies AGP's application plugin rather than its multiplatform library
  * plugin, and it has one target by construction.
  *
- * It still goes through `udea.kotlin-base`, so the explicit-API rule, the JDK toolchain, the
+ * It still goes through `dev.wildware.udea.kotlin-base`, so the explicit-API rule, the JDK toolchain, the
  * `kotlin-stdlib` pin and the K2 compiler plugin reach an app exactly as they reach a library. A
  * launcher that quietly compiled without the FIR checkers would be the one module in the tree the
  * checkers could not see.
@@ -23,7 +23,7 @@ import dev.wildware.udea.build.udeaCatalog
 plugins {
     id("com.android.application")
     kotlin("android")
-    id("udea.kotlin-base")
+    id("dev.wildware.udea.kotlin-base")
 }
 
 repositories {

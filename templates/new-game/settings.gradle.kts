@@ -39,12 +39,12 @@ pluginManagement {
     }
 
     // The version is stated once, here, so no build script in this repository repeats it. A
-    // script applies `id("udea.game-gates")` with no version and gets this one.
+    // script applies `id("dev.wildware.udea.game-gates")` with no version and gets this one.
     plugins {
-        id("udea.kotlin-library") version udeaVersion
-        id("udea.kotlin-multiplatform") version udeaVersion
-        id("udea.kotlin-multiplatform-render") version udeaVersion
-        id("udea.game-gates") version udeaVersion
+        id("dev.wildware.udea.kotlin-library") version udeaVersion
+        id("dev.wildware.udea.kotlin-multiplatform") version udeaVersion
+        id("dev.wildware.udea.kotlin-multiplatform-render") version udeaVersion
+        id("dev.wildware.udea.game-gates") version udeaVersion
         id("dev.wildware.udea.agent") version udeaVersion
         id("dev.wildware.udea.assets") version udeaVersion
     }

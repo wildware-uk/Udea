@@ -289,7 +289,7 @@ file; an undecodable `.ogg` and `.wav`; a line the system refuses; `close` while
 ## 7. What a browser implementation would take
 
 A Kool release with a `wasmJs` artifact (none exists for 0.19.0; #223). Then: add the `wasmJs` target to
-`udea.kotlin-multiplatform-render`, and a `wasmJsMain` loader that builds Kool's web clip from a URL (in the 0.19.0
+`dev.wildware.udea.kotlin-multiplatform-render`, and a `wasmJsMain` loader that builds Kool's web clip from a URL (in the 0.19.0
 JS artifact that is `AudioClipImpl(assetPath: String)` over an HTML `Audio` element), plus a factory like
 `koolAudioDevice` taking a base URL. `KoolAudioDevice` does not change. Two things to check then: whether the web
 clip has the same `minIntervalMs` and latest-voice volume behaviour, and that browsers only start audio after a user

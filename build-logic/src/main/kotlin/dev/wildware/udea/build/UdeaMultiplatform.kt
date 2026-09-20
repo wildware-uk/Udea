@@ -61,7 +61,7 @@ internal object UdeaMultiplatform {
      * AGP's build types, which name the front of an Android application's classpaths.
      *
      * Written out rather than read off the project, because this is a pure function used by the
-     * gates and by `UdeaMultiplatformTest`; `udea.android-application` declares exactly these two
+     * gates and by `UdeaMultiplatformTest`; `dev.wildware.udea.android-application` declares exactly these two
      * and nothing in this repository adds a third. A build type added there without a line here
      * is a classpath the gates would stop seeing - which is why `UdeaStdlibPin.unclassified` is
      * the backstop: it fails on any resolvable configuration nothing has classified, so the new
@@ -151,7 +151,7 @@ internal object UdeaMultiplatform {
             runtimeOnly(project.udeaLibrary("junit5-platform-launcher"))
         }
 
-        // The JVM leg runs on JUnit 5 like every `udea.kotlin-library` module. Only `jvmTest`:
+        // The JVM leg runs on JUnit 5 like every `dev.wildware.udea.kotlin-library` module. Only `jvmTest`:
         // Android host tests are also a `Test` task, and their runner is AGP's to choose.
         project.tasks.named<Test>("jvmTest") { useJUnitPlatform() }
 

@@ -47,14 +47,14 @@ class RenderModuleGraphTest {
     @Test
     fun `udea-render is the only module on the GL convention`() {
         // "udea.kotlin-library-gl" was the pre-Kool convention id, applied when udea-render was
-        // a plain JVM module. Issue #211 moved it onto "udea.kotlin-multiplatform-render"
+        // a plain JVM module. Issue #211 moved it onto "dev.wildware.udea.kotlin-multiplatform-render"
         // instead (jvm + android, no iOS, no wasmJs - Kool has neither), and that plugin id is
         // now the one and only marker of "this module owns GL".
         val offenders = RepoLayout.repoRoot.listFiles()
             .orEmpty()
             .filter { it.isDirectory && (it.name.startsWith("udea-") || it.name == "moba") }
             .map { it to it.resolve("build.gradle.kts") }
-            .filter { (_, script) -> script.isFile && "udea.kotlin-multiplatform-render" in script.readText() }
+            .filter { (_, script) -> script.isFile && "dev.wildware.udea.kotlin-multiplatform-render" in script.readText() }
             .map { (module, _) -> module.name }
 
         assertEquals(listOf("udea-render"), offenders)

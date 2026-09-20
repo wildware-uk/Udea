@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  */
 class ModuleGraphCheckTest {
 
-    private val gate = "udea.module-graph-check"
+    private val gate = "dev.wildware.udea.module-graph-check"
 
     @Test
     fun `UDEA-MG-001 fails an extra dependency on the annotations runtime classpath`(

@@ -3,7 +3,7 @@ package dev.wildware.udea.gradle
 /**
  * The Gradle plugin: tasks, verifiers and gamebridge.json emission.
  *
- * gradleApi() is compileOnly (see the udea.gradle-plugin convention) and no game module
+ * gradleApi() is compileOnly (see the dev.wildware.udea.gradle-plugin convention) and no game module
  * depends on this project, so the Gradle API cannot reach a game's runtime classpath the
  * way it did through the old gradle-plugin module.
  *

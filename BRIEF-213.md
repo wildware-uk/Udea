@@ -121,7 +121,7 @@ any module (it would ship with that module and be deleted with it). Commented on
   upward-arrow rules and the release rules. `governs()` and the scanned-configuration set moved
   from `LegacyDependencyRules` into `ModuleGraphRules` with the same values.
 
-**`udea.migration-check` became `udea.docs-check`.** It also registered `udeaVerifyAgentsMd` and
+**`udea.migration-check` became `dev.wildware.udea.docs-check`.** It also registered `udeaVerifyAgentsMd` and
 `udeaVerifyTrelloMap`, and both stay. Their failure message used to end "docs/migration/ledger.md
 explains the columns", which would have pointed at a deleted file, so each gate now states its own
 remedy. The shared finding type `MigrationFinding` is renamed `GateFinding`.

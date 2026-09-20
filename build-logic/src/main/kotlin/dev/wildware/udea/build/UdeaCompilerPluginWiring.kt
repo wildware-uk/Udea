@@ -185,7 +185,7 @@ public object UdeaCompilerPluginWiring {
     /**
      * True when the K2 plugin is applied to every compilation of [projectPath].
      *
-     * Every module on the `udea.kotlin-base` convention, minus [EXCLUSIONS]. It used to ask
+     * Every module on the `dev.wildware.udea.kotlin-base` convention, minus [EXCLUSIONS]. It used to ask
      * [ModuleGraphRules.governs] as well, which answered "is this path `:udea-*` or `:moba*`" -
      * true of every module on the convention in this repository, and false of every module of a
      * game in its own repository (issue #265). That is a question about *which build* is asking,

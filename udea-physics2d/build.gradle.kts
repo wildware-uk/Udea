@@ -1,7 +1,7 @@
 plugins {
     // `jvm` and `android` only: `box2d-jni` publishes natives for the desktop JVM and an AAR for
     // Android, and nothing for iOS or Wasm. See the convention's KDoc.
-    id("udea.kotlin-multiplatform-jvm-android")
+    id("dev.wildware.udea.kotlin-multiplatform-jvm-android")
 }
 
 /**

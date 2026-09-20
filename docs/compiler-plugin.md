@@ -114,7 +114,7 @@ Two switches, outer and inner:
 ### How the outer switch is wired
 
 `UdeaCompilerPluginSupport` in `build-logic` is a `KotlinCompilerPluginSupportPlugin`, applied
-by the `udea.kotlin-library` convention that every `udea-*` module and `moba` is on. It reads
+by the `dev.wildware.udea.kotlin-library` convention that every `udea-*` module and `moba` is on. It reads
 the flag in `isApplicable`, so with the flag off it declares no compilation applicable and the
 Kotlin Gradle plugin adds nothing to anything.
 
@@ -296,4 +296,4 @@ load-bearing.
 | No `@Q(bits)`-out-of-range or `min >= max` checker | The rule id exists — `UdeaRules.MALFORMED_QUANTIZATION` is `UDEA0007`, and `udea-codegen` raises it three times from `ComponentModelBuilder`. The remaining blocker is FIR-side: a checker would have to constant-evaluate the `@Q` arguments to know `bits` or `min`/`max` at all, which is what `UdeaRules.kt`'s own note on the rule says. KSP sees the literals and already raises both. |
 | No "`@Net`/`@Sim` on a property of a non-`@Replicated` class" checker | No registered id for it. The `val` rules do fire outside `@Replicated`, so the silent-failure case is not entirely uncovered. |
 | No authority-vocabulary warning (`OwnerPredicted` on a class with no owner concept) | There is no owner concept in the tree yet, so the check has nothing to test against. |
-| The `kotlin-upgrade-probe` CI leg does not actually build against an RC | `UdeaVersions.KOTLIN` is a hard-coded constant and `udea.kotlin-build-tool` fails configuration if the running KGP differs. Making it overridable is a `build-logic` change. |
+| The `kotlin-upgrade-probe` CI leg does not actually build against an RC | `UdeaVersions.KOTLIN` is a hard-coded constant and `dev.wildware.udea.kotlin-build-tool` fails configuration if the running KGP differs. Making it overridable is a `build-logic` change. |

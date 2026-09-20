@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
  *
  * Spec 7 makes this flag the mitigation for D8: a Kotlin release that breaks the K2 plugin
  * must degrade to checkers-off rather than blocking every phase. For the whole of Phase 0 the
- * flag was read by `udea.kotlin-library`, stored in `extraProperties` and consumed by nobody,
+ * flag was read by `dev.wildware.udea.kotlin-library`, stored in `extraProperties` and consumed by nobody,
  * so the `plugin-disabled` CI leg compiled byte for byte what the `build` job compiled. This
  * class was then a tripwire on that documented absence, written to fail the day wiring landed.
  *
@@ -31,11 +31,11 @@ class CompilerPluginSwitchTest {
     private val repoRoot = File("..").canonicalFile
 
     /**
-     * The convention every Kotlin module is on: `udea.kotlin-library` and both multiplatform
+     * The convention every Kotlin module is on: `dev.wildware.udea.kotlin-library` and both multiplatform
      * conventions apply it (issue #201), so it is where the wiring has to live.
      */
     private val convention =
-        repoRoot.resolve("build-logic/src/main/kotlin/udea.kotlin-base.gradle.kts")
+        repoRoot.resolve("build-logic/src/main/kotlin/dev.wildware.udea.kotlin-base.gradle.kts")
 
     private val ci = repoRoot.resolve(".github/workflows/ci.yml")
 
@@ -55,7 +55,7 @@ class CompilerPluginSwitchTest {
     fun `something implements a KotlinCompilerPluginSupportPlugin`() {
         val sources = buildLogicSources()
         assertTrue(
-            sources.any { it.name == "udea.kotlin-library.gradle.kts" },
+            sources.any { it.name == "dev.wildware.udea.kotlin-library.gradle.kts" },
             "the scan found no convention plugins under $repoRoot, so it is checking nothing",
         )
         val wiring = sources.filter { "KotlinCompilerPluginSupportPlugin" in it.readText() }
@@ -77,7 +77,7 @@ class CompilerPluginSwitchTest {
         assertTrue(convention.isFile, "not found: $convention")
         assertTrue(
             "apply<UdeaCompilerPluginSupport>()" in convention.readText(),
-            "udea.kotlin-base no longer applies UdeaCompilerPluginSupport, so whichever " +
+            "dev.wildware.udea.kotlin-base no longer applies UdeaCompilerPluginSupport, so whichever " +
                 "modules still compile with the K2 plugin do so by accident",
         )
     }

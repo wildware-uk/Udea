@@ -6,7 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * `udea.game-gates` over a build that is not this repository (issue #265).
+ * `dev.wildware.udea.game-gates` over a build that is not this repository (issue #265).
  *
  * The fixture is a root project with two subprojects and no engine in it, which is the shape of
  * a game's own build. What is being tested is that applying one plugin is enough: the per-project
@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
  */
 class GameGatesTest {
 
-    private val gates = "udea.game-gates"
+    private val gates = "dev.wildware.udea.game-gates"
 
     /** A game project: real configurations, so the module-graph gate has something to inspect. */
     private fun gameProject(name: String, fixture: GradleFixture) = fixture.project(
@@ -85,7 +85,7 @@ class GameGatesTest {
             "game",
             """
             plugins { `java-library` }
-            // What `udea.kotlin-library` registers on a real game module: the task that builds
+            // What `dev.wildware.udea.kotlin-library` registers on a real game module: the task that builds
             // the bytecode the scan reads. The gate depends on it by path, so that it can never
             // read whatever stale `build/classes` was lying around.
             tasks.register("${ModuleGraphRules.MAIN_BYTECODE_TASK}")

@@ -5,7 +5,7 @@ import dev.wildware.udea.build.UdeaMultiplatform
  * `iosArm64` and `iosSimulatorArm64` (spec section 3, issue #201).
  *
  * Build-time modules - `udea-codegen`, `udea-compiler-plugin`, `udea-assets-compiler`,
- * `udea-gradle` - stay on `udea.kotlin-library`: they run inside the compiler or Gradle, which
+ * `udea-gradle` - stay on `dev.wildware.udea.kotlin-library`: they run inside the compiler or Gradle, which
  * are JVM processes, so there is nowhere else for them to run.
  *
  * A JVM consumer of a module on this convention needs no change. Gradle's variant matching picks
@@ -20,7 +20,7 @@ import dev.wildware.udea.build.UdeaMultiplatform
 plugins {
     kotlin("multiplatform")
     id("com.android.kotlin.multiplatform.library")
-    id("udea.kotlin-base")
+    id("dev.wildware.udea.kotlin-base")
 }
 
 repositories {

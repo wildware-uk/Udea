@@ -28,7 +28,7 @@ still write a PNG, of an empty sky. So it is not the evidence command.
 
 Hollow is a second example game (epic #245), set up the way moba is:
 
-- `:hollow:game` is a KMP library on `udea.kotlin-multiplatform-render`. It has KSP (`udeaModule("Hollow")`
+- `:hollow:game` is a KMP library on `dev.wildware.udea.kotlin-multiplatform-render`. It has KSP (`udeaModule("Hollow")`
   gives `HollowUdeaRegistry`), the asset pipeline (`GameAssets.models.*`) and the bundled
   `levels/clearing.udealevel`.
 - `:hollow:desktop` is a JVM launcher.

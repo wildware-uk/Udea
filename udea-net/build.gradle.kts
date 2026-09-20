@@ -11,9 +11,9 @@ plugins {
     // THE iOS SWITCH. udea-core has iOS targets since Fleks was vendored (issue #215), but this
     // module does not yet: `webSocketEngine` is an `expect` with `actual`s for the socket targets
     // and Wasm only, so an iOS target fails to compile. With a native engine for it, this line
-    // becomes `id("udea.kotlin-multiplatform")`, and the `socket` group below gains `withNative()`
+    // becomes `id("dev.wildware.udea.kotlin-multiplatform")`, and the `socket` group below gains `withNative()`
     // so the iOS targets get `UdpTransport` too.
-    id("udea.kotlin-multiplatform-no-ios")
+    id("dev.wildware.udea.kotlin-multiplatform-no-ios")
 }
 
 /**

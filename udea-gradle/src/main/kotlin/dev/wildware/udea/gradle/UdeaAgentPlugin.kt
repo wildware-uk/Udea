@@ -169,7 +169,7 @@ public abstract class UdeaGenerateAgentBuildFlagsTask : DefaultTask() {
  *
  * ## Nothing here reaches the game's runtime classpath
  *
- * `gradleApi()` is `compileOnly` on this module (the `udea.gradle-plugin` convention) and no game
+ * `gradleApi()` is `compileOnly` on this module (the `dev.wildware.udea.gradle-plugin` convention) and no game
  * module depends on this project, which is what stops the defect the old `gradle-plugin` had: it
  * declared `gradleApi()` as `implementation` and games depended on it, so the whole Gradle API
  * shipped on the game's runtime classpath.

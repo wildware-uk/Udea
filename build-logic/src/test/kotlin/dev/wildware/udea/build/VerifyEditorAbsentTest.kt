@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
  */
 class VerifyEditorAbsentTest {
 
-    private val gate = "udea.module-graph-check"
+    private val gate = "dev.wildware.udea.module-graph-check"
     private val task = ":moba:udeaVerifyEditorAbsent"
 
     /** Writes a class called [name] implementing [interfaces] under [dir], as a compiler would. */

@@ -160,8 +160,8 @@ BUILD FAILED in 23s
 
 ## 2. Summary
 
-**Layout.** `udea-replay` applies `udea.kotlin-multiplatform-no-ios` (jvm, android, wasmJs) plus
-`udea.jvm-test-fixtures`, the way `udea-core` does after #203.
+**Layout.** `udea-replay` applies `dev.wildware.udea.kotlin-multiplatform-no-ios` (jvm, android, wasmJs) plus
+`dev.wildware.udea.jvm-test-fixtures`, the way `udea-core` does after #203.
 
 - `commonMain`: `ReplayFormat` (with `ByteSink`/`ByteSource`), `ReplayRecording` (encode/decode),
   `ReplayHeader`, `InputSchema`, `InputSample`, `ReplayRecorder`, `ReplayWorld`, `ReplaySession`,
@@ -400,8 +400,8 @@ keeps both modules:
 - `.github/workflows/ci.yml`: the iOS-tests comment now says `udea-gas` (#204) and `udea-replay`
   (#206) are both left out for the same reason, through `udea-core`. It is a comment only; no step
   changed.
-- `AGENTS.md`: the multiplatform paragraph names both modules on `udea.kotlin-multiplatform-no-ios`.
-- `docs/module-graph.md`: the `udea.kotlin-multiplatform-no-ios` row lists `udea-core`, `udea-gas`
+- `AGENTS.md`: the multiplatform paragraph names both modules on `dev.wildware.udea.kotlin-multiplatform-no-ios`.
+- `docs/module-graph.md`: the `dev.wildware.udea.kotlin-multiplatform-no-ios` row lists `udea-core`, `udea-gas`
   and `udea-replay`, each with its reason.
 
 Results on `eece16e`. Other developers' Gradle builds were running on the box at the same time.
@@ -423,7 +423,7 @@ Merge commit `c286c6c`. Git merged it with no conflicts. I read the three shared
 merge, and each still names `udea-gas` and `udea-replay` correctly:
 
 - the `ios-tests` comment in `ci.yml`;
-- the `udea.kotlin-multiplatform-no-ios` row in `docs/module-graph.md`;
+- the `dev.wildware.udea.kotlin-multiplatform-no-ios` row in `docs/module-graph.md`;
 - the multiplatform paragraph in `AGENTS.md`.
 
 `udea-assets` has iOS and joins the iOS job itself, so none of the three needed an edit.

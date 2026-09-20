@@ -107,7 +107,7 @@ on this box is Temurin **25.0.2**, and Gradle 8.13 does not support it. The enti
 
 No cause, no hint, no mention of Java. There is **no JDK 17 installed** here either — sdkman has
 11.0.32, 21.0.11, 21.0.2-graalce, 25.0.2 and 25.3.4-graalce — so the `jvmToolchain(17)` in
-`udea.kotlin-library.gradle.kts` is satisfied by provisioning, while the *launcher* JVM is whatever
+`dev.wildware.udea.kotlin-library.gradle.kts` is satisfied by provisioning, while the *launcher* JVM is whatever
 `JAVA_HOME` says. 21.0.11 works; 25 does not.
 
 **Pass `timeout: 600000` on every `gradlew` Bash call.** The tool's default is 120 seconds and a

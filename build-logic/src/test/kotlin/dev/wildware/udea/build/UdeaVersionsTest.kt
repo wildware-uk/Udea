@@ -56,7 +56,7 @@ class UdeaVersionsTest {
         assertTrue(
             text.contains("JvmTarget.JVM_${UdeaVersions.JVM_TOOLCHAIN}"),
             "the root build's allprojects block sets jvmTarget for the whole tree, including " +
-                "the old tree, which is not on the udea.kotlin-library convention. It must " +
+                "the old tree, which is not on the dev.wildware.udea.kotlin-library convention. It must " +
                 "agree with UdeaVersions.JVM_TOOLCHAIN=${UdeaVersions.JVM_TOOLCHAIN}, or " +
                 "udea-render compiles to one bytecode level and declares another - which is a " +
                 "dependency-resolution failure against ComposeGL's jvm.version=21, not a " +

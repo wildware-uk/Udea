@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * `udea.kotlin-multiplatform` and `udea.kotlin-multiplatform-render`, applied to a real build
+ * `dev.wildware.udea.kotlin-multiplatform` and `dev.wildware.udea.kotlin-multiplatform-render`, applied to a real build
  * (issue #201, spec sections 3 and 7).
  *
  * The targets a runtime module compiles for are the whole of what these conventions decide, and
@@ -43,7 +43,7 @@ class KotlinMultiplatformConventionTest {
 
     @Test
     fun `the runtime convention targets JVM, Android, Wasm and both iOS ARM targets`(@TempDir root: File) {
-        val result = multiplatformFixture(root, "udea.kotlin-multiplatform").build(":sample:printTargets")
+        val result = multiplatformFixture(root, "dev.wildware.udea.kotlin-multiplatform").build(":sample:printTargets")
 
         assertEquals(
             listOf("android", "iosArm64", "iosSimulatorArm64", "jvm", "wasmJs"),
@@ -56,7 +56,7 @@ class KotlinMultiplatformConventionTest {
         // Spec D2: Kool has no iOS backend, so the one module that draws cannot have an iOS
         // target until it does. Issue #223: Kool 0.19.0 publishes no wasmJs artifact, so a wasmJs
         // target fails resolution. Everything else about the conventions is shared.
-        val result = multiplatformFixture(root, "udea.kotlin-multiplatform-render").build(":sample:printTargets")
+        val result = multiplatformFixture(root, "dev.wildware.udea.kotlin-multiplatform-render").build(":sample:printTargets")
 
         assertEquals(listOf("android", "jvm"), printed(result.output, "targets"))
     }
@@ -65,7 +65,7 @@ class KotlinMultiplatformConventionTest {
     fun `the no-iOS convention is the runtime set without iOS`(@TempDir root: File) {
         // Issue #215: a module whose dependencies publish no iOS variant cannot declare an iOS
         // target at all, because Kotlin compiles iOS klibs on every host and resolution fails.
-        val result = multiplatformFixture(root, "udea.kotlin-multiplatform-no-ios").build(":sample:printTargets")
+        val result = multiplatformFixture(root, "dev.wildware.udea.kotlin-multiplatform-no-ios").build(":sample:printTargets")
 
         assertEquals(listOf("android", "jvm", "wasmJs"), printed(result.output, "targets"))
     }
@@ -74,21 +74,21 @@ class KotlinMultiplatformConventionTest {
     fun `the JVM-and-Android convention has no iOS and no Wasm target`(@TempDir root: File) {
         // `box2d-jni` publishes desktop natives and an Android AAR and nothing else, so a module
         // over it declares only the two targets a dependency on it can resolve for.
-        val result = multiplatformFixture(root, "udea.kotlin-multiplatform-jvm-android").build(":sample:printTargets")
+        val result = multiplatformFixture(root, "dev.wildware.udea.kotlin-multiplatform-jvm-android").build(":sample:printTargets")
 
         assertEquals(listOf("android", "jvm"), printed(result.output, "targets"))
     }
 
     @Test
     fun `every multiplatform convention carries the stdlib pin and the compiler-plugin gate on check`(@TempDir root: File) {
-        // A module moving from `udea.kotlin-library` to multiplatform must not lose the two gates
+        // A module moving from `dev.wildware.udea.kotlin-library` to multiplatform must not lose the two gates
         // that convention hangs on `check`. `--dry-run` lists what `check` would execute without
         // compiling anything.
         for (plugin in listOf(
-            "udea.kotlin-multiplatform",
-            "udea.kotlin-multiplatform-no-ios",
-            "udea.kotlin-multiplatform-render",
-            "udea.kotlin-multiplatform-jvm-android",
+            "dev.wildware.udea.kotlin-multiplatform",
+            "dev.wildware.udea.kotlin-multiplatform-no-ios",
+            "dev.wildware.udea.kotlin-multiplatform-render",
+            "dev.wildware.udea.kotlin-multiplatform-jvm-android",
         )) {
             val dir = File(root, plugin).also { it.mkdirs() }
             val output = multiplatformFixture(dir, plugin).build(":sample:check", "--dry-run").output
@@ -105,8 +105,8 @@ class KotlinMultiplatformConventionTest {
             "udea-annotations",
             """
             plugins {
-                id("udea.kotlin-multiplatform")
-                id("udea.module-graph-check")
+                id("dev.wildware.udea.kotlin-multiplatform")
+                id("dev.wildware.udea.module-graph-check")
             }
             ${fixture.repositoryBlock()}
             $dependencies
@@ -153,15 +153,15 @@ class KotlinMultiplatformConventionTest {
                 "library",
                 """
                 plugins {
-                    id("udea.kotlin-multiplatform")
-                    id("udea.jvm-test-fixtures")
+                    id("dev.wildware.udea.kotlin-multiplatform")
+                    id("dev.wildware.udea.jvm-test-fixtures")
                 }
                 """.trimIndent(),
             )
             .project(
                 "consumer",
                 """
-                plugins { id("udea.kotlin-library") }
+                plugins { id("dev.wildware.udea.kotlin-library") }
                 dependencies { testImplementation(testFixtures(project(":library"))) }
 
                 val classpath: FileCollection = configurations.getByName("testRuntimeClasspath")

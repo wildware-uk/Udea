@@ -19,21 +19,21 @@ plugins {
     // A game in its own repository applies this same plugin and writes the same block, so the
     // gates `moba` is held to are the gates any game is held to, by one code path rather than by
     // a list of `:moba:*` paths inside `build-logic` that only this repository could satisfy.
-    id("udea.game-gates")
+    id("dev.wildware.udea.game-gates")
 
     // The exception: `AGENTS.md` and the Trello map are documents about the whole tree, so the
     // gates that hold them to it belong on the root.
-    id("udea.docs-check")
+    id("dev.wildware.udea.docs-check")
 
     // And once more, for the same reason (issue #174): `docs/contracts/` is declared frozen in
     // `AGENTS.md` and nothing enforced it, so a contract several modules independently
     // implement could move in any commit and the build stayed green. The question is about the
     // repository rather than about a module, so the gate belongs where the other two do.
-    id("udea.contract-freeze")
+    id("dev.wildware.udea.contract-freeze")
 
     // Root for the same reason again (issue #181): the clean-build-budget CI job asks whether a
     // commit made `udeaAssemble` as a whole slower, and this is where it asks for the verdict.
-    id("udea.clean-build-budget")
+    id("dev.wildware.udea.clean-build-budget")
 
     // Publishing to Maven Central (issue #265). Declared here and applied below to the modules
     // the `published` set names, which is how a game in its own repository gets the engine at
@@ -51,7 +51,7 @@ plugins {
  * ordinary build here is `0.1.0-SNAPSHOT`.
  *
  * It used to be the literal `1.0-SNAPSHOT`, written once here and once again in
- * `udea.kotlin-base`. The second copy was the one that mattered, because a convention plugin sets
+ * `dev.wildware.udea.kotlin-base`. The second copy was the one that mattered, because a convention plugin sets
  * it on whatever project applies the convention - so a game in its own repository was published
  * under the engine's group and the engine's version by a plugin it merely applied. Group and
  * version are this build's own business, and they are set on this build's projects only.
@@ -121,7 +121,7 @@ allprojects {
  * the editor window - so a game that cannot resolve them cannot be developed at all. What
  * "debug-only" means here is that they must not reach a *release classpath*, which is
  * `UDEA-MG-012` and `UDEA-REL-002`'s job on the game's own build, and those gates travel with the
- * game because `udea.game-gates` publishes too.
+ * game because `dev.wildware.udea.game-gates` publishes too.
  *
  * `udea-assets-compiler` and `udea-gradle` are build-time only for the same reason and ship for
  * the same reason: `dev.wildware.udea.assets` cannot run a pipeline whose compiler is absent.
@@ -293,7 +293,7 @@ configure(subprojects.filter { it.path in published }) {
 
 // --- Phase 0 build gates (spec 4, spec 6, spec 7) ------------------------------------
 //
-// Wired through `udea.game-gates` rather than in each module's build script for two reasons: a
+// Wired through `dev.wildware.udea.game-gates` rather than in each module's build script for two reasons: a
 // gate a module opts into is a gate a new module forgets, and these files are owned by whoever
 // owns the module, which is the wrong person to be able to switch off the rule that governs the
 // module. The plugin registers the module-graph check on every project of this build that has a
@@ -346,7 +346,7 @@ udeaGates {
  * with no input passes forever"*. That refusal is right, so the container is excluded here rather
  * than the message being softened there.
  *
- * `udea.game-gates` selects the same set for the gates themselves; this local is what
+ * `dev.wildware.udea.game-gates` selects the same set for the gates themselves; this local is what
  * [udeaAssemble] below aggregates over.
  */
 val rewriteProjects = subprojects.filter { it.buildFile.exists() }

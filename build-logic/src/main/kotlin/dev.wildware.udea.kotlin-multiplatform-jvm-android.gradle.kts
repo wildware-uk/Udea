@@ -9,7 +9,7 @@ import dev.wildware.udea.build.UdeaMultiplatform
  * need an `actual` for each with nothing real behind it, which the charter forbids, so they are
  * simply absent. When `box2d-jni` publishes another platform, the switch is here.
  *
- * Not `udea.kotlin-multiplatform-render`, which configures the same two targets: that one is
+ * Not `dev.wildware.udea.kotlin-multiplatform-render`, which configures the same two targets: that one is
  * `udea-render`'s and says so, and `RenderModuleGraphTest` asserts `udea-render` is the only engine
  * module on it. The target set is the same by coincidence of two upstream libraries, not by design,
  * so the two conventions move independently.
@@ -18,7 +18,7 @@ import dev.wildware.udea.build.UdeaMultiplatform
 plugins {
     kotlin("multiplatform")
     id("com.android.kotlin.multiplatform.library")
-    id("udea.kotlin-base")
+    id("dev.wildware.udea.kotlin-base")
 }
 
 repositories {

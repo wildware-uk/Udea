@@ -143,7 +143,7 @@ Each mutation was reverted with `git checkout`. `git status` is clean except for
 
 `moba` was one JVM module with a LibGDX renderer and three `main`s. It had been red since #211 took LibGDX out of `udea-render`. Following spec D12, it is now three projects:
 
-- **`:moba:game`** is on `udea.kotlin-multiplatform-render`, so it builds for jvm and android. It holds the components, systems, assets, HUD and scene, and it has no entry point.
+- **`:moba:game`** is on `dev.wildware.udea.kotlin-multiplatform-render`, so it builds for jvm and android. It holds the components, systems, assets, HUD and scene, and it has no entry point.
   - KSP runs as `kspJvm`, and its output goes on `commonMain`. The Kotlin plugin creates no `commonMain` metadata compilation for an all-JVM-family target list, so `kspCommonMainKotlinMetadata` does not exist here. The build script explains this.
   - Its `net-protocol.lock` is byte-identical to `origin/kmp:moba/net-protocol.lock`. It moved and did not change.
 - **`:moba:desktop`** is the JVM launcher. It holds:

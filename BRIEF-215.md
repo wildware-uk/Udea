@@ -30,8 +30,8 @@ with `git checkout` after its run.
 **ev-origin-kmp-core** - udea-core put back as it is on `origin/kmp` (no iOS, Maven Fleks):
 
 ```
--    id("udea.kotlin-multiplatform")
-+    id("udea.kotlin-multiplatform-no-ios")
+-    id("dev.wildware.udea.kotlin-multiplatform")
++    id("dev.wildware.udea.kotlin-multiplatform-no-ios")
 ...
 -                api(project(":udea-fleks"))
 +                api(libs.fleks)
@@ -85,7 +85,7 @@ EXIT=1
 
 **What.** Fleks publishes no iOS variant at any version, and `udea-core` exposes it as `api`.
 Fleks' source from upstream tag `2.14` (commit `c3b69c240dc23e6869d7e54d53da8f1cb0e73c95`) is now
-the module `udea-fleks` on `udea.kotlin-multiplatform` (all five targets). `src/commonMain`,
+the module `udea-fleks` on `dev.wildware.udea.kotlin-multiplatform` (all five targets). `src/commonMain`,
 `src/commonTest` and `LICENSE` are byte-identical to the tag (`issue215-diff-commonMain.txt` is the
 empty `diff -r` output; the same `diff -r` for `commonTest` and `LICENSE` exited 0 in the session).
 `NOTICE.md` records origin, licence and the build differences. `udea-core` takes
@@ -153,7 +153,7 @@ and the KDoc paragraph that explained why it could not be banned is rewritten.
 **Comments on #215:** four decision comments (pin, DET002, which dependents flip, vendoring and
 catalog).
 
-**Not touched, noted.** `udea.kotlin-base.gradle.kts` still says removing the stdlib pin "makes
+**Not touched, noted.** `dev.wildware.udea.kotlin-base.gradle.kts` still says removing the stdlib pin "makes
 this task red on `udea-core` (Fleks requests 2.3.21)". `UdeaStdlibPin`/`UdeaKotlinPin` KDoc and
 `docs/module-graph.md` "Why the resolved stdlib had to be pinned" tell the same history. That was
 already not true on `origin/kmp`, where the compiler is 2.4.20. Left alone as out of scope.
@@ -265,7 +265,7 @@ The issue's "re-enabling iOS is" list, plus the lead's decided scope:
 | Criterion | Proof |
 |---|---|
 | Vendor Fleks 2.14 common source, MIT licence and notice kept, package names kept | `udea-fleks/{LICENSE,NOTICE.md}`; `diff -r` against tag `2.14` empty (section 2); udea-core main source unchanged apart from one KDoc paragraph in `Threads.native.kt` that said iOS was off; one test renamed |
-| New module on `udea.kotlin-multiplatform`, all five targets | `udea-fleks/build.gradle.kts`; iOS tests ran in CI (4b); jvm/android/wasm 298 each locally |
+| New module on `dev.wildware.udea.kotlin-multiplatform`, all five targets | `udea-fleks/build.gradle.kts`; iOS tests ran in CI (4b); jvm/android/wasm 298 each locally |
 | udea-core swaps Maven for `project(":udea-fleks")` as `api`, flips iOS | Section 1 `ev-maven-fleks` and `ev-origin-kmp-core` |
 | Dependents flip where nothing else blocks | gas/audio/replay: iOS CI 4b. net/agent blocked: `issue215-ios-probe.log` lines in section 2 |
 | Add udea-core and each flipped module to `ios-tests` | `.github/workflows/ci.yml`; 4b lists all five |

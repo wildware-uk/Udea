@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 plugins {
     // Every target, iOS included. Pathfinding is arithmetic over integer arrays: it names no
     // device, no clock and no platform API, so there is nothing here that a target could lack.
-    id("udea.kotlin-multiplatform")
+    id("dev.wildware.udea.kotlin-multiplatform")
     // Level files (issue #191): a building's footprint is level content, so `NavObstacle` and
     // `NavAgent` are `@Serializable` and `udea-codegen` lists them in `NavModuleRegistry`.
     alias(libs.plugins.kotlinSerialization)

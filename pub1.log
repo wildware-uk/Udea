@@ -1,0 +1,1139 @@
+Starting a Gradle Daemon, 3 busy Daemons could not be reused, use --status for details
+Calculating task graph as no cached configuration is available for tasks: publishToMavenLocal
+> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :build-logic:generateExternalPluginSpecBuilders FROM-CACHE
+> Task :build-logic:extractPrecompiledScriptPluginPlugins
+> Task :build-logic:compilePluginsBlocks FROM-CACHE
+> Task :build-logic:generatePrecompiledScriptPluginAccessors
+> Task :build-logic:generateScriptPluginAdapters
+> Task :build-logic:compileKotlin FROM-CACHE
+> Task :build-logic:compileJava NO-SOURCE
+> Task :build-logic:pluginDescriptors
+> Task :build-logic:processResources
+> Task :build-logic:classes
+> Task :build-logic:jar
+
+> Configure project :udea-agent
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Configure project :udea-annotations
+w: ⚠️ Native task 'iosSimulatorArm64Test' is disabled
+Task 'iosSimulatorArm64Test' for target 'ios_simulator_arm64' cannot run on the current host (linux-x86_64).
+Reason: simulator tests require macOS
+Solution: To suppress this warning, add 'kotlin.native.ignoreDisabledTargets=true' to gradle.properties.
+
+
+> Task :udea-annotations:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-diagnostics:jvmProcessResources NO-SOURCE
+> Task :udea-annotations:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-assets:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-diagnostics:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-diagnostics:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-agent:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-diagnostics:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-annotations:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-diagnostics:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-diagnostics:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-compiler-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-annotations:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-diagnostics:processJvmMainResources SKIPPED
+> Task :udea-annotations:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-diagnostics:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-assets:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-codegen:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-core:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-annotations:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-assets:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-assets:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-assets:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-assets:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-annotations:jvmProcessResources NO-SOURCE
+> Task :udea-annotations:processJvmMainResources SKIPPED
+> Task :udea-fleks:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-fleks:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-annotations:exportRootPublicationCoordinatesForMetadataApiElements
+> Task :udea-fleks:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-fleks:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-fleks:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-diagnostics:exportRootPublicationCoordinatesForMetadataApiElements
+> Task :udea-fleks:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-annotations:androidPreBuild UP-TO-DATE
+> Task :udea-annotations:preAndroidMainBuild UP-TO-DATE
+> Task :udea-core:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-core:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-compiler-plugin:processResources
+> Task :udea-core:metadataNonJvmMainProcessResources NO-SOURCE
+> Task :udea-core:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-core:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-fleks:androidPreBuild UP-TO-DATE
+> Task :udea-diagnostics:androidPreBuild UP-TO-DATE
+> Task :udea-diagnostics:preAndroidMainBuild UP-TO-DATE
+> Task :udea-fleks:preAndroidMainBuild UP-TO-DATE
+> Task :udea-assets:androidPreBuild UP-TO-DATE
+> Task :udea-assets:preAndroidMainBuild UP-TO-DATE
+> Task :udea-annotations:generateProjectStructureMetadata
+> Task :udea-diagnostics:generateProjectStructureMetadata
+> Task :udea-fleks:generateProjectStructureMetadata
+> Task :udea-core:androidPreBuild UP-TO-DATE
+> Task :udea-core:preAndroidMainBuild UP-TO-DATE
+> Task :udea-fleks:jvmProcessResources NO-SOURCE
+> Task :udea-fleks:processJvmMainResources SKIPPED
+> Task :udea-assets-compiler:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-fleks:exportRootPublicationCoordinatesForMetadataApiElements
+> Task :udea-assets:jvmProcessResources NO-SOURCE
+> Task :udea-annotations:exportCrossCompilationMetadataForIosArm64ApiElements
+> Task :udea-assets-compiler:processResources NO-SOURCE
+> Task :udea-assets:processJvmMainResources SKIPPED
+> Task :udea-core:downloadKotlinNativeDistribution
+> Task :udea-agent:androidPreBuild UP-TO-DATE
+> Task :udea-agent:preAndroidMainBuild UP-TO-DATE
+> Task :udea-fleks:exportCrossCompilationMetadataForIosSimulatorArm64ApiElements
+> Task :udea-diagnostics:commonizeNativeDistribution
+> Task :udea-fleks:exportCrossCompilationMetadataForIosArm64ApiElements
+> Task :udea-assets:commonizeNativeDistribution
+> Task :udea-assets:generateProjectStructureMetadata
+> Task :udea-annotations:exportCrossCompilationMetadataForIosSimulatorArm64ApiElements
+> Task :udea-fleks:commonizeNativeDistribution
+> Task :udea-fleks:downloadKotlinNativeDistribution
+> Task :udea-annotations:commonizeNativeDistribution
+> Task :udea-annotations:downloadKotlinNativeDistribution
+> Task :udea-core:commonizeNativeDistribution
+> Task :udea-core:generateProjectStructureMetadata
+> Task :udea-agent:processAndroidMainManifest FROM-CACHE
+> Task :udea-agent:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-annotations:exportTargetPublicationCoordinatesForAndroidApiElements
+> Task :udea-annotations:exportTargetPublicationCoordinatesForAndroidRuntimeElements
+> Task :udea-agent:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-assets:exportTargetPublicationCoordinatesForAndroidRuntimeElements
+> Task :udea-assets:exportTargetPublicationCoordinatesForAndroidApiElements
+> Task :udea-core:exportTargetPublicationCoordinatesForAndroidApiElements
+> Task :udea-core:exportTargetPublicationCoordinatesForAndroidRuntimeElements
+> Task :udea-diagnostics:exportTargetPublicationCoordinatesForAndroidApiElements
+> Task :udea-fleks:exportTargetPublicationCoordinatesForAndroidApiElements
+> Task :udea-fleks:exportTargetPublicationCoordinatesForAndroidRuntimeElements
+> Task :udea-diagnostics:exportTargetPublicationCoordinatesForAndroidRuntimeElements
+> Task :udea-annotations:exportTargetPublicationCoordinatesForJvmApiElements
+> Task :udea-agent:prepareAndroidMainArtProfile
+> Task :udea-agent:generateAndroidMainEmptyResourceFiles
+> Task :udea-assets:exportTargetPublicationCoordinatesForJvmApiElements
+> Task :udea-annotations:exportTargetPublicationCoordinatesForJvmRuntimeElements
+> Task :udea-annotations:compileKotlinJvm FROM-CACHE
+> Task :udea-core:exportTargetPublicationCoordinatesForJvmApiElements
+> Task :udea-core:exportTargetPublicationCoordinatesForJvmRuntimeElements
+> Task :udea-annotations:compileJvmMainJava NO-SOURCE
+> Task :udea-annotations:jvmMainClasses UP-TO-DATE
+> Task :udea-diagnostics:exportTargetPublicationCoordinatesForJvmRuntimeElements
+> Task :udea-diagnostics:exportTargetPublicationCoordinatesForJvmApiElements
+> Task :udea-fleks:exportTargetPublicationCoordinatesForJvmApiElements
+> Task :udea-assets:exportTargetPublicationCoordinatesForJvmRuntimeElements
+> Task :udea-fleks:exportTargetPublicationCoordinatesForJvmRuntimeElements
+> Task :udea-diagnostics:writeAndroidMainAarMetadata
+> Task :udea-core:writeAndroidMainAarMetadata
+> Task :udea-annotations:writeAndroidMainAarMetadata
+> Task :udea-agent:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-core:exportRootPublicationCoordinatesForMetadataApiElements
+> Task :udea-annotations:compileKotlinWasmJs FROM-CACHE
+> Task :udea-fleks:writeAndroidMainAarMetadata
+> Task :udea-agent:prepareLintJarForPublish
+> Task :udea-assets:writeAndroidMainAarMetadata
+> Task :udea-diagnostics:compileKotlinWasmJs FROM-CACHE
+> Task :udea-agent:writeAndroidMainAarMetadata
+> Task :udea-diagnostics:compileKotlinJvm FROM-CACHE
+> Task :udea-assets:exportRootPublicationCoordinatesForMetadataApiElements
+> Task :udea-agent:generatePomFileForKotlinMultiplatformPublication
+> Task :kotlinWasmKotlinNpmCachesSetup
+> Task :udea-annotations:compileAndroidMain FROM-CACHE
+> Task :udea-assets:exportTargetPublicationCoordinatesForWasmJsApiElements
+> Task :udea-annotations:exportTargetPublicationCoordinatesForWasmJsApiElements
+> Task :udea-diagnostics:compileJvmMainJava NO-SOURCE
+> Task :udea-annotations:exportTargetPublicationCoordinatesForWasmJsRuntimeElements
+> Task :udea-diagnostics:jvmMainClasses UP-TO-DATE
+> Task :udea-annotations:jvmJar
+> Task :udea-assets:exportTargetPublicationCoordinatesForWasmJsRuntimeElements
+> Task :udea-diagnostics:compileAndroidMain FROM-CACHE
+> Task :udea-diagnostics:transformCommonMainDependenciesMetadata
+> Task :udea-diagnostics:exportTargetPublicationCoordinatesForWasmJsApiElements
+> Task :udea-annotations:transformCommonMainDependenciesMetadata
+> Task :udea-core:exportTargetPublicationCoordinatesForWasmJsApiElements
+> Task :udea-agent:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-diagnostics:exportTargetPublicationCoordinatesForWasmJsRuntimeElements
+> Task :udea-agent-host:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-agent:generatePomFileForAndroidPublication
+> Task :udea-audio:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-audio:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-audio:jvmProcessResources NO-SOURCE
+> Task :udea-audio:processJvmMainResources SKIPPED
+> Task :udea-net:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-net:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-agent:wasmJsEmptyJavadocJar FROM-CACHE
+> Task :udea-agent:generatePomFileForJvmPublication
+> Task :udea-net:jvmProcessResources NO-SOURCE
+> Task :udea-net:processJvmMainResources SKIPPED
+> Task :udea-agent-host:processResources NO-SOURCE
+> Task :udea-render:jvmProcessResources NO-SOURCE
+> Task :udea-render:processJvmMainResources SKIPPED
+> Task :udea-fleks:transformCommonMainDependenciesMetadata
+> Task :udea-agent:exportTargetPublicationCoordinatesForJvmApiElements
+> Task :udea-agent:mergeAndroidMainJniLibFolders
+> Task :udea-render:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-diagnostics:transformNativeMainDependenciesMetadata
+> Task :udea-render:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-fleks:exportTargetPublicationCoordinatesForWasmJsRuntimeElements
+> Task :udea-fleks:exportTargetPublicationCoordinatesForWasmJsApiElements
+> Task :udea-annotations:transformNativeMainDependenciesMetadata
+> Task :udea-agent:exportTargetPublicationCoordinatesForJvmRuntimeElements
+> Task :udea-agent:generateProjectStructureMetadata
+> Task :udea-agent:checkAndroidMainAarMetadata
+> Task :udea-diagnostics:jvmJar
+> Task :udea-agent:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-net:exportTargetPublicationCoordinatesForJvmApiElements
+> Task :udea-net:exportTargetPublicationCoordinatesForJvmRuntimeElements
+> Task :udea-audio:exportTargetPublicationCoordinatesForJvmRuntimeElements
+> Task :udea-annotations:transformAppleMainDependenciesMetadata
+> Task :udea-diagnostics:transformAppleMainDependenciesMetadata
+> Task :udea-audio:exportTargetPublicationCoordinatesForJvmApiElements
+> Task :udea-render:exportTargetPublicationCoordinatesForJvmApiElements
+> Task :udea-diagnostics:compileCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-render:exportTargetPublicationCoordinatesForJvmRuntimeElements
+> Task :udea-diagnostics:metadataCommonMainClasses UP-TO-DATE
+> Task :udea-annotations:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-diagnostics:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-annotations:compileCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-fleks:transformNativeMainDependenciesMetadata
+> Task :udea-diagnostics:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-annotations:metadataCommonMainClasses UP-TO-DATE
+> Task :udea-annotations:transformIosMainDependenciesMetadata
+> Task :udea-annotations:checkAndroidMainAarMetadata
+> Task :udea-diagnostics:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-diagnostics:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-annotations:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-annotations:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-annotations:androidSourcesJar
+> Task :udea-annotations:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-annotations:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-annotations:prepareAndroidMainArtProfile
+> Task :udea-diagnostics:transformIosMainDependenciesMetadata
+> Task :udea-annotations:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-annotations:metadataIosMainClasses UP-TO-DATE
+> Task :udea-diagnostics:allMetadataJar
+> Task :udea-annotations:allMetadataJar
+> Task :udea-fleks:transformAppleMainDependenciesMetadata
+> Task :udea-diagnostics:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-diagnostics:metadataIosMainClasses UP-TO-DATE
+> Task :udea-annotations:generateAndroidMainEmptyResourceFiles
+> Task :udea-agent-host:generatePomFileForMavenPublication
+> Task :udea-annotations:prepareLintJarForPublish
+> Task :udea-annotations:processAndroidMainManifest FROM-CACHE
+> Task :udea-agent:copyAndroidMainJniLibsProjectOnly
+> Task :udea-annotations:iosArm64MetadataElements
+> Task :udea-annotations:mergeAndroidMainJniLibFolders
+> Task :udea-annotations:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-agent-host:sourcesJar
+> Task :udea-annotations:exportCommonSourceSetsMetadataLocationsForMetadataApiElements
+> Task :udea-annotations:generatePomFileForAndroidPublication
+> Task :udea-diagnostics:exportCommonSourceSetsMetadataLocationsForMetadataApiElements
+> Task :udea-annotations:iosSimulatorArm64MetadataElements
+> Task :udea-annotations:generatePomFileForIosArm64Publication
+> Task :udea-annotations:processAndroidMainJavaRes
+> Task :udea-diagnostics:iosArm64MetadataElements
+> Task :udea-diagnostics:iosSimulatorArm64MetadataElements
+> Task :udea-fleks:transformIosMainDependenciesMetadata
+> Task :udea-annotations:iosArm64SourcesJar
+> Task :udea-annotations:iosArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-annotations:generatePomFileForIosSimulatorArm64Publication
+> Task :udea-annotations:generatePomFileForJvmPublication
+> Task :udea-annotations:iosSimulatorArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-annotations:generatePomFileForKotlinMultiplatformPublication
+> Task :udea-agent:buildKotlinToolingMetadata
+> Task :udea-annotations:jvmSourcesJar
+> Task :udea-annotations:wasmJsProcessResources NO-SOURCE
+> Task :udea-annotations:buildKotlinToolingMetadata
+> Task :udea-annotations:wasmJsMainClasses UP-TO-DATE
+> Task :udea-annotations:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-annotations:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-compiler-plugin:compileKotlin FROM-CACHE
+> Task :udea-annotations:generatePomFileForWasmJsPublication
+> Task :udea-annotations:wasmJsEmptyJavadocJar FROM-CACHE
+> Task :udea-compiler-plugin:compileJava NO-SOURCE
+> Task :udea-compiler-plugin:classes
+> Task :udea-annotations:sourcesJar
+> Task :udea-annotations:copyAndroidMainJniLibsProjectOnly
+> Task :udea-annotations:iosSimulatorArm64SourcesJar
+> Task :udea-assets:prepareAndroidMainArtProfile
+> Task :udea-diagnostics:bundleAndroidMainClassesToCompileJar
+> Task :udea-codegen:kspKotlin FROM-CACHE
+> Task :udea-annotations:generateMetadataFileForJvmPublication
+> Task :udea-annotations:wasmJsSourcesJar
+> Task :udea-assets:mergeAndroidMainJniLibFolders
+> Task :udea-annotations:bundleAndroidMainClassesToCompileJar
+> Task :udea-assets:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-assets:checkAndroidMainAarMetadata
+> Task :udea-assets:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-assets:prepareLintJarForPublish
+> Task :udea-diagnostics:exportCrossCompilationMetadataForIosArm64ApiElements
+> Task :udea-assets:processAndroidMainManifest FROM-CACHE
+> Task :udea-annotations:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-assets:downloadKotlinNativeDistribution
+> Task :udea-diagnostics:downloadKotlinNativeDistribution
+> Task :udea-assets:generateAndroidMainEmptyResourceFiles
+> Task :udea-codegen:processResources
+> Task :udea-annotations:exportTargetPublicationCoordinatesForIosArm64ApiElements
+> Task :udea-assets:androidSourcesJar
+> Task :udea-assets:copyAndroidMainJniLibsProjectOnly
+> Task :udea-diagnostics:exportCrossCompilationMetadataForIosSimulatorArm64ApiElements
+> Task :udea-diagnostics:exportTargetPublicationCoordinatesForIosArm64ApiElements
+> Task :udea-compiler-plugin:jar
+> Task :udea-core:exportTargetPublicationCoordinatesForWasmJsRuntimeElements
+> Task :udea-assets:iosArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-annotations:exportTargetPublicationCoordinatesForIosSimulatorArm64ApiElements
+> Task :udea-diagnostics:exportTargetPublicationCoordinatesForIosSimulatorArm64ApiElements
+> Task :udea-assets:generatePomFileForAndroidPublication
+> Task :udea-assets:iosSimulatorArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-assets:iosArm64SourcesJar
+> Task :udea-assets:iosSimulatorArm64SourcesJar
+> Task :udea-fleks:wasmJsPackageJson
+> Task :udea-agent:generatePomFileForWasmJsPublication
+> Task :udea-annotations:wasmJsPackageJson
+> Task :udea-diagnostics:wasmJsPackageJson
+> Task :udea-annotations:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-annotations:publishJvmPublicationToMavenLocal
+> Task :udea-assets:generatePomFileForIosArm64Publication
+> Task :udea-assets:transformCommonMainDependenciesMetadata
+> Task :udea-assets:generatePomFileForIosSimulatorArm64Publication
+> Task :udea-core:wasmJsPackageJson
+> Task :udea-assets:generatePomFileForJvmPublication
+> Task :udea-annotations:wasmJsPublicPackageJson
+> Task :udea-assets:wasmJsPackageJson
+> Task :udea-assets:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-assets:jvmSourcesJar
+> Task :udea-agent:wasmJsPackageJson
+> Task :udea-assets:buildKotlinToolingMetadata
+> Task :udea-assets:generatePomFileForKotlinMultiplatformPublication
+> Task :udea-fleks:compileCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-fleks:metadataCommonMainClasses UP-TO-DATE
+> Task :udea-assets:wasmJsProcessResources NO-SOURCE
+> Task :udea-annotations:wasmJsJar
+> Task :udea-assets:sourcesJar
+> Task :udea-assets:transformNativeMainDependenciesMetadata
+> Task :udea-assets:compileCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-assets:metadataCommonMainClasses UP-TO-DATE
+> Task :udea-annotations:mergeAndroidMainJavaResource
+> Task :udea-agent:wasmJsPublicPackageJson
+> Task :udea-fleks:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-fleks:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-assets:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-annotations:generateMetadataFileForWasmJsPublication
+> Task :udea-annotations:publishWasmJsPublicationToMavenLocal
+> Task :udea-fleks:compileKotlinJvm FROM-CACHE
+> Task :udea-fleks:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-fleks:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-fleks:compileKotlinWasmJs FROM-CACHE
+> Task :udea-fleks:allMetadataJar
+> Task :udea-assets:generatePomFileForWasmJsPublication
+> Task :udea-assets:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-assets:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-fleks:compileJvmMainJava NO-SOURCE
+> Task :udea-fleks:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-fleks:jvmMainClasses UP-TO-DATE
+> Task :udea-fleks:metadataIosMainClasses UP-TO-DATE
+> Task :udea-assets:wasmJsPublicPackageJson
+> Task :udea-assets:wasmJsEmptyJavadocJar FROM-CACHE
+> Task :udea-assets:allMetadataJar
+> Task :udea-assets:wasmJsSourcesJar
+> Task :udea-audio:androidPreBuild UP-TO-DATE
+> Task :udea-audio:preAndroidMainBuild UP-TO-DATE
+> Task :udea-assets-compiler:generatePomFileForMavenPublication
+> Task :udea-audio:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-fleks:iosArm64MetadataElements
+> Task :udea-assets:transformAppleMainDependenciesMetadata
+> Task :udea-fleks:iosSimulatorArm64MetadataElements
+> Task :udea-assets:compileKotlinJvm FROM-CACHE
+> Task :udea-fleks:exportCommonSourceSetsMetadataLocationsForMetadataApiElements
+> Task :udea-assets:compileKotlinWasmJs FROM-CACHE
+> Task :udea-fleks:compileAndroidMain FROM-CACHE
+> Task :udea-audio:androidSourcesJar
+> Task :udea-assets:wasmJsMainClasses UP-TO-DATE
+> Task :udea-assets:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-assets:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-assets:compileAndroidMain FROM-CACHE
+> Task :udea-assets:compileJvmMainJava NO-SOURCE
+> Task :udea-assets:jvmMainClasses UP-TO-DATE
+> Task :udea-audio:prepareAndroidMainArtProfile
+> Task :udea-audio:processAndroidMainManifest FROM-CACHE
+> Task :udea-audio:prepareLintJarForPublish
+> Task :udea-fleks:jvmJar
+> Task :udea-fleks:bundleAndroidMainClassesToCompileJar
+> Task :udea-audio:generateAndroidMainEmptyResourceFiles
+> Task :udea-codegen:compileKotlin FROM-CACHE
+> Task :udea-assets:transformIosMainDependenciesMetadata
+> Task :udea-assets:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-audio:checkAndroidMainAarMetadata
+> Task :udea-audio:mergeAndroidMainJniLibFolders
+> Task :udea-assets-compiler:sourcesJar
+> Task :udea-audio:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-audio:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-audio:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-audio:commonizeNativeDistribution
+> Task :udea-audio:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-audio:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-assets:exportTargetPublicationCoordinatesForIosArm64ApiElements
+> Task :udea-assets:processAndroidMainJavaRes
+> Task :udea-audio:copyAndroidMainJniLibsProjectOnly
+> Task :udea-audio:generatePomFileForAndroidPublication
+> Task :udea-audio:downloadKotlinNativeDistribution
+> Task :udea-core:exportCrossCompilationMetadataForIosArm64ApiElements
+> Task :udea-audio:writeAndroidMainAarMetadata
+> Task :udea-fleks:exportTargetPublicationCoordinatesForIosArm64ApiElements
+> Task :udea-codegen:compileJava NO-SOURCE
+> Task :udea-assets:exportCrossCompilationMetadataForIosArm64ApiElements
+> Task :udea-assets:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-core:exportTargetPublicationCoordinatesForIosArm64ApiElements
+> Task :udea-assets:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-assets:bundleAndroidMainClassesToCompileJar
+> Task :udea-assets:metadataIosMainClasses UP-TO-DATE
+> Task :udea-assets:exportCrossCompilationMetadataForIosSimulatorArm64ApiElements
+> Task :udea-assets:wasmJsJar
+> Task :udea-codegen:classes
+> Task :udea-audio:iosArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-audio:iosSimulatorArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-core:exportCrossCompilationMetadataForIosSimulatorArm64ApiElements
+> Task :udea-audio:iosArm64SourcesJar
+> Task :udea-fleks:exportTargetPublicationCoordinatesForIosSimulatorArm64ApiElements
+> Task :udea-assets:exportTargetPublicationCoordinatesForIosSimulatorArm64ApiElements
+> Task :udea-audio:generatePomFileForIosArm64Publication
+> Task :udea-core:exportTargetPublicationCoordinatesForIosSimulatorArm64ApiElements
+> Task :udea-assets:generateMetadataFileForWasmJsPublication
+> Task :udea-assets:exportCommonSourceSetsMetadataLocationsForMetadataApiElements
+> Task :udea-assets:publishWasmJsPublicationToMavenLocal
+> Task :udea-assets:iosArm64MetadataElements
+> Task :udea-assets:iosSimulatorArm64MetadataElements
+> Task :udea-audio:wasmJsProcessResources NO-SOURCE
+> Task :udea-audio:iosSimulatorArm64SourcesJar
+> Task :udea-audio:generatePomFileForKotlinMultiplatformPublication
+> Task :udea-audio:jvmSourcesJar
+> Task :udea-assets:mergeAndroidMainJavaResource
+> Task :udea-audio:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-codegen:javadoc NO-SOURCE
+> Task :udea-assets:jvmJar
+> Task :udea-audio:buildKotlinToolingMetadata
+> Task :udea-audio:generatePomFileForWasmJsPublication
+> Task :udea-audio:generatePomFileForIosSimulatorArm64Publication
+> Task :udea-codegen:generatePomFileForMavenPublication
+> Task :udea-audio:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-audio:wasmJsEmptyJavadocJar FROM-CACHE
+> Task :udea-codegen:plainJavadocJar FROM-CACHE
+> Task :udea-audio:generatePomFileForJvmPublication
+> Task :udea-compiler-plugin:javadoc NO-SOURCE
+> Task :udea-audio:wasmJsPackageJson
+> Task :udea-audio:wasmJsSourcesJar
+> Task :udea-audio:sourcesJar
+> Task :udea-compiler-plugin:generatePomFileForMavenPublication
+> Task :udea-audio:generateProjectStructureMetadata
+> Task :udea-core:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-compiler-plugin:plainJavadocJar FROM-CACHE
+> Task :udea-core:mergeAndroidMainJniLibFolders
+> Task :udea-core:checkAndroidMainAarMetadata
+> Task :udea-compiler-plugin:sourcesJar
+> Task :udea-core:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-core:generatePomFileForIosArm64Publication
+> Task :udea-core:iosArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-assets:generateMetadataFileForJvmPublication
+> Task :udea-core:processAndroidMainManifest FROM-CACHE
+> Task :udea-core:generatePomFileForAndroidPublication
+> Task :udea-core:prepareAndroidMainArtProfile
+> Task :udea-core:prepareLintJarForPublish
+> Task :udea-core:generatePomFileForKotlinMultiplatformPublication
+> Task :udea-core:copyAndroidMainJniLibsProjectOnly
+> Task :udea-core:generatePomFileForIosSimulatorArm64Publication
+> Task :udea-codegen:sourcesJar
+> Task :udea-core:transformCommonMainDependenciesMetadata
+> Task :udea-core:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-core:iosSimulatorArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-audio:wasmJsPublicPackageJson
+> Task :udea-core:generatePomFileForJvmPublication
+> Task :udea-core:wasmJsProcessResources NO-SOURCE
+> Task :udea-core:generateAndroidMainEmptyResourceFiles
+> Task :udea-core:generatePomFileForWasmJsPublication
+> Task :udea-assets:publishJvmPublicationToMavenLocal
+> Task :udea-core:wasmJsEmptyJavadocJar FROM-CACHE
+> Task :udea-core:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-compiler-plugin:generateMetadataFileForMavenPublication
+> Task :udea-diagnostics:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-core:buildKotlinToolingMetadata
+> Task :udea-core:wasmJsPublicPackageJson
+> Task :udea-codegen:jar
+> Task :udea-diagnostics:prepareAndroidMainArtProfile
+> Task :udea-diagnostics:checkAndroidMainAarMetadata
+> Task :udea-core:transformNonJvmMainDependenciesMetadata
+> Task :udea-diagnostics:mergeAndroidMainJniLibFolders
+> Task :udea-diagnostics:generateAndroidMainEmptyResourceFiles
+> Task :udea-diagnostics:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-compiler-plugin:publishMavenPublicationToMavenLocal
+> Task :udea-diagnostics:prepareLintJarForPublish
+> Task :udea-compiler-plugin:publishToMavenLocal
+> Task :udea-diagnostics:generatePomFileForAndroidPublication
+> Task :udea-diagnostics:processAndroidMainJavaRes
+> Task :udea-diagnostics:processAndroidMainManifest FROM-CACHE
+> Task :udea-diagnostics:generatePomFileForIosArm64Publication
+> Task :udea-diagnostics:iosArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-diagnostics:generatePomFileForIosSimulatorArm64Publication
+> Task :udea-diagnostics:generatePomFileForJvmPublication
+> Task :udea-diagnostics:iosArm64SourcesJar
+> Task :udea-diagnostics:iosSimulatorArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-codegen:generateMetadataFileForMavenPublication
+> Task :udea-diagnostics:generatePomFileForKotlinMultiplatformPublication
+> Task :udea-diagnostics:iosSimulatorArm64SourcesJar
+> Task :udea-diagnostics:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-diagnostics:copyAndroidMainJniLibsProjectOnly
+> Task :udea-diagnostics:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-diagnostics:wasmJsProcessResources NO-SOURCE
+> Task :udea-diagnostics:mergeAndroidMainJavaResource
+> Task :udea-diagnostics:wasmJsMainClasses UP-TO-DATE
+> Task :udea-editor:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-diagnostics:wasmJsEmptyJavadocJar FROM-CACHE
+> Task :udea-diagnostics:buildKotlinToolingMetadata
+> Task :udea-core:transformNativeMainDependenciesMetadata
+> Task :udea-diagnostics:generatePomFileForWasmJsPublication
+> Task :udea-diagnostics:jvmSourcesJar
+> Task :udea-diagnostics:sourcesJar
+> Task :udea-diagnostics:wasmJsPublicPackageJson
+> Task :udea-codegen:publishMavenPublicationToMavenLocal
+> Task :udea-codegen:publishToMavenLocal
+> Task :udea-fleks:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-editor:generatePomFileForMavenPublication
+> Task :udea-core:transformAppleMainDependenciesMetadata
+> Task :udea-diagnostics:wasmJsSourcesJar
+> Task :udea-diagnostics:generateMetadataFileForJvmPublication
+> Task :udea-fleks:checkAndroidMainAarMetadata
+> Task :udea-diagnostics:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-editor:processResources
+> Task :udea-core:transformIosMainDependenciesMetadata
+> Task :udea-fleks:androidSourcesJar
+> Task :udea-fleks:mergeAndroidMainJniLibFolders
+> Task :udea-fleks:generateAndroidMainEmptyResourceFiles
+> Task :udea-diagnostics:publishJvmPublicationToMavenLocal
+> Task :udea-diagnostics:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-fleks:prepareAndroidMainArtProfile
+> Task :udea-fleks:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-fleks:generatePomFileForAndroidPublication
+> Task :udea-fleks:prepareLintJarForPublish
+> Task :udea-fleks:processAndroidMainManifest FROM-CACHE
+> Task :udea-diagnostics:wasmJsJar
+> Task :udea-fleks:iosArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-fleks:generatePomFileForIosSimulatorArm64Publication
+> Task :udea-fleks:generatePomFileForIosArm64Publication
+> Task :udea-diagnostics:androidSourcesJar
+> Task :udea-fleks:copyAndroidMainJniLibsProjectOnly
+> Task :udea-fleks:generatePomFileForJvmPublication
+> Task :udea-fleks:iosSimulatorArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-fleks:processAndroidMainJavaRes
+> Task :udea-fleks:generatePomFileForKotlinMultiplatformPublication
+> Task :udea-fleks:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-fleks:iosArm64SourcesJar
+> Task :udea-diagnostics:generateMetadataFileForWasmJsPublication
+> Task :udea-fleks:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-fleks:iosSimulatorArm64SourcesJar
+> Task :udea-fleks:wasmJsProcessResources NO-SOURCE
+> Task :udea-fleks:wasmJsMainClasses UP-TO-DATE
+> Task :udea-fleks:sourcesJar
+> Task :udea-fleks:buildKotlinToolingMetadata
+> Task :udea-fleks:wasmJsPublicPackageJson
+> Task :udea-fleks:generatePomFileForWasmJsPublication
+> Task :udea-diagnostics:publishWasmJsPublicationToMavenLocal
+> Task :udea-gas:androidPreBuild UP-TO-DATE
+> Task :udea-gas:preAndroidMainBuild UP-TO-DATE
+> Task :udea-fleks:wasmJsEmptyJavadocJar FROM-CACHE
+> Task :udea-fleks:jvmSourcesJar
+> Task :udea-gas:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-fleks:mergeAndroidMainJavaResource
+> Task :udea-gas:prepareLintJarForPublish
+> Task :udea-gas:downloadKotlinNativeDistribution
+> Task :udea-gas:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-gas:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-gas:prepareAndroidMainArtProfile
+> Task :udea-fleks:wasmJsSourcesJar
+> Task :udea-fleks:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-gas:checkAndroidMainAarMetadata
+> Task :udea-gas:processAndroidMainManifest FROM-CACHE
+> Task :udea-gas:mergeAndroidMainJniLibFolders
+> Task :udea-gas:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-gas:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-gas:generateAndroidMainEmptyResourceFiles
+> Task :udea-gas:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-fleks:generateMetadataFileForJvmPublication
+> Task :udea-fleks:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-gas:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-gas:generatePomFileForAndroidPublication
+> Task :udea-gas:writeAndroidMainAarMetadata
+> Task :udea-fleks:publishJvmPublicationToMavenLocal
+> Task :udea-gas:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-gas:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-gas:generatePomFileForIosArm64Publication
+> Task :udea-gas:iosSimulatorArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-assets-compiler:compileKotlin FROM-CACHE
+> Task :udea-gas:generatePomFileForIosSimulatorArm64Publication
+> Task :udea-gas:copyAndroidMainJniLibsProjectOnly
+> Task :udea-gas:wasmJsProcessResources NO-SOURCE
+> Task :udea-gas:generatePomFileForKotlinMultiplatformPublication
+> Task :udea-gas:commonizeNativeDistribution
+> Task :udea-gas:generatePomFileForJvmPublication
+> Task :udea-gradle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-gas:generatePomFileForWasmJsPublication
+> Task :udea-gas:iosArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-gas:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-editor:sourcesJar
+> Task :udea-net:androidPreBuild UP-TO-DATE
+> Task :udea-gas:buildKotlinToolingMetadata
+> Task :udea-net:preAndroidMainBuild UP-TO-DATE
+> Task :udea-assets-compiler:compileJava NO-SOURCE
+> Task :udea-assets-compiler:classes UP-TO-DATE
+> Task :udea-fleks:wasmJsJar
+> Task :udea-gradle:generatePomFileForMavenPublication
+> Task :udea-gas:generateProjectStructureMetadata
+> Task :udea-assets-compiler:javadoc NO-SOURCE
+> Task :udea-gas:wasmJsPackageJson
+> Task :udea-net:checkAndroidMainAarMetadata
+> Task :udea-gas:wasmJsEmptyJavadocJar FROM-CACHE
+> Task :udea-assets-compiler:plainJavadocJar FROM-CACHE
+> Task :udea-net:prepareAndroidMainArtProfile
+> Task :udea-net:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-gradle:processResources
+> Task :udea-gas:wasmJsPublicPackageJson
+> Task :udea-net:generateAndroidMainEmptyResourceFiles
+> Task :udea-net:mergeAndroidMainJniLibFolders
+> Task :udea-net:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-net:prepareLintJarForPublish
+> Task :udea-gradle:sourcesJar
+> Task :udea-fleks:generateMetadataFileForWasmJsPublication
+> Task :udea-net:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-net:generatePomFileForAndroidPublication
+> Task :udea-net:copyAndroidMainJniLibsProjectOnly
+> Task :udea-fleks:publishWasmJsPublicationToMavenLocal
+> Task :udea-net:generatePomFileForJvmPublication
+> Task :udea-net:wasmJsProcessResources NO-SOURCE
+> Task :udea-net:generatePomFileForKotlinMultiplatformPublication
+> Task :udea-net:writeAndroidMainAarMetadata
+> Task :udea-net:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-net:buildKotlinToolingMetadata
+> Task :udea-net:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-net:generateProjectStructureMetadata
+> Task :udea-physics2d:androidPreBuild UP-TO-DATE
+> Task :udea-physics2d:preAndroidMainBuild UP-TO-DATE
+> Task :udea-net:generatePomFileForWasmJsPublication
+> Task :udea-net:wasmJsEmptyJavadocJar FROM-CACHE
+> Task :udea-physics2d:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-physics2d:prepareAndroidMainArtProfile
+> Task :udea-net:processAndroidMainManifest FROM-CACHE
+> Task :udea-physics2d:generateAndroidMainEmptyResourceFiles
+> Task :udea-core:kspCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-physics2d:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-physics2d:mergeAndroidMainJniLibFolders
+> Task :udea-physics2d:prepareLintJarForPublish
+> Task :udea-physics2d:androidSourcesJar
+> Task :udea-net:jvmSourcesJar
+> Task :udea-net:androidSourcesJar
+> Task :udea-net:wasmJsSourcesJar
+> Task :udea-physics2d:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-physics2d:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-net:sourcesJar
+> Task :udea-physics2d:processAndroidMainManifest FROM-CACHE
+> Task :udea-physics2d:generatePomFileForAndroidPublication
+> Task :udea-physics2d:jvmProcessResources NO-SOURCE
+> Task :udea-physics2d:processJvmMainResources SKIPPED
+> Task :udea-physics2d:checkAndroidMainAarMetadata
+> Task :udea-physics2d:writeAndroidMainAarMetadata
+> Task :udea-physics2d:copyAndroidMainJniLibsProjectOnly
+> Task :udea-physics2d:generatePomFileForJvmPublication
+> Task :udea-physics2d:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-physics2d:generateProjectStructureMetadata
+> Task :udea-physics2d:generatePomFileForKotlinMultiplatformPublication
+> Task :udea-physics2d:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-physics2d:sourcesJar
+> Task :udea-render:androidPreBuild UP-TO-DATE
+> Task :udea-render:preAndroidMainBuild UP-TO-DATE
+> Task :udea-physics2d:buildKotlinToolingMetadata
+> Task :udea-physics2d:allMetadataJar
+> Task :udea-core:kspKotlinJvm FROM-CACHE
+> Task :udea-assets-compiler:jar
+> Task :udea-render:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-core:kspKotlinWasmJs FROM-CACHE
+> Task :udea-core:kspAndroidMain FROM-CACHE
+> Task :udea-physics2d:jvmSourcesJar
+> Task :udea-physics2d:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-core:jvmProcessResources NO-SOURCE
+> Task :udea-core:processJvmMainResources SKIPPED
+> Task :udea-physics2d:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-core:compileCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-core:metadataCommonMainClasses UP-TO-DATE
+> Task :udea-net:wasmJsPackageJson
+> Task :udea-render:prepareAndroidMainArtProfile
+> Task :udea-net:wasmJsPublicPackageJson
+> Task :udea-render:generateAndroidMainEmptyResourceFiles
+> Task :udea-assets-compiler:generateMetadataFileForMavenPublication
+> Task :udea-render:mergeAndroidMainJniLibFolders
+> Task :udea-assets-compiler:publishMavenPublicationToMavenLocal
+> Task :udea-assets-compiler:publishToMavenLocal
+> Task :udea-render:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-audio:exportTargetPublicationCoordinatesForAndroidApiElements
+> Task :udea-audio:exportTargetPublicationCoordinatesForAndroidRuntimeElements
+> Task :udea-render:processAndroidMainManifest FROM-CACHE
+> Task :udea-render:writeAndroidMainAarMetadata
+> Task :udea-render:prepareLintJarForPublish
+> Task :udea-render:generatePomFileForAndroidPublication
+> Task :udea-render:copyAndroidMainJniLibsProjectOnly
+> Task :udea-render:buildKotlinToolingMetadata
+> Task :udea-render:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-render:generatePomFileForJvmPublication
+> Task :udea-render:generatePomFileForKotlinMultiplatformPublication
+> Task :udea-render:generateProjectStructureMetadata
+> Task :udea-render:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-replay:androidEmptyJavadocJar FROM-CACHE
+> Task :udea-replay:androidPreBuild UP-TO-DATE
+> Task :udea-replay:preAndroidMainBuild UP-TO-DATE
+> Task :udea-render:sourcesJar
+> Task :udea-core:kspNonJvmMainKotlinMetadata FROM-CACHE
+> Task :udea-render:allMetadataJar
+> Task :udea-render:checkAndroidMainAarMetadata
+> Task :udea-render:androidSourcesJar
+> Task :udea-replay:downloadKotlinNativeDistribution
+> Task :udea-replay:checkAndroidMainAarMetadata
+> Task :udea-core:compileAndroidMain FROM-CACHE
+> Task :udea-replay:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-replay:mergeAndroidMainJniLibFolders
+> Task :udea-replay:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-replay:processAndroidMainManifest FROM-CACHE
+> Task :udea-replay:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-replay:prepareLintJarForPublish
+> Task :udea-replay:generateAndroidMainEmptyResourceFiles
+> Task :udea-replay:prepareAndroidMainArtProfile
+> Task :udea-core:compileNonJvmMainKotlinMetadata FROM-CACHE
+> Task :udea-core:metadataNonJvmMainClasses UP-TO-DATE
+> Task :udea-render:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-replay:generatePomFileForAndroidPublication
+> Task :udea-replay:writeAndroidMainAarMetadata
+> Task :udea-core:compileKotlinWasmJs FROM-CACHE
+> Task :udea-replay:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-replay:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-replay:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-core:wasmJsMainClasses UP-TO-DATE
+> Task :udea-replay:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-render:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-render:jvmSourcesJar
+> Task :udea-gradle:compileKotlin FROM-CACHE
+> Task :udea-replay:generatePomFileForIosArm64Publication
+> Task :udea-replay:commonizeNativeDistribution
+> Task :udea-replay:copyAndroidMainJniLibsProjectOnly
+> Task :udea-gradle:compileJava NO-SOURCE
+> Task :udea-gradle:classes
+> Task :udea-core:compileKotlinJvm FROM-CACHE
+> Task :udea-replay:generatePomFileForIosSimulatorArm64Publication
+> Task :udea-core:compileJvmMainJava NO-SOURCE
+> Task :udea-replay:iosArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-core:jvmMainClasses UP-TO-DATE
+> Task :udea-gradle:javadoc NO-SOURCE
+> Task :udea-replay:generatePomFileForJvmPublication
+> Task :udea-replay:iosSimulatorArm64EmptyJavadocJar FROM-CACHE
+> Task :udea-replay:generatePomFileForKotlinMultiplatformPublication
+> Task :udea-replay:jvmEmptyJavadocJar FROM-CACHE
+> Task :udea-replay:buildKotlinToolingMetadata
+> Task :udea-replay:wasmJsProcessResources NO-SOURCE
+> Task :udea-replay:kotlinMultiplatformEmptyJavadocJar FROM-CACHE
+> Task :udea-gradle:plainJavadocJar FROM-CACHE
+> Task :udea-replay:generatePomFileForWasmJsPublication
+> Task :udea-gradle:jar
+> Task :udea-core:allMetadataJar
+> Task :udea-replay:generateProjectStructureMetadata
+> Task :udea-replay:wasmJsEmptyJavadocJar FROM-CACHE
+> Task :udea-replay:wasmJsPackageJson
+> Task :udea-gradle:generateMetadataFileForMavenPublication
+> Task :udea-replay:wasmJsPublicPackageJson
+> Task :udea-replay:kspKotlinWasmJs FROM-CACHE
+> Task :udea-gradle:publishMavenPublicationToMavenLocal
+> Task :udea-gradle:publishToMavenLocal
+> Task :udea-replay:compileKotlinWasmJs FROM-CACHE
+> Task :udea-replay:wasmJsMainClasses UP-TO-DATE
+> Task :udea-audio:compileKotlinWasmJs FROM-CACHE
+> Task :udea-audio:wasmJsMainClasses UP-TO-DATE
+> Task :udea-audio:wasmJsJar
+> Task :udea-replay:wasmJsJar
+> Task :udea-audio:generateMetadataFileForWasmJsPublication
+> Task :udea-core:wasmJsJar
+> Task :udea-audio:publishWasmJsPublicationToMavenLocal
+> Task :udea-core:jvmJar
+> Task :udea-net:compileKotlinWasmJs FROM-CACHE
+> Task :udea-net:wasmJsMainClasses UP-TO-DATE
+> Task :udea-audio:compileKotlinJvm FROM-CACHE
+> Task :udea-audio:compileJvmMainJava NO-SOURCE
+> Task :udea-audio:jvmMainClasses UP-TO-DATE
+> Task :udea-audio:jvmJar
+> Task :udea-audio:generateMetadataFileForJvmPublication
+> Task :udea-physics2d:compileKotlinJvm FROM-CACHE
+> Task :udea-audio:publishJvmPublicationToMavenLocal
+> Task :udea-physics2d:compileJvmMainJava NO-SOURCE
+> Task :udea-physics2d:jvmMainClasses UP-TO-DATE
+> Task :udea-net:wasmJsJar
+> Task :udea-physics2d:jvmJar
+> Task :udea-physics2d:generateMetadataFileForJvmPublication
+> Task :udea-net:generateMetadataFileForWasmJsPublication
+> Task :udea-physics2d:publishJvmPublicationToMavenLocal
+> Task :udea-net:publishWasmJsPublicationToMavenLocal
+> Task :udea-net:compileKotlinJvm FROM-CACHE
+> Task :udea-net:compileJvmMainJava NO-SOURCE
+> Task :udea-net:jvmMainClasses UP-TO-DATE
+> Task :udea-net:jvmJar
+> Task :udea-net:generateMetadataFileForJvmPublication
+> Task :udea-net:publishJvmPublicationToMavenLocal
+> Task :udea-annotations:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-render:compileKotlinJvm FROM-CACHE
+> Task :udea-render:compileJvmMainJava NO-SOURCE
+> Task :udea-render:jvmMainClasses UP-TO-DATE
+> Task :udea-annotations:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-annotations:bundleAndroidMainAar
+> Task :udea-annotations:generateMetadataFileForAndroidPublication
+> Task :udea-annotations:publishAndroidPublicationToMavenLocal
+> Task :udea-assets:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-annotations:compileKotlinIosSimulatorArm64 FROM-CACHE
+> Task :udea-diagnostics:compileKotlinIosSimulatorArm64 FROM-CACHE
+> Task :udea-render:jvmJar
+> Task :udea-annotations:iosSimulatorArm64Klib
+> Task :udea-fleks:compileKotlinIosSimulatorArm64 FROM-CACHE
+> Task :udea-assets:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-diagnostics:iosSimulatorArm64Klib
+> Task :udea-annotations:generateMetadataFileForIosSimulatorArm64Publication
+> Task :udea-render:generateMetadataFileForJvmPublication
+> Task :udea-diagnostics:generateMetadataFileForIosSimulatorArm64Publication
+> Task :udea-annotations:publishIosSimulatorArm64PublicationToMavenLocal
+> Task :udea-assets:bundleAndroidMainAar
+> Task :udea-render:publishJvmPublicationToMavenLocal
+> Task :udea-diagnostics:publishIosSimulatorArm64PublicationToMavenLocal
+> Task :udea-assets:compileKotlinIosSimulatorArm64 FROM-CACHE
+> Task :udea-assets:generateMetadataFileForAndroidPublication
+> Task :udea-diagnostics:compileKotlinIosArm64 FROM-CACHE
+> Task :udea-assets:publishAndroidPublicationToMavenLocal
+> Task :udea-fleks:iosSimulatorArm64Klib
+> Task :udea-fleks:compileKotlinIosArm64 FROM-CACHE
+> Task :udea-annotations:compileKotlinIosArm64 FROM-CACHE
+> Task :udea-fleks:generateMetadataFileForIosSimulatorArm64Publication
+> Task :udea-fleks:publishIosSimulatorArm64PublicationToMavenLocal
+> Task :udea-diagnostics:iosArm64Klib
+> Task :udea-assets:iosSimulatorArm64Klib
+> Task :udea-diagnostics:generateMetadataFileForIosArm64Publication
+> Task :udea-annotations:iosArm64Klib
+> Task :udea-assets:generateMetadataFileForIosSimulatorArm64Publication
+> Task :udea-diagnostics:publishIosArm64PublicationToMavenLocal
+> Task :udea-fleks:iosArm64Klib
+> Task :udea-assets:publishIosSimulatorArm64PublicationToMavenLocal
+> Task :udea-annotations:generateMetadataFileForIosArm64Publication
+> Task :udea-annotations:publishIosArm64PublicationToMavenLocal
+> Task :udea-annotations:publishToMavenLocal
+> Task :udea-fleks:generateMetadataFileForIosArm64Publication
+> Task :udea-assets:compileKotlinIosArm64 FROM-CACHE
+> Task :udea-fleks:publishIosArm64PublicationToMavenLocal
+> Task :udea-core:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-diagnostics:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-diagnostics:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-diagnostics:bundleAndroidMainAar
+> Task :udea-fleks:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-diagnostics:generateMetadataFileForAndroidPublication
+> Task :udea-fleks:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-diagnostics:publishAndroidPublicationToMavenLocal
+> Task :udea-diagnostics:publishToMavenLocal
+> Task :udea-assets:iosArm64Klib
+> Task :udea-fleks:bundleAndroidMainAar
+> Task :udea-assets:generateMetadataFileForIosArm64Publication
+> Task :udea-fleks:generateMetadataFileForAndroidPublication
+> Task :udea-assets:publishIosArm64PublicationToMavenLocal
+> Task :udea-fleks:publishAndroidPublicationToMavenLocal
+> Task :udea-fleks:publishToMavenLocal
+> Task :udea-assets:publishToMavenLocal
+> Task :udea-core:compileNativeMainKotlinMetadata FROM-CACHE
+> Task :udea-core:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-core:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-core:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-core:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-core:metadataIosMainClasses UP-TO-DATE
+> Task :udea-core:exportCommonSourceSetsMetadataLocationsForMetadataApiElements
+> Task :udea-core:iosArm64MetadataElements
+> Task :udea-core:iosSimulatorArm64MetadataElements
+> Task :udea-replay:transformCommonMainDependenciesMetadata
+> Task :udea-gas:transformCommonMainDependenciesMetadata
+> Task :udea-audio:transformCommonMainDependenciesMetadata
+> Task :udea-replay:kspCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-agent:transformCommonMainDependenciesMetadata
+> Task :udea-audio:compileCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-audio:metadataCommonMainClasses UP-TO-DATE
+> Task :udea-replay:compileCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-replay:metadataCommonMainClasses UP-TO-DATE
+> Task :udea-audio:allMetadataJar
+> Task :udea-replay:allMetadataJar
+> Task :udea-audio:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-audio:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-gas:transformNativeMainDependenciesMetadata
+> Task :udea-gas:kspCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-replay:transformNativeMainDependenciesMetadata
+> Task :udea-replay:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-replay:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-gas:kspKotlinWasmJs FROM-CACHE
+> Task :udea-gas:transformAppleMainDependenciesMetadata
+> Task :udea-replay:transformAppleMainDependenciesMetadata
+> Task :udea-gas:kspKotlinJvm FROM-CACHE
+> Task :udea-gas:compileCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-replay:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-gas:metadataCommonMainClasses UP-TO-DATE
+> Task :udea-gas:jvmProcessResources NO-SOURCE
+> Task :udea-replay:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-gas:processJvmMainResources SKIPPED
+> Task :udea-gas:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-gas:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-gas:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-gas:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-gas:transformIosMainDependenciesMetadata
+> Task :udea-audio:transformNativeMainDependenciesMetadata
+> Task :udea-gas:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-replay:transformIosMainDependenciesMetadata
+> Task :udea-gas:metadataIosMainClasses UP-TO-DATE
+> Task :udea-audio:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-audio:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-replay:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-replay:metadataIosMainClasses UP-TO-DATE
+> Task :udea-gas:allMetadataJar
+> Task :udea-gas:iosSimulatorArm64MetadataElements
+> Task :udea-gas:iosArm64MetadataElements
+> Task :udea-replay:iosArm64MetadataElements
+> Task :udea-audio:transformAppleMainDependenciesMetadata
+> Task :udea-replay:iosSimulatorArm64MetadataElements
+> Task :udea-audio:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-audio:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-audio:transformIosMainDependenciesMetadata
+> Task :udea-audio:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-gas:compileKotlinWasmJs FROM-CACHE
+> Task :udea-audio:metadataIosMainClasses UP-TO-DATE
+> Task :udea-gas:wasmJsMainClasses UP-TO-DATE
+> Task :udea-audio:iosArm64MetadataElements
+> Task :udea-audio:iosSimulatorArm64MetadataElements
+> Task :udea-gas:compileKotlinJvm FROM-CACHE
+> Task :udea-agent:kspCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-gas:compileJvmMainJava NO-SOURCE
+> Task :udea-gas:jvmMainClasses UP-TO-DATE
+> Task :udea-agent:metadataCommonMainProcessResources
+> Task :udea-agent:wasmJsProcessResources
+> Task :udea-core:kspKotlinIosArm64 FROM-CACHE
+> Task :udea-core:kspKotlinIosSimulatorArm64 FROM-CACHE
+> Task :udea-gas:wasmJsJar
+> Task :udea-agent:kspKotlinWasmJs FROM-CACHE
+> Task :udea-gas:jvmJar
+> Task :udea-agent:compileCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-agent:metadataCommonMainClasses
+> Task :udea-agent:kspKotlinJvm FROM-CACHE
+> Task :udea-core:androidSourcesJar
+> Task :udea-core:processAndroidMainJavaRes
+> Task :udea-net:transformCommonMainDependenciesMetadata
+> Task :udea-agent:jvmProcessResources
+> Task :udea-agent:processJvmMainResources SKIPPED
+> Task :udea-core:jvmSourcesJar
+> Task :udea-core:bundleAndroidMainClassesToCompileJar
+> Task :udea-core:sourcesJar
+> Task :udea-core:compileKotlinIosArm64 FROM-CACHE
+> Task :udea-core:iosSimulatorArm64SourcesJar
+> Task :udea-core:wasmJsSourcesJar
+> Task :udea-core:mergeAndroidMainJavaResource
+> Task :udea-core:generateMetadataFileForJvmPublication
+> Task :udea-core:iosArm64SourcesJar
+> Task :udea-core:compileKotlinIosSimulatorArm64 FROM-CACHE
+> Task :udea-core:publishJvmPublicationToMavenLocal
+> Task :udea-agent:allMetadataJar
+> Task :udea-core:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-net:compileCommonMainKotlinMetadata FROM-CACHE
+> Task :udea-core:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-agent:compileKotlinWasmJs FROM-CACHE
+> Task :udea-agent:wasmJsMainClasses
+> Task :udea-net:metadataCommonMainClasses UP-TO-DATE
+> Task :udea-audio:compileAndroidMain FROM-CACHE
+> Task :udea-gas:kspAndroidMain FROM-CACHE
+> Task :udea-core:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-core:generateMetadataFileForWasmJsPublication
+> Task :udea-audio:processAndroidMainJavaRes
+> Task :udea-core:publishWasmJsPublicationToMavenLocal
+> Task :udea-audio:compileKotlinIosSimulatorArm64 FROM-CACHE
+> Task :udea-replay:kspAndroidMain FROM-CACHE
+> Task :udea-audio:compileKotlinIosArm64 FROM-CACHE
+> Task :udea-audio:bundleAndroidMainClassesToCompileJar
+> Task :udea-agent:kspAndroidMain FROM-CACHE
+> Task :udea-core:bundleAndroidMainAar
+> Task :udea-agent:compileKotlinJvm FROM-CACHE
+> Task :udea-net:allMetadataJar
+> Task :udea-agent:compileJvmMainJava NO-SOURCE
+> Task :udea-agent:jvmMainClasses
+> Task :udea-physics2d:compileAndroidMain FROM-CACHE
+> Task :udea-gas:kspKotlinIosArm64 FROM-CACHE
+> Task :udea-audio:iosSimulatorArm64Klib
+> Task :udea-audio:iosArm64Klib
+> Task :udea-audio:mergeAndroidMainJavaResource
+> Task :udea-gas:compileAndroidMain FROM-CACHE
+> Task :udea-physics2d:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-gas:kspKotlinIosSimulatorArm64 FROM-CACHE
+> Task :udea-agent:wasmJsJar
+> Task :udea-agent:compileAndroidMain FROM-CACHE
+> Task :udea-core:generateMetadataFileForAndroidPublication
+> Task :udea-agent:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-replay:kspKotlinIosSimulatorArm64 FROM-CACHE
+> Task :udea-gas:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-net:compileAndroidMain FROM-CACHE
+> Task :udea-replay:kspKotlinIosArm64 FROM-CACHE
+> Task :udea-audio:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-agent:androidSourcesJar
+> Task :udea-agent:sourcesJar
+> Task :udea-core:iosSimulatorArm64Klib
+> Task :udea-agent:jvmSourcesJar
+> Task :udea-audio:generateMetadataFileForIosArm64Publication
+> Task :udea-physics2d:processAndroidMainJavaRes
+> Task :udea-net:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-audio:generateMetadataFileForIosSimulatorArm64Publication
+> Task :udea-audio:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-core:publishAndroidPublicationToMavenLocal
+> Task :udea-gas:compileKotlinIosArm64 FROM-CACHE
+> Task :udea-core:iosArm64Klib
+> Task :udea-net:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-gas:processAndroidMainJavaRes
+> Task :udea-render:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-gas:compileKotlinIosSimulatorArm64 FROM-CACHE
+> Task :udea-agent:wasmJsSourcesJar
+> Task :udea-audio:publishIosArm64PublicationToMavenLocal
+> Task :udea-agent:processAndroidMainJavaRes
+> Task :udea-agent:jvmJar
+> Task :udea-gas:sourcesJar
+> Task :udea-gas:androidSourcesJar
+> Task :udea-replay:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-gas:iosArm64SourcesJar
+> Task :udea-net:processAndroidMainJavaRes
+> Task :udea-agent:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-audio:publishIosSimulatorArm64PublicationToMavenLocal
+> Task :udea-net:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-agent:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-gas:iosSimulatorArm64SourcesJar
+> Task :udea-gas:jvmSourcesJar
+> Task :udea-physics2d:mergeAndroidMainJavaResource
+> Task :udea-gas:iosArm64Klib
+> Task :udea-audio:bundleAndroidMainAar
+> Task :udea-gas:wasmJsSourcesJar
+> Task :udea-gas:mergeAndroidMainJavaResource
+> Task :udea-gas:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-gas:iosSimulatorArm64Klib
+> Task :udea-core:generateMetadataFileForIosArm64Publication
+> Task :udea-agent:generateMetadataFileForWasmJsPublication
+> Task :udea-core:generateMetadataFileForIosSimulatorArm64Publication
+> Task :udea-physics2d:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-replay:compileAndroidMain FROM-CACHE
+> Task :udea-gas:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-audio:generateMetadataFileForAndroidPublication
+> Task :udea-replay:compileKotlinIosSimulatorArm64 FROM-CACHE
+> Task :udea-agent:generateMetadataFileForJvmPublication
+> Task :udea-gas:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-gas:generateMetadataFileForJvmPublication
+> Task :udea-replay:compileKotlinIosArm64 FROM-CACHE
+> Task :udea-core:publishIosArm64PublicationToMavenLocal
+> Task :udea-gas:generateMetadataFileForIosArm64Publication
+> Task :udea-gas:generateMetadataFileForWasmJsPublication
+> Task :udea-net:mergeAndroidMainJavaResource
+> Task :udea-agent:mergeAndroidMainJavaResource
+> Task :udea-audio:publishAndroidPublicationToMavenLocal
+> Task :udea-replay:kspKotlinJvm FROM-CACHE
+> Task :udea-gas:generateMetadataFileForIosSimulatorArm64Publication
+> Task :udea-agent:publishWasmJsPublicationToMavenLocal
+> Task :udea-physics2d:bundleAndroidMainAar
+> Task :udea-audio:publishToMavenLocal
+> Task :udea-gas:publishIosArm64PublicationToMavenLocal
+> Task :udea-gas:publishWasmJsPublicationToMavenLocal
+> Task :udea-agent:publishJvmPublicationToMavenLocal
+> Task :udea-gas:publishJvmPublicationToMavenLocal
+> Task :udea-core:publishIosSimulatorArm64PublicationToMavenLocal
+> Task :udea-core:publishToMavenLocal
+> Task :udea-gas:publishIosSimulatorArm64PublicationToMavenLocal
+> Task :udea-replay:iosSimulatorArm64Klib
+> Task :udea-render:compileAndroidMain FROM-CACHE
+> Task :udea-replay:iosArm64SourcesJar
+> Task :udea-net:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-replay:androidSourcesJar
+> Task :udea-physics2d:generateMetadataFileForAndroidPublication
+> Task :udea-replay:jvmProcessResources
+> Task :udea-replay:iosSimulatorArm64SourcesJar
+> Task :udea-gas:bundleAndroidMainAar
+> Task :udea-replay:processAndroidMainJavaRes
+> Task :udea-replay:processJvmMainResources SKIPPED
+> Task :udea-replay:sourcesJar
+> Task :udea-physics2d:publishAndroidPublicationToMavenLocal
+> Task :udea-physics2d:publishToMavenLocal
+> Task :udea-replay:iosArm64Klib
+> Task :udea-replay:wasmJsSourcesJar
+> Task :udea-render:processAndroidMainJavaRes
+> Task :udea-agent-host:compileKotlin FROM-CACHE
+> Task :udea-agent-host:compileJava NO-SOURCE
+> Task :udea-agent-host:classes UP-TO-DATE
+> Task :udea-agent:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-agent-host:javadoc NO-SOURCE
+> Task :udea-replay:mergeAndroidMainJavaResource
+> Task :udea-editor:compileKotlin FROM-CACHE
+> Task :udea-replay:generateMetadataFileForIosSimulatorArm64Publication
+> Task :udea-replay:generateMetadataFileForKotlinMultiplatformPublication
+> Task :udea-gas:generateMetadataFileForAndroidPublication
+> Task :udea-replay:generateMetadataFileForIosArm64Publication
+> Task :udea-replay:jvmSourcesJar
+> Task :udea-editor:compileJava NO-SOURCE
+> Task :udea-editor:classes
+> Task :udea-editor:javadoc NO-SOURCE
+> Task :udea-agent-host:plainJavadocJar FROM-CACHE
+> Task :udea-net:bundleAndroidMainAar
+> Task :udea-replay:generateMetadataFileForWasmJsPublication
+> Task :udea-replay:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-editor:plainJavadocJar FROM-CACHE
+> Task :udea-render:mergeAndroidMainJavaResource
+> Task :udea-net:generateMetadataFileForAndroidPublication
+> Task :udea-replay:publishIosSimulatorArm64PublicationToMavenLocal
+> Task :udea-replay:publishWasmJsPublicationToMavenLocal
+> Task :udea-replay:compileKotlinJvm FROM-CACHE
+> Task :udea-replay:publishIosArm64PublicationToMavenLocal
+> Task :udea-replay:publishKotlinMultiplatformPublicationToMavenLocal
+> Task :udea-gas:publishAndroidPublicationToMavenLocal
+> Task :udea-gas:publishToMavenLocal
+> Task :udea-replay:compileJvmMainJava NO-SOURCE
+> Task :udea-replay:jvmMainClasses
+> Task :udea-net:publishAndroidPublicationToMavenLocal
+> Task :udea-net:publishToMavenLocal
+> Task :udea-agent:bundleAndroidMainAar
+> Task :udea-replay:bundleAndroidMainAar
+> Task :udea-render:syncAndroidMainLibJars FROM-CACHE
+> Task :udea-agent:generateMetadataFileForAndroidPublication
+> Task :udea-replay:generateMetadataFileForAndroidPublication
+> Task :udea-replay:publishAndroidPublicationToMavenLocal
+> Task :udea-agent-host:jar
+> Task :udea-agent:publishAndroidPublicationToMavenLocal
+> Task :udea-agent:publishToMavenLocal
+> Task :udea-agent-host:generateMetadataFileForMavenPublication
+> Task :udea-replay:jvmJar
+> Task :udea-render:bundleAndroidMainAar
+> Task :udea-agent-host:publishMavenPublicationToMavenLocal
+> Task :udea-agent-host:publishToMavenLocal
+> Task :udea-replay:generateMetadataFileForJvmPublication
+> Task :udea-render:generateMetadataFileForAndroidPublication
+> Task :udea-replay:publishJvmPublicationToMavenLocal
+> Task :udea-replay:publishToMavenLocal
+> Task :udea-render:publishAndroidPublicationToMavenLocal
+> Task :udea-render:publishToMavenLocal
+> Task :udea-editor:jar
+> Task :udea-editor:generateMetadataFileForMavenPublication
+> Task :udea-editor:publishMavenPublicationToMavenLocal
+> Task :udea-editor:publishToMavenLocal
+
+[Incubating] Problems report is available at: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 37s
+861 actionable tasks: 662 executed, 199 from cache
+Configuration cache entry stored.

@@ -2,11 +2,11 @@ plugins {
     `kotlin-dsl`
 
     // Publishing, for the same reason the engine's modules are published (issue #265): a game in
-    // its own repository applies `udea.kotlin-library`, `udea.game-gates` and
+    // its own repository applies `dev.wildware.udea.kotlin-library`, `dev.wildware.udea.game-gates` and
     // `dev.wildware.udea.agent`, and a convention plugin that only exists inside this checkout is
     // a convention plugin no outside game can apply. `kotlin-dsl` brings `java-gradle-plugin`
     // with it, so the precompiled script plugins in `src/main/kotlin` get plugin markers of their
-    // own and `id("udea.game-gates") version "..."` resolves to the jar this publishes.
+    // own and `id("dev.wildware.udea.game-gates") version "..."` resolves to the jar this publishes.
     //
     // Gradle's own `maven-publish` here, and not the `com.vanniktech.maven.publish` the engine's
     // modules use, for a reason that is a property of this build rather than a preference:
@@ -67,7 +67,7 @@ subprojects {
  *
  * The alternatives were worse. Moving the plugin into `build-logic` contradicts spec 4, which
  * gives `udea-gradle` this job and expects it to be publishable for real games. `includeBuild`ing
- * `udea-gradle` is circular: its own build script applies the `udea.gradle-plugin` convention from
+ * `udea-gradle` is circular: its own build script applies the `dev.wildware.udea.gradle-plugin` convention from
  * here. Copying the wiring into a convention plugin is the duplication that produces two
  * implementations which disagree.
  *
@@ -228,7 +228,7 @@ allprojects {
 dependencies {
     implementation(libs.kotlin.gradle.plugin)
 
-    // `udea.kotlin-multiplatform` gives every runtime module an Android target through AGP's
+    // `dev.wildware.udea.kotlin-multiplatform` gives every runtime module an Android target through AGP's
     // multiplatform library plugin (issue #201). Build-logic only, like the Kotlin plugin above.
     implementation(libs.android.gradle.plugin)
 
@@ -320,7 +320,7 @@ val outerBuildInputs: FileCollection = files(
 
     // The root build script, for the other half of the same pin (issue #186). The root's
     // `allprojects` block sets `jvmTarget`/`sourceCompatibility` for the whole tree - including
-    // the old tree, which is not on the `udea.kotlin-library` convention and so never sees
+    // the old tree, which is not on the `dev.wildware.udea.kotlin-library` convention and so never sees
     // `UdeaVersions.JVM_TOOLCHAIN`. Those two numbers disagreeing is not a compile error: it is
     // `udea-render` declaring one `org.gradle.jvm.version` and compiling to another, which
     // surfaces as a resolution failure against ComposeGL somewhere else entirely.

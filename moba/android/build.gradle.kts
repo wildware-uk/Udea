@@ -16,7 +16,7 @@
  */
 
 plugins {
-    id("udea.android-application")
+    id("dev.wildware.udea.android-application")
 }
 
 dependencies {

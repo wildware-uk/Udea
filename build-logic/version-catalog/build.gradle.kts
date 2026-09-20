@@ -17,7 +17,7 @@ description =
  * Published as a copy of `gradle/libs.versions.toml`, rather than as a hand-written subset.
  *
  * A game has to agree with the engine about two versions in particular or it does not build at
- * all: the Kotlin version (the engine's modules are compiled by it, and `udea.kotlin-base` pins
+ * all: the Kotlin version (the engine's modules are compiled by it, and `dev.wildware.udea.kotlin-base` pins
  * `kotlin-stdlib` to it) and the KSP version (`udea-codegen` is a KSP2 processor, and KSP names
  * no compiler version of its own since 2.3.0, so there is nothing to derive it from). Publishing
  * the whole file means those two cannot be copied out of date, and the rest costs nothing.

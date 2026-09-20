@@ -119,7 +119,7 @@ e: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-a3cb3603dfb72ee9f/ude
 
 ## 2. Summary
 
-**What moved.** `udea-assets` applies `udea.kotlin-multiplatform`: jvm, android, wasmJs, iosArm64 and iosSimulatorArm64.
+**What moved.** `udea-assets` applies `dev.wildware.udea.kotlin-multiplatform`: jvm, android, wasmJs, iosArm64 and iosSimulatorArm64.
 It does not depend on udea-core, so the Fleks limit behind #215 does not apply. `src/main` moved to `commonMain` unchanged,
 except for what the JVM alone provided:
 

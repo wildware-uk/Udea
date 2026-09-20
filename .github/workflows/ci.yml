@@ -663,7 +663,7 @@ jobs:
     # ## What this leg proves, and how it came to prove it
     #
     # Until issue #164 it proved almost nothing. `-Pudea.compilerPlugin.enabled=false` was read
-    # by `udea.kotlin-library` and consumed by nobody: no module applied a
+    # by `dev.wildware.udea.kotlin-library` and consumed by nobody: no module applied a
     # `KotlinCompilerPluginSupportPlugin`, so this job compiled byte for byte what the `build`
     # job compiled and reported 128 of 131 tasks up to date, which was itself the proof it had
     # changed nothing.
@@ -926,7 +926,7 @@ jobs:
     #
     # **What this leg does not do yet.** Issue #39 asks for a build against the next Kotlin
     # *RC*. That needs the project Kotlin version to be overridable, and it is not: the
-    # `udea.kotlin-build-tool` convention fails configuration outright when the running Kotlin
+    # `dev.wildware.udea.kotlin-build-tool` convention fails configuration outright when the running Kotlin
     # Gradle plugin differs from `UdeaVersions.KOTLIN`, which is a hard-coded constant in
     # `build-logic` (and deliberately so - see spec 7). Until that pin grows an explicit
     # override, this leg does the half that is honest: it reruns the gate suite nightly and

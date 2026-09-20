@@ -108,7 +108,7 @@ one, so it only appears in a full build, in a module that has an iOS target.
 I grepped every `commonTest` source set in the repository for a backtick name containing a comma.
 There is exactly one other, and it is *not* a latent failure: `udea-agent`'s
 `GeneratedToolDispatchTest > the index carries the generated description, not an empty one`.
-`udea-agent` is on `udea.kotlin-multiplatform-no-ios`, so Kotlin/Native never compiles it - which is
+`udea-agent` is on `dev.wildware.udea.kotlin-multiplatform-no-ios`, so Kotlin/Native never compiles it - which is
 the real reason `master` is green, rather than nobody having used a comma. `udea-core` is on the
 full convention, iOS included, so mine had to go. Both renamed.
 

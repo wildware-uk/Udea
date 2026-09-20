@@ -1,7 +1,7 @@
 plugins {
     // Every target, iOS included: `udea-core` gained its iOS targets when Fleks was vendored
     // (issue #215).
-    id("udea.kotlin-multiplatform")
+    id("dev.wildware.udea.kotlin-multiplatform")
 }
 
 // What is common and what is JVM (issue #207). The SPI, `AudioDevice.Silent`, the binding table and

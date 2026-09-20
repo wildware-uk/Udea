@@ -10,7 +10,7 @@ import org.gradle.api.tasks.TaskProvider
  * Registers a task that resolves this project's classpaths and fails on any [DependencyRule]
  * they break.
  *
- * Used by `udea.module-graph-check`, whose rules are data so that this function is the only
+ * Used by `dev.wildware.udea.module-graph-check`, whose rules are data so that this function is the only
  * thing that resolves a classpath and decides what on it is a violation.
  *
  * @param taskName the registered task name, quoted in the failure heading.

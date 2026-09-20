@@ -105,26 +105,26 @@ Three rules that are cheap to break and expensive to find:
   interface is ComposeGL (#189).
 
 Enforced by `./gradlew udeaVerifyModuleGraph`, applied automatically to every project of the
-build that has a build script of its own — `udea.game-gates`, on the root, is what applies it.
+build that has a build script of its own — `dev.wildware.udea.game-gates`, on the root, is what applies it.
 Rule ids and rationale: `docs/module-graph.md`.
 
 **Multiplatform (the Kool/KMP port, issue #201).** A runtime module moves to KMP by applying
-`udea.kotlin-multiplatform` (`jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64`);
-`udea-render` applies `udea.kotlin-multiplatform-render` (issue #211): `jvm` and `android` only, because Kool has no iOS backend (spec D2) and publishes no wasmJs artifact (issue #223).
-`udea-core` is on `udea.kotlin-multiplatform`, iOS included, because Fleks is vendored as source
+`dev.wildware.udea.kotlin-multiplatform` (`jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64`);
+`udea-render` applies `dev.wildware.udea.kotlin-multiplatform-render` (issue #211): `jvm` and `android` only, because Kool has no iOS backend (spec D2) and publishes no wasmJs artifact (issue #223).
+`udea-core` is on `dev.wildware.udea.kotlin-multiplatform`, iOS included, because Fleks is vendored as source
 in `udea-fleks` (issue #215): Fleks publishes no iOS artifact at any version. `udea-fleks` is
 third-party code under its own MIT licence (`udea-fleks/NOTICE.md`); do not refactor it, and an
 edit to it fails `udeaVerifyDeterminism` until `determinism-audit.md` is re-read. `udea-gas`
 (issue #204), `udea-replay` (issue #206) and `udea-audio` (issue #207) are on the full convention
 too. `udea-net` (issue #209) and `udea-agent` (issue #208) are on
-`udea.kotlin-multiplatform-no-ios` (`jvm`, `android`, `wasmJs`), because each has an `expect` with
+`dev.wildware.udea.kotlin-multiplatform-no-ios` (`jvm`, `android`, `wasmJs`), because each has an `expect` with
 no native `actual` yet, and each build script names it. `udea-net`'s UDP transport runs on `jvm`
-and `android` through a shared `socketMain` source set, and `wasmJs` has the WebSocket client only. `udea-physics2d` is on `udea.kotlin-multiplatform-jvm-android` (`jvm`, `android`), because `box2d-jni` publishes desktop natives and an Android AAR and nothing else; the AAR puts the same API in another Java package, so the solver code lives in `src/box2dMain`, compiled into both targets, over a per-target `Box2DBindings.kt`. In `udea-audio` the
+and `android` through a shared `socketMain` source set, and `wasmJs` has the WebSocket client only. `udea-physics2d` is on `dev.wildware.udea.kotlin-multiplatform-jvm-android` (`jvm`, `android`), because `box2d-jni` publishes desktop natives and an Android AAR and nothing else; the AAR puts the same API in another Java package, so the solver code lives in `src/box2dMain`, compiled into both targets, over a per-target `Box2DBindings.kt`. In `udea-audio` the
 `AudioDevice` SPI, `AudioDevice.Silent` and the cue drain are `commonMain`, and a device that makes
 a noise is not in it on any target: that is `udea-render`'s `KoolAudioDevice` (issue #221), common
 code over Kool's `AudioClip`, with a clip loader on `jvm` only so far. In `udea-agent` the tools and dispatcher are common, the
 `assets.*` toolset is `jvmMain` because the asset daemon is, and `udea-agent-host` stays JVM.
-`moba` is three projects (spec D12, issue #212): `moba:game` is on `udea.kotlin-multiplatform-render`, so it builds for every target `udea-render` has, and each launcher is a single-platform project whose targets are the platform's. Two things do not cross that line yet, and both are a module's gap rather than the game's: `udea-replay` generates its registry on its JVM target alone, so `MobaReplay` lives in `moba:desktop`; and `:moba:game` runs KSP through `kspJvm` rather than `kspCommonMainMetadata`, because the Kotlin plugin creates no `commonMain` metadata compilation for a project whose targets are all JVM-family - `moba/game/build.gradle.kts` writes that out at length. Build-time modules stay on `udea.kotlin-library`. The module-graph gates govern each target's
+`moba` is three projects (spec D12, issue #212): `moba:game` is on `dev.wildware.udea.kotlin-multiplatform-render`, so it builds for every target `udea-render` has, and each launcher is a single-platform project whose targets are the platform's. Two things do not cross that line yet, and both are a module's gap rather than the game's: `udea-replay` generates its registry on its JVM target alone, so `MobaReplay` lives in `moba:desktop`; and `:moba:game` runs KSP through `kspJvm` rather than `kspCommonMainMetadata`, because the Kotlin plugin creates no `commonMain` metadata compilation for a project whose targets are all JVM-family - `moba/game/build.gradle.kts` writes that out at length. Build-time modules stay on `dev.wildware.udea.kotlin-library`. The module-graph gates govern each target's
 classpath as the JVM classpath it stands for. `sh gradlew :<module>:allTests` skips iOS off
 macOS; the `ios-tests` CI job runs it. The Android SDK comes from `ANDROID_HOME` or an
 untracked `local.properties` (`sdk.dir=...`), which is never committed.
@@ -280,7 +280,7 @@ The pieces a newcomer meets first, each with the issue that made it so.
 - **A game does not have to live in this repository** (#265). The engine publishes: every
   `udea-*` module goes to Maven Central as `dev.wildware.udea:<module>`, and `build-logic`
   publishes the convention plugins and a `udea-version-catalog` beside them, so a game's own
-  build resolves `dev.wildware.udea:udea-core` and applies `id("udea.game-gates")` without
+  build resolves `dev.wildware.udea:udea-core` and applies `id("dev.wildware.udea.game-gates")` without
   naming a path to this checkout. That plugin is how it gets the same module-graph,
   determinism, editor-absent and release checks `moba` gets; `moba` declares itself to those
   gates through the same `udeaGates { }` block, in the root build script, so there is one code

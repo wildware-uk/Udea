@@ -2,10 +2,10 @@ import dev.wildware.udea.build.CharacterArtStaging
 import dev.wildware.udea.build.UdeaBuildFlags
 
 plugins {
-    id("udea.kotlin-build-tool")
+    id("dev.wildware.udea.kotlin-build-tool")
 }
 
-/** `-Pudea.compilerPlugin.enabled`, as `udea.kotlin-base` validated and published it. */
+/** `-Pudea.compilerPlugin.enabled`, as `dev.wildware.udea.kotlin-base` validated and published it. */
 val compilerPluginEnabled: Boolean = extra[UdeaBuildFlags.COMPILER_PLUGIN_ENABLED] as Boolean
 
 /** The desktop platforms LWJGL publishes Assimp's native library for, each a classified jar. */

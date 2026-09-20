@@ -265,7 +265,17 @@ BUILD SUCCESSFUL in 6m 10s
 1122 actionable tasks: 745 executed, 349 from cache, 28 up-to-date
 ```
 
-and at `9080c6f` itself (`scratchpad/runs/final.log`):
+and at `737b4b4`, the change plus this brief's body — the full run that covers every source file
+on this branch (`scratchpad/runs/tip.log`; `tip.sha` holds the SHA that run recorded for itself,
+taken by the script before it invoked Gradle):
+
+```
+BUILD SUCCESSFUL in 1m 6s
+1122 actionable tasks: 92 executed, 1030 up-to-date
+```
+
+with `> Task :build-logic:test` at `tip.log:1853`, executed rather than `UP-TO-DATE`, and 374
+tests / 0 failures in the XML afterwards; and at `9080c6f` itself (`scratchpad/runs/final.log`):
 
 ```
 BUILD SUCCESSFUL in 1m 3s

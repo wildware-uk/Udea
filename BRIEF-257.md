@@ -1,6 +1,10 @@
 # BRIEF-257 — an orthographic isometric camera for the 3D model stage
 
-SHA: `01409d1`
+SHA: `982ab3e` — the implementation commit, which is everything described below.
+
+The branch head is one commit later than that, because a file cannot name its own commit: the head
+commit adds this paragraph and nothing else. `git log --oneline -2` on `issue-257-iso-camera` shows
+both, and `git diff 982ab3e HEAD` shows only these lines.
 
 Branch `issue-257-iso-camera`, off `origin/master` at `9c95e0e`.
 

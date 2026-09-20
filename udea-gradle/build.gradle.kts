@@ -77,6 +77,15 @@ tasks.test {
     inputs.file(root.file("build.gradle.kts"))
         .withPropertyName("rootBuildScript")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // `BuildLogicGateTest` reads the two halves of "build-logic's own tests are inside
+    // `./gradlew build`" - the `dependsOn` in the root script above, and the aggregate task in
+    // `build-logic/build.gradle.kts` that it names. The second is in an *included build*, so
+    // nothing about it reaches this project's compile classpath and Gradle would otherwise
+    // associate it with nothing here: undeclared, the fence would be served from cache across
+    // exactly the edit that removes the task it checks for.
+    inputs.file(root.file("build-logic/build.gradle.kts"))
+        .withPropertyName("buildLogicBuildScript")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     // `CleanBuildBaseScriptTest` executes the script the clean-build job picks its base with
     // (issue #218), for the same reason: an edit to it has to re-run the test.
     inputs.file(root.file(".github/scripts/clean-build-base.sh"))

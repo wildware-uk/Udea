@@ -130,7 +130,7 @@ These measure wall-clock time or need a real GPU, so running them beside a paral
 
 Do not "fix" one of these by wiring it into `check`. Each task's KDoc says why it is kept off.
 
-`build-logic` is an included build, so the root `build` compiles it but never runs its tests. Run them with `./gradlew -p build-logic check`.
+`build-logic` is an included build, so no task of the root build reaches one of its tasks by itself. The root `check` names the one it needs — `build-logic`'s `udeaBuildLogicCheck` aggregate — so `./gradlew build` runs the gate rules' own tests along with everything else. It did not until issue #265's follow-up, and for a while the repository was green over a `build-logic` suite that did not compile. `./gradlew -p build-logic check` is that suite on its own, when it is all you want to run.
 
 ## CI
 

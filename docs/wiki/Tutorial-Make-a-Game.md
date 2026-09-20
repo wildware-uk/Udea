@@ -28,9 +28,10 @@ gradle wrapper --gradle-version 8.13
 `run` simulates 600 ticks headless and prints where its three rovers ended up. Deterministic, so two
 runs print the same thing.
 
-Then rename things: `rootProject.name` in `settings.gradle.kts`, `group` in `game/build.gradle.kts`,
-the `com.example.newgame` package, and the four places the game's name appears — the `udeaAgent`
-block, the `udeaModule("NewGame")` call, `udeaGates`' package prefix, and `flagsPackage`.
+Then rename things. Grep for `new-game`, `NewGame` and `com.example.newgame` and you will find them
+all; the ones that matter are `rootProject.name` in `settings.gradle.kts`, `group` in
+`game/build.gradle.kts`, the package itself, the `udeaAgent { name, portRange, flagsPackage }` block,
+the `udeaModule("NewGame")` call, and `udeaGates`' `packagePrefixes`.
 
 ## Step 2: which engine, and where from
 

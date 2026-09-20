@@ -100,8 +100,8 @@ public interface Gizmo<C : Component<C>> {
 ```
 
 `build` runs every frame the target is selected, and every frame of a drag, so a handle follows the
-value it drives. Inside it you have exactly two calls: `handle(...)` for something to grab, and
-`mark(...)` for a guide with nothing to grab.
+value it drives. Inside it, `handle(...)` declares something to grab and `mark(...)` draws a guide
+with nothing to grab.
 
 Here is `moba`'s tower range gizmo, in `:moba:desktop`'s `editor` source set, in full:
 

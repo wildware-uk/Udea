@@ -12,8 +12,11 @@ does for real, and the proof tasks below produce pictures you can look at.
 
 A 5v5 three-lane MOBA, drawn as sprites seen from above.
 
-`:moba:desktop:runLaneShot` is the picture of it: a creep wave walking down the lane, the clash
-under two towers, and a champion farming, with the HUD and the ability bar along the bottom.
+![Units fighting mid-lane between two towers, with the scoreboard above and an ability bar below](images/moba-lane-clash.png)
+
+One frame out of `:moba:desktop:runLaneShot`: the fight mid-lane between a blue tower and a purple
+one, the lane itself drawn as a translucent ribbon along the route creeps walk, the match scoreboard
+along the top, and the selected orc's health and four ability slots along the bottom.
 
 ### The projects
 
@@ -86,9 +89,10 @@ processes, so re-run a red one alone before believing it.
 A third-person co-op survival arena in a lit forest clearing. New (epic #245), and **only partly
 built** — what is below is what exists on master today.
 
-`:hollow:desktop:runPlayerShot` is the picture of it: a low-poly human in a low-poly forest
-clearing, seen from behind and slightly above, running across a patch of bare earth ringed by
-trees, rocks and flowers.
+![The player running across the clearing, seen from behind and above](images/hollow-player-run.png)
+
+That is one tile of `:hollow:desktop:runPlayerShot`'s output: the camera behind and above him, the
+run gait because he is going at running speed, and the rock ahead that he will stop at.
 
 ### The projects
 

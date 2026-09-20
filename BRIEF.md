@@ -1,523 +1,555 @@
-# BRIEF: plugin markers publish inside the verified namespace (#265 follow-up)
+9080c6f
 
-    f77dd4b
+That is the SHA of the change, and every run in this brief was executed against it. The commit on
+top of it adds this file and nothing else — a brief cannot carry the SHA of the commit that
+carries the brief. `git show --stat HEAD` is the check.
 
-SHA `f77dd4b` — the implementation commit, which is every source change described below. The
-branch head is one commit later, because a file cannot name its own commit, and that commit adds
-only this brief: `git diff f77dd4b HEAD --stat` names `BRIEF.md` and nothing else. **Review the
-branch tip**; `f77dd4b` is what to read as the change.
+# `build-logic`'s own tests run inside `./gradlew build`
 
-Branch `issue-265-plugin-namespace`, from `origin/master` at `a81af62`.
-Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a1c6f9b3733c59da9`.
-
-Two commits behind `origin/master` (`eb24cfd`), and both are `.claude/WAVE.md` only —
-`git diff --stat a81af62..origin/master` is `.claude/WAVE.md | 40 ++++++`, so there is nothing
-to conflict with.
-
-There is no issue number. The owner's standing rule is fix-don't-file; the decisions are recorded
-at <https://github.com/wildware-uk/Udea/issues/265#issuecomment-5751458567>.
+Branch `issue-265-buildlogic-gate`, off `origin/master` at `d1bf245` (fetched; `git rev-list
+--count HEAD..origin/master` = 0, `origin/master..HEAD` = 1). No issue number: the owner's rule is
+fix-don't-file, and `#265` is the ticket whose merge exposed this.
 
 ---
 
 ## 1. The evidence command
 
-```sh
-ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem \
-  sh scripts/outside-game-proof.sh
+```
+ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue --no-configuration-cache --max-workers=6
 ```
 
-It publishes the engine and `build-logic` to a local Maven repository, then - in the leg this
-change adds - reads the coordinates of **every plugin marker that publish actually wrote** and
-fails if any is outside `dev.wildware`, or if any plugin `templates/new-game` applies has no
-marker at all. Report: `build/reports/udea/outside-game/`.
+That is the whole of it. The claim is not "it is green" — it was green before, over a red suite.
+The claim is **that command now goes red when `build-logic` breaks, and did not before**, and the
+two runs below are what establish it. Both were run on this branch minutes apart, same daemon,
+same tree except for the stated mutation.
 
-Run on `ccd31ca`, exit code `0` off the marker file:
+### 1a. The break, caught
 
-```
-=== namespace: the coordinates of every plugin marker this run published
-  6 markers -> .../build/reports/udea/outside-game/plugin-markers.txt
-  every plugin the template applies has a marker inside dev.wildware
-...
-=== PROOF GREEN
-a game outside this repository resolved the engine from a repository, built, ran, and
-inherited gates that fail when broken.
-```
-
-*(Elision marked: the five legs between - build, run, bridge, det-red, graph-red - are in
-`build/reports/udea/outside-game/` and in `scratchpad/proof.log`.)*
-
-The six markers it wrote, from `build/reports/udea/outside-game/plugin-markers.txt` — and note
-that the game then **resolved and applied** them, which is the end-to-end half the coordinate
-check alone does not give:
-
-```
-dev/wildware/udea/agent/dev.wildware.udea.agent.gradle.plugin/0.1.0-SNAPSHOT/dev.wildware.udea.agent.gradle.plugin-0.1.0-SNAPSHOT.pom
-dev/wildware/udea/assets/dev.wildware.udea.assets.gradle.plugin/0.1.0-SNAPSHOT/dev.wildware.udea.assets.gradle.plugin-0.1.0-SNAPSHOT.pom
-dev/wildware/udea/game-gates/dev.wildware.udea.game-gates.gradle.plugin/0.1.0-SNAPSHOT/dev.wildware.udea.game-gates.gradle.plugin-0.1.0-SNAPSHOT.pom
-dev/wildware/udea/kotlin-library/dev.wildware.udea.kotlin-library.gradle.plugin/0.1.0-SNAPSHOT/dev.wildware.udea.kotlin-library.gradle.plugin-0.1.0-SNAPSHOT.pom
-dev/wildware/udea/kotlin-multiplatform/dev.wildware.udea.kotlin-multiplatform.gradle.plugin/0.1.0-SNAPSHOT/dev.wildware.udea.kotlin-multiplatform.gradle.plugin-0.1.0-SNAPSHOT.pom
-dev/wildware/udea/kotlin-multiplatform-render/dev.wildware.udea.kotlin-multiplatform-render.gradle.plugin/0.1.0-SNAPSHOT/dev.wildware.udea.kotlin-multiplatform-render.gradle.plugin-0.1.0-SNAPSHOT.pom
-```
-
-The fast inner loop, which fences the same rule at source level:
-
-```sh
-ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem \
-  sh gradlew -p build-logic test --tests '*PluginNamespaceTest*'
-```
-
-### Proof that it goes red — and it is the production shape, not an invented one
-
-**The artefact fence.** The "before" here is not a mutation I wrote. It is `origin/master`, the
-commit the Release workflow actually failed on. The script published `build-logic` from each tree
-into a throwaway repository and ran the leg's two commands verbatim
-(`/tmp/.../scratchpad/mutation2.sh`; the full output is in `census-final.txt` and
-`markers-*.txt`):
-
-```
-before = eb24cfd
-publish-before exit 0
-== before ==
-markers published: 19
-markers OUTSIDE dev.wildware: 17
-after = ccd31ca
-publish-after exit 0
-== after ==
-markers published: 6
-markers OUTSIDE dev.wildware: 0
-```
-
-The first line of `outside-before.txt` is the plugin the real release died on:
-
-```
-udea/android-application/udea.android-application.gradle.plugin/0.0.0-namespace-proof/udea.android-application.gradle.plugin-0.0.0-namespace-proof.pom
-```
-
-**Three numbers here are different and must not be conflated.** The lead expected the red count to
-be **4**; it is **17**, and the difference is the whole shape of the fix:
-
-| Number | What it counts |
-|---|---|
-| **4** | plugin ids renamed into `dev.wildware.udea.*`, because something outside applies them |
-| **13** | internal `udea.*` conventions whose markers are now suppressed rather than renamed |
-| **17** | markers the pre-fix tree publishes outside the namespace — 4 + 13, i.e. every precompiled script plugin |
-| **6** | markers the fixed tree publishes: the 4 renamed plus the 2 already-correct hand-registered ones |
-
-4 could never have been the red count, because the marker that took the release down
-(`udea.android-application`) is one of the 13, not one of the 4. A fix that renamed only the four
-would still have published thirteen bad markers.
-
-**The source fence.** Mutation: undo only the four renames, leave everything else — the literal
-`git diff --stat` of that mutation is `55 files changed, 129 insertions(+), 129 deletions(-)`, and
-the id-level diff is:
+`ModuleGraphRulesTest` calls two members that `#265` deleted — the exact shape of the original
+defect. Literal `git diff` of the mutation (saved at
+`/tmp/claude-1000/-srv-ssd1-workspace-Udea/1ad8c5e6-2def-4055-91d2-72acdfe77daf/scratchpad/runs/mutation.diff`):
 
 ```diff
---- a/templates/new-game/settings.gradle.kts
-+++ b/templates/new-game/settings.gradle.kts
-@@
--        id("dev.wildware.udea.kotlin-library") version udeaVersion
--        id("dev.wildware.udea.kotlin-multiplatform") version udeaVersion
--        id("dev.wildware.udea.kotlin-multiplatform-render") version udeaVersion
--        id("dev.wildware.udea.game-gates") version udeaVersion
-+        id("udea.kotlin-library") version udeaVersion
-+        id("udea.kotlin-multiplatform") version udeaVersion
-+        id("udea.kotlin-multiplatform-render") version udeaVersion
-+        id("udea.game-gates") version udeaVersion
+diff --git a/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt b/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt
+index 4c975c9..dd08835 100644
+--- a/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt
++++ b/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt
+@@ -696,7 +696,7 @@ class ModuleGraphRulesTest {
+         assertEquals(
+             emptyList(),
+             included.filterNot { project ->
+-                ModuleGraphRules.ALL.any { it.governsAnyConfigurationOf(project) }
++                ModuleGraphRules.ALL.any { it.governs(project) }
+             }.sorted(),
+             "projects settings.gradle.kts includes that no module-graph rule governs",
+         )
+@@ -710,7 +710,7 @@ class ModuleGraphRulesTest {
+         // of `:moba` paths - until issue #265 replaced it with `ProjectScope`, so "missing from a
+         // list" is no longer the way they stop covering a project. The property is unchanged and
+         // it is the property that is asserted, through the same `appliesTo` the task itself asks.
+-        val games = includedProjects().filterNot { it.startsWith(ProjectScope.ENGINE_PREFIX) }
++        val games = ModuleGraphRules.GAME_PROJECTS
+         assertTrue(games.isNotEmpty(), "no game project found in settings.gradle.kts")
+         val skipped = listOf(
+             ModuleGraphRules.NO_SCRIPTING_OR_REFLECTION_IN_THE_GAME,
 ```
 
-`PluginNamespaceTest` then reports **28 sites, 4 distinct ids, across 5 files** (spliced from
-`build-logic/build/test-results/test/TEST-...PluginNamespaceTest.xml` of that run):
+The evidence command then fails. Spliced from `scratchpad/runs/broken.log` (1880 lines): lines
+386-395, then lines 1866-1880, which is the end of the file. The one elision is marked.
 
 ```
-PluginNamespaceTest > every convention plugin a game outside this repository applies is published() FAILED
-BUILD FAILED in 28s
+> Task :build-logic:compileTestKotlin FAILED
+e: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8895f38eaaa458a7/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt:699:42 Type mismatch: inferred type is Unit but Boolean was expected
+e: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8895f38eaaa458a7/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt:699:47 Unresolved reference: governs
+e: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8895f38eaaa458a7/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt:713:38 Unresolved reference: GAME_PROJECTS
+e: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8895f38eaaa458a7/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt:718:11 Not enough information to infer type variable R
+e: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8895f38eaaa458a7/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt:719:62 Unresolved reference: it
+e: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8895f38eaaa458a7/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt:721:49 Unresolved reference: it
+e: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8895f38eaaa458a7/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt:723:22 Type mismatch: inferred type is List<???> but Double was expected
+e: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-a8895f38eaaa458a7/build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt:723:44 Type mismatch: inferred type is String but Double was expected
+
+[ ... ELISION: lines 396-1865, 1470 lines of other tasks, none of them failing ... ]
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':build-logic:compileTestKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 8s
+1121 actionable tasks: 23 executed, 4 from cache, 1094 up-to-date
 ```
 
+**Magnitude, not merely redness.** The failing task is the one I broke —
+`:build-logic:compileTestKotlin`, nothing downstream or incidental — and the first two errors name
+the two members by name: `Unresolved reference: governs` and `Unresolved reference:
+GAME_PROJECTS`. Those are the same two references and the same two messages the original defect
+produced. The line numbers differ (699/713 here, 701/712 in the original report) because the
+repair commit `f77dd4b` rewrote the surrounding comments; the call sites are the same two. The six
+further errors are the type inference collapsing around the two unresolved calls, which is also
+what the original produced.
+
+### 1b. The control: the same break, with the one wiring line removed, is green
+
+This is the half that proves the wiring is doing the work rather than something else. Same broken
+`ModuleGraphRulesTest`, unchanged; the root's `tasks.named("check") { dependsOn(...) }` commented
+out; `BuildLogicGateTest.kt` moved aside so its own failure could not be mistaken for the build
+noticing. That is `origin/master`'s arrangement exactly.
+
+Tail of `scratchpad/runs/control.log`:
+
 ```
-expected: <[]> but was: <[templates/new-game/build.gradle.kts:13 udea.game-gates,
-templates/new-game/settings.gradle.kts:43 udea.game-gates,
-templates/new-game/settings.gradle.kts:45 udea.kotlin-library,
-templates/new-game/settings.gradle.kts:46 udea.kotlin-multiplatform,
-templates/new-game/settings.gradle.kts:47 udea.kotlin-multiplatform-render,
-templates/new-game/settings.gradle.kts:48 udea.game-gates,
-templates/new-game/game/build.gradle.kts:16 udea.kotlin-multiplatform-render,
-templates/new-game/game/build.gradle.kts:21 udea.kotlin-library,
-docs/new-game.md:60 udea.game-gates, docs/new-game.md:60 udea.kotlin-library,
-docs/new-game.md:100 udea.kotlin-library, docs/new-game.md:101 udea.game-gates,
-docs/new-game.md:113 udea.game-gates, docs/new-game.md:159 udea.game-gates,
-docs/new-game.md:172 udea.game-gates, docs/new-game.md:195 udea.kotlin-library,
-docs/new-game.md:195 udea.kotlin-multiplatform-render,
-docs/new-game.md:311 udea.kotlin-multiplatform-render, docs/new-game.md:316 udea.game-gates,
-docs/wiki/Tutorial-Make-a-Game.md:71 udea.game-gates,
-docs/wiki/Tutorial-Make-a-Game.md:71 udea.kotlin-library,
-docs/wiki/Tutorial-Make-a-Game.md:109 udea.game-gates,
-docs/wiki/Tutorial-Make-a-Game.md:122 udea.game-gates,
-docs/wiki/Tutorial-Make-a-Game.md:144 udea.kotlin-library,
-docs/wiki/Tutorial-Make-a-Game.md:187 udea.kotlin-multiplatform-render,
-docs/wiki/Tutorial-Make-a-Game.md:187 udea.kotlin-library,
-docs/wiki/Tutorial-Make-a-Game.md:401 udea.kotlin-multiplatform-render,
-docs/wiki/Tutorial-Make-a-Game.md:405 udea.game-gates]>
+BUILD SUCCESSFUL in 28s
+1118 actionable tasks: 24 executed, 1094 up-to-date
 ```
 
-*(That block is one `expected:/but was:` value, re-wrapped at the commas so it fits the page; no
-entry is reordered and none is elided. The unwrapped original is in the XML named above.)*
+And `grep -n "build-logic" control.log` returns **twelve lines, and these are all of them**:
 
-The tree was restored with `git reset --hard` after each mutation, and `git status` is clean.
-`ccd31ca` in the transcripts above is this change one amend earlier: `f77dd4b` differs from it only
-by extracting a shared `misspelt(...)` helper out of two identical test bodies in
-`PluginNamespaceTest` (`git diff ccd31ca f77dd4b --stat` names that one test file and nothing
-else), which is why the marker counts quoted against `ccd31ca` still hold — no build script, no
-plugin id and no publish task is in that diff.
+```
+1:> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2:> Task :build-logic:generateExternalPluginSpecBuilders UP-TO-DATE
+3:> Task :build-logic:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+4:> Task :build-logic:compilePluginsBlocks UP-TO-DATE
+5:> Task :build-logic:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+6:> Task :build-logic:generateScriptPluginAdapters UP-TO-DATE
+7:> Task :build-logic:compileKotlin UP-TO-DATE
+8:> Task :build-logic:compileJava NO-SOURCE
+9:> Task :build-logic:pluginDescriptors UP-TO-DATE
+10:> Task :build-logic:processResources UP-TO-DATE
+11:> Task :build-logic:classes UP-TO-DATE
+12:> Task :build-logic:jar UP-TO-DATE
+```
 
-**Honest note on TDD order.** The test was written before it could be run — the box was on hold
-for another project's suite for the first hour — so its first *execution* was after the rename,
-not before. The red above is therefore produced by restoring the pre-fix shape rather than by
-having run it on the pre-fix tree at the time. The artefact half has no such caveat: its "before"
-is `origin/master` itself.
+Every one is the **main** source set, compiled so the outer build can configure itself. There is
+no `compileTestKotlin` line and no `test` line at all. That is the defect, reproduced: a broken
+test suite, a green build, and no trace in the log that the suite exists.
+
+Say what that does not say: it is not "the outer build ignores `build-logic`". It compiles it,
+twelve tasks' worth. What it never reached was the test half.
+
+### 1c. The same command, on the branch as committed
+
+`scratchpad/runs/final.log` (1864 lines), at `9080c6f`: lines 1853-1859, then lines 1863-1864,
+which are the end of the file.
+
+```
+> Task :build-logic:test
+> Task :build-logic:validatePlugins UP-TO-DATE
+> Task :build-logic:check
+> Task :build-logic:version-catalog:check UP-TO-DATE
+> Task :build-logic:udeaBuildLogicCheck
+> Task :check
+> Task :build
+
+[ ... ELISION: lines 1860-1862, a blank line, the problems-report link, a blank line ... ]
+
+BUILD SUCCESSFUL in 1m 3s
+1122 actionable tasks: 23 executed, 1 from cache, 1098 up-to-date
+```
+
+`> Task :check` and `> Task :build` sitting immediately under `udeaBuildLogicCheck` is the
+dependency itself: the root's `check` is the thing waiting on the included build.
 
 ---
 
-## 2. What the defect was
+## 2. What I did, why, and what I rejected
 
-The first real run of `.github/workflows/release.yml` (snapshot run 35523838813) published the
-engine and was refused on its build plugins:
+**The wiring is one line in the root build script**, on `check` rather than on `build`, so
+`./gradlew check` reaches it too:
+
+```kotlin
+tasks.named("check") {
+    dependsOn(gradle.includedBuild("build-logic").task(":udeaBuildLogicCheck"))
+}
+```
+
+**`udeaBuildLogicCheck` is a new aggregate in `build-logic/build.gradle.kts`:**
+
+```kotlin
+dependsOn(allprojects.map { "${it.path}:check" })
+```
+
+Three decisions, each with what was rejected. All three are on `#265` as a comment
+(<https://github.com/wildware-uk/Udea/issues/265#issuecomment-5752150039>).
+
+| Decision | Rejected | Why |
+|---|---|---|
+| Depend on the included build's **`check`**, not its `test` | `.task(":test")` | `check` there is `test` **plus** `validatePlugins`, the `java-gradle-plugin` gate on the plugin descriptors this build publishes — exactly the surface `#265` touched. Taking only `test` lights one dark gate and leaves another. It is also what CI's `build-logic` job already runs, so the local command and the CI job now cover the same set. |
+| The aggregate derives from **`allprojects`** | a literal list of `:` and `:version-catalog` | The defect is a suite nobody's habit reached. A hand-written list is the same defect one level in: the day somebody adds a project to the `build-logic` build, its tests are dark and nothing says so. |
+| An **aggregate task** in `build-logic` rather than the outer build naming each project | `dependsOn(...task(":test"), ...task(":version-catalog:check"))` | What one build asks another for should be "verify yourself", not a list of that build's projects maintained from outside it — which is a list that goes stale in the other repository. |
+
+**The regression fence is in `:udea-gradle`, not in `build-logic`.** A fence inside `build-logic`
+would be reached only by the wiring it exists to check, so deleting the wiring would delete the
+alarm with it. `:udea-gradle` is a project of the outer build and runs under `check` either way.
+It follows the repository's own idiom for a two-halves-in-two-files gate (`LatencyBudgetJobTest`,
+which reads the root script and `ci.yml` for the same reason), and I reused that test's
+repository-root accessor by extracting it to `RepositoryUnderTest` rather than copying it.
+
+**What the newly-lit suite showed red: nothing.** The first full `build` with the wiring in place
+was green on the first attempt — 374 tests, 0 failures. I went in expecting the lead's predicted
+category (a test that reads a repository file it never declared as an input, correct alone and red
+once Gradle tracks it). It did not happen, and the reason is visible in
+`build-logic/build.gradle.kts`: issue #180 already declared those outer-build files as task
+inputs, at length and with the rationale written out. Nothing was excluded, quietly or otherwise.
+
+**Documents that were made false by this change, and are fixed in the same commit:**
+`AGENTS.md`'s "Before you say it works" section (which said in as many words that `./gradlew
+build` does not run `:build-logic:test`) and `docs/wiki/Build-and-Verification.md` line 133.
+
+**Grepped for the class, not just the instance.** `grep -rn "build-logic" --include='*.md'
+--include='*.yml'` over `docs/`, `.claude/`, `AGENTS.md`, `CLAUDE.md` and the workflows. Besides
+those two, the hits are: `docs/new-game.md` and `docs/wiki/Tutorial-Make-a-Game.md`, which say
+`build-logic` is an included build and so needs its own `publishToMavenLocal` — still true, about
+publishing rather than testing; `.claude/agents/engineer.md`, `.claude/agents/reviewer.md` and
+`.claude/skills/dev-team/SKILL.md`, which offer `sh gradlew -p build-logic check` as the evidence
+command for a build-logic ticket — still true and still the fastest way to run that suite alone,
+so left alone (they are also agent configuration, which I do not edit); and the historical
+`BRIEF-*.md` files, which are records of what was true when written and are not edited.
+**Nothing else.**
+
+### A correction to the record, from a check I ran rather than assumed
+
+It is natural to write this up as "CI would have caught it". CI *does* have a `build-logic tests`
+job — `.github/workflows/ci.yml:559`, `./gradlew -p build-logic check`, on every push and every
+pull request, and its own comment says it is "the only place CI does". I nearly wrote that the
+gap was local-only and CI had it covered.
+
+Then I checked. GitHub has **zero** check runs recorded for the three commits in question:
 
 ```
-> Failed to publish publication 'udea.android-applicationPluginMarkerMaven' to repository 'mavenCentral'
-   > Could not PUT 'https://central.sonatype.com/repository/maven-snapshots/udea/android-application/udea.android-application.gradle.plugin/0.1.0-SNAPSHOT/udea.android-application.gradle.plugin-0.1.0-20260920.171606-1.pom'. Received status code 403 from server: Forbidden
+== 4b2aca4 4b2aca4c5a9dbf50bdba04cd5989e47eff02cf1e
+   total=0
+== 06843c6 06843c6c3015ed616dfd29c88bcd7d8686a71d6e
+   total=0
+== f77dd4b f77dd4b7e0ec6bf1503d56da689c93db291b0970
+   total=0
+== d1bf245 d1bf2453f469d6497dabfe7e6da705f4b6890cb6
+   total=28
+   build-logic tests: success
 ```
 
-*(Quoted from the lead's task brief, which took it from the run log. I have no access to GitHub
-Actions logs from this box, so this block is a quotation of a written record rather than something
-I spliced from a file — the one block in this document of which that is true, and it is flagged
-here rather than presented as a transcript.)*
+(`gh api repos/{owner}/{repo}/commits/<sha>/check-runs`, saved at
+`scratchpad/runs/checkruns.txt`. `06843c6` is #265's work, `4b2aca4` its merge, `f77dd4b` the
+follow-up that repaired the two call sites, `d1bf245` today's `origin/master`.) So nothing
+anywhere ran that suite while it was broken; the job exists and simply never ran on those SHAs. I
+am not asserting *why* — that is a fact about GitHub's records, not a reconstruction.
 
-A Gradle **plugin marker** is a POM whose coordinates are the plugin id itself — group = the id,
-artifact = `<id>.gradle.plugin` — so every plugin id that leaves the machine is a Maven group.
-Sonatype authorises a publisher per namespace; ours is `dev.wildware`. Our 17 precompiled script
-plugins were named `udea.*`, which asks Central for a group nobody here owns.
+`d1bf245`'s CI run (35529751827) is a `failure` overall, but `build-logic tests` is `success`
+there and the three failing jobs are `build (windows-latest)` and both Windows `determinism` legs.
+That is `origin/master`'s state on Windows and it is not something this branch touches or changes.
 
-**Why a green #265 could not have predicted it.** `scripts/outside-game-proof.sh` and
-`publishToMavenLocal` both stop at a local Maven repository, which enforces no namespace rule at
-all. Central is the first place the rule exists.
+### The blast radius, stated the narrow way
+
+The `udeaVerify*` **tasks** — `udeaVerifyContracts`, `udeaVerifyAgentsMd`,
+`udeaVerifyModuleGraph`, `udeaVerifyDeterminism` — are on the outer `check` and have been running
+correctly throughout. What was dark is the **unit** half: the tests *of* those rules. The rules
+have been correctly applied while untested. This is not "the contract freeze gate was out of
+service".
 
 ---
 
-## 3. What changed, and the decisions
+## 3. `sh gradlew build`'s real output, and the counts read out of XML
 
-### The rule
+The full run with the wiring in place, cold enough to execute 745 tasks
+(`scratchpad/runs/full.log`; same tree content as `9080c6f`, committed immediately after):
 
-An id now says whether a plugin is published, with no hand-maintained list anywhere:
+```
+BUILD SUCCESSFUL in 6m 10s
+1122 actionable tasks: 745 executed, 349 from cache, 28 up-to-date
+```
 
-- **`dev.wildware.udea.*`** — published. A game outside this repository applies it by id, so its
-  marker must resolve from a repository, so it must sit inside the verified namespace. Its id is a
-  public API.
-- **`udea.*`** — internal to this build. A precompiled script plugin that another one applies comes
-  off the jar's own classpath, no marker involved, so nothing outside can apply it and nothing is
-  uploaded.
+and at `9080c6f` itself (`scratchpad/runs/final.log`):
 
-`build-logic/build.gradle.kts` enforces it with one `onlyIf` on `AbstractPublishToMaven` keyed on
-`publishedNamespace`, and `AGENTS.md` gains a **"Naming a convention plugin"** section stating the
-rule and its tie-breaker (*prefer `udea.` when unsure: making one public later is additive,
-un-publishing one is not*).
+```
+BUILD SUCCESSFUL in 1m 3s
+1122 actionable tasks: 23 executed, 1 from cache, 1098 up-to-date
+```
 
-### Decision 1 — four ids move, not one. The brief's premise was wrong.
+`> Task :build-logic:test` appears without an `UP-TO-DATE` suffix in both, so the suite actually
+executed inside the build rather than being replayed.
 
-The task brief, quoting `AGENTS.md`, said `udea.game-gates` is "the one plugin a game outside this
-repository applies". The tree says otherwise: `templates/new-game/settings.gradle.kts` declares
-versions for four of ours, `templates/new-game/game/build.gradle.kts` applies
-`udea.kotlin-library`, and `docs/new-game.md` offers `udea.kotlin-multiplatform-render` to any game
-that draws.
+**Counted out of the JUnit XML, not off `BUILD SUCCESSFUL`** — summing `tests`/`failures`/
+`errors`/`skipped` over every `*.xml` in the results directory:
 
-Renaming only `game-gates` would have left the outside-game proof green — mavenLocal has no
-namespace rule — and produced three more 403s at the next release: the same defect, one round
-later. Renamed: `game-gates`, `kotlin-library`, `kotlin-multiplatform`, `kotlin-multiplatform-render`.
+| Directory | XML files | tests | failures | errors | skipped |
+|---|---|---|---|---|---|
+| `build-logic/build/test-results/test` | 43 | **374** | 0 | 0 | 0 |
+| `udea-gradle/build/test-results/test` | 11 | 63 | 0 | 0 | 0 |
 
-**Rejected:** renaming all 17. More uniform, but a published marker is a public API promise and
-that makes thirteen of them by accident. The split also yields the prefix rule above, which needs
-no list to maintain. **To reverse:** 13 `git mv`s plus one `perl -pi` sweep, after which the
-`onlyIf` filter becomes a no-op that can be deleted.
+374 matches the baseline in the ticket exactly, and it is now a number the outer build produces
+rather than one somebody has to remember to go and get. The 63 in `:udea-gradle` includes the 5
+new ones.
 
-### Decision 2 — `udea.android-application` stays internal
+`:udea-assets-compiler:udeaDaemonBudget` is a latency budget and is not on `check`; it did not run
+in this build and I did not need a solo re-run of it. Nothing timing-related failed.
 
-A game shipping on Android from its own repository would want it. No document offers it and nothing
-outside this tree is tested on it. **Publishing a marker later is additive; un-publishing one is a
-break**, so the reversible option was taken. **To reverse:** rename it like the four; nothing else
-changes, because suppression is by prefix rather than by list.
+**Up-to-dateness, because this cost is paid by every developer.** A second `build` with no edits
+in between reports `> Task :build-logic:test UP-TO-DATE` and
+`> Task :build-logic:udeaBuildLogicCheck UP-TO-DATE`, finishing in 8s
+(`scratchpad/runs/final2.log`). The suite re-runs when one of its declared inputs moves — which
+includes `AGENTS.md`, the root build script and `docs/wiki/**`, so a docs-only commit does pay for
+it. That is issue #180's deliberate design, not a side effect of this change.
 
-### Decision 3 — `publishToMavenLocal` gets the same filter as the remote publish
+**Configuration cache, checked because the ticket's command line disables it and the repository
+does not.** `gradle.properties:42` sets `org.gradle.configuration-cache = true`, so CI's `build`
+job configures from cache while every run above passed `--no-configuration-cache`. A
+`gradle.includedBuild(...).task(...)` dependency is exactly the shape that can fail to serialize,
+so I ran `sh gradlew build --continue --max-workers=6` twice with the flag dropped
+(`scratchpad/runs/cc.log`, `cc2.log`):
 
-The filter is on `AbstractPublishToMaven`, not only `PublishToMavenRepository`, so a local publish
-produces the artifact set a release produces. Filtering only the remote would leave
-`outside-game-proof.sh` standing on a laxer path than the one it is evidence about — which is
-precisely how this defect reached production.
+```
+BUILD SUCCESSFUL in 1m 9s
+1122 actionable tasks: 92 executed, 1030 up-to-date
+Configuration cache entry stored.
+```
 
-### Corrected because they had stopped being true
+```
+BUILD SUCCESSFUL in 3s
+1113 actionable tasks: 22 executed, 1091 up-to-date
+Configuration cache entry reused.
+```
 
-`AGENTS.md` and `release.yml` both said nothing had ever been published. `0.1.0-SNAPSHOT` of the
-engine's modules is on Central's snapshot repository, signed and resolvable; the convention plugins
-are not, until this lands; and no *release* has been made, only that snapshot.
+`> Task :build-logic:test` is in both graphs — executed in the storing run (`cc.log:1856`),
+`UP-TO-DATE` in the reusing one (`cc2.log:139`) — so the dependency survives being stored and
+replayed. I am not going to explain why the storing run executed 92 tasks where the previous
+non-cached run executed 23; I did not chase it, both runs are green, and asserting a cause I have
+not tested is the thing this brief is otherwise trying not to do.
+
+**No GL.** This branch touches `build.gradle.kts`, `build-logic/build.gradle.kts`,
+`udea-gradle/build.gradle.kts`, three new test sources in `:udea-gradle` and two documents.
+Nothing in `udea-render`, `udea-editor` or `udea-agent-host`, and the wiring adds no GL task to
+`build`'s graph — the tasks it adds are the five `build-logic` ones listed in 1c. So the xvfb run
+is not required and I did not run one; I am not claiming anything about GL.
 
 ---
 
-## 4. A separate, larger finding: `sh gradlew build` does not run `:build-logic:test`
+## 4. Failing test first
 
-**`:build-logic:test` did not compile on `origin/master`.** Read from the committed blobs, not my
-worktree:
+`BuildLogicGateTest` was written and watched fail before either half of the wiring existed.
+From `scratchpad/runs/red.log`, with the saved XML at `scratchpad/runs/red-BuildLogicGateTest.xml`:
 
 ```
-$ git show origin/master:build-logic/src/test/kotlin/dev/wildware/udea/build/ModuleGraphRulesTest.kt | grep -n 'ModuleGraphRules::governs\|ModuleGraphRules.GAME_PROJECTS'
-701:            included.filterNot(ModuleGraphRules::governs).sorted(),
-712:        assertEquals(emptyList(), (games - ModuleGraphRules.GAME_PROJECTS).sorted(), "game projects the game rules skip")
+> Task :udea-gradle:test FAILED
 
-$ git show origin/master:build-logic/src/main/kotlin/dev/wildware/udea/build/ModuleGraphRules.kt | grep -c 'GAME_PROJECTS\|fun governs'
-0
+BuildLogicGateTest > build-logic declares that task over every project of its own build() FAILED
+    org.opentest4j.AssertionFailedError at BuildLogicGateTest.kt:66
+
+BuildLogicGateTest > the outer check depends on build-logic's aggregate verification task() FAILED
+    org.opentest4j.AssertionFailedError at BuildLogicGateTest.kt:47
+
+5 tests completed, 2 failed
 ```
 
-#265 removed both members in favour of `DependencyRule.appliesTo` and `ProjectScope`
-(`UdeaCompilerPluginWiring.kt:189` documents the removal in past tense) and left the two tests
-calling them.
+The two wiring assertions were red; the three scanner controls were green from the start, which is
+what they are for.
 
-**`build-logic` is an included build, so the outer `build` never reaches its `test` task.** A green
-repository and a red suite can therefore coexist indefinitely. **#265's reviewer could not have
-caught this**: it ran `./gradlew build` with no exclusions, got a genuine green, and passed — the
-tests #265 broke are exactly the tests its own gate does not run.
+The assertion messages are each one long line in that XML's `message` attribute. **They are not
+spliced below** — they are those two lines with the `org.opentest4j.AssertionFailedError: ` prefix
+dropped, XML entities decoded and the text re-wrapped to fit this page, so read them as a quotation
+rather than as a transcript. The bytes are in `red-BuildLogicGateTest.xml`.
 
-**Be exact about which half is dark.** The `udeaVerify*` *tasks* — contracts, AGENTS.md, module
-graph, determinism, wiki — are on the outer `check` and ran throughout. What was absent is the unit
-tests **of** the rules, not the rules themselves. "The contract freeze gate was out of service"
-would be false.
+> build.gradle.kts no longer configures `tasks.named("check")`, so nothing in the outer build
+> reaches the included build `build-logic`. Its unit tests are then run by no habit anybody has,
+> which is the defect issue #265's merge exposed. ==> expected: not \<null\>
 
-**I got the elapsed time wrong, and the way I got it wrong is worth more than the number.** I first
-reported "three weeks". It was **four hours**: `4b2aca4` is dated 2026-09-20 12:25 and master's head
-was 16:25 the same day. I never measured it — I inferred a long duration from the fact that nobody
-had noticed, which assumes the conclusion. An unnoticed thing invites you to assume it was
-unnoticed for a long time, and that inference is worthless: with the detector switched off, four
-hours and three weeks are the same observation.
+> build-logic/build.gradle.kts does not register `udeaBuildLogicCheck`, which is the task the
+> outer `check` depends on. The outer build then fails to configure rather than failing to notice,
+> but the suite is unreached either way.
 
-**Repaired here** (both tests assert the same property, through the same `appliesTo` the verify
-task itself calls, via one new private helper `DependencyRule.governsAnyConfigurationOf` that also
-de-duplicates three lines already inline in the test twenty lines above). **Wiring
-`:build-logic:test` into the outer build is deliberately *not* on this branch** — the lead ruled it
-a ticket of its own, because it is an unbounded diff in a branch about plugin namespaces.
+### Mutations, each with its literal diff
 
-**For that ticket:** with the two compile errors fixed, **the whole suite is green — 374 tests, 0
-failed, 0 skipped**, counted from the 43 JUnit XML files in `build-logic/build/test-results/test/`
-rather than from `BUILD SUCCESSFUL`, which on a `test` task is compatible with nothing having run.
-So the scope is the wiring alone; there is no backlog of rot behind it. **That 374 is a baseline,
-not a comparison** — nobody has seen it before, because the suite could not compile to produce it.
-If wiring it in turns something red, the likely cause is the wiring newly exposing something always
-true and never observed (a test reading a repository file undeclared as a Gradle input, say),
-rather than a regression from this figure.
+Taken from the runs themselves, not retyped. Diffs saved at `scratchpad/runs/mutation-b.diff` and
+`mutation-c.diff`; the logs beside them. Each was produced by `git diff` against `9080c6f` while
+the mutation was in the tree, and each is quoted from its third line — the `diff --git` and
+`index` header lines are omitted, and nothing else is.
 
-`AGENTS.md`'s "Before you say it works" section now states the gap and points at
-`./gradlew -p build-logic check`.
+**Mutation B — the wiring line replaced by a plausible one.** Not deleted: replaced with a
+`dependsOn` that still leaves a `tasks.named("check") { }` block there, so the test cannot pass by
+noticing the block is gone.
+
+```diff
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -385,7 +385,7 @@ val udeaAssemble by tasks.registering {
+ // yourself" rather than a list of that build's projects maintained from outside it.
+ // `:udea-gradle`'s `BuildLogicGateTest` is what notices this line being removed.
+ tasks.named("check") {
+-    dependsOn(gradle.includedBuild("build-logic").task(":udeaBuildLogicCheck"))
++    dependsOn(udeaAssemble)
+ }
+```
+
+```
+BuildLogicGateTest > the outer check depends on build-logic's aggregate verification task() FAILED
+    org.opentest4j.AssertionFailedError at BuildLogicGateTest.kt:54
+
+5 tests completed, 1 failed
+```
+
+**Mutation C — the aggregate stops covering every project**, the realistic regression: a
+hand-written list in place of the derivation.
+
+```diff
+--- a/build-logic/build.gradle.kts
++++ b/build-logic/build.gradle.kts
+@@ -515,5 +515,5 @@ val udeaBuildLogicCheck by tasks.registering {
+     description =
+         "Verifies every project of the build-logic build. The outer build's `check` depends on " +
+             "this, because nothing in the outer build can reach an included build's tasks by itself."
+-    dependsOn(allprojects.map { "${it.path}:check" })
++    dependsOn(listOf(":check"))
+ }
+```
+
+```
+BuildLogicGateTest > build-logic declares that task over every project of its own build() FAILED
+    org.opentest4j.AssertionFailedError at BuildLogicGateTest.kt:75
+
+5 tests completed, 1 failed
+```
+
+Exactly one test red in each, and it is the one whose subject was mutated. Both blocks are
+`mutation-b.log` and `mutation-c.log` lines 81-84, unelided.
+
+### The controls, run rather than assumed
+
+The scanner reads build scripts as text, so the two ways a text fence goes wrong are both asserted
+in `BuildLogicGateTest` itself, as cases rather than as prose:
+
+- **A `//` comment or a KDoc mentioning the wiring does not satisfy it.** `stripComments` is a
+  string-aware state machine, so it also keeps the `https://` URLs these scripts are full of —
+  that case is its own test.
+- **A `dependsOn` hung on some other task does not answer for `check`.** The block is taken by
+  matching braces from `tasks.named("check")`, and a fixture that puts the same expression on a
+  task nothing runs is asserted to fail.
+
+Both controls go the other way too: the same scanner is handed the wiring as real code and must
+see it. A fence that fails on prose is as wrong as one that passes on it.
 
 ---
 
-## 5. `sh gradlew build` — the real output
+## 5. Images: none, deliberately
 
-The branch tip — `f77dd4b` plus this file, and nothing else in the tree differs from the run:
-
-```
-BUILD SUCCESSFUL in 27s
-1118 actionable tasks: 45 executed, 3 from cache, 1070 up-to-date
-```
-
-Exit code `0`, read off the marker file, not the process list. That run is short because it
-followed the substantive one below and almost everything was genuinely up to date. Among the 45
-that did re-execute, spliced from the run's own log:
-
-```
-> Task :moba:android:lint
-> Task :moba:game:udeaCheckProtocolLock
-> Task :udea-codegen:udeaCheckProtocolLock
-> Task :udea-core:udeaCheckProtocolLock
-> Task :udea-gradle:test
-```
-
-`:udeaVerifyAgentsMd` and `:udeaVerifyWiki` are **not** in that list, and correctly so: they are
-`UP-TO-DATE` here because the documents had not changed since the run before it. They re-executed
-and passed on the run immediately after the `AGENTS.md` and wiki edits, which is the run that
-matters for them:
-
-```
-> Task :udeaVerifyAgentsMd
-> Task :udeaVerifyWiki
-```
-
-The substantive run, on `1262cdf` (this tree before the `AGENTS.md` paragraph in §4):
-
-```
-BUILD SUCCESSFUL in 11m 36s
-1118 actionable tasks: 1096 executed, 13 from cache, 9 up-to-date
-```
-
-Command, both times, with no `-x` exclusions:
-
-```sh
-ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem \
-  sh gradlew build --continue --no-configuration-cache --max-workers=6
-```
-
-`build-logic`'s own suite, which the command above does **not** reach:
-
-```
-build-logic suite: 374 tests, 0 failed, 0 skipped
-PluginNamespaceTest: 7 tests, 0 failed
-BUILD SUCCESSFUL in 1m 55s
-```
-
-### GL
-
-The ticket changes `udea-render`'s convention plugin **id** and one comment, so the GL surface is
-touched in the sense that `udea-render` is configured by a renamed plugin. Run for real rather than
-argued:
-
-```sh
-xvfb-run -a -s "-screen 0 1280x720x24" \
-  env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
-  sh gradlew udeaGlTest udeaAgentGlTest udeaEditorGlTest -Pudea.render.requireGl=true
-```
-
-```
-> Task :udea-editor:udeaEditorGlTest
-BUILD SUCCESSFUL in 2m 56s
-126 actionable tasks: 12 executed, 114 up-to-date
-```
-
-`BUILD SUCCESSFUL` on a GL task is compatible with every test *skipping*, which is the whole trap
-`-Pudea.render.requireGl` exists for, so the tests were counted out of their own JUnit XML rather
-than read off that line:
-
-```
-udeaGlTest:       26 classes, 27 tests, 0 failed, 0 skipped
-udeaAgentGlTest:   2 classes,  2 tests, 0 failed, 0 skipped
-udeaEditorGlTest:  6 classes,  6 tests, 0 failed, 0 skipped
-```
-
-### `:moba:desktop:runUdpProof` and the latency budget
-
-Not run: nothing on this branch touches UDP, the simulation, or the asset daemon. The full `build`
-above includes `:udea-assets-compiler:udeaDaemonBudget` and it passed.
+Nothing on screen changes. `moba` on this branch and on `origin/master` renders identical pixels,
+and a screenshot here would imply evidence it does not carry. The artefacts are the transcripts
+above. Nothing was copied to `/srv/ssd1/workspace/Udea/build/debug-screenshots/`.
 
 ---
 
-## 6. The census the lead asked for
+## 6. What the outer `build` reaches that it did not before
 
-Every `udea.*` token left in the tree that is shaped like a plugin id, and what each one is.
-Produced by `final-census.sh` / `final-census2.sh`; full output in `census-final.txt`.
+Read off `sh gradlew :check --dry-run` and confirmed in every full-build log since:
 
-### A. Every convention plugin this build declares, and whether its marker publishes
-
-```
-dev.wildware.udea.agent                        PUBLISHED
-dev.wildware.udea.assets                       PUBLISHED
-dev.wildware.udea.game-gates                   PUBLISHED
-dev.wildware.udea.kotlin-library               PUBLISHED
-dev.wildware.udea.kotlin-multiplatform         PUBLISHED
-dev.wildware.udea.kotlin-multiplatform-render  PUBLISHED
-udea.android-application                       not published
-udea.clean-build-budget                        not published
-udea.contract-freeze                           not published
-udea.determinism-check                         not published
-udea.docs-check                                not published
-udea.gradle-plugin                             not published
-udea.jvm-test-fixtures                         not published
-udea.kotlin-base                               not published
-udea.kotlin-build-tool                         not published
-udea.kotlin-multiplatform-jvm-android          not published
-udea.kotlin-multiplatform-no-ios               not published
-udea.module-graph-check                        not published
-udea.release-check                             not published
-declared: 19   published markers: 6
-```
-
-Every one of the 13 `not published` entries is internal by the rule in §3: nothing outside this
-repository applies it, and no document offers it. `PluginNamespaceTest` would fail if any of them
-appeared in the template or the guides.
-
-### B1. Tokens the test's own scan sees, and discards because the bare name is not a convention
-
-```
-  dev.wildware.udea.annotations
-  dev.wildware.udea.build
-  dev.wildware.udea.compiler
-  udea.editor
-  udea.migration-check
-  udea.release
-  udea.render
-```
-
-Package names, Gradle properties (`-Pudea.release`), and one historical mention:
-`udea.migration-check` is named only in a KDoc line in `udea.docs-check.gradle.kts` recording that
-it *used* to be called that before #213. Checked by hand; nothing applies it.
-
-### B2. The false-positive class — tokens only a scan *without* the trailing guard produces
-
-47 of them, and this is the part worth reading:
-
-```
-  udea.agent          <- from -Pudea.agent.port=7820        (udea-agent-host/build.gradle.kts:73)
-  udea.assets         <- from "dev.wildware.udea.agent.assets.*"
-  dev.wildware.udea.core, .editor, .gas, .gradle, .moba, .module, .nav, .net, .render,
-  .replay, .spike     <- package names
-  udea.bench .clean .compiler .example .gizmo .gradle .headless .hollow .jvm .kotlin
-  .laneshot .level .levelshot .libgdx .matchshot .migrate .moba .modelshot .module .net
-  .pack .physics2d .pinned .plugin .project .registry .replay .repo .shot .source .state
-  .test .tool .update                                       <- Gradle properties and task prefixes
-```
-
-Two of those — `udea.agent` and `udea.assets` — **name plugins that really exist**. That is the
-dangerous shape: a false positive that looks like garbage is deleted in seconds; one that names a
-real thing is believed, and then somebody renames a plugin because a Gradle property mentioned it.
-My first scan produced exactly those two. The fix is a trailing `(?![\w.-])` so an id must end
-where it is written, and both real lines are now in the test's control fixture, so the guard cannot
-be removed without a test going red.
-
----
-
-## 7. Requirement by requirement
-
-| What was asked | Where it is proved |
+| Task | Was it in `./gradlew build` before? |
 |---|---|
-| 1. `udea.game-gates` → `dev.wildware.udea.game-gates` | §6 A: `PUBLISHED`. `templates/new-game/build.gradle.kts:13`, root `build.gradle.kts:22` |
-| 2. The other plugins' markers not published at all | §1 before/after: 19 markers → 6. §6 A lists the 13 as `not published`. Achieved by suppression, with four renamed rather than one — argued in §3 Decision 1 |
-| 3. The proof script can catch this class of fault, and would have gone red on the current tree | §1: the leg's two commands, run against `origin/master`, report **17** markers outside the namespace including `udea.android-application` — the exact one the release died on |
-| Everything naming the old ids moves with them | §1 mutation diffstat (55 files). `udeaVerifyWiki` and `udeaVerifyAgentsMd` re-ran green (§5). `PluginNamespaceTest`'s "still exists" tests fail on a half-finished rename in the guides *or* in this repository's own build scripts |
-| `docs/contracts/` untouched | `udeaVerifyContracts` is on `check` and the build is green; no file under `docs/contracts/` is in the diff |
-| `sh gradlew build` green, no `-x` | §5 |
-| Failing test first, watched red | §1, with the honest caveat about execution order stated there |
+| `:build-logic:compileTestKotlin` | no |
+| `:build-logic:test` (374 tests) | no |
+| `:build-logic:validatePlugins` | no |
+| `:build-logic:check` | no |
+| `:build-logic:version-catalog:check` | no |
+| `:build-logic:udeaBuildLogicCheck` | did not exist |
+| `:udea-gradle:test` — 5 new cases in `BuildLogicGateTest` | the task yes, the cases new |
+
+Nothing was removed from the graph and nothing outside `build-logic` gained or lost a task. The
+deliberately-excluded gates are untouched: `:moba:desktop:runUdpProof` and
+`:moba:desktop:runLaneShot` are still outside `check`, and so are the latency budgets.
 
 ---
 
-## 8. Images
+## 7. Regenerated files
 
-**None, and this is not an omission to route around.** The change is plugin ids, a publish filter,
-a source-scanning test and a shell leg. Nothing it does is visible in a frame: no simulation, no
-renderer, no HUD, no editor surface. A screenshot of `moba` on this branch and on `origin/master`
-would be the same pixels, and posting one would imply evidence it does not carry. The artefacts a
-reviewer should open instead are the two marker listings in §1 and the census in §6.
+None. This branch adds no replicated component and touches neither
+`udea-codegen/net-protocol.lock` nor `udea-codegen/src/test/resources/expected-generated-hashes.txt`.
+No file in `docs/contracts/` is touched, and `docs/contracts.lock` is unchanged.
 
 ---
 
-## 9. Regenerated files
+## 8. My own near-misses, and what is weaker than it looks
 
-**None.** No `@Replicated` component was added or removed, so `udea-codegen/net-protocol.lock` and
-`expected-generated-hashes.txt` are untouched and no id moved. `:udea-codegen:udeaCheckProtocolLock`
-and `:moba:game:udeaCheckProtocolLock` both ran on the final build (§5) and passed.
+Three, and the first is the one I would want a reviewer to know.
+
+**I almost published "CI would have caught it."** CI has a job for exactly this and I read its
+YAML, its name and its comment. That was a description of a thing within reach of the thing
+itself, and the arithmetic did not have to work for me to believe it. Running
+`gh api .../check-runs` took forty seconds and returned `total_count: 0` for all three commits.
+The conclusion I nearly shipped was not merely unsupported; it was wrong.
+
+**The unit fence is a text scan, and text is the weaker half.** `BuildLogicGateTest` reads two
+build scripts; it does not resolve a task graph. It can be defeated by a wiring spelt differently
+enough — `named<Task>("check")`, or the dependency attached from a plugin instead of from the
+script. What it does reliably catch is the line being *deleted*, which is the realistic
+regression, and it is deliberately not the whole of the evidence: 1a and 1b are executed runs. I
+considered a TestKit test that resolves the real graph and rejected it as a nested build of this
+whole repository inside a unit test, which is minutes per run for a stronger claim about a line
+that two transcripts already cover.
+
+**I mutated this worktree while the evidence runs were in flight**, including moving
+`BuildLogicGateTest.kt` out of the tree for the control run. Nobody else reads this worktree, and
+everything is restored — `git status` is clean at `9080c6f` and the two mutation diffs above were
+taken against that commit. Saying it after the fact rather than before is the part I would do
+differently.
+
+**One thing I did not exercise:** whether a *second* project added to the `build-logic` build
+would really be picked up. I asserted the property in source (`allprojects`) and confirmed the
+existing second project is reached — `:build-logic:version-catalog:check` is in the dry-run graph
+and in every build log — but I did not create a third project to watch it appear. The empty case
+is covered by the existing one being non-empty; the growth case is covered by the derivation and
+by Mutation C, not by an executed example.
 
 ---
 
-## 10. What I did not exercise
+## 9. The issue, criterion by criterion
 
-- **A real publish to Central.** Impossible from this box — no credentials, no signing key — and
-  the whole point is that the *local* repository cannot enforce the rule. What is checked here is
-  the coordinates, which is the input Central rejects on; the rejection itself is Central's.
-- **An outside game resolving the renamed plugins over the network.** The proof resolves them from
-  `mavenLocal()`, which is what #265 established and what CI's `outside-game` job runs.
-- **A game applying an internal `udea.*` plugin from outside.** That now cannot be set up at all —
-  there is no marker to resolve — which is the intended behaviour and is why it has no test.
-- **iOS.** Not buildable on this Linux box; not claimed.
-- **Whether renaming `udea.android-application` would be wanted.** Left internal, reversibly;
-  §3 Decision 2.
+The ticket has no numbered acceptance criteria, so this is its requirements as written.
+
+| Asked | Where it is proved |
+|---|---|
+| `:build-logic:test` reachable from `sh gradlew build` | §1c and §6: `> Task :build-logic:test` in the full-build log, without `UP-TO-DATE`, and 374 tests in the XML |
+| Reference `#265` in the commit message | `9080c6f`, subject line and body |
+| Prove a break in `build-logic` now fails `sh gradlew build` | §1a: the mutation diff and `:build-logic:compileTestKotlin FAILED` naming `governs` and `GAME_PROJECTS` |
+| ...and that it did not before | §1b: same break, wiring removed, `BUILD SUCCESSFUL`, and the twelve `build-logic` lines that are all main-source tasks |
+| Failing test first | §4: `BuildLogicGateTest` red at two assertions before either half of the wiring existed |
+| Do not weaken a test to make it pass | Nothing weakened. No test edited but `LatencyBudgetAggregate`, where one accessor was extracted, not changed |
+| Nothing excluded quietly | Nothing excluded at all; §2 records that the newly-lit suite showed nothing red |
+| Do not wire the deliberately-excluded gates into `check` | §6: `runUdpProof`, `runLaneShot` and the latency budgets are untouched |
+| `sh gradlew build` still one command, no exclusions | §1, §3 — the evidence command has no `-x` |
+| Count tests out of the XML | §3, the table |
+| Say why there are no images | §5 |
+| State what the outer `build` now reaches | §6 |
+| Decisions commented on the issue | <https://github.com/wildware-uk/Udea/issues/265#issuecomment-5752150039> |
+
+---
+
+## 10. Files
+
+```
+ AGENTS.md                                          |  20 +--
+ build-logic/build.gradle.kts                       |  38 ++++++
+ build.gradle.kts                                   |  23 ++++
+ docs/wiki/Build-and-Verification.md                |   2 +-
+ udea-gradle/build.gradle.kts                       |   9 ++
+ .../dev/wildware/udea/gradle/BuildLogicGate.kt     | 122 +++++++++++++++++
+ .../dev/wildware/udea/gradle/BuildLogicGateTest.kt | 149 +++++++++++++++++++++
+ .../wildware/udea/gradle/RepositoryUnderTest.kt    |  30 +++++
+ .../udea/gradle/ci/LatencyBudgetAggregate.kt       |  13 +-
+ 9 files changed, 389 insertions(+), 17 deletions(-)
+```
+
+`BRIEF-namespace.md` is `origin/master`'s `BRIEF.md` — the plugin-namespace developer's, verbatim,
+`git show origin/master:BRIEF.md`. Writing mine to `BRIEF.md` would otherwise have deleted it, and
+it had not been archived under a `BRIEF-<name>.md` yet. Delete it if the lead archives it under
+another name.
+
+The saved run artefacts every transcript above is spliced from live in
+`/tmp/claude-1000/-srv-ssd1-workspace-Udea/1ad8c5e6-2def-4055-91d2-72acdfe77daf/scratchpad/runs/`:
+`red.log`, `red-BuildLogicGateTest.xml`, `full.log`, `broken.log`, `mutation.diff`, `control.log`,
+`final.log`, `final2.log`, `mutation-b.diff`, `mutation-b.log`, `mutation-c.diff`,
+`mutation-c.log`, `dry.log`, `checkruns.txt`. They are on this box and outlive the processes that
+made them, but not the machine.

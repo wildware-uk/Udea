@@ -12,8 +12,8 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinProjectExtension
 /**
  * What every Kotlin module of the rewrite shares, whichever Kotlin plugin compiles it.
  *
- * Applied by `udea.kotlin-library` (JVM) and by `udea.kotlin-multiplatform` and
- * `udea.kotlin-multiplatform-render` (issue #201), each of which applies its own Kotlin plugin
+ * Applied by `dev.wildware.udea.kotlin-library` (JVM) and by `dev.wildware.udea.kotlin-multiplatform` and
+ * `dev.wildware.udea.kotlin-multiplatform-render` (issue #201), each of which applies its own Kotlin plugin
  * *first*: this script configures the Kotlin extension and registers a compiler plugin, and both
  * need a Kotlin plugin already on the project. It is not meant to be applied on its own.
  *

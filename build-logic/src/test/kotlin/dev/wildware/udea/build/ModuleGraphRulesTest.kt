@@ -680,10 +680,7 @@ class ModuleGraphRulesTest {
         // governs every one that is not an engine module. Reading the path list alone would have
         // called those rules unscoped and skipped them, which is the same blind spot one level up.
         val scanningNothing = ModuleGraphRules.ALL
-            .filter { rule ->
-                val configurations = rule.configurations.ifEmpty { ModuleGraphRules.CONFIGURATIONS }
-                included.none { project -> configurations.any { rule.appliesTo(project, it) } }
-            }
+            .filter { rule -> included.none { project -> rule.governsAnyConfigurationOf(project) } }
             .map { "${it.id.value} governs only ${it.projects.sorted()} (scope ${it.scope})" }
         assertEquals(emptyList(), scanningNothing, "rules that govern no project in settings.gradle.kts")
     }
@@ -698,18 +695,32 @@ class ModuleGraphRulesTest {
         assertTrue(":hollow:game" in included, "the settings scan found only $included")
         assertEquals(
             emptyList(),
-            included.filterNot(ModuleGraphRules::governs).sorted(),
+            included.filterNot { project ->
+                ModuleGraphRules.ALL.any { it.governsAnyConfigurationOf(project) }
+            }.sorted(),
             "projects settings.gradle.kts includes that no module-graph rule governs",
         )
     }
 
     @Test
     fun `every game project in settings_gradle_kts is one the game rules govern`() {
-        // UDEA-MG-005 and UDEA-MG-013 are about what a shipped game carries, and they read
-        // GAME_PROJECTS rather than every project. A game project missing from it passes both.
-        val games = includedProjects().filterNot { it.startsWith(":udea-") }
+        // UDEA-MG-005 and UDEA-MG-013 are about what a shipped game carries, and a game project
+        // neither of them inspects carries a Kotlin scripting host or the FBX converter with
+        // nothing to say so. They named `ModuleGraphRules.GAME_PROJECTS` - this repository's list
+        // of `:moba` paths - until issue #265 replaced it with `ProjectScope`, so "missing from a
+        // list" is no longer the way they stop covering a project. The property is unchanged and
+        // it is the property that is asserted, through the same `appliesTo` the task itself asks.
+        val games = includedProjects().filterNot { it.startsWith(ProjectScope.ENGINE_PREFIX) }
         assertTrue(games.isNotEmpty(), "no game project found in settings.gradle.kts")
-        assertEquals(emptyList(), (games - ModuleGraphRules.GAME_PROJECTS).sorted(), "game projects the game rules skip")
+        val skipped = listOf(
+            ModuleGraphRules.NO_SCRIPTING_OR_REFLECTION_IN_THE_GAME,
+            ModuleGraphRules.NO_MODEL_CONVERTER_AT_RUN_TIME,
+        ).flatMap { rule ->
+            games.filterNot { rule.governsAnyConfigurationOf(it) }
+                .sorted()
+                .map { "${rule.id.value} skips $it" }
+        }
+        assertEquals(emptyList(), skipped, "game projects the game rules skip")
     }
 
     @Test
@@ -725,6 +736,23 @@ class ModuleGraphRulesTest {
     }
 
     /** Every project `settings.gradle.kts` includes, as a Gradle path. */
+    /**
+     * True when this rule inspects [projectPath] on at least one of the configurations it reads.
+     *
+     * `ModuleGraphRules.governs` used to answer the "is this project governed at all" half, and
+     * issue #265 removed it: it answered "is this path `:udea-*` or `:moba*`", which is a
+     * question about *which repository* is asking rather than about the project. Membership is
+     * now `projects` and `scope` together, and `appliesTo` is the one place that combines them -
+     * the same call `UdeaVerifyModuleGraphTask` makes, so a test cannot agree with a second
+     * implementation of the rule instead of with the rule.
+     *
+     * A rule that names no configuration reads `ModuleGraphRules.CONFIGURATIONS`, which is what
+     * the task does too.
+     */
+    private fun DependencyRule.governsAnyConfigurationOf(projectPath: String): Boolean =
+        configurations.ifEmpty { ModuleGraphRules.CONFIGURATIONS }
+            .any { appliesTo(projectPath, it) }
+
     private fun includedProjects(): Set<String> {
         val settings = File("../settings.gradle.kts").canonicalFile
         assertTrue(settings.isFile, "settings.gradle.kts not found at ${settings.absolutePath}")

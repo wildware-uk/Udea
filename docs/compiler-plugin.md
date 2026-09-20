@@ -114,7 +114,7 @@ Two switches, outer and inner:
 ### How the outer switch is wired
 
 `UdeaCompilerPluginSupport` in `build-logic` is a `KotlinCompilerPluginSupportPlugin`, applied
-by the `udea.kotlin-library` convention that every `udea-*` module and `moba` is on. It reads
+by the `dev.wildware.udea.kotlin-library` convention that every `udea-*` module and `moba` is on. It reads
 the flag in `isApplicable`, so with the flag off it declares no compilation applicable and the
 Kotlin Gradle plugin adds nothing to anything.
 

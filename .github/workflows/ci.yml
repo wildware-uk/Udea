@@ -663,7 +663,7 @@ jobs:
     # ## What this leg proves, and how it came to prove it
     #
     # Until issue #164 it proved almost nothing. `-Pudea.compilerPlugin.enabled=false` was read
-    # by `udea.kotlin-library` and consumed by nobody: no module applied a
+    # by `dev.wildware.udea.kotlin-library` and consumed by nobody: no module applied a
     # `KotlinCompilerPluginSupportPlugin`, so this job compiled byte for byte what the `build`
     # job compiled and reported 128 of 131 tasks up to date, which was itself the proof it had
     # changed nothing.

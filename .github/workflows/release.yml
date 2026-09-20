@@ -35,10 +35,18 @@
 # The namespace `dev.wildware` is verified in the Central portal, by a DNS TXT record on
 # wildware.dev. That record has to stay there.
 #
-# NOTHING HAS EVER BEEN PUBLISHED BY THIS WORKFLOW. It landed with issue #265, which deliberately
-# published nothing: the evidence for that ticket is `publishToMavenLocal` on a developer's
-# machine and the `outside-game` CI job, both of which stop at the local Maven repository. The
-# first person to run this is releasing Udea 0.1.0 for real, so rehearse first.
+# WHAT THIS WORKFLOW HAS PUBLISHED SO FAR: one snapshot, `0.1.0-SNAPSHOT`, of the engine's
+# modules. NO RELEASE HAS EVER BEEN MADE, so the first person to pick `patch`, `minor` or `major`
+# is releasing Udea for real and should rehearse first - a Central release can never be deleted
+# or replaced.
+#
+# That snapshot run is also why "Publish the build plugins" below is worth reading twice. It
+# failed, with a 403 on every convention plugin, because a Gradle plugin marker's Maven group is
+# the plugin id itself and the ids were `udea.*` - a namespace nobody here owns. The engine's
+# modules had already gone up fine. The convention plugins a game applies are now named
+# `dev.wildware.udea.*`, the internal ones are not published at all, and
+# `scripts/outside-game-proof.sh` checks the coordinates of every marker a publish writes, which
+# is the part of this that can be done without Central.
 
 name: Release
 
@@ -237,7 +245,7 @@ jobs:
           echo "deployment ${id:-none, which is normal for a snapshot}"
 
       # The convention plugins and the version catalog, from the included build. Without these an
-      # outside game can resolve every engine module and still not apply `udea.game-gates`.
+      # outside game can resolve every engine module and still not apply `dev.wildware.udea.game-gates`.
       - name: Publish the build plugins
         if: steps.plan.outputs.upload == 'yes'
         env:

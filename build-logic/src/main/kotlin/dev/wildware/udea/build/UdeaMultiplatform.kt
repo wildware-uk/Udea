@@ -151,7 +151,7 @@ internal object UdeaMultiplatform {
             runtimeOnly(project.udeaLibrary("junit5-platform-launcher"))
         }
 
-        // The JVM leg runs on JUnit 5 like every `udea.kotlin-library` module. Only `jvmTest`:
+        // The JVM leg runs on JUnit 5 like every `dev.wildware.udea.kotlin-library` module. Only `jvmTest`:
         // Android host tests are also a `Test` task, and their runner is AGP's to choose.
         project.tasks.named<Test>("jvmTest") { useJUnitPlatform() }
 

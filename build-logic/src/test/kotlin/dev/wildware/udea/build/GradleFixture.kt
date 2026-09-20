@@ -94,7 +94,7 @@ class GradleFixture(private val root: File) {
     /**
      * Declares a stand-in `:udea-compiler-plugin` project.
      *
-     * `udea.kotlin-library` applies [UdeaCompilerPluginSupport], which substitutes the K2
+     * `dev.wildware.udea.kotlin-library` applies [UdeaCompilerPluginSupport], which substitutes the K2
      * plugin's Maven coordinate to that project on every compiler-plugin classpath. A fixture
      * that applies the convention without it fails with "Project with path
      * ':udea-compiler-plugin' not found", which is the wiring working, not the fixture being
@@ -115,7 +115,7 @@ class GradleFixture(private val root: File) {
     /**
      * Makes the project's real version catalog available to the fixture as `libs`.
      *
-     * `udea.kotlin-library` reads the catalog through `udeaLibrary(...)`, so a fixture that
+     * `dev.wildware.udea.kotlin-library` reads the catalog through `udeaLibrary(...)`, so a fixture that
      * applies the convention has to have one. Pointing at the repository's own
      * `gradle/libs.versions.toml` rather than a hand-written stub is deliberate: the
      * convention is being tested as it will actually run, versions included.

@@ -10,7 +10,7 @@ plugins {
     // each project that has a build script, the determinism scan over the scopes declared below,
     // and the release scan on the project named by `ships`. The engine's own root build script
     // applies this same plugin and writes this same block.
-    id("udea.game-gates")
+    id("dev.wildware.udea.game-gates")
 }
 
 udeaGates {

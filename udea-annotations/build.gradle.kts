@@ -1,7 +1,7 @@
 plugins {
     // Multiplatform (issue #201). A JVM consumer - KSP, the K2 plugin, every JVM module - still
     // resolves the `jvm` variant without asking for it.
-    id("udea.kotlin-multiplatform")
+    id("dev.wildware.udea.kotlin-multiplatform")
 }
 
 /**

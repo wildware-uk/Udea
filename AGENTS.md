@@ -105,13 +105,13 @@ Three rules that are cheap to break and expensive to find:
   interface is ComposeGL (#189).
 
 Enforced by `./gradlew udeaVerifyModuleGraph`, applied automatically to every project of the
-build that has a build script of its own — `udea.game-gates`, on the root, is what applies it.
+build that has a build script of its own — `dev.wildware.udea.game-gates`, on the root, is what applies it.
 Rule ids and rationale: `docs/module-graph.md`.
 
 **Multiplatform (the Kool/KMP port, issue #201).** A runtime module moves to KMP by applying
-`udea.kotlin-multiplatform` (`jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64`);
-`udea-render` applies `udea.kotlin-multiplatform-render` (issue #211): `jvm` and `android` only, because Kool has no iOS backend (spec D2) and publishes no wasmJs artifact (issue #223).
-`udea-core` is on `udea.kotlin-multiplatform`, iOS included, because Fleks is vendored as source
+`dev.wildware.udea.kotlin-multiplatform` (`jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64`);
+`udea-render` applies `dev.wildware.udea.kotlin-multiplatform-render` (issue #211): `jvm` and `android` only, because Kool has no iOS backend (spec D2) and publishes no wasmJs artifact (issue #223).
+`udea-core` is on `dev.wildware.udea.kotlin-multiplatform`, iOS included, because Fleks is vendored as source
 in `udea-fleks` (issue #215): Fleks publishes no iOS artifact at any version. `udea-fleks` is
 third-party code under its own MIT licence (`udea-fleks/NOTICE.md`); do not refactor it, and an
 edit to it fails `udeaVerifyDeterminism` until `determinism-audit.md` is re-read. `udea-gas`
@@ -124,10 +124,31 @@ and `android` through a shared `socketMain` source set, and `wasmJs` has the Web
 a noise is not in it on any target: that is `udea-render`'s `KoolAudioDevice` (issue #221), common
 code over Kool's `AudioClip`, with a clip loader on `jvm` only so far. In `udea-agent` the tools and dispatcher are common, the
 `assets.*` toolset is `jvmMain` because the asset daemon is, and `udea-agent-host` stays JVM.
-`moba` is three projects (spec D12, issue #212): `moba:game` is on `udea.kotlin-multiplatform-render`, so it builds for every target `udea-render` has, and each launcher is a single-platform project whose targets are the platform's. Two things do not cross that line yet, and both are a module's gap rather than the game's: `udea-replay` generates its registry on its JVM target alone, so `MobaReplay` lives in `moba:desktop`; and `:moba:game` runs KSP through `kspJvm` rather than `kspCommonMainMetadata`, because the Kotlin plugin creates no `commonMain` metadata compilation for a project whose targets are all JVM-family - `moba/game/build.gradle.kts` writes that out at length. Build-time modules stay on `udea.kotlin-library`. The module-graph gates govern each target's
+`moba` is three projects (spec D12, issue #212): `moba:game` is on `dev.wildware.udea.kotlin-multiplatform-render`, so it builds for every target `udea-render` has, and each launcher is a single-platform project whose targets are the platform's. Two things do not cross that line yet, and both are a module's gap rather than the game's: `udea-replay` generates its registry on its JVM target alone, so `MobaReplay` lives in `moba:desktop`; and `:moba:game` runs KSP through `kspJvm` rather than `kspCommonMainMetadata`, because the Kotlin plugin creates no `commonMain` metadata compilation for a project whose targets are all JVM-family - `moba/game/build.gradle.kts` writes that out at length. Build-time modules stay on `dev.wildware.udea.kotlin-library`. The module-graph gates govern each target's
 classpath as the JVM classpath it stands for. `sh gradlew :<module>:allTests` skips iOS off
 macOS; the `ios-tests` CI job runs it. The Android SDK comes from `ANDROID_HOME` or an
 untracked `local.properties` (`sdk.dir=...`), which is never committed.
+
+**Naming a convention plugin.** A plugin id in `build-logic/src/main/kotlin/` is a *decision about
+publishing*, not a label. Gradle publishes a **plugin marker** for every plugin - a POM whose
+**group is the plugin id itself** and whose artifact is `<id>.gradle.plugin` - and Sonatype
+authorises a publisher per namespace. Ours is `dev.wildware`, verified by a DNS TXT record on
+wildware.dev; a PUT to any other namespace comes back 403, and that is what refused every
+convention plugin on the first real run of `.github/workflows/release.yml`. So:
+
+- **`dev.wildware.udea.<name>`** - published. A game in its own repository applies it by id, so
+  its marker has to resolve from a repository, so it has to sit inside the verified namespace.
+  Its id is then a public API: adding one is additive, removing or renaming one is a break.
+- **`udea.<name>`** - internal to this build. One precompiled script plugin applying another gets
+  it off the jar's own classpath, no marker involved, so nothing outside can apply it and nothing
+  is uploaded.
+
+Pick the prefix by asking whether anything outside this repository applies it, and **prefer
+`udea.` when unsure**: making one public later is additive, and un-publishing one is not.
+`PluginNamespaceTest` holds the two apart in source - it fails when a guide or
+`templates/new-game` names a plugin that cannot be published, or names one that no longer exists -
+and `scripts/outside-game-proof.sh` reads the coordinates back out of a repository a publish
+actually wrote. `docs/module-graph.md` lists every convention with its id.
 
 ---
 
@@ -280,7 +301,7 @@ The pieces a newcomer meets first, each with the issue that made it so.
 - **A game does not have to live in this repository** (#265). The engine publishes: every
   `udea-*` module goes to Maven Central as `dev.wildware.udea:<module>`, and `build-logic`
   publishes the convention plugins and a `udea-version-catalog` beside them, so a game's own
-  build resolves `dev.wildware.udea:udea-core` and applies `id("udea.game-gates")` without
+  build resolves `dev.wildware.udea:udea-core` and applies `id("dev.wildware.udea.game-gates")` without
   naming a path to this checkout. That plugin is how it gets the same module-graph,
   determinism, editor-absent and release checks `moba` gets; `moba` declares itself to those
   gates through the same `udeaGates { }` block, in the root build script, so there is one code
@@ -289,11 +310,18 @@ The pieces a newcomer meets first, each with the issue that made it so.
   deployment and stops, for a person to press publish in `central-publish.yml`. A game builds
   against **one pinned snapshot** - `udeaVersion` in its own `gradle.properties`, changed when
   the owner says so rather than when the engine moves - resolved from `mavenLocal()` first and
-  then from Central's snapshots. **Nothing has been published yet**, so today that means
-  `./gradlew publishToMavenLocal` and `./gradlew -p build-logic publishToMavenLocal`.
+  then from Central's snapshots.
+  **Published so far:** the engine's modules, at `0.1.0-SNAPSHOT`, on Central's snapshot
+  repository - signed, and resolvable today. The convention plugins are **not** there: the first
+  snapshot run reached them and was refused 403, for the reason under "Naming a convention
+  plugin" below. No *release* has been made, only that snapshot.
+  Building a game against an engine change you have not pushed is still
+  `./gradlew publishToMavenLocal` and `./gradlew -p build-logic publishToMavenLocal`, which
+  `mavenLocal()` resolves ahead of the network.
   `templates/new-game/` is a working game of that shape, `docs/new-game.md` is the guide, and
-  `scripts/outside-game-proof.sh` publishes, builds it from outside the tree, runs it, and
-  proves its gates still fail when the game breaks them.
+  `scripts/outside-game-proof.sh` publishes, builds it from outside the tree, runs it, checks
+  every plugin marker it wrote is inside the verified namespace, and proves its gates still fail
+  when the game breaks them.
 
 ---
 
@@ -348,6 +376,19 @@ in `models/` - the Fox (#240, #242) and the socket fixture `models/chassis` (#26
 ```
 
 No `-x` exclusions. The whole repository is green; if it is not, that is your change.
+
+**And it does not run `:build-logic:test`.** `build-logic` is an *included* build, so the outer
+`build` never reaches its `test` task; the build gates' own unit tests are there, and a green
+`./gradlew build` says nothing about them. That is not a theoretical gap: issue #265 removed two
+members of `ModuleGraphRules` and left two tests calling them, so `:build-logic:test` did not
+compile while the repository was green, and its reviewer ran `./gradlew build` with no exclusions,
+got a true green, and merged it. Note which half is dark - the `udeaVerify*` *tasks* are on the
+outer `check` and run throughout; what is absent is the tests **of** the rules, not the rules. So
+if you touch `build-logic`, run this too:
+
+```
+./gradlew -p build-logic check
+```
 
 - **There is no art step.** `moba/game/assets/sprites/` is gitignored licensed art, and
   `:moba:game:udeaStageCharacterArt` copies it out of the tree that already holds it, ahead of the

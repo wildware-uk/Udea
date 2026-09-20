@@ -4,13 +4,17 @@
 # OUTSIDE this repository against the published artifacts, and proves the gates it inherited can
 # fail (issue #265).
 #
-# Six legs, in order. Each writes its whole transcript into the report directory, and the script
+# Seven legs, in order. Each writes its whole transcript into the report directory, and the script
 # stops at the first one that does not do what it says.
 #
 #   0. publish  `publishToMavenLocal` for the engine's modules, and again for `build-logic`,
 #               which carries the convention plugins and the version catalog. Nothing leaves this
 #               machine: the local Maven repository stands in for Maven Central, and is the whole
 #               difference between this proof and a release.
+#   0b. namespace  every plugin marker this run published is inside `dev.wildware`, and every
+#               plugin the template applies has one. Central authorises a publisher per namespace
+#               and a local repository does not, so this is the one rule the stand-in above drops
+#               - and the one that took the first real release run down (issue #265).
 #   1. build    `./gradlew build` in the copied game: compiles against the published engine, runs
 #               the game's own tests, and runs udeaVerifyModuleGraph, udeaVerifyDeterminism,
 #               udeaVerifyKotlinPin and udeaVerifyCompilerPlugin over it.
@@ -92,18 +96,69 @@ game_gradle() {
 #
 # Two builds, because `build-logic` is an included build: the outer `publishToMavenLocal` does
 # not reach it, and it is the half that carries the plugins a game applies.
+#
+# The marker file is what leg 0b tells this run's artifacts from the ones a previous run left in
+# the same repository. `publishToMavenLocal` writes into `~/.m2`, which nothing here empties, so
+# "what is in the repository" and "what this publish produced" are different questions and only
+# the second one is evidence.
+touch "$WORK/publish-start"
+
 engine_gradle publish publishToMavenLocal "-PudeaVersion=$UDEA_VERSION" ||
     fail "the engine did not publish; see $REPORT/publish.log"
 engine_gradle publish-build-logic -p build-logic publishToMavenLocal "-PudeaVersion=$UDEA_VERSION" ||
     fail "build-logic did not publish; see $REPORT/publish-build-logic.log"
 
-M2=${M2_REPO:-$HOME/.m2/repository}/dev/wildware/udea
+M2_ROOT=${M2_REPO:-$HOME/.m2/repository}
+M2=$M2_ROOT/dev/wildware/udea
 for artifact in udea-core udea-annotations udea-agent-host udea-codegen udea-build-logic udea-version-catalog; do
     [ -d "$M2/$artifact/$UDEA_VERSION" ] ||
         fail "$artifact:$UDEA_VERSION is not in the local Maven repository after publishing"
 done
 ls "$M2" > "$REPORT/published-artifacts.txt"
 echo "  published $(wc -l < "$REPORT/published-artifacts.txt") artifacts at $UDEA_VERSION -> $REPORT/published-artifacts.txt"
+
+# --- 0b. every plugin marker published sits inside the verified namespace ----------------------
+#
+# Gradle publishes a *plugin marker* for every plugin: a POM whose group is the plugin id and
+# whose artifact is `<id>.gradle.plugin`. A plugin id is therefore a Maven group, and Sonatype
+# authorises this account for `dev.wildware` alone - verified by a DNS TXT record on wildware.dev
+# - and answers a PUT anywhere else with 403.
+#
+# A local Maven repository enforces none of that, which is how this proof was green while the
+# first real run of `.github/workflows/release.yml` failed on it: the engine's modules published
+# and the convention plugins did not, because they were named `udea.*` (snapshot run 35523838813,
+# issue #265). So the check is on the coordinates rather than on the upload, which is the part
+# that can be done offline - and it reads them out of the repository the publish above wrote,
+# rather than out of a build script that says what it intends to write.
+say "namespace: the coordinates of every plugin marker this run published"
+MARKERS="$REPORT/plugin-markers.txt"
+find "$M2_ROOT" -path '*.gradle.plugin/*' -name '*.pom' -newer "$WORK/publish-start" \
+    | sed "s|^$M2_ROOT/||" | sort > "$MARKERS"
+
+# A `grep -v` over an empty file reports nothing and looks exactly like a pass, so the file being
+# non-empty is asserted before anything is concluded from what is in it.
+[ -s "$MARKERS" ] ||
+    fail "this run published no plugin markers at all, so the namespace check below proves nothing"
+echo "  $(wc -l < "$MARKERS") markers -> $MARKERS"
+
+if grep -v '^dev/wildware/' "$MARKERS" > "$REPORT/markers-outside-namespace.txt"; then
+    cat "$REPORT/markers-outside-namespace.txt"
+    fail "those plugin markers publish under a namespace Central refuses with a 403; see $REPORT/markers-outside-namespace.txt"
+fi
+
+# The other direction, and the one a rename can break silently: a plugin the template applies
+# whose marker never got published is a plugin an outside game cannot resolve. The list is read
+# out of the template rather than written here, so the two cannot drift.
+sed -n 's/.*id("\([^"]*\)") version udeaVersion.*/\1/p' "$REPO/templates/new-game/settings.gradle.kts" \
+    | sort -u > "$REPORT/template-plugin-ids.txt"
+[ -s "$REPORT/template-plugin-ids.txt" ] ||
+    fail "no plugin ids were read out of templates/new-game/settings.gradle.kts"
+while read -r plugin_id; do
+    marker_path="$(printf '%s' "$plugin_id" | tr . /)/$plugin_id.gradle.plugin/"
+    grep -q "^$marker_path" "$MARKERS" ||
+        fail "the template applies $plugin_id, and this run published no marker for it"
+done < "$REPORT/template-plugin-ids.txt"
+echo "  every plugin the template applies has a marker inside dev.wildware"
 
 # Nothing in the game may name this checkout. The previous shape of this proof included the
 # engine's build, and a path left behind would make every leg below pass for the wrong reason.

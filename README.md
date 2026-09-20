@@ -12,7 +12,7 @@ A Kotlin+Kool+Fleks game engine for 2D games.
 
 ## 📖 Documentation
 
-Check out the [Udea Engine Documentation](docs/home.md) to get started!
+Check out the [Udea wiki](docs/wiki/Home.md) to get started!
 
 ## Features
 

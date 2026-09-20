@@ -624,6 +624,8 @@ jobs:
     #
     # `udeaVerifyTrelloMap` rides along because it is the same class of failure: bookkeeping
     # spanning two systems, which decays into nothing unless something goes red when it drifts.
+    # `udeaVerifyWiki` is the third of the kind: every page, path and project `docs/wiki/` names
+    # has to exist.
     #
     # **This job must be a required status check on `master`.**
     name: agent brief matches the tree
@@ -644,9 +646,9 @@ jobs:
         shell: bash
         run: chmod +x ./gradlew
 
-      - name: AGENTS.md and the Trello map describe the tree that exists
+      - name: AGENTS.md, the Trello map and the wiki describe the tree that exists
         shell: bash
-        run: ./gradlew udeaVerifyAgentsMd udeaVerifyTrelloMap --stacktrace
+        run: ./gradlew udeaVerifyAgentsMd udeaVerifyTrelloMap udeaVerifyWiki --stacktrace
 
   plugin-disabled:
     # Spec 7's mitigation for D8, and a Phase 0 exit criterion: **CI proves the build is green

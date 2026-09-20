@@ -187,7 +187,11 @@ ksp {
 - Apply `udea.kotlin-multiplatform-render` instead of `udea.kotlin-library` when the game draws and
   ships on more than one platform.
 
-### `game/src/main/.../NewGame.kt` — the game
+### `NewGame.kt` — the game
+
+The template's copy is
+`templates/new-game/game/src/main/kotlin/com/example/newgame/NewGame.kt`; in the repository you
+copied it into, the same path with that `templates/new-game/` prefix dropped.
 
 A module lists systems; a definition is modules plus the generated registry; a host runs it.
 
@@ -314,7 +318,7 @@ fail is unverified.
 {
   "name": "new-game",
   "launch": {
-    "command": "./gradlew :game:run -PdebugPort={port} --console=plain",
+    "command": "./gradlew <project path>:run -PdebugPort={port} --console=plain",
     "cwd": ".",
     "portRange": "7860-7879",
     "readyTimeoutMs": 180000,
@@ -322,6 +326,9 @@ fail is unverified.
   }
 }
 ```
+
+`<project path>` is the Gradle path of whichever project applies the plugin — the `game` module
+in the template — and `{port}` is the bridge's own placeholder, which it fills in when it launches.
 
 Then:
 
@@ -346,8 +353,9 @@ val tools: ToolIndex = EngineToolModules
 ```
 
 `WorldToolset` is deliberately absent: it needs an `AgentComponentIndex` over `@Replicated`
-components, and the template declares none. `moba/desktop/src/agent/.../MobaAgent.kt` is the worked
-example that wires it.
+components, and the template declares none.
+`moba/desktop/src/agent/kotlin/dev/wildware/moba/agent/MobaAgent.kt` is the
+worked example that wires it.
 
 The template's instance is `Headless`, so `world.*`, `time.*` and `events.*` answer and every
 `render.*` tool answers `no_render_context` — **which is the contract working**, not a fault. A game

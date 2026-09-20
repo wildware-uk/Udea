@@ -444,6 +444,21 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
+## Wave 19 (2026-09-20): in flight
+- MERGED into master at 8ba4c5d: #264 (udea-nav pathfinding), #248 (third-person camera), #260 (model sockets),
+  #249 (Hollow H1 scaffold). All four PASS at round 1/2, 0 findings. Trial build green: 984+ tasks, GL suites green.
+  #260 and #264 both touched `net-components.lock`; resolved by keeping both comment paragraphs, the name list
+  merged clean and stayed in strict ASCII order (Animator 27, AttachedTo 28, Transform3D 29, NavAgent 30, NavObstacle 31).
+- Shader API spec written on the owner's request: docs/superpowers/specs/2026-09-20-shader-api-design.md.
+  Five tickets sketched (S1 materials, S2 material assets, S3 screen passes closing #259, S4 editor inspector,
+  S5 compute). NOT filed - waiting on the owner's go.
+- New friction issues filed by the robot-game session: #266 (no shader API - answered on the issue, KSL not GLSL
+  strings), #267 (no sky or clear colour), #268 (screenshot needs backend.pipeline?.capture), #269 (the new-game
+  template cannot draw).
+- REVIEWER TRAP, cost 13 hours: an `Agent` spawn with a name and NO `isolation` registers as a pane teammate in
+  this session and never runs - no worktree, no build, no reply, and the spawn reports success. Always spawn
+  reviewers with `isolation: "worktree"` and have them `git checkout --detach <SHA>` inside it.
+
 ## Wave 18 (2026-09-19): in flight - robot-game engine features (epic #256, R1-R9 = #257-#265, filed by owner)
 - dispatched: dev-260 (sockets; udea-core, assets compiler, udea-render), dev-264 (pathfinding, new module udea-nav),
   dev-265 (outside-repo games by composite build; build-logic, udea-gradle gates). Decisions commented on #264, #265.

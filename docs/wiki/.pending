@@ -1,18 +1,17 @@
-# Wiki pages another branch is still writing: the wiki-tools half, and the Hollow editor walkthrough
-# written with the Hollow work (#255).
+# Wiki pages another branch is still writing: the wiki-tools half.
 #
 # udeaVerifyWiki lets Home.md and _Sidebar.md link to these before they exist. It fails when a
 # listed page is present, so the branch that merges last deletes the entry, and then this file.
-Getting-Started.md
-Rendering-with-Kool.md
-Models-and-Animation.md
-UI-with-ComposeGL.md
-Input.md
-Cameras.md
+#
+# The six pages this branch wrote - Getting-Started, Rendering-with-Kool, Models-and-Animation,
+# UI-with-ComposeGL, Input and Cameras - are here now, so their entries are gone.
+#
+# Building-Hollow-in-the-Editor.md is gone too, and it is the one entry that went for a different
+# reason: the page belongs to issue #255, which adds the editor entry point it would describe, so
+# nothing links it today. Its entry and its links go back together when the page exists.
 Audio.md
 The-Editor.md
 Gizmos.md
 Agent-Tool-Surface.md
 Tutorial-Make-a-Game.md
 Example-Games.md
-Building-Hollow-in-the-Editor.md

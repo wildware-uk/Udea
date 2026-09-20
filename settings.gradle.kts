@@ -72,3 +72,12 @@ include("udea-gradle")
 include("moba:game")
 include("moba:desktop")
 include("moba:android")
+
+// --- the 3D example game (epic #245, issue #249) -------------------------------------------------
+//
+// Hollow: a third-person co-op survival arena in a lit forest clearing, built to exercise what
+// `moba`'s 2D cannot - models, shadows, `Transform3D`, and later 3D physics, abilities and co-op.
+// The same shape as `moba`: the game is a library and the launcher is a project of its own. There is
+// no Android launcher in this epic.
+include("hollow:game")
+include("hollow:desktop")

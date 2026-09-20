@@ -12,10 +12,10 @@ module took over from that tree, as history.
 | Plugin | For | What it gives you |
 |---|---|---|
 | `udea.kotlin-base` | applied by the Kotlin conventions below, never on its own | JDK 21 toolchain, `explicitApi()`, the `kotlin-stdlib` pin with `udeaVerifyKotlinPin`, the K2 compiler plugin with `udeaVerifyCompilerPlugin` |
-| `udea.kotlin-library` | every JVM runtime module and `moba:desktop` | Kotlin JVM plus `udea.kotlin-base`, kotlin.test on JUnit 5. **No GL.** |
+| `udea.kotlin-library` | every JVM runtime module, `moba:desktop` and `hollow:desktop` | Kotlin JVM plus `udea.kotlin-base`, kotlin.test on JUnit 5. **No GL.** |
 | `udea.kotlin-multiplatform` | runtime modules ported to KMP (issue #201) | Kotlin Multiplatform on `jvm`, `android` (AGP's KMP library plugin), `wasmJs` (Node), `iosArm64`, `iosSimulatorArm64`, plus `udea.kotlin-base`; kotlin.test in `commonTest`, JUnit 5 on `jvmTest` |
 | `udea.kotlin-multiplatform-no-ios` | a runtime module that cannot have an iOS target yet, whose build script names why: `udea-net`, whose `webSocketEngine` has no native `actual` (issue #209); `udea-agent`, whose `enumConstantsOf` and `heapFigures` have none (issue #208). `udea-core` left it when Fleks was vendored (issue #215) | `udea.kotlin-multiplatform` without the iOS targets; switching back to `udea.kotlin-multiplatform` re-enables them |
-| `udea.kotlin-multiplatform-render` | `udea-render` (spec D2, issue #211) and `moba:game`, which builds for every target `udea-render` has (issue #212) | `udea.kotlin-multiplatform-no-ios`, applied rather than copied |
+| `udea.kotlin-multiplatform-render` | `udea-render` (spec D2, issue #211), and `moba:game` and `hollow:game`, which build for every target `udea-render` has (issues #212, #249) | `udea.kotlin-multiplatform-no-ios`, applied rather than copied |
 | `udea.kotlin-multiplatform-jvm-android` | `udea-physics2d`, whose native library `box2d-jni` publishes for the desktop JVM and Android only | Kotlin Multiplatform on `jvm` and `android`, the same target set as the render convention but its own plugin, so the two move independently |
 | `udea.jvm-test-fixtures` | a KMP module with JVM test fixtures | a `jvmTestFixtures` source set published under the `-test-fixtures` capability, so `testFixtures(project(...))` works from a JVM consumer |
 | `udea.kotlin-build-tool` | `udea-codegen`, `udea-compiler-plugin`, `udea-assets-compiler` | `udea.kotlin-library` plus the exact-Kotlin-version pin (spec §7), checked at configuration time |
@@ -49,6 +49,8 @@ mirrors the catalog's `kotlin` key and a test in `build-logic` fails if the two 
 | `moba:game` | `udea.kotlin-multiplatform-render` | The example game as a library: components, systems, assets and what it draws, with no entry point (issue #212) | `example` | `udea-core`, `udea-render` (`api`); `udea-annotations`, `udea-gas`, `udea-net`, `udea-assets`, `udea-audio` (`implementation`) | `moba:desktop`, `moba:android` |
 | `moba:desktop` | `udea.kotlin-library` | The desktop launcher: the client, the server, the shot mains, the proofs and the agent surface | `moba`'s entry points | `moba:game`, `udea-replay` (`api`); `udea-core`, `udea-render`, `udea-net`, `udea-gas`, `udea-audio`, `udea-assets` (`implementation`); the agent source set's `udea-agent-host` comes from `dev.wildware.udea.agent` and is kept out of release by `UDEA-REL-002` | — |
 | `moba:android` | `udea.android-application` | The Android launcher, one activity | — | `moba:game` | — |
+| `hollow:game` | `udea.kotlin-multiplatform-render` | The 3D example game as a library (epic #245, issue #249): its components, the CC0 nature models, the `clearing.udealevel` level, what it draws, and the server and client sessions. No entry point | — | `udea-core`, `udea-render` (`api`); `udea-annotations`, `udea-assets`, `udea-net` (`implementation`) | `hollow:desktop` |
+| `hollow:desktop` | `udea.kotlin-library` | Hollow's desktop launcher: `run` (a listen server and its local player), `runServer`, `runClient host\|join`, `runShot` | — | `hollow:game` (`api`); `udea-core`, `udea-render`, `udea-assets`, `udea-net` (`implementation`) | — |
 
 ## Arrows that must never appear
 
@@ -112,9 +114,9 @@ rule has a stable id so a failure message and this document can be joined up by 
 
 | Task | Registered on | Reads | Runs from |
 |---|---|---|---|
-| `udeaVerifyModuleGraph` | every `:udea-*` and `:moba:*` project | the resolved dependency graph | that project's `check`, plus the root aggregate |
-| `udeaVerifyRelease` | `:moba:desktop` | the **packaged artifact**, plus the release runtime classpath | `finalizedBy` on `:moba:desktop:assemble`, release builds only |
-| `udeaVerifyEditorAbsent` | every `:udea-*` and `:moba:*` project with a JVM release classpath, except `:udea-editor` | the **classes** on the release runtime classpath and in the project's jar | that project's `check` |
+| `udeaVerifyModuleGraph` | every `:udea-*`, `:moba:*` and `:hollow:*` project (`ModuleGraphRules.governs`) | the resolved dependency graph | that project's `check`, plus the root aggregate |
+| `udeaVerifyRelease` | `:moba:desktop` and `:hollow:desktop`, each game's launcher | the **packaged artifact**, plus the release runtime classpath | `finalizedBy` on that launcher's `assemble`, release builds only |
+| `udeaVerifyEditorAbsent` | every `:udea-*`, `:moba:*` and `:hollow:*` project with a JVM release classpath, except `:udea-editor` | the **classes** on the release runtime classpath and in the project's jar | that project's `check` |
 
 Both read the **resolved** graph rather than declared dependencies, because the arrow
 that matters is the one nobody declared: a module two hops away from a banned artifact has
@@ -268,8 +270,8 @@ the scan unnoticed.
 
 ## `UDEA-MG-010` — no compile or runtime classpath resolves `udea-editor`
 
-**Issue #194.** Banned on `compileClasspath` and `runtimeClasspath` of every `udea-*` and `moba`
-project: `:udea-editor`.
+**Issue #194.** Banned on `compileClasspath` and `runtimeClasspath` of every `udea-*`, `moba` and
+`hollow` project: `:udea-editor`.
 
 The editor window writes any field of any entity through the `editor.*` tools, which ignore
 `agentWritable` because authoring a level needs every field. It is a tool for a person at a desk,
@@ -283,7 +285,7 @@ scanned by it. What a dependency rule cannot see - a class with no coordinate - 
 
 ## `UDEA-MG-012` — no release classpath carries a `udea-editor` class or a `Gizmo`
 
-**Issue #233.** Read by `udeaVerifyEditorAbsent`, on every `udea-*` and `moba` project with a JVM
+**Issue #233.** Read by `udeaVerifyEditorAbsent`, on every `udea-*`, `moba` and `hollow` project with a JVM
 release classpath (`runtimeClasspath`, or `jvmRuntimeClasspath` on a multiplatform project) except
 `:udea-editor` itself, from that project's `check`. It reads every class on that classpath and in
 the project's own jar, and fails on one that is `udea-editor`'s (`dev/wildware/udea/editor/`), that
@@ -325,7 +327,7 @@ draw stay inside `udea-render` as spec §3 requires. This rule is that sentence 
 ## `UDEA-MG-013` — the FBX converter runs in the asset build and nowhere else
 
 **Issue #244.** Banned on `compileClasspath` and `runtimeClasspath` of every `udea-*` module and
-every `moba` project except `ModuleGraphRules.MODEL_CONVERTER_PROJECTS` (`udea-assets-compiler`
+every game project (`moba` and `hollow`) except `ModuleGraphRules.MODEL_CONVERTER_PROJECTS` (`udea-assets-compiler`
 and `udea-gradle`): `*:*assimp*`, every Assimp binding, LWJGL's included.
 
 Kool reads glTF and has no FBX loader, so a game that drops an `.fbx` into its assets gets the
@@ -367,9 +369,12 @@ closes the other half of the same hole.
 
 ## `UDEA-MG-005` — no scripting host and no classpath scanner in the game
 
-**Spec §6 (Phase 2 exit), §3.6.** Banned on the `runtimeClasspath` of every `moba` project -
-`:moba:game`, `:moba:desktop`, `:moba:android`, plus `:moba`, so that re-creating a flat `moba`
-module does not re-open the hole, and `:moba:web` for the same reason ahead of issue #226:
+**Spec §6 (Phase 2 exit), §3.6.** Banned on the `runtimeClasspath` of every game project,
+`ModuleGraphRules.GAME_PROJECTS` - `:moba:game`, `:moba:desktop`, `:moba:android`, plus `:moba`, so
+that re-creating a flat `moba` module does not re-open the hole, and `:moba:web` for the same reason
+ahead of issue #226; and Hollow's `:hollow:game` and `:hollow:desktop`, plus `:hollow` (issue #249).
+`ModuleGraphRulesTest` fails when `settings.gradle.kts` includes a project that is neither `udea-*`
+nor in that set, so a third game cannot join ungoverned:
 `org.jetbrains.kotlin:kotlin-scripting-*`, `org.jetbrains.kotlin:kotlin-reflect`,
 `org.reflections:reflections`.
 
@@ -439,7 +444,7 @@ catches:
 - `dev/wildware/udea/agent/`
 - `dev/wildware/udea/agenthost/`
 
-Scanned: every zip entry of every archive `:moba:desktop` produces — the jar today,
+Scanned: every zip entry of every archive `:moba:desktop` and `:hollow:desktop` produce — the jar today,
 `distZip`/`distTar` the day a distribution is added. Selected by task type rather than by name
 so the gate cannot silently narrow when the packaging changes.
 
@@ -455,7 +460,7 @@ Finding no archive at all fails too. A release gate with no input passes forever
 
 ## `UDEA-REL-002` — no agent module on the release runtime classpath
 
-**Spec §4, §6 (Phase 1 exit).** Banned on `:moba:desktop`'s `runtimeClasspath` in a release build:
+**Spec §4, §6 (Phase 1 exit).** Banned on each launcher's (`:moba:desktop`, `:hollow:desktop`) `runtimeClasspath` in a release build:
 `:udea-agent`, `:udea-agent-host`.
 
 Belt to `UDEA-REL-001`'s braces, and not redundant: the model check says *which dependency* to

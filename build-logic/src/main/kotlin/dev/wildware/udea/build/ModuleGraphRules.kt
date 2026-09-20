@@ -83,6 +83,19 @@ public object ModuleGraphRules {
         setOf(":moba", ":moba:game", ":moba:desktop", ":moba:android", ":moba:web")
 
     /**
+     * Hollow, the 3D example game (epic #245): `:hollow:game` is the library and `:hollow:desktop`
+     * the launcher (issue #249). `:hollow` is here for the reason `:moba` is in [MOBA_PROJECTS].
+     */
+    internal val HOLLOW_PROJECTS: Set<String> = setOf(":hollow", ":hollow:game", ":hollow:desktop")
+
+    /**
+     * Every game, as every path each has had or is planned to have: what a rule about the shipped
+     * game governs. `ModuleGraphRulesTest` fails when `settings.gradle.kts` includes a project
+     * outside `udea-*` that is not in here, so a third game cannot be added ungoverned.
+     */
+    internal val GAME_PROJECTS: Set<String> = MOBA_PROJECTS + HOLLOW_PROJECTS
+
+    /**
      * Every module that must stay free of GL: the whole `udea-*` tree except
      * [GL_ALLOWED_PROJECTS].
      *
@@ -288,8 +301,8 @@ public object ModuleGraphRules {
 
     /**
      * Placed before Phase 2 had a reason to reach for `kotlin-scripting-jvm-host`, as a ratchet.
-     * It governs [MOBA_PROJECTS]: scoped to the flat `:moba` alone, it scanned nothing once issue
-     * #212 split that project up.
+     * It governs [GAME_PROJECTS]: scoped to the flat `:moba` alone, it scanned nothing once issue
+     * #212 split that project up, and scoped to moba alone it would not scan Hollow.
      */
     public val NO_SCRIPTING_OR_REFLECTION_IN_THE_GAME: DependencyRule = DependencyRule(
         id = RuleId("UDEA-MG-005"),
@@ -299,7 +312,7 @@ public object ModuleGraphRules {
             "reflection-on-hot-paths smell the rewrite exists to kill. Asset scripts are compiled " +
             "at build time; discovery is a generated registry, not classpath scanning.",
         specSection = "6 (Phase 2 exit), 3.6",
-        projects = MOBA_PROJECTS,
+        projects = GAME_PROJECTS,
         configurations = setOf("runtimeClasspath"),
         banned = listOf(
             CoordinatePattern("org.jetbrains.kotlin:kotlin-scripting-*"),
@@ -480,7 +493,7 @@ public object ModuleGraphRules {
             "banned from every engine runtime module and every game project, on the compile and " +
             "runtime classpaths; the asset compiler and udea-gradle, which carries it, are the exceptions.",
         specSection = "issue #244",
-        projects = HEADLESS_PROJECTS + GL_ALLOWED_PROJECTS + MOBA_PROJECTS - MODEL_CONVERTER_PROJECTS,
+        projects = HEADLESS_PROJECTS + GL_ALLOWED_PROJECTS + GAME_PROJECTS - MODEL_CONVERTER_PROJECTS,
         configurations = setOf("compileClasspath", "runtimeClasspath"),
         banned = listOf(CoordinatePattern("*:*assimp*")),
     )
@@ -506,10 +519,13 @@ public object ModuleGraphRules {
      * `:moba:` as a prefix and not `:moba` alone, because issue #212 split the game into nested
      * projects (spec D12): `:moba:game`, `:moba:desktop` and `:moba:android`. Matching the parent
      * path only would leave every one of them ungoverned - silently, because an ungoverned project
-     * is not reported as skipped. The compiler-plugin wiring asks the same question through here.
+     * is not reported as skipped. The compiler-plugin wiring and the root build's list of projects
+     * that get `udeaVerifyModuleGraph` ask the same question through here, and Hollow (issue #249)
+     * is governed as moba is.
      */
     public fun governs(projectPath: String): Boolean =
-        projectPath.startsWith(":udea-") || projectPath == ":moba" || projectPath.startsWith(":moba:")
+        projectPath.startsWith(":udea-") ||
+            GAME_PROJECTS.any { game -> projectPath == game || projectPath.startsWith("$game:") }
 
     /** Every violation visible on [configuration] of [projectPath]. */
     public fun violations(

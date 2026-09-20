@@ -655,6 +655,52 @@ class ModuleGraphRulesTest {
     }
 
     @Test
+    fun `every project settings_gradle_kts includes is governed, a second game's included`() {
+        // Issue #249 added Hollow beside moba. A game project the rules do not govern gets no
+        // module-graph gate, no K2 plugin and no editor-class scan - silently, because an
+        // ungoverned project is not reported as skipped. So the check runs from the settings file
+        // rather than from a list: a third game fails here the day it is included.
+        val included = includedProjects()
+        assertTrue(":hollow:game" in included, "the settings scan found only $included")
+        assertEquals(
+            emptyList(),
+            included.filterNot(ModuleGraphRules::governs).sorted(),
+            "projects settings.gradle.kts includes that no module-graph rule governs",
+        )
+    }
+
+    @Test
+    fun `every game project in settings_gradle_kts is one the game rules govern`() {
+        // UDEA-MG-005 and UDEA-MG-013 are about what a shipped game carries, and they read
+        // GAME_PROJECTS rather than every project. A game project missing from it passes both.
+        val games = includedProjects().filterNot { it.startsWith(":udea-") }
+        assertTrue(games.isNotEmpty(), "no game project found in settings.gradle.kts")
+        assertEquals(emptyList(), (games - ModuleGraphRules.GAME_PROJECTS).sorted(), "game projects the game rules skip")
+    }
+
+    @Test
+    fun `the game rules fire on Hollow's projects as they do on moba's`() {
+        listOf(":hollow:game", ":hollow:desktop").forEach { project ->
+            val scripting = violate(project, "runtimeClasspath", graph(project, "org.reflections:reflections"))
+            assertEquals(listOf(RuleId("UDEA-MG-005")), scripting.map { it.ruleId }, project)
+            val converter = violate(project, "runtimeClasspath", graph(project, "org.lwjgl:lwjgl-assimp"))
+            assertEquals(listOf(RuleId("UDEA-MG-013")), converter.map { it.ruleId }, project)
+            val editor = violate(project, "runtimeClasspath", graph(project, ":udea-editor"))
+            assertEquals(listOf(RuleId("UDEA-MG-010")), editor.map { it.ruleId }, project)
+        }
+    }
+
+    /** Every project `settings.gradle.kts` includes, as a Gradle path. */
+    private fun includedProjects(): Set<String> {
+        val settings = File("../settings.gradle.kts").canonicalFile
+        assertTrue(settings.isFile, "settings.gradle.kts not found at ${settings.absolutePath}")
+        return Regex("""^include\("([a-z0-9:-]+)"\)""", RegexOption.MULTILINE)
+            .findAll(settings.readText())
+            .map { ":" + it.groupValues[1] }
+            .toSet()
+    }
+
+    @Test
     fun `every rule id is unique`() {
         val ids = ModuleGraphRules.ALL.map { it.id }
         assertEquals(ids.size, ids.toSet().size, "duplicate rule id in ModuleGraphRules.ALL: $ids")

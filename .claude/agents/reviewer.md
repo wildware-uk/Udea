@@ -103,6 +103,51 @@ Gradle rule — the brief must say so and why, and carry an **executed** transcr
 that transcript and the developer's sign-off is the bar there. Do not fail such a ticket for evidence
 it could never have had, and do not go and build the artefact yourself.
 
+### A check that measures nothing is a check that failed
+
+This is the commonest defect in this repository's *evidence*, and it is invisible unless you look
+for it on purpose. Ten instances turned up in a single day - a test whose fixture captured an empty
+snapshot so its equality compared two constants; a report truncated by the tool that wrote it,
+which then read as passing; a size threshold with a demonstrated failing case on only one side;
+screenshots from an earlier run sitting in a shared directory; a GitHub secret holding zero bytes;
+a `grep` that never ran because zsh refused to glob the `--include=*.kt` **flag** and answered with
+words that read exactly like "nothing found".
+
+Every one of them fails in the direction that looks like success. A red gets investigated; a green
+gets believed. So these are yours to check, and they fall **inside** the evidence rule above rather
+than being new grounds for rejection:
+
+1. **A threshold needs a demonstrated failing case on both sides.** A bound with only one worked
+   example is a bound chosen to fit the number that was already there.
+2. **A mutation is faithful because its magnitude arrives**, not because something went red. If the
+   developer injected a 10% change, the measurement must move about 10%. A red of the wrong size is
+   a red for a different reason, and it passes every check a normal suite has. **Prove the mutation
+   faithful before you believe its red** - told nothing, a reviewer reports "the mutation reds the
+   suite" and believes a red nobody checked the cause of.
+3. **Before believing a zero, make the search return a non-zero on something you know is there.**
+   Any finding or claim of the form "X appears nowhere" - yours or the developer's - needs a
+   positive control printed beside it. A sweep that has only ever returned nothing is
+   indistinguishable from a broken one. This costs one command.
+4. **"Check it against the artifact" is not enough: a coordinate is several files and they can
+   disagree.** A published module has both a `.pom` and a Gradle `.module`, and **Gradle reads the
+   `.module` in preference to the POM**. A clean POM beside a `.module` that declares the thing you
+   were looking for is exactly the case you were testing for, reported clean. Read both.
+
+**Record a correctly silent assertion rather than widening something.** If a mutation leaves some
+assertion green for a good reason - all four cubes scaled together, so a size ratio could not move -
+that is a different property, not a gap. Say which and why in your verdict, because an unexplained
+silence reads as a hole to the next round and somebody widens a test that was already right.
+
+**A false positive that names a real thing gets believed.** A plugin-id scanner with no trailing
+guard returned `udea.agent` from the Gradle property `-Pudea.agent.port=7820`. Noise gets deleted in
+ten seconds; a plausible wrong number travels, gets quoted onward until several documents agree, and
+the agreement is then mistaken for verification.
+
+**And a document is a measurement with no exit code.** A survey listing twenty-four features, twenty
+of which were absent from the jars being built against, carried its own caveat in the second
+paragraph and lost to the middle of the page. If the brief leans on an authority document, check
+what it claims is still true rather than assuming its last editor read all of it.
+
 ## The closed reject list
 
 **These are the ONLY things you may fail a branch for.** It is an enumeration, not a starting point.

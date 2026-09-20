@@ -69,7 +69,7 @@ A green scan does not prove determinism. [Tick Model and Determinism](Tick-Model
 - Page links may be written `[text](Page-Name)`, `[text](Page-Name.md)`, `[[Page Name]]` or `[[text|Page Name]]`. A relative link with a slash in it, such as an image, must resolve from `docs/wiki/`. Links inside code are not checked.
 - A backticked path is checked when it has a slash in it and either its first folder exists at the repository root or its last part looks like a file name. `...` stands for any run of folders: `udea-core/src/.../Tick.kt`. Paths under a `build/` folder, globs, and `/health`-style endpoints are skipped.
 - A task path is checked anywhere, code blocks included, because a command in a code block is exactly what a reader pastes. Only the project part is checked; task names are registered by plugins and a document gate cannot see them.
-- `docs/wiki/.pending` lists pages another branch is still writing, so they can be linked early. A pending page that exists is itself a failure (`UDEA-DOC-007`), so the list is deleted once the last of them lands.
+- A branch writing a page ahead of the links to it may put a `.pending` file beside the pages, one file name per line, and the gate counts those names as linkable. An entry whose page now exists is itself a failure (`UDEA-DOC-007`), so entries go as pages land and the file goes with the last of them. With no such file — the normal state — nothing is pending and every link has to name a page that is there.
 
 The rules are in `build-logic/src/main/kotlin/dev/wildware/udea/build/WikiCheck.kt`, and `WikiCheckTest` covers each one both ways: a page that breaks it fails, and a similar page that does not break it passes.
 

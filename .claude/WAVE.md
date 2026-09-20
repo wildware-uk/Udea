@@ -1093,6 +1093,34 @@ Note for anyone dating an artifact: every entry in that jar is stamped `1980-02-
 deliberate - the build discards timestamps so the same source produces a byte-identical jar - so a
 jar cannot tell you when it was built and the date has to come from the snapshot version string.
 
+**Incident, mine, 2026-09-20: a clean rebase with the wrong result.** At `a2b73ff` I archived
+`BRIEF.md` as `BRIEF-266.md` and left no `BRIEF.md`, so four branches each adding the file would not
+conflict. That is exactly the shape **git's rename detection** looks for: `master` deletes a file, a
+branch writes one with the same name, and git concludes the branch's file *is* the archived one
+moving. `dev-shaderassets` rebased across it and had its brief applied onto `BRIEF-266.md`, leaving
+no `BRIEF.md` at all. **No conflict, no warning, wrong result**, and the same fires on a merge - so
+it would have reached `master` through me.
+
+Fixed at the cause in `67d9f99`: `master` keeps a placeholder `BRIEF.md` whose text explains the
+convention, so a branch's brief collides with it as an ordinary modify/modify conflict. `dev-windows`
+then verified that on a throwaway branch rather than on its own - the rebase stops with
+`CONFLICT (content): Merge conflict in BRIEF.md` and nothing else unmerged.
+
+**The rule, from `dev-windows`, and it is the same one this repository keeps relearning:** *the
+failure mode and the success mode print the same thing.* A clean rebase and a clean rebase that put
+the file somewhere else are byte-identical at the terminal. So the check is **name the file and read
+its first line**, never "no conflict appeared":
+
+    head -1 BRIEF-266.md   # must be #266's title
+    head -1 BRIEF.md       # must be the branch's own
+
+Run it against one file you know should be untouched *and* one you know should carry your text -
+one of each, or the check has only ever seen one answer. The same caution applies with far worse
+consequences to `net-protocol.lock` and `expected-generated-hashes.txt`: a lock misfiled by rename
+detection would still be one internally consistent file, and nothing downstream would report a
+mismatch. After any regeneration, check `git status` names the files you expected **by name**,
+rather than that the tree is clean.
+
 **Unassigned, from `dev-274`, waiting on a lock this wave:** `GeneratedSources.files` filters
 `extension == "kt"`, so **every generated resource this build has ever written** - `net-protocol.lock`,
 the tool manifest, the new component manifest - has been outside `GeneratedFileDeterminismTest`

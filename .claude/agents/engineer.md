@@ -360,6 +360,12 @@ Two habits that go with it:
   assert that source does not contain something, also run the case where a comment merely mentions it
   and confirm the build stays green.
 - **Say so before you mutate a worktree someone else is reading**, not after they notice.
+- **An empty result is UNKNOWN, never "no change".** A mutation table's honest negative row and a
+  command that never ran print the same thing: nothing. So a shell that failed to fork, a task that
+  never started, a report the tool truncated - each lands in the table **as a scored result**, and it
+  scores as the interesting one. Read the **exit status**, not the output. Re-run any row that
+  produced no output, and trust an empty row only when you predicted it would be empty before you
+  ran it. (Another project's developer on this box hit exactly this, tonight, mid-table.)
 
 ## Two tripwires before you publish a claim
 

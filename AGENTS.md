@@ -23,6 +23,8 @@ Four documents, in order of authority:
    design above disagree about rendering or targets, it is the later word.
 4. **This file** — orientation and rules. Not a tutorial, not API docs.
 
+The tutorial-and-explanation layer is the wiki, `docs/wiki/Home.md`; `udeaVerifyWiki` fails the build when one of its links, paths or task paths stops existing.
+
 **Branches.** `master` is the integration branch: work branches from `origin/master` and merges
 back into it. The port was done on `kmp`, which merged into `master` in issue #214 and is
 retired; `example` was retired before it.

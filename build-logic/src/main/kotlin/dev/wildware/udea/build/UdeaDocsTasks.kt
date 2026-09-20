@@ -2,12 +2,16 @@ package dev.wildware.udea.build
 
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+import org.gradle.api.tasks.UntrackedTask
+import java.io.File
 
 /**
  * Fails if `AGENTS.md` stops describing the tree it is a brief for.
@@ -96,5 +100,63 @@ public abstract class UdeaVerifyTrelloMapTask : DefaultTask() {
         }
 
         TrelloMap.report(name, findings)?.let { throw GradleException(it) }
+    }
+}
+
+/**
+ * Fails if a page in `docs/wiki/` links to a page, a repository path or a Gradle project that
+ * does not exist.
+ *
+ * See [WikiCheck] for the rules. A page may name any file in the repository, so every file is in
+ * effect an input; rather than declare the whole tree, the task is untracked and runs every time,
+ * which costs one read of the wiki and a few directory lookups.
+ */
+@UntrackedTask(because = "a wiki page may name any file in the repository, so every file is an input")
+public abstract class UdeaVerifyWikiTask : DefaultTask() {
+
+    /** The repository root, which backticked paths are resolved against. */
+    @get:Internal
+    public abstract val repoRoot: DirectoryProperty
+
+    /** `docs/wiki/`. */
+    @get:Internal
+    public abstract val wikiDirectory: DirectoryProperty
+
+    /** `settings.gradle.kts`, the only authority on which projects exist. */
+    @get:Internal
+    public abstract val settingsScript: RegularFileProperty
+
+    /** What was checked, written on success so a green run still shows its working. */
+    @get:Internal
+    public abstract val report: RegularFileProperty
+
+    /** Checks every page and fails naming every finding. */
+    @TaskAction
+    public fun verify() {
+        val wiki = wikiDirectory.get().asFile
+        val pages = wiki.listFiles { file -> file.isFile && file.name.endsWith(".md") }
+            .orEmpty()
+            .associate { it.name to it.readText() }
+        val pendingFile = File(wiki, WikiCheck.PENDING_FILE)
+        val pending = WikiCheck.pendingPages(if (pendingFile.isFile) pendingFile.readText() else "")
+        val findings = WikiCheck.findings(
+            pages = pages,
+            pending = pending,
+            repo = RepoFiles(repoRoot.get().asFile),
+            projects = WikiCheck.projects(settingsScript.get().asFile.readText()),
+        )
+
+        report.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(
+                buildString {
+                    appendLine("pages checked: ${pages.keys.sorted().joinToString()}")
+                    appendLine("pending pages: ${pending.sorted().joinToString().ifEmpty { "(none)" }}")
+                    appendLine("findings: ${findings.size}")
+                },
+            )
+        }
+
+        WikiCheck.report(name, findings)?.let { throw GradleException(it) }
     }
 }

@@ -336,6 +336,10 @@ val outerBuildInputs: FileCollection = files(
     // it a comparison of two files nothing re-read.
     rootDir.resolve("../docs/migration/trello-map.md"),
     rootDir.resolve("../docs/superpowers/specs/2026-08-22-udea-ai-native-rewrite-design.md"),
+
+    // `WikiCheckTest`'s last test reads every committed wiki page and `.pending` against the real
+    // tree, so an edit to a page is exactly the edit it has to re-run on.
+    fileTree(rootDir.resolve("../docs/wiki")),
     fileTree(rootDir.resolve("..")) {
         include("*/build.gradle.kts")
         include("build.gradle.kts")

@@ -1,0 +1,11 @@
+--- a/ModelView.kt	2026-09-20 14:38:50.157663580 +0000
++++ b/ModelView.kt	2026-09-20 14:38:50.170663865 +0000
+@@ -174,7 +174,7 @@
+             }
+             ModelProjection.Orthographic -> {
+                 val halfHeight = viewHeight / 2f
+-                out[0] = 1f / (halfHeight * aspect)
++                out[0] = 1f / halfHeight
+                 out[5] = 1f / halfHeight
+                 out[10] = -2f / (far - near)
+                 out[14] = -(far + near) / (far - near)

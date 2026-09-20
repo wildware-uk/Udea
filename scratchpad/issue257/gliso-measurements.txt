@@ -1,0 +1,39 @@
+GlIsoCameraTest: orthographic: north measured (239.5, 63.752808) over 2314 pixels, 52x57; the matrices predict (240.0, 64.164276)
+GlIsoCameraTest: orthographic: south measured (239.5, 223.7528) over 2314 pixels, 52x57; the matrices predict (240.0, 224.16429)
+GlIsoCameraTest: orthographic: east measured (376.5, 143.7528) over 2314 pixels, 52x57; the matrices predict (377.14285, 144.16428)
+GlIsoCameraTest: orthographic: west measured (102.5, 143.7528) over 2314 pixels, 52x57; the matrices predict (102.85715, 144.16428)
+GlIsoCameraTest: orthographic: left pillar measured (91.0, 240.73758) over 1791 pixels, 19x99; the matrices predict (91.428566, 241.17603)
+GlIsoCameraTest: orthographic: right pillar measured (388.0, 240.73758) over 1791 pixels, 19x99; the matrices predict (388.57144, 241.17603)
+GlIsoCameraTest: orthographic: the lifted cube is at (377.0, 60.5), the one under it at (376.5, 143.7528)
+GlIsoCameraTest: orthographic: cube areas [2314, 2314, 2314, 2314]
+GlIsoCameraTest: orthographic: the left pillar leans 0.0 pixels
+GlIsoCameraTest: orthographic: the right pillar leans 0.0 pixels
+GlIsoCameraTest: perspective: north measured (239.5, 76.12051) over 1726 pixels, 46x48; the matrices predict (240.0, 76.67965)
+GlIsoCameraTest: perspective: south measured (239.5, 235.51472) over 3260 pixels, 62x71; the matrices predict (240.0, 235.9515)
+GlIsoCameraTest: perspective: east measured (377.02637, 143.67459) over 2314 pixels, 55x57; the matrices predict (377.48566, 144.12448)
+GlIsoCameraTest: perspective: west measured (101.97364, 143.67459) over 2314 pixels, 55x57; the matrices predict (102.51436, 144.12448)
+GlIsoCameraTest: perspective: left pillar measured (37.668587, 262.67535) over 2954 pixels, 42x116; the matrices predict (39.032635, 269.80365)
+GlIsoCameraTest: perspective: right pillar measured (441.33142, 262.67535) over 2954 pixels, 42x116; the matrices predict (440.96735, 269.80365)
+GlIsoCameraTest: perspective cube areas [1726, 3260, 2314, 2314]
+GlIsoCameraTest: perspective: the left pillar leans -13.226374 pixels
+GlIsoCameraTest: perspective: the right pillar leans 13.226379 pixels
+GlIsoCameraTest: yaw 45.0: north measured (239.5, 63.752808) over 2314 pixels, 52x57; the matrices predict (240.0, 64.164276)
+GlIsoCameraTest: yaw 45.0: south measured (239.5, 223.7528) over 2314 pixels, 52x57; the matrices predict (240.0, 224.16429)
+GlIsoCameraTest: yaw 45.0: east measured (376.5, 143.7528) over 2314 pixels, 52x57; the matrices predict (377.14285, 144.16428)
+GlIsoCameraTest: yaw 45.0: west measured (102.5, 143.7528) over 2314 pixels, 52x57; the matrices predict (102.85715, 144.16428)
+GlIsoCameraTest: yaw 45.0: cube areas [2314, 2314, 2314, 2314]
+GlIsoCameraTest: yaw -45.0: north measured (79.5, 143.7528) over 2314 pixels, 52x57; the matrices predict (79.99999, 144.16428)
+GlIsoCameraTest: yaw -45.0: south measured (399.5, 143.7528) over 2314 pixels, 52x57; the matrices predict (400.00003, 144.16428)
+GlIsoCameraTest: yaw -45.0: east measured (238.72081, 74.78837) over 2235 pixels, 52x57; the matrices predict (240.0, 75.59285)
+GlIsoCameraTest: yaw -45.0: west measured (239.5, 212.2472) over 2314 pixels, 52x57; the matrices predict (240.0, 212.73572)
+GlIsoCameraTest: yaw -45.0: cube areas [2314, 2314, 2235, 2314]
+GlIsoCameraTest: yaw -135.0: north measured (239.5, 223.7528) over 2314 pixels, 52x57; the matrices predict (240.0, 224.16429)
+GlIsoCameraTest: yaw -135.0: south measured (239.56369, 63.713604) over 2308 pixels, 52x57; the matrices predict (240.0, 64.164276)
+GlIsoCameraTest: yaw -135.0: east measured (102.5, 143.7528) over 2314 pixels, 52x57; the matrices predict (102.85715, 144.16428)
+GlIsoCameraTest: yaw -135.0: west measured (376.5, 143.7528) over 2314 pixels, 52x57; the matrices predict (377.14285, 144.16428)
+GlIsoCameraTest: yaw -135.0: cube areas [2314, 2308, 2314, 2314]
+GlIsoCameraTest: yaw 135.0: north measured (399.5, 143.7528) over 2314 pixels, 52x57; the matrices predict (400.00003, 144.16428)
+GlIsoCameraTest: yaw 135.0: south measured (79.5, 143.7528) over 2314 pixels, 52x57; the matrices predict (79.99999, 144.16428)
+GlIsoCameraTest: yaw 135.0: east measured (239.5, 212.2472) over 2314 pixels, 52x57; the matrices predict (240.0, 212.73572)
+GlIsoCameraTest: yaw 135.0: west measured (239.5, 75.24719) over 2314 pixels, 52x57; the matrices predict (240.0, 75.59285)
+GlIsoCameraTest: yaw 135.0: cube areas [2314, 2314, 2314, 2314]

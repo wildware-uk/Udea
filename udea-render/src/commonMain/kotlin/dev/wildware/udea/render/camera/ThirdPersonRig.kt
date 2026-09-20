@@ -12,7 +12,6 @@ import dev.wildware.udea.render.input.PointerMotion
 import dev.wildware.udea.render.input.PointerState
 import dev.wildware.udea.render.model.ModelCamera
 import dev.wildware.udea.render.model.ModelPlacer
-import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -307,10 +306,5 @@ public class ThirdPersonRig(
 
         /** Straight up or down: the pitch limits stay strictly inside it. */
         const val MAX_PITCH_LIMIT: Float = 90f
-
-        /** Degrees in the half turn that is [PI] radians. */
-        const val HALF_TURN_DEGREES: Double = 180.0
-
-        fun radians(degrees: Float): Float = (degrees * PI / HALF_TURN_DEGREES).toFloat()
     }
 }

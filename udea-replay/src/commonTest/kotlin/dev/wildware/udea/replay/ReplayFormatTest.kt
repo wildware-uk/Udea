@@ -231,7 +231,7 @@ class ReplayFormatTest {
         val bytes = recorder.seal().encode()
         val decoded = ReplayRecording.decode(bytes)
 
-        assertEquals(ReplayFormat.FORMAT_VERSION, bytes[ReplayFormat.MAGIC.size].toInt())
+        assertEquals(ReplayFormat.EDITS_FORMAT_VERSION, bytes[ReplayFormat.MAGIC.size].toInt())
         assertEquals(listOf(first, second, third), decoded.edits)
         assertEquals(listOf(first, second), decoded.editsAt(FIRST + 1L))
         assertEquals(emptyList(), decoded.editsAt(FIRST + 2L))

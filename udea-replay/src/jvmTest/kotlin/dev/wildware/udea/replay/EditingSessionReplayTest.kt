@@ -81,7 +81,7 @@ class EditingSessionReplayTest {
         val bytes = record().encode()
         val recording = ReplayRecording.decode(bytes)
 
-        assertEquals(ReplayFormat.FORMAT_VERSION, bytes[ReplayFormat.MAGIC.size].toInt())
+        assertEquals(ReplayFormat.EDITS_FORMAT_VERSION, bytes[ReplayFormat.MAGIC.size].toInt())
         assertEquals(SCRIPT.values.sumOf { it.size } + 1, recording.edits.size, recording.edits.joinToString("\n"))
         // The sweep's cancel is an ordinary cancel_edit, stamped with the tick it landed on, so a
         // replay needs no clock to make it.

@@ -318,6 +318,9 @@ class WallClockBudgetCensusTest {
         val NOT_A_BUDGET: Map<String, String> = mapOf(
             "moba/desktop/src/test/kotlin/dev/wildware/moba/net/MobaUdpTwoProcessTest.kt" to
                 "a deadline: how long to wait for a line from a forked process",
+            "moba/desktop/src/test/kotlin/dev/wildware/moba/replay/MobaPointerReplayTest.kt" to
+                "a seed: the mouse pilot's world points must be unreconstructable, or the file is not " +
+                    "the only route from the recording run to the replay run",
             "moba/desktop/src/test/kotlin/dev/wildware/moba/replay/MobaReplayProofTest.kt" to
                 "a seed: the pilot must differ between runs or the proof repeats one run",
             "udea-agent-host/src/test/kotlin/dev/wildware/udea/agent/host/LiveInstance.kt" to

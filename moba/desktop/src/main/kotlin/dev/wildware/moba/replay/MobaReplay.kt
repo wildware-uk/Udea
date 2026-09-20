@@ -172,8 +172,23 @@ public object MobaReplay {
         return MobaReplayWorld(host)
     }
 
-    /** Copies one tick of [intent] into [sample]. Allocation-free; called per tick while recording. */
+    /**
+     * Copies one tick of [intent] into [sample]. Allocation-free; called per tick while recording.
+     *
+     * The pointer goes across with everything else (issue #262). It has to: in a game driven by the
+     * mouse, the pointer *is* the orders, and a recorder that copied only the keys and the sticks
+     * would produce a file that replays a match in which nobody clicked on anything - with no test
+     * failing, because the arrays would all still be the right length. The sample arrives cleared,
+     * so a tick with no pointer in the intent leaves none in the sample.
+     */
     public fun capture(intent: Intent, sample: InputSample) {
+        // Cleared first, and that is not tidiness. A recorder reuses one `InputSample` for the whole
+        // match, and the pointer's parts are *events*: a drag that began on tick 40 is written by
+        // `setDragStart` and nothing below would unwrite it, so tick 41 would be recorded as
+        // beginning the same drag again, and so would every tick after it. The axes and the actions
+        // are overwritten unconditionally below and do not care; the pointer is why this line is
+        // here, and it is the `Q.Axis8` shape - a value left standing reads as input nobody gave.
+        sample.clear()
         for (axis in 0 until SCHEMA.axisCount) {
             val id = dev.wildware.udea.render.input.AxisId(axis)
             sample.setAxis(axis, intent.axisX(id), intent.axisY(id))
@@ -183,6 +198,10 @@ public object MobaReplay {
             sample.setPressed(action, intent.isPressed(id))
             sample.setPressCount(action, intent.pressCount(id))
         }
+        if (intent.hasPointer) sample.setPointer(intent.pointerX, intent.pointerY, intent.pointerEntity)
+        if (intent.scroll != 0f) sample.setScroll(intent.scroll)
+        if (intent.dragStarted) sample.setDragStart(intent.dragStartX, intent.dragStartY)
+        if (intent.dragEnded) sample.setDragEnd(intent.dragEndX, intent.dragEndY)
     }
 
     /** Copies [sample] into [intent], which arrives cleared. The replay half of [capture]. */
@@ -199,6 +218,10 @@ public object MobaReplay {
             intent.setPressed(id, sample.isPressed(action))
             intent.setPressCount(id, sample.pressCount(action))
         }
+        if (sample.hasPointer) intent.setPointer(sample.pointerX, sample.pointerY, sample.pointerEntity)
+        if (sample.scroll != 0f) intent.setScroll(sample.scroll)
+        if (sample.dragStarted) intent.setDragStart(sample.dragStartX, sample.dragStartY)
+        if (sample.dragEnded) intent.setDragEnd(sample.dragEndX, sample.dragEndY)
     }
 }
 

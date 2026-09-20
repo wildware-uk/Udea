@@ -146,14 +146,43 @@ public class ReplayRecording internal constructor(
     public fun newSampleSlots(): Array<InputSample> = Array(peerCount) { InputSample(schema) }
 
     /**
+     * The lowest format version that can express this recording (see [ReplayFormat]): 1 when nobody
+     * edited the world and nobody pointed at it, 2 when somebody edited it, 3 when a tick carries a
+     * pointer.
+     *
+     * The *lowest*, rather than simply the newest this build writes, because that is what keeps an
+     * ordinary match recording readable by every earlier build: a file only declares a version its
+     * contents actually need. Computed once, and only when the recording is written out.
+     */
+    private val formatVersion: Int by lazy {
+        when {
+            carriesPointer() -> ReplayFormat.FORMAT_VERSION
+            edits.isNotEmpty() -> ReplayFormat.EDITS_FORMAT_VERSION
+            else -> ReplayFormat.EDITLESS_FORMAT_VERSION
+        }
+    }
+
+    /** Whether any tick of any peer carries a pointer. One pass over the frames, never per tick. */
+    private fun carriesPointer(): Boolean {
+        if (header.tickCount == 0) return false
+        val slots = newSampleSlots()
+        for (index in 0 until header.tickCount) {
+            samplesInto(firstTick + index.toLong(), slots)
+            for (sample in slots) if (sample.carriesPointer) return true
+        }
+        return false
+    }
+
+    /**
      * The whole file, ready to write. Deterministic: the same recording encodes to the same bytes.
      *
-     * Format 1 when nobody edited the world, format 2 when somebody did; see [ReplayFormat].
+     * Format 1 when nobody edited the world and nobody pointed at it, 2 when somebody edited it, 3
+     * when a tick carries a pointer; see [formatVersion] and [ReplayFormat].
      */
     public fun encode(): ByteArray {
         val sink = ByteSink(ReplayFormat.PREAMBLE_BYTES + frameBytes.size + hashes.size * 8 + 512)
         sink.raw(ReplayFormat.MAGIC)
-        sink.u16(if (edits.isEmpty()) ReplayFormat.EDITLESS_FORMAT_VERSION else ReplayFormat.FORMAT_VERSION)
+        sink.u16(formatVersion)
         val lengthAt = sink.size
         sink.i32(0)
         val headerStart = sink.size
@@ -161,7 +190,10 @@ public class ReplayRecording internal constructor(
         sink.patchI32(lengthAt, sink.size - headerStart)
         sink.raw(frameBytes)
         for (hash in hashes) sink.i64(hash)
-        if (edits.isNotEmpty()) writeEdits(sink)
+        // The section belongs to every format from 2 on, not to every recording with an edit in it:
+        // a format-3 file written for its pointer still has to carry the count a format-3 reader
+        // goes looking for, even when that count is zero.
+        if (formatVersion >= ReplayFormat.EDITS_FORMAT_VERSION) writeEdits(sink)
         sink.i32(ReplayFormat.crc32(sink.backing(), sink.size).toInt())
         return sink.toByteArray()
     }
@@ -270,8 +302,9 @@ public class ReplayRecording internal constructor(
             val frameBytes = bytes.copyOfRange(frameStart, source.position)
 
             val hashes = LongArray(header.tickCount) { source.i64() }
-            val edits = if (version >= ReplayFormat.FORMAT_VERSION) readEdits(source) else emptyList()
-            source.expectRemaining(CRC_BYTES, if (version >= ReplayFormat.FORMAT_VERSION) "after the edits" else "after the hash stream")
+            val hasEdits = version >= ReplayFormat.EDITS_FORMAT_VERSION
+            val edits = if (hasEdits) readEdits(source, version) else emptyList()
+            source.expectRemaining(CRC_BYTES, if (hasEdits) "after the edits" else "after the hash stream")
             return ReplayRecording(header, frameBytes, offsets, hashes, edits)
         }
 
@@ -296,12 +329,16 @@ public class ReplayRecording internal constructor(
             }
         }
 
-        private fun readEdits(source: ByteSource): List<ReplayEdit> {
+        private fun readEdits(source: ByteSource, version: Int): List<ReplayEdit> {
             val count = source.i32()
-            if (count < 1 || count > ReplayFormat.MAX_EDITS) {
-                // Zero is refused too: a recording with no edits is written as format 1.
+            // Zero is refused **at format 2 exactly**: that format exists only to carry edits, so a
+            // recording with none of them is written as format 1 and a zero there is a corrupt
+            // file. A later format is written for a reason of its own - a pointer, at format 3 -
+            // and then an empty edits section is what a match nobody edited legitimately has.
+            val least = if (version == ReplayFormat.EDITS_FORMAT_VERSION) 1 else 0
+            if (count < least || count > ReplayFormat.MAX_EDITS) {
                 throw ReplayFormatException(
-                    "the edits section declares $count edits, outside 1..${ReplayFormat.MAX_EDITS}",
+                    "the edits section declares $count edits, outside $least..${ReplayFormat.MAX_EDITS}",
                 )
             }
             return List(count) {

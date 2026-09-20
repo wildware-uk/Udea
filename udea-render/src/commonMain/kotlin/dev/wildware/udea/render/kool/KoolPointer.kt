@@ -5,8 +5,10 @@ import de.fabmax.kool.util.Time
 import dev.wildware.udea.render.input.InputFrame
 import dev.wildware.udea.render.input.PointerId
 import dev.wildware.udea.render.input.PointerMotion
+import dev.wildware.udea.render.input.PointerPosition
 import dev.wildware.udea.render.input.PointerReportListener
 import dev.wildware.udea.render.input.PointerState
+import dev.wildware.udea.render.input.PointerWheel
 import dev.wildware.udea.render.input.UiPointers
 import dev.wildware.udea.render.ui.UiLayer
 
@@ -76,7 +78,7 @@ import dev.wildware.udea.render.ui.UiLayer
 public class KoolPointer internal constructor(
     /** Asked whether a verdict is coming, and told each one. [UiPointers.NONE] with no interface. */
     private val ui: UiPointers,
-) : PointerState, PointerMotion, AutoCloseable {
+) : PointerState, PointerMotion, PointerPosition, PointerWheel, AutoCloseable {
 
     /** Reads pointers after [ui] has had first refusal on them, or straight away when it is `null`. */
     public constructor(ui: UiLayer? = null) : this(ui?.pointers ?: UiPointers.NONE)
@@ -108,6 +110,8 @@ public class KoolPointer internal constructor(
             if (!pointer.isValid) continue
             onPointer(PointerId(pointer.id), pointer.buttonMask)
             onMotion(pointer.delta.x, pointer.delta.y)
+            onPosition(pointer.pos.x, pointer.pos.y)
+            onScroll(pointer.scroll.y)
         }
         endFrame()
     }
@@ -156,6 +160,46 @@ public class KoolPointer internal constructor(
         motionY += dy
     }
 
+    /**
+     * Where the last pointer Kool listed this frame is, in window pixels (issue #262).
+     *
+     * **Not held back for the interface's verdict**, for [PointerMotion]'s reason: a cursor resting
+     * on a button is still at a position, and hiding it would make a game's hover flicker as the
+     * mouse crossed the interface. What the interface takes is the *press*, and a press it took
+     * never reaches the tick - so a click on a button cannot become an order however well the game
+     * knows where the cursor is.
+     */
+    override var isPointerOver: Boolean = false
+        private set
+
+    /** Pixels right of the window's left edge. */
+    override var pointerX: Float = 0f
+        private set
+
+    /** Pixels down from the window's top edge, as Kool reports a pointer's position. */
+    override var pointerY: Float = 0f
+        private set
+
+    /** Notches turned since [spendScroll], every pointer summed. */
+    override var scrollY: Float = 0f
+        private set
+
+    override fun spendScroll() {
+        scrollY = 0f
+    }
+
+    /** One pointer's position this frame, in Kool's window pixels. `internal`, like [onMotion]. */
+    internal fun onPosition(x: Float, y: Float) {
+        isPointerOver = true
+        pointerX = x
+        pointerY = y
+    }
+
+    /** One pointer's wheel this frame, in notches. `internal`, like [onMotion]. */
+    internal fun onScroll(notches: Float) {
+        scrollY += notches
+    }
+
     /** Stops listening. After this, no pointer reaches the game through this. */
     override fun close() {
         InputStack.remove(handler)
@@ -166,6 +210,8 @@ public class KoolPointer internal constructor(
         listed.clear()
         waiting.clear()
         spendMotion()
+        spendScroll()
+        isPointerOver = false
     }
 
     /**
@@ -179,6 +225,10 @@ public class KoolPointer internal constructor(
         if (!ui.isReporting) settleAll()
         this.frame = frame
         listedNow.clear()
+        // Cleared here and set by each valid pointer read below, so a mouse that has left the
+        // window stops reporting a position instead of leaving the last one it had standing for
+        // ever - which would be a game aiming at wherever the cursor happened to go out.
+        isPointerOver = false
     }
 
     /**

@@ -98,7 +98,7 @@ class KotlinClockTest {
         val project = ":" + module.replace('/', ':')
         val inputs = DeterminismRules.SIMULATION_SCOPES
             .filter { it.project == project }
-            .map { DeterminismLayout.scopeInput(repo, it) }
+            .map { DeterminismLayout.scopeInput(repo, it, DeterminismLayout.moduleDirectoryUnder(repo, it.project)) }
         assertEquals(1, inputs.size, "no declared simulation scope for $project")
         return DeterminismScan.run(inputs = inputs, allowlist = Allowlist.parse(""), repoRoot = repo)
     }
@@ -290,8 +290,14 @@ class KotlinClockTest {
     /**
      * The controls. A `TimeSource` or `Clock` received through its interface may be a deterministic
      * one driven by the tick - the scan cannot see the receiver, and the place a wall clock gets
-     * *chosen* is flagged by the tests above. And presentation keeps its clocks: `udea-audio` seeds
-     * its mixer from `Clock.System`, and `moba`'s HUD is outside its declared prefixes.
+     * *chosen* is flagged by the tests above. And code outside a scope's declared package prefixes
+     * keeps its clocks: `udea-net` declares prediction and input and not the transport, whose
+     * socket loop legitimately reads one.
+     *
+     * The second control used to plant its clock in `moba`'s HUD. It moved to `udea-net` when the
+     * game's scope moved out of [DeterminismRules.SIMULATION_SCOPES] and into the build script
+     * that contains the game (issue #265): a control over a scope this table no longer declares
+     * would have had to carry a copy of that declaration, and a copy is a thing that drifts.
      */
     @Test
     fun `an interface-typed clock and a clock outside the declared prefixes are not findings`() {
@@ -323,11 +329,11 @@ class KotlinClockTest {
         )
         assertEquals("", throughInterface.rendered())
 
-        val presentation = plant(
-            module = "moba/game",
-            className = "dev.wildware.moba.hud.HudClockKt",
+        val outsideThePrefixes = plant(
+            module = "udea-net",
+            className = "dev.wildware.udea.net.transport.PlantedClockKt",
             sourceLines = listOf(
-                "package dev.wildware.moba.hud",
+                "package dev.wildware.udea.net.transport",
                 "",
                 "import kotlin.time.Clock",
                 "",
@@ -335,7 +341,7 @@ class KotlinClockTest {
             ),
             methods = listOf(systemNow("kotlin/time", line = 5), markNow(line = 5)),
         )
-        assertEquals("", presentation.rendered())
-        assertTrue(presentation.scannedClasses.getValue(":moba:game") > 0, "the control scanned nothing")
+        assertEquals("", outsideThePrefixes.rendered())
+        assertTrue(outsideThePrefixes.scannedClasses.getValue(":udea-net") > 0, "the control scanned nothing")
     }
 }

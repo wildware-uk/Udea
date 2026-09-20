@@ -332,3 +332,8 @@ tasks.register<JavaExec>("runModelShot") {
     // Where the Khronos Fox the shot imports is (issue #240).
     systemProperty("udea.render.exampleAssets", exampleAssets.asFile.absolutePath)
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's renderer: Kool sprites and 3D models, the ComposeGL interface host and the audio " +
+    "device. The only module that touches a graphics context."

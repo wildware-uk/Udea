@@ -567,6 +567,55 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  outside-game:
+    # Issue #265. A game in its own repository resolves this engine from a repository - not from a
+    # path, not from an included build - and gets the same gates `moba` gets. Both halves of that
+    # rot silently without something running them: a module that stopped being published, or a
+    # convention plugin that only works inside this tree, compiles exactly as green here, and a
+    # gate that stopped applying to a game's projects is a gate nobody notices is absent.
+    #
+    # `scripts/outside-game-proof.sh` publishes the engine and `build-logic` to the runner's local
+    # Maven repository - which stands in for Maven Central, and is the whole difference between
+    # this job and a release - copies `templates/new-game` into a directory outside the
+    # repository, builds it, runs it, and then breaks it twice on purpose: a wall-clock read in
+    # its simulation package, a Kotlin scripting host on what it ships. It requires
+    # udeaVerifyDeterminism and udeaVerifyModuleGraph to fail with DET001 and UDEA-MG-005. It is
+    # a job of its own rather than a step of `build` because it is a second full build of the
+    # engine, through a second Gradle build tree.
+    #
+    # Nothing leaves the runner. Publishing to Maven Central is the `release` workflow, which
+    # nothing here triggers.
+    name: a game outside this repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make the wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: Build, run and break a game that lives outside this repository
+        shell: bash
+        run: sh scripts/outside-game-proof.sh
+
+      - name: Upload the transcripts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: outside-game-transcripts
+          path: build/reports/udea/outside-game/**
+          if-no-files-found: error
+          retention-days: 7
+
   agents-md:
     # Issues #138 and #139. `AGENTS.md` is the only thing an agent starting cold reads, so a
     # module table that no longer matches `settings.gradle.kts` is a correctness bug rather

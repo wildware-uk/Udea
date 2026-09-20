@@ -1,4 +1,7 @@
-import dev.wildware.udea.build.ModuleGraphRules
+import com.vanniktech.maven.publish.MavenPublishBaseExtension
+import dev.wildware.udea.build.ProjectScope
+import dev.wildware.udea.build.UdeaPom
+import dev.wildware.udea.build.UdeaVersion
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -10,21 +13,17 @@ plugins {
     // `KotlinCompile` type below resolvable for the `allprojects` jvmTarget rule.
     kotlin("jvm") version "2.4.20" apply false
 
-    // Phase 0 build gates from the `build-logic` included build. Applied to the subprojects
-    // below, never to the root.
-    id("udea.module-graph-check") apply false
-    id("udea.release-check") apply false
+    // Phase 0's build gates, as the one plugin a Udea build applies to get them (issue #265):
+    // the module-graph check on every project that has a build script, the determinism scan over
+    // the scopes `udeaGates { }` below declares, and the release scan on the project that ships.
+    // A game in its own repository applies this same plugin and writes the same block, so the
+    // gates `moba` is held to are the gates any game is held to, by one code path rather than by
+    // a list of `:moba:*` paths inside `build-logic` that only this repository could satisfy.
+    id("udea.game-gates")
 
     // The exception: `AGENTS.md` and the Trello map are documents about the whole tree, so the
     // gates that hold them to it belong on the root.
     id("udea.docs-check")
-
-    // The same exception, for the same reason (issue #150): `udeaVerifyDeterminism` asks about
-    // a *set* of source sets spanning four modules, declared in
-    // `DeterminismRules.SIMULATION_SCOPES`, so a per-module answer to "does simulation read the
-    // wall clock" would be four answers to a question that has one. Root also keeps the switch
-    // that disables the gate out of the build script of the module it polices.
-    id("udea.determinism-check")
 
     // And once more, for the same reason (issue #174): `docs/contracts/` is declared frozen in
     // `AGENTS.md` and nothing enforced it, so a contract several modules independently
@@ -35,12 +34,46 @@ plugins {
     // Root for the same reason again (issue #181): the clean-build-budget CI job asks whether a
     // commit made `udeaAssemble` as a whole slower, and this is where it asks for the verdict.
     id("udea.clean-build-budget")
+
+    // Publishing to Maven Central (issue #265). Declared here and applied below to the modules
+    // the `published` set names, which is how a game in its own repository gets the engine at
+    // all: it resolves `dev.wildware.udea:udea-core` from a repository rather than from this
+    // checkout. Nothing has been published from this branch - see `BRIEF-265.md`.
+    alias(libs.plugins.mavenPublish) apply false
 }
 
-group = "dev.wildware.udea"
-version = "1.0-SNAPSHOT"
+/**
+ * The version every module of this build carries, and the one every published artifact gets.
+ *
+ * The rule is [UdeaVersion.resolve], where each of its branches is executed by `UdeaVersionTest`:
+ * `-PudeaVersion` wins, else a `v1.4.2` tag on this exact commit, else a snapshot of the next
+ * minor, else [UdeaVersion.FIRST_SNAPSHOT]. This repository has no release tag today, so an
+ * ordinary build here is `0.1.0-SNAPSHOT`.
+ *
+ * It used to be the literal `1.0-SNAPSHOT`, written once here and once again in
+ * `udea.kotlin-base`. The second copy was the one that mattered, because a convention plugin sets
+ * it on whatever project applies the convention - so a game in its own repository was published
+ * under the engine's group and the engine's version by a plugin it merely applied. Group and
+ * version are this build's own business, and they are set on this build's projects only.
+ */
+val udeaVersion: String = UdeaVersion.resolve(
+    asked = providers.gradleProperty(UdeaVersion.PROPERTY).orNull,
+    // `--always` so a repository with no tag answers a commit id instead of failing, and
+    // `isIgnoreExitValue` plus the catch so a tree exported without its `.git`, or a machine with
+    // no git on it, publishes the first snapshot rather than failing to configure. Neither is an
+    // error: the release workflow passes the property.
+    described = runCatching {
+        providers.exec {
+            commandLine("git", "describe", "--tags", "--always", "--dirty")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get()
+    }.getOrDefault(""),
+)
 
 allprojects {
+    group = UdeaPom.GROUP
+    version = udeaVersion
+
     repositories {
         mavenCentral()
         mavenLocal()
@@ -74,6 +107,185 @@ allprojects {
     }
 }
 
+// --- publishing (issue #265) ------------------------------------------------------------------
+
+/**
+ * The projects that go to Maven Central, and nothing else.
+ *
+ * A written-out list rather than "everything that is not `moba`", because the cost of getting
+ * this wrong is permanent: a version published to Central can never be deleted or replaced. The
+ * example game published by accident is a 5v5 MOBA somebody can depend on forever.
+ *
+ * Two of these are debug-only and are published anyway, which is not a contradiction.
+ * `udea-agent-host` and `udea-editor` are the tools a game is *made* with - the MCP surface and
+ * the editor window - so a game that cannot resolve them cannot be developed at all. What
+ * "debug-only" means here is that they must not reach a *release classpath*, which is
+ * `UDEA-MG-012` and `UDEA-REL-002`'s job on the game's own build, and those gates travel with the
+ * game because `udea.game-gates` publishes too.
+ *
+ * `udea-assets-compiler` and `udea-gradle` are build-time only for the same reason and ship for
+ * the same reason: `dev.wildware.udea.assets` cannot run a pipeline whose compiler is absent.
+ */
+val published: Set<String> = setOf(
+    ":udea-annotations",
+    ":udea-diagnostics",
+    ":udea-codegen",
+    ":udea-compiler-plugin",
+    ":udea-fleks",
+    ":udea-core",
+    ":udea-assets",
+    ":udea-assets-compiler",
+    ":udea-gas",
+    ":udea-net",
+    // Ground-plane navigation (issue #264). Merged after this list was written, and the gate
+    // below is what caught it: an engine module nothing publishes is a module a game outside
+    // this repository cannot compile against.
+    ":udea-nav",
+    ":udea-physics2d",
+    ":udea-render",
+    ":udea-audio",
+    ":udea-agent",
+    ":udea-agent-host",
+    ":udea-editor",
+    ":udea-replay",
+    ":udea-gradle",
+)
+
+/**
+ * The list above is a snapshot, so the build re-derives it rather than trusting it.
+ *
+ * Every engine module has to appear, because the arrows point downward and a missing one is a
+ * module somebody's game cannot resolve - found, if this were left to a reviewer, as a resolution
+ * failure in a repository that is not this one. And every entry has to be a real project, so a
+ * module that is renamed fails here instead of silently dropping out of the release.
+ *
+ * `ProjectScope.ENGINE_PREFIX` is the same `:udea-` the module-graph rules scope themselves by,
+ * so "engine module" means one thing in this build rather than two.
+ */
+run {
+    val paths = subprojects.filter { it.buildFile.exists() }.map { it.path }.toSet()
+    val missing = paths.filter { ProjectScope.isEngineModule(it) } - published
+    check(missing.isEmpty()) {
+        "$missing are engine modules that nothing publishes. A game outside this repository " +
+            "resolves the engine from a repository, so a module left out here is a module it " +
+            "cannot compile against. Add it to `published`, or, if it genuinely must not ship, " +
+            "say so here in a line that explains why."
+    }
+    val unknown = published - paths
+    check(unknown.isEmpty()) {
+        "$unknown are named in `published` but are not projects of this build."
+    }
+}
+
+/**
+ * Which tasks read a KSP output directory without Gradle knowing who wrote it.
+ *
+ * A list of predicates rather than a list of names, because the names are per-target and per-
+ * variant - `sourcesJar`, `androidSourcesJar`, `bundleAndroidMainClassesToCompileJar`,
+ * `processAndroidMainJavaRes` - and a module that gains a target would otherwise gain a silent
+ * gap. Each one is here because a build failed on it by name; nothing is here speculatively.
+ */
+val KSP_OUTPUT_CONSUMERS: List<(String) -> Boolean> = listOf(
+    // The sources jars: the generated sources are on the source set, so they are packed.
+    { name: String -> name.endsWith("ourcesJar") },
+    // The Android variant's bundling tasks - `bundleAndroidMainClassesToCompileJar`,
+    // `bundleLibRuntimeToDirAndroidMain` - and its resource processing, which read the same
+    // source set. Every `bundle*` task rather than the two the build named, because they are one
+    // family reading one source set and the third would fail the same way on some later build.
+    { name: String -> name.startsWith("bundle") },
+    { name: String -> name.startsWith("process") && name.endsWith("JavaRes") },
+)
+
+configure(subprojects.filter { it.path in published }) {
+    apply(plugin = "com.vanniktech.maven.publish")
+
+    /**
+     * What Central insists on: a name, a description, a home, a licence, a human, and where the
+     * source is. [UdeaPom] holds the values, so the engine's modules and `build-logic`'s plugins
+     * describe themselves as the same project.
+     *
+     * Signing and the upload are configured by properties rather than here, so the key and the
+     * token live in CI's secrets and never in the repository. Without them this still builds -
+     * `publishToMavenLocal` works on any machine, and that is what `scripts/outside-game-proof.sh`
+     * uses - it simply cannot publish.
+     */
+    afterEvaluate {
+        /**
+         * A sources jar packs the generated sources too, and nothing told it who writes them.
+         *
+         * Publishing is the first thing in this build to ask for a sources jar, and it fails
+         * immediately on `udea-core`:
+         *
+         *     Task ':udea-core:sourcesJar' uses this output of task
+         *     ':udea-core:kspCommonMainKotlinMetadata' without declaring an explicit or implicit
+         *     dependency.
+         *
+         * The source *directory* is on the source set, so the jar task reads
+         * `build/generated/ksp/...`, but the generator is a KSP task the jar has no edge to.
+         * Gradle refuses rather than racing, which is the right answer; this supplies the edge.
+         * Every KSP task of the module rather than the one named in the message, because which
+         * ones exist depends on the module's targets - `kspCommonMainKotlinMetadata`,
+         * `kspKotlinJvm`, `kspKotlinAndroidRelease` - and a sources jar wants all of them.
+         *
+         * Matched by name, and not by `tasks.withType<Jar>()`, which silently matches nothing
+         * here. A multiplatform module's `sourcesJar` is registered as `org.gradle.jvm.tasks.Jar`,
+         * and `Jar` in a build script is `org.gradle.api.tasks.bundling.Jar`, which *extends* it -
+         * so the filter that looks like the obvious one asks for a subtype the task is not. The
+         * failure mode is a filter that matches nothing and a build that stays green until
+         * something else notices, which is what this comment is for.
+         */
+        // Main-source KSP only. A test compilation's processor - `kspAndroidHostTest` - reads the
+        // main variant's classes jar, so making that jar wait for every KSP task of the module is
+        // a cycle: `bundleAndroidMainClassesToCompileJar` -> `kspAndroidHostTest` ->
+        // `bundleAndroidMainClassesToCompileJar`. Nothing published packs a test source set.
+        val kspTasks = tasks.matching { it.name.startsWith("ksp") && !it.name.contains("Test") }
+        tasks.matching { name -> KSP_OUTPUT_CONSUMERS.any { it(name.name) } }
+            .configureEach { dependsOn(kspTasks) }
+
+        // Read out here: inside the `pom` block, `name` and `description` are the POM's own.
+        val moduleName = name
+        val moduleDescription = description
+            ?: error("$moduleName has no description, and Central requires one")
+
+        extensions.configure<MavenPublishBaseExtension> {
+            // Upload a deployment and stop. A person presses publish, in the `central-publish`
+            // workflow; nothing about a push or a tag releases anything.
+            publishToMavenCentral(automaticRelease = false)
+            if (project.hasProperty("signingInMemoryKey")) signAllPublications()
+
+            coordinates(group.toString(), name, version.toString())
+
+            pom {
+                name.set(moduleName)
+                description.set(moduleDescription)
+                url.set(UdeaPom.URL)
+                inceptionYear.set(UdeaPom.INCEPTION_YEAR)
+
+                licenses {
+                    license {
+                        name.set(UdeaPom.LICENCE_NAME)
+                        url.set(UdeaPom.LICENCE_URL)
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set(UdeaPom.DEVELOPER_ID)
+                        name.set(UdeaPom.DEVELOPER_NAME)
+                        url.set(UdeaPom.DEVELOPER_URL)
+                    }
+                }
+
+                scm {
+                    url.set(UdeaPom.URL)
+                    connection.set(UdeaPom.SCM_CONNECTION)
+                    developerConnection.set(UdeaPom.SCM_DEVELOPER_CONNECTION)
+                }
+            }
+        }
+    }
+}
+
 // The root project deliberately declares no sources and no dependencies. It used to be a
 // Compose Desktop application wrapping `:level-editor`, with an `integrationTest` source set
 // over a checked-in copy of an entire sample project. D6 deleted the editor; the root is now
@@ -81,59 +293,63 @@ allprojects {
 
 // --- Phase 0 build gates (spec 4, spec 6, spec 7) ------------------------------------
 //
-// Wired here rather than in each module's build script for two reasons: a gate a module opts
-// into is a gate a new module forgets, and these files are owned by whoever owns the module,
-// which is the wrong person to be able to switch off the rule that governs the module.
+// Wired through `udea.game-gates` rather than in each module's build script for two reasons: a
+// gate a module opts into is a gate a new module forgets, and these files are owned by whoever
+// owns the module, which is the wrong person to be able to switch off the rule that governs the
+// module. The plugin registers the module-graph check on every project of this build that has a
+// build script, the determinism scan over the scopes declared below, and the release scan on
+// each project `ships` names - plus the aggregates over all three.
 
 /**
- * Gradle paths of the engine and the games: everything the Phase 0 gates apply to.
+ * What this build tells the gates about itself (issue #265).
  *
- * Which projects those are is `ModuleGraphRules.governs`, the one answer the rules themselves and
- * the compiler-plugin wiring use, so a game the rules cover is a game these gates run on: Hollow
- * (issue #249) joined by being added there, and a list written out here as well would be a second
- * thing to forget.
+ * Every line here used to be a `:moba` path inside `build-logic` - `MOBA_PROJECTS` for the
+ * module-graph rules about a shipped game, `:moba:desktop` for the release scan, and
+ * `DeterminismRules.SIMULATION_SCOPES`' last entry for the game's own rules. A game in its own
+ * repository could satisfy none of them, and was gated by nothing while its build looked green.
+ * They are configuration now, and this block is both this repository's declaration and the
+ * worked example a game's own root build script follows; `docs/new-game.md` is the guide.
+ */
+udeaGates {
+    // The release gate lives on the project that actually ships a runnable process. That is the
+    // desktop launcher now (issue #212): `:moba:game` is a library with no entry point in it, and
+    // the classpath `UDEA-REL-002` is about is the one a player's or an agent's process runs on.
+    ships(":moba:desktop")
+
+    // Hollow's launcher (epic #245, issue #249), for the same reason: `:hollow:game` is the
+    // library and `:hollow:desktop` is the process a player runs.
+    ships(":hollow:desktop")
+
+    // `:moba:game` since issue #212 split the launchers off. The game's rules are the whole of
+    // what simulates; neither launcher holds a system.
+    simulation(
+        project = ":moba:game",
+        packagePrefixes = listOf(
+            "dev.wildware.moba.ability",
+            "dev.wildware.moba.ai",
+            "dev.wildware.moba.match",
+        ),
+        why = "The example game's own rules: abilities and combat, unit AI, and the match " +
+            "lifecycle. Its HUD, audio cues, scene, animation and renderers live outside " +
+            "these prefixes and are presentation, where seconds and PresentationRandom are " +
+            "allowed (spec 3.3, spec 5).",
+    )
+}
+
+/**
+ * Gradle paths of the engine and the game: every project with a build script of its own.
  *
  * `buildFile.exists()` is not a nicety. `:moba` is a container since issue #212 - it holds
  * `:moba:game`, `:moba:desktop` and `:moba:android` and has no build script, no plugins and no
- * configurations of its own, and `:hollow` is the same - and both gates refuse a project they
- * would inspect nothing of: *"matched none of the configurations [...], so udeaVerifyModuleGraph
- * inspected nothing. A gate with no input passes forever"*. That refusal is right, so the
- * container is excluded here rather than the message being softened there.
+ * configurations of its own - and the gates refuse a project they would inspect nothing of:
+ * *"matched none of the configurations [...], so udeaVerifyModuleGraph inspected nothing. A gate
+ * with no input passes forever"*. That refusal is right, so the container is excluded here rather
+ * than the message being softened there.
+ *
+ * `udea.game-gates` selects the same set for the gates themselves; this local is what
+ * [udeaAssemble] below aggregates over.
  */
-val rewriteProjects = subprojects.filter { ModuleGraphRules.governs(it.path) && it.buildFile.exists() }
-
-/**
- * The projects that ship a runnable process, and so get the release gate: each game's desktop
- * launcher. A game's library has no entry point in it, and the classpath `UDEA-REL-002` is about
- * is the one a player's or an agent's process runs on.
- */
-val launcherProjects = listOf(":moba:desktop", ":hollow:desktop")
-
-subprojects {
-    if (this in rewriteProjects) {
-        apply(plugin = "udea.module-graph-check")
-    }
-    if (path in launcherProjects) {
-        apply(plugin = "udea.release-check")
-    }
-}
-
-/**
- * Aggregates, so a developer can run one gate over the whole tree. Each depends on the
- * per-project task by path; the per-project tasks are also on their own `check`, so a plain
- * `./gradlew build` cannot pass while a rule is broken.
- */
-val udeaVerifyModuleGraph by tasks.registering {
-    group = "verification"
-    description = "Runs udeaVerifyModuleGraph on every udea-* project and every game project."
-    dependsOn(rewriteProjects.map { "${it.path}:udeaVerifyModuleGraph" })
-}
-
-val udeaVerifyRelease by tasks.registering {
-    group = "verification"
-    description = "Runs the release artifact scan on every shipping project."
-    dependsOn(launcherProjects.map { "$it:udeaVerifyRelease" })
-}
+val rewriteProjects = subprojects.filter { it.buildFile.exists() }
 
 /**
  * `assemble` for the engine and the game.
@@ -142,19 +358,11 @@ val udeaVerifyRelease by tasks.registering {
  * introduced so the budget would not measure the old tree - `common` and `example` resolving
  * KryoNet, Box2D natives and five `kotlin-scripting-*` artifacts - and it stays after issue #213
  * deleted that tree, because the clean-build-budget CI job names this task.
- *
- * It is the engine and `moba`, and not Hollow (issue #249): that job compares this task's clean
- * build on a branch with the same task on its base, and a second game in it would read as the
- * engine's build slowing down on the branch that added the game.
  */
 val udeaAssemble by tasks.registering {
     group = "build"
     description = "Assembles every udea-* project and every moba project."
-    dependsOn(
-        rewriteProjects
-            .filter { it.path.startsWith(":udea-") || it.path.startsWith(":moba:") }
-            .map { "${it.path}:assemble" },
-    )
+    dependsOn(rewriteProjects.map { "${it.path}:assemble" })
 }
 
 // --- the wall-clock latency budgets (issue #175) ----------------------------------------------
@@ -271,8 +479,4 @@ subprojects {
             }
         }
     }
-}
-
-tasks.named("check") {
-    dependsOn(udeaVerifyModuleGraph)
 }

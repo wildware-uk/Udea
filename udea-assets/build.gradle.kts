@@ -19,3 +19,8 @@ kotlin {
         }
     }
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's runtime asset model and the reader for the .udeapak archive the asset pipeline " +
+    "produces."

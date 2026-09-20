@@ -199,3 +199,8 @@ tasks.named<KotlinJsTest>("wasmJsNodeTest") {
         environment("UDEA_WS_SNAPSHOT_URL", server.get().url(serverClasspath.asPath))
     }
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's networking: transports, baselines, relevancy, client prediction and remote calls " +
+    "over the same generated replicators that snapshots use."

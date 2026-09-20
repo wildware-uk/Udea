@@ -147,3 +147,8 @@ tasks.register<JavaExec>("udeaNavShot") {
     outputs.dir(out)
     argumentProviders.add { listOf("--out", out.get().asFile.absolutePath) }
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's ground-plane navigation: a nav grid rebuilt from building footprints, deterministic " +
+    "A* for one unit, flow fields for a group, and the steering that moves a crowd through them."

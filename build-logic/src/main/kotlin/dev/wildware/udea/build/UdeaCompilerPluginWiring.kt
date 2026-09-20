@@ -49,6 +49,35 @@ public object UdeaCompilerPluginWiring {
     public const val ARTIFACT_VERSION: String = "substituted-to-project"
 
     /**
+     * The version half of that coordinate, for the build actually asking.
+     *
+     * Two builds ask, and they need opposite answers. This repository compiles the plugin and
+     * substitutes the coordinate onto the project, so its version must be one no repository can
+     * answer - [ARTIFACT_VERSION] - because that is what turns a substitution which silently
+     * stopped being registered into a resolution failure rather than a stale jar out of
+     * `mavenLocal()`. A game in its own repository (issue #265) has nothing to substitute onto:
+     * the plugin is a published artifact there, and the coordinate has to name the engine
+     * release that game is built against.
+     *
+     * @param buildCompilesPlugin whether the build contains [PLUGIN_PROJECT_PATH].
+     * @param udeaVersion the `-P${UdeaVersion.PROPERTY}` property of the build asking, which is
+     *   the one line a game's `gradle.properties` states its engine version on.
+     */
+    public fun artifactVersion(buildCompilesPlugin: Boolean, udeaVersion: String?): String {
+        if (buildCompilesPlugin) return ARTIFACT_VERSION
+        val named = udeaVersion?.trim()
+        check(!named.isNullOrEmpty()) {
+            "This build applies Udea's Kotlin convention but does not compile " +
+                "$PLUGIN_PROJECT_PATH, so the K2 compiler plugin has to be resolved from a " +
+                "repository - and nothing says which version of it. Set " +
+                "${UdeaVersion.PROPERTY}=<the engine version this project builds against> in " +
+                "gradle.properties, which is the same property the engine's own coordinates and " +
+                "plugin ids take their version from. See docs/new-game.md."
+        }
+        return named
+    }
+
+    /**
      * Prefix of the Kotlin Gradle plugin's per-compilation plugin classpaths
      * (`kotlinCompilerPluginClasspathMain`, `…Test`, `…TestFixtures`).
      *
@@ -156,15 +185,20 @@ public object UdeaCompilerPluginWiring {
     /**
      * True when the K2 plugin is applied to every compilation of [projectPath].
      *
+     * Every module on the `udea.kotlin-base` convention, minus [EXCLUSIONS]. It used to ask
+     * [ModuleGraphRules.governs] as well, which answered "is this path `:udea-*` or `:moba*`" -
+     * true of every module on the convention in this repository, and false of every module of a
+     * game in its own repository (issue #265). That is a question about *which build* is asking,
+     * and the checkers are not a thing an outside game should silently do without: the answer
+     * here is now about the module, and the convention decides membership by being applied.
+     *
      * @param projectPath Gradle path of the module.
      * @param enabled the value of `-Pudea.compilerPlugin.enabled`, as read by
      *   [UdeaBuildFlags.compilerPluginEnabled]. `false` is spec 7's degrade path and makes
      *   this return `false` for every project, so no `-Xplugin` argument is produced anywhere.
      */
     public fun appliesTo(projectPath: String, enabled: Boolean): Boolean =
-        enabled &&
-            ModuleGraphRules.governs(projectPath) &&
-            projectPath !in EXCLUDED_PROJECTS
+        enabled && projectPath !in EXCLUDED_PROJECTS
 
     /**
      * True when [configurationName] is one compilation's plugin classpath.
@@ -194,6 +228,14 @@ public object UdeaCompilerPluginWiring {
      * @param resolvedComponents `displayName` of every component resolved on those
      *   classpaths — `project :udea-compiler-plugin` when the substitution worked, a Maven
      *   coordinate when it did not.
+     * @param buildCompilesPlugin whether the build being checked contains
+     *   [PLUGIN_PROJECT_PATH]. In this repository it does, and a Maven coordinate on the
+     *   classpath then means the substitution broke and the compilation is using a jar somebody
+     *   published rather than the one this build just compiled - the whole point of the third
+     *   branch below. A game in its own repository (issue #265) has no such project and resolves
+     *   the plugin from a repository *by design*, so the same evidence means the opposite thing
+     *   there. It defaults to the strict answer, so a caller that forgets to say gets the rule
+     *   that fails rather than the rule that passes.
      * @return the failure message, or `null` when the classpath matches the promise.
      */
     public fun classpathViolation(
@@ -201,10 +243,12 @@ public object UdeaCompilerPluginWiring {
         enabled: Boolean,
         pluginClasspaths: Collection<String>,
         resolvedComponents: Collection<String>,
+        buildCompilesPlugin: Boolean = true,
     ): String? {
         val expected = appliesTo(projectPath, enabled)
         val fromProject = "project $PLUGIN_PROJECT_PATH"
         val present = resolvedComponents.filter { ARTIFACT_NAME in it }
+        val fromAnyProject = present.filter(::isPluginProject)
         return when {
             expected && pluginClasspaths.isEmpty() ->
                 "$projectPath should have the K2 plugin applied, but it has no " +
@@ -218,11 +262,12 @@ public object UdeaCompilerPluginWiring {
                     "returned false for a project UdeaCompilerPluginWiring.appliesTo accepts, " +
                     "so no -Xplugin argument is produced and the FIR checkers are silently off."
 
-            expected && present.none { it == fromProject } ->
+            expected && buildCompilesPlugin && fromAnyProject.isEmpty() ->
                 "$projectPath resolves $ARTIFACT_NAME from $present instead of from " +
-                    "'$fromProject'. The dependency substitution in " +
-                    "UdeaCompilerPluginSupport.apply is not in effect, so the compilation is " +
-                    "using a published jar rather than the plugin this build just compiled."
+                    "'$fromProject' or the same project in an included build. The dependency " +
+                    "substitution in UdeaCompilerPluginSupport.apply is not in effect, so the " +
+                    "compilation is using a published jar rather than the plugin the build just " +
+                    "compiled."
 
             !expected && present.isNotEmpty() ->
                 "$projectPath must not compile with the K2 plugin (" +
@@ -234,6 +279,28 @@ public object UdeaCompilerPluginWiring {
     }
 
     /**
+     * True when [displayName] is a resolved component that *is* the compiler-plugin project,
+     * in this build or in one that included it.
+     *
+     * Gradle renders a project component as `project <identity path>`, and an included build's
+     * identity path carries that build's name in front of the project path - a build that
+     * includes this one resolves `project :Udea:udea-compiler-plugin`, where this repository's own
+     * build resolves `project :udea-compiler-plugin`. Both are the jar the surrounding build tree
+     * just compiled, which is the property this check is about.
+     *
+     * A Maven coordinate for the same artifact is not, and in a build that compiles the plugin it
+     * is what this exists to fail on. In a build that does not (issue #265: a game resolving the
+     * published engine) it is the only thing there can be, which is why `classpathViolation`
+     * takes `buildCompilesPlugin` rather than deciding from the component alone.
+     */
+    public fun isPluginProject(displayName: String): Boolean =
+        displayName.startsWith(PROJECT_PREFIX) &&
+            displayName.substringAfterLast(':') == ARTIFACT_NAME
+
+    /** How Gradle renders a project component: `project ` then its identity path. */
+    private const val PROJECT_PREFIX: String = "project :"
+
+    /**
      * Why [appliesTo] said no, for a build report or a test failure message.
      *
      * @return `null` when the plugin *is* applied to [projectPath].
@@ -242,10 +309,6 @@ public object UdeaCompilerPluginWiring {
         !enabled ->
             "-P${UdeaBuildFlags.COMPILER_PLUGIN_ENABLED}=false: spec 7's degrade path, so no " +
                 "module gets the K2 plugin"
-
-        !ModuleGraphRules.governs(projectPath) ->
-            "$projectPath is not part of the rewrite tree; the plugin is applied to udea-* " +
-                "and moba only"
 
         else -> EXCLUSIONS.firstOrNull { it.projectPath == projectPath }?.reason
     }

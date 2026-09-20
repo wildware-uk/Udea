@@ -182,6 +182,18 @@ class LevelServiceTest {
     }
 
     @Test
+    fun `a presentation-only component no module lists is left out - and the level is the world without it`() {
+        val host = host()
+        val saved = populated(host)
+        val levels = levels(host, extra = arrayOf(linkComponent))
+        val without = save(host, levels)
+        with(host.world) { saved.body.configure { it += Trail(lastX = 4f) } }
+
+        // Saved, where an unmarked unlisted component - Link, above - refuses the whole save.
+        assertContentEquals(without, save(host, levels), "the presentation component reached the level")
+    }
+
+    @Test
     fun `a save waits for the barrier - and sees what was queued ahead of it`() {
         val host = host()
         val levels = levels(host)
@@ -393,6 +405,13 @@ internal class Link(
     override fun type(): ComponentType<Link> = Link
 
     companion object : ComponentType<Link>()
+}
+
+/** Renderer-side state nothing lists for levels, marked so a save leaves it out. */
+internal class Trail(var lastX: Float = 0f) : Component<Trail>, PresentationOnly {
+    override fun type(): ComponentType<Trail> = Trail
+
+    companion object : ComponentType<Trail>()
 }
 
 /** One component, as it was when a level was saved... */

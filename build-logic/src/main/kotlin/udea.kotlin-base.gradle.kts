@@ -5,6 +5,7 @@ import dev.wildware.udea.build.UdeaCompilerPluginWiring
 import dev.wildware.udea.build.UdeaKotlinPin
 import dev.wildware.udea.build.UdeaStdlibPin
 import dev.wildware.udea.build.UdeaVersions
+import dev.wildware.udea.build.buildCompilesCompilerPlugin
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.jetbrains.kotlin.gradle.dsl.KotlinProjectExtension
 
@@ -16,15 +17,18 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinProjectExtension
  * *first*: this script configures the Kotlin extension and registers a compiler plugin, and both
  * need a Kotlin plugin already on the project. It is not meant to be applied on its own.
  *
- * It holds the policy rather than the platform - the group and version, the explicit-API rule,
- * the JDK toolchain, the `kotlin-stdlib` pin and the K2 compiler plugin with the two gates that
- * prove each is in effect. A module moving from JVM to multiplatform keeps every one of them,
- * because both conventions reach them through this one file rather than through two copies that
- * would drift.
+ * It holds the policy rather than the platform - the explicit-API rule, the JDK toolchain, the
+ * `kotlin-stdlib` pin and the K2 compiler plugin with the two gates that prove each is in effect.
+ * A module moving from JVM to multiplatform keeps every one of them, because both conventions
+ * reach them through this one file rather than through two copies that would drift.
+ *
+ * It does *not* set the group or the version, and that is a change of issue #265 rather than an
+ * omission. It used to set both, to `dev.wildware.udea` and `1.0-SNAPSHOT`. A game in its own
+ * repository applies this convention too - that is the whole point of publishing it - and a
+ * convention that names the engine's coordinates would have published that game as the engine.
+ * Udea's own modules get theirs from the root build script, which is where a build's identity
+ * belongs.
  */
-
-group = "dev.wildware.udea"
-version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -267,9 +271,13 @@ val udeaVerifyCompilerPlugin by tasks.registering {
     val components = pluginClasspathComponents
     val enabled = compilerPluginEnabled
     val projectPath = project.path
+    // Whether a Maven coordinate on the plugin classpath is the substitution having broken, or
+    // the only way this build could have got the plugin at all (issue #265).
+    val compilesPlugin = project.buildCompilesCompilerPlugin()
     val report = layout.buildDirectory.file("reports/udea/compiler-plugin.txt")
 
     inputs.property("compilerPluginEnabled", enabled)
+    inputs.property("buildCompilesPlugin", compilesPlugin)
     inputs.property("pluginClasspaths", classpaths)
     inputs.property("pluginClasspathComponents", components)
     outputs.file(report)
@@ -285,11 +293,12 @@ val udeaVerifyCompilerPlugin by tasks.registering {
                         "project=$projectPath",
                         "${UdeaBuildFlags.COMPILER_PLUGIN_ENABLED}=$enabled",
                         "applied=${UdeaCompilerPluginWiring.appliesTo(projectPath, enabled)}",
+                        "buildCompilesPlugin=$compilesPlugin",
                     ) + names.sorted().map { "classpath $it" } + resolved.map { "resolved $it" }
                     ).joinToString(separator = "\n", postfix = "\n"),
             )
         }
-        UdeaCompilerPluginWiring.classpathViolation(projectPath, enabled, names, resolved)
+        UdeaCompilerPluginWiring.classpathViolation(projectPath, enabled, names, resolved, compilesPlugin)
             ?.let { throw GradleException(it) }
     }
 }

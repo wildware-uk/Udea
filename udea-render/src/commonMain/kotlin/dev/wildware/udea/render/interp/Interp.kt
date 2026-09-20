@@ -2,6 +2,7 @@ package dev.wildware.udea.render.interp
 
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
+import dev.wildware.udea.core.level.PresentationOnly
 
 /**
  * Where an entity's body stood at the start of the tick, so a renderer can draw between there
@@ -33,6 +34,10 @@ import com.github.quillraven.fleks.ComponentType
  * gets the same visible behaviour (no one-frame smear across the map after a rewind) at the
  * cost of one frame of interpolation, and it is what makes moving the component to `udea-core`
  * later a widening rather than a rewrite.
+ *
+ * It is [PresentationOnly] for the same reason it is not snapshotted: a level saved from a world
+ * that has ticked leaves it out, and [InterpSnapshotSystem] gives each loaded body a fresh one,
+ * marked [snap], on the next tick.
  */
 public class Interp(
     /** The body's `x` at the start of the current tick. */
@@ -53,7 +58,7 @@ public class Interp(
      * permanently.
      */
     public var snap: Boolean = true,
-) : Component<Interp> {
+) : Component<Interp>, PresentationOnly {
 
     /** Records [x], [y] and [angle] as the pose this tick started from. */
     public fun capture(x: Float, y: Float, angle: Float) {

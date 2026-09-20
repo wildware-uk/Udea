@@ -9,6 +9,7 @@ import org.gradle.api.provider.MapProperty
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
@@ -36,8 +37,16 @@ public abstract class UdeaVerifyDeterminismTask : DefaultTask() {
     @get:Input
     public abstract val repoRootPath: org.gradle.api.provider.Property<String>
 
-    /** `determinism-allowlist.txt`. Parsed strictly; see [Allowlist]. */
+    /**
+     * `determinism-allowlist.txt`. Parsed strictly; see [Allowlist].
+     *
+     * Optional, because a build that is not this repository's has nothing to excuse yet (issue
+     * #265) and an empty allowlist is the strict end of the range rather than a hole: every
+     * finding fires. Absent is reported on every run, so it cannot be mistaken for an entry that
+     * matched.
+     */
     @get:InputFile
+    @get:Optional
     @get:PathSensitive(PathSensitivity.RELATIVE)
     public abstract val allowlistFile: RegularFileProperty
 
@@ -68,12 +77,25 @@ public abstract class UdeaVerifyDeterminismTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     public abstract val vendoredFleksSources: ConfigurableFileCollection
 
-    /** The declared scopes, as strings, so editing the table invalidates the task. */
+    /**
+     * Every scope scanned: the engine's, when this build contains the engine, plus the ones the
+     * build declared through `udeaGates { simulation(...) }` (issue #265).
+     *
+     * An `@Input` so that editing the table, or a game's own declaration, invalidates the task -
+     * which is the edit this gate most needs to re-run on.
+     */
     @get:Input
-    public val declaredScopes: List<String>
-        get() = DeterminismRules.SIMULATION_SCOPES.map {
-            "${it.project}/${it.sourceSet}${it.packagePrefixes.sorted()}"
-        }
+    public abstract val scopes: org.gradle.api.provider.ListProperty<SimScope>
+
+    /**
+     * Gradle path to module directory, for the projects in [scopes].
+     *
+     * The build knows where its projects are and a path does not (issue #265). Declared as an
+     * input for the same reason [scopes] is: a project that moved is a scan pointed somewhere
+     * else.
+     */
+    @get:Input
+    public abstract val moduleDirectories: MapProperty<String, String>
 
     /** The full report, kept on a green run as well as a red one. */
     @get:OutputFile
@@ -86,20 +108,45 @@ public abstract class UdeaVerifyDeterminismTask : DefaultTask() {
     @TaskAction
     public fun verify() {
         val repoRoot = File(repoRootPath.get())
-        val allowlistText = allowlistFile.get().asFile.readText()
+        val allowlist = allowlistFile.orNull?.asFile
+        val allowlistText = allowlist?.readText().orEmpty()
         val catalogVersions = resolvedVersions.get()
-        val release = requireNotNull(catalogVersions[VendoredFleks.ALIAS]) {
-            "no '${VendoredFleks.ALIAS}' version to stamp the vendored Fleks source with"
+        // Empty on a build that is not the engine's own: the audit and the vendored source the
+        // pin describes are the engine's, and it checks them in its own `check` (issue #265).
+        val auditedVersions = if (catalogVersions.isEmpty()) {
+            emptyMap()
+        } else {
+            val release = requireNotNull(catalogVersions[VendoredFleks.ALIAS]) {
+                "no '${VendoredFleks.ALIAS}' version to stamp the vendored Fleks source with"
+            }
+            catalogVersions + (
+                VendoredFleks.ALIAS to VendoredFleks.auditedVersion(
+                    release,
+                    repoRoot.resolve(VendoredFleks.SOURCE_DIRECTORY),
+                )
+                )
         }
-        val auditedVersions = catalogVersions +
-            (VendoredFleks.ALIAS to VendoredFleks.auditedVersion(release, repoRoot.resolve(VendoredFleks.SOURCE_DIRECTORY)))
+        val directories = moduleDirectories.get()
         val result = DeterminismScan.run(
-            inputs = DeterminismRules.SIMULATION_SCOPES.map { DeterminismLayout.scopeInput(repoRoot, it) },
+            inputs = scopes.get().map { scope ->
+                val moduleDir = directories[scope.project]
+                    ?.let(::File)
+                    ?: DeterminismLayout.moduleDirectoryUnder(repoRoot, scope.project)
+                DeterminismLayout.scopeInput(repoRoot, scope, moduleDir)
+            },
             allowlist = Allowlist.parse(allowlistText),
             repoRoot = repoRoot,
             resolvedVersions = auditedVersions,
         )
-        val text = DeterminismScan.report(result)
+        val text = buildString {
+            append(DeterminismScan.report(result))
+            appendLine()
+            appendLine(
+                allowlist?.let { "allowlist: ${it.absolutePath}" }
+                    ?: "allowlist: none - every finding fires, nothing is excused",
+            )
+            appendLine("scopes scanned: " + scopes.get().joinToString { "${it.project}/${it.sourceSet}" })
+        }
         report.get().asFile.apply { parentFile.mkdirs(); writeText(text) }
         if (result.failed) throw GradleException(text)
         // On a green run too. A first filter whose limits are only stated when it fails is a

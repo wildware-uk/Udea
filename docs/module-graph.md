@@ -326,9 +326,13 @@ draw stay inside `udea-render` as spec §3 requires. This rule is that sentence 
 
 ## `UDEA-MG-013` — the FBX converter runs in the asset build and nowhere else
 
-**Issue #244.** Banned on `compileClasspath` and `runtimeClasspath` of every `udea-*` module and
-every game project (`moba` and `hollow`) except `ModuleGraphRules.MODEL_CONVERTER_PROJECTS` (`udea-assets-compiler`
-and `udea-gradle`): `*:*assimp*`, every Assimp binding, LWJGL's included.
+**Issue #244.** Banned on `compileClasspath` and `runtimeClasspath` of every project the gate runs
+on, with `ModuleGraphRules.MODEL_CONVERTER_PROJECTS` (`udea-assets-compiler` and `udea-gradle`)
+excused by name: `*:*assimp*`, every Assimp binding, LWJGL's included.
+
+"Every project, less those two" rather than a list of every project there is, for the reason
+`UDEA-MG-005` above gives: the list was this repository's modules plus `:moba`'s paths, so the
+projects of a game in its own repository were in none of it (issue #265).
 
 Kool reads glTF and has no FBX loader, so a game that drops an `.fbx` into its assets gets the
 `.glb` the asset compiler converts it to, with Assimp through `org.lwjgl:lwjgl-assimp`. The
@@ -369,14 +373,17 @@ closes the other half of the same hole.
 
 ## `UDEA-MG-005` — no scripting host and no classpath scanner in the game
 
-**Spec §6 (Phase 2 exit), §3.6.** Banned on the `runtimeClasspath` of every game project,
-`ModuleGraphRules.GAME_PROJECTS` - `:moba:game`, `:moba:desktop`, `:moba:android`, plus `:moba`, so
-that re-creating a flat `moba` module does not re-open the hole, and `:moba:web` for the same reason
-ahead of issue #226; and Hollow's `:hollow:game` and `:hollow:desktop`, plus `:hollow` (issue #249).
-`ModuleGraphRulesTest` fails when `settings.gradle.kts` includes a project that is neither `udea-*`
-nor in that set, so a third game cannot join ungoverned:
-`org.jetbrains.kotlin:kotlin-scripting-*`, `org.jetbrains.kotlin:kotlin-reflect`,
-`org.reflections:reflections`.
+**Spec §6 (Phase 2 exit), §3.6.** Banned on the `runtimeClasspath` of every project the gate runs
+on that is **not** an engine module (`ProjectScope.GAME`): `org.jetbrains.kotlin:kotlin-scripting-*`,
+`org.jetbrains.kotlin:kotlin-reflect`, `org.reflections:reflections`.
+
+The scope is a role rather than a list of paths, and issue #265 is why. The rule named `:moba`'s
+paths, which made it a rule about *this repository*: a game that lives in its own repository and
+resolves the engine from Maven has projects called `:game` and `:desktop`, matched none of them,
+and shipped whatever it liked with `udeaVerifyModuleGraph` green - because an ungoverned project
+is not reported as skipped. Naming paths had already failed once for the same
+reason: scoped to the flat `:moba`, the rule scanned nothing at all after issue #212 split that
+project into three.
 
 It was placed as a ratchet *before* Phase 2 had a reason to reach for
 `kotlin-scripting-jvm-host`. Until issue #212 it named the flat `:moba` alone, which after the

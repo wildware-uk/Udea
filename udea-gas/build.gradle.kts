@@ -198,3 +198,8 @@ val udeaGasAllocationBudget = tasks.register<Test>("udeaGasAllocationBudget") {
 tasks.named("check") {
     dependsOn(udeaVerifyGasTime, udeaGasAllocationBudget)
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's gameplay ability system: abilities, attributes and effects, with every duration " +
+    "and cooldown denominated in simulation ticks."

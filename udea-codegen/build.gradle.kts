@@ -157,3 +157,8 @@ tasks.test {
     systemProperty("udea.kotlinLanguageVersion", UdeaVersions.KOTLIN.substringBeforeLast('.'))
     systemProperty("udea.jvmTarget", UdeaVersions.JVM_TOOLCHAIN.toString())
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's KSP2 processor: it generates a replicator per component, a registry per module, " +
+    "the agent's tool surface, and the network ids that the checked-in protocol lock pins."

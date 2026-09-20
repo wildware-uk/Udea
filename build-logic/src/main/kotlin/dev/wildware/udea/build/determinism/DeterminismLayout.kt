@@ -24,9 +24,16 @@ internal object DeterminismLayout {
      */
     private val BYTECODE_TARGETS: List<String> = listOf("jvm", "android")
 
-    /** The scan input for [scope], resolved against [repoRoot]. */
-    fun scopeInput(repoRoot: File, scope: SimScope): DeterminismScan.ScopeInput {
-        val module = repoRoot.resolve(scope.project.removePrefix(":").replace(':', '/'))
+    /**
+     * The scan input for [scope], whose module directory is [moduleDir].
+     *
+     * The directory is passed in rather than derived from the Gradle path (issue #265): the build
+     * knows where a project is and a path does not, and a game outside this repository may lay
+     * its projects out however it likes. [moduleDirectoryUnder] is the default a build with no
+     * answer falls back on, and is what this repository's own layout gives.
+     */
+    fun scopeInput(repoRoot: File, scope: SimScope, moduleDir: File): DeterminismScan.ScopeInput {
+        val module = moduleDir
         val suffix = scope.sourceSet.replaceFirstChar { it.uppercase() }
         return if (isMultiplatform(module)) {
             DeterminismScan.ScopeInput(
@@ -45,6 +52,10 @@ internal object DeterminismLayout {
             )
         }
     }
+
+    /** Where a project at [projectPath] sits under [repoRoot] when nothing says otherwise. */
+    fun moduleDirectoryUnder(repoRoot: File, projectPath: String): File =
+        repoRoot.resolve(projectPath.removePrefix(":").replace(':', '/'))
 
     /**
      * True when [module] keeps its sources in multiplatform source sets (`src/commonMain`, ...)

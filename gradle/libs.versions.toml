@@ -182,3 +182,11 @@ composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "k
 # repository in lockstep with the compiler, so `version.ref = "kotlin"` is the only version that
 # loads. Applied to the modules whose components a level file saves: udea-core, udea-gas, moba.
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+# Publishing to Maven Central (issue #265). An outside game resolves the engine from a repository
+# rather than from this checkout, so the engine has to be publishable at all. This is the same
+# plugin at the same version ComposeGL publishes with, and this build copies that arrangement
+# deliberately: `publishToMavenCentral(automaticRelease = false)` uploads a deployment and stops,
+# so releasing is a person's decision rather than a push's side effect. Applied to the modules the
+# root build script's `published` set names, and separately to `build-logic`, which publishes the
+# convention plugins and the version catalog a game outside this repository applies.
+mavenPublish = { id = "com.vanniktech.maven.publish", version = "0.37.0" }

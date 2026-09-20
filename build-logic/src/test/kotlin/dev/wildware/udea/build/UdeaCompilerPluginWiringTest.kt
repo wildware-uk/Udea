@@ -3,6 +3,7 @@ package dev.wildware.udea.build
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -32,18 +33,19 @@ class UdeaCompilerPluginWiringTest {
     // --- which modules ------------------------------------------------------------------
 
     @Test
-    fun `the rewrite tree gets the plugin and the old tree does not`() {
+    fun `every module on the convention gets the plugin, whichever build it is in`() {
         assertTrue(UdeaCompilerPluginWiring.appliesTo(":udea-core", enabled = true))
         assertTrue(UdeaCompilerPluginWiring.appliesTo(":udea-render", enabled = true))
-        assertTrue(UdeaCompilerPluginWiring.appliesTo(":moba", enabled = true))
+        assertTrue(UdeaCompilerPluginWiring.appliesTo(":moba:game", enabled = true))
 
-        // `common`, `example` and `gradle-plugin` are the old tree: they are not on the
-        // `udea.kotlin-library` convention, they still compile against Kotlin's language
-        // version 1.8, and a checker firing there would be a rule applied to code on its way
-        // out of the repository.
-        assertFalse(UdeaCompilerPluginWiring.appliesTo(":common", enabled = true))
-        assertFalse(UdeaCompilerPluginWiring.appliesTo(":example", enabled = true))
-        assertFalse(UdeaCompilerPluginWiring.appliesTo(":gradle-plugin", enabled = true))
+        // The projects of a game in its own repository (issue #265). They are called whatever
+        // that repository calls them and they are on the same convention, so they get the same
+        // checkers. This used to ask `ModuleGraphRules.governs`, which answered "does the path
+        // start with :udea- or :moba" - false for every path below, so an outside game's
+        // checkers were off and nothing said so.
+        assertTrue(UdeaCompilerPluginWiring.appliesTo(":game", enabled = true))
+        assertTrue(UdeaCompilerPluginWiring.appliesTo(":desktop", enabled = true))
+        assertTrue(UdeaCompilerPluginWiring.appliesTo(":robot:units", enabled = true))
     }
 
     @Test
@@ -51,7 +53,7 @@ class UdeaCompilerPluginWiringTest {
         // Spec 7's degrade path. If this ever returns true for one module, that module keeps
         // compiling with the checkers a developer believes they switched off, and the
         // `plugin-disabled` CI leg goes back to proving nothing.
-        val everyKind = listOf(":udea-core", ":udea-render", ":moba", ":udea-annotations", ":common")
+        val everyKind = listOf(":udea-core", ":udea-render", ":moba:game", ":udea-annotations", ":game")
         everyKind.forEach {
             assertFalse(
                 UdeaCompilerPluginWiring.appliesTo(it, enabled = false),
@@ -110,14 +112,11 @@ class UdeaCompilerPluginWiringTest {
     }
 
     @Test
-    fun `skipReason names the flag, the tree and the cycle separately`() {
+    fun `skipReason names the flag and the cycle separately`() {
         assertNull(UdeaCompilerPluginWiring.skipReason(":udea-core", enabled = true))
         assertTrue(
             UdeaBuildFlags.COMPILER_PLUGIN_ENABLED in
                 UdeaCompilerPluginWiring.skipReason(":udea-core", enabled = false).orEmpty(),
-        )
-        assertTrue(
-            "rewrite tree" in UdeaCompilerPluginWiring.skipReason(":common", enabled = true).orEmpty(),
         )
         assertTrue(
             "runtime classpath" in
@@ -197,6 +196,17 @@ class UdeaCompilerPluginWiringTest {
     private val theProject = "project ${UdeaCompilerPluginWiring.PLUGIN_PROJECT_PATH}"
     private val kgpOwnJars = listOf("org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:2.2.10")
 
+    /**
+     * The plugin project as a build that *included* this one renders it.
+     *
+     * Gradle renders a project component as `project <identity path>`, and an included build's
+     * identity path carries that build's name in front of the project path. A game outside this
+     * repository resolves the published jar rather than this (issue #265, and the tests at the
+     * end of this file), but a build that includes the engine's build still gets the project -
+     * and that is the same "the jar this build tree just compiled" the check is about.
+     */
+    private val theProjectThroughAComposite = "project :Udea:udea-compiler-plugin"
+
     @Test
     fun `a correctly wired module passes`() {
         assertNull(
@@ -207,6 +217,31 @@ class UdeaCompilerPluginWiringTest {
                 resolvedComponents = kgpOwnJars + theProject,
             ),
         )
+    }
+
+    @Test
+    fun `a build that includes the engine's build resolves the project and passes`() {
+        assertNull(
+            UdeaCompilerPluginWiring.classpathViolation(
+                projectPath = ":game",
+                enabled = true,
+                pluginClasspaths = appliedClasspaths,
+                resolvedComponents = kgpOwnJars + theProjectThroughAComposite,
+                buildCompilesPlugin = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `a project component is one thing and a published artifact is another`() {
+        assertTrue(UdeaCompilerPluginWiring.isPluginProject(theProject))
+        assertTrue(UdeaCompilerPluginWiring.isPluginProject(theProjectThroughAComposite))
+
+        // The case the check exists for: the coordinate resolved from a repository, which is a
+        // jar somebody published months ago rather than the one this build tree compiled.
+        assertFalse(UdeaCompilerPluginWiring.isPluginProject("dev.wildware.udea:udea-compiler-plugin:1.0-SNAPSHOT"))
+        // And a project that merely ends in something similar.
+        assertFalse(UdeaCompilerPluginWiring.isPluginProject("project :my-udea-compiler-plugin-fork"))
     }
 
     @Test
@@ -284,6 +319,93 @@ class UdeaCompilerPluginWiringTest {
                 resolvedComponents = kgpOwnJars,
             ),
         )
+    }
+
+    // --- the build that does not compile the plugin (issue #265) ----------------------------
+    //
+    // A game in its own repository resolves the engine from Maven, so the compiler plugin arrives
+    // as a published jar. That is the one thing the branch above exists to refuse, and refusing it
+    // there is right: in *this* build a published jar means the substitution broke and the
+    // checkers are whatever somebody published months ago. The two are told apart by whether the
+    // build being checked contains `:udea-compiler-plugin` at all.
+
+    private val thePublishedPlugin = "dev.wildware.udea:udea-compiler-plugin:0.1.0-SNAPSHOT"
+
+    @Test
+    fun `a game whose build does not compile the plugin may resolve it from a repository`() {
+        assertNull(
+            UdeaCompilerPluginWiring.classpathViolation(
+                projectPath = ":game",
+                enabled = true,
+                pluginClasspaths = appliedClasspaths,
+                resolvedComponents = kgpOwnJars + thePublishedPlugin,
+                buildCompilesPlugin = false,
+            ),
+            "a published jar is the only way an outside game can get the plugin at all",
+        )
+    }
+
+    @Test
+    fun `a build that compiles the plugin still refuses the published jar`() {
+        val violation = UdeaCompilerPluginWiring.classpathViolation(
+            projectPath = ":udea-core",
+            enabled = true,
+            pluginClasspaths = appliedClasspaths,
+            resolvedComponents = kgpOwnJars + thePublishedPlugin,
+            buildCompilesPlugin = true,
+        )
+        assertNotNull(violation)
+        assertTrue("substitution" in violation, violation)
+    }
+
+    @Test
+    fun `a game with no plugin on the classpath fails like any other module`() {
+        // The looser rule above is about *where* the plugin came from, not about whether it is
+        // there. Without this, "the build does not compile the plugin" would be a way to have no
+        // checkers at all and stay green - which is issue #164 arriving through a new door.
+        val violation = UdeaCompilerPluginWiring.classpathViolation(
+            projectPath = ":game",
+            enabled = true,
+            pluginClasspaths = appliedClasspaths,
+            resolvedComponents = kgpOwnJars,
+            buildCompilesPlugin = false,
+        )
+        assertNotNull(violation)
+        assertTrue("silently off" in violation, violation)
+    }
+
+    @Test
+    fun `the plugin coordinate names a real version only where it has to resolve`() {
+        // In this build the coordinate is substituted onto the project before anything resolves,
+        // so it carries a version that exists in no repository - that is what turns a broken
+        // substitution into a resolution failure instead of a stale jar. In a game's build there
+        // is nothing to substitute onto, so the coordinate has to be one Maven can answer.
+        assertEquals(
+            UdeaCompilerPluginWiring.ARTIFACT_VERSION,
+            UdeaCompilerPluginWiring.artifactVersion(buildCompilesPlugin = true, udeaVersion = "0.1.0-SNAPSHOT"),
+            "a build that compiles the plugin must not be able to resolve a published one",
+        )
+        assertEquals(
+            "0.1.0-SNAPSHOT",
+            UdeaCompilerPluginWiring.artifactVersion(buildCompilesPlugin = false, udeaVersion = "0.1.0-SNAPSHOT"),
+        )
+        assertEquals(
+            "0.1.0-SNAPSHOT",
+            UdeaCompilerPluginWiring.artifactVersion(buildCompilesPlugin = false, udeaVersion = " 0.1.0-SNAPSHOT\n"),
+        )
+    }
+
+    @Test
+    fun `a game that does not say which engine it is on is told so by name`() {
+        val thrown = assertFailsWith<IllegalStateException> {
+            UdeaCompilerPluginWiring.artifactVersion(buildCompilesPlugin = false, udeaVersion = null)
+        }
+        assertTrue(UdeaVersion.PROPERTY in (thrown.message ?: ""), thrown.message ?: "")
+        // Blank is the same as absent: `-PudeaVersion=` is a property that is set and empty, and
+        // a coordinate ending in a colon resolves to nothing with a much worse message.
+        assertFailsWith<IllegalStateException> {
+            UdeaCompilerPluginWiring.artifactVersion(buildCompilesPlugin = false, udeaVersion = "  ")
+        }
     }
 
     @Test

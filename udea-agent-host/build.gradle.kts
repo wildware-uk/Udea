@@ -291,3 +291,8 @@ tasks.withType<Test>().configureEach {
         systemProperty("udea.assetsCompiler.classpath", classpath.asPath)
     }
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "The HTTP server that exposes a running Udea game's agent tool surface to an MCP bridge. " +
+    "A development tool: the build gates keep it off a released classpath."

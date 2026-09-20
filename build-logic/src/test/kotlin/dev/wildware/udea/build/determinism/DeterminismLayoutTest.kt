@@ -18,17 +18,26 @@ class DeterminismLayoutTest {
     @TempDir
     lateinit var repo: File
 
-    private val scope = SimScope(project = ":udea-core", sourceSet = "main", packagePrefixes = emptyList(), why = "test")
+    private val scope = SimScope(
+        project = ":udea-core",
+        sourceSet = "main",
+        packagePrefixes = emptyList(),
+        why = "A fixture scope: this test is about where a module's classes and sources are " +
+            "found, not about what is in them.",
+    )
 
     private fun dirs(vararg paths: String) = paths.forEach { repo.resolve(it).mkdirs() }
 
     private fun relative(files: List<File>) = files.map { it.relativeTo(repo).invariantSeparatorsPath }
 
+    /** Where the build would say the module is, which for this repository is under its path. */
+    private fun moduleDir(): File = DeterminismLayout.moduleDirectoryUnder(repo, scope.project)
+
     @Test
     fun `a JVM module is read from its language directories`() {
         dirs("udea-core/src/main/kotlin")
 
-        val input = DeterminismLayout.scopeInput(repo, scope)
+        val input = DeterminismLayout.scopeInput(repo, scope, moduleDir())
 
         assertEquals(
             listOf("udea-core/build/classes/kotlin/main", "udea-core/build/classes/java/main"),
@@ -48,7 +57,7 @@ class DeterminismLayoutTest {
             "udea-core/build/classes/kotlin/main",
         )
 
-        val input = DeterminismLayout.scopeInput(repo, scope)
+        val input = DeterminismLayout.scopeInput(repo, scope, moduleDir())
 
         assertEquals(
             listOf(

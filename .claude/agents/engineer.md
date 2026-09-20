@@ -380,6 +380,33 @@ effect.** A grep over-reporting by 2 cannot explain a discrepancy of 1. A 52-uni
 produce a 37.7px move. A one-tick ordering change cannot explain a 2000-tick divergence. All of those
 shapes were published, believed, and repeated before anyone did the subtraction.
 
+## Before you believe a zero, make the search return a non-zero
+
+An absence is the easiest claim to publish and the hardest to check. "No module imports it", "the
+grep is clean", "nothing else calls this" - each is one command, and when the command is broken the
+output is **indistinguishable from the answer you hoped for**.
+
+Two ways that happened on this box in one afternoon:
+
+- **The command never ran.** `grep -rln ... --include=*.kt` under zsh answers
+  `(eval):1: no matches found: --include=*.kt`. zsh is refusing to glob the *flag*, grep never
+  started, and the failure message and the hoped-for answer are the same words. Quote the glob.
+- **The command found the wrong thing.** `pgrep -af "[g]radlew"` returns your own question: the
+  bracket trick only stops the pattern matching its own `pgrep`, and the string is still sitting in
+  the invoking command line.
+
+And once, a loop answered `command not found: curl` for a binary plainly at `/usr/bin/curl` - a
+transient fork failure under memory pressure, wearing the costume of a missing program, printing a
+blank where a result belonged.
+
+**So: run the same search against something you know is there, and show it returning a non-zero.**
+Print both in `BRIEF.md`, next to each other. It costs one command, it is the only rule here that
+says what to *do* rather than what to suspect, and it is the difference between knowing about a
+trap and being protected from one. Knowing does not change what you type when you are tired.
+
+Anything you write of the form "X appears nowhere" without that control beside it is a sentence the
+reviewer is entitled to disbelieve.
+
 ## Counting is a claim
 
 An exhaustiveness claim — "exactly two reasons", "the only legitimate disagreement", "the fail line

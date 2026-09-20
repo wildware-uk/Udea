@@ -1,5 +1,6 @@
 package dev.wildware.udea.gradle.ci
 
+import dev.wildware.udea.gradle.RepositoryUnderTest
 import java.io.File
 
 /**
@@ -21,16 +22,12 @@ internal object LatencyBudgetAggregate {
      * The repository root, as the test task hands it over.
      *
      * A test that guessed it from `user.dir` would read a different tree under Gradle and under
-     * an IDE, and a source fence pointed at the wrong tree passes over nothing.
+     * an IDE, and a source fence pointed at the wrong tree passes over nothing. One accessor for
+     * the whole module, in [RepositoryUnderTest], since `BuildLogicGateTest` needs the same tree.
      */
-    val repoRoot: File
-        get() = File(
-            checkNotNull(System.getProperty("udea.repoRoot")) {
-                "udea.repoRoot is not set; the test task must pass the repository root"
-            },
-        )
+    val repoRoot: File get() = RepositoryUnderTest.root
 
-    val rootBuildScript: File get() = File(repoRoot, "build.gradle.kts")
+    val rootBuildScript: File get() = RepositoryUnderTest.file("build.gradle.kts")
 
     /**
      * The task paths hung on `udeaLatencyBudgets`.

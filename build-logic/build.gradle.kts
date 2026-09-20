@@ -479,3 +479,41 @@ tasks.test {
         },
     )
 }
+
+/**
+ * The one task the outer build depends on, and the whole of how `build-logic` is verified.
+ *
+ * `build-logic` is an **included build**. The outer build compiles these classes to configure
+ * itself and then reaches none of these tasks, so `./gradlew build` could be - and was - green
+ * over a `build-logic` test suite that did not compile: issue #265 deleted two members of
+ * `ModuleGraphRules` and left `ModuleGraphRulesTest` calling both. That change's reviewer ran
+ * `./gradlew build` with no exclusions, got a true green, and merged it, because the tests a
+ * change breaks in here are exactly the tests that gate does not run.
+ *
+ * Which half was dark is worth stating, because the alarming reading is false: the `udeaVerify*`
+ * **tasks** are on the outer `check` and were running correctly throughout. What nothing ran was
+ * the unit tests *of* those rules.
+ *
+ * The outer root build script hangs its `check` off this task, which is what puts this suite
+ * inside the one command everybody already runs.
+ *
+ * Two things about the shape.
+ *
+ * **`allprojects` rather than a list.** The defect is a suite nobody's habit reached, and a
+ * hand-written list of projects is the same defect one level in: the day somebody adds a project
+ * to this build, its tests would be dark and nothing would say so. `BuildLogicGateTest` - in
+ * `:udea-gradle`, a project of the *outer* build, so it runs whether or not this wiring exists -
+ * fails if this stops being derived.
+ *
+ * **`check` rather than `test`.** `check` is `test` plus `validatePlugins`, the
+ * `java-gradle-plugin` gate on the plugin descriptors this build publishes. Both are about this
+ * build's own correctness, and taking only `test` would leave a second dark gate behind in the
+ * act of lighting the first.
+ */
+val udeaBuildLogicCheck by tasks.registering {
+    group = "verification"
+    description =
+        "Verifies every project of the build-logic build. The outer build's `check` depends on " +
+            "this, because nothing in the outer build can reach an included build's tasks by itself."
+    dependsOn(allprojects.map { "${it.path}:check" })
+}

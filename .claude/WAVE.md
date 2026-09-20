@@ -945,3 +945,59 @@ file that is not declared as an input, say - rather than a regression against th
 
 Dispatch the moment the plugin-namespace branch merges; it edits `build-logic` too, so it cannot
 run beside it.
+
+## Wave 23 — the plugin namespace, and the dark suite
+
+`master` is `dd82a11`. Two merges: the plugin-namespace fix (`d1bf245`, reviewed at `cc15575`) and
+the build-logic gate (`8cf72f0`, reviewed at `6149934`). Both PASS round 1, zero findings.
+
+**The engine is published.** `dev.wildware.udea:*:0.1.0-SNAPSHOT` is on Central's snapshot
+repository, signed, and verified by downloading the jar and its `.asc` rather than by a green tick.
+All four org secrets are on `wildware-uk`, scoped `selected` to `Udea` and `composegl`.
+
+**Three traps this wave, all the same species: something reports success while measuring nothing.**
+
+1. **`gh secret set` accepts empty stdin without a word.** A failed
+   `gpg --armor --export-secret-keys | gh secret set` pipe stored a zero-byte `SIGNING_KEY` that
+   looked set and signed nothing - `gh` never sees gpg's exit code. Export to a file, check
+   `wc -c`, then set from the file.
+2. **An org secret with `PRIVATE` visibility is invisible to a public repository.** `Udea` is
+   public, all four secrets were `PRIVATE`, and the workflow received empty strings. The symptom
+   named nothing: `secret key ring doesn't start with secret key tag: tag 0xffffffff`, which is
+   end-of-input on byte one. Verify scope with
+   `gh api orgs/wildware-uk/actions/secrets/<NAME>/repositories`, not the word `SELECTED`.
+3. **`mavenLocal()` enforces no namespace rule**, so `scripts/outside-game-proof.sh` was green
+   while the real publish 403'd. **Central is the first place that rule exists.** A proof that
+   resolves locally proves nothing about publishing.
+
+**`sh gradlew build` now runs `:build-logic:test`.** It never did before, because `build-logic` is
+an included build - so the repository could be green while that suite was red, and it was for four
+hours. Read the #265 comment thread for the whole of it; the sentence worth keeping is that
+**#265's reviewer could not have caught it**, having run the full build correctly and got a true
+green. A green build is evidence about the tasks the build reaches and nothing about the ones it
+does not.
+
+**CI does not test every commit.** `ci.yml:67-69` has `cancel-in-progress: true` keyed on the ref,
+so on a fast-moving branch only the last commit of a burst is ever tested. Three commits this wave
+have `total_count: 0` check runs. Right setting for a busy PR, wrong one for `master`.
+
+**`master` is red on Windows**, in two pre-existing places neither branch caused:
+`VerifyEditorAbsentTest.kt:62` asserts a forward-slash path against output Windows writes with a
+backslash, and `UdeaAgentPluginTest > a release build generates a flag that refuses to bind()`.
+Both want a developer; neither is a finding against anything merged.
+
+**The shader design was rewritten at the owner's direction** (`67470ae`). Materials are **data** -
+albedo, normal, metallic, roughness, emissive, no code. Shaders are **programs** - fragment, vertex,
+compute - written in **GLSL**, not a Kotlin DSL. The first draft chose KSL for portability to a
+backend that does not speak GLSL, and Udea has no such target: web is shelved, Kool has no iOS
+backend, so `udea-render` is `jvm` and `android` alone. S1 (the screen-effect pass, closing #259)
+is dispatched.
+
+**In flight:** `dev-262` (pointer position and ground picking), `dev-266-shader` (S1, held off the
+box until a slot frees). Both are in `udea-render`; their files are disjoint and neither adds a
+replicated component, so neither regenerates a lock file. `dev-262` owns `model/ModelView.kt`,
+`view/PickBounds.kt`, the camera rigs and anything touching `PointerState`.
+
+**Parallel work exists outside this session.** Another agent filed #272 and opened PR #273 for the
+same 403, forty minutes before ours merged. Check `gh pr list` before starting anything - we both
+wrote the same fix.

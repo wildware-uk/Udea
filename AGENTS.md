@@ -381,14 +381,18 @@ in `models/` - the Fox (#240, #242) and the socket fixture `models/chassis` (#26
 
 No `-x` exclusions. The whole repository is green; if it is not, that is your change.
 
-**And it does not run `:build-logic:test`.** `build-logic` is an *included* build, so the outer
-`build` never reaches its `test` task; the build gates' own unit tests are there, and a green
-`./gradlew build` says nothing about them. That is not a theoretical gap: issue #265 removed two
-members of `ModuleGraphRules` and left two tests calling them, so `:build-logic:test` did not
-compile while the repository was green, and its reviewer ran `./gradlew build` with no exclusions,
-got a true green, and merged it. Note which half is dark - the `udeaVerify*` *tasks* are on the
-outer `check` and run throughout; what is absent is the tests **of** the rules, not the rules. So
-if you touch `build-logic`, run this too:
+**And it now runs `build-logic`'s tests too.** `build-logic` is an *included* build, so no task
+of the outer build reaches one of its tasks by itself, and for a while none did: the build gates'
+own unit tests were there and a green `./gradlew build` said nothing about them. That was not a
+theoretical gap. Issue #265 removed two members of `ModuleGraphRules` and left two tests calling
+them, so `:build-logic:test` did not compile while the repository was green, and that change's
+reviewer ran `./gradlew build` with no exclusions, got a true green, and merged it. Note which
+half was dark - the `udeaVerify*` *tasks* are on the outer `check` and ran throughout; what was
+absent is the tests **of** the rules, not the rules.
+
+The outer `check` now depends on `build-logic`'s own `udeaBuildLogicCheck` aggregate, which is
+every project of that build's `check`, so the one command covers it. Running that suite alone is
+still the quick way round when `build-logic` is all you are touching:
 
 ```
 ./gradlew -p build-logic check

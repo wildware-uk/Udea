@@ -17,91 +17,137 @@ on its own classpath and fail the build — correctly.
 So the API is not "let the game reach Kool". It is a shader surface of Udea's own types that
 `udea-render` implements over Kool's KSL.
 
-## Why KSL and not GLSL strings
+## Materials and shaders are different things
 
-Kool's shaders are written in **KSL**, a Kotlin DSL that each backend turns into its own shading
-language. Taking KSL as the base rather than a GLSL string gets three things for free:
+Owner, on revision (dashboard, 2026-09-20): *"I think 'materials' and 'shaders' should be split
+different, shaders are anything that is rendered, effects, screen effects etc, and materials are
+specifically applied to objects, and have set fields (albedo, normal, diffuse etc), I'm talking
+specifically about pixel, fragment and compute shaders."*
 
-- **One shader, every target.** Desktop GL, Android and any later WebGPU backend compile from the
-  same source. A GLSL string would be desktop-only the day it was written.
-- **Errors at build time, in Kotlin.** A misspelled uniform is a Kotlin compile error, not a black
-  screen at run time.
-- **No string-built code**, which `AGENTS.md` forbids anyway.
+The first draft of this document conflated the two: it used "material" to mean "a surface shader a
+game writes", which is why it then had to argue about how much of the vertex stage a game could be
+trusted with. Split properly, that argument disappears.
 
-The cost is that a shader is Kotlin rather than a `.frag` an artist can paste in. That is the right
-trade for this engine: everything else here — assets, levels, abilities — is typed and checked.
+- A **material** is **data on an object**. Named slots - albedo, normal, metallic, roughness,
+  emissive - and nothing else. It contains no code, so it cannot break skinning, instancing or the
+  shadow pass, because it is not in a position to.
+- A **shader** is **a program**: fragment, vertex, compute. Screen effects, object effects, anything
+  rendered.
+
+## Why GLSL and not a Kotlin DSL
+
+The first draft chose Kool's KSL - a Kotlin DSL each backend turns into its own shading language -
+and gave three reasons. One of them was wrong, and it was the load-bearing one.
+
+**The wrong reason: "one shader, every target."** KSL's real advantage is a backend that does not
+speak GLSL: Kool's WebGPU path wants WGSL. **Udea has no such target.** Web is shelved (#223, #226),
+Kool publishes no wasmJs artifact, and Kool has no iOS backend, so `udea-render` builds for `jvm` and
+`android` alone - OpenGL and GLES, both of which take GLSL. The DSL was buying portability to
+platforms this engine does not ship to, and charging a real cost for it.
+
+**The cost it charged** is that a shader became Kotlin rather than a `.frag` anyone can paste in,
+read, or carry between engines. For the thing games actually want first - a screen effect - that is
+the whole ergonomic budget spent on a guarantee nobody is collecting.
+
+Issue #266 asked for the right thing in its own words before this document was revised: *"Fragment
+source (or an engine-wrapped shader object) plus typed uniforms."*
+
+**What the DSL was genuinely protecting**, and how GLSL keeps it:
+
+- **No Kool type in a game.** A GLSL shader is a string and a set of typed uniforms, so
+  `UDEA-MG-002` is satisfied by construction rather than by care.
+- **No string-built code.** `AGENTS.md` forbids *generating* code by concatenation. A shader authored
+  as text in its own file is not generated code, any more than a `.udea.kts` is.
+- **Errors that name a line.** This is the one the DSL got for free and GLSL has to earn: a compile
+  failure must arrive as a `UdeaDiagnostic` with the file, the line and the driver's message, not a
+  stack trace. That is a ticket requirement, below.
+
+**The one real cost of GLSL, stated plainly:** GL and GLES differ in `precision` qualifiers and
+version pragmas, so the engine prepends the right header per backend. A game that writes its own
+`#version` line is a shader that works on desktop and fails on Android with a compiler error its
+author cannot read.
 
 ## The shape
 
-Three kinds, one vocabulary. Every parameter is a plain float, int, colour, vector of floats, or a
-texture handle. No Kool type crosses into a game, and no shader type goes in a component.
+Two kinds, not three. A **material** is data; a **shader** is a program, and a compute shader is a
+shader like the others. Every parameter a game supplies is a plain float, int, colour, vector or
+texture handle. No Kool type crosses into a game, and no shader or material type goes in a component
+- an entity carries an asset index and plain values, nothing else.
 
-### 1. Material — how one thing looks
+### 1. Material - data on an object
+
+Fixed slots, no code:
 
 ```kotlin
-// hollow/game/src/commonMain/.../WaterMaterial.kt
-object Water : UdeaMaterial("water") {
-    val waveHeight by float(default = 0.3f, range = 0f..2f)
-    val tint by color(default = Color(0.2f, 0.5f, 0.7f))
-    val foam by texture()
+val hull = UdeaMaterial(
+    albedo = texture("robot/hull_albedo"),
+    normal = texture("robot/hull_normal"),
+    metallic = 0.9f,
+    roughness = 0.35f,
+    emissive = Color(0f, 0.8f, 1f),
+)
+```
 
-    override fun surface(input: SurfaceInput): Surface = surface {
-        val wave = sin(input.worldPosition.x * 4f + time) * waveHeight
-        baseColor = tint * (1f + wave * 0.2f)
-        roughness = 0.1f
-        emissive = foam.sample(input.uv).rgb * wave
-    }
+`ModelRenderer` and the sprite renderer take a material instead of always using the built-in one.
+The engine chooses the shading; the built-in PBR and unlit paths become the default material, so the
+API is proved by the engine's own use of it rather than by an example.
+
+Because a material holds no code, GPU skinning from `Animator`, instancing and the shadow pass are
+untouched by anything a game can write here. That is the whole reason for the split.
+
+### 2. Shader - a program
+
+A fragment body in its own `.frag`, plus typed uniforms declared in Kotlin. The engine supplies the
+inputs and prepends the backend's header.
+
+```kotlin
+val palette = UdeaShader.fragment(
+    source = "shaders/palette.frag",
+    uniforms = { float("uLevels", 16f); texture("uRamp", ramp) },
+)
+```
+
+```glsl
+// shaders/palette.frag - the engine supplies uColor, uDepth and uMask
+vec4 udeaMain(vec2 uv) {
+    vec3 c = texture(uColor, uv).rgb;
+    float edge = udeaOutline(uMask, uv, 1.0);
+    return vec4(mix(quantise(c, uLevels), OUTLINE, edge), 1.0);
 }
 ```
 
-- `ModelRenderer` and the sprite renderer take a material instead of always using the built-in one.
-- `SurfaceInput` gives world position, normal, UV, vertex colour and the render-side `time` in
-  seconds. It cannot read the simulation: seconds exist only in `udea-render` (`AGENTS.md`), and the
-  signature is the enforcement, exactly as `OverlaySystem` does it.
-- The built-in PBR and unlit shaders become two materials written against this same surface, so the
-  API is proved by the engine's own use of it rather than by an example.
+**As a screen effect**, it reads the colour buffer, depth, and an object/mask buffer - so a 1-pixel
+outline does not need the scene rendered twice, which is #266's second acceptance criterion. A game
+orders its passes in `WindowConfig`; they run at render resolution, before the upscale, and are
+excluded from the editor's gizmo capture like every other presentation layer. **Issue #259 asks for
+exactly this** and is built as its first user, with a palette and an outline shipped as built-ins.
 
-### 2. Screen pass — how the whole picture looks
+**On an object**, the same fragment body, with the engine owning the vertex stage: the game receives
+the already-skinned position, normal and UV as inputs rather than inheriting the job of computing
+them. A game that wants a damage flash or a build-in dissolve writes twelve lines and keeps every
+animated model working.
 
-The same declaration with a screen input instead of a surface one: colour, depth, an optional
-object-id buffer, and the render resolution.
-
-```kotlin
-object Palette : UdeaScreenPass("palette") {
-    val palette by texture()
-    override fun pixel(input: ScreenInput): Color = nearestIn(palette, input.color)
-}
-```
-
-Issue #259 (robot-game R3) asks for exactly this and should be built as the first user of it, with
-`PalettePass` and `OutlinePass` shipped as built-ins. A game orders its passes in `WindowConfig`;
-they run at render resolution, before the upscale, and are excluded from the editor's gizmo capture
-like every other presentation layer.
-
-### 3. Compute — work on the GPU that never touches the simulation
+### 3. Compute - a shader that never touches the simulation
 
 ```kotlin
-object ParticleStep : UdeaCompute("particle-step") {
-    val particles by buffer<ParticleLayout>(readWrite = true)
-    val dtSeconds by float()
-    override fun main(id: ThreadId) { ... }
-}
+val fog = UdeaCompute(source = "shaders/fog.comp", groups = 64)
 
 // in a RenderSystem:
-compute.dispatch(ParticleStep, groups = particles.count / 64)
+compute.dispatch(fog, groups = tiles / 64)
 ```
 
 Two rules make this safe rather than a determinism hole:
 
-- **A compute result may never reach the simulation.** `dispatch` is only callable from a
+- **A compute result may never reach the simulation.** `dispatch` is callable only from a
   `RenderSystem`, and there is no read-back into world state. A GPU is not bit-identical across
-  drivers, so a simulation that read one would desync every client and break every replay. This is
-  the single most important line in the design, and it is structural: the sim modules cannot see the
-  API at all, because it lives in `udea-render`.
-- **Compute is optional hardware.** It needs GL 4.3+ or WebGPU; some Android drivers have neither.
-  `render.capabilities.compute` answers before use, a shader declares a CPU fallback or declares that
-  it requires compute, and a game that requires it fails at load with a diagnostic rather than
-  drawing nothing.
+  drivers and vendors, so a simulation that read one would desync every client and break every replay
+  and every rewind - silently, which is the worst way. Compute may light, cull, and decide what is
+  drawn; it may not decide what happens. This is structural, not a convention: the simulation modules
+  cannot see the API at all, because it lives in `udea-render`.
+- **Compute is optional hardware.** It needs GL 4.3+ or GLES 3.1; some Android drivers have neither.
+  `render.capabilities.compute` answers before use, a shader either declares a CPU fallback or
+  declares that it requires compute, and a game that requires it fails at load with a diagnostic
+  rather than drawing nothing.
 
 ## Assets, editing and errors
 
@@ -123,19 +169,22 @@ Two rules make this safe rather than a determinism hole:
 
 | # | Ticket | Needs |
 |---|---|---|
-| S1 | `UdeaMaterial`: the declaration, parameters, the surface DSL over KSL, and the built-in PBR and unlit shaders rewritten as materials | - |
-| S2 | Materials as assets: KSP accessors, the material component, level save, hot reload, diagnostics | S1 |
-| S3 | `UdeaScreenPass` and the ordered post-process list, with `PalettePass` and `OutlinePass`; closes #259 | S1, #258 |
-| S4 | The editor's material inspector, parameters driven from their declarations | S2 |
-| S5 | `UdeaCompute`: buffers, dispatch from a `RenderSystem`, the capability gate, and a GPU particle step as its first user | S1 |
+| S1 | `UdeaShader.fragment` as a screen effect: GLSL source, typed uniforms, the ordered pass list, engine-supplied colour/depth/mask, the per-backend header, and compile failures as `UdeaDiagnostic`s naming file and line. Ships a palette and an outline. **Closes #259 and the first half of #266** | - |
+| S2 | `UdeaMaterial`: the fixed slots, the default material the engine's own PBR and unlit paths are rewritten as, and materials as assets - KSP accessors, the component, level save, hot reload | - |
+| S3 | A shader on an object: the same fragment body over an engine-owned vertex stage, with skinning, instancing and the shadow pass intact | S1, S2 |
+| S4 | The editor's material inspector, slots driven from their declarations | S2 |
+| S5 | `UdeaCompute`: buffers, dispatch from a `RenderSystem`, the capability gate, and one real first user | S1 |
 
-S1 is the ticket that decides whether this is clean or not; the rest follow its vocabulary. S5 is
-last because a compute API with no user is a guess.
+S1 is the ticket that decides whether this is clean or not, and it is first because it is what
+unblocks a real game today. S5 is last because a compute API with no user is a guess.
 
 ## What this deliberately does not do
 
 - **No render-graph authoring.** Passes are an ordered list, not a graph. A graph is the right answer
   for a bigger engine and the wrong first API.
 - **No node-graph shader editor.** Text first; a graph can emit the same declarations later.
-- **No raw GLSL escape hatch in v1.** It would be the thing every game reached for, and it would be
-  desktop-only. If a real need appears, it arrives as its own ticket with its own portability story.
+- **No WGSL, and no second shading language.** GLSL is the language because GL and GLES are the
+  backends. If a WebGPU backend ever lands, that is when a translation story is designed - and it is
+  a real one, not a line in this document.
+- **No shader authored as a Kotlin DSL.** The first draft chose that and it was wrong for the reason
+  given above. A game writes GLSL in a file.

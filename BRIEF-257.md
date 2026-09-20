@@ -1,10 +1,11 @@
 # BRIEF-257 — an orthographic isometric camera for the 3D model stage
 
-SHA: `982ab3e` — the implementation commit, which is everything described below.
+SHA: `982ab3e` — the implementation commit, which is every source change described below.
 
-The branch head is one commit later than that, because a file cannot name its own commit: the head
-commit adds this paragraph and nothing else. `git log --oneline -2` on `issue-257-iso-camera` shows
-both, and `git diff 982ab3e HEAD` shows only these lines.
+The branch head is later than that, because a file cannot name its own commit. Everything after
+`982ab3e` on `issue-257-iso-camera` is either a merge of `origin/master` or an edit of this file, and
+the one command that says so without my having to count anything is `git diff 982ab3e HEAD --
+udea-render/src`, which is empty. **Review the branch tip**; `982ab3e` is what to read as the change.
 
 Branch `issue-257-iso-camera`, off `origin/master` at `9c95e0e`.
 
@@ -307,6 +308,50 @@ BUILD SUCCESSFUL in 6m 22s
 
 `:udea-assets-compiler:udeaDaemonBudget` passed inside that run; it did not need a solo re-run.
 
+### After merging `origin/master`
+
+That run was on `9c95e0e`. While this was being written `origin/master` moved twice: to `f6d7af1`,
+carrying #250's Hollow player, and then to `db5e1d0`, carrying the wiki. Both merged into this branch
+clean, `AGENTS.md` included — #250, the wiki's one-word `socket_roof` fix and this ticket all edited
+different bullets of the same list, and all three survive — and with no lock file in conflict,
+because this change adds no replicated component and so never touched `net-protocol.lock` or
+`expected-generated-hashes.txt`.
+
+**One part of that merge is the interesting part, and it is decision 1 being paid for.** The reason
+`ModelCamera` got an enum and two fields rather than a sealed `ModelProjection` carrying its own
+numbers was partly that the sealed form would have forced a signature change on `HollowScene`, a
+file frozen under review on #250 at the time. #250 then **rewrote that file underneath this branch**.
+Post-merge it reads:
+
+```kotlin
+public val camera: ModelCamera = ModelCamera(fovYDegrees = FOV_DEGREES, near = NEAR, far = FAR)
+```
+
+— still a named constructor argument, still compiling against the signature here, with no edit from
+either side. "Merged clean" says nothing on its own; that is why it merged clean.
+
+**Post-merge build**, the same command on the merged tree, full log
+`scratchpad/issue257/full-build2.log`:
+
+```
+BUILD SUCCESSFUL in 8m 54s
+1118 actionable tasks: 1006 executed, 18 from cache, 94 up-to-date
+```
+
+That run compiled `hollow/game` — including the `HollowScene` above, rewritten by #250 and untouched
+by this branch — against the `ModelCamera` signature here. So the paragraph above is a result rather
+than a claim.
+
+**Post-merge GL suite**, under xvfb with `-Pudea.render.requireGl=true`, full log
+`scratchpad/issue257/gl-suite2.log`:
+
+```
+BUILD SUCCESSFUL in 1m 52s
+126 actionable tasks: 13 executed, 113 up-to-date
+```
+
+All three GL tasks executed. Every image in section 4 is from this run.
+
 ### The GL suite, for real, under xvfb
 
 This ticket is all `udea-render`, so a green `build` says nothing about GL: with no `DISPLAY` the
@@ -389,14 +434,25 @@ the pillars lean by 13.2 pixels each, in opposite directions.
 
 ## 4. The images
 
-All in `/srv/ssd1/workspace/Udea/build/debug-screenshots/`, all produced by the evidence command and
-copied across byte-identically.
+All in `/srv/ssd1/workspace/Udea/build/debug-screenshots/`, and the six single frames are the exact
+bytes the **post-merge** GL run of the evidence command wrote into
+`udea-render/build/reports/udea/gl/`, copied across with no processing. The two collages are
+`tools/collage.py` over those six.
+
+That directory is shared by every agent on this box rather than being per-worktree, so provenance is
+worth stating rather than assuming. A pre-merge green run had already written six files of the same
+names; `cmp` says all six are **byte-identical** to what the post-merge run produced, which is also a
+small piece of evidence in its own right — this GL test is deterministic across a rebuild and a merge.
+No mutation run's output reached the gallery, and the order is what says so rather than my word: the
+copy into the gallery happened **before** the first mutation was applied, the mutations then wrote
+only into this worktree's own report directory, and a forced green re-run overwrote that directory
+before anything was copied again. `cmp` agreeing across all three sets is the check on that account.
 
 | File | What it shows | What it proves |
 |---|---|---|
 | `issue257-flat-vs-perspective.png` | The collage: the flattened view on the left, the perspective control on the right, same scene, same eye, same target | The whole ticket in one picture. On the right the far red cube is visibly smaller than the near green one and the pillars splay outwards; on the left every cube is the same and the pillars are exactly vertical |
 | `issue257-ortho-cubes.png` | Four identical cubes at four places, two pillars, one cube hanging in the air, on a tiled ground | AC 1: a cube is the same size anywhere on screen, and the pillars' edges are parallel. The floating cube's shadow on the ground is real |
-| `issue257-perspective-control.png` | The same scene with only the projection swapped to perspective | The measurement can fail. Without this, "the cubes are all one size" is a number that would be true of any renderer that drew nothing |
+| `issue257-perspective-control.png` | The same scene with only the projection swapped to perspective | The measurement can fail. Without this, "the cubes are all one size" is a number that would be true of any renderer that drew nothing. The two pillars run off the bottom edge here, because a perspective lens at this distance takes in more of the near ground: that is the control behaving as a perspective lens does rather than a clipped screenshot, and it does not affect the lean measurement, which reads bands of whatever the pillar's silhouette occupies |
 | `issue257-four-yaw-steps.png` | The collage of the four quarter turns | AC 2 in one image: the same fox and the same four cubes from four angles |
 | `issue257-yaw-0-yaw045.png` | The isometric preset, yaw 45, the Khronos Fox on the ground | AC 2, step 1. The fox is a real imported glTF model, textured |
 | `issue257-yaw-1-yaw315.png` | One quarter turn right, yaw 315 | AC 2, step 2 |

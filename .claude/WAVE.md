@@ -1093,6 +1093,16 @@ Note for anyone dating an artifact: every entry in that jar is stamped `1980-02-
 deliberate - the build discards timestamps so the same source produces a byte-identical jar - so a
 jar cannot tell you when it was built and the date has to come from the snapshot version string.
 
+**Unassigned, from `dev-274`, waiting on a lock this wave:** `GeneratedSources.files` filters
+`extension == "kt"`, so **every generated resource this build has ever written** - `net-protocol.lock`,
+the tool manifest, the new component manifest - has been outside `GeneratedFileDeterminismTest`
+entirely. `dev-274` covered them with a new `GeneratedSources.resources` rather than widening
+`files`, because widening adds three rows to `expected-generated-hashes.txt`, which `dev-270` owns
+this wave - a regeneration, not a text conflict. Once #270 has merged, widening `files` is a
+one-line change plus three rows, and it buys the thing a two-run byte comparison cannot: a
+**checked-in** hash, so a resource that changes for a reason nobody intended is caught in review
+rather than being consistently wrong on both runs.
+
 **Unassigned, from `dev-windows`, deliberately not fixed inside its branch:** `udea-agent`'s
 `AssetsToolset` puts a native-separator `created.path` into a tool result's `path` field and
 `udea-editor`'s `EditorAssets` prints it verbatim, which `MobaEditorSaveTest` asserts forward-slashed.

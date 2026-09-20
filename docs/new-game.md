@@ -331,8 +331,8 @@ You write one function, `vec4 udeaMain(vec2 uv)`. The engine writes everything a
 | Name | What it is |
 |---|---|
 | `uColor` | the frame so far, as the previous effect in the list left it |
-| `uDepth` | how far away the 3D scene is: `0` at the near plane, `1` where nothing was drawn |
-| `uMask` | the same, for the entities you marked - see below |
+| `uDepth` | `.r` is how far away the 3D scene is, **in the backend's own direction** - see below |
+| `uMask` | `.a` is `1` where an entity you marked was drawn, `0` everywhere else - see below |
 | `uResolution` | the frame in pixels; `uTexel` is `1.0 / uResolution` |
 | `uTime` | render seconds since the first frame. There is deliberately no way to read simulation time from here |
 | `udeaMasked(uv)` | `1` where a marked entity was drawn, `0` where none was |
@@ -346,6 +346,14 @@ against the sky, and the ground would get one too.
 ```kotlin
 it += ModelRenderer(mesh, material).apply { mask = true }
 ```
+
+**`uDepth` does not run the way you expect, and that is why `uMask` exists.** Its direction is the
+backend's: the desktop OpenGL backend draws reversed, so `0` is the far plane and a *nearer*
+surface is a *larger* number - on a scene seven units deep the whole picture lands between `0` and
+about `0.022`. Use `uMask` for "is anything here", because that means the same thing everywhere.
+Use `uDepth` when you want to compare two distances in the same frame - fog, a depth-of-field blur,
+a fade into the distance - and write it so that either direction still looks right, or read
+`uDepth` on the platforms you ship on before you rely on which way round it is.
 
 **Two are shipped ready-made**, and they are ordinary shaders registered the same way:
 

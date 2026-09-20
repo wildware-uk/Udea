@@ -444,6 +444,28 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
+## Wave 20 (2026-09-20): in flight
+- MERGED: #265 (publish the engine + outside-repo games, PASS at 6d48acd), the #246 reopen (level save,
+  PASS at 9b353ad), #250 (the Hollow player, PASS at 9e77add). master at 98bc86e.
+- #265 merge conflicted with #264 in build-logic: #265 replaced `:moba:*` path lists with role scopes
+  (`ProjectScope.GAME`, `udeaGates { ships/simulation }`), #264 had added entries to those lists. Took
+  the new structure and re-added by hand: udea-nav's SimScope, udea-nav in HEADLESS_PROJECTS,
+  `ships(":hollow:desktop")`. Then #265's own gates caught two more: udea-nav missing from `published`,
+  and udea-nav having no POM description. Both fixed; every engine module needs both from now on.
+- #250 shifted every component's wire id by one (`dev.wildware.hollow.Player` sorts first): four
+  net-protocol.lock files, net-components.lock, expected-generated-hashes.txt, moba's two .udearep
+  fixtures and moba's roster worldHash all regenerated. Reviewer verified from the generating tasks.
+- #250 merged with NO trial build, deliberately: the branch had merged master at 9c95e0e, master had
+  not moved, and the merged tree was byte-identical to the reviewed one.
+- IN FLIGHT: dev-257 (isometric camera), dev-wiki-tools. review queue empty.
+- Owner asked for video. Recipe in memory (`recording-udea-video.md`): Xvfb + ffmpeg x11grab, and
+  `:moba:desktop:run` is Offscreen so it records black - use `runClient --args=local`. Sent moba,
+  Hollow clearing, and the player running (issue250-player-clearing.mp4).
+- BOX SHARING: melon-merge-31 runs timing-sensitive suites here. Standing arrangement - it asks, I hold
+  my developers' builds for 30 minutes, it pings when done. Owner requests override the hold; tell it after.
+- Carried forward: two-client screenshots on #254; `CharacterSystem.sync()` mutating the world from the
+  render thread, with the ModelRenderer save question, on #255.
+
 ## Wave 19 (2026-09-20): in flight
 - MERGED into master at 8ba4c5d: #264 (udea-nav pathfinding), #248 (third-person camera), #260 (model sockets),
   #249 (Hollow H1 scaffold). All four PASS at round 1/2, 0 findings. Trial build green: 984+ tasks, GL suites green.

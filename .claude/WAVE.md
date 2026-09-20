@@ -1018,13 +1018,27 @@ engine modules, convention plugins and `udea-version-catalog`. Verified by fetch
 not by the workflow's tick. `udea.android-application.gradle.plugin` is **404 by design**: its
 marker group is outside the verified `dev.wildware` namespace and is deliberately suppressed.
 
-**In flight: `dev-shaderassets`**, branch `shader-assets`, **on a build hold**. It may not start a
-JVM until this file exists:
+**In flight: three developers, every one on a build hold.** None may start a JVM until its own
+gate file exists, under
+`/tmp/claude-1000/-srv-ssd1-workspace-Udea/1ad8c5e6-2def-4055-91d2-72acdfe77daf/scratchpad/`:
 
-    /tmp/claude-1000/-srv-ssd1-workspace-Udea/1ad8c5e6-2def-4055-91d2-72acdfe77daf/scratchpad/BOX_FREE
+| Developer | Branch | Modules it owns | Gate file |
+|---|---|---|---|
+| `dev-shaderassets` | `shader-assets` | `udea-assets-compiler`, `udea-render/shader`, docs | `BOX_FREE` |
+| `dev-274` | `issue-274-net-components` | `build-logic`, `udea-gradle`, the template | `BOX_FREE_274` |
+| `dev-270` | `issue-270-attachment-index` | `udea-core` attachments, `udea-render` model view | `BOX_FREE_270` |
+
+**A gate file per developer, not one for the wave.** That is what lets me let them in one at a
+time when the box comes back rather than having three builds start on the same second.
+
+**`dev-270` owns the locks this wave.** It adds a `@Replicated` component, so it is the only branch
+permitted to move `net-protocol.lock` and `expected-generated-hashes.txt`. The other two are told
+to stop and tell me if their change moves either — that is a regeneration, not a text conflict.
 
 The box is `melon-merge-31`'s while `dev-chaindecay` runs unit tests, an icon pack, a solo
-scenario and `-Pscenario=all`. They release **in words**; the file is what I write when they do.
+scenario and `-Pscenario=all`. They release **in words**; the files are what I write when they do.
+A hold that lapses because a timer ran out is not a release, and neither side knows the window
+stopped being real.
 
 **What it is.** The owner read `docs/new-game.md:306` —
 `val source = checkNotNull(javaClass.getResource("/shaders/scanlines.frag")).readText()` — and

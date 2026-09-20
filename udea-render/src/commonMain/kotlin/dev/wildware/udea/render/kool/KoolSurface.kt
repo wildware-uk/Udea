@@ -9,6 +9,7 @@ import de.fabmax.kool.pipeline.OffscreenPass
 import de.fabmax.kool.pipeline.OffscreenPass2d
 import de.fabmax.kool.pipeline.RenderPass
 import de.fabmax.kool.pipeline.TexFormat
+import de.fabmax.kool.pipeline.Texture2d
 import de.fabmax.kool.scene.Camera
 import de.fabmax.kool.scene.Node
 import de.fabmax.kool.scene.OrthographicCamera
@@ -125,6 +126,18 @@ internal class KoolSurface(
     /** The capturable pass, as something a `SceneView` can show. See [WorldView]. */
     val worldView: WorldView = WorldView(blit)
 
+    /**
+     * The game's screen effects (issues #259, #266), run over the frame every `RenderSystem` drew.
+     *
+     * Its view is added here, while the surface is being built, and that is what puts it in the
+     * right place in the frame: `addOnTop` appends, and nothing else has added a view yet, so the
+     * effects run after the sprite batch and before any `CapturedUi` a game adds later. A HUD is
+     * drawn over the processed picture rather than through it.
+     */
+    private val screenPasses = GlScreenPasses(this)
+
+    private val screenPassView: RenderPass.View = addOnTop(SCREEN_PASS_VIEW, screenPasses::draw)
+
     private val presented = SpriteRegion(
         SpriteTexture.ofPassColour(
             checkNotNull(pass.colorTexture) { "the offscreen pass has no colour attachment" },
@@ -149,8 +162,19 @@ internal class KoolSurface(
             RenderResource { screenBatch.releaseOwned() },
             RenderResource { presentBatch.releaseOwned() },
             RenderResource { detachAndRelease() },
+            // Last, so reverse-order release reaches it first: its view sits on the capturable
+            // pass, and taking a view off a pass the scene has already released is a use of a
+            // freed object rather than a tidy-up.
+            RenderResource { releaseScreenPasses() },
         ),
+        screenPasses = screenPasses,
     )
+
+    /** Takes the effects' view off the pass and gives back every GL object the chain made. */
+    private fun releaseScreenPasses() {
+        removeOnTop(screenPassView)
+        screenPasses.release()
+    }
 
     private var attachedTo: KoolContext? = null
 
@@ -227,6 +251,10 @@ internal class KoolSurface(
         view.drawNode.release()
     }
 
+    override fun setScreenInputs(depth: () -> Texture2d?, mask: () -> Texture2d?) {
+        screenPasses.setSceneInputs(depth, mask)
+    }
+
     override fun begin() {
         offscreenBatch.clear()
     }
@@ -276,6 +304,9 @@ internal class KoolSurface(
             clipNear = CLIP_NEAR
             clipFar = CLIP_FAR
         }
+
+        /** The name of the view the screen effects draw in, on the capturable pass. */
+        const val SCREEN_PASS_VIEW: String = "udea-screen-passes"
 
         const val CAMERA_Z: Float = 10f
         const val CLIP_NEAR: Float = 1f

@@ -19,6 +19,21 @@ import com.github.quillraven.fleks.ComponentType
  */
 public class ModelRenderer(
     public var model: ModelSource,
+    /**
+     * Whether this entity goes into the object mask a screen shader reads (issues #259, #266).
+     *
+     * The engine draws the marked models a second time, depth-only, into a picture a screen
+     * effect samples as `uMask` - which is how an outline finds the edge of a unit without the
+     * game rendering the scene twice and comparing. A game marks the things it wants outlined and
+     * leaves the ground, the sky and the scenery alone; with nothing marked the mask is empty and
+     * an outline effect is a no-op, which is the honest answer for a game that has not said what
+     * its objects are.
+     *
+     * A `var`, so a unit can leave the mask when it dies or is picked up, and back on the next
+     * frame. It costs nothing when it is false: the marked models are the only ones the mask pass
+     * draws.
+     */
+    public var mask: Boolean = false,
 ) : Component<ModelRenderer> {
 
     /** A built-in [mesh] in [material]: `ModelRenderer(ModelMesh.box(1f, 1f, 1f), crate)`. */
@@ -26,7 +41,7 @@ public class ModelRenderer(
 
     override fun type(): ComponentType<ModelRenderer> = ModelRenderer
 
-    override fun toString(): String = "ModelRenderer($model)"
+    override fun toString(): String = "ModelRenderer($model, mask=$mask)"
 
     public companion object : ComponentType<ModelRenderer>()
 }

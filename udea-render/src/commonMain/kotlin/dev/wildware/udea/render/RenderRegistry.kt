@@ -4,6 +4,7 @@ import com.github.quillraven.fleks.IntervalSystem
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.render.capture.FrameCaptureSlot
+import dev.wildware.udea.render.shader.UdeaShader
 import dev.wildware.udea.render.view.ViewCursor
 
 /**
@@ -44,6 +45,9 @@ public class RenderRegistry(
 ) {
 
     private val entries = ArrayList<Entry>()
+
+    /** The screen effects, in the order they were registered. See [screenPass]. */
+    private val screenShaders = ArrayList<UdeaShader>()
 
     private val timer = FrameTimer(clock)
 
@@ -107,6 +111,38 @@ public class RenderRegistry(
     ): RenderHandle = add(RenderPhase.Overlay, Entry.Kind.Overlay(factory), constrain)
 
     /**
+     * Adds [shader] to the ordered list of screen effects (issues #259, #266).
+     *
+     * The list runs over the finished frame, in registration order, at render resolution and
+     * before the picture reaches the window - so a palette registered before an outline quantises
+     * the colours the outline is then drawn over, and the other order draws an outline that is
+     * then quantised. Ordering is registration order and nothing else: a screen effect reads the
+     * whole previous picture, so there is nothing for a `before`/`after` constraint to say that
+     * the order of two lines does not already say.
+     *
+     * A shader is compiled by [build], on the render thread, before the first frame. One that the
+     * driver refuses throws `ScreenShaderException` from there, naming the author's file and line.
+     *
+     * ```kotlin
+     * registry.screenPass(ScreenEffects.palette(colours))
+     * registry.screenPass(ScreenEffects.outline(Rgba.BLACK))
+     * ```
+     *
+     * @return [shader], so a game can keep the handle it needs to turn the effect off.
+     * @throws IllegalArgumentException if [shader] is already registered here. One shader is one
+     *   compiled program with one set of uniform values, so registering it twice would run the
+     *   same effect twice with the same parameters rather than give the second a life of its own.
+     */
+    public fun screenPass(shader: UdeaShader): UdeaShader {
+        require(screenShaders.none { it === shader }) {
+            "$shader is already registered on this registry. Build a second shader from the same " +
+                "source if the effect is genuinely wanted twice."
+        }
+        screenShaders += shader
+        return shader
+    }
+
+    /**
      * Instantiates every registration, orders it, binds it, and returns the pipeline.
      *
      * Instantiation happens here rather than at registration so the whole declaration can be
@@ -123,6 +159,9 @@ public class RenderRegistry(
         targets: RenderTargets,
     ): RenderPipeline {
         val cursor = ViewCursor()
+        // Before any system is constructed: a shader the driver refuses should stop the build of
+        // the pipeline before it has allocated a texture, a font or a framebuffer to give back.
+        targets.screenPasses?.install(screenShaders, timer)
         val resources = RenderResources(targets.batch, targets.offscreen, targets.passes, cursor)
         // A second, deliberately poorer set for the overlay side: the screen batch and the window,
         // and no capturable target or capturable batch anywhere on it (spec 3.7).

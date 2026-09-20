@@ -73,7 +73,12 @@ class UdeaRulesTest {
         assertEquals("UDEA0016", UdeaRules.UNRESOLVED_ANIMATION_CLIP.id)
         assertEquals("UDEA0017", UdeaRules.GIZMO_HANDLE_FIELD.id)
         assertEquals("UDEA0018", UdeaRules.UNRESOLVED_MODEL_NODE.id)
-        assertEquals(18, UdeaRules.all.size)
+        assertEquals("UDEA0019", UdeaRules.SHADER_COMPILE_FAILED.id)
+        // UDEA0020..UDEA0029 are AssetCompilerRules' reserved band and UDEA0030..UDEA0039 are
+        // AssetValidationRules'; ModuleContractTest fails if this registry grows into either, so
+        // the shader uniform rule takes the first id past both rather than the next number up.
+        assertEquals("UDEA0040", UdeaRules.SHADER_UNIFORM_NOT_DECLARED.id)
+        assertEquals(20, UdeaRules.all.size)
         assertTrue(UdeaRules.all.all { it.defaultSeverity == Severity.Error })
     }
 

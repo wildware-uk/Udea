@@ -13,8 +13,11 @@ import de.fabmax.kool.modules.ksl.KslShader
 import de.fabmax.kool.pipeline.AttachmentConfig
 import de.fabmax.kool.pipeline.ClearColorFill
 import de.fabmax.kool.pipeline.CullMethod
+import de.fabmax.kool.pipeline.DepthMapPass
+import de.fabmax.kool.pipeline.FrameCopy
 import de.fabmax.kool.pipeline.OffscreenPass2d
 import de.fabmax.kool.pipeline.TexFormat
+import de.fabmax.kool.pipeline.Texture2d
 import de.fabmax.kool.pipeline.shading.DepthShader
 import de.fabmax.kool.scene.Camera
 import de.fabmax.kool.scene.InstanceLayouts
@@ -105,6 +108,49 @@ internal class ModelStage(
     private val shadow = SimpleShadowMap(perspective, drawNode, sun, SHADOW_MAP_SIZE, "udea-model-shadow")
 
     /**
+     * The 3D depth of the frame, resolved into a texture a screen shader can sample (issue #266).
+     *
+     * A `FrameCopy` rather than the pass's own depth attachment, because this pass is
+     * multisampled: Kool resolves a copy, and reading the multisampled attachment directly is not
+     * the same picture. Kool makes the copy as part of drawing the pass, so it costs a resolve
+     * whether or not a shader reads it - which is why the chain is the only thing that asks for
+     * one, and a game with no screen shader pays for it all the same. That is the one cost this
+     * feature adds to a game that does not use it, and it is a resolve of a depth buffer per frame.
+     */
+    private val depthCopy: FrameCopy = pass.copyOutput(isCopyColor = false, isCopyDepth = true)
+
+    /**
+     * The object mask (issues #259, #266): the same models, drawn depth-only, filtered to the ones
+     * the game marked.
+     *
+     * A depth pass rather than a colour one because Kool already draws this node graph depth-only
+     * for the shadow map, skinned and instanced meshes included, so the mask costs no new shader
+     * and cannot disagree with the picture about where anything is. Its texture is `1` - the far
+     * plane - wherever no marked model was drawn, and the marked model's depth where one was;
+     * `udeaMasked` in the shader header is what turns that into the `0`/`1` an author wants.
+     *
+     * The draw node is shared with the capturable pass, so this pass neither updates nor releases
+     * it: the stage's own pass does both, and two passes doing it would place every model twice a
+     * frame and release it from under the other. `ViewPass` does the same for the same reason.
+     */
+    private val maskPass: DepthMapPass = DepthMapPass(
+        drawNode,
+        initialSize = Vec2i(width, height),
+        name = "udea-model-mask",
+    ).apply {
+        camera = this@ModelStage.perspective
+        isUpdateDrawNode = false
+        isReleaseDrawNode = false
+    }
+
+    /**
+     * The Kool nodes drawn into the mask this frame: a run whose entities asked for it, and an
+     * imported node whose entity did. Emptied by [begin] and filled by [show], so a model that
+     * stops asking is out of the mask on the very next frame.
+     */
+    private val maskedNodes = HashSet<Node>()
+
+    /**
      * Every Scene view's preview node (issue #243): drawn by that view's pass and by no other. The
      * capturable pass and the shadow map skip them, so a preview reaches neither a capture nor a
      * shadow. Compared by identity: a Kool node has no equality of its own.
@@ -115,9 +161,15 @@ internal class ModelStage(
         pass.dependsOn(shadow)
         passes.addBeforeCapture(shadow)
         passes.addBeforeCapture(pass)
+        // Before the capturable pass, because the screen effects run inside it and sample this.
+        passes.addBeforeCapture(maskPass)
         pass.defaultView.drawFilter = { node -> node !in previewNodes }
         val castsShadow = shadow.defaultView.drawFilter
         shadow.defaultView.drawFilter = { node -> node !in previewNodes && castsShadow(node) }
+        val masks = maskPass.defaultView.drawFilter
+        maskPass.defaultView.drawFilter = { node -> node in maskedNodes && masks(node) }
+        // Read through lambdas: Kool replaces both textures when the frame is resized (#234).
+        passes.setScreenInputs({ depthCopy.depthCopy2d }, { maskPass.depthTexture })
     }
 
     /** The pass's picture, for the 2D batch to draw into the capturable frame. */
@@ -129,8 +181,11 @@ internal class ModelStage(
         ),
     )
 
-    /** Every pair seen so far, looked up by mesh then material: no key object per lookup. */
-    private val runs = HashMap<ModelMesh, HashMap<ModelMaterial, Run>>()
+    /**
+     * Every run seen so far, looked up by mesh, then material, then whether it is masked: no key
+     * object per lookup. See [runFor] for why the mask is part of the key.
+     */
+    private val runs = HashMap<ModelMesh, HashMap<ModelMaterial, Array<Run?>>>()
     private val allRuns = ArrayList<Run>()
 
     /** Every imported model seen so far, with the scene nodes made for it. */
@@ -179,6 +234,9 @@ internal class ModelStage(
     fun fit(width: Int, height: Int) {
         if (width == this.width && height == this.height) return
         pass.setSize(width, height)
+        // The mask is sampled at the frame's own texel grid, so a mask of another shape would put
+        // an outline a fraction of a pixel away from the silhouette it belongs to.
+        maskPass.setSize(width, height)
         this.width = width
         this.height = height
     }
@@ -192,10 +250,14 @@ internal class ModelStage(
         }
         for (index in allImports.indices) allImports[index].hideAll()
         drawnNodes.clear()
+        maskedNodes.clear()
 
         // The shadow map follows the pass's camera: both must be the projection this frame asked for,
         // or the shadows would be fitted to a frustum nothing is drawn through.
         val aimed = aim(view)
+        // The mask is drawn through the same camera as the picture, whatever this frame asked for:
+        // a mask from another projection would be an outline around where a model is not.
+        if (maskPass.camera !== aimed) maskPass.camera = aimed
         if (pass.camera !== aimed) {
             pass.camera = aimed
             shadow.sceneCam = aimed
@@ -339,32 +401,48 @@ internal class ModelStage(
         scaleX: Float, scaleY: Float, scaleZ: Float,
         pose: ClipPose,
         entity: Int = NO_ENTITY,
+        mask: Boolean = false,
     ) {
         // Translate, then turn about Z, Y, X - so X is applied to the model first - then scale.
         matrix.place(x, y, z, rotationX, rotationY, rotationZ, axisScale.set(scaleX, scaleY, scaleZ))
-        show(source, pose, entity)
+        show(source, pose, entity, mask)
     }
 
     /**
      * Draws [source] at [world] this frame, in [pose]: [add] with the transform already built,
      * which is what a part mounted on a socket has (issue #260). Render thread only.
      */
-    fun addAt(source: ModelSource, world: Mat4f, pose: ClipPose, entity: Int = NO_ENTITY) {
+    fun addAt(
+        source: ModelSource,
+        world: Mat4f,
+        pose: ClipPose,
+        entity: Int = NO_ENTITY,
+        mask: Boolean = false,
+    ) {
         matrix.set(world)
-        show(source, pose, entity)
+        show(source, pose, entity, mask)
     }
 
-    /** Draws [source] at whatever [matrix] holds, in [pose], for Fleks entity [entity]. */
-    private fun show(source: ModelSource, pose: ClipPose, entity: Int) {
+    /**
+     * Draws [source] at whatever [matrix] holds, in [pose], for Fleks entity [entity].
+     *
+     * [mask] puts what is drawn into the object mask a screen shader reads (issue #266). A
+     * built-in shape goes in through its own run, because instances of one run share a mesh and
+     * the mask is filtered per Kool node: two entities with the same shape and material but
+     * different answers are two runs, which is why [runFor] is keyed on the flag as well.
+     */
+    private fun show(source: ModelSource, pose: ClipPose, entity: Int, mask: Boolean) {
         when (source) {
             is MeshModel -> {
-                val run = runFor(source.mesh, source.material)
+                val run = runFor(source.mesh, source.material, mask)
                 run.instances.addInstance(writeMatrix)
                 run.mesh.isVisible = true
+                if (mask) maskedNodes += run.mesh
             }
             // The file is Y-up: turned onto the world's Z-up before anything else is applied.
             is ImportedModel -> {
                 val placed = importsFor(source).show(matrix.rotate(Y_UP_TO_Z_UP, Vec3f.X_AXIS), pose)
+                if (mask) maskedNodes += placed.node
                 if (drawnNodes.size == drawnEntities.size) drawnEntities = drawnEntities.copyOf(drawnEntities.size * 2)
                 drawnEntities[drawnNodes.size] = entity
                 drawnNodes += placed
@@ -372,12 +450,21 @@ internal class ModelStage(
         }
     }
 
-    private fun runFor(mesh: ModelMesh, material: ModelMaterial): Run {
+    /**
+     * The run for this shape, material and mask answer, made the first time it is asked for.
+     *
+     * Three keys rather than two: a run is one Kool mesh with one instance list, and the mask pass
+     * filters whole meshes, so a shape drawn both in and out of the mask has to be two meshes. A
+     * game that never sets the flag has exactly the runs it had before issue #266.
+     */
+    private fun runFor(mesh: ModelMesh, material: ModelMaterial, mask: Boolean): Run {
         val byMaterial = runs.getOrPut(mesh) { HashMap() }
-        byMaterial[material]?.let { return it }
+        val slots = byMaterial.getOrPut(material) { arrayOfNulls(MASK_ANSWERS) }
+        val slot = if (mask) MASKED else UNMASKED
+        slots[slot]?.let { return it }
         val run = Run(mesh, material, allRuns.size)
         run.shader.ambientFactor = ambient
-        byMaterial[material] = run
+        slots[slot] = run
         allRuns += run
         drawNode.addNode(run.mesh)
         return run
@@ -672,17 +759,26 @@ internal class ModelStage(
         }
     }
 
-    /** Takes both passes off the scene and releases them, meshes and shaders with the draw node. */
+    /** Takes this stage's passes off the scene and releases them, meshes and shaders with the draw node. */
     override fun release() {
         for (seen in views.values) seen.release()
         views.clear()
         passes.remove(pass)
         passes.remove(shadow)
+        passes.remove(maskPass)
+        // Before the pass it copies: a frame copy holds the textures the pass resolves into.
+        depthCopy.release()
         pass.release()
         shadow.release()
+        maskPass.release()
     }
 
     private companion object {
+        /** Whether a run is in the object mask; [runFor]'s third key. */
+        const val MASK_ANSWERS = 2
+        const val UNMASKED = 0
+        const val MASKED = 1
+
         /** Texels along each side of the shadow map: sharp shadow edges at a modest memory cost. */
         const val SHADOW_MAP_SIZE = 2048
 

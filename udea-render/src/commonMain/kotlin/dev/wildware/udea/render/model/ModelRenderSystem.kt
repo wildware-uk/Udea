@@ -200,7 +200,8 @@ public class ModelRenderSystem(
         val parent = mount?.let { netIdsOrNull()?.resolveOrNull(it.parent) }
         if (parent != null && budget > 0 && parent has ModelRenderer) draw(parent, now, alpha, budget - 1)
         val pose = clips.set(entity.getOrNull(Animator), now, alpha)
-        val model = entity[ModelRenderer].model
+        val renderer = entity[ModelRenderer]
+        val model = renderer.model
         if (mount != null && parent != null && stage.socket(parent.id, mount.node, socket)) {
             socket.mul(
                 mountOffset.place(
@@ -209,7 +210,7 @@ public class ModelRenderSystem(
                     mountScale,
                 ),
             )
-            stage.addAt(model, socket, pose, entity.id)
+            stage.addAt(model, socket, pose, entity.id, renderer.mask)
         } else {
             if (!placer.place(this, entity, alpha)) return
             val at = placer.placed
@@ -218,6 +219,7 @@ public class ModelRenderSystem(
                 at.x, at.y, at.z, at.rotationX, at.rotationY, at.rotationZ, at.scaleX, at.scaleY, at.scaleZ,
                 pose,
                 entity.id,
+                renderer.mask,
             )
         }
         markDrawn(entity)

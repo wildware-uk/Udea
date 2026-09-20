@@ -80,10 +80,16 @@ kotlin {
         }
         jvmTest {
             dependencies {
-                // Test-only, deliberately. `udeaVerifyHeadless` reports through the one
-                // UdeaDiagnostic (spec 5) so its output has the same rule ids, spans and cap as
-                // every other producer; nothing shipped here needs diagnostics.
-                // RenderModuleGraphTest asserts it stays test-only.
+                // Test-only, deliberately, and issue #266 re-decided it rather than inheriting it.
+                // `udeaVerifyHeadless` reports through the one UdeaDiagnostic (spec 5) so its
+                // output has the same rule ids, spans and cap as every other producer. A screen
+                // shader the driver refuses (#266) says the same things - rule id, the author's
+                // `.frag`, the author's line, the driver's words - but says them in plain fields on
+                // `ScreenShaderException`, because `udea-render` ships inside every game and a
+                // public `UdeaDiagnostic` there would put this module on every shipped game's
+                // runtime classpath for ever to carry a type a game can only read. Adding that
+                // type later is additive; un-shipping a dependency is not.
+                // `ScreenShaderRuleIdTest` is what stops the two vocabularies drifting.
                 implementation(project(":udea-diagnostics"))
 
                 // The bytecode gate. A class-file parser is a check, not a runtime feature.

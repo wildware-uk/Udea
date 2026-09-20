@@ -8,7 +8,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 plugins {
     // Every target, iOS included: `udea-core` gained its iOS targets when Fleks was vendored
     // (issue #215).
-    id("udea.kotlin-multiplatform")
+    id("dev.wildware.udea.kotlin-multiplatform")
     // Level files (issue #191): `Attributes`, `Abilities` and `GameplayEffects` are saved, so
     // they need serializers, and `udea-codegen` lists them in the generated `GasModuleRegistry`.
     alias(libs.plugins.kotlinSerialization)

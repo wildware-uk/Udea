@@ -17,11 +17,11 @@ import org.jetbrains.kotlin.gradle.plugin.getKotlinPluginVersion
  * 2. the **kotlin-stdlib actually resolved**, which the catalog does not control. That pin
  *    used to live here, which meant it protected the three build-time modules and left
  *    every runtime module resolving 2.3.21 in silence. It now lives in
- *    `udea.kotlin-library` for every module at once — see `UdeaStdlibPin`.
+ *    `dev.wildware.udea.kotlin-library` for every module at once — see `UdeaStdlibPin`.
  */
 
 plugins {
-    id("udea.kotlin-library")
+    id("dev.wildware.udea.kotlin-library")
 }
 
 private val kotlinInUse = getKotlinPluginVersion()

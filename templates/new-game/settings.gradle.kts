@@ -2,7 +2,8 @@
  * A Udea game that lives in its own repository (issue #265).
  *
  * Nothing here names a path to a Udea checkout. The engine is a set of published artifacts -
- * `dev.wildware.udea:udea-core`, the `udea.*` convention plugins, and a version catalog - and
+ * `dev.wildware.udea:udea-core`, the `dev.wildware.udea.*` convention plugins, and a version
+ * catalog - and
  * this build resolves them the way it resolves any other library. That is what makes a game a
  * repository of its own rather than a folder that has to sit next to the engine's.
  *
@@ -39,12 +40,12 @@ pluginManagement {
     }
 
     // The version is stated once, here, so no build script in this repository repeats it. A
-    // script applies `id("udea.game-gates")` with no version and gets this one.
+    // script applies `id("dev.wildware.udea.game-gates")` with no version and gets this one.
     plugins {
-        id("udea.kotlin-library") version udeaVersion
-        id("udea.kotlin-multiplatform") version udeaVersion
-        id("udea.kotlin-multiplatform-render") version udeaVersion
-        id("udea.game-gates") version udeaVersion
+        id("dev.wildware.udea.kotlin-library") version udeaVersion
+        id("dev.wildware.udea.kotlin-multiplatform") version udeaVersion
+        id("dev.wildware.udea.kotlin-multiplatform-render") version udeaVersion
+        id("dev.wildware.udea.game-gates") version udeaVersion
         id("dev.wildware.udea.agent") version udeaVersion
         id("dev.wildware.udea.assets") version udeaVersion
     }

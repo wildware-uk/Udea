@@ -22,7 +22,7 @@ plugins {
     // `jvm` and `android`, because this module draws through `udea-render`, which is on the same
     // convention. There is no Android launcher in the Hollow epic; the target is here because the
     // convention is, and it keeps the game from naming anything desktop-only.
-    id("udea.kotlin-multiplatform-render")
+    id("dev.wildware.udea.kotlin-multiplatform-render")
 
     // The generated registry (issue #202): `HollowUdeaRegistry` and the level component list.
     id("com.google.devtools.ksp") version libs.versions.ksp.get()

@@ -2,11 +2,14 @@ plugins {
     `kotlin-dsl`
 
     // Publishing, for the same reason the engine's modules are published (issue #265): a game in
-    // its own repository applies `udea.kotlin-library`, `udea.game-gates` and
-    // `dev.wildware.udea.agent`, and a convention plugin that only exists inside this checkout is
-    // a convention plugin no outside game can apply. `kotlin-dsl` brings `java-gradle-plugin`
-    // with it, so the precompiled script plugins in `src/main/kotlin` get plugin markers of their
-    // own and `id("udea.game-gates") version "..."` resolves to the jar this publishes.
+    // its own repository applies `dev.wildware.udea.kotlin-library`,
+    // `dev.wildware.udea.game-gates` and `dev.wildware.udea.agent`, and a convention plugin that
+    // only exists inside this checkout is a convention plugin no outside game can apply.
+    // `kotlin-dsl` brings `java-gradle-plugin` with it, so the precompiled script plugins in
+    // `src/main/kotlin` get plugin markers of their own and
+    // `id("dev.wildware.udea.game-gates") version "..."` resolves to the jar this publishes.
+    //
+    // Which of those markers actually leaves this machine is `publishedNamespace` below.
     //
     // Gradle's own `maven-publish` here, and not the `com.vanniktech.maven.publish` the engine's
     // modules use, for a reason that is a property of this build rather than a preference:
@@ -143,7 +146,56 @@ val centralRepositoryUrl: String =
         "https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/"
     }
 
+/**
+ * The one Maven namespace this account may publish under, and the whole of the rule about
+ * plugin ids.
+ *
+ * Sonatype authorises a publisher per namespace - `dev.wildware` here, verified by a DNS TXT
+ * record on wildware.dev - and refuses a PUT to any other one with a 403. That is a rule Central
+ * has and a local Maven repository does not, which is why `scripts/outside-game-proof.sh`,
+ * `publishToMavenLocal` and a green `build` were all quiet about it until the first real run of
+ * `.github/workflows/release.yml` (snapshot run 35523838813, issue #265). The engine's own
+ * modules went up; step 12, the one that publishes these plugins, did not:
+ *
+ *     > Failed to publish publication 'udea.android-applicationPluginMarkerMaven' to repository
+ *     > 'mavenCentral'
+ *        > Could not PUT '.../udea/android-application/udea.android-application.gradle.plugin/...'
+ *        > Received status code 403 from server: Forbidden
+ *
+ * A Gradle **plugin marker** is a POM whose coordinates are the plugin id itself: the group is
+ * the id and the artifact is `<id>.gradle.plugin`. So every plugin id that leaves this machine
+ * is a Maven group, and `udea.android-application` was asking Central for the group `udea`,
+ * which nobody here owns.
+ *
+ * Hence two kinds of convention plugin in `src/main/kotlin`, told apart by their id alone:
+ *
+ *  - **`dev.wildware.udea.*` is published.** A game in its own repository applies it by id, so
+ *    its marker has to resolve from a repository, so it has to sit inside the namespace above.
+ *    `templates/new-game/settings.gradle.kts` is the list of them, and the one that governs:
+ *    the outside-game proof fails if a plugin it names has no marker.
+ *  - **`udea.*` is internal to this build.** Nothing outside applies it - a precompiled script
+ *    plugin that another one applies comes off the jar's own classpath and needs no marker - so
+ *    its marker is not published and it is not a public API. Making one public is a rename.
+ *
+ * `PluginNamespaceTest` reads the literal below, the plugin ids this build declares, and the ids
+ * the template and the guides beside it apply, and fails when those stop agreeing.
+ */
+val publishedNamespace = "dev.wildware"
+
 allprojects {
+    // Nothing outside the namespace is uploaded - not to Central, and not to the local Maven
+    // repository either. The same rule on both means `publishToMavenLocal` produces the set of
+    // artifacts a release produces, so `scripts/outside-game-proof.sh` is evidence about the
+    // release path rather than about a laxer one. A skipped task reports itself as SKIPPED with
+    // the reason below, so it is visible rather than silent.
+    tasks.withType<AbstractPublishToMaven>().configureEach {
+        val namespace = publishedNamespace
+        onlyIf("$publishedNamespace is the only namespace this account may publish under") { task ->
+            val group = (task as AbstractPublishToMaven).publication.groupId
+            group == namespace || group.startsWith("$namespace.")
+        }
+    }
+
     val artifactId = publishedArtifactIds[path]
         ?: error(
             "$path is a project of build-logic with no artifact id in publishedArtifactIds. " +
@@ -228,7 +280,7 @@ allprojects {
 dependencies {
     implementation(libs.kotlin.gradle.plugin)
 
-    // `udea.kotlin-multiplatform` gives every runtime module an Android target through AGP's
+    // `dev.wildware.udea.kotlin-multiplatform` gives every runtime module an Android target through AGP's
     // multiplatform library plugin (issue #201). Build-logic only, like the Kotlin plugin above.
     implementation(libs.android.gradle.plugin)
 
@@ -320,7 +372,7 @@ val outerBuildInputs: FileCollection = files(
 
     // The root build script, for the other half of the same pin (issue #186). The root's
     // `allprojects` block sets `jvmTarget`/`sourceCompatibility` for the whole tree - including
-    // the old tree, which is not on the `udea.kotlin-library` convention and so never sees
+    // the old tree, which is not on the `dev.wildware.udea.kotlin-library` convention and so never sees
     // `UdeaVersions.JVM_TOOLCHAIN`. Those two numbers disagreeing is not a compile error: it is
     // `udea-render` declaring one `org.gradle.jvm.version` and compiling to another, which
     // surfaces as a resolution failure against ComposeGL somewhere else entirely.
@@ -340,8 +392,22 @@ val outerBuildInputs: FileCollection = files(
     // `WikiCheckTest`'s last test reads every committed wiki page and `.pending` against the real
     // tree, so an edit to a page is exactly the edit it has to re-run on.
     fileTree(rootDir.resolve("../docs/wiki")),
+
+    // `PluginNamespaceTest` reads the two things that tell a game outside this repository which
+    // convention plugin to apply: the working template and the guide beside it. They are the
+    // subject of that gate, so an edit to either is precisely the edit it has to re-run on - and
+    // an edit to either is how a plugin id stops being one that can be published. The wiki
+    // tutorial is its third source and is already declared, one line up.
+    fileTree(rootDir.resolve("../templates")) { exclude("**/build/**") },
+    rootDir.resolve("../docs/new-game.md"),
+
     fileTree(rootDir.resolve("..")) {
         include("*/build.gradle.kts")
+        // A launcher's build script is two levels down - `moba/desktop`, `hollow/game`,
+        // `templates/new-game/game` - and `PluginNamespaceTest` scans every build script in the
+        // repository for a convention plugin id that no longer exists. A half-finished rename
+        // lives exactly in the scripts the line above does not reach.
+        include("*/*/build.gradle.kts")
         include("build.gradle.kts")
         include("udea-gradle/src/**")
         include("moba/*/src/**/*.kt")

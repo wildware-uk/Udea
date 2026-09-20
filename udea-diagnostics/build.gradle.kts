@@ -1,7 +1,7 @@
 plugins {
     // Multiplatform (issue #201). Every JVM consumer - the K2 plugin, the KSP processor, the
     // asset compiler - still resolves the `jvm` variant without asking for it.
-    id("udea.kotlin-multiplatform")
+    id("dev.wildware.udea.kotlin-multiplatform")
 
     /*
      * `LatencyBudget` (issue #175), and why the shared home is this module.

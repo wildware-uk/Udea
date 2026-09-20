@@ -57,7 +57,7 @@ cd <udea>
 ```
 
 Two commands, because `build-logic` is an included build of the engine and the outer one does not
-reach it. It is the half that carries `udea.game-gates`, `udea.kotlin-library` and
+reach it. It is the half that carries `dev.wildware.udea.game-gates`, `dev.wildware.udea.kotlin-library` and
 `dev.wildware.udea.agent`, so without it a game can resolve every engine module and still not
 apply a single plugin.
 
@@ -97,8 +97,8 @@ pluginManagement {
     val udeaVersion: String = providers.gradleProperty("udeaVersion").get()
     repositories { mavenLocal(); mavenCentral(); gradlePluginPortal(); google() }
     plugins {
-        id("udea.kotlin-library") version udeaVersion
-        id("udea.game-gates") version udeaVersion
+        id("dev.wildware.udea.kotlin-library") version udeaVersion
+        id("dev.wildware.udea.game-gates") version udeaVersion
         id("dev.wildware.udea.agent") version udeaVersion
         // ...
     }
@@ -110,9 +110,17 @@ it: the plugin ids here, the module coordinates in `game/build.gradle.kts`, and 
 plugin the convention puts on your compilations. Upgrading the engine is that one line.
 
 The convention plugins come from `dev.wildware.udea:udea-build-logic`, which publishes a plugin
-marker per id - that is why `id("udea.game-gates")` resolves at all. A Gradle plugin has to be on
-the settings classpath before any build script is evaluated, which is why the version is declared
-here rather than in the build script that applies it.
+marker per published id - that is why `id("dev.wildware.udea.game-gates")` resolves at all. A
+Gradle plugin has to be on the settings classpath before any build script is evaluated, which is
+why the version is declared here rather than in the build script that applies it.
+
+A marker's coordinates *are* the plugin id: the group is the id and the artifact is
+`<id>.gradle.plugin`. Sonatype authorises a publisher per namespace, so only ids inside
+`dev.wildware` can be published at all, and that is the whole difference between the two kinds of
+convention plugin in the engine's `build-logic`. **`dev.wildware.udea.*` is published and you may
+apply it; `udea.*` is internal to the engine's own build and you cannot.**
+`templates/new-game/settings.gradle.kts` is the published set, and `docs/module-graph.md` lists
+every convention with its id.
 
 The catalog is the engine's, published as `dev.wildware.udea:udea-version-catalog` and imported as
 `libs`: the conventions read Kotlin, `kotlin-test`, JUnit and the Android SDK levels out of it by
@@ -148,7 +156,7 @@ those snapshot repositories or resolution fails.
 ### `build.gradle.kts` - what this build is
 
 ```kotlin
-plugins { id("udea.game-gates") }
+plugins { id("dev.wildware.udea.game-gates") }
 
 udeaGates {
     ships(":game")
@@ -161,7 +169,7 @@ udeaGates {
 }
 ```
 
-`udea.game-gates` is the one plugin that carries Udea's build gates, and this repository's own
+`dev.wildware.udea.game-gates` is the one plugin that carries Udea's build gates, and this repository's own
 root build script applies it and writes the same block. It registers:
 
 | Gate | What it refuses |
@@ -184,7 +192,7 @@ people switch off.
 
 ```kotlin
 plugins {
-    id("udea.kotlin-library")            // or udea.kotlin-multiplatform-render, if it draws
+    id("dev.wildware.udea.kotlin-library")            // or dev.wildware.udea.kotlin-multiplatform-render, if it draws
     id("dev.wildware.udea.agent")        // gamebridge.json and the debug-only agent source set
     id("com.google.devtools.ksp") version libs.versions.ksp.get()
 }
@@ -300,10 +308,10 @@ Stated rather than implied, because each is a real piece of work and none of it 
   `.udeapak`. `moba/game/build.gradle.kts` is the worked example; the template has no assets, and
   whether that plugin needs anything extra outside this repository is untested.
 - **Drawing.** The template is headless. A game that draws applies
-  `udea.kotlin-multiplatform-render` and opens a `KoolBackend`; `moba` is the example, and the
+  `dev.wildware.udea.kotlin-multiplatform-render` and opens a `KoolBackend`; `moba` is the example, and the
   snapshot repository note above is the part that bites first.
 - **`AGENTS.md` and the frozen contracts.** `udeaVerifyAgentsMd` holds *this* repository's module
   table against *this* repository's `settings.gradle.kts` and requires the nine spec section 5
   contracts to be named; `udeaVerifyContracts` freezes `docs/contracts/`. Both are statements
-  about the engine's own documents, so `udea.game-gates` does not apply either to a game. Your
+  about the engine's own documents, so `dev.wildware.udea.game-gates` does not apply either to a game. Your
   game's `AGENTS.md` is yours.

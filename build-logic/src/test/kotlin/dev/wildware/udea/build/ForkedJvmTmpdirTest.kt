@@ -47,7 +47,7 @@ class ForkedJvmTmpdirTest {
 
     private fun module(label: String): String =
         """
-        plugins { id("udea.kotlin-library") }
+        plugins { id("dev.wildware.udea.kotlin-library") }
 
         val probeMain = sourceSets.main.get()
         listOf("probeOne", "probeTwo").forEach { name ->

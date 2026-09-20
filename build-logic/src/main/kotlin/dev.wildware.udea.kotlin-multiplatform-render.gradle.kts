@@ -4,7 +4,7 @@ import dev.wildware.udea.build.UdeaMultiplatform
  * The convention for `udea-render`: Kotlin Multiplatform on `jvm` and `android` (spec section 3,
  * issues #201 and #211).
  *
- * Two targets fewer than `udea.kotlin-multiplatform`, and each for a reason that lives in Kool,
+ * Two targets fewer than `dev.wildware.udea.kotlin-multiplatform`, and each for a reason that lives in Kool,
  * which `udea-render` draws with:
  *
  * - **no iOS**: Kool has no iOS backend (spec D2). Every other module builds and tests for iOS;

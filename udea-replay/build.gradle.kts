@@ -8,7 +8,7 @@ plugins {
     // Every target, iOS included: `udea-core` gained its iOS targets when Fleks was vendored
     // (issue #215). `udea-agent`, which has none yet, is a `jvmMain` edge below, so it does not
     // reach the iOS compilations.
-    id("udea.kotlin-multiplatform")
+    id("dev.wildware.udea.kotlin-multiplatform")
     // The `replay-equality` fixture world (issue #152). A published variant rather than this
     // module's private test source for the same reason `udea-core` publishes `TransformReplicator`:
     // the CI job runs it as a `JavaExec` main class, and a test main class is an entry point

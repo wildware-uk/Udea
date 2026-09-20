@@ -13,12 +13,12 @@ import dev.wildware.udea.gradle.UdeaAgentPlugin
 plugins {
     // The engine's JVM convention: Kotlin, the JDK toolchain, explicit API, the `kotlin-stdlib`
     // pin and the K2 compiler plugin whose checkers hold `@Net`, `@Replicated` and the rest of
-    // the annotations honest. `udea.kotlin-multiplatform-render` is the one to apply instead when
+    // the annotations honest. `dev.wildware.udea.kotlin-multiplatform-render` is the one to apply instead when
     // the game draws and ships on more than one platform.
     //
-    // No version on any `udea.*` or `dev.wildware.udea.*` id: `settings.gradle.kts` states it
+    // No version on any `dev.wildware.udea.*` id: `settings.gradle.kts` states it
     // once, from the `udeaVersion` property.
-    id("udea.kotlin-library")
+    id("dev.wildware.udea.kotlin-library")
 
     // `gamebridge.json`, the debug-only `agent` source set, and the `-PdebugPort=` wiring that
     // puts the agent's HTTP surface on a running instance.

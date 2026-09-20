@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
  * JVM only, and deliberately: a fixture here exists to serve JVM consumers, and the one that
  * needed this reads the JVM's own management beans.
  *
- * Apply after `udea.kotlin-multiplatform`, which declares the `jvm` target.
+ * Apply after `dev.wildware.udea.kotlin-multiplatform`, which declares the `jvm` target.
  */
 
 val kotlinExtension = extensions.getByType<KotlinMultiplatformExtension>()

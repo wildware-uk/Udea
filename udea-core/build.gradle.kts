@@ -13,7 +13,7 @@ plugins {
     // Every target, iOS included (issue #215). Fleks publishes no iOS variant at any version, so
     // it is built from source in `udea-fleks` rather than resolved from Maven; with the Maven
     // artifact back, the iOS targets here fail dependency resolution on every machine, Linux too.
-    id("udea.kotlin-multiplatform")
+    id("dev.wildware.udea.kotlin-multiplatform")
     // The Replicator contract ships an executable specification: TransformReplicator and
     // ArrayFieldStore. udea-codegen's golden tests consume them, so they have to be a
     // published variant rather than this module's private test source (issue #28 scope).

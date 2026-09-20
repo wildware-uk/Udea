@@ -20,7 +20,7 @@ import javax.inject.Inject
  * exercises it on every run.
  *
  * ```kotlin
- * plugins { id("udea.game-gates") }
+ * plugins { id("dev.wildware.udea.game-gates") }
  *
  * udeaGates {
  *     ships(":desktop")
@@ -104,7 +104,7 @@ public abstract class UdeaGatesExtension @Inject constructor(private val project
 public const val UDEA_GATES_EXTENSION: String = "udeaGates"
 
 /**
- * This build's [UdeaGatesExtension], creating it if `udea.game-gates` has not already.
+ * This build's [UdeaGatesExtension], creating it if `dev.wildware.udea.game-gates` has not already.
  *
  * Create-or-return, because `udea.determinism-check` reads the extension and can be applied on
  * its own - a build that wants the determinism scan and nothing else is a reasonable thing, and

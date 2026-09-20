@@ -74,6 +74,13 @@
 # Issue #246 made every one of its fields `@Net`, so a client sees a 3D entity move; that changed
 # no id and no field order here, only which fields a delta may carry.
 #
+# The two `dev.wildware.udea.nav` names are ground-plane navigation (issue #264): the order a unit
+# is walking to, and a building's footprint. Both are here because both have to survive a
+# `time.rewind` - a unit whose order a rewind did not restore would carry on to a goal the restored
+# world never gave it, and a footprint a rewind did not restore would leave the nav grid blocked
+# where a destroyed building used to be, since the grid is rebuilt from these components and from
+# nothing else. They sort after every earlier name, so adding them moved no existing id.
+#
 dev.wildware.moba.CharacterView
 dev.wildware.moba.Player
 dev.wildware.moba.Position
@@ -103,3 +110,5 @@ dev.wildware.udea.core.physics.PhysicsBody
 dev.wildware.udea.core.physics.Teleport
 dev.wildware.udea.core.spatial.Animator
 dev.wildware.udea.core.spatial.Transform3D
+dev.wildware.udea.nav.NavAgent
+dev.wildware.udea.nav.NavObstacle

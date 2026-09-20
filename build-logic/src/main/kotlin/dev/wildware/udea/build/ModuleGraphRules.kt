@@ -122,6 +122,9 @@ public object ModuleGraphRules {
         ":udea-fleks",
         ":udea-gas",
         ":udea-gradle",
+        // Navigation is a grid and two searches over it: a dedicated server routes its units and
+        // a replay re-routes them, both with no display anywhere.
+        ":udea-nav",
         ":udea-net",
         // Box2D is native, but it is a solver and not a renderer: the simulation steps it on a
         // dedicated server and in CI, where there is no display.

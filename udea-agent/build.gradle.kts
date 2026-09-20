@@ -13,8 +13,8 @@ plugins {
     // targets since Fleks was vendored (issue #215), but this module does not yet: the `expect`
     // declarations `enumConstantsOf` and `heapFigures` have `actual`s for the JVM, Android and Wasm
     // only, so an iOS target fails to compile. With a native `actual` for each, this line becomes
-    // `id("udea.kotlin-multiplatform")` and the module joins the `ios-tests` job in `ci.yml`.
-    id("udea.kotlin-multiplatform-no-ios")
+    // `id("dev.wildware.udea.kotlin-multiplatform")` and the module joins the `ios-tests` job in `ci.yml`.
+    id("dev.wildware.udea.kotlin-multiplatform-no-ios")
     // The engine's own toolsets go through the same `@AgentTool` KSP pass every game's do.
     // There is one mechanism on the agent surface, not an engine one and a game one - see
     // `EngineToolModules` for what that took and for the one thing it deliberately does not do.

@@ -1,0 +1,2002 @@
+Calculating task graph as no cached configuration is available for tasks: build
+> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :build-logic:generateExternalPluginSpecBuilders UP-TO-DATE
+> Task :build-logic:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+> Task :build-logic:compilePluginsBlocks UP-TO-DATE
+> Task :build-logic:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+> Task :build-logic:generateScriptPluginAdapters UP-TO-DATE
+> Task :build-logic:compileKotlin UP-TO-DATE
+> Task :build-logic:compileJava NO-SOURCE
+> Task :build-logic:pluginDescriptors UP-TO-DATE
+> Task :build-logic:processResources UP-TO-DATE
+> Task :build-logic:classes UP-TO-DATE
+> Task :build-logic:jar UP-TO-DATE
+
+> Configure project :udea-agent
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Configure project :udea-annotations
+w: ⚠️ Native task 'iosSimulatorArm64Test' is disabled
+Task 'iosSimulatorArm64Test' for target 'ios_simulator_arm64' cannot run on the current host (linux-x86_64).
+Reason: simulator tests require macOS
+Solution: To suppress this warning, add 'kotlin.native.ignoreDisabledTargets=true' to gradle.properties.
+
+
+> Task :udea-compiler-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-annotations:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-diagnostics:jvmProcessResources NO-SOURCE
+> Task :udea-diagnostics:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-annotations:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-annotations:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-codegen:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-fleks:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-annotations:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-annotations:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-annotations:androidPreBuild UP-TO-DATE
+> Task :udea-fleks:androidPreBuild UP-TO-DATE
+> Task :udea-annotations:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-compiler-plugin:processResources UP-TO-DATE
+> Task :udea-fleks:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-core:kmpPartiallyResolvedDependenciesChecker
+> Task :compileJava NO-SOURCE
+> Task :processResources NO-SOURCE
+> Task :udea-fleks:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-annotations:jvmProcessResources NO-SOURCE
+> Task :udeaVerifyAgentsMd
+> Task :udea-diagnostics:processJvmMainResources SKIPPED
+> Task :udea-diagnostics:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :classes UP-TO-DATE
+> Task :udea-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-fleks:preAndroidMainBuild UP-TO-DATE
+> Task :udea-fleks:jvmProcessResources NO-SOURCE
+> Task :udea-annotations:preAndroidMainBuild UP-TO-DATE
+> Task :udea-fleks:generateProjectStructureMetadata
+> Task :udea-annotations:generateProjectStructureMetadata
+> Task :udea-fleks:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-annotations:processJvmMainResources SKIPPED
+> Task :udea-fleks:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-fleks:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-core:androidPreBuild UP-TO-DATE
+> Task :udea-fleks:processJvmMainResources SKIPPED
+> Task :udea-core:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-core:preAndroidMainBuild UP-TO-DATE
+> Task :udea-core:metadataNonJvmMainProcessResources NO-SOURCE
+> Task :udea-core:metadataAppleMainProcessResources NO-SOURCE
+> Task :udeaVerifyContracts
+> Task :udea-gas:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-core:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-gas:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-agent:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-core:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-agent:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-assets:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-nav:kmpPartiallyResolvedDependenciesChecker
+> Task :jar
+> Task :udea-diagnostics:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-fleks:exportCrossCompilationMetadataForIosSimulatorArm64ApiElements
+> Task :udea-fleks:exportCrossCompilationMetadataForIosArm64ApiElements
+> Task :assemble
+> Task :udea-fleks:exportRootPublicationCoordinatesForMetadataApiElements
+> Task :udea-diagnostics:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-nav:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-assets:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-assets:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-annotations:exportRootPublicationCoordinatesForMetadataApiElements
+> Task :udea-assets:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-assets:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-annotations:exportCrossCompilationMetadataForIosArm64ApiElements
+> Task :udea-annotations:exportCrossCompilationMetadataForIosSimulatorArm64ApiElements
+> Task :udea-diagnostics:exportRootPublicationCoordinatesForMetadataApiElements
+> Task :udea-annotations:downloadKotlinNativeDistribution
+> Task :udea-core:downloadKotlinNativeDistribution
+> Task :udea-diagnostics:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-diagnostics:generateProjectStructureMetadata
+> Task :udea-assets-compiler:processResources NO-SOURCE
+> Task :udea-assets:jvmProcessResources NO-SOURCE
+> Task :udea-fleks:downloadKotlinNativeDistribution
+> Task :udea-assets-compiler:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-assets:processJvmMainResources SKIPPED
+> Task :udea-assets:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-diagnostics:androidPreBuild UP-TO-DATE
+> Task :udea-diagnostics:preAndroidMainBuild UP-TO-DATE
+> Task :udea-net:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-physics2d:jvmProcessResources NO-SOURCE
+> Task :udea-physics2d:processJvmMainResources SKIPPED
+> Task :udea-assets:androidPreBuild UP-TO-DATE
+> Task :udea-diagnostics:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-annotations:commonizeNativeDistribution
+> Task :udea-net:jvmProcessResources NO-SOURCE
+> Task :udea-assets:commonizeNativeDistribution
+> Task :udea-physics2d:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-fleks:commonizeNativeDistribution
+> Task :udea-core:commonizeNativeDistribution
+> Task :udea-net:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-audio:androidPreBuild UP-TO-DATE
+> Task :udea-audio:preAndroidMainBuild UP-TO-DATE
+> Task :udea-gas:androidPreBuild UP-TO-DATE
+> Task :udea-gas:preAndroidMainBuild UP-TO-DATE
+> Task :udea-audio:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-audio:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-diagnostics:commonizeNativeDistribution
+> Task :udea-render:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-render:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-core:exportCrossCompilationMetadataForIosArm64ApiElements
+> Task :udea-render:androidPreBuild UP-TO-DATE
+> Task :udea-render:preAndroidMainBuild UP-TO-DATE
+> Task :udea-core:exportCrossCompilationMetadataForIosSimulatorArm64ApiElements
+> Task :udea-physics2d:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :moba:game:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-assets:preAndroidMainBuild UP-TO-DATE
+> Task :udea-net:androidPreBuild UP-TO-DATE
+> Task :udea-net:processJvmMainResources SKIPPED
+> Task :udea-audio:jvmProcessResources NO-SOURCE
+> Task :udea-assets:generateProjectStructureMetadata
+> Task :udea-core:generateProjectStructureMetadata
+> Task :udea-annotations:wasmJsProcessResources NO-SOURCE
+> Task :udea-assets:wasmJsProcessResources NO-SOURCE
+> Task :udea-audio:wasmJsProcessResources NO-SOURCE
+> Task :udea-audio:processJvmMainResources SKIPPED
+> Task :udea-gas:downloadKotlinNativeDistribution
+> Task :udea-render:jvmProcessResources NO-SOURCE
+> Task :udea-net:preAndroidMainBuild UP-TO-DATE
+> Task :udea-diagnostics:wasmJsProcessResources NO-SOURCE
+> Task :udea-diagnostics:jvmTestFixturesProcessResources NO-SOURCE
+> Task :udea-diagnostics:processJvmTestFixturesResources SKIPPED
+> Task :udea-gas:wasmJsProcessResources NO-SOURCE
+> Task :udea-net:wasmJsProcessResources NO-SOURCE
+> Task :moba:game:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-replay:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-compiler-plugin:udeaVerifyModuleGraph
+> Task :udea-replay:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-replay:wasmJsProcessResources NO-SOURCE
+> Task :udea-editor:udeaVerifyModuleGraph
+> Task :udea-render:processJvmMainResources SKIPPED
+> Task :udea-fleks:wasmJsProcessResources NO-SOURCE
+> Task :udea-core:wasmJsProcessResources NO-SOURCE
+> Task :hollow:game:kmpPartiallyResolvedDependenciesChecker
+> Task :udea-agent:androidPreBuild UP-TO-DATE
+> Task :hollow:game:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-agent:preAndroidMainBuild UP-TO-DATE
+> Task :udea-gradle:udeaVerifyModuleGraph
+> Task :udeaVerifyTrelloMap
+> Task :udea-assets:exportRootPublicationCoordinatesForMetadataApiElements
+> Task :hollow:desktop:udeaVerifyModuleGraph
+> Task :udea-core:exportRootPublicationCoordinatesForMetadataApiElements
+> Task :moba:desktop:udeaVerifyModuleGraph
+> Task :moba:android:udeaVerifyModuleGraph
+> Task :udea-agent:generateProjectStructureMetadata
+
+> Task :moba:game:udeaStageCharacterArt
+[udeaStageCharacterArt] staged 33 sheet(s) into /tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/moba/game/assets/sprites
+
+> Task :udea-agent:prepareAndroidMainArtProfile
+> Task :kotlinWasmKotlinNpmCachesSetup
+> Task :udea-agent:generateAndroidMainEmptyResourceFiles
+> Task :udea-agent:androidJar
+> Task :udea-assets:writeAndroidMainAarMetadata
+> Task :udea-diagnostics:writeAndroidMainAarMetadata
+> Task :udea-agent:preAndroidHostTestBuild UP-TO-DATE
+> Task :kotlinWasmRestoreYarnLock
+> Task :udea-agent:wasmJsTestProcessResources NO-SOURCE
+> Task :udea-agent-host:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-agent:prepareLintJarForPublish
+> Task :udea-agent-host:processResources NO-SOURCE
+> Task :udea-agent-host:sourcesJar UP-TO-DATE
+> Task :udea-agent-host:processTestResources NO-SOURCE
+> Task :udea-diagnostics:transformCommonMainDependenciesMetadata
+> Task :udea-annotations:wasmJsPackageJson
+> Task :udea-fleks:wasmJsPackageJson
+> Task :udea-annotations:transformCommonMainDependenciesMetadata
+> Task :udea-diagnostics:wasmJsPackageJson
+> Task :udea-annotations:checkAndroidMainAarMetadata
+> Task :udea-annotations:transformNativeMainDependenciesMetadata
+> Task :udea-diagnostics:transformNativeMainDependenciesMetadata
+> Task :udea-assets:wasmJsPackageJson
+> Task :udea-agent:writeAndroidMainAarMetadata
+> Task :udea-annotations:transformAppleMainDependenciesMetadata
+> Task :udea-core:wasmJsPackageJson
+> Task :udea-diagnostics:transformAppleMainDependenciesMetadata
+> Task :udea-annotations:transformIosMainDependenciesMetadata
+> Task :udea-agent:wasmJsPackageJson
+> Task :udea-diagnostics:transformIosMainDependenciesMetadata
+> Task :udeaVerifyWiki
+> Task :udea-agent:wasmJsPublicPackageJson
+> Task :udea-core:wasmJsTestPackageJson
+> Task :udea-audio:wasmJsPackageJson
+> Task :udea-annotations:wasmJsTestPackageJson
+> Task :udea-assets:wasmJsTestPackageJson
+> Task :udea-agent:wasmJsTestPackageJson
+> Task :udea-gas:wasmJsPackageJson
+> Task :udea-diagnostics:wasmJsTestPackageJson
+> Task :udea-fleks:wasmJsTestPackageJson
+> Task :udea-gas:wasmJsTestPackageJson
+> Task :udea-nav:wasmJsPackageJson
+> Task :udea-replay:wasmJsPackageJson
+> Task :udea-audio:wasmJsTestPackageJson
+> Task :udea-annotations:wasmJsPublicPackageJson
+> Task :udea-nav:wasmJsTestPackageJson
+> Task :udea-agent:wasmJsTestPublicPackageJson
+> Task :udea-annotations:wasmJsTestPublicPackageJson
+> Task :udea-net:wasmJsPackageJson
+> Task :udea-replay:wasmJsTestPackageJson
+> Task :udea-assets:wasmJsPublicPackageJson
+> Task :udea-audio:wasmJsPublicPackageJson
+> Task :udea-core:wasmJsTestPublicPackageJson
+> Task :udea-audio:wasmJsTestPublicPackageJson
+> Task :udea-core:wasmJsPublicPackageJson
+> Task :udea-assets:wasmJsTestPublicPackageJson
+> Task :udea-diagnostics:wasmJsPublicPackageJson
+> Task :udea-fleks:wasmJsTestPublicPackageJson
+> Task :udea-diagnostics:wasmJsTestPublicPackageJson
+> Task :udea-gas:wasmJsTestPublicPackageJson
+> Task :udea-gas:wasmJsPublicPackageJson
+> Task :udea-fleks:wasmJsPublicPackageJson
+> Task :udea-nav:wasmJsTestPublicPackageJson
+> Task :udea-fleks:transformCommonMainDependenciesMetadata
+> Task :udea-nav:wasmJsPublicPackageJson
+> Task :udea-replay:wasmJsTestPublicPackageJson
+> Task :udea-replay:wasmJsPublicPackageJson
+> Task :udea-annotations:prepareAndroidMainArtProfile
+> Task :udea-net:wasmJsPublicPackageJson
+> Task :udea-net:wasmJsTestPackageJson
+> Task :udea-annotations:generateAndroidMainEmptyResourceFiles
+> Task :udea-annotations:iosArm64ProcessResources NO-SOURCE
+> Task :udea-annotations:iosSimulatorArm64ProcessResources NO-SOURCE
+> Task :udea-annotations:validateLocalSwiftPMDependencies SKIPPED
+> Task :udea-annotations:computeLocalPackageDependencyInputFiles SKIPPED
+> Task :udea-annotations:generateUmbrellaPackageIdentifierBasedResolutionForDefault SKIPPED
+> Task :udea-annotations:fetchUmbrellaPackageIdentifierForDefault SKIPPED
+> Task :udea-annotations:extractAndroidMainAnnotations
+> Task :udea-annotations:writeAndroidMainAarMetadata
+> Task :udea-annotations:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-annotations:jvmTestProcessResources NO-SOURCE
+> Task :udea-net:wasmJsTestPublicPackageJson
+> Task :udea-fleks:transformNativeMainDependenciesMetadata
+> Task :udea-annotations:processJvmTestResources SKIPPED
+> Task :udea-annotations:wasmJsTestProcessResources NO-SOURCE
+> Task :kotlinWasmPackageJsonUmbrella
+> Task :udea-annotations:udeaVerifyCompilerPlugin
+> Task :udea-annotations:androidJar
+> Task :udea-annotations:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-assets:generateAndroidMainEmptyResourceFiles
+> Task :udea-fleks:transformAppleMainDependenciesMetadata
+> Task :udea-assets:prepareAndroidMainArtProfile
+> Task :udea-assets:prepareLintJarForPublish
+> Task :udea-annotations:mergeAndroidMainJniLibFolders
+> Task :udea-fleks:transformIosMainDependenciesMetadata
+> Task :udea-annotations:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-agent:mergeAndroidMainJniLibFolders
+> Task :udea-assets:downloadKotlinNativeDistribution
+> Task :udea-agent:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :wasmRootPackageJson
+> Task :udea-diagnostics:exportCrossCompilationMetadataForIosArm64ApiElements
+> Task :udea-diagnostics:downloadKotlinNativeDistribution
+> Task :udea-diagnostics:exportCrossCompilationMetadataForIosSimulatorArm64ApiElements
+> Task :udea-core:writeAndroidMainAarMetadata
+> Task :udea-assets:iosArm64ProcessResources NO-SOURCE
+> Task :udea-assets:iosSimulatorArm64ProcessResources NO-SOURCE
+> Task :udea-assets:validateLocalSwiftPMDependencies SKIPPED
+> Task :udea-assets:computeLocalPackageDependencyInputFiles SKIPPED
+> Task :udea-annotations:processAndroidMainManifest
+> Task :udea-agent:processAndroidMainManifest
+> Task :udea-assets:mergeAndroidMainJniLibFolders
+> Task :udea-assets:jvmTestProcessResources NO-SOURCE
+> Task :udea-assets:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-assets:processJvmTestResources SKIPPED
+> Task :udea-assets:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-assets:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-assets:androidJar
+> Task :udea-assets:copyAndroidMainJniLibsProjectOnly
+> Task :udea-assets:wasmJsTestProcessResources NO-SOURCE
+> Task :udea-assets-compiler:sourcesJar UP-TO-DATE
+> Task :udea-audio:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-audio:generateProjectStructureMetadata
+> Task :udea-audio:generateAndroidMainEmptyResourceFiles
+> Task :udea-fleks:writeAndroidMainAarMetadata
+> Task :udea-assets-compiler:processTestResources
+> Task :udea-audio:prepareAndroidMainArtProfile
+> Task :udea-audio:checkAndroidMainAarMetadata
+> Task :udea-audio:prepareLintJarForPublish
+> Task :udea-audio:processAndroidMainManifest
+> Task :udea-audio:commonizeNativeDistribution
+> Task :udea-audio:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-assets:fingerprintSyntheticPackage
+> Task :udea-assets:generateSyntheticLinkageSwiftPMImportProjectForCinteropsAndLdDump SKIPPED
+> Task :udea-audio:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-annotations:fingerprintSyntheticPackage
+> Task :udea-assets:syncPersistedPackageResolvedToSynthetic SKIPPED
+> Task :udea-annotations:syncPersistedPackageResolvedToSynthetic SKIPPED
+> Task :udea-annotations:fingerprintXcodebuildIphonesimulator SKIPPED
+> Task :udea-annotations:generateSyntheticLinkageSwiftPMImportProjectForCinteropsAndLdDump SKIPPED
+> Task :udea-assets:fingerprintXcodebuildIphonesimulator SKIPPED
+> Task :udea-annotations:fetchSyntheticImportProjectPackages SKIPPED
+> Task :udea-assets:fetchSyntheticImportProjectPackages SKIPPED
+> Task :udea-assets:dumpXcodebuildArgsIphonesimulator SKIPPED
+> Task :udea-annotations:dumpXcodebuildArgsIphonesimulator SKIPPED
+> Task :udea-assets:convertSyntheticImportProjectIntoDefFileIphonesimulator SKIPPED
+> Task :udea-annotations:convertSyntheticImportProjectIntoDefFileIphonesimulator SKIPPED
+> Task :udea-assets:exportCrossCompilationMetadataForIosArm64ApiElements
+> Task :udea-assets:exportCrossCompilationMetadataForIosSimulatorArm64ApiElements
+> Task :udea-audio:downloadKotlinNativeDistribution
+> Task :udea-audio:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-audio:iosArm64ProcessResources NO-SOURCE
+> Task :udea-audio:validateLocalSwiftPMDependencies SKIPPED
+> Task :udea-audio:iosSimulatorArm64ProcessResources NO-SOURCE
+> Task :udea-audio:computeLocalPackageDependencyInputFiles SKIPPED
+> Task :udea-audio:jvmTestProcessResources NO-SOURCE
+> Task :udea-audio:processJvmTestResources SKIPPED
+> Task :udea-audio:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-audio:fingerprintSyntheticPackage
+> Task :udea-audio:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-audio:syncPersistedPackageResolvedToSynthetic SKIPPED
+> Task :udea-audio:generateSyntheticLinkageSwiftPMImportProjectForCinteropsAndLdDump SKIPPED
+> Task :udea-audio:fingerprintXcodebuildIphonesimulator SKIPPED
+> Task :udea-audio:fetchSyntheticImportProjectPackages SKIPPED
+> Task :udea-audio:dumpXcodebuildArgsIphonesimulator SKIPPED
+> Task :udea-audio:convertSyntheticImportProjectIntoDefFileIphonesimulator SKIPPED
+> Task :udea-editor:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-editor:processResources UP-TO-DATE
+> Task :udea-audio:androidJar
+> Task :udea-compiler-plugin:sourcesJar UP-TO-DATE
+> Task :udea-compiler-plugin:udeaVerifyCompilerPlugin
+> Task :udea-codegen:udeaVerifyKotlinPin
+> Task :udea-compiler-plugin:udeaVerifyKotlinPin
+> Task :udea-compiler-plugin:processTestResources NO-SOURCE
+> Task :udea-core:checkAndroidMainAarMetadata
+> Task :udea-core:generateAndroidMainEmptyResourceFiles
+> Task :udea-core:mergeAndroidMainJniLibFolders
+> Task :udea-core:prepareAndroidMainArtProfile
+> Task :udea-core:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-assets:checkAndroidMainAarMetadata
+> Task :udea-assets:processAndroidMainManifest
+> Task :udea-core:iosArm64ProcessResources NO-SOURCE
+> Task :udea-core:iosSimulatorArm64ProcessResources NO-SOURCE
+> Task :udea-core:validateLocalSwiftPMDependencies SKIPPED
+> Task :udea-core:computeLocalPackageDependencyInputFiles SKIPPED
+> Task :udea-audio:writeAndroidMainAarMetadata
+> Task :udea-core:fingerprintSyntheticPackage
+> Task :udea-core:generateSyntheticLinkageSwiftPMImportProjectForCinteropsAndLdDump SKIPPED
+> Task :udea-core:syncPersistedPackageResolvedToSynthetic SKIPPED
+> Task :udea-core:fetchSyntheticImportProjectPackages SKIPPED
+> Task :udea-core:fingerprintXcodebuildIphonesimulator SKIPPED
+> Task :udea-core:dumpXcodebuildArgsIphonesimulator SKIPPED
+> Task :udea-core:convertSyntheticImportProjectIntoDefFileIphonesimulator SKIPPED
+> Task :udea-core:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-core:wasmJsTestProcessResources NO-SOURCE
+> Task :udea-core:androidJar
+> Task :udea-core:copyAndroidMainJniLibsProjectOnly
+> Task :udea-diagnostics:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-annotations:copyAndroidMainJniLibsProjectOnly
+> Task :udea-diagnostics:prepareAndroidMainArtProfile
+> Task :udea-diagnostics:generateAndroidMainEmptyResourceFiles
+> Task :udea-audio:mergeAndroidMainJniLibFolders
+> Task :udea-diagnostics:prepareLintJarForPublish
+> Task :udea-audio:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-diagnostics:iosArm64ProcessResources NO-SOURCE
+> Task :udea-annotations:prepareLintJarForPublish
+> Task :udea-core:prepareLintJarForPublish
+> Task :udea-diagnostics:iosSimulatorArm64ProcessResources NO-SOURCE
+> Task :udea-diagnostics:validateLocalSwiftPMDependencies SKIPPED
+> Task :udea-diagnostics:computeLocalPackageDependencyInputFiles SKIPPED
+> Task :udea-diagnostics:fingerprintSyntheticPackage
+> Task :udea-diagnostics:generateSyntheticLinkageSwiftPMImportProjectForCinteropsAndLdDump SKIPPED
+> Task :udea-diagnostics:syncPersistedPackageResolvedToSynthetic SKIPPED
+> Task :udea-diagnostics:fetchSyntheticImportProjectPackages SKIPPED
+> Task :udea-diagnostics:fingerprintXcodebuildIphonesimulator SKIPPED
+> Task :udea-diagnostics:dumpXcodebuildArgsIphonesimulator SKIPPED
+> Task :udea-diagnostics:convertSyntheticImportProjectIntoDefFileIphonesimulator SKIPPED
+> Task :udea-diagnostics:jvmTestProcessResources
+> Task :udea-diagnostics:processJvmTestResources SKIPPED
+> Task :udea-diagnostics:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-diagnostics:wasmJsTestProcessResources NO-SOURCE
+> Task :udea-diagnostics:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-editor:sourcesJar UP-TO-DATE
+> Task :udea-diagnostics:udeaVerifyCompilerPlugin
+> Task :udea-editor:processTestResources NO-SOURCE
+> Task :udea-diagnostics:androidJar
+> Task :udea-editor:udeaVerifyKotlinPin
+> Task :udea-core:processAndroidMainManifest
+> Task :udea-diagnostics:processAndroidMainManifest
+> Task :udea-agent:copyAndroidMainJniLibsProjectOnly
+> Task :udea-fleks:generateAndroidMainEmptyResourceFiles
+> Task :udea-fleks:prepareAndroidMainArtProfile
+> Task :udea-fleks:iosArm64ProcessResources NO-SOURCE
+> Task :udea-agent:checkAndroidMainAarMetadata
+> Task :udea-fleks:validateLocalSwiftPMDependencies SKIPPED
+> Task :udea-fleks:computeLocalPackageDependencyInputFiles SKIPPED
+> Task :udea-fleks:iosSimulatorArm64ProcessResources NO-SOURCE
+> Task :udea-fleks:jvmTestProcessResources NO-SOURCE
+> Task :udea-fleks:processJvmTestResources SKIPPED
+> Task :udea-fleks:fingerprintSyntheticPackage
+> Task :udea-fleks:generateSyntheticLinkageSwiftPMImportProjectForCinteropsAndLdDump SKIPPED
+> Task :udea-fleks:syncPersistedPackageResolvedToSynthetic SKIPPED
+> Task :udea-fleks:fetchSyntheticImportProjectPackages SKIPPED
+> Task :udea-fleks:fingerprintXcodebuildIphonesimulator SKIPPED
+> Task :udea-fleks:dumpXcodebuildArgsIphonesimulator SKIPPED
+> Task :udea-fleks:convertSyntheticImportProjectIntoDefFileIphonesimulator SKIPPED
+> Task :udea-fleks:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-fleks:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-fleks:androidJar
+> Task :udea-fleks:wasmJsTestProcessResources NO-SOURCE
+> Task :udea-gas:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-fleks:checkAndroidMainAarMetadata
+> Task :udea-gas:generateProjectStructureMetadata
+> Task :udea-gas:generateAndroidMainEmptyResourceFiles
+> Task :udea-gas:prepareAndroidMainArtProfile
+> Task :udea-fleks:mergeAndroidMainJniLibFolders
+> Task :udea-gas:checkAndroidMainAarMetadata
+> Task :udea-fleks:processAndroidMainManifest
+> Task :udea-fleks:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-fleks:prepareLintJarForPublish
+> Task :udea-gas:mergeAndroidMainJniLibFolders
+> Task :udea-gas:commonizeNativeDistribution
+> Task :udea-gas:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-gas:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-gas:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-gas:iosArm64ProcessResources NO-SOURCE
+> Task :udea-gas:iosSimulatorArm64ProcessResources NO-SOURCE
+> Task :udea-fleks:copyAndroidMainJniLibsProjectOnly
+> Task :udea-gas:validateLocalSwiftPMDependencies SKIPPED
+> Task :udea-gas:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-gas:computeLocalPackageDependencyInputFiles SKIPPED
+> Task :udea-gas:fingerprintSyntheticPackage
+> Task :udea-gas:generateSyntheticLinkageSwiftPMImportProjectForCinteropsAndLdDump SKIPPED
+> Task :udea-gas:syncPersistedPackageResolvedToSynthetic SKIPPED
+> Task :udea-gas:fetchSyntheticImportProjectPackages SKIPPED
+> Task :udea-gas:fingerprintXcodebuildIphonesimulator SKIPPED
+> Task :udea-gas:copyAndroidMainJniLibsProjectOnly
+> Task :udea-gas:dumpXcodebuildArgsIphonesimulator SKIPPED
+> Task :udea-gas:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-gas:convertSyntheticImportProjectIntoDefFileIphonesimulator SKIPPED
+> Task :udea-gas:processAndroidMainManifest
+> Task :udea-gradle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-diagnostics:checkAndroidMainAarMetadata
+> Task :udea-gas:wasmJsTestProcessResources NO-SOURCE
+> Task :udea-gas:prepareLintJarForPublish
+> Task :udea-diagnostics:mergeAndroidMainJniLibFolders
+> Task :udea-nav:generateProjectStructureMetadata
+> Task :udea-nav:androidPreBuild UP-TO-DATE
+> Task :udea-nav:preAndroidMainBuild UP-TO-DATE
+> Task :udea-gradle:udeaVerifyKotlinPin
+> Task :udea-fleks:extractAndroidMainAnnotations
+> Task :udea-diagnostics:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-nav:generateAndroidMainEmptyResourceFiles
+> Task :udea-gas:androidJar
+> Task :udea-nav:downloadKotlinNativeDistribution
+> Task :udea-audio:copyAndroidMainJniLibsProjectOnly
+> Task :udea-gas:writeAndroidMainAarMetadata
+> Task :udea-nav:mergeAndroidMainJniLibFolders
+> Task :udea-nav:prepareAndroidMainArtProfile
+> Task :udea-gradle:processResources
+> Task :udea-nav:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-nav:validateLocalSwiftPMDependencies SKIPPED
+> Task :udea-nav:prepareLintJarForPublish
+> Task :udea-nav:computeLocalPackageDependencyInputFiles SKIPPED
+> Task :udea-nav:commonizeNativeDistribution
+> Task :udea-nav:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-diagnostics:copyAndroidMainJniLibsProjectOnly
+> Task :udea-nav:fingerprintSyntheticPackage
+> Task :udea-nav:checkAndroidMainAarMetadata
+> Task :udea-nav:generateSyntheticLinkageSwiftPMImportProjectForCinteropsAndLdDump SKIPPED
+> Task :udea-nav:syncPersistedPackageResolvedToSynthetic SKIPPED
+> Task :udea-nav:wasmJsTestProcessResources NO-SOURCE
+> Task :udea-net:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-nav:fetchSyntheticImportProjectPackages SKIPPED
+> Task :udea-nav:fingerprintXcodebuildIphonesimulator SKIPPED
+> Task :udea-nav:dumpXcodebuildArgsIphonesimulator SKIPPED
+> Task :udea-nav:convertSyntheticImportProjectIntoDefFileIphonesimulator SKIPPED
+> Task :udea-nav:processAndroidMainManifest
+> Task :udea-net:generateProjectStructureMetadata
+> Task :udea-net:prepareAndroidMainArtProfile
+> Task :udea-nav:writeAndroidMainAarMetadata
+> Task :udea-net:checkAndroidMainAarMetadata
+> Task :udea-nav:androidJar
+> Task :udea-net:generateAndroidMainEmptyResourceFiles
+> Task :udea-net:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-net:mergeAndroidMainJniLibFolders
+> Task :udea-net:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-gas:udeaVerifyGasTime
+> Task :udea-net:prepareLintJarForPublish
+> Task :udea-physics2d:androidPreBuild UP-TO-DATE
+> Task :udea-net:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-physics2d:preAndroidMainBuild UP-TO-DATE
+> Task :udea-net:wasmJsTestProcessResources NO-SOURCE
+> Task :udea-physics2d:generateProjectStructureMetadata
+> Task :udea-net:jvmTestProcessResources
+> Task :udea-net:processJvmTestResources SKIPPED
+> Task :udea-physics2d:allMetadataJar UP-TO-DATE
+> Task :udea-physics2d:prepareAndroidMainArtProfile
+> Task :udea-gradle:sourcesJar
+> Task :udea-net:androidJar
+> Task :udea-physics2d:generateAndroidMainEmptyResourceFiles
+> Task :udea-nav:copyAndroidMainJniLibsProjectOnly
+> Task :udea-physics2d:jvmTestProcessResources NO-SOURCE
+> Task :udea-physics2d:processJvmTestResources SKIPPED
+> Task :udea-physics2d:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-physics2d:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-render:generateProjectStructureMetadata
+> Task :udea-render:allMetadataJar UP-TO-DATE
+> Task :udea-physics2d:androidJar
+> Task :udea-net:writeAndroidMainAarMetadata
+> Task :udea-net:copyAndroidMainJniLibsProjectOnly
+> Task :udea-render:generateAndroidMainEmptyResourceFiles
+> Task :udea-render:prepareAndroidMainArtProfile
+> Task :udea-render:mergeAndroidMainJniLibFolders
+> Task :udea-render:prepareLintJarForPublish
+> Task :udea-physics2d:processAndroidMainManifest
+> Task :udea-render:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-physics2d:prepareLintJarForPublish
+> Task :udea-render:copyAndroidMainJniLibsProjectOnly
+> Task :udea-render:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-render:processAndroidHostTestJavaRes NO-SOURCE
+> Task :hollow:desktop:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :hollow:desktop:processResources NO-SOURCE
+> Task :udea-render:jvmTestProcessResources
+> Task :udea-render:androidJar
+> Task :udea-render:processJvmTestResources SKIPPED
+> Task :moba:android:preBuild UP-TO-DATE
+> Task :moba:android:preReleaseBuild UP-TO-DATE
+> Task :moba:game:androidPreBuild UP-TO-DATE
+> Task :moba:game:preAndroidMainBuild UP-TO-DATE
+> Task :moba:android:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-physics2d:writeAndroidMainAarMetadata
+> Task :moba:game:writeAndroidMainAarMetadata
+> Task :moba:android:generateReleaseResValues
+> Task :moba:game:generateAndroidMainEmptyResourceFiles
+> Task :moba:android:createReleaseCompatibleScreenManifests
+> Task :moba:android:generateReleaseResources
+> Task :moba:game:processAndroidMainManifest
+> Task :udea-net:processAndroidMainManifest
+> Task :udea-physics2d:mergeAndroidMainJniLibFolders
+> Task :udea-physics2d:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-physics2d:checkAndroidMainAarMetadata
+> Task :moba:android:extractDeepLinksRelease
+> Task :moba:desktop:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :udea-replay:metadataCommonMainProcessResources NO-SOURCE
+> Task :udea-replay:generateProjectStructureMetadata
+> Task :udea-replay:androidPreBuild UP-TO-DATE
+> Task :udea-replay:preAndroidMainBuild UP-TO-DATE
+> Task :moba:android:packageReleaseResources
+> Task :udea-replay:generateAndroidMainEmptyResourceFiles
+> Task :udea-replay:downloadKotlinNativeDistribution
+> Task :udea-replay:prepareAndroidMainArtProfile
+> Task :udea-render:writeAndroidMainAarMetadata
+> Task :udea-annotations:compileCommonMainKotlinMetadata
+> Task :udea-annotations:metadataCommonMainClasses
+> Task :udea-annotations:allMetadataJar UP-TO-DATE
+> Task :udea-annotations:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-annotations:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-annotations:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-annotations:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-annotations:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-annotations:metadataIosMainClasses UP-TO-DATE
+> Task :udea-annotations:exportCommonSourceSetsMetadataLocationsForMetadataApiElements
+> Task :udea-annotations:iosArm64MetadataElements UP-TO-DATE
+> Task :udea-annotations:iosSimulatorArm64MetadataElements UP-TO-DATE
+> Task :udea-replay:processAndroidMainManifest
+> Task :udea-replay:prepareLintJarForPublish
+> Task :udea-replay:commonizeNativeDistribution
+> Task :udea-replay:metadataNativeMainProcessResources NO-SOURCE
+> Task :udea-replay:metadataAppleMainProcessResources NO-SOURCE
+> Task :udea-replay:iosArm64ProcessResources NO-SOURCE
+> Task :udea-replay:iosSimulatorArm64ProcessResources NO-SOURCE
+> Task :udea-replay:metadataIosMainProcessResources NO-SOURCE
+> Task :udea-replay:validateLocalSwiftPMDependencies SKIPPED
+> Task :udea-replay:computeLocalPackageDependencyInputFiles SKIPPED
+> Task :udea-replay:fingerprintSyntheticPackage
+> Task :udea-replay:generateSyntheticLinkageSwiftPMImportProjectForCinteropsAndLdDump SKIPPED
+> Task :udea-replay:syncPersistedPackageResolvedToSynthetic SKIPPED
+> Task :udea-replay:fetchSyntheticImportProjectPackages SKIPPED
+> Task :udea-replay:fingerprintXcodebuildIphonesimulator SKIPPED
+> Task :udea-replay:dumpXcodebuildArgsIphonesimulator SKIPPED
+> Task :udea-replay:convertSyntheticImportProjectIntoDefFileIphonesimulator SKIPPED
+> Task :udea-replay:androidJar
+> Task :udea-replay:preAndroidHostTestBuild UP-TO-DATE
+> Task :udea-replay:wasmJsTestProcessResources NO-SOURCE
+> Task :hollow:desktop:udeaVerifyKotlinPin
+> Task :hollow:game:generateProjectStructureMetadata
+> Task :hollow:game:allMetadataJar
+> Task :hollow:game:androidPreBuild UP-TO-DATE
+> Task :hollow:game:preAndroidMainBuild UP-TO-DATE
+> Task :udea-diagnostics:compileCommonMainKotlinMetadata
+> Task :udea-diagnostics:metadataCommonMainClasses
+> Task :udea-diagnostics:allMetadataJar UP-TO-DATE
+> Task :udea-diagnostics:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-diagnostics:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-diagnostics:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-diagnostics:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-diagnostics:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-diagnostics:metadataIosMainClasses UP-TO-DATE
+> Task :udea-diagnostics:exportCommonSourceSetsMetadataLocationsForMetadataApiElements
+> Task :udea-diagnostics:iosArm64MetadataElements UP-TO-DATE
+> Task :udea-diagnostics:iosSimulatorArm64MetadataElements UP-TO-DATE
+> Task :udea-replay:checkAndroidMainAarMetadata
+> Task :hollow:game:mergeAndroidMainJniLibFolders
+> Task :hollow:game:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-replay:mergeAndroidMainJniLibFolders
+> Task :udea-replay:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-replay:copyAndroidMainJniLibsProjectOnly
+> Task :hollow:game:generateAndroidMainEmptyResourceFiles
+> Task :hollow:game:prepareAndroidMainArtProfile
+> Task :udea-diagnostics:compileKotlinWasmJs
+> Task :udea-diagnostics:wasmJsMainClasses
+> Task :udea-annotations:compileKotlinWasmJs
+> Task :udea-annotations:wasmJsMainClasses
+> Task :udea-annotations:wasmJsJar
+> Task :hollow:game:prepareLintJarForPublish
+> Task :udea-annotations:compileTestKotlinWasmJs
+> Task :udea-annotations:wasmJsTestClasses
+> Task :udea-replay:writeAndroidMainAarMetadata
+> Task :udea-audio:wasmJsTestProcessResources NO-SOURCE
+> Task :udea-render:processAndroidMainManifest
+> Task :hollow:game:copyAndroidMainJniLibsProjectOnly
+> Task :hollow:game:writeAndroidMainAarMetadata
+> Task :hollow:game:preAndroidHostTestBuild UP-TO-DATE
+> Task :hollow:game:androidJar
+> Task :udea-physics2d:copyAndroidMainJniLibsProjectOnly
+> Task :moba:android:preDebugBuild UP-TO-DATE
+> Task :moba:android:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :hollow:game:processAndroidHostTestJavaRes NO-SOURCE
+> Task :hollow:game:processAndroidMainManifest
+> Task :moba:android:generateDebugResValues FROM-CACHE
+> Task :udea-diagnostics:wasmJsJar
+> Task :moba:android:createDebugCompatibleScreenManifests
+> Task :moba:android:generateDebugResources FROM-CACHE
+> Task :moba:android:checkReleaseAarMetadata
+> Task :moba:android:extractDeepLinksDebug FROM-CACHE
+> Task :moba:android:mapReleaseSourceSetPaths
+> Task :moba:android:processReleaseNavigationResources
+> Task :udea-diagnostics:compileTestKotlinWasmJs
+> Task :udea-diagnostics:wasmJsTestClasses
+> Task :udea-render:checkAndroidMainAarMetadata
+> Task :moba:android:packageDebugResources
+> Task :hollow:game:checkAndroidMainAarMetadata
+> Task :moba:android:mergeDebugShaders
+> Task :moba:android:javaPreCompileDebug
+> Task :moba:android:compileDebugShaders NO-SOURCE
+> Task :moba:android:generateDebugAssets UP-TO-DATE
+> Task :moba:android:desugarDebugFileDependencies
+> Task :udea-assets:transformCommonMainDependenciesMetadata
+> Task :moba:android:mergeDebugJniLibFolders
+> Task :udea-assets:transformNativeMainDependenciesMetadata
+> Task :moba:android:mapDebugSourceSetPaths
+> Task :udea-assets:transformAppleMainDependenciesMetadata
+> Task :udea-assets:transformIosMainDependenciesMetadata
+> Task :moba:android:compileReleaseNavigationResources
+> Task :moba:android:writeDebugAppMetadata
+> Task :moba:android:validateSigningDebug
+> Task :moba:android:mergeReleaseJniLibFolders
+> Task :moba:android:processReleaseMainManifest
+> Task :moba:android:writeDebugSigningConfigVersions
+> Task :kotlinWasmNodeJsSetup
+> Task :moba:android:javaPreCompileRelease FROM-CACHE
+> Task :moba:android:processDebugMainManifest
+> Task :kotlinWasmYarnSetup
+> Task :moba:game:mergeAndroidMainJniLibFolders
+> Task :udea-annotations:compileKotlinJvm
+> Task :moba:android:buildKotlinToolingMetadata
+> Task :moba:game:mergeAndroidMainNativeLibs NO-SOURCE
+> Task :udea-annotations:compileJvmMainJava NO-SOURCE
+> Task :udea-annotations:jvmMainClasses
+> Task :udea-annotations:jvmJar UP-TO-DATE
+> Task :moba:android:processDebugNavigationResources FROM-CACHE
+> Task :moba:android:checkDebugAarMetadata
+> Task :moba:game:copyAndroidMainJniLibsProjectOnly
+> Task :moba:android:mergeDebugAssets
+> Task :udea-annotations:udeaVerifyKotlinPin
+> Task :udea-annotations:udeaVerifyModuleGraph
+> Task :udea-annotations:compileAndroidMain
+> Task :moba:android:compileDebugNavigationResources FROM-CACHE
+> Task :moba:android:compressDebugAssets
+> Task :udea-annotations:processAndroidMainJavaRes
+> Task :moba:android:processDebugManifest
+> Task :udea-annotations:udeaMainBytecode
+> Task :moba:android:processReleaseManifest
+> Task :moba:android:processReleaseManifestForPackage
+> Task :udea-annotations:udeaVerifyEditorAbsent
+> Task :udea-agent:kotlinWasmNodeJsSetup
+> Task :moba:android:processDebugManifestForPackage
+> Task :udea-annotations:bundleLibRuntimeToDirAndroidMain
+> Task :udea-annotations:bundleAndroidMainClassesToRuntimeJar
+> Task :moba:android:mergeReleaseResources
+> Task :udea-annotations:mergeAndroidMainJavaResource
+> Task :udea-annotations:kotlinWasmNodeJsSetup
+> Task :udea-annotations:syncAndroidMainLibJars
+> Task :udea-annotations:bundleAndroidMainAar
+> Task :udea-annotations:assembleAndroidMain
+> Task :moba:android:desugarReleaseFileDependencies
+> Task :moba:android:mergeReleaseStartupProfile
+> Task :moba:game:prepareAndroidMainArtProfile
+> Task :moba:android:parseDebugLocalResources
+> Task :udea-diagnostics:compileAndroidMain
+> Task :moba:android:checkReleaseDuplicateClasses
+> Task :udea-diagnostics:bundleAndroidMainClassesToCompileJar
+> Task :udea-diagnostics:processAndroidMainJavaRes
+> Task :kotlinWasmNpmInstall
+> Task :kotlinWasmStoreYarnLock
+> Task :udea-diagnostics:compileKotlinJvm
+> Task :udea-diagnostics:compileJvmMainJava NO-SOURCE
+> Task :udea-diagnostics:jvmMainClasses
+> Task :udea-diagnostics:jvmJar UP-TO-DATE
+> Task :udea-assets:kotlinWasmNodeJsSetup
+> Task :moba:android:mergeReleaseArtProfile
+> Task :udea-agent-host:udeaVerifyModuleGraph
+> Task :udea-assets-compiler:udeaVerifyModuleGraph
+> Task :moba:android:mergeDebugResources
+> Task :udea-agent-host:udeaVerifyKotlinPin
+> Task :moba:android:parseReleaseLocalResources
+> Task :udea-assets-compiler:udeaVerifyKotlinPin
+> Task :udea-diagnostics:udeaVerifyEditorAbsent
+> Task :udea-diagnostics:udeaMainBytecode
+> Task :udea-annotations:bundleAndroidMainClassesToCompileJar
+> Task :udea-audio:kotlinWasmNodeJsSetup
+> Task :udea-assets:extractAndroidMainAnnotations
+> Task :udea-core:kotlinWasmNodeJsSetup
+> Task :udea-diagnostics:compileTestFixturesKotlinJvm
+> Task :udea-diagnostics:compileJvmTestFixturesJava NO-SOURCE
+> Task :udea-diagnostics:jvmTestFixturesClasses
+> Task :udea-diagnostics:udeaVerifyModuleGraph
+> Task :udea-diagnostics:jvmTestFixturesJar
+> Task :udea-diagnostics:kotlinWasmNodeJsSetup
+> Task :udea-diagnostics:udeaVerifyKotlinPin
+> Task :udea-annotations:compileTestDevelopmentExecutableKotlinWasmJs
+> Task :udea-annotations:wasmJsTestTestDevelopmentExecutableCompileSync
+> Task :udea-fleks:kotlinWasmNodeJsSetup
+> Task :udea-diagnostics:mergeAndroidMainJavaResource
+> Task :moba:android:processReleaseResources
+> Task :udea-diagnostics:syncAndroidMainLibJars
+> Task :moba:android:processDebugResources
+> Task :udea-diagnostics:bundleAndroidMainAar
+> Task :udea-diagnostics:assembleAndroidMain
+> Task :udea-annotations:createFullJarAndroidMain
+> Task :moba:android:extractProguardFiles
+> Task :udea-annotations:bundleAndroidMainLocalLintAar
+> Task :udea-diagnostics:bundleAndroidMainLocalLintAar
+> Task :udea-gas:kotlinWasmNodeJsSetup
+> Task :moba:android:extractReleaseVersionControlInfo
+> Task :udea-nav:kotlinWasmNodeJsSetup
+> Task :moba:android:collectReleaseDependencies
+> Task :udea-net:kotlinWasmNodeJsSetup
+> Task :moba:android:sdkReleaseDependencyData
+> Task :moba:android:writeReleaseAppMetadata
+> Task :udea-replay:kotlinWasmNodeJsSetup
+> Task :udea-annotations:generateAndroidHostTestLintModel
+> Task :udea-annotations:compileKotlinIosSimulatorArm64
+> Task :udea-annotations:iosSimulatorArm64MainKlibrary
+> Task :udea-annotations:compileKotlinIosArm64
+> Task :udea-annotations:iosArm64MainKlibrary
+> Task :udea-annotations:compileTestKotlinIosSimulatorArm64
+> Task :udea-annotations:linkDebugTestIosSimulatorArm64 SKIPPED
+> Task :udea-annotations:iosSimulatorArm64Test SKIPPED
+> Task :udea-annotations:compileTestKotlinIosArm64
+> Task :udea-annotations:assemble
+> Task :moba:android:preDebugUnitTestBuild UP-TO-DATE
+> Task :moba:android:preDebugAndroidTestBuild SKIPPED
+> Task :moba:game:preAndroidHostTestBuild UP-TO-DATE
+> Task :moba:android:generateDebugAndroidTestResValues FROM-CACHE
+> Task :moba:android:udeaVerifyKotlinPin
+> Task :moba:desktop:udeaGenerateLaunchDeclaration
+> Task :moba:desktop:udeaGenerateAgentBuildFlags
+> Task :moba:game:androidJar
+> Task :moba:game:generateProjectStructureMetadata
+> Task :moba:game:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-diagnostics:bundleAndroidMainClassesToRuntimeJar
+> Task :moba:game:allMetadataJar
+> Task :udea-diagnostics:createFullJarAndroidMain
+> Task :udea-diagnostics:generateAndroidHostTestLintModel
+> Task :udea-annotations:compileTestKotlinJvm
+> Task :udea-annotations:compileJvmTestJava NO-SOURCE
+> Task :udea-annotations:jvmTestClasses
+> Task :moba:android:writeReleaseSigningConfigVersions
+> Task :moba:android:mergeReleaseShaders
+> Task :udea-codegen:kspKotlin
+> Task :kotlinWasmToolingSetup
+> Task :moba:android:compileReleaseShaders NO-SOURCE
+> Task :udea-codegen:sourcesJar UP-TO-DATE
+> Task :moba:android:generateReleaseAssets UP-TO-DATE
+> Task :udea-codegen:processResources UP-TO-DATE
+> Task :moba:android:mergeReleaseNativeLibs
+> Task :moba:game:prepareLintJarForPublish
+
+> Task :udea-compiler-plugin:compileKotlin
+w: The argument '-Xcontext-parameters' is redundant for the current language version 2.4.
+
+> Task :udea-diagnostics:compileKotlinIosSimulatorArm64
+> Task :udea-diagnostics:iosSimulatorArm64MainKlibrary
+> Task :udea-diagnostics:bundleLibRuntimeToDirAndroidMain
+> Task :udea-annotations:wasmJsNodeTest
+> Task :udea-diagnostics:compileKotlinIosArm64
+> Task :udea-annotations:wasmJsTest
+> Task :udea-diagnostics:iosArm64MainKlibrary
+> Task :udea-annotations:compileAndroidHostTest
+> Task :udea-compiler-plugin:compileJava NO-SOURCE
+> Task :udea-compiler-plugin:classes UP-TO-DATE
+> Task :udea-compiler-plugin:jar UP-TO-DATE
+> Task :moba:android:mergeDebugNativeLibs
+> Task :udea-diagnostics:compileAndroidHostTest
+> Task :moba:android:checkDebugDuplicateClasses
+> Task :udea-diagnostics:compileTestKotlinJvm
+> Task :moba:game:checkAndroidMainAarMetadata
+> Task :udea-agent:udeaVerifyCompilerPlugin
+> Task :udea-agent-host:udeaVerifyCompilerPlugin
+> Task :moba:android:mergeReleaseAssets
+> Task :udea-annotations:jvmTest
+> Task :udea-assets:udeaVerifyCompilerPlugin
+> Task :udea-assets-compiler:udeaVerifyCompilerPlugin
+> Task :udea-audio:udeaVerifyCompilerPlugin
+> Task :udea-codegen:udeaVerifyCompilerPlugin
+> Task :udea-compiler-plugin:assemble UP-TO-DATE
+> Task :udea-compiler-plugin:udeaVerifyEditorAbsent
+> Task :udea-core:udeaVerifyCompilerPlugin
+> Task :udea-diagnostics:compileJvmTestJava NO-SOURCE
+> Task :udea-diagnostics:jvmTestClasses
+> Task :moba:android:optimizeReleaseResources
+
+> Task :udea-assets:compileKotlinWasmJs
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:29:20 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:29:26 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:29:88 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:33:16 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:33:22 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:33:105 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:39:26 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:39:48 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:39:69 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:39:70 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:41:9 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:41:17 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:47:50 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:47:58 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:54:44 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:61:40 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:65:2 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:66:45 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:68:2 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:69:62 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsMain/kotlin/dev/wildware/udea/assets/pack/BundleFetch.kt:71:2 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+
+> Task :udea-assets:wasmJsMainClasses
+> Task :udea-fleks:compileCommonMainKotlinMetadata
+> Task :udea-fleks:metadataCommonMainClasses
+> Task :udea-fleks:allMetadataJar UP-TO-DATE
+> Task :udea-fleks:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-fleks:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-fleks:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-fleks:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-fleks:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-fleks:metadataIosMainClasses UP-TO-DATE
+> Task :udea-fleks:exportCommonSourceSetsMetadataLocationsForMetadataApiElements
+> Task :udea-fleks:iosArm64MetadataElements UP-TO-DATE
+> Task :udea-fleks:iosSimulatorArm64MetadataElements UP-TO-DATE
+> Task :udea-fleks:compileAndroidMain
+> Task :udea-fleks:compileKotlinJvm
+> Task :udea-fleks:compileJvmMainJava NO-SOURCE
+> Task :udea-fleks:jvmMainClasses
+> Task :udea-fleks:jvmJar UP-TO-DATE
+> Task :udea-assets:wasmJsJar
+> Task :udea-fleks:processAndroidMainJavaRes
+> Task :udea-fleks:compileKotlinWasmJs
+> Task :udea-fleks:wasmJsMainClasses
+> Task :udea-fleks:udeaVerifyModuleGraph
+> Task :udea-editor:udeaVerifyCompilerPlugin
+> Task :udea-assets:compileKotlinJvm
+> Task :udea-assets:compileJvmMainJava NO-SOURCE
+> Task :udea-assets:jvmMainClasses
+> Task :udea-assets:jvmJar UP-TO-DATE
+> Task :udea-fleks:bundleAndroidMainClassesToCompileJar
+> Task :udea-fleks:bundleAndroidMainClassesToRuntimeJar
+> Task :udea-core:transformCommonMainDependenciesMetadata
+> Task :udea-assets:compileAndroidMain
+> Task :udea-core:transformNonJvmMainDependenciesMetadata
+> Task :udea-assets:udeaVerifyModuleGraph
+> Task :udea-core:transformNativeMainDependenciesMetadata
+> Task :udea-core:transformAppleMainDependenciesMetadata
+> Task :udea-core:transformIosMainDependenciesMetadata
+> Task :udea-codegen:compileKotlin
+> Task :udea-assets:processAndroidMainJavaRes
+> Task :udea-codegen:compileJava NO-SOURCE
+> Task :udea-codegen:classes UP-TO-DATE
+> Task :udea-codegen:jar UP-TO-DATE
+> Task :udea-diagnostics:compileTestDevelopmentExecutableKotlinWasmJs
+> Task :udea-assets:udeaVerifyEditorAbsent
+> Task :udea-assets:udeaVerifyKotlinPin
+> Task :udea-codegen:assemble UP-TO-DATE
+> Task :udea-assets:mergeAndroidMainJavaResource
+> Task :udea-assets:bundleAndroidMainClassesToRuntimeJar
+> Task :udea-core:extractAndroidMainAnnotations
+> Task :udea-diagnostics:wasmJsTestTestDevelopmentExecutableCompileSync
+
+> Task :udea-assets:compileTestKotlinWasmJs
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:31:70 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:31:78 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:31:88 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:42:76 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:42:84 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:42:94 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:59:68 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:59:76 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:59:86 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:75:22 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:75:35 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:75:57 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:79:13 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:79:26 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:89:50 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:89:58 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:89:68 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:93:31 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:94:31 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:94:41 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:100:26 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:100:56 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:101:5 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:101:13 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:107:94 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:113:38 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:114:17 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:115:37 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:115:45 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:116:12 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:119:41 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:121:2 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:122:47 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:124:2 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:125:37 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:128:2 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:143:54 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:143:62 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:145:2 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:149:2 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:150:54 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-assets/src/wasmJsTest/kotlin/dev/wildware/udea/assets/pack/BundleFetchTest.kt:150:62 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+
+> Task :udea-assets:wasmJsTestClasses
+> Task :udea-codegen:udeaVerifyEditorAbsent
+
+> Task :moba:android:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libkoolandroidnative.so. Run with --info option to learn more.
+
+> Task :udea-assets:syncAndroidMainLibJars
+> Task :udea-assets:bundleAndroidMainAar
+> Task :udea-assets:assembleAndroidMain
+> Task :udea-fleks:wasmJsJar
+
+> Task :udea-compiler-plugin:compileTestKotlin
+w: The argument '-Xcontext-parameters' is redundant for the current language version 2.4.
+
+> Task :udea-fleks:mergeAndroidMainJavaResource
+> Task :udea-assets:compileCommonMainKotlinMetadata
+> Task :udea-assets:metadataCommonMainClasses
+> Task :udea-assets:allMetadataJar UP-TO-DATE
+> Task :udea-assets:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-assets:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-assets:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-assets:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-fleks:syncAndroidMainLibJars
+> Task :udea-assets:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-assets:metadataIosMainClasses UP-TO-DATE
+> Task :udea-assets:iosArm64MetadataElements UP-TO-DATE
+> Task :udea-assets:exportCommonSourceSetsMetadataLocationsForMetadataApiElements
+> Task :udea-assets:iosSimulatorArm64MetadataElements UP-TO-DATE
+> Task :udea-fleks:bundleAndroidMainAar
+> Task :udea-fleks:assembleAndroidMain
+> Task :udea-fleks:udeaVerifyCompilerPlugin
+> Task :udea-fleks:udeaVerifyEditorAbsent
+> Task :udea-fleks:udeaVerifyKotlinPin
+> Task :udea-gas:udeaVerifyCompilerPlugin
+> Task :udea-gradle:udeaVerifyCompilerPlugin
+> Task :udea-nav:udeaVerifyCompilerPlugin
+> Task :udea-net:udeaVerifyCompilerPlugin
+> Task :udea-physics2d:udeaVerifyCompilerPlugin
+> Task :udea-assets:udeaMainBytecode
+> Task :udea-codegen:udeaMainBytecode UP-TO-DATE
+> Task :udea-compiler-plugin:udeaMainBytecode UP-TO-DATE
+> Task :udea-fleks:udeaMainBytecode
+> Task :udea-render:udeaVerifyCompilerPlugin
+> Task :udea-replay:udeaVerifyCompilerPlugin
+> Task :hollow:desktop:udeaVerifyCompilerPlugin
+> Task :hollow:game:udeaVerifyCompilerPlugin
+> Task :udea-compiler-plugin:compileTestJava NO-SOURCE
+> Task :udea-compiler-plugin:testClasses UP-TO-DATE
+> Task :udea-diagnostics:compileTestKotlinIosArm64
+> Task :udea-diagnostics:wasmJsNodeTest
+> Task :udea-diagnostics:compileTestKotlinIosSimulatorArm64
+> Task :udea-diagnostics:assemble
+> Task :udea-diagnostics:linkDebugTestIosSimulatorArm64 SKIPPED
+> Task :udea-diagnostics:iosSimulatorArm64Test SKIPPED
+> Task :udea-annotations:testAndroidHostTest
+> Task :udea-annotations:testAndroid
+> Task :udea-fleks:compileTestKotlinJvm
+> Task :udea-fleks:compileJvmTestJava NO-SOURCE
+> Task :udea-fleks:jvmTestClasses
+> Task :udea-fleks:compileAndroidHostTest
+> Task :udea-assets:bundleLibRuntimeToDirAndroidMain
+> Task :udea-assets:compileTestDevelopmentExecutableKotlinWasmJs
+> Task :udea-assets:wasmJsTestTestDevelopmentExecutableCompileSync
+> Task :udea-assets-compiler:compileKotlin
+> Task :udea-assets-compiler:compileJava NO-SOURCE
+> Task :udea-assets-compiler:classes UP-TO-DATE
+> Task :udea-assets-compiler:jar UP-TO-DATE
+> Task :udea-annotations:lintAnalyzeAndroidHostTest
+> Task :udea-diagnostics:wasmJsTest
+> Task :udea-assets:bundleAndroidMainClassesToCompileJar
+
+> Task :moba:game:udeaScanAssets
+[udeaScanAssets] 24 script(s), 162 declaration(s)
+
+> Task :udea-fleks:compileTestKotlinWasmJs
+> Task :udea-assets-compiler:assemble UP-TO-DATE
+
+> Task :hollow:game:udeaScanAssets
+[udeaScanAssets] 2 script(s), 26 declaration(s)
+
+> Task :udea-fleks:bundleLibRuntimeToDirAndroidMain
+
+> Task :moba:android:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libkoolandroidnative.so. Run with --info option to learn more.
+
+> Task :udea-fleks:wasmJsTestClasses
+> Task :udea-annotations:allTests
+> Task :udea-annotations:check
+> Task :udea-annotations:build
+
+> Task :moba:game:udeaGenerateAccessors
+[udeaGenerateAccessors] 14 file(s) from 162 declaration(s)
+
+> Task :udea-assets-compiler:udeaMainBytecode UP-TO-DATE
+
+> Task :hollow:game:udeaGenerateAccessors
+[udeaGenerateAccessors] 28 file(s) from 26 declaration(s)
+
+> Task :udea-fleks:testAndroidHostTest
+> Task :udea-fleks:testAndroid
+> Task :udea-assets-compiler:udeaVerifyEditorAbsent
+> Task :moba:android:mergeExtDexRelease
+> Task :udea-assets:compileAndroidHostTest
+> Task :moba:android:extractReleaseNativeSymbolTables
+> Task :moba:android:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :udea-assets:compileTestKotlinJvm
+> Task :udea-assets:compileJvmTestJava NO-SOURCE
+> Task :udea-assets:jvmTestClasses
+> Task :udea-assets-compiler:compileTestKotlin
+> Task :udea-assets-compiler:compileTestJava NO-SOURCE
+> Task :udea-assets-compiler:testClasses
+> Task :udea-diagnostics:jvmTest
+> Task :moba:android:compressReleaseAssets
+> Task :udea-assets:createFullJarAndroidMain
+> Task :udea-fleks:createFullJarAndroidMain
+> Task :udea-assets:bundleAndroidMainLocalLintAar
+> Task :udea-fleks:bundleAndroidMainLocalLintAar
+> Task :udea-diagnostics:testAndroidHostTest
+> Task :udea-assets:generateAndroidHostTestLintModel
+> Task :udea-diagnostics:testAndroid
+> Task :udea-compiler-plugin:udeaVerifyPluginOptional
+> Task :udea-compiler-plugin:check
+> Task :udea-compiler-plugin:build
+> Task :udea-fleks:jvmTest
+> Task :udea-fleks:generateAndroidHostTestLintModel
+> Task :moba:android:udeaVerifyCompilerPlugin
+> Task :moba:desktop:udeaVerifyCompilerPlugin
+> Task :moba:game:udeaVerifyCompilerPlugin
+> Task :udea-assets:wasmJsNodeTest
+> Task :udea-diagnostics:allTests
+> Task :udea-diagnostics:check
+> Task :udea-diagnostics:build
+> Task :udea-diagnostics:lintAnalyzeAndroidHostTest
+> Task :udea-assets:testAndroidHostTest
+> Task :udea-assets:testAndroid
+> Task :udea-assets:wasmJsTest
+> Task :udea-assets:jvmTest
+> Task :udea-fleks:compileTestDevelopmentExecutableKotlinWasmJs
+> Task :udea-fleks:wasmJsTestTestDevelopmentExecutableCompileSync
+
+> Task :hollow:game:udeaPackBundle
+[udeaPackBundle] assets.udeapak: 26 asset(s), 0 sheet(s), 0 atlas page(s), 2128 bytes; 1 model(s) converted
+
+> Task :hollow:game:udeaBundleResources
+> Task :udea-fleks:wasmJsNodeTest
+> Task :udea-fleks:wasmJsTest
+
+> Task :hollow:game:udeaValidateAssets
+[udeaValidateAssets] 26 asset(s), 0 diagnostic(s)
+
+> Task :hollow:game:udeaVerifyRelocatable
+> Task :udea-fleks:compileKotlinIosArm64
+> Task :udea-fleks:compileKotlinIosSimulatorArm64
+> Task :udea-assets:compileKotlinIosArm64
+> Task :udea-assets:compileKotlinIosSimulatorArm64
+> Task :udea-core:kspCommonMainKotlinMetadata
+> Task :udea-gradle:compileKotlin
+> Task :udea-gradle:compileJava NO-SOURCE
+> Task :udea-gradle:classes
+> Task :udea-gradle:udeaMainBytecode
+> Task :udea-gradle:jar
+> Task :udea-gradle:assemble
+> Task :moba:android:mergeExtDexDebug
+> Task :udea-assets:iosSimulatorArm64MainKlibrary
+> Task :udea-assets:iosArm64MainKlibrary
+> Task :udea-gradle:udeaVerifyEditorAbsent
+> Task :udea-gradle:check
+> Task :udea-gradle:build
+> Task :udea-fleks:iosSimulatorArm64MainKlibrary
+> Task :udea-fleks:iosArm64MainKlibrary
+
+> Task :moba:game:udeaValidateAssets
+[udeaValidateAssets] 162 asset(s), 0 diagnostic(s)
+
+> Task :moba:game:udeaPackBundle
+[udeaPackBundle] assets.udeapak: 162 asset(s), 38 sheet(s), 1 atlas page(s), 101035 bytes; 1 model(s) converted
+
+> Task :moba:game:udeaBundleResources
+> Task :moba:game:udeaVerifyRelocatable
+> Task :udea-assets:lintAnalyzeAndroidHostTest
+> Task :udea-core:udeaCheckProtocolLock
+> Task :udea-core:kspKotlinIosArm64
+> Task :udea-core:kspKotlinWasmJs
+> Task :udea-core:kspKotlinIosSimulatorArm64
+> Task :udea-core:kspKotlinJvm
+> Task :udea-core:jvmProcessResources NO-SOURCE
+> Task :udea-core:processJvmMainResources SKIPPED
+> Task :udea-assets:compileTestKotlinIosSimulatorArm64
+> Task :udea-assets:linkDebugTestIosSimulatorArm64 SKIPPED
+> Task :udea-assets:iosSimulatorArm64Test SKIPPED
+> Task :udea-assets:allTests
+> Task :udea-assets:check
+> Task :udea-assets:compileTestKotlinIosArm64
+> Task :udea-assets:assemble
+> Task :udea-assets:build
+> Task :udea-core:kspAndroidMain
+> Task :udea-core:compileCommonMainKotlinMetadata
+> Task :udea-core:metadataCommonMainClasses
+> Task :udea-core:kspNonJvmMainKotlinMetadata
+> Task :udea-core:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-core:compileNonJvmMainKotlinMetadata
+> Task :udea-core:metadataNonJvmMainClasses
+> Task :udea-core:allMetadataJar UP-TO-DATE
+> Task :udea-assets-compiler:udeaPackGate
+> Task :udea-core:compileKotlinWasmJs
+> Task :udea-core:wasmJsMainClasses
+> Task :udea-replay:kspKotlinWasmJs
+> Task :udea-core:kspTestKotlinWasmJs
+> Task :udea-core:compileNativeMainKotlinMetadata
+> Task :udea-core:metadataNativeMainClasses
+> Task :udea-core:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-core:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-core:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-core:metadataIosMainClasses UP-TO-DATE
+> Task :udea-core:iosSimulatorArm64MetadataElements UP-TO-DATE
+> Task :udea-core:iosArm64MetadataElements UP-TO-DATE
+> Task :udea-core:exportCommonSourceSetsMetadataLocationsForMetadataApiElements
+> Task :udea-audio:compileKotlinWasmJs
+> Task :udea-audio:wasmJsMainClasses
+> Task :udea-nav:transformCommonMainDependenciesMetadata
+> Task :udea-gas:transformCommonMainDependenciesMetadata
+> Task :udea-replay:transformCommonMainDependenciesMetadata
+> Task :udea-replay:kspCommonMainKotlinMetadata
+> Task :udea-audio:wasmJsJar
+> Task :udea-audio:transformCommonMainDependenciesMetadata
+> Task :udea-nav:transformNativeMainDependenciesMetadata
+> Task :udea-agent:transformCommonMainDependenciesMetadata
+> Task :udea-replay:transformNativeMainDependenciesMetadata
+> Task :udea-replay:transformAppleMainDependenciesMetadata
+> Task :udea-gas:transformNativeMainDependenciesMetadata
+> Task :udea-replay:transformIosMainDependenciesMetadata
+> Task :udea-nav:transformAppleMainDependenciesMetadata
+> Task :udea-gas:transformAppleMainDependenciesMetadata
+> Task :udea-nav:transformIosMainDependenciesMetadata
+> Task :udea-replay:compileKotlinWasmJs
+> Task :udea-replay:wasmJsMainClasses
+> Task :udea-gas:transformIosMainDependenciesMetadata
+> Task :udea-audio:transformNativeMainDependenciesMetadata
+> Task :udea-replay:wasmJsJar
+> Task :udea-audio:compileTestKotlinWasmJs
+> Task :udea-audio:wasmJsTestClasses
+> Task :udea-core:wasmJsJar
+> Task :udea-audio:transformAppleMainDependenciesMetadata
+> Task :udea-audio:compileCommonMainKotlinMetadata
+> Task :udea-net:transformCommonMainDependenciesMetadata
+> Task :udea-audio:metadataCommonMainClasses
+> Task :udea-audio:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-audio:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-audio:allMetadataJar UP-TO-DATE
+> Task :udea-audio:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-audio:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-audio:transformIosMainDependenciesMetadata
+> Task :udea-audio:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-audio:metadataIosMainClasses UP-TO-DATE
+> Task :udea-audio:iosArm64MetadataElements UP-TO-DATE
+> Task :udea-audio:iosSimulatorArm64MetadataElements UP-TO-DATE
+> Task :udea-replay:compileCommonMainKotlinMetadata
+> Task :udea-replay:metadataCommonMainClasses
+> Task :udea-replay:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-replay:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-replay:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-replay:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-replay:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-replay:allMetadataJar UP-TO-DATE
+> Task :udea-replay:metadataIosMainClasses UP-TO-DATE
+> Task :udea-replay:iosArm64MetadataElements UP-TO-DATE
+> Task :udea-replay:iosSimulatorArm64MetadataElements UP-TO-DATE
+> Task :udea-replay:kspTestKotlinWasmJs
+> Task :udea-assets-compiler:check
+> Task :udea-assets-compiler:build
+> Task :udea-replay:compileTestKotlinWasmJs
+> Task :udea-replay:wasmJsTestClasses
+> Task :udea-core:compileAndroidMain
+> Task :udea-core:processAndroidMainJavaRes
+> Task :udea-core:bundleAndroidMainClassesToRuntimeJar
+> Task :udea-core:bundleAndroidMainClassesToCompileJar
+> Task :udea-core:mergeAndroidMainJavaResource
+> Task :udea-core:compileKotlinJvm
+> Task :udea-audio:extractAndroidMainAnnotations
+> Task :udea-core:compileJvmMainJava NO-SOURCE
+> Task :udea-core:jvmMainClasses
+> Task :udea-core:udeaMainBytecode
+> Task :udea-agent:extractAndroidMainAnnotations
+> Task :udea-core:createFullJarAndroidMain
+> Task :udea-fleks:lintAnalyzeAndroidHostTest
+> Task :udea-core:jvmJar UP-TO-DATE
+> Task :udea-codegen:udeaVerifyModuleGraph
+> Task :udea-core:kspTestFixturesKotlinJvm
+> Task :udea-core:syncAndroidMainLibJars
+> Task :udea-net:compileKotlinWasmJs
+> Task :udea-core:jvmTestFixturesProcessResources NO-SOURCE
+> Task :udea-core:processJvmTestFixturesResources SKIPPED
+> Task :udea-net:wasmJsMainClasses
+> Task :udea-core:compileTestKotlinWasmJs
+> Task :udea-core:wasmJsTestClasses
+> Task :udea-core:bundleLibRuntimeToDirAndroidMain
+> Task :udea-core:bundleAndroidMainAar
+> Task :udea-core:assembleAndroidMain
+> Task :udea-gas:extractAndroidMainAnnotations
+> Task :udea-nav:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-net:compileCommonMainKotlinMetadata
+> Task :udea-net:metadataCommonMainClasses
+> Task :udea-net:extractAndroidMainAnnotations
+> Task :udea-core:udeaVerifyEditorAbsent
+> Task :udea-net:allMetadataJar UP-TO-DATE
+> Task :udea-physics2d:extractAndroidMainAnnotations
+> Task :udea-net:wasmJsJar
+> Task :udea-replay:extractAndroidMainAnnotations FROM-CACHE
+> Task :udea-replay:kspAndroidMain
+
+> Task :udea-net:compileTestKotlinWasmJs
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-net/src/wasmJsTest/kotlin/dev/wildware/udea/net/transport/WebSocketWasmClientTest.kt:77:5 This declaration needs opt-in. Its usage should be marked with '@kotlin.js.ExperimentalWasmJsInterop' or '@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)'
+
+> Task :udea-net:wasmJsTestClasses
+> Task :udea-audio:compileKotlinJvm
+> Task :udea-audio:compileJvmMainJava NO-SOURCE
+> Task :udea-audio:jvmMainClasses
+> Task :udea-audio:jvmJar UP-TO-DATE
+> Task :udea-core:compileTestFixturesKotlinJvm
+> Task :udea-audio:compileAndroidMain
+> Task :udea-audio:udeaVerifyModuleGraph
+> Task :udea-core:compileJvmTestFixturesJava NO-SOURCE
+> Task :udea-core:jvmTestFixturesClasses
+> Task :udea-audio:bundleAndroidMainClassesToCompileJar
+> Task :udea-core:udeaVerifyModuleGraph
+> Task :udea-core:jvmTestFixturesJar
+> Task :udea-audio:processAndroidMainJavaRes
+The Daemon will expire after the build after running out of JVM Metaspace.
+The project memory settings are likely not configured or are configured to an insufficient value.
+The daemon will restart for the next build, which may increase subsequent build times.
+These settings can be adjusted by setting 'org.gradle.jvmargs' in 'gradle.properties'.
+The currently configured max heap space is '2 GiB' and the configured max metaspace is '1 GiB'.
+For more information on how to set these values, please refer to https://docs.gradle.org/8.13/userguide/build_environment.html#sec:configuring_jvm_memory in the Gradle documentation.
+To disable this warning, set 'org.gradle.daemon.performance.disable-logging=true'.
+> Task :udea-audio:mergeAndroidMainJavaResource
+Daemon will be stopped at the end of the build after running out of JVM Metaspace
+> Task :udea-audio:syncAndroidMainLibJars
+> Task :udea-audio:bundleAndroidMainAar
+> Task :udea-audio:assembleAndroidMain
+> Task :udea-physics2d:compileAndroidMain
+> Task :udea-replay:compileAndroidMain
+> Task :udea-physics2d:compileKotlinJvm
+> Task :udea-physics2d:compileJvmMainJava NO-SOURCE
+> Task :udea-physics2d:jvmMainClasses
+> Task :udea-physics2d:udeaMainBytecode
+> Task :udea-physics2d:udeaVerifyModuleGraph
+> Task :udea-physics2d:jvmJar UP-TO-DATE
+> Task :udea-audio:bundleAndroidMainClassesToRuntimeJar
+> Task :udea-audio:udeaVerifyKotlinPin
+> Task :udea-audio:udeaVerifyEditorAbsent
+> Task :udea-core:udeaVerifyKotlinPin
+> Task :udea-physics2d:processAndroidMainJavaRes
+> Task :udea-physics2d:mergeAndroidMainJavaResource
+> Task :udea-physics2d:syncAndroidMainLibJars
+> Task :udea-physics2d:bundleAndroidMainAar
+> Task :udea-physics2d:assembleAndroidMain
+> Task :udea-physics2d:assemble
+> Task :udea-gas:kspCommonMainKotlinMetadata
+> Task :udea-physics2d:bundleAndroidMainClassesToRuntimeJar
+> Task :udea-nav:kspCommonMainKotlinMetadata
+> Task :udea-fleks:compileTestKotlinIosSimulatorArm64
+> Task :udea-gas:kspAndroidMain
+> Task :udea-gas:kspKotlinWasmJs
+> Task :udea-fleks:compileTestKotlinIosArm64
+> Task :udea-gas:kspKotlinJvm
+> Task :udea-nav:kspKotlinWasmJs
+> Task :udea-gas:jvmProcessResources NO-SOURCE
+> Task :udea-gas:processJvmMainResources SKIPPED
+> Task :udea-core:kspTestKotlinJvm
+> Task :udea-nav:wasmJsProcessResources UP-TO-DATE
+> Task :udea-audio:compileTestKotlinJvm
+> Task :udea-audio:compileJvmTestJava NO-SOURCE
+> Task :udea-audio:jvmTestClasses
+> Task :udea-audio:compileAndroidHostTest
+> Task :udea-audio:compileTestDevelopmentExecutableKotlinWasmJs
+> Task :udea-audio:wasmJsTestTestDevelopmentExecutableCompileSync
+> Task :udea-replay:compileTestDevelopmentExecutableKotlinWasmJs
+> Task :udea-core:jvmTestProcessResources
+> Task :udea-core:processJvmTestResources SKIPPED
+> Task :udea-fleks:assemble
+> Task :udea-fleks:linkDebugTestIosSimulatorArm64 SKIPPED
+> Task :udea-fleks:iosSimulatorArm64Test SKIPPED
+> Task :udea-fleks:allTests
+> Task :udea-fleks:check
+> Task :udea-fleks:build
+> Task :udea-audio:wasmJsNodeTest
+> Task :udea-audio:wasmJsTest
+> Task :udea-net:compileAndroidMain
+> Task :udea-core:compileAndroidHostTest
+> Task :udea-nav:compileKotlinWasmJs
+> Task :udea-nav:wasmJsMainClasses
+> Task :udea-nav:metadataCommonMainProcessResources UP-TO-DATE
+> Task :udea-nav:kspAndroidMain
+> Task :udea-nav:metadataNativeMainProcessResources UP-TO-DATE
+> Task :udea-nav:metadataAppleMainProcessResources UP-TO-DATE
+> Task :udea-net:bundleAndroidMainClassesToCompileJar
+> Task :udea-nav:iosArm64ProcessResources
+> Task :udea-nav:metadataIosMainProcessResources UP-TO-DATE
+> Task :udea-nav:iosSimulatorArm64ProcessResources
+> Task :udea-net:compileKotlinJvm
+> Task :udea-net:compileJvmMainJava NO-SOURCE
+> Task :udea-net:jvmMainClasses
+> Task :udea-net:udeaMainBytecode
+> Task :udea-net:jvmJar UP-TO-DATE
+> Task :udea-nav:kspTestKotlinWasmJs
+> Task :udea-net:udeaVerifyModuleGraph
+> Task :udea-nav:wasmJsJar
+> Task :udea-net:processAndroidMainJavaRes
+> Task :udea-net:mergeAndroidMainJavaResource
+> Task :udea-audio:testAndroidHostTest
+> Task :udea-audio:testAndroid
+> Task :udea-net:bundleAndroidMainClassesToRuntimeJar
+> Task :udea-net:syncAndroidMainLibJars
+> Task :udea-net:bundleAndroidMainAar
+> Task :udea-net:assembleAndroidMain
+> Task :udea-net:assemble
+> Task :udea-net:udeaVerifyEditorAbsent
+> Task :udea-net:udeaVerifyKotlinPin
+> Task :udea-audio:jvmTest
+> Task :udea-physics2d:bundleAndroidMainClassesToCompileJar
+> Task :udea-physics2d:compileAndroidHostTest NO-SOURCE
+> Task :udea-physics2d:testAndroidHostTest NO-SOURCE
+> Task :udea-physics2d:testAndroid UP-TO-DATE
+> Task :udea-physics2d:udeaVerifyEditorAbsent
+> Task :udea-physics2d:udeaVerifyKotlinPin
+> Task :udea-nav:compileAndroidMain
+> Task :udea-audio:udeaMainBytecode
+> Task :udea-replay:wasmJsTestTestDevelopmentExecutableCompileSync
+> Task :udea-render:extractAndroidMainAnnotations
+> Task :udea-gas:compileKotlinWasmJs
+> Task :udea-gas:wasmJsMainClasses
+> Task :udea-gas:wasmJsJar
+> Task :udea-nav:compileCommonMainKotlinMetadata
+> Task :udea-nav:metadataCommonMainClasses
+> Task :udea-gas:kspTestKotlinWasmJs
+> Task :udea-nav:allMetadataJar UP-TO-DATE
+> Task :udea-nav:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-nav:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-nav:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-nav:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-nav:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-nav:metadataIosMainClasses UP-TO-DATE
+> Task :udea-nav:iosArm64MetadataElements UP-TO-DATE
+> Task :udea-nav:iosSimulatorArm64MetadataElements UP-TO-DATE
+> Task :udea-nav:compileTestKotlinWasmJs
+> Task :udea-replay:wasmJsNodeTest
+> Task :udea-nav:wasmJsTestClasses
+> Task :udea-replay:wasmJsTest
+> Task :udea-gas:compileCommonMainKotlinMetadata
+> Task :udea-gas:metadataCommonMainClasses
+> Task :udea-gas:allMetadataJar UP-TO-DATE
+> Task :udea-gas:compileNativeMainKotlinMetadata NO-SOURCE
+> Task :udea-gas:metadataNativeMainClasses UP-TO-DATE
+> Task :udea-gas:compileAppleMainKotlinMetadata NO-SOURCE
+> Task :udea-gas:metadataAppleMainClasses UP-TO-DATE
+> Task :udea-net:bundleLibRuntimeToDirAndroidMain
+> Task :udea-gas:compileIosMainKotlinMetadata NO-SOURCE
+> Task :udea-gas:metadataIosMainClasses UP-TO-DATE
+> Task :udea-gas:iosArm64MetadataElements UP-TO-DATE
+> Task :udea-gas:iosSimulatorArm64MetadataElements UP-TO-DATE
+> Task :udea-net:compileAndroidHostTest
+> Task :udea-audio:bundleLibRuntimeToDirAndroidMain
+> Task :udea-gas:compileAndroidMain
+> Task :udea-net:testAndroidHostTest
+> Task :udea-net:testAndroid
+> Task :udea-gas:compileKotlinJvm
+> Task :udea-gas:compileJvmMainJava NO-SOURCE
+> Task :udea-gas:jvmMainClasses
+> Task :udea-gas:udeaMainBytecode
+> Task :udea-gas:jvmJar UP-TO-DATE
+> Task :udea-gas:udeaVerifyModuleGraph
+> Task :udea-gas:udeaVerifyEditorAbsent
+> Task :udea-gas:udeaVerifyKotlinPin
+> Task :udea-gas:kspTestKotlinJvm
+> Task :udea-gas:jvmTestProcessResources NO-SOURCE
+> Task :udea-gas:processJvmTestResources SKIPPED
+
+> Task :udea-gas:compileTestKotlinWasmJs
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-gas/src/commonTest/kotlin/dev/wildware/udea/gas/AttributeRecomputeTest.kt:57:29 Unnecessary non-null assertion (!!) on a non-null receiver of type 'FloatArray'.
+
+> Task :udea-physics2d:compileTestKotlinJvm
+> Task :udea-physics2d:compileJvmTestJava NO-SOURCE
+> Task :udea-physics2d:jvmTestClasses
+> Task :udea-gas:wasmJsTestClasses
+> Task :udea-core:testAndroidHostTest
+> Task :udea-core:testAndroid
+> Task :udea-audio:createFullJarAndroidMain
+> Task :udea-net:bundleAndroidMainLocalLintAar
+> Task :udea-net:createFullJarAndroidMain
+> Task :udea-audio:bundleAndroidMainLocalLintAar
+> Task :udea-core:bundleAndroidMainLocalLintAar
+> Task :udea-audio:generateAndroidHostTestLintModel
+> Task :udea-core:generateAndroidHostTestLintModel
+> Task :udea-net:generateAndroidHostTestLintModel
+
+> Task :udea-gas:compileTestKotlinJvm
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-gas/src/commonTest/kotlin/dev/wildware/udea/gas/AttributeRecomputeTest.kt:57:29 Unnecessary non-null assertion (!!) on a non-null receiver of type 'FloatArray'.
+
+> Task :udea-gas:compileJvmTestJava NO-SOURCE
+> Task :udea-gas:jvmTestClasses
+
+> Task :udea-net:compileTestKotlinJvm
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-net/src/jvmTest/kotlin/dev/wildware/udea/net/bits/BitStreamAllocationTest.kt:34:47 'val id: Long' is deprecated. Deprecated in Java.
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-net/src/jvmTest/kotlin/dev/wildware/udea/net/proof/UdpProofServer.kt:80:32 'fun readLine(): String?' is deprecated. Use `readln()` instead of `readLine()!!`, and `readlnOrNull()` instead of `readLine()`.
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-net/src/jvmTest/kotlin/dev/wildware/udea/net/transport/WebSocketSnapshotServer.kt:28:13 'lateinit' is unnecessary: definitely initialized in constructors.
+
+> Task :udea-render:compileKotlinJvm
+> Task :udea-render:compileJvmMainJava NO-SOURCE
+> Task :udea-render:jvmMainClasses
+> Task :udea-render:jvmJar UP-TO-DATE
+> Task :udea-render:udeaVerifyModuleGraph
+> Task :udea-render:udeaVerifyKotlinPin
+> Task :udea-render:compileAndroidMain
+> Task :udea-render:processAndroidMainJavaRes
+> Task :udea-net:compileJvmTestJava NO-SOURCE
+> Task :udea-net:jvmTestClasses
+> Task :udea-render:bundleAndroidMainClassesToCompileJar
+> Task :udea-render:udeaMainBytecode
+> Task :udea-render:bundleAndroidMainClassesToRuntimeJar
+> Task :udea-render:mergeAndroidMainJavaResource
+> Task :udea-core:compileTestDevelopmentExecutableKotlinWasmJs
+> Task :udea-core:wasmJsTestTestDevelopmentExecutableCompileSync
+> Task :udea-nav:compileTestDevelopmentExecutableKotlinWasmJs
+> Task :udea-render:syncAndroidMainLibJars
+> Task :udea-nav:wasmJsTestTestDevelopmentExecutableCompileSync
+> Task :udea-render:bundleAndroidMainAar
+> Task :udea-render:assembleAndroidMain
+> Task :udea-render:assemble
+> Task :udea-render:udeaVerifyEditorAbsent
+> Task :udea-render:bundleLibRuntimeToDirAndroidMain
+> Task :hollow:game:extractAndroidMainAnnotations
+> Task :udea-render:createFullJarAndroidMain
+> Task :udea-render:bundleAndroidMainLocalLintAar
+
+> Task :udea-core:compileTestKotlinJvm
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-core/src/jvmTest/kotlin/dev/wildware/udea/core/identity/NetIdIndexTest.kt:213:47 'val id: Long' is deprecated. Deprecated in Java.
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-core/src/jvmTest/kotlin/dev/wildware/udea/core/snapshot/ColumnarFieldStoreTest.kt:194:46 Unchecked cast of 'Any' to 'Array<Any?>'.
+
+> Task :udea-render:compileAndroidHostTest
+> Task :udea-render:generateAndroidHostTestLintModel
+> Task :udea-nav:wasmJsNodeTest
+> Task :udea-nav:wasmJsTest
+> Task :udea-gas:udeaGasAllocationBudget
+> Task :udea-core:compileJvmTestJava NO-SOURCE
+> Task :udea-core:jvmTestClasses
+> Task :udea-physics2d:jvmTest
+> Task :udea-core:wasmJsNodeTest
+> Task :udea-physics2d:allTests
+> Task :udea-physics2d:check
+> Task :udea-physics2d:build
+> Task :udea-core:wasmJsTest
+> Task :udea-gas:jvmTest
+> Task :udea-audio:lintAnalyzeAndroidHostTest
+> Task :udea-gas:compileTestDevelopmentExecutableKotlinWasmJs
+> Task :udea-gas:wasmJsTestTestDevelopmentExecutableCompileSync
+> Task :udea-gas:wasmJsNodeTest
+> Task :udea-gas:wasmJsTest
+> Task :udea-render:testAndroidHostTest
+> Task :udea-render:testAndroid
+> Task :udea-core:compileKotlinIosArm64
+> Task :udea-core:compileKotlinIosSimulatorArm64
+> Task :udea-net:compileTestDevelopmentExecutableKotlinWasmJs
+> Task :udea-net:wasmJsTestTestDevelopmentExecutableCompileSync
+
+> Task :udea-render:compileTestKotlinJvm
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/capture/CaptureOrderingTest.kt:69:37 Unnecessary non-null assertion (!!) on a non-null receiver of type 'FrameCaptureSlot'.
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/capture/CaptureOrderingTest.kt:169:37 Unnecessary non-null assertion (!!) on a non-null receiver of type 'FrameCaptureSlot'.
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/interp/Interpolation3DTest.kt:91:88 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Triple<Float, Float, Float>'.
+
+> Task :udea-render:compileJvmTestJava NO-SOURCE
+> Task :udea-render:jvmTestClasses
+> Task :udea-net:lintAnalyzeAndroidHostTest
+> Task :udea-render:lintAnalyzeAndroidHostTest
+> Task :udea-net:wasmJsNodeTest
+> Task :udea-net:wasmJsTest
+> Task :udea-agent:kspCommonMainKotlinMetadata
+> Task :udea-core:jvmTest
+> Task :hollow:game:kspKotlinJvm
+> Task :hollow:game:udeaCheckProtocolLock
+> Task :hollow:game:jvmProcessResources
+> Task :hollow:game:processJvmMainResources SKIPPED
+> Task :hollow:game:compileAndroidMain
+> Task :hollow:game:processAndroidMainJavaRes
+> Task :hollow:game:bundleAndroidMainClassesToCompileJar
+> Task :hollow:game:compileAndroidHostTest NO-SOURCE
+> Task :hollow:game:bundleAndroidMainClassesToRuntimeJar
+> Task :hollow:game:compileKotlinJvm
+> Task :hollow:game:compileJvmMainJava NO-SOURCE
+> Task :hollow:game:jvmMainClasses
+> Task :hollow:game:testAndroidHostTest NO-SOURCE
+> Task :hollow:game:testAndroid UP-TO-DATE
+> Task :hollow:game:udeaMainBytecode
+> Task :hollow:game:udeaVerifyKotlinPin
+> Task :hollow:game:mergeAndroidMainJavaResource
+> Task :hollow:game:kspTestKotlinJvm
+> Task :hollow:game:jvmTestProcessResources NO-SOURCE
+> Task :hollow:game:processJvmTestResources SKIPPED
+> Task :hollow:game:syncAndroidMainLibJars
+> Task :hollow:game:udeaVerifyModuleGraph
+> Task :hollow:game:bundleAndroidMainAar
+> Task :hollow:game:assembleAndroidMain
+> Task :hollow:game:jvmJar
+> Task :hollow:game:assemble
+> Task :hollow:game:udeaVerifyEditorAbsent
+> Task :hollow:desktop:compileKotlin
+> Task :hollow:desktop:compileJava NO-SOURCE
+> Task :hollow:desktop:classes UP-TO-DATE
+> Task :hollow:desktop:udeaMainBytecode UP-TO-DATE
+> Task :hollow:desktop:jar
+> Task :hollow:desktop:assemble
+> Task :hollow:desktop:kotlinSourcesJar
+> Task :hollow:desktop:udeaVerifyRelease SKIPPED
+> Task :hollow:game:compileTestKotlinJvm
+> Task :hollow:game:compileJvmTestJava NO-SOURCE
+> Task :hollow:game:jvmTestClasses
+> Task :hollow:desktop:udeaVerifyEditorAbsent
+> Task :hollow:desktop:check
+> Task :hollow:desktop:build
+> Task :udea-core:iosSimulatorArm64MainKlibrary
+> Task :udea-core:kspTestKotlinIosSimulatorArm64
+> Task :udea-nav:kspKotlinIosSimulatorArm64
+> Task :udea-core:iosArm64MainKlibrary
+> Task :udea-replay:kspKotlinIosSimulatorArm64
+> Task :udea-gas:kspKotlinIosArm64
+> Task :udea-core:kspTestKotlinIosArm64
+> Task :udea-replay:kspKotlinIosArm64
+> Task :udea-gas:kspKotlinIosSimulatorArm64
+> Task :udea-nav:kspKotlinIosArm64
+> Task :udea-gas:processAndroidMainJavaRes
+> Task :udea-gas:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-gas:mergeAndroidMainJavaResource
+> Task :udea-gas:bundleAndroidMainClassesToCompileJar
+> Task :udea-gas:bundleAndroidMainClassesToRuntimeJar
+> Task :udea-gas:syncAndroidMainLibJars
+> Task :udea-gas:bundleAndroidMainLocalLintAar
+> Task :udea-gas:bundleLibRuntimeToDirAndroidMain
+> Task :udea-gas:createFullJarAndroidMain
+> Task :udea-gas:bundleAndroidMainAar
+> Task :udea-gas:assembleAndroidMain
+> Task :udea-gas:generateAndroidHostTestLintModel
+> Task :moba:game:extractAndroidMainAnnotations
+> Task :hollow:game:jvmTest
+> Task :hollow:game:allTests
+> Task :hollow:game:check
+> Task :hollow:game:build
+> Task :udea-core:lintAnalyzeAndroidHostTest
+> Task :udea-net:jvmTest
+> Task :udea-net:allTests
+> Task :udea-net:check
+> Task :udea-net:build
+
+> Task :udea-gas:compileAndroidHostTest
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-gas/src/commonTest/kotlin/dev/wildware/udea/gas/AttributeRecomputeTest.kt:57:29 Unnecessary non-null assertion (!!) on a non-null receiver of type 'FloatArray'.
+
+> Task :udea-gas:testAndroidHostTest
+> Task :udea-gas:testAndroid
+> Task :moba:game:kspKotlinJvm
+> Task :udea-gas:lintAnalyzeAndroidHostTest
+> Task :udea-audio:compileKotlinIosArm64
+> Task :udea-audio:iosArm64MainKlibrary
+> Task :udea-audio:compileKotlinIosSimulatorArm64
+> Task :udea-audio:iosSimulatorArm64MainKlibrary
+> Task :udea-replay:compileKotlinIosSimulatorArm64
+> Task :udea-replay:iosSimulatorArm64MainKlibrary
+> Task :udea-replay:compileKotlinIosArm64
+> Task :udea-replay:iosArm64MainKlibrary
+> Task :udea-replay:kspTestKotlinIosArm64
+> Task :udea-replay:kspTestKotlinIosSimulatorArm64
+> Task :udea-nav:compileKotlinIosSimulatorArm64
+> Task :udea-nav:iosSimulatorArm64MainKlibrary
+> Task :udea-nav:compileKotlinIosArm64
+> Task :udea-nav:iosArm64MainKlibrary
+> Task :udea-nav:kspTestKotlinIosSimulatorArm64
+> Task :udea-nav:kspTestKotlinIosArm64
+> Task :udea-replay:compileTestKotlinIosSimulatorArm64
+> Task :udea-replay:linkDebugTestIosSimulatorArm64 SKIPPED
+> Task :udea-replay:iosSimulatorArm64Test SKIPPED
+> Task :udea-audio:compileTestKotlinIosSimulatorArm64
+> Task :udea-audio:linkDebugTestIosSimulatorArm64 SKIPPED
+> Task :udea-audio:iosSimulatorArm64Test SKIPPED
+> Task :udea-audio:allTests
+> Task :udea-audio:check
+> Task :udea-nav:compileTestKotlinIosArm64
+> Task :udea-audio:compileTestKotlinIosArm64
+> Task :udea-audio:assemble
+> Task :udea-audio:build
+> Task :udea-nav:compileTestKotlinIosSimulatorArm64
+> Task :udea-nav:linkDebugTestIosSimulatorArm64 SKIPPED
+> Task :udea-nav:iosSimulatorArm64Test SKIPPED
+> Task :udea-replay:compileTestKotlinIosArm64
+> Task :udea-gas:compileKotlinIosSimulatorArm64
+> Task :udea-gas:iosSimulatorArm64MainKlibrary
+> Task :udea-gas:compileKotlinIosArm64
+> Task :udea-gas:iosArm64MainKlibrary
+> Task :udea-gas:kspTestKotlinIosArm64
+> Task :udea-gas:kspTestKotlinIosSimulatorArm64
+> Task :udea-render:udeaGlTest
+> Task :udea-agent:wasmJsProcessResources UP-TO-DATE
+> Task :udea-agent:metadataCommonMainProcessResources UP-TO-DATE
+> Task :udea-agent:kspKotlinWasmJs
+> Task :udea-agent:kspAndroidMain
+> Task :udea-core:compileTestKotlinIosSimulatorArm64
+> Task :udea-core:linkDebugTestIosSimulatorArm64 SKIPPED
+> Task :udea-core:iosSimulatorArm64Test SKIPPED
+> Task :udea-core:allTests
+> Task :udea-core:check
+> Task :udea-core:compileTestKotlinIosArm64
+> Task :udea-core:assemble
+> Task :udea-core:build
+> Task :udea-agent:compileCommonMainKotlinMetadata
+> Task :udea-agent:metadataCommonMainClasses
+> Task :udea-agent:allMetadataJar UP-TO-DATE
+> Task :udea-agent:compileKotlinWasmJs
+> Task :udea-agent:wasmJsMainClasses
+> Task :udea-agent:kspTestKotlinWasmJs
+
+> Task :udea-gas:compileTestKotlinIosArm64
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-gas/src/commonTest/kotlin/dev/wildware/udea/gas/AttributeRecomputeTest.kt:57:29 Unnecessary non-null assertion (!!) on a non-null receiver of type 'FloatArray'.
+
+> Task :udea-gas:compileTestKotlinIosSimulatorArm64
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-gas/src/commonTest/kotlin/dev/wildware/udea/gas/AttributeRecomputeTest.kt:57:29 Unnecessary non-null assertion (!!) on a non-null receiver of type 'FloatArray'.
+
+> Task :udea-gas:assemble
+> Task :udea-gas:linkDebugTestIosSimulatorArm64 SKIPPED
+> Task :udea-gas:iosSimulatorArm64Test SKIPPED
+> Task :udea-gas:allTests
+> Task :udea-agent:compileTestKotlinWasmJs
+> Task :udea-gas:check
+> Task :udea-gas:build
+> Task :udea-agent:wasmJsTestClasses
+> Task :udea-agent:wasmJsJar
+
+> Task :udea-agent:compileAndroidMain
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-agent/src/jvmAndAndroidMain/kotlin/dev/wildware/udea/agent/query/EnumConstants.jvmAndAndroid.kt:4:5 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'Array<(out) CapturedType(*)!>?'.
+
+> Task :moba:game:udeaCheckProtocolLock
+> Task :moba:game:jvmProcessResources
+> Task :moba:game:processJvmMainResources SKIPPED
+> Task :udea-agent:kspKotlinJvm
+> Task :udea-agent:jvmProcessResources UP-TO-DATE
+> Task :udea-agent:processJvmMainResources SKIPPED
+> Task :udea-agent:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-agent:processAndroidMainJavaRes
+> Task :udea-agent:mergeAndroidMainJavaResource
+> Task :udea-agent:bundleAndroidMainClassesToCompileJar
+> Task :udea-agent:bundleAndroidMainClassesToRuntimeJar
+> Task :udea-agent:syncAndroidMainLibJars
+> Task :udea-agent:bundleAndroidMainAar
+> Task :udea-agent:assembleAndroidMain
+> Task :udea-agent:compileAndroidHostTest
+> Task :udea-agent:testAndroidHostTest
+> Task :udea-agent:testAndroid
+> Task :udea-agent:compileKotlinJvm
+> Task :udea-agent:compileJvmMainJava NO-SOURCE
+> Task :udea-agent:jvmMainClasses
+> Task :udea-agent:udeaMainBytecode
+> Task :udea-agent:jvmJar UP-TO-DATE
+> Task :udea-agent:assemble
+> Task :udea-agent:udeaVerifyKotlinPin
+> Task :udea-agent:udeaVerifyModuleGraph
+> Task :udea-agent:kspTestKotlinJvm
+> Task :udea-agent:jvmTestProcessResources NO-SOURCE
+> Task :udea-agent:processJvmTestResources SKIPPED
+> Task :udea-agent:udeaVerifyEditorAbsent
+> Task :udea-agent:compileTestDevelopmentExecutableKotlinWasmJs
+> Task :udea-agent:wasmJsTestTestDevelopmentExecutableCompileSync
+> Task :udea-replay:kspKotlinJvm
+> Task :udea-replay:jvmProcessResources UP-TO-DATE
+> Task :udea-replay:processJvmMainResources SKIPPED
+> Task :udea-replay:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-replay:bundleAndroidMainClassesToCompileJar
+> Task :udea-replay:processAndroidMainJavaRes
+> Task :udea-replay:bundleAndroidMainClassesToRuntimeJar
+> Task :udea-replay:mergeAndroidMainJavaResource
+> Task :udea-replay:syncAndroidMainLibJars
+> Task :udea-replay:bundleAndroidMainAar
+> Task :udea-replay:assembleAndroidMain
+> Task :udea-agent:wasmJsNodeTest
+> Task :udea-agent:wasmJsTest
+> Task :udea-replay:compileAndroidHostTest
+> Task :udea-agent-host:compileKotlin
+> Task :udea-nav:kspKotlinJvm
+> Task :udea-agent-host:compileJava NO-SOURCE
+> Task :udea-agent-host:classes UP-TO-DATE
+> Task :udea-agent-host:udeaMainBytecode UP-TO-DATE
+> Task :udea-nav:processAndroidHostTestJavaRes NO-SOURCE
+> Task :udea-nav:jvmProcessResources UP-TO-DATE
+> Task :udea-nav:processJvmMainResources SKIPPED
+> Task :udea-agent-host:jar UP-TO-DATE
+> Task :udea-agent-host:assemble UP-TO-DATE
+> Task :udea-nav:bundleAndroidMainClassesToRuntimeJar
+> Task :udea-nav:bundleAndroidMainClassesToCompileJar
+> Task :udea-nav:processAndroidMainJavaRes
+> Task :udea-nav:mergeAndroidMainJavaResource
+> Task :udea-nav:syncAndroidMainLibJars
+> Task :udea-nav:bundleAndroidMainAar
+> Task :udea-nav:assembleAndroidMain
+> Task :udea-replay:compileKotlinJvm
+> Task :udea-replay:compileJvmMainJava NO-SOURCE
+> Task :udea-replay:jvmMainClasses
+> Task :udea-replay:udeaMainBytecode
+> Task :udea-replay:jvmJar UP-TO-DATE
+> Task :udea-replay:assemble
+> Task :udea-replay:kspTestFixturesKotlinJvm
+> Task :udea-replay:jvmTestFixturesProcessResources
+> Task :udea-replay:processJvmTestFixturesResources SKIPPED
+> Task :udea-replay:udeaVerifyEditorAbsent
+> Task :udea-replay:testAndroidHostTest
+> Task :udea-replay:testAndroid
+> Task :udea-agent-host:udeaVerifyEditorAbsent
+> Task :udea-nav:compileAndroidHostTest
+> Task :udea-editor:compileKotlin
+> Task :udea-editor:compileJava NO-SOURCE
+> Task :udea-editor:classes UP-TO-DATE
+> Task :udea-editor:jar UP-TO-DATE
+> Task :udea-editor:udeaMainBytecode UP-TO-DATE
+> Task :udea-editor:assemble UP-TO-DATE
+
+> Task :moba:game:compileAndroidMain
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/moba/game/src/commonMain/kotlin/dev/wildware/moba/net/MobaUdpClient.kt:65:37 'fun readLine(): String?' is deprecated. Use `readln()` instead of `readLine()!!`, and `readlnOrNull()` instead of `readLine()`.
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/moba/game/src/commonMain/kotlin/dev/wildware/moba/net/MobaUdpServer.kt:82:37 'fun readLine(): String?' is deprecated. Use `readln()` instead of `readLine()!!`, and `readlnOrNull()` instead of `readLine()`.
+
+> Task :udea-replay:compileTestFixturesKotlinJvm
+> Task :udea-nav:compileKotlinJvm
+> Task :udea-agent:compileTestKotlinJvm
+> Task :udea-nav:compileJvmMainJava NO-SOURCE
+> Task :udea-nav:jvmMainClasses
+> Task :udea-nav:udeaMainBytecode
+> Task :udea-replay:compileJvmTestFixturesJava NO-SOURCE
+> Task :udea-agent:compileJvmTestJava NO-SOURCE
+> Task :udea-replay:jvmTestFixturesClasses
+> Task :udea-agent:jvmTestClasses
+> Task :udea-nav:udeaVerifyKotlinPin
+> Task :udea-nav:jvmJar UP-TO-DATE
+> Task :udea-nav:assemble
+> Task :udea-nav:udeaVerifyModuleGraph
+> Task :udea-replay:udeaVerifyModuleGraph
+> Task :udea-replay:udeaVerifyKotlinPin
+> Task :udea-nav:kspTestKotlinJvm
+> Task :udea-replay:kspTestKotlinJvm
+> Task :udea-nav:jvmTestProcessResources NO-SOURCE
+> Task :udea-nav:processJvmTestResources SKIPPED
+> Task :udea-replay:jvmTestFixturesJar
+> Task :udea-replay:jvmTestProcessResources
+
+> Task :moba:game:compileKotlinJvm
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/moba/game/src/commonMain/kotlin/dev/wildware/moba/net/MobaUdpClient.kt:65:37 'fun readLine(): String?' is deprecated. Use `readln()` instead of `readLine()!!`, and `readlnOrNull()` instead of `readLine()`.
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/moba/game/src/commonMain/kotlin/dev/wildware/moba/net/MobaUdpServer.kt:82:37 'fun readLine(): String?' is deprecated. Use `readln()` instead of `readLine()!!`, and `readlnOrNull()` instead of `readLine()`.
+
+> Task :udea-replay:processJvmTestResources SKIPPED
+> Task :udea-nav:udeaVerifyEditorAbsent
+> Task :moba:game:processAndroidMainJavaRes
+> Task :moba:game:bundleAndroidMainClassesToRuntimeJar
+> Task :moba:game:mergeAndroidMainJavaResource
+> Task :moba:game:bundleAndroidMainClassesToCompileJar
+> Task :moba:game:compileAndroidHostTest NO-SOURCE
+> Task :moba:game:testAndroidHostTest NO-SOURCE
+> Task :moba:game:testAndroid UP-TO-DATE
+> Task :moba:game:createFullJarAndroidMain
+> Task :moba:game:bundleLibRuntimeToDirAndroidMain
+> Task :moba:game:syncAndroidMainLibJars
+> Task :moba:game:bundleAndroidMainLocalLintAar
+> Task :moba:game:compileJvmMainJava NO-SOURCE
+> Task :moba:game:jvmMainClasses
+> Task :moba:game:udeaMainBytecode
+> Task :moba:game:bundleAndroidMainAar
+> Task :moba:game:udeaVerifyModuleGraph
+> Task :udeaVerifyModuleGraph
+> Task :moba:game:assembleAndroidMain
+> Task :moba:game:udeaVerifyKotlinPin
+> Task :udea-nav:testAndroidHostTest
+> Task :udea-nav:testAndroid
+> Task :moba:game:kspTestKotlinJvm
+> Task :moba:game:jvmTestProcessResources NO-SOURCE
+> Task :moba:game:processJvmTestResources SKIPPED
+> Task :moba:game:generateAndroidHostTestLintModel
+> Task :moba:game:jvmJar
+> Task :moba:game:assemble
+> Task :moba:desktop:kspKotlin
+> Task :moba:desktop:processResources
+> Task :moba:android:compileDebugKotlin
+> Task :moba:android:compileDebugJavaWithJavac NO-SOURCE
+> Task :moba:android:compileReleaseKotlin
+> Task :moba:android:udeaMainBytecode
+> Task :moba:android:processDebugJavaRes
+> Task :moba:android:compileReleaseJavaWithJavac NO-SOURCE
+> Task :moba:android:bundleDebugClassesToCompileJar
+> Task :moba:android:generateReleaseLintVitalReportModel
+> Task :moba:android:generateDebugLintReportModel
+> Task :moba:android:processReleaseJavaRes
+
+> Task :udeaVerifyDeterminism
+udeaVerifyDeterminism
+  scanned :udea-core: 650 class files
+  scanned :udea-gas: 272 class files
+  scanned :udea-nav: 88 class files
+  scanned :udea-net: 421 class files
+  scanned :udea-physics2d: 72 class files
+  scanned :moba:game: 710 class files
+  allowlist entries used: 0
+  findings: 0
+
+udeaVerifyDeterminism is a cheap first filter, not the determinism gate. It sees direct references only: nondeterminism laundered through Fleks internals, through an interface call whose receiver happens to be a HashMap, or through float differences between two JVMs is invisible to it. The gate is WorldHasher snapshot equivalence and the cross-OS replay-equality CI job. See determinism-audit.md for the full list of what this cannot see.
+
+allowlist: /tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/determinism-allowlist.txt
+scopes scanned: :udea-core/main, :udea-gas/main, :udea-nav/main, :udea-net/main, :udea-physics2d/main, :moba:game/main
+
+
+> Task :check
+> Task :build
+> Task :moba:android:generateDebugAndroidTestLintModel
+> Task :udea-nav:compileTestKotlinJvm
+> Task :udea-nav:compileJvmTestJava NO-SOURCE
+> Task :udea-nav:jvmTestClasses
+> Task :moba:game:udeaVerifyEditorAbsent
+> Task :moba:android:generateDebugUnitTestLintModel
+> Task :moba:android:dexBuilderRelease
+
+> Task :udea-replay:compileTestKotlinJvm
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-replay/src/jvmTest/kotlin/dev/wildware/udea/replay/ReplayToolTest.kt:164:17 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+
+> Task :moba:desktop:compileKotlin
+> Task :moba:desktop:compileJava NO-SOURCE
+> Task :moba:desktop:classes
+> Task :moba:desktop:udeaMainBytecode
+> Task :moba:desktop:jar
+> Task :moba:desktop:assemble
+> Task :udea-replay:compileJvmTestJava NO-SOURCE
+> Task :udea-replay:jvmTestClasses
+> Task :moba:desktop:kotlinSourcesJar
+> Task :moba:desktop:udeaVerifyRelease SKIPPED
+
+> Task :udea-agent-host:compileTestKotlin
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-agent-host/src/test/kotlin/dev/wildware/udea/agent/host/AgentRegistryTest.kt:96:25 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Path'.
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-agent-host/src/test/kotlin/dev/wildware/udea/agent/host/RenderToolsetTest.kt:110:40 Unnecessary safe call on a non-null receiver of type 'AgentArtifacts'.
+
+> Task :moba:android:dexBuilderDebug
+> Task :moba:android:mergeReleaseJavaResource
+> Task :moba:android:mergeDebugJavaResource
+> Task :udea-render:udeaVerifyHeadless
+> Task :moba:desktop:kspAgentKotlin
+> Task :moba:desktop:processAgentResources NO-SOURCE
+> Task :moba:android:mergeProjectDexDebug
+> Task :udea-agent-host:compileTestJava NO-SOURCE
+> Task :udea-agent-host:testClasses UP-TO-DATE
+> Task :moba:desktop:udeaVerifyEditorAbsent
+
+> Task :udea-editor:compileTestKotlin
+w: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/udea-editor/src/test/kotlin/dev/wildware/udea/editor/gizmo/GizmoApiTest.kt:101:41 Division by zero.
+
+> Task :moba:game:compileTestKotlinJvm
+> Task :moba:desktop:compileAgentKotlin
+> Task :moba:desktop:compileAgentJava NO-SOURCE
+> Task :moba:desktop:agentClasses UP-TO-DATE
+> Task :moba:game:compileJvmTestJava NO-SOURCE
+> Task :moba:game:jvmTestClasses
+> Task :udea-editor:compileTestJava NO-SOURCE
+> Task :udea-editor:testClasses UP-TO-DATE
+> Task :udea-nav:jvmTest
+> Task :moba:desktop:kspEditorKotlin
+> Task :moba:desktop:processEditorResources NO-SOURCE
+> Task :udea-agent:jvmTest
+> Task :udea-nav:allTests
+> Task :udea-nav:check
+> Task :udea-nav:build
+> Task :udea-agent:allTests
+> Task :udea-render:udeaVerifyNoLibGdx
+> Task :moba:desktop:compileEditorKotlin
+> Task :moba:desktop:compileEditorJava NO-SOURCE
+> Task :moba:desktop:editorClasses UP-TO-DATE
+> Task :moba:desktop:udeaVerifyKotlinPin
+> Task :moba:desktop:kspEditorTestKotlin
+> Task :moba:desktop:processEditorTestResources NO-SOURCE
+> Task :moba:desktop:compileEditorTestKotlin
+> Task :moba:desktop:compileEditorTestJava NO-SOURCE
+> Task :moba:desktop:editorTestClasses UP-TO-DATE
+> Task :udea-render:jvmTest
+> Task :udea-render:allTests
+> Task :udea-replay:jvmTest
+> Task :udea-replay:allTests
+> Task :udea-replay:check
+> Task :udea-replay:build
+> Task :moba:android:lintVitalAnalyzeRelease
+> Task :moba:game:lintAnalyzeAndroidHostTest
+> Task :moba:android:lintVitalReportRelease SKIPPED
+> Task :moba:android:lintVitalRelease SKIPPED
+> Task :udea-codegen:kspTestKotlin
+> Task :udea-codegen:udeaCheckProtocolLock
+> Task :udea-codegen:check
+> Task :udea-codegen:build
+> Task :moba:android:lintAnalyzeDebugAndroidTest
+> Task :moba:android:lintAnalyzeDebugUnitTest
+> Task :moba:game:jvmTest
+> Task :moba:game:allTests
+> Task :moba:game:check
+> Task :moba:game:build
+> Task :moba:android:lintAnalyzeDebug
+> Task :moba:android:mergeDebugGlobalSynthetics
+> Task :moba:android:mergeReleaseGlobalSynthetics
+
+> Task :moba:android:lintReportDebug
+Wrote HTML report to file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/moba/android/build/reports/lint-results-debug.html
+
+> Task :moba:android:lintDebug
+> Task :moba:android:lint
+> Task :moba:android:check
+> Task :moba:android:mergeLibDexDebug
+> Task :udea-agent:udeaAssetTools
+> Task :moba:android:packageDebug
+> Task :moba:android:assembleDebug
+> Task :moba:android:createDebugApkListingFileRedirect
+> Task :udea-agent:check
+> Task :udea-agent:build
+> Task :udea-agent-host:udeaAgentGlTest
+> Task :udea-agent-host:check
+> Task :udea-agent-host:build
+> Task :moba:android:mergeDexRelease
+> Task :udea-editor:udeaEditorGlTest
+> Task :moba:android:compileReleaseArtProfile
+> Task :moba:android:packageRelease
+> Task :moba:android:assembleRelease
+> Task :moba:android:assemble
+> Task :moba:android:build
+> Task :moba:android:createReleaseApkListingFileRedirect
+> Task :moba:desktop:editorTest
+> Task :udea-editor:check
+> Task :udea-editor:build
+> Task :moba:desktop:check
+> Task :moba:desktop:build
+> Task :udea-render:check
+> Task :udea-render:build
+
+[Incubating] Problems report is available at: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 17s
+1097 actionable tasks: 1011 executed, 10 from cache, 76 up-to-date
+Configuration cache entry stored.

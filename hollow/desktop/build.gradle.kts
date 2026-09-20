@@ -9,7 +9,7 @@
  */
 
 plugins {
-    id("udea.kotlin-library")
+    id("dev.wildware.udea.kotlin-library")
 }
 
 dependencies {

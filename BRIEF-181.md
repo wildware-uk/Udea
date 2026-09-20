@@ -100,7 +100,7 @@ passes the samples to `CleanBuildComparison.judge`, which fails when the head's 
 is more than **1.10x** the base's.
 
 - `build-logic/.../CleanBuildComparison.kt`: the rule (parse, fastest-of, tolerance, summary). Unit-tested.
-- `build-logic/.../UdeaCleanBuildVerdictTask.kt` and `udea.clean-build-budget.gradle.kts`: the task, applied at the root. Not on `check`.
+- `build-logic/.../UdeaCleanBuildVerdictTask.kt` and `dev.wildware.udea.clean-build-budget.gradle.kts`: the task, applied at the root. Not on `check`.
 - `.github/workflows/ci.yml`: the job rewritten. The dispatch input `clean_build_budget_ms` is replaced by `clean_build_plant_functions`, which plants N functions in the head's `udea-core` to prove the gate goes red.
 - `udea-gradle/.../CleanBuildBudgetJobTest.kt`: pins the job's shape (both sides timed, then the verdict task on the samples).
 - `docs/budgets.md`: the clean-build section rewritten, with the reasoning, the numbers and what the gate does not catch. #184's rows are untouched.

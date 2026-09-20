@@ -13,7 +13,7 @@
  * JVM only for now, as the issue says: the window is a desktop thing, and it needs `DesktopFonts`.
  */
 plugins {
-    id("udea.kotlin-library")
+    id("dev.wildware.udea.kotlin-library")
 
     // The panels are `@Composable`. `udea-render` is the only other module with this plugin, and for
     // the same reason: this is a module that writes composables.

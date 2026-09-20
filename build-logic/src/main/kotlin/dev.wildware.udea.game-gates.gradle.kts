@@ -11,18 +11,18 @@ import dev.wildware.udea.build.udeaGates
  *
  * ## What it wires
  *
- * - `udea.module-graph-check` on every project of the build that has a build script, which is
+ * - `dev.wildware.udea.module-graph-check` on every project of the build that has a build script, which is
  *   what registers the per-project `udeaVerifyModuleGraph` and `udeaVerifyEditorAbsent` on their
  *   own `check`. A container project - `:moba` holds three projects and has no build script of
  *   its own - is excluded, because both gates refuse a project they would inspect nothing of.
  * - the `udeaVerifyModuleGraph` aggregate, so one command covers the whole build.
- * - `udea.determinism-check`, which reads `udeaGates { simulation(...) }`.
- * - `udea.release-check` on each project named by `udeaGates { ships(...) }`, and the
+ * - `dev.wildware.udea.determinism-check`, which reads `udeaGates { simulation(...) }`.
+ * - `dev.wildware.udea.release-check` on each project named by `udeaGates { ships(...) }`, and the
  *   `udeaVerifyRelease` aggregate over them.
  *
  * ## What it does not wire, and why
  *
- * `udea.docs-check` and `udea.contract-freeze` are this repository's own bookkeeping:
+ * `dev.wildware.udea.docs-check` and `dev.wildware.udea.contract-freeze` are this repository's own bookkeeping:
  * `udeaVerifyAgentsMd` holds `AGENTS.md`'s module table against `settings.gradle.kts` *and*
  * requires the nine spec section 5 contracts to be named, and `udeaVerifyContracts` freezes
  * `docs/contracts/`. Both are statements about the engine's documents, which a game's repository
@@ -56,11 +56,11 @@ val gatedProjects: List<Project> = subprojects.filter { it.buildFile.exists() }
 
 subprojects {
     if (this in gatedProjects) {
-        apply(plugin = "udea.module-graph-check")
+        apply(plugin = "dev.wildware.udea.module-graph-check")
     }
 }
 
-apply(plugin = "udea.determinism-check")
+apply(plugin = "dev.wildware.udea.determinism-check")
 
 /**
  * Aggregates, so a developer can run one gate over the whole build. Each depends on the

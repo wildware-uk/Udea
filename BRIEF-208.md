@@ -21,7 +21,7 @@ It runs `GeneratedToolDispatchTest` (in `commonTest`), `SpillMemoTest` and `Wasm
 
 ## 2. Summary
 
-**What moved.** All of `udea-agent/src/main` is now `commonMain`, and `src/test` is now `jvmTest`. The module uses `udea.kotlin-multiplatform-no-ios`, so it builds for jvm, android and wasmJs. There is no iOS because `udea-core` has none (#215). Three things moved to `jvmMain`: `AssetsToolset` and `AssetToolModule`, which compile against the JVM asset daemon, and `AgentThreads` (a `ThreadFactory` only the JVM host uses). `udea-agent-host` is unchanged and stays JVM.
+**What moved.** All of `udea-agent/src/main` is now `commonMain`, and `src/test` is now `jvmTest`. The module uses `dev.wildware.udea.kotlin-multiplatform-no-ios`, so it builds for jvm, android and wasmJs. There is no iOS because `udea-core` has none (#215). Three things moved to `jvmMain`: `AssetsToolset` and `AssetToolModule`, which compile against the JVM asset daemon, and `AgentThreads` (a `ThreadFactory` only the JVM host uses). `udea-agent-host` is unchanged and stays JVM.
 
 **JVM-only calls replaced in common code** (commented on the issue):
 - Atomics now come from the stdlib `kotlin.concurrent.atomics`, with a per-file `@OptIn(ExperimentalAtomicApi::class)`.

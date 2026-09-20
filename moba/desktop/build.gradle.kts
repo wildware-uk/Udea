@@ -26,7 +26,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
  */
 
 plugins {
-    id("udea.kotlin-library")
+    id("dev.wildware.udea.kotlin-library")
 
     // The plugin that creates the `agent` source set, generates the per-variant agent flag, wires
     // `-Dudea.agent.port` into `run`, and writes the launch declaration at the repository root.

@@ -7,7 +7,7 @@ kotlin = "2.4.20"
 # UdeaVersions.KOTLIN is asserted equal to it by a test.
 # It does NOT by itself control the kotlin-stdlib that resolves: Gradle takes the highest
 # requested version, and libraries such as kotlinpoet below request a newer one. Modules on
-# the `udea.kotlin-build-tool` convention - the jars loaded inside the compiler - pin the
+# the `dev.wildware.udea.kotlin-build-tool` convention - the jars loaded inside the compiler - pin the
 # resolved stdlib back to `kotlin` and prove it with `udeaVerifyKotlinPin`. Everything
 # else deliberately takes the higher stdlib, which is the supported direction.
 #

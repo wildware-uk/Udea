@@ -25,7 +25,7 @@ class UdeaModuleRegistryTest {
         plugins {
             `java-library`
             // Only so the build-logic classes are on this script's classpath.
-            id("udea.module-graph-check")
+            id("dev.wildware.udea.module-graph-check")
         }
         dependencies { $dependencies }
         val options = udeaModule("$name")

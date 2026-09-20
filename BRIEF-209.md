@@ -49,7 +49,7 @@ I also checked that the Wasm test really exercises the connection. Earlier in th
 
 ## Summary
 
-**The targets.** `udea-net` now uses `udea.kotlin-multiplatform-no-ios`: `jvm`, `android` and `wasmJs`. The iOS targets stay off because `udea-core` has none (#215). The build script has a one-line switch comment that names #215. A custom hierarchy group, `socket` (`jvm` + `androidJvm`), provides `socketMain`. The UDP transport and its handshake live there: `UdpTransport`, `UdpConnection`, `ConnectionSecret` and `HandshakeRateLimiter`. Wasm gets the WebSocket client only, with no expect/actual stub for UDP.
+**The targets.** `udea-net` now uses `dev.wildware.udea.kotlin-multiplatform-no-ios`: `jvm`, `android` and `wasmJs`. The iOS targets stay off because `udea-core` has none (#215). The build script has a one-line switch comment that names #215. A custom hierarchy group, `socket` (`jvm` + `androidJvm`), provides `socketMain`. The UDP transport and its handshake live there: `UdpTransport`, `UdpConnection`, `ConnectionSecret` and `HandshakeRateLimiter`. Wasm gets the WebSocket client only, with no expect/actual stub for UDP.
 
 **The UDP port.**
 - `java.nio.DatagramChannel` is replaced by Ktor `ktor-network` datagram sockets.

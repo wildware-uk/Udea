@@ -1,0 +1,65 @@
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :generateExternalPluginSpecBuilders UP-TO-DATE
+> Task :extractPrecompiledScriptPluginPlugins UP-TO-DATE
+> Task :compilePluginsBlocks UP-TO-DATE
+> Task :generatePrecompiledScriptPluginAccessors UP-TO-DATE
+> Task :generateScriptPluginAdapters UP-TO-DATE
+> Task :compileKotlin UP-TO-DATE
+> Task :compileJava NO-SOURCE
+> Task :pluginDescriptors UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :jar UP-TO-DATE
+> Task :javadoc NO-SOURCE
+> Task :javadocJar UP-TO-DATE
+> Task :sourcesJar
+> Task :generateMetadataFileForPluginMavenPublication
+> Task :generatePomFileForPluginMavenPublication
+> Task :publishPluginMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.android-applicationPluginMarkerMavenPublication
+> Task :publishUdea.android-applicationPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.clean-build-budgetPluginMarkerMavenPublication
+> Task :publishUdea.clean-build-budgetPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.contract-freezePluginMarkerMavenPublication
+> Task :publishUdea.contract-freezePluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.determinism-checkPluginMarkerMavenPublication
+> Task :publishUdea.determinism-checkPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.docs-checkPluginMarkerMavenPublication
+> Task :publishUdea.docs-checkPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.game-gatesPluginMarkerMavenPublication
+> Task :publishUdea.game-gatesPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.gradle-pluginPluginMarkerMavenPublication
+> Task :publishUdea.gradle-pluginPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.jvm-test-fixturesPluginMarkerMavenPublication
+> Task :publishUdea.jvm-test-fixturesPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.kotlin-basePluginMarkerMavenPublication
+> Task :publishUdea.kotlin-basePluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.kotlin-build-toolPluginMarkerMavenPublication
+> Task :publishUdea.kotlin-build-toolPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.kotlin-libraryPluginMarkerMavenPublication
+> Task :publishUdea.kotlin-libraryPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.kotlin-multiplatform-jvm-androidPluginMarkerMavenPublication
+> Task :publishUdea.kotlin-multiplatform-jvm-androidPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.kotlin-multiplatform-no-iosPluginMarkerMavenPublication
+> Task :publishUdea.kotlin-multiplatform-no-iosPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.kotlin-multiplatform-renderPluginMarkerMavenPublication
+> Task :publishUdea.kotlin-multiplatform-renderPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.kotlin-multiplatformPluginMarkerMavenPublication
+> Task :publishUdea.kotlin-multiplatformPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.module-graph-checkPluginMarkerMavenPublication
+> Task :publishUdea.module-graph-checkPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdea.release-checkPluginMarkerMavenPublication
+> Task :publishUdea.release-checkPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdeaAgentPluginMarkerMavenPublication
+> Task :publishUdeaAgentPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdeaAssetsPluginMarkerMavenPublication
+> Task :publishUdeaAssetsPluginMarkerMavenPublicationToMavenLocal
+> Task :publishToMavenLocal
+> Task :version-catalog:generateCatalogAsToml UP-TO-DATE
+> Task :version-catalog:generateMetadataFileForVersionCatalogPublication
+> Task :version-catalog:generatePomFileForVersionCatalogPublication
+> Task :version-catalog:publishVersionCatalogPublicationToMavenLocal
+> Task :version-catalog:publishToMavenLocal
+
+BUILD SUCCESSFUL in 4s
+56 actionable tasks: 45 executed, 11 up-to-date

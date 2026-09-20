@@ -84,7 +84,7 @@ testsuite name="dev.wildware.udea.physics2d.PhysicsNeverOnTheWireTest" tests="2"
 3. The rewind limitation is stated and measured (below, and on #199).
 4. The Box2D version is 3.1.1. The binding's README says 3.3.1 and is wrong. The worker count cannot be set, because `box2d-jni` does not bind `workerCount`.
 5. Targets, bindings and NetIds:
-   - a new convention, `udea.kotlin-multiplatform-jvm-android`, for the `jvm` and `android` targets;
+   - a new convention, `dev.wildware.udea.kotlin-multiplatform-jvm-android`, for the `jvm` and `android` targets;
    - one shared `src/box2dMain` over per-target typealias files;
    - a `PhysicsBody` with no `NetId` fails loudly.
 

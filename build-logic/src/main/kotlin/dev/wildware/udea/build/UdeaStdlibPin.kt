@@ -18,7 +18,7 @@ package dev.wildware.udea.build
  * guaranteed rather than merely possible (spec 7).
  *
  * The pin therefore lives here, in one place, and every module gets it from
- * `udea.kotlin-library`. Escaping it requires an [Exemption] with a stated reason, which is
+ * `dev.wildware.udea.kotlin-library`. Escaping it requires an [Exemption] with a stated reason, which is
  * the difference between a deliberate exception and the silence this replaces.
  */
 public object UdeaStdlibPin {

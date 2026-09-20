@@ -14,7 +14,7 @@ import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
  * `determinism-audit.md` is re-read against it.
  */
 plugins {
-    id("udea.kotlin-multiplatform")
+    id("dev.wildware.udea.kotlin-multiplatform")
     // Fleks' `Entity`, `Snapshot` and `ComponentType` are `@Serializable`: a level file is Fleks' own
     // `world.snapshot()` encoded as CBOR (issue #191).
     alias(libs.plugins.kotlinSerialization)

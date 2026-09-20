@@ -78,7 +78,7 @@ copy. One visible difference: `world.spawn_blueprint` with no spawner or an unkn
 
 **Not exercised:** undo after a rewind or level load (the `entity_gone` path) has no test; there is
 no redo; `editor.save` in a real browser was not run (nothing on this tree hosts the agent surface
-in a browser); iOS is not built by `udea-agent` (it is on `udea.kotlin-multiplatform-no-ios`).
+in a browser); iOS is not built by `udea-agent` (it is on `dev.wildware.udea.kotlin-multiplatform-no-ios`).
 
 ## 3. `sh gradlew build --continue`
 

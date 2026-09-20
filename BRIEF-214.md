@@ -10,7 +10,7 @@ Branch `issue-214-docs-green`. It was cut from `origin/kmp` at `2046c79`, then m
 - `b281244` Merge of `origin/kmp` (`117f4c8`); a clean merge that touched none of this branch's files
 - `21cac4e` AGENTS.md: animation time is derived from a start Tick (#241)
 - `e2bc87c` Merge of `origin/kmp` (`bf714e6`, #234). `ci.yml` conflicted: I kept #234's list of the three GL suites and this branch's "Kool's desktop backend" wording. #234's AGENTS.md editor paragraph auto-merged, and both sides' facts are kept. HANDOFF, the skill and the agents files now name `udeaEditorGlTest` wherever they list the GL suites, and `udea-editor` among the modules that need the xvfb run.
-- `14a7907` Docs: the verifiers run on `check`, and only the two proofs are run by name. HANDOFF, the skill, and the engineer and reviewer agents listed `udeaVerifyModuleGraph` and `udeaVerifyAgentsMd` among the gates outside `check`. That was already wrong on `origin/kmp`, and my first pass carried it forward. Both are wired into `check`, by `udea.module-graph-check` and `udea.docs-check`, and so is `udeaVerifyContracts`. I searched the six documents for every other outside-`check` claim: the only ones left are `runUdpProof` and `runLaneShot`, which are genuinely left out.
+- `14a7907` Docs: the verifiers run on `check`, and only the two proofs are run by name. HANDOFF, the skill, and the engineer and reviewer agents listed `udeaVerifyModuleGraph` and `udeaVerifyAgentsMd` among the gates outside `check`. That was already wrong on `origin/kmp`, and my first pass carried it forward. Both are wired into `check`, by `dev.wildware.udea.module-graph-check` and `dev.wildware.udea.docs-check`, and so is `udeaVerifyContracts`. I searched the six documents for every other outside-`check` claim: the only ones left are `runUdpProof` and `runLaneShot`, which are genuinely left out.
 
 Every log, diff and script named below is in `/tmp/claude-1000/-srv-ssd1-workspace-Udea/1ad8c5e6-2def-4055-91d2-72acdfe77daf/scratchpad/issue214/`, and is called the scratchpad for short.
 
@@ -150,7 +150,7 @@ Three pieces of work.
 - one shared tmpdir: `crashed(signal)=10 failed(nonzero)=2`;
 - separate tmpdirs: `crashed(signal)=0 failed(nonzero)=0`.
 
-**Fix.** Every forked `Test` and `JavaExec` JVM gets its own task's `temporaryDir` as `java.io.tmpdir`. This is `ForkedJvmTmpdir`, applied from `udea.kotlin-base`, so every module gets it.
+**Fix.** Every forked `Test` and `JavaExec` JVM gets its own task's `temporaryDir` as `java.io.tmpdir`. This is `ForkedJvmTmpdir`, applied from `dev.wildware.udea.kotlin-base`, so every module gets it.
 - End to end over the real GL tasks (`e2e/*-summary.txt`): 5 `.so` files landed in the shared directory before the fix, and 0 after.
 - **Rejected:** serialising the two GL tasks. That hides the race for this pair only.
 - **Not covered, and the KDoc says so:** JVMs a test starts itself with `ProcessBuilder`, and tasks with `maxParallelForks > 1`.

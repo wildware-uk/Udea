@@ -347,7 +347,7 @@ Each of these is also a comment on issue #264, so it is reviewable next to the c
 
 ### What I did not exercise
 
-- **iOS.** `udea-nav` is on `udea.kotlin-multiplatform`, so it has the iOS targets, and this box
+- **iOS.** `udea-nav` is on `dev.wildware.udea.kotlin-multiplatform`, so it has the iOS targets, and this box
   cannot build them. The `ios-tests` CI job is what covers it. I have not claimed otherwise.
 - **A real network.** The determinism criterion is proved with two worlds in one process, a replay
   and a rewind (section 6, AC-2). No `udea-net` code is involved in this branch at all.

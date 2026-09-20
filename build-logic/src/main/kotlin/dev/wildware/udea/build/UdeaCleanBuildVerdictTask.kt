@@ -17,7 +17,7 @@ import org.gradle.api.tasks.TaskAction
  * `CleanBuildComparisonTest` executes. The job does the timing, because a Gradle task cannot time
  * a clean build of the build it is running in; this does the judging.
  *
- * `internal`: registered by `udea.clean-build-budget` in this module, and named by no build script.
+ * `internal`: registered by `dev.wildware.udea.clean-build-budget` in this module, and named by no build script.
  */
 internal abstract class UdeaCleanBuildVerdictTask : DefaultTask() {
 

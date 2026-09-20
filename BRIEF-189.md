@@ -112,7 +112,7 @@ What changed:
   `LIBGDX_BANNED_OWNERS`, which is read over every module. This mirrors the dependency level,
   where `UDEA-MG-002` leaves LibGDX to `UDEA-MG-009`. One reference gives one diagnostic, and a
   test pins that the two tables share no owner.
-- **`moba:android` gets a `udeaMainBytecode` task.** The `udea.android-application` convention
+- **`moba:android` gets a `udeaMainBytecode` task.** The `dev.wildware.udea.android-application` convention
   registers it on `compileReleaseKotlin`, the variant the APK ships. `RepoLayout.classFiles` reads
   an Android application's `build/tmp/kotlin-classes/release`. Without this the gate would either
   skip the app or fail as vacuous.

@@ -13,14 +13,14 @@ plugins {
     // Every target, iOS included (issue #215). Fleks publishes no iOS variant at any version, so
     // it is built from source in `udea-fleks` rather than resolved from Maven; with the Maven
     // artifact back, the iOS targets here fail dependency resolution on every machine, Linux too.
-    id("udea.kotlin-multiplatform")
+    id("dev.wildware.udea.kotlin-multiplatform")
     // The Replicator contract ships an executable specification: TransformReplicator and
     // ArrayFieldStore. udea-codegen's golden tests consume them, so they have to be a
     // published variant rather than this module's private test source (issue #28 scope).
-    // `udea.jvm-test-fixtures` rather than Gradle's `java-test-fixtures`, which cannot be applied
+    // `dev.wildware.udea.jvm-test-fixtures` rather than Gradle's `java-test-fixtures`, which cannot be applied
     // beside the multiplatform plugin; every consumer's `testFixtures(project(":udea-core"))` is
     // unchanged (issue #203).
-    id("udea.jvm-test-fixtures")
+    id("dev.wildware.udea.jvm-test-fixtures")
     // Level files (issue #191). The serialization plugin gives this module's components their
     // serializers, and KSP runs `udea-codegen` over them to generate `CoreModuleRegistry`, whose
     // level-component list a level file's polymorphic component section is built from.

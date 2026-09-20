@@ -8,14 +8,14 @@ plugins {
     // Every target, iOS included: `udea-core` gained its iOS targets when Fleks was vendored
     // (issue #215). `udea-agent`, which has none yet, is a `jvmMain` edge below, so it does not
     // reach the iOS compilations.
-    id("udea.kotlin-multiplatform")
+    id("dev.wildware.udea.kotlin-multiplatform")
     // The `replay-equality` fixture world (issue #152). A published variant rather than this
     // module's private test source for the same reason `udea-core` publishes `TransformReplicator`:
     // the CI job runs it as a `JavaExec` main class, and a test main class is an entry point
-    // living inside the thing that is supposed to be testing it. `udea.jvm-test-fixtures` rather
+    // living inside the thing that is supposed to be testing it. `dev.wildware.udea.jvm-test-fixtures` rather
     // than `java-test-fixtures`, which cannot be applied beside the multiplatform plugin; its
     // source set is `jvmTestFixtures` (issue #206).
-    id("udea.jvm-test-fixtures")
+    id("dev.wildware.udea.jvm-test-fixtures")
     // The replay toolset goes through the same `@AgentTool` KSP pass every other toolset does.
     // `EngineToolModules` deliberately does not name these tools - see `ReplayToolModules` for
     // why a replay session is a thing only a host that has one can register.
@@ -198,7 +198,7 @@ val replayEqualityDir: Provider<Directory> =
  */
 val workspaceRoot: String = rootProject.layout.projectDirectory.asFile.absolutePath
 
-/** The JVM target's test-fixtures compilation, which `udea.jvm-test-fixtures` declares. */
+/** The JVM target's test-fixtures compilation, which `dev.wildware.udea.jvm-test-fixtures` declares. */
 val jvmTestFixturesCompilation: KotlinCompilation<*> =
     (the<KotlinMultiplatformExtension>().targets.getByName("jvm") as KotlinJvmTarget).compilations.getByName("testFixtures")
 

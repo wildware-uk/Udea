@@ -46,14 +46,14 @@ Udea uses Kotlin Multiplatform. A module picks its targets by applying one of th
 
 | Convention plugin | Targets | Used by |
 |---|---|---|
-| `udea.kotlin-multiplatform` | `jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64` | `udea-annotations`, `udea-diagnostics`, `udea-fleks`, `udea-core`, `udea-assets`, `udea-gas`, `udea-audio`, `udea-replay` |
-| `udea.kotlin-multiplatform-no-ios` | `jvm`, `android`, `wasmJs` | `udea-net`, `udea-agent` (each has an `expect` with no iOS `actual` yet) |
-| `udea.kotlin-multiplatform-jvm-android` | `jvm`, `android` | `udea-physics2d` (`box2d-jni` publishes nothing else) |
-| `udea.kotlin-multiplatform-render` | `jvm`, `android` | `udea-render` and `moba:game` (Kool has no iOS backend and no wasmJs artifact) |
-| `udea.kotlin-library` | JVM | `udea-agent-host`, `udea-editor`, `moba:desktop` |
-| `udea.kotlin-build-tool` | JVM, build time only | `udea-codegen`, `udea-compiler-plugin`, `udea-assets-compiler` |
+| `dev.wildware.udea.kotlin-multiplatform` | `jvm`, `android`, `wasmJs`, `iosArm64`, `iosSimulatorArm64` | `udea-annotations`, `udea-diagnostics`, `udea-fleks`, `udea-core`, `udea-assets`, `udea-gas`, `udea-audio`, `udea-replay` |
+| `dev.wildware.udea.kotlin-multiplatform-no-ios` | `jvm`, `android`, `wasmJs` | `udea-net`, `udea-agent` (each has an `expect` with no iOS `actual` yet) |
+| `dev.wildware.udea.kotlin-multiplatform-jvm-android` | `jvm`, `android` | `udea-physics2d` (`box2d-jni` publishes nothing else) |
+| `dev.wildware.udea.kotlin-multiplatform-render` | `jvm`, `android` | `udea-render` and `moba:game` (Kool has no iOS backend and no wasmJs artifact) |
+| `dev.wildware.udea.kotlin-library` | JVM | `udea-agent-host`, `udea-editor`, `moba:desktop` |
+| `dev.wildware.udea.kotlin-build-tool` | JVM, build time only | `udea-codegen`, `udea-compiler-plugin`, `udea-assets-compiler` |
 
-`udea-gradle` is a Gradle plugin (`udea.gradle-plugin`) and `moba:android` is an Android app (`udea.android-application`).
+`udea-gradle` is a Gradle plugin (`dev.wildware.udea.gradle-plugin`) and `moba:android` is an Android app (`dev.wildware.udea.android-application`).
 
 Some consequences worth knowing:
 

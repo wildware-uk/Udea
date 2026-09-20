@@ -20,7 +20,7 @@ import javax.inject.Inject
  * exercises it on every run.
  *
  * ```kotlin
- * plugins { id("udea.game-gates") }
+ * plugins { id("dev.wildware.udea.game-gates") }
  *
  * udeaGates {
  *     ships(":desktop")
@@ -96,7 +96,7 @@ public abstract class UdeaGatesExtension @Inject constructor(private val project
     internal val shipping: MutableSet<String> = linkedSetOf()
 
     private companion object {
-        const val RELEASE_CHECK_PLUGIN: String = "udea.release-check"
+        const val RELEASE_CHECK_PLUGIN: String = "dev.wildware.udea.release-check"
     }
 }
 
@@ -104,9 +104,9 @@ public abstract class UdeaGatesExtension @Inject constructor(private val project
 public const val UDEA_GATES_EXTENSION: String = "udeaGates"
 
 /**
- * This build's [UdeaGatesExtension], creating it if `udea.game-gates` has not already.
+ * This build's [UdeaGatesExtension], creating it if `dev.wildware.udea.game-gates` has not already.
  *
- * Create-or-return, because `udea.determinism-check` reads the extension and can be applied on
+ * Create-or-return, because `dev.wildware.udea.determinism-check` reads the extension and can be applied on
  * its own - a build that wants the determinism scan and nothing else is a reasonable thing, and
  * a plugin that failed unless another one had been applied first would be an ordering rule
  * nobody can see.

@@ -202,10 +202,10 @@ ContractFreezeCheckTest > deleting the lock fails rather than freezing nothing(F
 ### M5 — the gate exists but is not on `check`
 
 ```
-diff --git a/build-logic/src/main/kotlin/udea.contract-freeze.gradle.kts b/build-logic/src/main/kotlin/udea.contract-freeze.gradle.kts
+diff --git a/build-logic/src/main/kotlin/dev.wildware.udea.contract-freeze.gradle.kts b/build-logic/src/main/kotlin/dev.wildware.udea.contract-freeze.gradle.kts
 index 4454861..dca88d6 100644
---- a/build-logic/src/main/kotlin/udea.contract-freeze.gradle.kts
-+++ b/build-logic/src/main/kotlin/udea.contract-freeze.gradle.kts
+--- a/build-logic/src/main/kotlin/dev.wildware.udea.contract-freeze.gradle.kts
++++ b/build-logic/src/main/kotlin/dev.wildware.udea.contract-freeze.gradle.kts
 @@ -68,6 +68,6 @@ val udeaVerifyContracts = tasks.register<UdeaVerifyContractsTask>(ContractFreeze
      mustRunAfter(udeaWriteContractLock)
  }
@@ -570,7 +570,7 @@ than committed. The committed-and-green half is covered twice over:
 
 ### AC3 — the gate is on `check` (or something `build` reaches), not only in `ci.yml`
 
-`build-logic/src/main/kotlin/udea.contract-freeze.gradle.kts` ends:
+`build-logic/src/main/kotlin/dev.wildware.udea.contract-freeze.gradle.kts` ends:
 
 ```kotlin
 tasks.named("check") {
@@ -579,7 +579,7 @@ tasks.named("check") {
 ```
 
 applied at the root in `build.gradle.kts` alongside `udea.migration-check` and
-`udea.determinism-check`. Proved three ways rather than asserted:
+`dev.wildware.udea.determinism-check`. Proved three ways rather than asserted:
 
 - AC1 above is a `sh gradlew build` failing on a fresh edit — nothing but `check` invoked it.
 - `ContractFreezeCheckTest > an untouched tree passes, and check is what runs the gate` asserts

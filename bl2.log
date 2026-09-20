@@ -1,0 +1,65 @@
+> Task :generatePomFileForDev.wildware.udea.android-applicationPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.android-applicationPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.clean-build-budgetPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.clean-build-budgetPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.contract-freezePluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.contract-freezePluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.determinism-checkPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.determinism-checkPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.docs-checkPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.docs-checkPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.game-gatesPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.game-gatesPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.gradle-pluginPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.gradle-pluginPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.jvm-test-fixturesPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.jvm-test-fixturesPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.kotlin-basePluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.kotlin-basePluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.kotlin-build-toolPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.kotlin-build-toolPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.kotlin-libraryPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.kotlin-libraryPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.kotlin-multiplatform-jvm-androidPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.kotlin-multiplatform-jvm-androidPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.kotlin-multiplatform-no-iosPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.kotlin-multiplatform-no-iosPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.kotlin-multiplatform-renderPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.kotlin-multiplatform-renderPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.kotlin-multiplatformPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.kotlin-multiplatformPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.module-graph-checkPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.module-graph-checkPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForDev.wildware.udea.release-checkPluginMarkerMavenPublication
+> Task :publishDev.wildware.udea.release-checkPluginMarkerMavenPublicationToMavenLocal
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :generateExternalPluginSpecBuilders UP-TO-DATE
+> Task :extractPrecompiledScriptPluginPlugins UP-TO-DATE
+> Task :compilePluginsBlocks UP-TO-DATE
+> Task :generatePrecompiledScriptPluginAccessors UP-TO-DATE
+> Task :generateScriptPluginAdapters UP-TO-DATE
+> Task :compileKotlin UP-TO-DATE
+> Task :compileJava NO-SOURCE
+> Task :pluginDescriptors UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :jar UP-TO-DATE
+> Task :javadoc NO-SOURCE
+> Task :javadocJar UP-TO-DATE
+> Task :sourcesJar UP-TO-DATE
+> Task :generateMetadataFileForPluginMavenPublication
+> Task :generatePomFileForPluginMavenPublication
+> Task :publishPluginMavenPublicationToMavenLocal
+> Task :generatePomFileForUdeaAgentPluginMarkerMavenPublication
+> Task :publishUdeaAgentPluginMarkerMavenPublicationToMavenLocal
+> Task :generatePomFileForUdeaAssetsPluginMarkerMavenPublication
+> Task :publishUdeaAssetsPluginMarkerMavenPublicationToMavenLocal
+> Task :publishToMavenLocal
+> Task :version-catalog:generateCatalogAsToml UP-TO-DATE
+> Task :version-catalog:generateMetadataFileForVersionCatalogPublication
+> Task :version-catalog:generatePomFileForVersionCatalogPublication
+> Task :version-catalog:publishVersionCatalogPublicationToMavenLocal
+> Task :version-catalog:publishToMavenLocal
+
+BUILD SUCCESSFUL in 4s
+56 actionable tasks: 44 executed, 12 up-to-date

@@ -77,7 +77,7 @@ Reverted with `git checkout -- udea-audio`. The tree matches commit `c59f403`.
 
 ## 2. Summary
 
-`udea-audio` moves from `udea.kotlin-library` to `udea.kotlin-multiplatform-no-ios`: `jvm`, `android`, `wasmJs`.
+`udea-audio` moves from `dev.wildware.udea.kotlin-library` to `dev.wildware.udea.kotlin-multiplatform-no-ios`: `jvm`, `android`, `wasmJs`.
 
 - **Sources.** Everything in `src/main` goes to `commonMain` unchanged: the `AudioDevice` interface,
   `AudioDevice.Silent`, `AudioBindings`, `AudioListener` and `CueAudio`. `CueAudioTest`, `AudioBindingsTest` and
@@ -91,8 +91,8 @@ Reverted with `git checkout -- udea-audio`. The tree matches commit `c59f403`.
      `Clock.System.now()`, folded into a `Long` (epoch seconds times 1e9, plus nanoseconds).
 - **Dependencies unchanged:** `udea-core` as `api`, `udea-assets` as `implementation`, now in `commonMain`.
 - **Docs.** `docs/module-graph.md`: the `udea-audio` row now names the new convention, and `udea-audio` is added to
-  the list of modules without iOS. The stale `udea-assets` row (said `udea.kotlin-library`, was already
-  `udea.kotlin-multiplatform` after #205) is fixed. `AGENTS.md`: the multiplatform paragraph now covers
+  the list of modules without iOS. The stale `udea-assets` row (said `dev.wildware.udea.kotlin-library`, was already
+  `dev.wildware.udea.kotlin-multiplatform` after #205) is fixed. `AGENTS.md`: the multiplatform paragraph now covers
   `udea-audio`. `.github/workflows/ci.yml`: one comment in the `ios-tests` job now lists `udea-audio` among the
   modules left out through `udea-core`. Only the comment changed.
 

@@ -68,7 +68,7 @@ cd <udea>
 ```
 
 Two commands, because `build-logic` is an included build and the outer one does not reach it. It is
-the half that carries `udea.game-gates`, `udea.kotlin-library` and `dev.wildware.udea.agent`, so
+the half that carries `dev.wildware.udea.game-gates`, `dev.wildware.udea.kotlin-library` and `dev.wildware.udea.agent`, so
 without it your game resolves every engine module and cannot apply a single plugin. `mavenLocal()` is
 first in every repository list, so what you publish there wins.
 
@@ -106,7 +106,7 @@ to disagree with the compiler the engine was built with.
 ### `build.gradle.kts` — what this build is
 
 ```kotlin
-plugins { id("udea.game-gates") }
+plugins { id("dev.wildware.udea.game-gates") }
 
 udeaGates {
     ships(":game")
@@ -119,7 +119,7 @@ udeaGates {
 }
 ```
 
-`udea.game-gates` is the plugin that gives your game Udea's build gates — the same ones the engine's
+`dev.wildware.udea.game-gates` is the plugin that gives your game Udea's build gates — the same ones the engine's
 own root build script applies to itself:
 
 | Gate | Refuses |
@@ -141,7 +141,7 @@ the scan. A gate that fires on those is a gate people switch off.
 
 ```kotlin
 plugins {
-    id("udea.kotlin-library")
+    id("dev.wildware.udea.kotlin-library")
     id("dev.wildware.udea.agent")
     id("com.google.devtools.ksp") version libs.versions.ksp.get()
 }
@@ -184,7 +184,7 @@ ksp {
   A bridge does not check whose game answered a port, so two games sharing a range means either
   one's bridge can drive and stop the other's instance — and that looks like an instance vanishing
   rather than like a misconfiguration.
-- Apply `udea.kotlin-multiplatform-render` instead of `udea.kotlin-library` when the game draws and
+- Apply `dev.wildware.udea.kotlin-multiplatform-render` instead of `dev.wildware.udea.kotlin-library` when the game draws and
   ships on more than one platform.
 
 ### `NewGame.kt` — the game
@@ -398,11 +398,11 @@ Stated plainly, because each is real work and none of it is broken.
 - **Levels.** `.udealevel` files and `-Plevel=<path>` work inside the engine's repository; the
   template has none. See [Levels](Levels).
 - **Drawing.** The template is headless. A game that draws applies
-  `udea.kotlin-multiplatform-render` and opens a `KoolBackend`; `moba` and `hollow` are the examples,
+  `dev.wildware.udea.kotlin-multiplatform-render` and opens a `KoolBackend`; `moba` and `hollow` are the examples,
   and the snapshot repository note in step 2 is the part that bites first. See
   [Rendering with Kool](Rendering-with-Kool).
 - **`AGENTS.md` and the frozen contracts.** `udeaVerifyAgentsMd` and `udeaVerifyContracts` are
-  statements about the *engine's* own documents, so `udea.game-gates` applies neither to a game. Your
+  statements about the *engine's* own documents, so `dev.wildware.udea.game-gates` applies neither to a game. Your
   game's `AGENTS.md` is yours.
 
 ## See also

@@ -61,7 +61,7 @@ udea-core is now multiplatform on **jvm, android and wasmJs**.
 
 **Tests.**
 - The portable test sources moved to `commonTest`: `git diff -M --name-status origin/kmp HEAD` shows 23 renames into it, plus the new `SystemOrderSortTest`. They run as 18 test classes. Everything else stayed in `jvmTest`.
-- Test fixtures moved to `src/jvmTestFixtures` (still `udea.jvm-test-fixtures`), so every consumer's `testFixtures(project(":udea-core"))` is unchanged.
+- Test fixtures moved to `src/jvmTestFixtures` (still `dev.wildware.udea.jvm-test-fixtures`), so every consumer's `testFixtures(project(":udea-core"))` is unchanged.
 - commonTest names containing `,` or `()` were renamed, because Kotlin/Native rejects those characters in backticked names. Every rename, old and new, is listed in `logs/renamed-tests.txt`.
 
 **Build.**
@@ -76,11 +76,11 @@ udea-core is now multiplatform on **jvm, android and wasmJs**.
 
 **Decisions.** Each one is commented on #203 (https://github.com/wildware-uk/Udea/issues/203#issuecomment-5705686407).
 - **iOS off, lead-approved.** Fleks has no iOS artifact. The evidence is in section 5a. Follow-up is #215: "Fleks has no iOS artifact: blocks iOS for udea-core and dependents", Part of #199, naming both fixes (upstream PR, vendoring).
-  - The switch is one named line in `udea-core/build.gradle.kts`, under `// THE iOS SWITCH (issue #215)`: `id("udea.kotlin-multiplatform-no-ios")`.
-  - Re-enabling means changing it to `id("udea.kotlin-multiplatform")`, then adding udea-core to `ios-tests`.
+  - The switch is one named line in `udea-core/build.gradle.kts`, under `// THE iOS SWITCH (issue #215)`: `id("dev.wildware.udea.kotlin-multiplatform-no-ios")`.
+  - Re-enabling means changing it to `id("dev.wildware.udea.kotlin-multiplatform")`, then adding udea-core to `ios-tests`.
   - **udea-core is deliberately not added to the `ios-tests` CI job.** The comment in `ci.yml` says so and names #215.
   - The #203 criterion "all four targets" was ruled met-as-far-as-possible by the lead.
-- **New convention `udea.kotlin-multiplatform-no-ios`.** It is the multiplatform set minus iOS. `udea.kotlin-multiplatform-render` now applies it rather than repeating the configuration. `KotlinMultiplatformConventionTest` pins the target set; it was red before the plugin existed (`logs/noios-red.log`).
+- **New convention `dev.wildware.udea.kotlin-multiplatform-no-ios`.** It is the multiplatform set minus iOS. `dev.wildware.udea.kotlin-multiplatform-render` now applies it rather than repeating the configuration. `KotlinMultiplatformConventionTest` pins the target set; it was red before the plugin existed (`logs/noios-red.log`).
 - **Test fixtures stay JVM-only.** udea-codegen consumes them as a JVM variant. So tests that use them stay in `jvmTest`, including these, which I tried in commonTest and moved back when they would not compile there: PhysicsRestoreOrder, SceneTeardown, DivergenceReport, LoopDrivenCapture, TornWorldRestore, WorldFieldStoreDiff.
 - **`runtimeName` is `java.name` on JVM/Android.** The manifest golden and error text keep `$` for nested classes on the authoritative JVM.
 - **`Thread.yield()` rather than `onSpinWait()`.** `onSpinWait` needs Android API 33.

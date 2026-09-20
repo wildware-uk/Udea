@@ -2,7 +2,7 @@ plugins {
     // Multiplatform (issue #205): jvm, android, wasmJs, iosArm64, iosSimulatorArm64. This module
     // depends on no Fleks, so unlike `udea-core` it takes the full runtime set. Every JVM
     // consumer - the asset compiler, the engine, moba - resolves the `jvm` variant unchanged.
-    id("udea.kotlin-multiplatform")
+    id("dev.wildware.udea.kotlin-multiplatform")
 }
 
 kotlin {

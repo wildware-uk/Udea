@@ -25,7 +25,7 @@ class KotlinPinCheckTest {
         GradleFixture(root).withVersionCatalog().withCompilerPluginProject().project(
             "udea-core",
             """
-            plugins { id("udea.kotlin-library") }
+            plugins { id("dev.wildware.udea.kotlin-library") }
             $extraBuildScript
             """.trimIndent(),
         )

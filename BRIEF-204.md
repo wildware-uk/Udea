@@ -57,7 +57,7 @@ fails the Wasm compile, and mutations M3 to M7 of the ported arithmetic turn tes
 
 udea-gas now builds for `jvm`, `android` and `wasmJs` and runs its tests on all three.
 
-- **Build script.** `udea.kotlin-multiplatform-no-ios`, copying `udea-core`'s #203 wiring: KSP over
+- **Build script.** `dev.wildware.udea.kotlin-multiplatform-no-ios`, copying `udea-core`'s #203 wiring: KSP over
   `kspCommonMainMetadata` with the generated source dir added to `commonMain`, the same two
   `dependsOn` lines, `udeaModule("Gas")` kept, `testFixtures(project(":udea-core"))` on
   `jvmTestImplementation`. `udeaGasAllocationBudget` points at the `jvm` test compilation and sets

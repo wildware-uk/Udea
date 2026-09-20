@@ -11,7 +11,7 @@ import org.jetbrains.kotlin.gradle.plugin.SubpluginOption
  * Applies `udea-compiler-plugin` to every compilation of a `udea-*` module and of `moba`.
  *
  * This is what `-Pudea.compilerPlugin.enabled=false` switches off. Before it existed the flag
- * was read by `udea.kotlin-library`, stored in `extraProperties` and consumed by nobody, so
+ * was read by `dev.wildware.udea.kotlin-library`, stored in `extraProperties` and consumed by nobody, so
  * the CI leg that proves the degrade path works compiled byte for byte what the normal build
  * compiled (issue #164). [isApplicable] is the consumer: with the flag off it returns `false`
  * for every compilation, the Kotlin Gradle plugin adds no dependency and produces no
@@ -157,7 +157,7 @@ public fun Project.buildCompilesCompilerPlugin(): Boolean =
 /**
  * `-Pudea.compilerPlugin.enabled`, validated by [UdeaBuildFlags] and absent meaning enabled.
  *
- * A `Provider` rather than the `extraProperties` entry `udea.kotlin-library` publishes: an
+ * A `Provider` rather than the `extraProperties` entry `dev.wildware.udea.kotlin-library` publishes: an
  * extra property is untyped and can be absent, and reading the property directly means this
  * plugin behaves identically whether or not it is applied through that convention.
  */

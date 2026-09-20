@@ -5,7 +5,7 @@ import dev.wildware.udea.build.registerNetProtocolLock
 import dev.wildware.udea.build.udeaRegistryModules
 
 plugins {
-    id("udea.kotlin-build-tool")
+    id("dev.wildware.udea.kotlin-build-tool")
     // The KSP Gradle plugin is applied here only so that the processor can be run over this
     // module's own test fixtures (`kspTest` below). Nothing in `src/main` is KSP-processed.
     id("com.google.devtools.ksp") version libs.versions.ksp.get()

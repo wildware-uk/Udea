@@ -80,7 +80,7 @@ internal object RepoLayout {
 
     /**
      * An Android application's main bytecode: the release variant's Kotlin output, which is what
-     * its APK ships and what its `udeaMainBytecode` task compiles (`udea.android-application`).
+     * its APK ships and what its `udeaMainBytecode` task compiles (`dev.wildware.udea.android-application`).
      */
     private fun androidApplicationClassFiles(module: String): List<File> =
         moduleDir(module).resolve("build/tmp/kotlin-classes/$ANDROID_SHIPPED_VARIANT")

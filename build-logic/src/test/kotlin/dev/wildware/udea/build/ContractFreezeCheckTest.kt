@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
  */
 class ContractFreezeCheckTest {
 
-    private val gate = "udea.contract-freeze"
+    private val gate = "dev.wildware.udea.contract-freeze"
 
     private val rootBuildScript = """
         plugins { id("$gate") }

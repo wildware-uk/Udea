@@ -237,7 +237,7 @@ jobs:
           echo "deployment ${id:-none, which is normal for a snapshot}"
 
       # The convention plugins and the version catalog, from the included build. Without these an
-      # outside game can resolve every engine module and still not apply `udea.game-gates`.
+      # outside game can resolve every engine module and still not apply `dev.wildware.udea.game-gates`.
       - name: Publish the build plugins
         if: steps.plan.outputs.upload == 'yes'
         env:

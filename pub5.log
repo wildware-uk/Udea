@@ -1,0 +1,73 @@
+Caught exception: Already watching path: /srv/ssd1/workspace/Udea/.claude/worktrees/agent-a270e9172406f94bb
+Unable to watch the file system for changes. Unable to watch same file twice via different paths: Already watching path: /srv/ssd1/workspace/Udea/.claude/worktrees/agent-a270e9172406f94bb.
+Stopping file watching and invalidating VFS after an error happened
+Calculating task graph as configuration cache cannot be reused because file 'settings.gradle.kts' has changed.
+> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :build-logic:generateExternalPluginSpecBuilders FROM-CACHE
+> Task :build-logic:extractPrecompiledScriptPluginPlugins FROM-CACHE
+> Task :build-logic:compilePluginsBlocks FROM-CACHE
+> Task :build-logic:generatePrecompiledScriptPluginAccessors FROM-CACHE
+> Task :build-logic:generateScriptPluginAdapters FROM-CACHE
+> Task :build-logic:compileKotlin FROM-CACHE
+> Task :build-logic:compileJava NO-SOURCE
+> Task :build-logic:pluginDescriptors
+> Task :build-logic:processResources
+> Task :build-logic:classes
+> Task :build-logic:jar
+
+> Configure project :common
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Task :gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :common:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:pluginDescriptors
+> Task :gradle-plugin:processResources
+> Task :gradle-plugin:sourcesJar
+> Task :gradle-plugin:generatePomFileForPluginMavenPublication
+> Task :gradle-plugin:generatePomFileForMavenJavaPublication
+> Task :common:generatePomFileForMavenJavaPublication
+> Task :gradle-plugin:compileKotlin FROM-CACHE
+> Task :gradle-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:classes
+> Task :gradle-plugin:jar
+> Task :gradle-plugin:generateMetadataFileForMavenJavaPublication
+> Task :gradle-plugin:generateMetadataFileForPluginMavenPublication
+> Task :gradle-plugin:generatePomFileForUdeaPluginPluginMarkerMavenPublication
+> Task :gradle-plugin:publishPluginMavenPublicationToMavenLocal
+> Task :gradle-plugin:publishUdeaPluginPluginMarkerMavenPublicationToMavenLocal
+
+> Task :gradle-plugin:publishMavenJavaPublicationToMavenLocal
+Multiple publications with coordinates 'dev.wildware.udea:gradle-plugin:1.0-SNAPSHOT' are published to repository 'mavenLocal'. The publications 'mavenJava' in project ':gradle-plugin' and 'pluginMaven' in project ':gradle-plugin' will overwrite each other!
+
+> Task :gradle-plugin:publishToMavenLocal
+> Task :common:kspKotlin FROM-CACHE
+> Task :common:processResources
+> Task :common:sourcesJar
+> Task :common:kaptGenerateStubsKotlin FROM-CACHE
+> Task :common:kaptKotlin SKIPPED
+> Task :common:compileKotlin FROM-CACHE
+> Task :common:compileJava NO-SOURCE
+> Task :common:classes
+> Task :common:jar
+> Task :common:generateMetadataFileForMavenJavaPublication
+> Task :common:publishMavenJavaPublicationToMavenLocal
+> Task :common:publishToMavenLocal
+
+[Incubating] Problems report is available at: file:///tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 8s
+31 actionable tasks: 21 executed, 10 from cache
+Configuration cache entry stored.

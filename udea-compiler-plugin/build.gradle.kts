@@ -1,5 +1,5 @@
 plugins {
-    id("udea.kotlin-build-tool")
+    id("dev.wildware.udea.kotlin-build-tool")
 }
 
 dependencies {
@@ -28,7 +28,7 @@ kotlin {
 
 /**
  * The exact Kotlin version this module is pinned to, asserted against the compiler the
- * plugin will be loaded by (spec 7). Set by the `udea.kotlin-build-tool` convention.
+ * plugin will be loaded by (spec 7). Set by the `dev.wildware.udea.kotlin-build-tool` convention.
  */
 val pinnedKotlinVersion = extensions.extraProperties["udeaPinnedKotlinVersion"] as String
 

@@ -6,8 +6,8 @@ import dev.wildware.udea.build.UdeaWriteContractLockTask
  * Registers `udeaVerifyContracts` and `udeaWriteContractLock`, and wires the first into `check`
  * (issue #174).
  *
- * Applied to the **root** project, for the same reason `udea.docs-check` and
- * `udea.determinism-check` are: the question is about the repository as a whole — "have the
+ * Applied to the **root** project, for the same reason `dev.wildware.udea.docs-check` and
+ * `dev.wildware.udea.determinism-check` are: the question is about the repository as a whole — "have the
  * frozen agreements moved" — and a per-module answer to it would be one answer per module to
  * a question that has one. It also keeps the switch that could turn the gate off out of the build
  * script of any module that implements what the contracts say.

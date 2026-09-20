@@ -1,0 +1,36 @@
+
+=== publish: ./gradlew publishToMavenLocal -PudeaVersion=0.1.0-SNAPSHOT
+  green  -> /tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/build/reports/udea/outside-game/publish.log
+
+=== publish-build-logic: ./gradlew -p build-logic publishToMavenLocal -PudeaVersion=0.1.0-SNAPSHOT
+  green  -> /tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/build/reports/udea/outside-game/publish-build-logic.log
+  published 96 artifacts at 0.1.0-SNAPSHOT -> /tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/build/reports/udea/outside-game/published-artifacts.txt
+
+=== build: ./gradlew build
+  green  -> /tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/build/reports/udea/outside-game/build.log
+
+=== run: ./gradlew run
+  green  -> /tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/build/reports/udea/outside-game/run.log
+
+=== bridge: gamebridge.json
+{
+  "name": "new-game",
+  "launch": {
+    "command": "./gradlew :game:run -PdebugPort={port} --console=plain",
+    "cwd": ".",
+    "portRange": "7860-7879",
+    "readyTimeoutMs": 180000,
+    "env": {}
+  }
+}
+
+=== det-red: ./gradlew udeaVerifyDeterminism
+  red    -> /tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/build/reports/udea/outside-game/det-red.log
+
+=== graph-red: ./gradlew :game:udeaVerifyModuleGraph
+  red    -> /tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/build/reports/udea/outside-game/graph-red.log
+
+=== PROOF GREEN
+a game outside this repository resolved the engine from a repository, built, ran, and
+inherited gates that fail when broken.
+transcripts: /tmp/claude-1000/-srv-ssd1-workspace-robot-game/5f75d121-04e0-4e18-afab-6eb6797e8599/scratchpad/udea265/build/reports/udea/outside-game

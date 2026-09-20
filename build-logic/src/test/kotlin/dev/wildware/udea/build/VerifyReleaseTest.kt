@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  */
 class VerifyReleaseTest {
 
-    private val gate = "udea.release-check"
+    private val gate = "dev.wildware.udea.release-check"
     private val agentEntry = "dev/wildware/udea/agent/AgentTools.class"
 
     private fun moba(fixture: GradleFixture, dependencies: String = ""): GradleFixture =

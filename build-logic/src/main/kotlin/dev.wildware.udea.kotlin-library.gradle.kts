@@ -6,16 +6,16 @@ import dev.wildware.udea.build.udeaLibrary
  *
  * Deliberately contains NO graphics dependency: a module on this convention cannot see
  * GL. The module that legitimately touches GL, `udea-render`, is on
- * `udea.kotlin-multiplatform-render` and takes Kool itself (spec 4, spec 3.5).
+ * `dev.wildware.udea.kotlin-multiplatform-render` and takes Kool itself (spec 4, spec 3.5).
  *
  * The policy every Kotlin module shares - the explicit-API rule, the resolved `kotlin-stdlib`
  * pinned to the catalog's Kotlin version (see `UdeaStdlibPin`), and the K2 compiler plugin with
- * its gates - is `udea.kotlin-base`, which the multiplatform conventions apply too.
+ * its gates - is `dev.wildware.udea.kotlin-base`, which the multiplatform conventions apply too.
  */
 
 plugins {
     kotlin("jvm")
-    id("udea.kotlin-base")
+    id("dev.wildware.udea.kotlin-base")
 }
 
 dependencies {

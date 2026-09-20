@@ -27,9 +27,9 @@ plugins {
     // `jvm` and `android`, and no more, because this module draws: it depends on `udea-render`,
     // which is on the same convention for the two reasons that convention states - Kool has no
     // iOS backend (spec D2) and publishes no wasmJs artifact (issue #223). The game is otherwise
-    // ready for all four; `udea.kotlin-multiplatform` is the one-line change that follows #223
+    // ready for all four; `dev.wildware.udea.kotlin-multiplatform` is the one-line change that follows #223
     // and #226.
-    id("udea.kotlin-multiplatform-render")
+    id("dev.wildware.udea.kotlin-multiplatform-render")
 
     // `@Replicated` on this game's components. The processor runs **once**, and every target
     // compiles the one copy it writes - see `kspJvm` below for why the run is hung off the JVM

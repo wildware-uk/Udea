@@ -95,7 +95,7 @@ class AccessorGeneratorTest {
         val files = generate(packAssets)
 
         val aggregate = fileNamed(files, "GameAssets").text
-        listOf("blueprint", "character", "level", "root").forEach { group ->
+        listOf("blueprint", "character", "level", "root", "shaders").forEach { group ->
             assertEquals(
                 1,
                 Regex("""public val $group:""").findAll(aggregate).count(),

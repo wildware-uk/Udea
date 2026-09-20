@@ -97,15 +97,24 @@ untouched by anything a game can write here. That is the whole reason for the sp
 
 ### 2. Shader - a program
 
-A fragment body in its own `.frag`, plus typed uniforms declared in Kotlin. The engine supplies the
-inputs and prepends the backend's header.
+A fragment body in its own `.frag`, declared as an asset, plus typed uniforms declared in Kotlin.
+The engine supplies the inputs and prepends the backend's header.
 
 ```kotlin
-val palette = UdeaShader.fragment(
-    source = "shaders/palette.frag",
-    uniforms = { float("uLevels", 16f); texture("uRamp", ramp) },
-)
+// assets/shaders/shaders.udea.kts
+shader(name = "palette", file = "shaders/palette.frag")
 ```
+
+```kotlin
+val palette = UdeaShader.fragment(GameAssets.shaders.palette, assets) {
+    float("uLevels", 16f)
+    texture("uRamp", ramp)
+}
+```
+
+The first draft of this section passed the *path* as `source`, which is the shape that made a game
+read the file itself; see "Assets, editing and errors" below for why the text travels in the asset
+instead.
 
 ```glsl
 // shaders/palette.frag - the engine supplies uColor, uDepth and uMask
@@ -151,8 +160,25 @@ Two rules make this safe rather than a determinism hole:
 
 ## Assets, editing and errors
 
-- **A shader is an asset.** It is discovered by KSP like everything else and gets a typed accessor,
-  so a material is `Materials.Water`, beside `Fox.Clips.Walk` and `Chassis.Nodes.socket_roof`.
+- **A shader is an asset, and it is declared.** Not discovered: a `.frag` is written into a
+  `.udea.kts` with `shader(name = "scanlines", file = "shaders/scanlines.frag")`, and the asset
+  build reads it, checks it, packs it and generates the accessor - the same five passes every
+  other file-backed asset goes through. The accessor follows the one naming convention the
+  generator already has, `GameAssets.<folder>.<name>`, so it is `GameAssets.shaders.scanlines`
+  beside `GameAssets.models.fox`. An earlier draft of this document said "discovered by KSP" and
+  named it `Materials.Water`; both were wrong. KSP processes annotated Kotlin and has never seen
+  an asset tree, and a second naming scheme for one asset kind is the defect #269 is about.
+- **The GLSL travels inside the asset, not as a path to it.** This is the one place a shader
+  differs from a model, and the reason is multiplatform. A `Model` names a file and `udea-render`
+  opens it on the platform it is running on; a game doing the same for a `.frag` writes
+  `javaClass.getResource(...).readText()`, which is JVM-only, so it writes that line once per
+  platform to load a file that is byte-identical everywhere. The build reads the file instead and
+  packs the text as an ordinary string field, so it comes back out of `BundleReader` in
+  `commonMain` on every target and there is no shader loader at all. A game writes
+  `UdeaShader.fragment(GameAssets.shaders.scanlines, assets)`.
+- **The `path`/`source` overload stays**, for GLSL a game genuinely makes up at run time - a
+  material permutation, a node graph's output - and for the engine's own built-ins, whose source
+  is a constant in `udea-render`. It is not what the documentation shows.
 - **A material instance is data on an entity**: an asset index plus its parameter values, which are
   plain floats — so it saves into a `.udealevel`, replicates if a game marks it `@Net`, and is
   editable by the agent tool surface without any new machinery.
@@ -161,7 +187,12 @@ Two rules make this safe rather than a determinism hole:
   `editor.*` like every other edit, so undo and the agent see it.
 - **Errors are `UdeaDiagnostic`s** with a rule id and a source span, capped and root-cause-first, the
   same as every other error in this engine. A shader that fails to compile on a backend names the
-  backend and the line.
+  backend and the line (`UDEA0019`), a uniform declared in Kotlin that the source never declares is
+  `UDEA0040`, and a declared `.frag` that is missing, empty, not a `.frag`, states its own
+  `#version` or defines no `udeaMain` is `UDEA0041` at the declaration, with a did-you-mean over
+  the `.frag` files that are there. The last one is a **build** failure rather than a launch
+  failure on purpose: an asset shader is compiled into the `.udeapak` long before anything
+  registers it, so a check left to registration ships a pack nobody can use.
 - **Hot reload** rides the existing asset delta path: a changed shader recompiles and swaps on the
   `SimBarrier`, no restart.
 
@@ -170,6 +201,7 @@ Two rules make this safe rather than a determinism hole:
 | # | Ticket | Needs |
 |---|---|---|
 | S1 | `UdeaShader.fragment` as a screen effect: GLSL source, typed uniforms, the ordered pass list, engine-supplied colour/depth/mask, the per-backend header, and compile failures as `UdeaDiagnostic`s naming file and line. Ships a palette and an outline. **Closes #259 and the first half of #266** | - |
+| S1a | A `.frag` is a declared asset: the `shader(...)` DSL word, the `Shader` runtime type carrying the text the build read, `GameAssets.shaders.<name>`, `UdeaShader.fragment(ref, assets)` in `commonMain`, and `UDEA0041` for a `.frag` the build cannot use. The docs and the template stop showing `javaClass.getResource`. **Recorded as a decision on #269** | S1 |
 | S2 | `UdeaMaterial`: the fixed slots, the default material the engine's own PBR and unlit paths are rewritten as, and materials as assets - KSP accessors, the component, level save, hot reload | - |
 | S3 | A shader on an object: the same fragment body over an engine-owned vertex stage, with skinning, instancing and the shadow pass intact | S1, S2 |
 | S4 | The editor's material inspector, slots driven from their declarations | S2 |

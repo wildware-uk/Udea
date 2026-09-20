@@ -45,6 +45,37 @@ The short version:
 | `game/src/agent` | the debug-only launcher that binds the MCP surface. Never shipped |
 | `game/src/test` | a headless test over the real tick loop |
 
+## Giving your game a look of its own
+
+A screen effect is GLSL you wrote in a `.frag` file. It is an **asset**, like a model or a sound:
+you declare it, the build reads it, checks it and packs it, and your Kotlin names it by the
+accessor the build generated.
+
+```kotlin
+// assets/shaders/shaders.udea.kts
+shader(name = "scanlines", file = "shaders/scanlines.frag")
+```
+
+```kotlin
+// anywhere in your game's shared code
+val scanlines = UdeaShader.fragment(GameAssets.shaders.scanlines, assets) {
+    float("uStrength", 0.25f)
+}
+registry.screenPass(scanlines)
+```
+
+No path, no string, and nothing that reads a file - so that line compiles on every platform your
+game ships on. Reaching for `javaClass.getResource("/shaders/scanlines.frag").readText()` instead
+gives you a line that compiles on the desktop alone; misspell the name here and it does not
+compile at all, and a `.frag` that is missing, empty, states its own `#version` or defines no
+`udeaMain` fails the build with `UDEA0041` and a did-you-mean.
+
+**This template does not ship one**, and that is a fact about the template rather than about the
+engine: it is one JVM project with no renderer and no asset pipeline applied, so there is nothing
+here for a screen effect to run over. Add `id("dev.wildware.udea.assets")` and a renderer when
+your game draws; `moba/game/assets/shaders/` in the Udea repository is the whole worked example,
+and `docs/new-game.md` has the long version.
+
 Two commands worth knowing before you change anything:
 
 ```sh

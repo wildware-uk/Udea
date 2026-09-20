@@ -83,6 +83,10 @@ class MigratedCorpusGapTest {
                 // its glTF file. Not a migrated kind - the old tree had no 3D models - but the
                 // corpus is the live game's asset root, so it is in the set that root declares.
                 "model",
+                // The game's own screen effect, whose `.frag` the asset build reads and packs so
+                // that the Kotlin naming it is `commonMain` on every target. Not a migrated kind
+                // either - the old tree had no shaders - but this is the live game's asset root.
+                "shader",
                 // No `level`: the game's one level is a saved `.udealevel` file since issue #192,
                 // not a script, so the corpus no longer declares one.
                 "soundCue",

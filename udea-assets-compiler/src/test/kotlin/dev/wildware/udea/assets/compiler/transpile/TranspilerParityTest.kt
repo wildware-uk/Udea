@@ -66,6 +66,9 @@ class TranspilerParityTest {
             sourceDirectory = TestPaths.scratch("$name-src"),
             outputDirectory = TestPaths.scratch("$name-classes"),
             compileClasspath = scriptingFreeClasspath(),
+            // The same root the script front end compiled against, so both fill a shader's
+            // source from the same files and "the same graph" stays a real comparison.
+            assetRoot = assetRoot,
         )
         val sources = loader.write(results)
         val compileDiagnostics = loader.compile(sources)

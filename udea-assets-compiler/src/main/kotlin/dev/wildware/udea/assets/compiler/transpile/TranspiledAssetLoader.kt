@@ -7,6 +7,7 @@ import dev.wildware.udea.assets.compiler.AssetGraph
 import dev.wildware.udea.assets.compiler.AssetScope
 import dev.wildware.udea.assets.compiler.AssetSource
 import dev.wildware.udea.assets.compiler.DeclaredAsset
+import dev.wildware.udea.assets.compiler.shader.ShaderSources
 import dev.wildware.udea.diagnostics.Severity
 import dev.wildware.udea.diagnostics.SourceSpan
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
@@ -57,6 +58,16 @@ public class TranspiledAssetLoader(
      * asserts by filtering those jars out before calling this and still compiling.
      */
     private val compileClasspath: List<Path>,
+    /**
+     * The asset root the sources were transpiled from.
+     *
+     * Required rather than defaulted, because it is only needed for the one pass that reads a
+     * file the declarations *name* - `ShaderSources`, which puts a `.frag`'s GLSL into the
+     * declaration - and a caller that forgot it would produce a graph that differs from the
+     * script front end's by exactly that field, silently. That is the difference
+     * `TranspilerParityTest` exists to catch, so it must not be possible to forget.
+     */
+    private val assetRoot: Path,
 ) {
     /** Writes every [TranspileResult] with code to disk, plus the `ServiceLoader` file. */
     public fun write(results: List<TranspileResult>): List<Path> {
@@ -124,7 +135,10 @@ public class TranspiledAssetLoader(
                 }
                 assets += scope.assets
             }
-            return AssetCompileResult(AssetGraph.of(assets), diagnostics)
+            // The same fill the script front end does, so the two graphs agree about a shader's
+            // text as well as about its path. See `AssetCompiler.compile`.
+            val declared = ShaderSources.fill(assetRoot, assets)
+            return AssetCompileResult(AssetGraph.of(declared), diagnostics)
         }
     }
 

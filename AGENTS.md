@@ -260,7 +260,15 @@ The pieces a newcomer meets first, each with the issue that made it so.
   menu or an editor panel: it draws into the window after the captured frame, so no screenshot
   sees it. A `CapturedUi` is a HUD: it draws into the captured frame, so an agent's screenshot
   sees the cooldown a player sees (#188).
-- **A game can write a screen shader** (#259, #266). `UdeaShader.fragment(path, source) { ... }`
+- **A game can write a screen shader** (#259, #266), and the `.frag` is an asset (#269).
+  `shader(name = "scanlines", file = "shaders/scanlines.frag")` in a `.udea.kts` makes the build
+  read the file, check it and pack its **text** into the graph, so
+  `UdeaShader.fragment(GameAssets.shaders.scanlines, assets) { ... }` is `commonMain` on every
+  target - no `javaClass.getResource`, no per-platform loader, and a misspelled name does not
+  compile. A `.frag` that is missing, empty, not a `.frag`, states its own `#version` or defines
+  no `udeaMain` fails the build with `UDEA0041` and a did-you-mean.
+  The `UdeaShader.fragment(path, source) { ... }` overload stays, for GLSL a game makes up at run
+  time and for the engine's own built-ins. Either way it
   takes GLSL a game authored and typed uniforms declared in Kotlin, and `RenderRegistry.screenPass`
   puts it in an ordered list that runs over the finished frame at render resolution, before any
   upscale, inside the captured frame and outside the editor's gizmo capture. The engine prepends

@@ -423,6 +423,23 @@ tasks.register<JavaExec>("runShaderProof") {
     )
 }
 
+// The shader-as-an-asset proof. Same shape as `runShaderProof`, and deliberately a second task
+// rather than more assertions in the first: this one's shader is GLSL the *game* wrote, read out
+// of the packed bundle, and its figures are about that path rather than about the built-ins.
+// Needs a GL driver, so it is run by name, for the reason `runMatchShot` gives.
+tasks.register<JavaExec>("runShaderAssetProof") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.shaderassetproof: a .frag the game declared as an asset, drawn and measured."
+    mainClass.set("dev.wildware.moba.shader.ShaderAssetProof")
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty(
+        "udea.shaderassetproof.dir",
+        providers.gradleProperty("udea.shaderassetproof.dir").orNull
+            ?: layout.buildDirectory.dir("reports/udea/shader-asset").get().asFile.absolutePath,
+    )
+}
+
 // Issue #191's pictures. `LevelShot` saves a real match to a level file in one JVM and loads it
 // into a fresh game in a second, photographing both from the same camera; the second run fails
 // unless the two pictures are pixel-identical. Two tasks because the two halves must not share a

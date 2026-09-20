@@ -37,18 +37,23 @@ class DrivenBodyTest {
                 scene.bodyOf(walker).linearY = 0f
                 scene.step()
             }
-            val afterEast = scene.transformOf(walker)
-            assertTrue(afterEast.x > SPEED * NEARLY, "a second at $SPEED/s east put it at ${afterEast.x}")
-            assertTrue(afterEast.y in -TOLERANCE..TOLERANCE, "it did not drift north: ${afterEast.y}")
+            // Read out as numbers. `transformOf` hands back the live `Transform3D`, so a reference
+            // held across the next loop would be re-read at assert time and the comparison below
+            // would be one value against itself - a test that cannot fail.
+            val eastX = scene.transformOf(walker).x
+            val eastY = scene.transformOf(walker).y
+            assertTrue(eastX > SPEED * NEARLY, "a second at $SPEED/s east put it at $eastX")
+            assertTrue(eastY in -TOLERANCE..TOLERANCE, "it did not drift north: $eastY")
 
             repeat(TICKS_PER_SECOND) {
                 scene.bodyOf(walker).linearX = 0f
                 scene.bodyOf(walker).linearY = SPEED
                 scene.step()
             }
-            val afterNorth = scene.transformOf(walker)
-            assertTrue(afterNorth.y > SPEED * NEARLY, "a second at $SPEED/s north put it at ${afterNorth.y}")
-            assertEquals(afterEast.x, afterNorth.x, TOLERANCE, "it stopped moving east when the game stopped asking")
+            val northX = scene.transformOf(walker).x
+            val northY = scene.transformOf(walker).y
+            assertTrue(northY > SPEED * NEARLY, "a second at $SPEED/s north put it at $northY")
+            assertEquals(eastX, northX, TOLERANCE, "it stopped moving east when the game stopped asking")
         }
     }
 

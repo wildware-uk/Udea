@@ -29,21 +29,26 @@ class PlayerMovementTest {
 
         scene.moveX = 1f
         scene.run(TICKS_PER_SECOND)
-        val walked = scene.transformOf(me)
+        // Read out as numbers, not kept as a component. `transformOf` hands back the live
+        // `Transform3D`, so a reference held across the next `run` would be re-read at assert time
+        // and every comparison against it would be the value against itself - a test that cannot
+        // fail, which is exactly what the first pass of this file was.
+        val walkedX = scene.transformOf(me).x
+        val walkedY = scene.transformOf(me).y
 
         assertEquals(
             HollowMovement.WALK_SPEED,
-            walked.x,
+            walkedX,
             WALK_TOLERANCE,
-            "a second of walking east should cover about ${HollowMovement.WALK_SPEED} units, and covered ${walked.x}",
+            "a second of walking east should cover about ${HollowMovement.WALK_SPEED} units, and covered $walkedX",
         )
-        assertTrue(abs(walked.y) < DRIFT, "it drifted north: ${walked.y}")
+        assertTrue(abs(walkedY) < DRIFT, "it drifted north: $walkedY")
 
         // Let go. The ground plane has no gravity and no friction, so a character that was not
         // asked to stop every tick would coast for ever.
         scene.moveX = 0f
         scene.run(TICKS_PER_SECOND)
-        assertEquals(walked.x, scene.transformOf(me).x, DRIFT, "it kept walking after the key went up")
+        assertEquals(walkedX, scene.transformOf(me).x, DRIFT, "it kept walking after the key went up")
     }
 
     @Test

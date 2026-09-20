@@ -905,3 +905,36 @@ waits on the owner.
 
 **Box sharing:** see the memory note. Release explicitly, never on a lapsed timer, and a hold
 means the agent is told not to start a JVM rather than trusted to finish early.
+
+### Next ticket, not yet dispatched: make `:build-logic:test` reachable from `sh gradlew build`
+
+Found 2026-09-20 by `dev-plugin-namespace` while working the plugin-namespace branch.
+
+`build-logic` is an **included build**, so the outer `build` never reaches its `test` task.
+`:build-logic:test` has not compiled since `4b2aca4` - today's #265 merge, which deleted
+`ModuleGraphRules.governs` and `ModuleGraphRules.GAME_PROJECTS` and left
+`ModuleGraphRulesTest.kt:701,712` calling them:
+
+```
+e: ModuleGraphRulesTest.kt:701:50 Unresolved reference: governs
+e: ModuleGraphRulesTest.kt:712:61 Unresolved reference: GAME_PROJECTS
+```
+
+**Four hours, not three weeks - and that is luck rather than health.** The detector is switched
+off, so the elapsed time says nothing. The same breakage could have sat there for a month.
+
+**Be exact about which half is dark.** The `udeaVerify*` *tasks* - contracts, AGENTS.md, module
+graph, determinism - are on the outer `check` and have been running fine throughout. What is
+absent is the *unit* half: the tests of the rules themselves. The rules have been correctly
+applied while untested. "The contract freeze gate is out of service" would be false.
+
+**The part worth remembering: #265's reviewer could not have caught this.** It ran
+`sh gradlew build` with no exclusions, got a real green, and passed. The tests #265 broke are
+exactly the tests its own gate does not run. A reviewer doing everything right, on a green
+build, merging a red suite.
+
+Scope: wire `:build-logic:test` into the outer `build`, then fix whatever else the newly-lit
+suite shows red. `dev-plugin-namespace` owes the full red list once the suite compiles - the
+compiler stops at the first failing file and there may be more behind it. Dispatch this the
+moment the plugin-namespace branch merges; it edits `build-logic` too, so it cannot run beside
+it.

@@ -20,6 +20,10 @@ dependencies {
     implementation(project(":udea-assets"))
     // The UDP transport the servers and clients talk over.
     implementation(project(":udea-net"))
+    // The solver a launcher opens for an authoritative game and does not for a client (issue #250).
+    // The launcher owns it because a `Physics2DModule` is a native world with a lifetime: `HollowGame`
+    // says which modules a definition is made of, and this is the process that closes them.
+    implementation(project(":udea-physics2d"))
 }
 
 /**
@@ -32,9 +36,21 @@ val gameAssetRoot: Directory = project(":hollow:game").layout.projectDirectory.d
 val launchLevel: Provider<String> = providers.gradleProperty("level")
     .map { rootProject.layout.projectDirectory.file(it).asFile.absolutePath }
 
+/**
+ * Where `:hollow:game:udeaPackBundle` writes the `.glb` it converted each `.fbx` to (issue #244).
+ *
+ * The clearing's props ship as `.glb` and are read from the asset root above; the human ships as
+ * `models/human/Human.fbx`, and its `.glb` only exists under the build directory. Both roots are
+ * passed, because the launcher reads one model from each.
+ */
+val convertedModels: Provider<Directory> = project(":hollow:game").layout.buildDirectory.dir("udea/converted")
+
 tasks.withType<JavaExec>().configureEach {
     systemProperty("hollow.assets.root", gameAssetRoot.asFile.absolutePath)
+    systemProperty("hollow.assets.converted", convertedModels.get().asFile.absolutePath)
     launchLevel.orNull?.let { systemProperty("hollow.level", it) }
+    // The converted models are an output of the game's asset pack, which a run must not race.
+    dependsOn(":hollow:game:udeaPackBundle")
 }
 
 tasks.register<JavaExec>("run") {
@@ -74,6 +90,23 @@ tasks.register<JavaExec>("runShot") {
         "udea.shot.out",
         providers.gradleProperty("udea.shot.out").orNull
             ?: layout.buildDirectory.file("reports/udea/clearing.png").get().asFile.absolutePath,
+    )
+}
+
+/**
+ * `runPlayerShot`: the character standing, walking and then running a lap of the clearing, as one
+ * PNG per known tick (issue #250). A GL task run by name, for the reason `runShot` gives.
+ */
+tasks.register<JavaExec>("runPlayerShot") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "hollow.player: captures the character walking and running, into -Pudea.shot.out=<dir>."
+    mainClass.set("dev.wildware.hollow.desktop.HollowPlayerShot")
+    classpath = sourceSets.main.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty(
+        "udea.shot.out",
+        providers.gradleProperty("udea.shot.out").orNull
+            ?: layout.buildDirectory.dir("reports/udea/player").get().asFile.absolutePath,
     )
 }
 

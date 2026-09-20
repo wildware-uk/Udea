@@ -17,6 +17,16 @@ import kotlin.test.assertEquals
  *
  * The comparison is made at boot, after the one tick `MobaEntry.seed` runs, and not later. What a
  * match does from there is the replay fixtures' business, not this file's.
+ *
+ * ## The `worldHash` line moves when the wire id space does, and the rest does not
+ *
+ * `WorldHasher` folds each captured component's `typeId` - the id from the checked-in global
+ * `net-components.lock` - so adding a `@Replicated` component anywhere in the repository renumbers
+ * its successors and changes this hash for a world that has not moved an inch. Issue #250 did
+ * exactly that (`dev.wildware.hollow.Player` sorts before every `dev.wildware.moba.*` name), and
+ * every other line of the golden file was byte-identical across that change, which is what says the
+ * units really did boot where they always boot. If this hash and nothing else differs again, that
+ * is the thing to check first; if a `netId=` line differs, a unit genuinely moved.
  */
 class TestLevelRosterTest {
 

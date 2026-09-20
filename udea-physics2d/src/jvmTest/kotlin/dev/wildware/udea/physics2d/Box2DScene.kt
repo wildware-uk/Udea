@@ -97,6 +97,9 @@ internal class Box2DScene(
 
     fun bodyOf(id: NetId): PhysicsBody = with(world) { entityOf(id)[PhysicsBody] }
 
+    /** The pose a dynamic body drives, and a kinematic or static one is driven by (issue #247). */
+    fun transformOf(id: NetId): Transform3D = with(world) { entityOf(id)[Transform3D] }
+
     fun step() {
         game.simulation.step()
     }

@@ -143,6 +143,21 @@ internal class Box2DPhysicsWorld(
     private var sensors = BooleanArray(capacity)
     private var shapeMasks = IntArray(capacity)
     private var dims = FloatArray(capacity * DIMS_PER_BODY)
+
+    /**
+     * The velocity each body was last *known* to hold: what the solver produced at the last
+     * [writeBack], or what [pushWrittenVelocity] last wrote.
+     *
+     * This is what makes "the game wrote a velocity" answerable at all. A `PhysicsBody` is a plain
+     * component and nothing instruments its setters (`AGENTS.md`'s do-not list), so the only way to
+     * tell a velocity a game wrote from the one the solver produced is to remember the latter and
+     * compare - capture-and-diff, the same bargain replication strikes.
+     */
+    private var solvedVelX = FloatArray(capacity)
+
+    /** @see solvedVelX */
+    private var solvedVelY = FloatArray(capacity)
+
     private var freeSlots = IntArray(capacity)
     private var freeCount = 0
     private var highWater = 0
@@ -152,6 +167,15 @@ internal class Box2DPhysicsWorld(
 
     /** [rebuildFrom] calls since construction. */
     internal var rebuildCount: Long = 0L
+        private set
+
+    /**
+     * Velocities [pushWrittenVelocity] actually put into the solver since construction.
+     *
+     * The observable half of "a scene nobody steers costs nothing": a counter a test can read,
+     * rather than a claim about native calls that nothing can check.
+     */
+    internal var velocityPushes: Long = 0L
         private set
 
     override val bodyCount: Int get() = liveCount
@@ -178,6 +202,8 @@ internal class Box2DPhysicsWorld(
             val velocity = B2Body.getLinearVelocity(body)
             component.linearX = B2Vec2.getX(velocity)
             component.linearY = B2Vec2.getY(velocity)
+            solvedVelX[slot] = component.linearX
+            solvedVelY[slot] = component.linearY
             component.angularVelocity = B2Body.getAngularVelocity(body)
             component.awake = B2Body.isAwake(body)
         }
@@ -368,6 +394,11 @@ internal class Box2DPhysicsWorld(
         // The slot, offset by one so that zero - a body with no user data - names nothing. Box2D
         // stores the value and never dereferences it.
         B2Body.setUserData(body, slot + 1L)
+        // The velocity the body was built with is already in the solver, so it is what this slot is
+        // known to hold. Without this a body built moving would look, on its first tick, like a
+        // body a game had just written a velocity onto, and be pushed for nothing.
+        solvedVelX[slot] = component.linearX
+        solvedVelY[slot] = component.linearY
 
         val base = slot * DIMS_PER_BODY
         var mask = 0
@@ -489,6 +520,41 @@ internal class Box2DPhysicsWorld(
 
     override fun setAwake(handle: BodyHandle, awake: Boolean) {
         B2Body.setAwake(bodyIds[requireSlot(handle)], awake)
+    }
+
+    /**
+     * Puts [component]'s `linearX`/`linearY` into the solver, if the game changed them.
+     *
+     * How a game *steers* a dynamic body (issue #250): a character walks because its game writes a
+     * velocity onto its `PhysicsBody` every tick, and this is the one place that reaches Box2D.
+     * Before this existed a written velocity was read only when the body was built, so a component
+     * could be written all day and the body never moved.
+     *
+     * "If the game changed them" is the whole of the cost argument, and it is exact rather than
+     * approximate: the comparison is on raw bits against [solvedVelX]/[solvedVelY], which hold what
+     * the solver last produced, so a scene nobody steers makes **zero** native calls here -
+     * `DrivenBodyTest` asserts that on the counter. A tolerance would have been wrong twice over: a
+     * game writing a velocity a hair from the solved one means it, and `-0.0` and `0.0` are the same
+     * number to `==` and a different push to Box2D.
+     *
+     * Wakes the body only for a non-zero velocity: writing zero is how a game stops a character, and
+     * waking a body to tell it to stand still is how a resting body never sleeps again.
+     *
+     * A handle that names no live body is ignored rather than refused: a caller walking a family of
+     * components is looking at exactly the entities whose bodies may have been destroyed this tick.
+     */
+    override fun pushWrittenVelocity(component: PhysicsBody) {
+        val slot = slotOf(component.handle)
+        if (slot < 0) return
+        val x = component.linearX
+        val y = component.linearY
+        if (x.toRawBits() == solvedVelX[slot].toRawBits() && y.toRawBits() == solvedVelY[slot].toRawBits()) return
+        val body = bodyIds[slot]
+        B2Body.setLinearVelocity(body, vec(vecA, x, y))
+        if (x != 0f || y != 0f) B2Body.setAwake(body, true)
+        solvedVelX[slot] = x
+        solvedVelY[slot] = y
+        velocityPushes++
     }
 
     override fun raycast(fromX: Float, fromY: Float, toX: Float, toY: Float, hit: RayHit): Boolean {
@@ -681,6 +747,8 @@ internal class Box2DPhysicsWorld(
         sensors = sensors.copyOf(capacity)
         shapeMasks = shapeMasks.copyOf(capacity)
         dims = dims.copyOf(capacity * DIMS_PER_BODY)
+        solvedVelX = solvedVelX.copyOf(capacity)
+        solvedVelY = solvedVelY.copyOf(capacity)
         freeSlots = freeSlots.copyOf(capacity)
     }
 

@@ -82,6 +82,16 @@
 # and `spatial.Transform3D`, so `Transform3D` alone moves up by one. Nothing has shipped against
 # that id.
 #
+# `dev.wildware.hollow.Player` is Hollow's character (issue #250): the axis its player asked for
+# this tick, whether the run control was held, and which connection drives it. It is here because
+# the last of those, `owner`, has to reach a client - a two-player game cannot be played until each
+# client knows which of the two characters is its own, and a `NetId` is allocation order, which a
+# client cannot predict. `dev.wildware.hollow` sorts before every `dev.wildware.moba` name, so every
+# id in this file moved up by one. `HollowNet`'s KDoc left that decision to "the first ticket that
+# needs a Hollow component on the wire", and this is it. Nothing has shipped against the old
+# numbering: `moba`'s two checked-in `.udearep` fixtures were regenerated in the same change, which
+# is what `:moba:desktop:udeaWriteReplayFixture` is for, and no client is connected to anything.
+#
 # The two `dev.wildware.udea.nav` names are ground-plane navigation (issue #264): the order a unit
 # is walking to, and a building's footprint. Both are here because both have to survive a
 # `time.rewind` - a unit whose order a rewind did not restore would carry on to a goal the restored
@@ -89,6 +99,7 @@
 # where a destroyed building used to be, since the grid is rebuilt from these components and from
 # nothing else. They sort after every earlier name, so adding them moved no existing id.
 #
+dev.wildware.hollow.Player
 dev.wildware.moba.CharacterView
 dev.wildware.moba.Player
 dev.wildware.moba.Position

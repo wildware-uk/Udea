@@ -1,6 +1,6 @@
 # BRIEF-265 — a game that builds and runs outside the Udea repository
 
-SHA: PENDING-R2
+SHA: `65029e7`
 
 Branch `issue-265-outside-game`, off `origin/master` at `a45636c`.
 

@@ -1082,4 +1082,11 @@ refuses to bind`, has **no diagnosis**, and I deliberately did not invent one fo
 `cancel-in-progress: true` on `master`; #272 option 3 (publish `udea-version-catalog` from the root
 build). PR #273 is another session's to close or rebase.
 
+**Unassigned, found while waiting and deliberately not fixed mid-wave:** two Gradle
+`DomainObjectCollection.all { }` calls in the gate code - `DependencyVerification.kt:37` and
+`UdeaVerifyEditorAbsentTask.kt:110` - want a comment naming the receiver, because `.all { }` there
+returns `Unit` and registers a callback rather than answering a question. Neither is wrong; both are
+in `build-logic`, which `dev-274` owns this wave, so it waits rather than becoming an unreviewed
+edit on somebody's branch. The general rule is now in `.claude/agents/engineer.md`.
+
 **Backlog:** robot-game #258, #261, #263, #267, #268, #269, #270, #271, #274. Hollow #251-#255.

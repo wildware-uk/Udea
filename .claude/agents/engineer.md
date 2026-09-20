@@ -386,6 +386,32 @@ effect.** A grep over-reporting by 2 cannot explain a discrepancy of 1. A 52-uni
 produce a 37.7px move. A one-tick ordering change cannot explain a 2000-tick divergence. All of those
 shapes were published, believed, and repeated before anyone did the subtraction.
 
+## `.all { }` in a Gradle script is not a predicate
+
+Two meanings, five identical characters, and the failure is asymmetric.
+
+```kotlin
+listOf(1, 2).all { it > 0 }                       // Iterable.all: returns Boolean, answers a question
+configurations.matching { ... }.all { ... }       // DomainObjectCollection.all: returns Unit,
+                                                  // runs the block for every element now AND hereafter
+```
+
+Read the Gradle one as a predicate and **you believe there is a check where there is a loop**. Both
+live in this repository's classpath-gate code (`DependencyVerification.kt`,
+`UdeaVerifyEditorAbsentTask.kt`), and in that setting the mistake produces a gate that looks like it
+measures something - this project's commonest defect, arriving through a language feature.
+
+Nothing is wrong at either site today. The hazard is that a reader has no type information at the
+call and no reason to suspect two meanings exist, so **name the receiver in a comment** when you
+write or touch one.
+
+The general form is worth more than the instance, and it came from another project on this box:
+**a collection whose behaviour is chosen by `all { }` over its members changes behaviour when one
+member changes, at a site that names neither.** Not the member, not the instruction, not the diff of
+the member. If you are adding an entry to a shared registry - `DslKinds.TYPES`, a component
+registry, a plugin convention - check whether anything decides a *mode* by quantifying over that
+registry. A guard whose whole-group effect is written down is a guard; one that is not is a mine.
+
 ## Before you believe a zero, make the search return a non-zero
 
 An absence is the easiest claim to publish and the hardest to check. "No module imports it", "the

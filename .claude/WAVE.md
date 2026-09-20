@@ -444,6 +444,25 @@ Since #201 the build needs an Android SDK: add `ANDROID_HOME=$HOME/Android/Sdk` 
   `.claude/worktrees/agent-a3cbf6ce8ad2f0116`. Report: `scratchpad/review212/review-212-r1.md`.
 - **In flight: 0.** Wave 10 complete.
 
+## Wave 21 (2026-09-20): the wiki, done
+- MERGED and PUSHED (master 4c8e8a6): `wiki-core` (13 engine pages, Home, _Sidebar, the udeaVerifyWiki
+  gate), `wiki-render` (Getting-Started, Rendering-with-Kool, Models-and-Animation, UI-with-ComposeGL,
+  Input, Cameras) and `wiki-tools2` (Audio, The-Editor, Gizmos, Agent-Tool-Surface, Tutorial-Make-a-Game,
+  Example-Games). 25 pages, 5 images. `udeaVerifyWiki` green on the merged tree.
+- PUBLISHED to the GitHub wiki, commit 6358fba. The sidebar's `Building-Hollow-in-the-Editor` link is
+  removed until #255 writes that page.
+- Merge conflicts resolved by hand: `docs/home.md` (kept the wiki pointer, kept new-game.md and
+  engineering-standards links), `docs/getting_started.md` (master deleted it in #265; deletion wins),
+  `.pending`/Home/_Sidebar add/add. `.pending` deleted once every page it listed existed.
+- dev-wiki-tools KILLED after 19h: it had drifted into building a tutorial *game with tests* instead of
+  writing pages. Two writers replaced it and did 12 pages in about 90 minutes. Lesson for a docs
+  dispatch: say "you write documentation, you do not write code or tests" in the prompt.
+- The writers caught three classes of error worth remembering: a documented command that silently does
+  nothing (`-Dudea.render.mode=Windowed` never reaches `:moba:desktop:run`), a confident false caption
+  (lane ribbon called tower range), and seven elided `.../` paths nobody can open - the gate caught one,
+  a writer swept the class.
+- AGENTS.md fixed: the generated node member is `Chassis.Nodes.socket_roof`, not `socketRoof`.
+
 ## Wave 20 (2026-09-20): in flight
 - MERGED: #265 (publish the engine + outside-repo games, PASS at 6d48acd), the #246 reopen (level save,
   PASS at 9b353ad), #250 (the Hollow player, PASS at 9e77add). master at 98bc86e.

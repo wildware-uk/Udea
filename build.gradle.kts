@@ -365,6 +365,29 @@ val udeaAssemble by tasks.registering {
     dependsOn(rewriteProjects.map { "${it.path}:assemble" })
 }
 
+// --- build-logic's own tests, inside `./gradlew build` (issue #265's merge) --------------------
+//
+// `build-logic` is an included build. The outer build compiles its classes in order to configure
+// itself and then reaches none of its tasks, so `./gradlew build` was green over a `build-logic`
+// test suite that did not compile: #265 deleted `ModuleGraphRules.governs` and
+// `ModuleGraphRules.GAME_PROJECTS` and left `ModuleGraphRulesTest` calling both. That change's
+// reviewer ran the build with no exclusions, got a genuine green, and merged it. The tests a
+// change breaks in there are exactly the tests the gate does not run, so no amount of care at
+// review time could have caught it.
+//
+// Note which half was dark, because the alarming version is false: `udeaVerifyContracts`,
+// `udeaVerifyAgentsMd`, `udeaVerifyModuleGraph` and `udeaVerifyDeterminism` are *tasks* on this
+// build's `check` and have been running throughout. The rules were applied; what was untested was
+// the unit half - the tests of those rules.
+//
+// One line, on `check` rather than on `build`, so `./gradlew check` reaches it too; and on the
+// included build's own aggregate rather than on `:test`, so what this build asks for is "verify
+// yourself" rather than a list of that build's projects maintained from outside it.
+// `:udea-gradle`'s `BuildLogicGateTest` is what notices this line being removed.
+tasks.named("check") {
+    dependsOn(gradle.includedBuild("build-logic").task(":udeaBuildLogicCheck"))
+}
+
 // --- the wall-clock latency budgets (issue #175) ----------------------------------------------
 //
 // Every gate in this repository that asserts a number of *milliseconds*, gathered under one task

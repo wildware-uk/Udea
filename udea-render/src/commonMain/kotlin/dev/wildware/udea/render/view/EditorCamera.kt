@@ -2,6 +2,7 @@ package dev.wildware.udea.render.view
 
 import dev.wildware.udea.render.camera.Camera2D
 import dev.wildware.udea.render.camera.ExtendViewport
+import dev.wildware.udea.render.camera.wrapDegrees
 import dev.wildware.udea.render.draw.Projection2D
 import dev.wildware.udea.render.model.ModelCamera
 import kotlin.math.PI
@@ -206,7 +207,7 @@ public class EditorCamera(
 
     /** Turns the orbit by [yawDelta] degrees about Z and [pitchDelta] degrees up. */
     public fun orbit(yawDelta: Float, pitchDelta: Float) {
-        yawDegrees = wrap(yawDegrees + yawDelta)
+        yawDegrees = wrapDegrees(yawDegrees + yawDelta)
         pitchDegrees += pitchDelta
     }
 
@@ -410,18 +411,9 @@ public class EditorCamera(
         const val MAX_PITCH: Float = 89f
 
         const val HALF_TURN: Float = 180f
-        const val FULL_TURN: Float = 360f
 
         fun radians(degrees: Float): Float = (degrees * PI / HALF_TURN).toFloat()
 
         fun degrees(radians: Float): Float = (radians * HALF_TURN / PI).toFloat()
-
-        /** [degrees] folded into (-180, 180]. */
-        fun wrap(degrees: Float): Float {
-            var folded = degrees % FULL_TURN
-            if (folded <= -HALF_TURN) folded += FULL_TURN
-            if (folded > HALF_TURN) folded -= FULL_TURN
-            return folded
-        }
     }
 }

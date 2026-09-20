@@ -121,7 +121,7 @@ class GlKoolPointerTest {
             input.state.source = DeviceIntent(bindings, pointer = pointer)
 
             awaitFrames(frames, frames.count.get() + 3)
-            backend.moveTo(SCENE_X, SCENE_Y)
+            backend.moveMouseTo(SCENE_X, SCENE_Y)
             settle(backend, frames, recorder)
 
             // 1. A click on the scene reaches the simulation as an intent - left and right both.
@@ -143,7 +143,7 @@ class GlKoolPointerTest {
             assertEquals(1, onScene.presses(aim), "a right click on the scene did not become exactly one intent: $onScene")
 
             // 2. A click on a ComposeGL button is the button's, and never becomes an intent.
-            backend.moveTo(BUTTON_X, BUTTON_Y)
+            backend.moveMouseTo(BUTTON_X, BUTTON_Y)
             settle(backend, frames, recorder)
             backend.onRenderThread { recorder.reset() }
             val clicksBefore = screen.clicks.get()
@@ -165,7 +165,7 @@ class GlKoolPointerTest {
             backend.onRenderThread { recorder.reset() }
             backend.button(GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_PRESS)
             settle(backend, frames, recorder)
-            backend.moveTo(SCENE_X, SCENE_Y)
+            backend.moveMouseTo(SCENE_X, SCENE_Y)
             settle(backend, frames, recorder)
             backend.button(GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_RELEASE)
             settle(backend, frames, recorder)
@@ -179,7 +179,7 @@ class GlKoolPointerTest {
             backend.onRenderThread { recorder.reset() }
             backend.button(GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_PRESS)
             settle(backend, frames, recorder)
-            backend.moveTo(BUTTON_X, BUTTON_Y)
+            backend.moveMouseTo(BUTTON_X, BUTTON_Y)
             settle(backend, frames, recorder)
             val heldOverButton = backend.onRenderThread { recorder.isHeld(fire) }
             backend.button(GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_RELEASE)
@@ -193,7 +193,7 @@ class GlKoolPointerTest {
             // 5. Pressed on the scene and the mouse leaves the window: Kool drops the pointer, and the
             //    game lets go of what it held. Then it comes back with the button up, and that is not a
             //    click: Kool lists the returning mouse with the button it left holding marked as changed.
-            backend.moveTo(SCENE_X, SCENE_Y)
+            backend.moveMouseTo(SCENE_X, SCENE_Y)
             settle(backend, frames, recorder)
             backend.onRenderThread { recorder.reset() }
             backend.button(GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_PRESS)
@@ -203,7 +203,7 @@ class GlKoolPointerTest {
             settle(backend, frames, recorder)
             val left = backend.onRenderThread { recorder.snapshot() }
             backend.button(GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_RELEASE)
-            backend.moveTo(SCENE_X, SCENE_Y)
+            backend.moveMouseTo(SCENE_X, SCENE_Y)
             settle(backend, frames, recorder)
             val back = backend.onRenderThread { recorder.snapshot() }
 
@@ -214,7 +214,7 @@ class GlKoolPointerTest {
 
             // 6. With no screen shown, the same click where the button was is the game's.
             ui.show(null)
-            backend.moveTo(BUTTON_X, BUTTON_Y)
+            backend.moveMouseTo(BUTTON_X, BUTTON_Y)
             settle(backend, frames, recorder)
             backend.onRenderThread { recorder.reset() }
             val clicksHidden = screen.clicks.get()
@@ -256,34 +256,6 @@ class GlKoolPointerTest {
             Thread.onSpinWait()
         }
         assertTrue(backend.onRenderThread { recorder.ticks } >= ticks + SETTLE_TICKS, "the simulation stopped ticking")
-    }
-
-    /**
-     * Moves the mouse on Kool's own GLFW cursor callback, as a real mouse would.
-     *
-     * The same round trip `GlKoolInputTest` takes for keys, for the same reason: the position goes in
-     * as GLFW's and Kool decides the pointer, so what reaches `KoolPointer` - and what the toolkit hit-
-     * tests - is what Kool made of it rather than a value this test chose. GLFW has no getter for a
-     * callback, only a setter that returns the previous one, so it is taken off and put straight back.
-     * Render thread only: GLFW requires the thread that owns the window.
-     *
-     * Reported twice, as a real mouse reports a drag in many small moves. Kool holds back the position
-     * of the move that *starts* a drag, so that the drag begins where the press was
-     * (`BufferedPointerInput.movePointer`), and a single jump with a button held would leave Kool's
-     * pointer - and so the toolkit's hit test - where it started. That is not hypothetical: with one
-     * move, "dragged off the button and released on the scene" released on the button, and clicked it.
-     */
-    private fun KoolBackend.moveTo(x: Double, y: Double) = onRenderThread {
-        val window = currentWindow()
-        val callback = checkNotNull(GLFW.glfwSetCursorPosCallback(window, null)) {
-            "Kool installed no GLFW cursor callback, so this test would be moving nothing"
-        }
-        try {
-            callback.invoke(window, x, y)
-            callback.invoke(window, x, y)
-        } finally {
-            GLFW.glfwSetCursorPosCallback(window, callback)
-        }
     }
 
     /** Presses or releases a mouse button on Kool's own GLFW callback. */

@@ -4,6 +4,7 @@ import de.fabmax.kool.input.InputStack
 import de.fabmax.kool.util.Time
 import dev.wildware.udea.render.input.InputFrame
 import dev.wildware.udea.render.input.PointerId
+import dev.wildware.udea.render.input.PointerMotion
 import dev.wildware.udea.render.input.PointerReportListener
 import dev.wildware.udea.render.input.PointerState
 import dev.wildware.udea.render.input.UiPointers
@@ -20,6 +21,9 @@ import dev.wildware.udea.render.ui.UiLayer
  * val pointer = KoolPointer(ui)                         // `ui` is the UiLayer, or null for none
  * val source = DeviceIntent(game.bindings, keyboard, pointer = pointer)
  * ```
+ *
+ * It is also the mouse's motion ([PointerMotion], issue #248), which a camera turns by: summed every
+ * frame, and spent by that camera rather than by the tick.
  *
  * ## Held back until the interface has judged it
  *
@@ -72,7 +76,7 @@ import dev.wildware.udea.render.ui.UiLayer
 public class KoolPointer internal constructor(
     /** Asked whether a verdict is coming, and told each one. [UiPointers.NONE] with no interface. */
     private val ui: UiPointers,
-) : PointerState, AutoCloseable {
+) : PointerState, PointerMotion, AutoCloseable {
 
     /** Reads pointers after [ui] has had first refusal on them, or straight away when it is `null`. */
     public constructor(ui: UiLayer? = null) : this(ui?.pointers ?: UiPointers.NONE)
@@ -101,7 +105,9 @@ public class KoolPointer internal constructor(
     private val listener = InputStack.PointerListener { state, _ ->
         beginFrame(InputFrame(Time.frameCount))
         for (pointer in state.pointers) {
-            if (pointer.isValid) onPointer(PointerId(pointer.id), pointer.buttonMask)
+            if (!pointer.isValid) continue
+            onPointer(PointerId(pointer.id), pointer.buttonMask)
+            onMotion(pointer.delta.x, pointer.delta.y)
         }
         endFrame()
     }
@@ -125,6 +131,31 @@ public class KoolPointer internal constructor(
         presses.fill(0)
     }
 
+    /**
+     * Pixels moved right since [spendMotion], every pointer summed. Not held back for the interface's
+     * verdict, as a press is: see [PointerMotion] for why, and for what a reader does instead.
+     */
+    override var motionX: Float = 0f
+        private set
+
+    /** Pixels moved down the window since [spendMotion], every pointer summed. */
+    override var motionY: Float = 0f
+        private set
+
+    override fun spendMotion() {
+        motionX = 0f
+        motionY = 0f
+    }
+
+    /**
+     * One pointer's motion this frame, in Kool's window pixels: `+y` is down, as Kool's pointer
+     * position runs. `internal`, like [onPointer], so it can be driven with no context.
+     */
+    internal fun onMotion(dx: Float, dy: Float) {
+        motionX += dx
+        motionY += dy
+    }
+
     /** Stops listening. After this, no pointer reaches the game through this. */
     override fun close() {
         InputStack.remove(handler)
@@ -134,6 +165,7 @@ public class KoolPointer internal constructor(
         presses.fill(0)
         listed.clear()
         waiting.clear()
+        spendMotion()
     }
 
     /**

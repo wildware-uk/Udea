@@ -13,7 +13,6 @@ import dev.wildware.udea.render.interp.Pose
 import dev.wildware.udea.render.interp.PoseSource
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
-import kotlin.math.exp
 
 /**
  * The world camera, and the only thing that moves it.
@@ -215,7 +214,7 @@ public class CameraRig(
         if (followed != null && poses.poseOf(world, followed, alpha, pose)) {
             val desiredX = pose.x + offsetX
             val desiredY = pose.y + offsetY
-            val t = smoothingFactor(frameTime.frameSeconds)
+            val t = halfLifeStep(frameTime.frameSeconds, followHalfLife)
             camera.position.x += (desiredX - camera.position.x) * t
             camera.position.y += (desiredY - camera.position.y) * t
         }
@@ -358,26 +357,11 @@ public class CameraRig(
         viewport.update(target.width, target.height)
     }
 
-    /**
-     * Fraction of the remaining distance to close this frame.
-     *
-     * `1 - 2^(-dt / halfLife)`, which is the frame-rate-independent form: halving the frame
-     * time halves the step, so two frames of a 120Hz display move the camera exactly as far as
-     * one frame of a 60Hz one. A fixed per-frame fraction does not, and is why cameras tuned
-     * on one machine feel sluggish on another.
-     */
-    private fun smoothingFactor(dtSeconds: Float): Float {
-        if (followHalfLife <= 0f || dtSeconds <= 0f) return 1f
-        return 1f - exp(-LN_2 * dtSeconds / followHalfLife)
-    }
-
     private companion object {
         const val DEFAULT_WORLD_WIDTH: Float = 32f
         const val DEFAULT_WORLD_HEIGHT: Float = 18f
 
         /** A tenth of a second: tight enough to feel attached, loose enough to absorb jitter. */
         const val DEFAULT_HALF_LIFE: Float = 0.1f
-
-        val LN_2: Float = kotlin.math.ln(2f)
     }
 }

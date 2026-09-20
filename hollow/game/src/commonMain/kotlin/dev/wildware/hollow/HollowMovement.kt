@@ -60,21 +60,21 @@ public object HollowMovement {
  * Mutable and reused because it is on the per-tick path, and a reconciliation replays every
  * unacknowledged command on the tick a correction lands.
  */
-public class MoveAxis {
+internal class MoveAxis {
 
     /** The clamped x. */
-    public var x: Float = 0f
+    var x: Float = 0f
         private set
 
     /** The clamped y. */
-    public var y: Float = 0f
+    var y: Float = 0f
         private set
 
     /** True when the player asked to move at all this tick. */
-    public val isMoving: Boolean get() = x != 0f || y != 0f
+    val isMoving: Boolean get() = x != 0f || y != 0f
 
     /** Reads ([rawX], [rawY]) in, clamped to the unit circle, and returns this. */
-    public fun set(rawX: Float, rawY: Float): MoveAxis {
+    fun set(rawX: Float, rawY: Float): MoveAxis {
         val square = rawX * rawX + rawY * rawY
         if (square > 1f) {
             // `sqrt` is the one transcendental IEEE-754 specifies exactly, so both ends of a
@@ -111,7 +111,7 @@ public class MoveAxis {
  * within the solver's own rounding, which is several orders of magnitude inside
  * `PredictionSmoothing.tolerance`.
  */
-public class HollowMoveModel(
+internal class HollowMoveModel(
     /** Walk speed in units a second. The server's own, so the two cannot drift apart. */
     private val walkSpeed: Float = HollowMovement.WALK_SPEED,
     /** Run speed in units a second. */

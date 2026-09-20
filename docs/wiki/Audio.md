@@ -140,8 +140,8 @@ change a rewind. Seeding it from `RngService` would couple it to the simulation 
 sound and every later combat roll shifts. The seed comes from `kotlin.time.Clock.System`, and a test
 that needs two mixers to agree passes `seed` itself.
 
-This is the general rule — see [[Tick-Model-and-Determinism]]. Presentation randomness is separately
-typed and lives where the simulation cannot see it.
+This is the general rule — see [Tick Model and Determinism](Tick-Model-and-Determinism).
+Presentation randomness is separately typed and lives where the simulation cannot see it.
 
 ## The ear
 
@@ -248,12 +248,12 @@ the ear where the camera is. A free camera — which `moba` does not have — wo
 
 ## Hollow has no audio yet
 
-`hollow`, the 3D example, emits no cues and builds no mixer on master. See [[Example-Games]].
+`hollow`, the 3D example, emits no cues and builds no mixer on master. See [Example Games](Example-Games).
 
 ## See also
 
-- [[Assets]] — where `soundCue` is authored and how `.udeapak` is built
-- [[Abilities-GAS]] — the ability system that emits most of `moba`'s cues
-- [[Architecture]] — why `udea-audio` is headless and `udea-render` is not
-- [[Tick-Model-and-Determinism]] — cues, snapshots, and why presentation randomness is separate
-- [[Example-Games]] — `moba`'s nine cues, and what Hollow does not have yet
+- [Assets](Assets) — where `soundCue` is authored and how `.udeapak` is built
+- [Abilities (GAS)](Abilities-GAS) — the ability system that emits most of `moba`'s cues
+- [Architecture](Architecture) — why `udea-audio` is headless and `udea-render` is not
+- [Tick Model and Determinism](Tick-Model-and-Determinism) — cues, snapshots, and why presentation randomness is separate
+- [Example Games](Example-Games) — `moba`'s nine cues, and what Hollow does not have yet

@@ -177,7 +177,7 @@ is one edit session — live while it moves, one undo entry when you let go, can
 toolbar over the Scene tab holds grid snapping and its step, angle snapping and its step, and a
 World/Local axes switch, all kept in the project's editor preferences.
 
-Gizmos have their own page: [[Gizmos]].
+Gizmos have their own page: [Gizmos](Gizmos).
 
 ## Building an editor for your game
 
@@ -223,9 +223,9 @@ xvfb-run -a -s "-screen 0 1280x720x24" \
 
 ## See also
 
-- [[Gizmos]] — handles, the annotations that generate them, and writing your own
-- [[Agent-Tool-Surface]] — the `editor.*` tools the window calls, and how to call them yourself
-- [[UI-with-ComposeGL]] — the toolkit the panels are written in
-- [[Cameras]] — `EditorCamera` and the Scene tab's 2D/3D switch
-- [[Assets]] — what the Asset panel is editing
-- [[Levels]] — what Save and Play standalone write
+- [Gizmos](Gizmos) — handles, the annotations that generate them, and writing your own
+- [Agent Tool Surface](Agent-Tool-Surface) — the `editor.*` tools the window calls, and how to call them yourself
+- [UI with ComposeGL](UI-with-ComposeGL) — the toolkit the panels are written in
+- [Cameras](Cameras) — `EditorCamera` and the Scene tab's 2D/3D switch
+- [Assets](Assets) — what the Asset panel is editing
+- [Levels](Levels) — what Save and Play standalone write

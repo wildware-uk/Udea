@@ -167,7 +167,7 @@ public data class Drag(
 with `dx`, `dy`, `dz`, plus `stretchFrom(centre)` (how much further out it is), `along(direction)`,
 and `turnAbout(centre)` / `turnAbout(centre, axis)` (the angle it went round).
 
-**One gotcha, and it is the only real one.** The editor keeps the handle you pressed for the whole
+**One gotcha worth knowing.** The editor keeps the handle you pressed for the whole
 drag while the component changes *live* underneath. So compute from what `build` read this frame,
 captured in a local — never from the component inside the response, or the drag compounds its own
 writes. Every built-in takes each field twice for exactly this reason: as a property reference, which
@@ -250,8 +250,8 @@ val writes = handles.single().drag(Drag(start, at))
 
 ## See also
 
-- [[The-Editor]] — the window the handles are drawn in, and what a drag becomes
-- [[Agent-Tool-Surface]] — `editor.begin_edit` and friends, which every drag goes through
-- [[ECS-and-Components]] — components, and what makes a field writable
-- [[Diagnostics-and-Compiler-Plugin]] — `UDEA0017` and the did-you-mean rule
-- [[Build-and-Verification]] — `UDEA-MG-010` and `UDEA-MG-012`, the gates that keep editor code out of a release
+- [The Editor](The-Editor) — the window the handles are drawn in, and what a drag becomes
+- [Agent Tool Surface](Agent-Tool-Surface) — `editor.begin_edit` and friends, which every drag goes through
+- [ECS and Components](ECS-and-Components) — components, and what makes a field writable
+- [Diagnostics and Compiler Plugin](Diagnostics-and-Compiler-Plugin) — `UDEA0017` and the did-you-mean rule
+- [Build and Verification](Build-and-Verification) — `UDEA-MG-010` and `UDEA-MG-012`, the gates that keep editor code out of a release

@@ -29,11 +29,19 @@ import org.jetbrains.kotlin.gradle.plugin.SubpluginOption
  *
  * [getPluginArtifact] is the only way to tell the Kotlin Gradle plugin what to put on the
  * compiler-plugin classpath, and it takes Maven coordinates: `SubpluginEnvironment` turns it
- * into `project.dependencies.add(pluginConfigurationName, "group:name:version")`. Those
- * coordinates are never published anywhere — the plugin is built by this build — so [apply]
- * substitutes them back to `:udea-compiler-plugin` on every compiler-plugin classpath. The
- * substitution is what makes `compileKotlin` depend on `:udea-compiler-plugin:jar`, which is
- * how a plugin edit is picked up by the next build instead of by the next publish.
+ * into `project.dependencies.add(pluginConfigurationName, "group:name:version")`. In *this*
+ * build the plugin is a project rather than a dependency, so [apply] substitutes those
+ * coordinates back to `:udea-compiler-plugin` on every compiler-plugin classpath, and they carry
+ * a version no repository can answer so that a substitution which silently stopped being
+ * registered fails loudly. The substitution is what makes `compileKotlin` depend on
+ * `:udea-compiler-plugin:jar`, which is how a plugin edit is picked up by the next build instead
+ * of by the next publish.
+ *
+ * A game in its own repository (issue #265) has no such project: it applies this convention from
+ * a published `udea-build-logic`, and the plugin is a published jar it resolves like any other
+ * dependency. Both arrangements are wired here, they are told apart by
+ * [Project.buildCompilesCompilerPlugin], and neither is allowed to end in "no plugin at all" -
+ * `udeaVerifyCompilerPlugin` fails when nothing landed on the classpath, in either build.
  *
  * A plain `dependencies { kotlinCompilerPluginClasspathMain(project(...)) }` would put the jar
  * on the classpath too, but it would leave the `-P plugin:…` options to be hand-encoded into
@@ -41,6 +49,15 @@ import org.jetbrains.kotlin.gradle.plugin.SubpluginOption
  * standards names, and it would not survive a new source set.
  */
 public class UdeaCompilerPluginSupport : KotlinCompilerPluginSupportPlugin {
+
+    /**
+     * The project this instance was applied to.
+     *
+     * [getPluginArtifact] takes no arguments and the answer is not the same for every build, so
+     * the project has to be remembered. One instance is created per project that applies the
+     * plugin, which is what makes this safe.
+     */
+    private lateinit var project: Project
 
     /**
      * Registers the substitution described above on this project's compiler-plugin classpaths.
@@ -51,18 +68,15 @@ public class UdeaCompilerPluginSupport : KotlinCompilerPluginSupportPlugin {
      * this plugin having to know their names.
      */
     override fun apply(target: Project) {
+        project = target
         val classpaths = target.configurations.matching {
             it.name.startsWith(UdeaCompilerPluginWiring.PLUGIN_CLASSPATH_PREFIX)
         }
-        // Loud, and named, rather than Gradle's bare "Project with path ... not found" from
-        // deep inside a resolution. A build that carries this convention without the project
-        // that builds the plugin has no wiring at all, and every checker is silently off.
-        requireNotNull(target.rootProject.findProject(UdeaCompilerPluginWiring.PLUGIN_PROJECT_PATH)) {
-            "${target.path} is on the udea.kotlin-library convention, which applies the K2 " +
-                "compiler plugin, but this build has no " +
-                "${UdeaCompilerPluginWiring.PLUGIN_PROJECT_PATH} project to apply. Include it " +
-                "in settings.gradle.kts, or the FIR checkers are off with nothing saying so."
-        }
+        // Substituted only when this build is the one that compiles the plugin. A game in its own
+        // repository (issue #265) has no `:udea-compiler-plugin` project, and a substitution
+        // naming a project path the build does not have fails at configuration time; there the
+        // coordinate is a published artifact and is meant to resolve.
+        val substituteToProject = target.buildCompilesCompilerPlugin()
         val coordinates = "${UdeaCompilerPluginWiring.ARTIFACT_GROUP}:" +
             UdeaCompilerPluginWiring.ARTIFACT_NAME
         classpaths.configureEach {
@@ -76,14 +90,16 @@ public class UdeaCompilerPluginSupport : KotlinCompilerPluginSupportPlugin {
             // after the configuration is created and so after this block first runs.
             val classpath = this
             withDependencies { classpath.isTransitive = true }
-            resolutionStrategy.dependencySubstitution {
-                substitute(module(coordinates))
-                    .using(project(UdeaCompilerPluginWiring.PLUGIN_PROJECT_PATH))
-                    .because(
-                        "udea-compiler-plugin is built by this build and published nowhere; " +
-                            "getPluginArtifact() can only name Maven coordinates, so they are " +
-                            "substituted back to the project that produces them.",
-                    )
+            if (substituteToProject) {
+                resolutionStrategy.dependencySubstitution {
+                    substitute(module(coordinates))
+                        .using(project(UdeaCompilerPluginWiring.PLUGIN_PROJECT_PATH))
+                        .because(
+                            "udea-compiler-plugin is built by this build and published nowhere; " +
+                                "getPluginArtifact() can only name Maven coordinates, so they are " +
+                                "substituted back to the project that produces them.",
+                        )
+                }
             }
         }
     }
@@ -110,12 +126,33 @@ public class UdeaCompilerPluginSupport : KotlinCompilerPluginSupportPlugin {
 
     override fun getCompilerPluginId(): String = UdeaCompilerPluginWiring.PLUGIN_ID
 
+    /**
+     * The coordinate the Kotlin Gradle plugin puts on each compiler-plugin classpath.
+     *
+     * Its version depends on which build is asking - see
+     * [UdeaCompilerPluginWiring.artifactVersion]. In this repository it is the unresolvable
+     * sentinel that the substitution in [apply] replaces; in a game's own repository it is the
+     * engine version that game builds against, and there is nothing to substitute.
+     */
     override fun getPluginArtifact(): SubpluginArtifact = SubpluginArtifact(
         groupId = UdeaCompilerPluginWiring.ARTIFACT_GROUP,
         artifactId = UdeaCompilerPluginWiring.ARTIFACT_NAME,
-        version = UdeaCompilerPluginWiring.ARTIFACT_VERSION,
+        version = UdeaCompilerPluginWiring.artifactVersion(
+            buildCompilesPlugin = project.buildCompilesCompilerPlugin(),
+            udeaVersion = project.providers.gradleProperty(UdeaVersion.PROPERTY).orNull,
+        ),
     )
 }
+
+/**
+ * Whether this build is the one that compiles `udea-compiler-plugin`.
+ *
+ * The question every decision about the plugin coordinate turns on, asked in one place so the
+ * substitution, the artifact version and `udeaVerifyCompilerPlugin` cannot answer it differently.
+ * `false` is a game in its own repository (issue #265), where the plugin is a published artifact.
+ */
+public fun Project.buildCompilesCompilerPlugin(): Boolean =
+    rootProject.findProject(UdeaCompilerPluginWiring.PLUGIN_PROJECT_PATH) != null
 
 /**
  * `-Pudea.compilerPlugin.enabled`, validated by [UdeaBuildFlags] and absent meaning enabled.

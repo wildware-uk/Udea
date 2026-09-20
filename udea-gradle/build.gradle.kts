@@ -100,3 +100,8 @@ tasks.test {
         },
     ).withPropertyName("repositoryTestSources").withPathSensitivity(PathSensitivity.RELATIVE)
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's Gradle plugins: the agent bridge descriptor and debug-only agent source set, and " +
+    "the asset pipeline tasks a game's build runs."

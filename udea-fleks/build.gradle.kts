@@ -48,3 +48,9 @@ kotlin {
         }
     }
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Fleks 2.14, the Kotlin entity component system by Simon Klausner (MIT), vendored as " +
+    "source so that Udea's kernel has iOS targets. Unmodified upstream source; see " +
+    "udea-fleks/NOTICE.md."

@@ -1,8 +1,60 @@
 plugins {
     `kotlin-dsl`
+
+    // Publishing, for the same reason the engine's modules are published (issue #265): a game in
+    // its own repository applies `udea.kotlin-library`, `udea.game-gates` and
+    // `dev.wildware.udea.agent`, and a convention plugin that only exists inside this checkout is
+    // a convention plugin no outside game can apply. `kotlin-dsl` brings `java-gradle-plugin`
+    // with it, so the precompiled script plugins in `src/main/kotlin` get plugin markers of their
+    // own and `id("udea.game-gates") version "..."` resolves to the jar this publishes.
+    //
+    // Gradle's own `maven-publish` here, and not the `com.vanniktech.maven.publish` the engine's
+    // modules use, for a reason that is a property of this build rather than a preference:
+    //
+    //     > Failed to apply plugin class 'com.vanniktech.maven.publish.MavenPublishBasePlugin'.
+    //     > Make sure the Kotlin version 2.2.0 or newer is applied. Otherwise, detected Kotlin
+    //     > plugin org.jetbrains.kotlin.jvm but was not able to access Kotlin plugin classes.
+    //
+    // `kotlin-dsl` is what compiles a precompiled script plugin, and it applies the Kotlin plugin
+    // that the *Gradle distribution* embeds - 2.0.21 for Gradle 8.13 - from Gradle's own
+    // classloader. Every project that can hold a `.gradle.kts` convention plugin is in that state,
+    // so this is not something a version bump fixes. The endpoints below are the same two Central
+    // endpoints that plugin posts to, and the shape is the same: a release is uploaded and left
+    // sitting for a person to press publish on.
+    `maven-publish`
+    signing
 }
 
-group = "dev.wildware.udea.build"
+group = "dev.wildware.udea"
+
+description =
+    "Udea's Gradle convention plugins: the Kotlin conventions every engine and game module is " +
+        "on, the build gates (module graph, determinism, release, contracts), and the " +
+        "gamebridge.json and asset-pipeline plugins."
+
+/**
+ * The version these plugins publish under - and the one place in the repository that carries the
+ * default as a literal.
+ *
+ * `UdeaVersion.resolve` is the rule (`-PudeaVersion` wins, else the git tag, else the first
+ * snapshot), and every `udea-*` module gets its version from it. This build script cannot call
+ * it: `UdeaVersion` is compiled *by* this project, and a build script cannot use a class the
+ * project it configures produces. So the property is read here directly and the no-property
+ * answer is written out.
+ *
+ * That leaves exactly one way for the two to disagree - a build that passes no `-PudeaVersion` -
+ * and `UdeaVersionTest.build-logic publishes its plugins at the same default this rule gives`
+ * reads this file and fails when the literal below stops being `UdeaVersion.FIRST_SNAPSHOT`. The
+ * release workflow passes the property to the whole tree, so a release cannot be affected either
+ * way.
+ */
+version = providers.gradleProperty("udeaVersion").orNull?.trim()?.takeIf { it.isNotEmpty() }
+    ?: "0.1.0-SNAPSHOT"
+
+subprojects {
+    group = rootProject.group
+    version = rootProject.version
+}
 
 /**
  * `udea-gradle`'s plugin sources, compiled a second time so that THIS build can apply them.
@@ -44,6 +96,131 @@ gradlePlugin {
             id = "dev.wildware.udea.assets"
             implementationClass = "dev.wildware.udea.gradle.UdeaAssetsPlugin"
             description = "scan, compile, validate, pack and generate accessors for a .udea.kts tree."
+        }
+    }
+}
+
+// --- publishing the plugins a game applies (issue #265) --------------------------------------
+
+// Central refuses a jar that arrives without sources and javadoc beside it.
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+//
+// The engine's modules are published by the root build script. These two are published here
+// because they are in a different build: `build-logic` is an included build, so nothing in the
+// outer build can configure it.
+//
+// The POM values are written out rather than read from `UdeaPom`, for the reason given on
+// `version` above - this is the build that compiles that class - and `UdeaPomTest` reads this
+// file and fails when the two stop agreeing.
+
+/**
+ * What each project of this build is called on Maven Central, and the whole list of them.
+ *
+ * A map rather than "publish everything", because the cost of getting it wrong is permanent: a
+ * version published to Central can never be deleted or replaced. A project that is added here
+ * without a line is refused below rather than published under its directory name.
+ */
+val publishedArtifactIds: Map<String, String> = mapOf(
+    ":" to "udea-build-logic",
+    ":version-catalog" to "udea-version-catalog",
+)
+
+/**
+ * Where a deployment goes, which is decided by the version and by nothing else.
+ *
+ * A snapshot is mutable and goes to Central's snapshot repository. A release goes to the staging
+ * API, which is the plain-Maven door into the same Central portal the engine's modules are
+ * uploaded to: it *stages* the deployment and leaves it there. Nothing is released by arriving.
+ */
+val centralRepositoryUrl: String =
+    if (version.toString().endsWith("SNAPSHOT")) {
+        "https://central.sonatype.com/repository/maven-snapshots/"
+    } else {
+        "https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/"
+    }
+
+allprojects {
+    val artifactId = publishedArtifactIds[path]
+        ?: error(
+            "$path is a project of build-logic with no artifact id in publishedArtifactIds. " +
+                "Add one, or move the project somewhere that is not published.",
+        )
+
+    afterEvaluate {
+        // Read out here: inside the `pom` block, `name` and `description` are the POM's own.
+        val moduleDescription = description
+            ?: error("$path has no description, and Central requires one")
+
+        extensions.configure<PublishingExtension> {
+            repositories {
+                maven {
+                    name = "mavenCentral"
+                    setUrl(centralRepositoryUrl)
+                    // The same two property names the engine's modules take their credentials
+                    // from, so one pair of secrets covers the whole release.
+                    credentials {
+                        username = providers.gradleProperty("mavenCentralUsername").orNull
+                        password = providers.gradleProperty("mavenCentralPassword").orNull
+                    }
+                }
+            }
+
+            publications.withType<MavenPublication>().configureEach {
+                // The plugin markers `java-gradle-plugin` generates are named after the plugin id
+                // they resolve - that *is* their coordinate - so only the main publication is
+                // renamed. The markers point at whatever this one ends up being called.
+                if (name == "pluginMaven" || name == "versionCatalog") {
+                    this.artifactId = artifactId
+                }
+
+                pom {
+                    name.set(artifactId)
+                    description.set(moduleDescription)
+                    url.set("https://github.com/wildware-uk/Udea")
+                    inceptionYear.set("2026")
+
+                    licenses {
+                        license {
+                            // MIT, because the repository's own `LICENSE` is. See `UdeaPom`.
+                            name.set("MIT License")
+                            url.set("https://opensource.org/licenses/MIT")
+                        }
+                    }
+
+                    developers {
+                        developer {
+                            id.set("shaun-wild")
+                            name.set("Shaun Wild")
+                            url.set("https://github.com/shaun-wild")
+                        }
+                    }
+
+                    scm {
+                        url.set("https://github.com/wildware-uk/Udea")
+                        connection.set("scm:git:git://github.com/wildware-uk/Udea.git")
+                        developerConnection.set("scm:git:ssh://git@github.com/wildware-uk/Udea.git")
+                    }
+                }
+            }
+        }
+
+        // Signed when there is a key, and not otherwise. `publishToMavenLocal` has to work on a
+        // machine with no GPG key on it - it is what `scripts/outside-game-proof.sh` resolves the
+        // engine through - and Central will not take an unsigned release, so the same build does
+        // both depending on whether CI handed it a key.
+        val signingKey = providers.gradleProperty("signingInMemoryKey").orNull
+        if (!signingKey.isNullOrBlank()) {
+            extensions.configure<SigningExtension> {
+                useInMemoryPgpKeys(
+                    signingKey,
+                    providers.gradleProperty("signingInMemoryKeyPassword").orNull ?: "",
+                )
+                sign(extensions.getByType<PublishingExtension>().publications)
+            }
         }
     }
 }

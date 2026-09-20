@@ -28,3 +28,9 @@ kotlin {
         }
     }
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's audio: it drains the simulation's cue queue and plays it through a pluggable " +
+    "device, with a silent device for headless runs. No graphics context and no playback " +
+    "backend of its own."

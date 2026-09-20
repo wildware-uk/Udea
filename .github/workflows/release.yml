@@ -1,0 +1,302 @@
+# Publishes Udea, from a button (issue #265).
+#
+# Actions tab, "Release", "Run workflow", and pick one:
+#
+#   rehearse   builds and signs, uploads nothing, tags nothing. The default, deliberately.
+#   snapshot   the next minor as X.Y.0-SNAPSHOT, pushed to Central's snapshot repository. No tag,
+#              and nothing permanent: a snapshot can be overwritten all day.
+#   patch      0.1.0 becomes 0.1.1
+#   minor      0.1.0 becomes 0.2.0
+#   major      0.1.0 becomes 1.0.0
+#
+# The number is worked out from the last `vX.Y.Z` tag, so there is nothing in the repository to
+# edit and no commit that says "prepare 0.2.0". The three release kinds create the tag themselves,
+# and only after the build has compiled and signed: a commit that cannot be built should not leave
+# a tag behind. `build.gradle.kts` reads the same rule out of `UdeaVersion.resolve`, so a build
+# with no `-PudeaVersion` and a build run by this workflow agree.
+#
+# `automaticRelease = false` in the root build is deliberate: a release is uploaded and left
+# sitting in the portal for a person to press the button on. That button is `central-publish.yml`.
+# Snapshots skip all of that.
+#
+# Two builds, because `build-logic` is an included build: the outer `publishToMavenCentral` does
+# not reach it, and it is the half that carries the convention plugins and the version catalog a
+# game applies. It publishes with Gradle's own `maven-publish` rather than the plugin the engine's
+# modules use - `build-logic/build.gradle.kts` says why - so it posts to the same two Central
+# endpoints by URL instead.
+#
+# It needs four secrets, and does nothing useful until they exist:
+#
+#   MAVEN_CENTRAL_USERNAME    the two halves of a user token from central.sonatype.com
+#   MAVEN_CENTRAL_PASSWORD
+#   SIGNING_KEY               a GPG secret key, ASCII-armoured (`gpg --armor --export-secret-keys`)
+#   SIGNING_PASSWORD          its passphrase
+#
+# The namespace `dev.wildware` is verified in the Central portal, by a DNS TXT record on
+# wildware.dev. That record has to stay there.
+#
+# NOTHING HAS EVER BEEN PUBLISHED BY THIS WORKFLOW. It landed with issue #265, which deliberately
+# published nothing: the evidence for that ticket is `publishToMavenLocal` on a developer's
+# machine and the `outside-game` CI job, both of which stop at the local Maven repository. The
+# first person to run this is releasing Udea 0.1.0 for real, so rehearse first.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: What to publish
+        type: choice
+        required: true
+        default: rehearse
+        options:
+          - rehearse
+          - snapshot
+          - patch
+          - minor
+          - major
+  push:
+    tags: ['v*']
+
+# Write, only so the job can push the tag it just worked out.
+permissions:
+  contents: write
+
+# One at a time. Two releases uploading at once is not something Central makes easy to undo.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      # The whole history, because the version is worked out from the tags. A shallow clone has
+      # none, and every release would come out 0.1.0.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Everything downstream reads these four outputs, so that "what number is this" is decided
+      # once, in one place, rather than re-derived by each step that needs it.
+      - name: Work out the version
+        id: plan
+        env:
+          KIND: ${{ inputs.kind }}
+          TAG: ${{ github.ref_name }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT" = "push" ]; then
+            # A tag pushed by hand. Anything but vX.Y.Z would build a snapshot, and the release
+            # path would then upload it to a repository that refuses snapshots.
+            if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::$TAG is not vX.Y.Z, so the build makes a snapshot and Central will refuse it"
+              exit 1
+            fi
+            version="${TAG#v}"
+            tag_now=no
+          else
+            # sort -V so v0.10.0 beats v0.9.0, which is the one place a plain sort gets it wrong.
+            last=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -1)
+            last="${last:-v0.0.0}"
+            base="${last#v}"
+            major="${base%%.*}"
+            rest="${base#*.}"
+            minor="${rest%%.*}"
+            patch="${rest#*.}"
+            echo "the last release was $last"
+
+            case "$KIND" in
+              major)    version="$((major + 1)).0.0" ;;
+              minor)    version="$major.$((minor + 1)).0" ;;
+              patch)    version="$major.$minor.$((patch + 1))" ;;
+              # A snapshot is named after the release it is on the way to, never after one that
+              # has already shipped.
+              *)        version="$major.$((minor + 1)).0-SNAPSHOT" ;;
+            esac
+
+            case "$KIND" in
+              major|minor|patch) tag_now=yes ;;
+              *)                 tag_now=no ;;
+            esac
+          fi
+
+          case "$version" in *-SNAPSHOT) snapshot=yes ;; *) snapshot=no ;; esac
+          if [ "${KIND:-}" = "rehearse" ]; then upload=no; else upload=yes; fi
+
+          echo "publishing $version (tag: $tag_now, snapshot: $snapshot, upload: $upload)"
+          {
+            echo "version=$version"
+            echo "tag_now=$tag_now"
+            echo "snapshot=$snapshot"
+            echo "upload=$upload"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+
+      # The wrapper is checked in without the executable bit; every job in `ci.yml` does this.
+      - name: Make the wrapper executable
+        run: chmod +x ./gradlew
+
+      # The same build the pull request passed, run again here. A tag is not a promise that
+      # anything still compiles.
+      - name: Build
+        run: ./gradlew build -PudeaVersion=${{ steps.plan.outputs.version }} --stacktrace
+
+      # Does Central know this token? Asking whether a version exists is a read, so it changes
+      # nothing and still fails on a bad or revoked token. The token is sent as one base64 blob,
+      # which is what Central's API expects - it is not a password in a URL.
+      - name: Central accepts the credentials
+        if: steps.plan.outputs.upload == 'yes'
+        env:
+          USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+            echo "::error::MAVEN_CENTRAL_USERNAME or MAVEN_CENTRAL_PASSWORD is not set"; exit 1
+          fi
+          token=$(printf '%s:%s' "$USERNAME" "$PASSWORD" | base64 -w0)
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $token" \
+            'https://central.sonatype.com/api/v1/publisher/published?namespace=dev.wildware&name=udea-core&version=0.0.0-does-not-exist')
+          case "$code" in
+            200) echo "credentials accepted" ;;
+            401|403) echo "::error::Central rejected the token ($code). Generate a new user token and reset both secrets."; exit 1 ;;
+            *) echo "::warning::unexpected $code from Central; carrying on" ;;
+          esac
+
+      # Everything a real release does, into a local folder. This runs for every kind, and it runs
+      # before the tag exists, so a wrong GPG key fails here - with nothing off the runner and no
+      # tag to go and delete. It is also the exact command `scripts/outside-game-proof.sh` runs,
+      # which is what makes that proof evidence about this path.
+      - name: Build and sign, upload nothing
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          ./gradlew publishToMavenLocal \
+            -PudeaVersion=${{ steps.plan.outputs.version }} \
+            --no-configuration-cache --stacktrace
+          ./gradlew -p build-logic publishToMavenLocal \
+            -PudeaVersion=${{ steps.plan.outputs.version }} \
+            --no-configuration-cache --stacktrace
+          signed=$(find ~/.m2/repository/dev/wildware -name '*.asc' | wc -l)
+          echo "$signed signatures written"
+          [ "$signed" -gt 0 ] || { echo "::error::nothing was signed; check SIGNING_KEY"; exit 1; }
+
+      - name: Tag it
+        if: steps.plan.outputs.tag_now == 'yes'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin "v$VERSION"
+
+          # With no property the build reads the version out of the tag. Now that the tag exists,
+          # the two have to say the same thing - and if they ever stop agreeing, the number that
+          # was published was computed wrong.
+          described=$(git describe --tags --always)
+          if [ "$described" != "v$VERSION" ]; then
+            echo "::error::the tag is $described but the build was told v$VERSION"; exit 1
+          fi
+          echo "tagged v$VERSION, and the build agrees"
+
+      # A snapshot goes to Central's snapshot repository and a release goes to the portal. The
+      # publishing plugin picks by looking at the version, so this is the same command either way.
+      - name: Publish the engine
+        if: steps.plan.outputs.upload == 'yes'
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          set -o pipefail
+          ./gradlew publishToMavenCentral \
+            -PudeaVersion=${{ steps.plan.outputs.version }} \
+            --no-configuration-cache --stacktrace | tee publish.log
+          # A snapshot prints no deployment id, and with pipefail a grep that matches nothing
+          # takes the whole step down - on a publish that worked. `|| id=` is what stops a
+          # successful snapshot reporting as a failed run.
+          id=$(grep -o 'deployment id: [0-9a-f-]*' publish.log | tail -1 | cut -d' ' -f3) || id=
+          echo "DEPLOYMENT_ID=$id" >> "$GITHUB_ENV"
+          echo "deployment ${id:-none, which is normal for a snapshot}"
+
+      # The convention plugins and the version catalog, from the included build. Without these an
+      # outside game can resolve every engine module and still not apply `udea.game-gates`.
+      - name: Publish the build plugins
+        if: steps.plan.outputs.upload == 'yes'
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          ./gradlew -p build-logic publishAllPublicationsToMavenCentralRepository \
+            -PudeaVersion=${{ steps.plan.outputs.version }} \
+            --no-configuration-cache --stacktrace
+
+      # The upload does not wait, so a green publish step means Central took the bundle, not that
+      # it liked it. Validation happens afterwards and can still refuse an unverified namespace or
+      # a missing signature. Without this, a failed release looks exactly like a good one.
+      - name: Central validated the bundle
+        if: steps.plan.outputs.upload == 'yes' && steps.plan.outputs.snapshot == 'no'
+        env:
+          USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          [ -n "$DEPLOYMENT_ID" ] || { echo "::warning::no deployment id in the publish output"; exit 0; }
+          token=$(printf '%s:%s' "$USERNAME" "$PASSWORD" | base64 -w0)
+          for _ in $(seq 1 40); do
+            body=$(curl -sS -X POST -H "Authorization: Bearer $token" \
+              "https://central.sonatype.com/api/v1/publisher/status?id=$DEPLOYMENT_ID" || true)
+            state=$(echo "$body" | jq -r '.deploymentState // "unknown"')
+            echo "$state"
+            case "$state" in
+              VALIDATED|PUBLISHING|PUBLISHED) echo "$body" | jq .; exit 0 ;;
+              FAILED) echo "$body" | jq .; echo "::error::Central refused the bundle; nothing was published"; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::warning::still $state after ten minutes; look at the portal"
+
+      - name: What to do next
+        if: always() && steps.plan.outputs.version != ''
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          SNAPSHOT: ${{ steps.plan.outputs.snapshot }}
+          UPLOAD: ${{ steps.plan.outputs.upload }}
+        run: |
+          {
+            if [ "$UPLOAD" = "no" ]; then
+              echo "### Rehearsed $VERSION"
+              echo ""
+              echo "It built and it signed. Nothing was uploaded and nothing was tagged."
+            elif [ "$SNAPSHOT" = "yes" ]; then
+              echo "### Published $VERSION"
+              echo ""
+              echo "It is on Central's snapshot repository, now. Depend on it with"
+              echo '`https://central.sonatype.com/repository/maven-snapshots/` in your repositories.'
+            else
+              echo "### Uploaded $VERSION"
+              echo ""
+              echo "It is sitting in the portal, not released. Open"
+              echo "<https://central.sonatype.com/publishing/deployments>, look at it, and press publish"
+              echo "with the \"Central publish\" workflow."
+              echo "That step is a person on purpose: a Central release can never be deleted or replaced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

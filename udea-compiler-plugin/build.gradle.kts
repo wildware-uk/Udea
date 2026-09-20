@@ -78,3 +78,9 @@ val udeaVerifyPluginOptional by tasks.registering(Test::class) {
 tasks.named("check") {
     dependsOn(udeaVerifyPluginOptional)
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's K2 compiler plugin: the FIR checkers, the KDoc propagation and the gated " +
+    "declaration synthesis that hold a game's components to the engine's contracts at compile " +
+    "time."

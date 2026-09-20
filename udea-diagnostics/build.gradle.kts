@@ -27,3 +27,9 @@ plugins {
      */
     id("udea.jvm-test-fixtures")
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's diagnostic model: one diagnostic type with a severity, a stable rule id, a " +
+    "repository-relative source span and an optional fix, shared by the compiler checkers and " +
+    "the asset validator so both name a problem the same way."

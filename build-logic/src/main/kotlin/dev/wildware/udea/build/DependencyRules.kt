@@ -44,6 +44,47 @@ public value class CoordinatePattern(public val pattern: String) : Serializable 
 }
 
 /**
+ * Which *kind* of project a rule governs, for the rules whose subject is a role rather than a
+ * list of paths (issue #265).
+ *
+ * A rule about "the shipped game" used to name `:moba`'s paths, which made it a rule about this
+ * repository: a game in its own repository, resolving the engine from Maven, has
+ * projects called `:game` and `:desktop` and was governed by none of them - silently, because an
+ * ungoverned project is not reported as skipped. The role is what those rules always meant, so
+ * the role is what they now say, and a game's projects are governed wherever they live.
+ *
+ * The engine is identified by its module prefix rather than by a list, because that prefix is
+ * what `settings.gradle.kts` and `AGENTS.md`'s module table already agree on, and because a game
+ * that named a project `:udea-something` would be claiming to be part of the engine.
+ */
+public enum class ProjectScope : Serializable {
+    /** Every project the owning task is registered on. */
+    EVERY,
+
+    /** The engine's own modules: `:udea-*`. */
+    ENGINE,
+
+    /** Everything that is not an engine module - the game, whichever repository it lives in. */
+    GAME,
+    ;
+
+    /** True when a project at [projectPath] is in this scope. */
+    public fun covers(projectPath: String): Boolean = when (this) {
+        EVERY -> true
+        ENGINE -> isEngineModule(projectPath)
+        GAME -> !isEngineModule(projectPath)
+    }
+
+    public companion object {
+        /** The prefix every engine module's Gradle path has. */
+        public const val ENGINE_PREFIX: String = ":udea-"
+
+        /** True when [projectPath] is one of the engine's own modules. */
+        public fun isEngineModule(projectPath: String): Boolean = projectPath.startsWith(ENGINE_PREFIX)
+    }
+}
+
+/**
  * One banned-arrow rule, expressed as data so that adding a rule is a one-line change and
  * so that the rule set can be asserted against in a unit test rather than only observed
  * through a Gradle build.
@@ -60,7 +101,10 @@ public value class CoordinatePattern(public val pattern: String) : Serializable 
  * @param rationale why the arrow is banned — the text `docs/module-graph.md` carries.
  * @param specSection the design-spec section the rule comes from, so it can be traced back.
  * @param projects Gradle paths the rule applies to. Empty means every project the owning
- *   task is registered on.
+ *   task is registered on, narrowed by [scope].
+ * @param scope which kind of project the rule governs, for a rule whose subject is a role -
+ *   "the shipped game" - rather than a list of module paths (issue #265). [ProjectScope.EVERY]
+ *   and a non-empty [projects] is how a rule names paths directly.
  * @param configurations configuration names the rule applies to. Empty means all scanned.
  * @param allowedIn coordinates excused on one project only, keyed by its Gradle path: a named,
  *   per-module exemption from a deny list, such as the FBX converter on the asset compiler
@@ -72,6 +116,7 @@ public data class DependencyRule(
     public val rationale: String,
     public val specSection: String,
     public val projects: Set<String> = emptySet(),
+    public val scope: ProjectScope = ProjectScope.EVERY,
     public val configurations: Set<String> = emptySet(),
     public val banned: List<CoordinatePattern> = emptyList(),
     public val allowed: List<CoordinatePattern> = emptyList(),
@@ -91,6 +136,7 @@ public data class DependencyRule(
     /** True when this rule governs [projectPath] on [configuration]. */
     public fun appliesTo(projectPath: String, configuration: String): Boolean =
         (projects.isEmpty() || projectPath in projects) &&
+            scope.covers(projectPath) &&
             (configurations.isEmpty() || configuration in configurations)
 
     /** True when [coordinate] breaks this rule. The root project itself never does. */

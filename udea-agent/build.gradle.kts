@@ -302,3 +302,8 @@ tasks.register<Test>("udeaQueryBudget") {
 // "every gate in this repository that asserts a number of milliseconds", and a list that quietly
 // excludes two is a list nobody can trust.
 
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's agent tool surface: the generated tools an agent drives a running game with - " +
+    "input, time, world queries, screenshots and replay - over the same code path the test " +
+    "harness uses."

@@ -97,3 +97,9 @@ fun Test.readsTheFox() {
 tasks.check {
     dependsOn(udeaEditorGlTest)
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's editor window: docked panels over the same tool surface an agent calls, the world " +
+    "in a Scene and a Game tab, and the gizmo API. A development tool: the build gates keep " +
+    "it, and every gizmo, off a released classpath."

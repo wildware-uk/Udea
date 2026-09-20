@@ -481,3 +481,8 @@ tasks.register("udeaReplayEqualityProof") {
         )
     }
 }
+
+// The one-line description Maven Central requires of a published artifact (issue #265).
+description =
+    "Udea's replay: .udearep input recording, deterministic headless playback, and the bisect " +
+    "tools that find the tick where two runs diverged."

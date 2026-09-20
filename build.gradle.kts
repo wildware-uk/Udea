@@ -137,6 +137,10 @@ val published: Set<String> = setOf(
     ":udea-assets-compiler",
     ":udea-gas",
     ":udea-net",
+    // Ground-plane navigation (issue #264). Merged after this list was written, and the gate
+    // below is what caught it: an engine module nothing publishes is a module a game outside
+    // this repository cannot compile against.
+    ":udea-nav",
     ":udea-physics2d",
     ":udea-render",
     ":udea-audio",

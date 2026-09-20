@@ -1,9 +1,12 @@
 package dev.wildware.udea.physics2d
 
+import com.github.quillraven.fleks.Entity
 import com.github.quillraven.fleks.World
 import dev.wildware.udea.core.GameContextBuilder
 import dev.wildware.udea.core.SimSystem
+import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
+import dev.wildware.udea.core.identity.NetIdVisitor
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.module.SimPhase
 import dev.wildware.udea.core.module.SimRegistry
@@ -11,6 +14,8 @@ import dev.wildware.udea.core.module.UdeaModule
 import dev.wildware.udea.core.module.after
 import dev.wildware.udea.core.module.before
 import dev.wildware.udea.core.physics.BodyHandle
+import dev.wildware.udea.core.physics.BodyKind
+import dev.wildware.udea.core.physics.PhysicsBody
 import dev.wildware.udea.core.physics.PhysicsStepSystem
 import dev.wildware.udea.core.physics.PhysicsWorld
 
@@ -29,7 +34,9 @@ import dev.wildware.udea.core.physics.PhysicsWorld
  * 2. `Physics`: [PhysicsReconcileSystem] makes the solver match the components - a body for every
  *    new entity, none for a destroyed one, a fresh body where a shape was edited, and a loud
  *    failure where static geometry changed.
- * 3. `Physics`: `PhysicsStepSystem` advances Box2D one tick and copies every body's pose,
+ * 3. `Physics`: [DrivenVelocitySystem] hands the solver any linear velocity a game wrote onto a
+ *    dynamic `PhysicsBody` since the last step - how a character walks (issue #250).
+ * 4. `Physics`: `PhysicsStepSystem` advances Box2D one tick and copies every body's pose,
  *    velocity and sleep state back into its `PhysicsBody`. That copy happens once per tick,
  *    inside the solver's own step, and is the only way a solver result reaches the components.
  *
@@ -38,8 +45,8 @@ import dev.wildware.udea.core.physics.PhysicsWorld
  * An entity that also carries a `Transform3D` (issue #247) is placed by it and, if dynamic, moves
  * it. Three more `Physics` systems wrap the ones above: [Transform3DSeedSystem] before step 2
  * builds a new body where `Transform3D.x/y/rotationZ` says; [BodyFollowsTransform3DSystem] between
- * steps 2 and 3 carries each kinematic body to its `Transform3D` in one step, pushing what it meets,
- * and teleports a static one whose `Transform3D` moved; and [Transform3DFromBodySystem] after step 3
+ * steps 2 and 4 carries each kinematic body to its `Transform3D` in one step, pushing what it meets,
+ * and teleports a static one whose `Transform3D` moved; and [Transform3DFromBodySystem] after step 4
  * copies each dynamic body's solved pose into its `Transform3D`. `z` and the other rotations and the
  * scale stay the game's. So a 3D game moves a dynamic body the way a 2D one does - velocity, or a
  * `Teleport` - and moves a kinematic or static one by writing its `Transform3D`. An entity with no
@@ -90,6 +97,12 @@ public class Physics2DModule(
             after<PhysicsReconcileSystem>()
             before<PhysicsStepSystem>()
         }
+        registry.add(SimPhase.Physics, { ctx ->
+            DrivenVelocitySystem(openedBackend(), ctx[CoreModule.NET_IDS])
+        }) {
+            after<PhysicsReconcileSystem>()
+            before<PhysicsStepSystem>()
+        }
         registry.add(SimPhase.Physics, { Transform3DFromBodySystem() }) {
             after<PhysicsStepSystem>()
         }
@@ -122,6 +135,45 @@ internal class PhysicsReconcileSystem(
     }
 }
 
+/**
+ * Hands the solver every linear velocity a game wrote onto a dynamic `PhysicsBody` this tick.
+ *
+ * ## The gap it closes
+ *
+ * `PhysicsBody`'s velocity fields reached Box2D only when the body was built: afterwards the step's
+ * write-back overwrote them with the solver's own, so a system that set a walk velocity every tick
+ * was writing into a field nobody read. That made a character controller on the ground plane
+ * impossible to write with what [Physics2DModule] offered - a kinematic body is not stopped by a
+ * static one, and a `Teleport` ignores collision - which is the wall Hollow's player met (#250).
+ *
+ * ## Why it cannot change a scene that does not use it
+ *
+ * The push is skipped unless the component's velocity differs, **bit for bit**, from what the last
+ * write-back put there. A scene in which nothing writes a velocity therefore makes no native call
+ * at all, and `DrivenBodyTest` asserts that as a count rather than leaving it as a claim.
+ *
+ * Visits entities in ascending `NetId`, as its two siblings in this module do. The order decides
+ * nothing here - setting one body's velocity reads nothing and touches no other body - and it is
+ * kept anyway so that every per-tick walk of the bodies in this module is the same walk.
+ */
+internal class DrivenVelocitySystem(
+    private val backend: SolverBackend,
+    private val netIds: NetIdIndex,
+) : SimSystem() {
+
+    private val visitor = object : NetIdVisitor {
+        override fun visit(netId: NetId, entity: Entity) {
+            val body = with(world) { entity.getOrNull(PhysicsBody) } ?: return
+            if (body.kind != BodyKind.Dynamic || !body.handle.isValid) return
+            backend.pushWrittenVelocity(body)
+        }
+    }
+
+    override fun onTick() {
+        netIds.forEachLive(visitor)
+    }
+}
+
 /** What the module needs from a solver beyond `PhysicsWorld`: reconciliation and a native free. */
 internal interface SolverBackend : PhysicsWorld, AutoCloseable {
 
@@ -137,6 +189,15 @@ internal interface SolverBackend : PhysicsWorld, AutoCloseable {
      * ([x], [y], [angle]) in exactly one step, waking it if it must move.
      */
     fun moveKinematicTo(handle: BodyHandle, x: Float, y: Float, angle: Float)
+
+    /**
+     * Hands the solver the linear velocity on [component], if a game wrote one since the last step.
+     *
+     * "If a game wrote one" is decided by comparing the component's two velocity floats, bit for
+     * bit, against what the solver itself last reported for that body - so a component nobody
+     * touched costs two comparisons and no native call. See [DrivenVelocitySystem].
+     */
+    fun pushWrittenVelocity(component: PhysicsBody)
 }
 
 /** Opens the Box2D world for this target. */

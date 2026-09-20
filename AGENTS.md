@@ -76,7 +76,7 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `udea-assets-compiler` | Build-time only. **Zero Gradle types** |
 | `udea-gas` | Abilities, attributes, effects — tick-denominated |
 | `udea-net` | Transports, baselines, relevancy, prediction, RPC |
-| `udea-physics2d` | 2D physics: Box2D 3 through `box2d-jni`, behind `udea-core`'s `PhysicsWorld`. Headless (no Kool, no GL), `jvm` and `android` only because that is what `box2d-jni` publishes; no Box2D type in any public API. It is also the ground plane of a 3D game: a dynamic body drives its entity's `Transform3D.x/y/rotationZ`, and a kinematic or static one follows it (#247) |
+| `udea-physics2d` | 2D physics: Box2D 3 through `box2d-jni`, behind `udea-core`'s `PhysicsWorld`. Headless (no Kool, no GL), `jvm` and `android` only because that is what `box2d-jni` publishes; no Box2D type in any public API. It is also the ground plane of a 3D game: a dynamic body drives its entity's `Transform3D.x/y/rotationZ`, and a kinematic or static one follows it (#247). A game steers a dynamic body by writing `PhysicsBody.linearX/linearY`, which reaches the solver once a tick, and only for a body whose velocity actually changed (#250) |
 | `udea-nav` | Ground navigation for many units: a nav grid rebuilt from the buildings standing in the world, integer-cost A* for one unit, a shared flow field for a group ordered to one point, and local separation so they do not stand in each other. Headless, `udea-core` only, and no per-unit routing state outside the components, so a rewind re-derives every step (#264) |
 | `udea-render` | **The only module that touches GL**. Kool stays inside it (spec section 3), and so do the ComposeGL UI host (`UiLayer`, `CapturedUi`) and the Kool-backed `AudioDevice` (`koolAudioDevice`, desktop) |
 | `udea-audio` | Drains `GameContext.cues` and plays sound. No GL, no `Gdx` and no Kool: playback is an `AudioDevice` SPI, `AudioDevice.Silent` is what Headless uses, and the device that makes a noise is `udea-render`'s |
@@ -89,7 +89,7 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `moba:desktop` | The desktop launcher: `run`, `runServer`, `runClient`, the shot mains, the proofs and the agent surface. JVM |
 | `moba:android` | The Android launcher. One activity, and it boots the simulation headless because `udea-render` has no Android Kool backend yet |
 | `hollow:game` | The 3D example game (epic #245): a third-person co-op survival arena in a lit forest clearing. A library like `moba:game` - components, CC0 models, the `clearing.udealevel` level, what it draws, and the server and client sessions |
-| `hollow:desktop` | Hollow's desktop launcher: `run` (a listen server and its local player, `-Plevel=<path>`), `runServer` (headless), `runClient` (`host` or `join`) and `runShot`. JVM. No Android launcher in this epic |
+| `hollow:desktop` | Hollow's desktop launcher: `run` (a listen server and its local player, `-Plevel=<path>`), `runServer` (headless), `runClient` (`host` or `join`), `runShot` and `runPlayerShot` (the character walking, running a lap and stopping at a rock, one PNG per known tick). JVM. No Android launcher in this epic |
 
 Three rules that are cheap to break and expensive to find:
 

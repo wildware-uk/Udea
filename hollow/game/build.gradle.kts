@@ -1,5 +1,6 @@
 import dev.wildware.udea.build.UdeaModuleRegistry
 import dev.wildware.udea.build.UdeaNetComponents
+import dev.wildware.udea.build.registerNetProtocolLock
 import dev.wildware.udea.build.udeaModule
 import dev.wildware.udea.gradle.UdeaAssetsPlugin
 import dev.wildware.udea.gradle.UdeaGenerateAccessorsTask
@@ -12,10 +13,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
  * Hollow, the 3D example game (epic #245): components, assets, the clearing level and what it
  * draws. A library, like `:moba:game`, with no entry point in it; `:hollow:desktop` launches it.
  *
- * This script is `moba/game/build.gradle.kts` with the parts Hollow does not use yet left out -
- * the character-art staging (Hollow's art is committed CC0) and the protocol lock (Hollow declares
- * no `@Replicated` component of its own yet: it replicates `udea-core`'s `Transform3D`, see
- * `HollowNet`). Where a line is the same as moba's, moba's script carries the long form of why.
+ * This script is `moba/game/build.gradle.kts` with the one part Hollow does not use left out: the
+ * character-art staging, because Hollow's art is committed CC0. Where a line is the same as moba's,
+ * moba's script carries the long form of why.
  */
 
 plugins {
@@ -97,8 +97,12 @@ kotlin {
                 api(project(":udea-core"))
                 implementation(project(":udea-annotations"))
                 implementation(project(":udea-assets"))
-                // Replication: the server and client sessions (issue #249, multiplayer from H1).
+                // Replication and prediction: the server and client sessions (issue #249,
+                // multiplayer from H1), and the local player's predictor (issue #250).
                 implementation(project(":udea-net"))
+                // Box2D on the ground plane: what stops a character at a rock (issue #250). Its
+                // targets are `jvm` and `android`, which is exactly what this module has.
+                implementation(project(":udea-physics2d"))
                 // `api`: `HollowScene` takes a `RenderRegistry` and makes `ModelRenderer`s, which a
                 // launcher names.
                 api(project(":udea-render"))
@@ -124,7 +128,7 @@ udea {
 /** `HollowUdeaRegistry`: this module's registry and every Udea module's on its runtime classpath. */
 val udeaRegistry = udeaModule("Hollow")
 
-/** The project-wide `@Replicated` id space. Hollow adds nothing to it yet; the processor reads it all the same. */
+/** The project-wide `@Replicated` id space, which `dev.wildware.hollow.Player` is now in (issue #250). */
 val projectComponents: Provider<String> =
     providers.fileContents(rootProject.layout.projectDirectory.file(UdeaNetComponents.FILE_NAME))
         .asText
@@ -145,5 +149,28 @@ tasks.withType<KotlinCompilationTask<*>>().configureEach {
     if (name != kspRun) dependsOn(kspRun)
 }
 
+/**
+ * Hollow emits protocol identity (issue #250's `Player`), so it gets the same reviewed lock gate
+ * `:moba:game` and `:udea-codegen` have.
+ *
+ * One run writes it, so there is one lock and no arrangement in which the JVM and the Android leg
+ * could be numbered differently. [generatedRegistry] says why the path has `jvm` in it.
+ */
+registerNetProtocolLock(
+    generatedLock = layout.buildDirectory.file(
+        "generated/ksp/$KSP_TARGET/resources/udea/Hollow-net-protocol.lock",
+    ),
+    producingTask = kspRun,
+)
+
 kotlin.sourceSets.named("jvmMain") { resources.srcDir(bundleResources) }
 kotlin.sourceSets.named("androidMain") { resources.srcDir(bundleResources) }
+
+// --- the source rules that read this project's tree --------------------------------------------
+
+tasks.withType<Test>().configureEach {
+    // Where `HumanAssetTest` finds this module's asset tree, and moba's beside it. A relative path
+    // would resolve against the project directory under Gradle and against the daemon's working
+    // directory under an IDE, and a file comparison that silently read nothing would pass.
+    systemProperty("udea.hollow.projectDir", layout.projectDirectory.asFile.absolutePath)
+}

@@ -50,7 +50,7 @@ public object HollowShot {
                 )
             }
         } finally {
-            started.backend.close()
+            started.close()
         }
         if (written == null) {
             System.err.println("[hollow.shot] the frame did not settle in $FRAME_BUDGET frames")

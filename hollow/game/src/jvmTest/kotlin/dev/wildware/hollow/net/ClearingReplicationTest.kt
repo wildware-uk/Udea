@@ -107,7 +107,14 @@ class ClearingReplicationTest {
                 assertTrue(entity has Transform3D, "${client.peer}'s $id has no Transform3D")
                 assertTrue(entity hasNo Scenery, "${client.peer}'s $id is level content, not the spawned entity")
             }
-            assertEquals(1L, client.applier.entitiesCreated, "${client.peer} created")
+            // The entity this test spawned, and one character per seat: since issue #250 a peer
+            // that joins is given a character, and that character reaches a client the same way
+            // anything else the server spawns does - through a create on the wire.
+            assertEquals(
+                (1 + clients.size).toLong(),
+                client.applier.entitiesCreated,
+                "${client.peer} created",
+            )
         }
 
         val withSpawn = clients.map { it.host.world.numEntities }

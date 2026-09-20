@@ -5,6 +5,7 @@ import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.spatial.Transform3D
 import kotlin.math.hypot
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -18,8 +19,14 @@ import kotlin.test.assertTrue
  */
 class ClearingLevelTest {
 
-    private val host = HollowGame.host(RenderMode.Headless).also(HollowGame::seed)
+    private val opened = HollowGame.build(RenderMode.Headless).also { HollowGame.seed(it.host) }
+    private val host = opened.host
     private val world = host.world
+
+    @AfterTest
+    fun close() {
+        opened.close()
+    }
 
     private fun entities(): List<Entity> = buildList { world.forEach { add(it) } }
 
@@ -98,15 +105,16 @@ class ClearingLevelTest {
         // `Transform3D` a render-only `Interp3D` at its first tick end, which no level can hold, so
         // a clearing that has run a tick cannot be saved as it stands. #246 is reopened for that;
         // when its fix lands, this saves the running clearing instead.
-        val playing = HollowGame.host(RenderMode.Headless, level = ByteArray(0))
-        playing.run(SAVED_AFTER_TICKS)
-        val savedAt = playing.tick
-        val saved = playing.game.levels.saveNow()
-        playing.stop()
-        val resumed = HollowGame.host(RenderMode.Headless, level = saved).also(HollowGame::seed)
-        // `seed` runs one tick to apply what it queued.
-        assertEquals(savedAt + 1L, resumed.tick)
-        resumed.stop()
+        HollowGame.build(RenderMode.Headless, level = ByteArray(0)).use { playing ->
+            playing.host.run(SAVED_AFTER_TICKS)
+            val savedAt = playing.host.tick
+            val saved = playing.host.game.levels.saveNow()
+            HollowGame.build(RenderMode.Headless, level = saved).use { resumed ->
+                HollowGame.seed(resumed.host)
+                // `seed` runs one tick to apply what it queued.
+                assertEquals(savedAt + 1L, resumed.host.tick)
+            }
+        }
     }
 
     private companion object {

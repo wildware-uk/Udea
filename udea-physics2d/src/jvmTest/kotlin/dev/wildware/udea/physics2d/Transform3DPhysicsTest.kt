@@ -260,8 +260,6 @@ class Transform3DPhysicsTest {
     private fun firstDifference(a: List<IntArray>, b: List<IntArray>): Int =
         a.indices.firstOrNull { !a[it].contentEquals(b[it]) } ?: -1
 
-    private fun Box2DScene.transformOf(id: NetId): Transform3D = with(world) { entityOf(id)[Transform3D] }
-
     private fun Box2DScene.transformOrNull(id: NetId): Transform3D? = with(world) { entityOf(id).getOrNull(Transform3D) }
 
     private companion object {

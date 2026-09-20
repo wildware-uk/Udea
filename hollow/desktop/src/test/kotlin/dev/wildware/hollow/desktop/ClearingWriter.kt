@@ -20,7 +20,8 @@ internal object ClearingWriter {
         val out = File(requireNotNull(args.firstOrNull()) { "usage: ClearingWriter <out.udealevel>" })
         // The level this host would play is never loaded: the writer makes one, it does not play
         // one. Empty bytes, because the file it would otherwise read is the file being written.
-        val host = HollowGame.host(RenderMode.Headless, level = ByteArray(0))
+        val opened = HollowGame.build(RenderMode.Headless, level = ByteArray(0))
+        val host = opened.host
         val netIds = host.ctx[CoreModule.NET_IDS]
         val world = host.world
         for (placed in ClearingLayout.props()) {
@@ -46,6 +47,6 @@ internal object ClearingWriter {
         out.parentFile.mkdirs()
         out.writeBytes(bytes)
         println("[hollow.clearing] ${world.numEntities} entities, ${bytes.size} bytes -> ${out.absolutePath}")
-        host.stop()
+        opened.close()
     }
 }

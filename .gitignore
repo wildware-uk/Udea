@@ -126,3 +126,11 @@ gamebridge.json
 # desktop launcher run from its own project directory leaves `moba/desktop/.lwjgl/` behind. They
 # are a cache of jars already in the Gradle cache, never source (issue #212).
 **/.lwjgl/
+
+# Review evidence that is a run's output rather than repository content. A ticket's
+# scratchpad keeps its mutation diffs and its measurements - those are what a later
+# reader checks a claim against - but not the raw build logs, and never a `.orig` copy
+# of a source file that also exists for real two directories away: the copy never
+# updates, and a grep finds both.
+scratchpad/**/*.log
+*.orig

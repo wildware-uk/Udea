@@ -1,9 +1,9 @@
 # BRIEF — #266 (and #259): screen-effect shaders a game writes in GLSL
 
-00f9506
+d1b633f
 
-That is the SHA every figure in this document was measured at. The branch tip is one commit later
-and adds this document and nothing else, so a reviewer may rule on either.
+Every figure in this document was measured at that SHA. The branch tip is one commit later and
+adds this document and nothing else.
 
 Branch `issue-266-screen-shader`, worktree
 `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a5832e6b1af778f5d`, merged with `origin/master`
@@ -55,6 +55,7 @@ The lead asked for a demonstrated failing case on both sides, not one number tha
 | Outline darkens pixels around the boxes | `469` | mutation 2: `0` |
 | Outline darkens open ground | `0` | asserted `== 0` on every green run; the palette-only frame darkens `0` there too |
 | `uDepth` separates two distances | `0.015181172` vs `0.017600346` | mutation 3: `0.0` vs `0.0` |
+| Each uniform kind reaches the GPU | five changes, five different frames | mutation 4: the `vec2` step alone goes red |
 
 ## 2. Proof it goes red — three mutations, with their literal diffs
 
@@ -127,6 +128,35 @@ screen-shader: uDepth ranges from 0.0 to 0.0 across the frame
 screen-shader: uDepth over the box 0.0, over open ground 0.0
 org.opentest4j.AssertionFailedError: the box reads 0.0 and the open ground reads 0.0 in uDepth, a difference of less than 5.0E-4. Two surfaces at different distances read the same, so uDepth is not carrying the scene's depth. See screen-depth.png
 ```
+
+### Mutation 4 — one uniform kind stops being uploaded
+
+The ticket asks for *typed* uniforms, and a shader that merely compiles proves none of them
+arrived. Scenario 7 of `GlScreenShaderTest` declares all five kinds in one shader, reads all five
+in its body, and changes them **one at a time**, requiring the frame to change with each. This
+mutation neutralises the `vec2` upload and nothing else.
+
+```diff
+--- a/udea-render/src/commonMain/kotlin/dev/wildware/udea/render/kool/GlScreenProgram.kt
++++ b/udea-render/src/commonMain/kotlin/dev/wildware/udea/render/kool/GlScreenProgram.kt
+@@ -122,3 +122,3 @@ internal class GlScreenProgram private constructor(
+             override fun write() {
+-                gl.uniform2f(location, uniform.x, uniform.y)
++                gl.uniform2f(location, 0f, 0f)
+             }
+```
+
+`:udea-render:udeaGlTest --tests '…GlScreenShaderTest'` → `EXIT=1` (`scratchpad/mutation4.xml`):
+
+```
+org.opentest4j.AssertionFailedError: changing the vec2 uShift uniform left the frame exactly as it was, so that kind is not reaching the shader
+```
+
+Exactly one step went red, and it named the kind. That is what makes the other four steps worth
+reading: the mutation could have turned the whole scenario red and told you nothing.
+
+`vec2` was also the one declared kind nothing else used — a `public` declaration with no caller is
+on the reject list, and this closes it with a test rather than by deleting the ticket's "vector".
 
 ## 3. What I did, what I decided, and what I got wrong
 
@@ -270,10 +300,14 @@ Merged tree, SHA `00f9506`, no exclusions, from
 `scratchpad/final-build.log`:
 
 ```
-BUILD SUCCESSFUL in 4m 8s
-1122 actionable tasks: 153 executed, 5 from cache, 964 up-to-date
+BUILD SUCCESSFUL in 1m 24s
+1122 actionable tasks: 29 executed, 3 from cache, 1090 up-to-date
 EXIT=0
 ```
+
+The task count is low because this is the last of several full `build` runs on the same daemon and
+worktree; the run before it, at `00f9506`, executed 153 tasks and was also `EXIT=0`. Nothing was
+excluded in either: the command is the one above, verbatim, with no `-x`.
 
 `:udea-assets-compiler:udeaDaemonBudget` does **not** appear in that log and was not run: it is
 registered as its own task and excluded from `test`, so it is not on `check`. I did not run it
@@ -291,6 +325,21 @@ xvfb-run -a -s "-screen 0 1280x720x24" \
   --continue --no-configuration-cache --max-workers=4 --console=plain
 ```
 
+At `d1b633f`:
+
+```
+> Task :udea-render:udeaGlTest
+> Task :udea-agent-host:udeaAgentGlTest FROM-CACHE
+> Task :udea-editor:udeaEditorGlTest FROM-CACHE
+BUILD SUCCESSFUL in 1m 47s
+126 actionable tasks: 10 executed, 2 from cache, 114 up-to-date
+EXIT=0
+```
+
+**Two of the three came from the build cache here**, because the only thing that changed since the
+previous run is a file in `udea-render`. That previous run, at `00f9506`, executed all three for
+real and is the one to read for the other two modules:
+
 ```
 > Task :udea-render:udeaGlTest
 > Task :udea-agent-host:udeaAgentGlTest
@@ -300,7 +349,7 @@ BUILD SUCCESSFUL in 3m 2s
 EXIT=0
 ```
 
-None of the three is `UP-TO-DATE`; all three executed. Counted out of the JUnit XML in
+Counted out of the JUnit XML in
 `*/build/test-results/<task>/TEST-*.xml`:
 
 | Task | tests | skipped | failures | errors |
@@ -342,6 +391,11 @@ All in `/srv/ssd1/workspace/Udea/build/debug-screenshots/`.
 | `issue266-gltest-palette-outline.png` | both |
 | `issue266-gltest-sequence.png` | the six above tiled |
 
+Scenario 7, the uniform-kind walk, deliberately saves no picture. Its frames are a probe rather
+than a style - a quantised, shifted, tinted, ramp-multiplied picture that nobody would ship - and
+what it asserts is that consecutive frames *differ*, which a still image cannot show. Mutation 4 is
+its evidence instead.
+
 One thing to look at rather than measure, and it is not a defect: in the paletted frames the
 brightest corner of the ground snaps to the lightest palette colour, which reads as a sand-coloured
 wedge at the top right. That is a three- and four-colour palette doing its job on a lit gradient —
@@ -359,6 +413,7 @@ entry than the mid one.
 | A game registers a post-process pass **with no Kool type in its source**, and its output differs from the unprocessed frame | `ShaderProof.kt` in `:moba:desktop`, where `UDEA-MG-002` bans `de.fabmax.kool:*` outright, so this is a build gate. `palette: 0% off-palette, frame moved 13.255876 levels/channel` against a control of `0.0`. `issue266-1-unprocessed.png` → `issue266-2-palette.png`. Mutation 1 makes it `0.0` |
 | The engine supplies that pass with **depth and an object/mask input**, so an outline can be drawn without rendering the scene twice | `issue266-gltest-mask.png` and `issue266-gltest-depth.png`. `uDepth ranges from 0.0 to 0.022083813`, box `0.015181172` vs ground `0.017600346`. The mask is one extra pass over the marked models only — the scene is not redrawn. Mutations 2 and 3 |
 | The **per-backend header** is prepended by the engine; a game's shader states no `#version` | `ScreenShaderSource.fragment` joins `version + preamble + body + footer`, the version read from Kool's `GlslGenerator.Hints`. A body that states its own is refused: `shader 'shaders/versioned.frag' states its own #version…`. `ScreenShaderRuleIdTest` also pins the **known negative**, and it is not the one you would guess: a `#version` inside a *comment* is refused too, deliberately, because it is one line away from being uncommented. The test says which way round the fence points rather than leaving it to be inferred |
+| **Typed uniforms declared in Kotlin** — float, int, colour, vector, texture handle | Scenario 7 of `GlScreenShaderTest`: one shader declaring all five, each changed on its own, each required to change the frame. Mutation 4 turns exactly the `vec2` step red |
 | An **ordered pass list** a game configures | `registry.screenPass(palette); registry.screenPass(outline)` in `ShaderProof`, and `both: differs from the palette alone by 0.36317998 and from the outline alone by 13.19968` — neither alone is the answer. `issue266-4-palette-and-outline.png` |
 | Passes run **at render resolution, before any upscale**, and are **excluded from the editor's gizmo capture** | The chain is a view on the capturable pass at `frameWidth`/`frameHeight`, added by `addOnTop`; gizmos are drawn in `udea-editor`'s own Scene view, which is a different pass. `udeaEditorGlTest`: 6 tests, 0 failures, unchanged by this branch |
 | **Compile failures are `UdeaDiagnostic`s** — rule id, file, line, driver's message; not a stack trace | Shape changed on the lead's instruction: plain fields carrying the same four things, so `udea-diagnostics` stays off every shipped game's classpath. `UDEA0019` at `shaders/broken.frag:3`, message `0:42(2): error: initializer of type float cannot be assigned to variable of type vec3`. `ScreenShaderRuleIdTest` pins both literals against `UdeaRules` |

@@ -32,7 +32,8 @@ import kotlinx.serialization.SerializationException
  * generated [LevelComponentModule] lists - one that is not `@Serializable`, or whose module does
  * not run `udea-codegen`. It never drops one: a level that silently lost a component is a level
  * that loads into a different game. Entity tags are refused the same way, because Fleks' tags are
- * not listed anywhere a level could name them from.
+ * not listed anywhere a level could name them from. What a save does leave out is a component marked
+ * [PresentationOnly]: renderer state the game rebuilds from the saved components after a load.
  *
  * A save is queued on the [SimBarrier] like a load, for the reason [save] gives, so it is safe to
  * ask for from any thread; its result arrives when the barrier drains.
@@ -221,6 +222,8 @@ public class LevelService internal constructor(
         }
         val named = ArrayList<Pair<String, Component<out Any>>>(snapshot.components.size)
         for (component in snapshot.components) {
+            // Presentation state is rebuilt from the saved components after a load; see PresentationOnly.
+            if (component is PresentationOnly) continue
             val name = format.serialNameOf(component) ?: throw LevelSaveException(
                 "entity $entity holds ${component::class.qualifiedName}, which no generated level " +
                     "component list names. Mark it @Serializable in a module that runs " +

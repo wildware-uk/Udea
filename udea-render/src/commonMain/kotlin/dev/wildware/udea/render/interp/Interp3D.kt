@@ -2,6 +2,7 @@ package dev.wildware.udea.render.interp
 
 import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
+import dev.wildware.udea.core.level.PresentationOnly
 
 /**
  * Where a `Transform3D` stood at the end of the last two ticks, so a renderer can draw between
@@ -30,7 +31,9 @@ import com.github.quillraven.fleks.ComponentType
  * per frame for no visible change.
  *
  * Presentation-local, like [Interp]: nothing simulated reads it, it is not in any
- * `ComponentRegistry`, and it is not captured, hashed or sent.
+ * `ComponentRegistry`, and it is not captured, hashed or sent. It is [PresentationOnly], so a
+ * level saved from a world that has ticked leaves it out, and [Interp3DSnapshotSystem] gives the
+ * loaded entities a fresh one on the next tick.
  */
 internal class Interp3D(
     var prevX: Float,
@@ -43,7 +46,7 @@ internal class Interp3D(
     var lastZ: Float = prevZ,
     /** Radians about Z. */
     var lastHeading: Float = prevHeading,
-) : Component<Interp3D> {
+) : Component<Interp3D>, PresentationOnly {
 
     /** Shifts the last recorded pose to the previous one and records [x], [y], [z] and [heading]. */
     fun record(x: Float, y: Float, z: Float, heading: Float) {

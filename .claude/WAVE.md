@@ -1027,6 +1027,7 @@ gate file exists, under
 | `dev-shaderassets` | `shader-assets` | `udea-assets-compiler`, `udea-render/shader`, docs | `BOX_FREE` |
 | `dev-274` | `issue-274-net-components` | `build-logic`, `udea-gradle`, the template | `BOX_FREE_274` |
 | `dev-270` | `issue-270-attachment-index` | `udea-core` attachments, `udea-render` model view | `BOX_FREE_270` |
+| `dev-windows` | `windows-green` | `build-logic` and `udea-gradle` **tests only** | `BOX_FREE_WIN` |
 
 **A gate file per developer, not one for the wave.** That is what lets me let them in one at a
 time when the box comes back rather than having three builds start on the same second.
@@ -1070,8 +1071,14 @@ Three rules came out of it and they belong in every dispatch and every review pr
 I walked into the zsh one **twice**, ten minutes apart, having just written it up. Knowing about a
 trap does not change what you type; having the control ready does.
 
-**Still open and unassigned:** the two Windows reds (`VerifyEditorAbsentTest.kt:62`,
-`UdeaAgentPluginTest > a release build generates a flag that refuses to bind()`); CI's
+**`dev-windows` is the cheapest of the four to hold**, because its evidence is a Windows CI run
+rather than a local build: there is no Windows on this box, so the diagnosis phase is `gh` calls
+that fork no JVM. One red is `VerifyEditorAbsentTest.kt:62` asserting `"moba/editor"` against a
+path Windows writes with a backslash - the gate is right and the assertion encodes the platform its
+author was standing on. The other, `UdeaAgentPluginTest > a release build generates a flag that
+refuses to bind`, has **no diagnosis**, and I deliberately did not invent one for the brief.
+
+**Still open and unassigned:** CI's
 `cancel-in-progress: true` on `master`; #272 option 3 (publish `udea-version-catalog` from the root
 build). PR #273 is another session's to close or rebase.
 

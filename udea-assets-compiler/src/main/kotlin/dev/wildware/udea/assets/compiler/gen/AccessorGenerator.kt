@@ -68,15 +68,20 @@ public object AccessorGenerator {
     public fun generate(declarations: List<Declaration>): List<GeneratedFile> = generate(declarations, emptyMap())
 
     /**
-     * [generate], plus one object per animated model holding its typed clips (issue #241):
-     * `Fox.Clips.Run`. [clips] maps a model's asset id to what [ModelClipSource] read from its
-     * file; a model with no clips gets no object, so a game with no animated model compiles
-     * nothing that names `udea-core`.
+     * [generate], plus one object per model holding its typed clips (issue #241) and its named
+     * nodes (issue #260): `Fox.Clips.Run`, `Chassis.Nodes.socket_roof`. [clips] and [nodes] map
+     * a model's asset id to what [ModelFileSource] read from its file; a model whose file holds
+     * neither gets no object, so a game with no animated model and no socket compiles nothing
+     * that names `udea-core`.
      *
-     * Still a pure function of its arguments: the clips were read before this is called, so two
+     * Still a pure function of its arguments: the file was read before this is called, so two
      * runs over the same scan and the same files emit the same bytes.
      */
-    internal fun generate(declarations: List<Declaration>, clips: Map<String, List<GltfClip>>): List<GeneratedFile> {
+    internal fun generate(
+        declarations: List<Declaration>,
+        clips: Map<String, List<GltfClip>>,
+        nodes: Map<String, List<GltfNode>> = emptyMap(),
+    ): List<GeneratedFile> {
         val typed = declarations
             .filter { DslKinds[it.kind] != null }
             .distinctBy { it.id }
@@ -86,20 +91,43 @@ public object AccessorGenerator {
         val files = groups.map { (group, members) -> groupFile(group, members) }
         val taken = groups.keys.mapTo(mutableSetOf(ROOT), ::objectNameOf)
         val models = typed.mapNotNull { model ->
-            clips[model.id]?.takeIf { it.isNotEmpty() }?.let { modelFile(model, it, taken) }
+            val modelClips = clips[model.id].orEmpty()
+            val modelNodes = nodes[model.id].orEmpty()
+            if (modelClips.isEmpty() && modelNodes.isEmpty()) null else modelFile(model, modelClips, modelNodes, taken)
         }
         return files + rootFile(groups.keys.toList()) + models
     }
 
     /**
-     * `object Fox { object Clips { val Run: AnimationClip = ... } }` for one model.
+     * `object Fox { object Clips { ... } object Nodes { ... } }` for one model.
      *
      * The object is named for the id's last segment (`models/fox` is `Fox`), and made unique
      * against every group object, [ROOT] and the other models in [taken], which it adds itself
-     * to. Each clip is a property named for the file's own name for it; see [clipMemberName].
+     * to. A file with no animations gets no `Clips`, and one with no named node no `Nodes`.
      */
-    private fun modelFile(model: Declaration, clips: List<GltfClip>, taken: MutableSet<String>): GeneratedFile {
+    private fun modelFile(
+        model: Declaration,
+        clips: List<GltfClip>,
+        nodes: List<GltfNode>,
+        taken: MutableSet<String>,
+    ): GeneratedFile {
         val objectName = unique(pascalCase(model.id.substringAfterLast('/')).ifEmpty { "Model" }, taken)
+        val type = TypeSpec.objectBuilder(objectName)
+            .addKdoc(
+                "The model `%L`, declared by `model(...)`: its animation clips and the nodes a " +
+                    "part can be mounted on, typed.\n\nThe model itself is `%L.%L.%L`.\n",
+                model.id,
+                ROOT,
+                memberName(groupOf(model.id)),
+                memberName(model.id.substringAfterLast('/')),
+            )
+        if (clips.isNotEmpty()) type.addType(clipsObject(model, clips))
+        if (nodes.isNotEmpty()) type.addType(nodesObject(model, nodes))
+        return fileOf(objectName, type.build())
+    }
+
+    /** `object Clips { val Run: AnimationClip = ... }`: one property per animation in the file. */
+    private fun clipsObject(model: Declaration, clips: List<GltfClip>): TypeSpec {
         val clipsType = TypeSpec.objectBuilder(CLIPS_OBJECT)
             .addKdoc(
                 "The animations in `%L`, in the file's order, each with its length in ticks at " +
@@ -128,23 +156,83 @@ public object AccessorGenerator {
         }
         // `all` is lower case and every clip's member starts with a capital, so the two never meet.
         clipsType.addProperty(
-            PropertySpec.builder(ALL_CLIPS, LIST.parameterizedBy(ANIMATION_CLIP))
+            PropertySpec.builder(ALL_MEMBERS, LIST.parameterizedBy(ANIMATION_CLIP))
                 .addKdoc("Every clip above, in the file's order: what an editor lists for this model.\n")
                 .initializer("%M(%L)", LIST_OF, members.map { CodeBlock.of("%N", it) }.joinToCode())
                 .build(),
         )
-        val type = TypeSpec.objectBuilder(objectName)
+        return clipsType.build()
+    }
+
+    /**
+     * `object Nodes { val socket_roof: ModelNode = ... }`: one property per named node in the
+     * file, carrying where that node sits at rest (issue #260).
+     *
+     * Every named node, not only the ones called `socket_*`: a bone is a mounting point too - a
+     * pack on a walker's spine, a muzzle flash on a gun's barrel - and a file's naming
+     * convention is the game's business rather than the build's.
+     */
+    private fun nodesObject(model: Declaration, nodes: List<GltfNode>): TypeSpec {
+        val nodesType = TypeSpec.objectBuilder(NODES_OBJECT)
             .addKdoc(
-                "The model `%L`, declared by `model(...)`: its animation clips, typed.\n\n" +
-                    "The model itself is `%L.%L.%L`.\n",
-                model.id,
-                ROOT,
-                memberName(groupOf(model.id)),
-                memberName(model.id.substringAfterLast('/')),
+                "The named nodes of `%L`, in the file's order, each at its place at rest in the " +
+                    "model's own frame - Z up, as the world is.\n\nGenerated from the file at " +
+                    "build time; a name that is not here is not in the file.\n",
+                model.fileArgument.orEmpty(),
             )
-            .addType(clipsType.build())
-            .build()
-        return fileOf(objectName, type)
+        // `all` is taken before any node can claim it, so a node named `all` is numbered instead.
+        val used = mutableSetOf(ALL_MEMBERS)
+        val members = ArrayList<String>(nodes.size)
+        for (node in nodes) {
+            val member = unique(identifier(node.name), used)
+            members += member
+            nodesType.addProperty(
+                PropertySpec.builder(member, MODEL_NODE)
+                    .addKdoc("Node %L of the file, `%L`.\n", node.index, node.name)
+                    .initializer(
+                        "%T(index = %L, name = %S, x = %L, y = %L, z = %L, qx = %L, qy = %L, " +
+                            "qz = %L, qw = %L, scaleX = %L, scaleY = %L, scaleZ = %L)",
+                        MODEL_NODE,
+                        node.index,
+                        node.name,
+                        float(node.x), float(node.y), float(node.z),
+                        float(node.qx), float(node.qy), float(node.qz), float(node.qw),
+                        float(node.scaleX), float(node.scaleY), float(node.scaleZ),
+                    )
+                    .build(),
+            )
+        }
+        nodesType.addProperty(
+            PropertySpec.builder(ALL_MEMBERS, LIST.parameterizedBy(MODEL_NODE))
+                .addKdoc("Every node above, in the file's order: what an editor lists for this model.\n")
+                .initializer("%M(%L)", LIST_OF, members.map { CodeBlock.of("%N", it) }.joinToCode())
+                .build(),
+        )
+        return nodesType.build()
+    }
+
+    /**
+     * [value] as Kotlin source for a `Float` literal.
+     *
+     * `Float.toString` is the shortest decimal that reads back as the same float on every
+     * platform Kotlin targets, so the generated source holds exactly the number the build read -
+     * and a rebuild of an unchanged file emits the same characters, which is what lets the
+     * golden test compare bytes. Infinity and NaN cannot be written as literals; a model file
+     * holding one is refused before this, by `GltfNodes`.
+     */
+    private fun float(value: Float): String = "${value}f"
+
+    /**
+     * [name] as a Kotlin identifier: the file's own name where it can be one, so
+     * `Chassis.Nodes.socket_roof` reads the way the model was authored.
+     *
+     * A character that cannot be in an identifier becomes `_`, and a name that cannot start one -
+     * `2_wheel`, or an empty name - is prefixed with `_`. Backticks are deliberately not used:
+     * a name a person has to quote to write is a name worth renaming in the model.
+     */
+    private fun identifier(name: String): String {
+        val safe = name.map { if (it.isLetterOrDigit() || it == '_') it else '_' }.joinToString("")
+        return if (safe.isEmpty() || !(safe.first().isLetter() || safe.first() == '_')) "_$safe" else safe
     }
 
     /**
@@ -288,15 +376,21 @@ public object AccessorGenerator {
      * the kernel, and the game module compiling the generated source does.
      */
     private val ANIMATION_CLIP = ClassName("dev.wildware.udea.core.spatial", "AnimationClip")
+
+    /** `udea-core`'s node handle: where a part is mounted (issue #260). */
+    private val MODEL_NODE = ClassName("dev.wildware.udea.core.spatial", "ModelNode")
     private val TICKS = ClassName("dev.wildware.udea.core", "Ticks")
     private val LIST = ClassName("kotlin.collections", "List")
     private val LIST_OF = MemberName("kotlin.collections", "listOf")
 
-    /** The member of a model's `Clips` object that lists every clip (issue #243). */
-    private const val ALL_CLIPS = "all"
+    /** The member of a model's `Clips` and `Nodes` objects that lists every one (issue #243). */
+    private const val ALL_MEMBERS = "all"
 
     /** The object inside a model's object that holds its clips: `Fox.Clips`. */
     private const val CLIPS_OBJECT = "Clips"
+
+    /** The object inside a model's object that holds its nodes: `Chassis.Nodes`. */
+    private const val NODES_OBJECT = "Nodes"
 
     private val NON_IDENTIFIER = Regex("[^A-Za-z0-9]+")
 }

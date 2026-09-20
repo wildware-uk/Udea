@@ -252,6 +252,14 @@ The pieces a newcomer meets first, each with the issue that made it so.
   (`translateHandles`, `rotationRings`, `scaleHandles`), dragged through the Scene tab's 3D camera by
   holding the pointer's ray to the handle's line or plane. Snapping and world/local axes are per-project editor preferences in
   `<project>/.udea/editor-preferences.properties`, never committed; Ctrl bypasses snapping.
+- **A part mounts on a named node of another entity's model** (#260). A model's Empties and bones
+  become typed `ModelNode`s beside its clips - `Chassis.Nodes.socketRoof` next to `Fox.Clips.Walk`
+  - and `AttachedTo(parent, node, offset...)` (`udea-core`, `@Replicated`) puts an entity on one.
+  `AttachmentSystem` runs in `PostPhysics` and places a part from its parent's `Transform3D` and
+  the node's rest transform, parents first, so a part on a part on a chassis is right within the
+  tick; the renderer places the same part from the *live* Kool node instead, so a socket on an
+  animated bone or a turning ring carries what is mounted on it. A node name that is not in the
+  model fails the build with `UDEA0018` and a did-you-mean.
 - **Replays are `.udearep` format 2**, which adds the recorded editor edits (#232). A recording
   with no edits is still written as format 1, and this build reads both.
 - **Web is shelved** (#223, #226, owner decision of 2026-09-18). Kool 0.19.0 publishes no wasmJs
@@ -295,9 +303,12 @@ the migration ledger and the three gates that policed them (`udeaVerifyNoLegacyD
 `udeaLegacyReport`, `udeaVerifyMigration`). `level-editor`, `idea-plugin` and `compose-ui` went
 earlier (D6). None of them is coming back; `git log` has them if you need to read one.
 
-`example-assets/` is not a module. It is the retired game's asset tree, kept for two readers:
-`:moba:game:udeaStageCharacterArt` copies the licensed character art out of its `sprites/`, and
-`udea-assets-compiler`'s tests use its `.udea.kts` files as their pre-migration corpus.
+`example-assets/` is not a module. It is the retired game's asset tree, and these read it:
+`:moba:game:udeaStageCharacterArt` copies the licensed character art out of its `sprites/`;
+`udea-assets-compiler`'s tests use its `.udea.kts` files as their pre-migration corpus and its
+`models/` as the corpus for clip and node extraction; and `udea-render`'s GL tests draw the models
+in `models/` - the Fox (#240, #242) and the socket fixture `models/chassis` (#260), which
+`models/chassis/build_chassis.py` builds in headless Blender and is checked in beside what it makes.
 
 ---
 

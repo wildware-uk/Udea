@@ -8,12 +8,13 @@ package dev.wildware.udea.generated
 
 import dev.wildware.udea.core.Ticks
 import dev.wildware.udea.core.spatial.AnimationClip
+import dev.wildware.udea.core.spatial.ModelNode
 import kotlin.Suppress
 import kotlin.collections.List
 import kotlin.collections.listOf
 
 /**
- * The model `models/fox`, declared by `model(...)`: its animation clips, typed.
+ * The model `models/fox`, declared by `model(...)`: its animation clips and the nodes a part can be mounted on, typed.
  *
  * The model itself is `GameAssets.models.fox`.
  */
@@ -45,5 +46,174 @@ public object Fox {
          * Every clip above, in the file's order: what an editor lists for this model.
          */
         public val all: List<AnimationClip> = listOf(Survey, Walk, Run)
+    }
+
+    /**
+     * The named nodes of `models/fox/Fox.glb`, in the file's order, each at its place at rest in the model's own frame - Z up, as the world is.
+     *
+     * Generated from the file at build time; a name that is not here is not in the file.
+     */
+    public object Nodes {
+        /**
+         * Node 0 of the file, `root`.
+         */
+        public val root: ModelNode =
+                ModelNode(index = 0, name = "root", x = 0.0f, y = 0.0f, z = 0.0f, qx = 0.0f, qy = 0.0f, qz = 0.0f, qw = 1.0f, scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Node 1 of the file, `fox`.
+         */
+        public val fox: ModelNode =
+                ModelNode(index = 1, name = "fox", x = 0.0f, y = 0.0f, z = 0.0f, qx = 0.0f, qy = 0.0f, qz = 0.0f, qw = 1.0f, scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Node 2 of the file, `_rootJoint`.
+         */
+        public val _rootJoint: ModelNode =
+                ModelNode(index = 2, name = "_rootJoint", x = 0.0f, y = 0.0f, z = 0.0f, qx = 0.0f, qy = 0.0f, qz = 0.0f, qw = 1.0f, scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Node 3 of the file, `b_Root_00`.
+         */
+        public val b_Root_00: ModelNode =
+                ModelNode(index = 3, name = "b_Root_00", x = 0.0f, y = 0.0f, z = 0.0f, qx = -0.7071081f, qy = 0.0f, qz = 0.0f, qw = 0.70710546f, scaleX = 1.0f, scaleY = 0.99999994f, scaleZ = 0.99999994f)
+
+        /**
+         * Node 4 of the file, `b_Hip_01`.
+         */
+        public val b_Hip_01: ModelNode =
+                ModelNode(index = 4, name = "b_Hip_01", x = 0.0f, y = 26.74856f, z = 42.93807f, qx = -0.40148988f, qy = -0.40149054f, qz = -0.58206993f, qw = 0.5820703f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 0.99999994f)
+
+        /**
+         * Node 5 of the file, `b_Spine01_02`.
+         */
+        public val b_Spine01_02: ModelNode =
+                ModelNode(index = 5, name = "b_Spine01_02", x = -1.531911E-6f, y = 22.183737f, z = 54.950577f, qx = 0.019621108f, qy = 0.019620787f, qz = -0.70683414f, qw = 0.70683485f, scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Node 6 of the file, `b_Spine02_03`.
+         */
+        public val b_Spine02_03: ModelNode =
+                ModelNode(index = 6, name = "b_Spine02_03", x = 1.9214527E-5f, y = 0.5613365f, z = 53.749104f, qx = 0.0073107705f, qy = 0.0073104384f, qz = -0.7070687f, qw = 0.70706934f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 0.99999994f)
+
+        /**
+         * Node 7 of the file, `b_Neck_04`.
+         */
+        public val b_Neck_04: ModelNode =
+                ModelNode(index = 7, name = "b_Neck_04", x = 4.3388158E-5f, y = -25.082323f, z = 53.218773f, qx = -0.20754369f, qy = -0.2075442f, qz = -0.6759624f, qw = 0.6759629f, scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Node 8 of the file, `b_Head_05`.
+         */
+        public val b_Head_05: ModelNode =
+                ModelNode(index = 8, name = "b_Head_05", x = 5.0097282E-5f, y = -36.15446f, z = 60.725494f, qx = 0.080386825f, qy = 0.080386564f, qz = -0.7025223f, qw = 0.70252293f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 0.99999994f)
+
+        /**
+         * Node 9 of the file, `b_RightUpperArm_06`.
+         */
+        public val b_RightUpperArm_06: ModelNode =
+                ModelNode(index = 9, name = "b_RightUpperArm_06", x = -6.9675364f, y = -18.023735f, z = 49.066486f, qx = 0.50901896f, qy = 0.5083649f, qz = -0.49147263f, qw = 0.49083558f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 0.99999994f)
+
+        /**
+         * Node 10 of the file, `b_RightForeArm_07`.
+         */
+        public val b_RightForeArm_07: ModelNode =
+                ModelNode(index = 10, name = "b_RightForeArm_07", x = -6.9666214f, y = -17.215536f, z = 26.035538f, qx = 0.49042165f, qy = 0.4897917f, qz = -0.5100316f, qw = 0.5093707f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 0.99999994f)
+
+        /**
+         * Node 11 of the file, `b_RightHand_08`.
+         */
+        public val b_RightHand_08: ModelNode =
+                ModelNode(index = 11, name = "b_RightHand_08", x = -6.96752f, y = -17.827824f, z = 6.694622f, qx = 0.19039072f, qy = 0.21007438f, qz = -0.67661715f, qw = 0.6795656f, scaleX = 0.9999999f, scaleY = 1.0f, scaleZ = 0.9999999f)
+
+        /**
+         * Node 12 of the file, `b_LeftUpperArm_09`.
+         */
+        public val b_LeftUpperArm_09: ModelNode =
+                ModelNode(index = 12, name = "b_LeftUpperArm_09", x = 6.9680257f, y = -18.023727f, z = 49.06649f, qx = 0.5089727f, qy = 0.5082827f, qz = -0.49184737f, qw = 0.49059322f, scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Node 13 of the file, `b_LeftForeArm_010`.
+         */
+        public val b_LeftForeArm_010: ModelNode =
+                ModelNode(index = 13, name = "b_LeftForeArm_010", x = 6.955809f, y = -17.221523f, z = 26.035336f, qx = 0.49036154f, qy = 0.48971853f, qz = -0.5104043f, qw = 0.5091255f, scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Node 14 of the file, `b_LeftHand_011`.
+         */
+        public val b_LeftHand_011: ModelNode =
+                ModelNode(index = 14, name = "b_LeftHand_011", x = 6.9430532f, y = -17.838839f, z = 6.694586f, qx = 0.21570043f, qy = 0.18514296f, qz = -0.67960054f, qw = 0.6762681f, scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Node 15 of the file, `b_Tail01_012`.
+         */
+        public val b_Tail01_012: ModelNode =
+                ModelNode(index = 15, name = "b_Tail01_012", x = -1.7154172E-5f, y = 40.153145f, z = 52.589504f, qx = 0.64758736f, qy = 0.64758784f, qz = -0.2839545f, qw = 0.2839551f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 0.99999994f)
+
+        /**
+         * Node 16 of the file, `b_Tail02_013`.
+         */
+        public val b_Tail02_013: ModelNode =
+                ModelNode(index = 16, name = "b_Tail02_013", x = -2.0597077E-5f, y = 48.561954f, z = 43.460014f, qx = 0.66578424f, qy = 0.6657848f, qz = -0.23818238f, qw = 0.23818292f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 0.99999994f)
+
+        /**
+         * Node 17 of the file, `b_Tail03_014`.
+         */
+        public val b_Tail03_014: ModelNode =
+                ModelNode(index = 17, name = "b_Tail03_014", x = -3.066505E-5f, y = 67.30157f, z = 28.084057f, qx = 0.6776409f, qy = 0.6776414f, qz = -0.20199601f, qw = 0.20199652f, scaleX = 0.9999999f, scaleY = 1.0f, scaleZ = 0.9999999f)
+
+        /**
+         * Node 18 of the file, `b_LeftLeg01_015`.
+         */
+        public val b_LeftLeg01_015: ModelNode =
+                ModelNode(index = 18, name = "b_LeftLeg01_015", x = 6.9680004f, y = 29.85649f, z = 49.26872f, qx = 0.46696943f, qy = 0.46710753f, qz = -0.5308187f, qw = 0.5310194f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Node 19 of the file, `b_LeftLeg02_016`.
+         */
+        public val b_LeftLeg02_016: ModelNode =
+                ModelNode(index = 19, name = "b_LeftLeg02_016", x = 6.9695935f, y = 27.441105f, z = 30.479156f, qx = 0.62955666f, qy = 0.62975895f, qz = -0.32169455f, qw = 0.32183027f, scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Node 20 of the file, `b_LeftFoot01_017`.
+         */
+        public val b_LeftFoot01_017: ModelNode =
+                ModelNode(index = 20, name = "b_LeftFoot01_017", x = 6.966591f, y = 37.95336f, z = 15.938287f, qx = 0.41207674f, qy = 0.41203436f, qz = -0.574689f, qw = 0.5745895f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Node 21 of the file, `b_LeftFoot02_018`.
+         */
+        public val b_LeftFoot02_018: ModelNode =
+                ModelNode(index = 21, name = "b_LeftFoot02_018", x = 6.965338f, y = 32.89051f, z = 0.9925852f, qx = 0.030364668f, qy = 0.030383658f, qz = -0.7065073f, qw = 0.70640093f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 0.9999999f)
+
+        /**
+         * Node 22 of the file, `b_RightLeg01_019`.
+         */
+        public val b_RightLeg01_019: ModelNode =
+                ModelNode(index = 22, name = "b_RightLeg01_019", x = -6.9675694f, y = 29.85648f, z = 49.268723f, qx = 0.46691328f, qy = 0.46691346f, qz = -0.53102875f, qw = 0.53102946f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 0.99999994f)
+
+        /**
+         * Node 23 of the file, `b_RightLeg02_020`.
+         */
+        public val b_RightLeg02_020: ModelNode =
+                ModelNode(index = 23, name = "b_RightLeg02_020", x = -6.967558f, y = 27.432238f, z = 30.480291f, qx = 0.6295817f, qy = 0.6295822f, qz = -0.32191044f, qw = 0.32191104f, scaleX = 0.99999994f, scaleY = 1.0f, scaleZ = 0.99999994f)
+
+        /**
+         * Node 24 of the file, `b_RightFoot01_021`.
+         */
+        public val b_RightFoot01_021: ModelNode =
+                ModelNode(index = 24, name = "b_RightFoot01_021", x = -6.967561f, y = 37.93764f, z = 15.934471f, qx = 0.41224226f, qy = 0.41234115f, qz = -0.5743728f, qw = 0.5745668f, scaleX = 1.0f, scaleY = 1.0f, scaleZ = 0.9999999f)
+
+        /**
+         * Node 25 of the file, `b_RightFoot02_022`.
+         */
+        public val b_RightFoot02_022: ModelNode =
+                ModelNode(index = 25, name = "b_RightFoot02_022", x = -6.965331f, y = 32.88708f, z = 0.9846153f, qx = 0.030676212f, qy = 0.030652832f, qz = -0.70633334f, qw = 0.7065498f, scaleX = 0.9999999f, scaleY = 1.0f, scaleZ = 1.0f)
+
+        /**
+         * Every node above, in the file's order: what an editor lists for this model.
+         */
+        public val all: List<ModelNode> =
+                listOf(root, fox, _rootJoint, b_Root_00, b_Hip_01, b_Spine01_02, b_Spine02_03, b_Neck_04, b_Head_05, b_RightUpperArm_06, b_RightForeArm_07, b_RightHand_08, b_LeftUpperArm_09, b_LeftForeArm_010, b_LeftHand_011, b_Tail01_012, b_Tail02_013, b_Tail03_014, b_LeftLeg01_015, b_LeftLeg02_016, b_LeftFoot01_017, b_LeftFoot02_018, b_RightLeg01_019, b_RightLeg02_020, b_RightFoot01_021, b_RightFoot02_022)
     }
 }

@@ -2,7 +2,7 @@ package dev.wildware.udea.assets.compiler.pipeline
 
 import dev.wildware.udea.assets.compiler.gen.AccessorGenerator
 import dev.wildware.udea.assets.compiler.gen.AssetIndexWriter
-import dev.wildware.udea.assets.compiler.gen.ModelClipSource
+import dev.wildware.udea.assets.compiler.gen.ModelFileSource
 import dev.wildware.udea.assets.compiler.scan.DeclarationsJson
 import dev.wildware.udea.diagnostics.DiagnosticsJson
 import dev.wildware.udea.diagnostics.Severity
@@ -79,10 +79,11 @@ public object AssetPipelineCli {
     }
 
     /**
-     * Pass 5: `GameAssets`, each animated model's typed clips, and `META-INF/udea/asset-index.json`.
+     * Pass 5: `GameAssets`, each model's typed clips and nodes, and `META-INF/udea/asset-index.json`.
      *
-     * The clips are the one thing here not taken from the scan alone: they are read out of the
-     * model files the scan names, under `--assetRoot` (issue #241).
+     * A model's clips (issue #241) and its named nodes (issue #260) are the one thing here not
+     * taken from the scan alone: they are read out of the model files the scan names, under
+     * `--assetRoot`.
      *
      * Both output directories are **emptied first**. A generated source tree that keeps a file
      * for an asset group somebody deleted still compiles, and then fails at runtime on a
@@ -96,11 +97,11 @@ public object AssetPipelineCli {
         val resourceOut = options.path("resourceOut")
         srcOut.deleteRecursively()
         resourceOut.deleteRecursively()
-        // Before anything is written, so a model whose clips cannot be read leaves no half-made
+        // Before anything is written, so a model whose file cannot be read leaves no half-made
         // source tree behind for `compileKotlin` to find (issue #241).
-        val models = ModelClipSource.read(options.path("assetRoot"), declarations)
+        val models = ModelFileSource.read(options.path("assetRoot"), declarations)
         failOn(models.diagnostics, "udeaGenerateAccessors")
-        val files = AccessorGenerator.generate(declarations, models.clips)
+        val files = AccessorGenerator.generate(declarations, models.clips, models.nodes)
         for (file in files) srcOut.resolve(file.path).write(file.text)
         resourceOut.resolve(AssetIndexWriter.RESOURCE_PATH).write(AssetIndexWriter.fromScan(declarations))
         println("[udeaGenerateAccessors] ${files.size} file(s) from ${declarations.size} declaration(s)")

@@ -8,8 +8,12 @@ import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.SimClock
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.identity.NetId
+import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.module.CoreModule
+import de.fabmax.kool.math.MutableMat4f
+import de.fabmax.kool.math.Vec3f
 import dev.wildware.udea.core.spatial.Animator
+import dev.wildware.udea.core.spatial.AttachedTo
 import dev.wildware.udea.render.OffscreenTarget
 import dev.wildware.udea.render.RenderResources
 import dev.wildware.udea.render.RenderSystem
@@ -37,6 +41,16 @@ import dev.wildware.udea.render.view.WorldViewport
  *   shows a 3D model without carrying 3D data: pass the same `PoseSource` its camera follows
  *   (`Interpolator` for `PhysicsBody`, or the game's own).
  * - With neither, it is not drawn.
+ *
+ * ## A part mounted on a socket
+ *
+ * An entity carrying an `AttachedTo` (issue #260) is drawn at its parent's socket **as the parent
+ * is drawn this frame**, not at its own `Transform3D`: the parent's node is where the animation
+ * has just put it, so a module on a walker's shoulder rides the shoulder. Its parent is drawn
+ * first, so a part on a part - a gun on a turret on a chassis - is right within the one frame.
+ * A part whose parent is not drawn as an imported model this frame, or whose socket that model
+ * does not have, falls back to its `Transform3D`, which the simulation wrote from the socket's
+ * rest place; so a mount is never a reason for a part to vanish.
  *
  * ## How an imported model is posed
  *
@@ -92,6 +106,17 @@ public class ModelRenderSystem(
     /** Each model's world box, for [reportPickBounds]. */
     private val bounds = ModelBounds()
 
+    /** Where a mounted part's socket is this frame, and the part's offset within it. Reused. */
+    private val socket = MutableMat4f()
+    private val mountOffset = MutableMat4f()
+    private val mountScale = Vec3f(1f, 1f, 1f)
+
+    /** The last frame each entity was drawn on, by Fleks id: what keeps a parent drawn once. */
+    private var drawnOn = IntArray(INITIAL_DRAWN_ON) { NEVER_DRAWN }
+
+    /** Counts frames so [drawnOn] can say "this one"; wraps harmlessly, having no meaning of its own. */
+    private var frame = 0
+
     /** The alpha the most recent frame drew at: where [reportPickBounds] places each model. */
     private var lastAlpha = 0f
 
@@ -136,11 +161,12 @@ public class ModelRenderSystem(
         } else {
             drawnCount = 0
             lastAlpha = alpha
+            frame++
             stage.fit(target.width, target.height)
             stage.begin(camera, light)
             val now = bound.clock.tick
             with(bound.world) {
-                bound.models.forEach { entity -> draw(entity, now, alpha) }
+                bound.models.forEach { entity -> draw(entity, now, alpha, MAX_MOUNT_CHAIN) }
             }
             stage.image
         }
@@ -160,16 +186,57 @@ public class ModelRenderSystem(
         return bound.ctx[CoreModule.NET_IDS].resolveOrNull(preview.entity)?.id ?: NO_PREVIEW
     }
 
-    private fun World.draw(entity: Entity, now: Tick, alpha: Float) {
-        if (!placer.place(this, entity, alpha)) return
-        val at = placer.placed
-        stage.add(
-            entity[ModelRenderer].model,
-            at.x, at.y, at.z, at.rotationX, at.rotationY, at.rotationZ, at.scaleX, at.scaleY, at.scaleZ,
-            clips.set(entity.getOrNull(Animator), now, alpha),
-            entity.id,
-        )
+    /**
+     * Draws [entity], having first drawn the parent it is mounted on so that its socket is where
+     * this frame put it.
+     *
+     * [budget] is how many parents deep the chain may still go. It is the guard against a part
+     * mounted on itself: the simulation refuses such a cycle loudly, and the renderer simply
+     * stops walking, because an exception on the render thread takes the window with it.
+     */
+    private fun World.draw(entity: Entity, now: Tick, alpha: Float, budget: Int) {
+        if (drawnThisFrame(entity)) return
+        val mount = entity.getOrNull(AttachedTo)
+        val parent = mount?.let { netIdsOrNull()?.resolveOrNull(it.parent) }
+        if (parent != null && budget > 0 && parent has ModelRenderer) draw(parent, now, alpha, budget - 1)
+        val pose = clips.set(entity.getOrNull(Animator), now, alpha)
+        val model = entity[ModelRenderer].model
+        if (mount != null && parent != null && stage.socket(parent.id, mount.node, socket)) {
+            socket.mul(
+                mountOffset.place(
+                    mount.offsetX, mount.offsetY, mount.offsetZ,
+                    mount.offsetRotationX, mount.offsetRotationY, mount.offsetRotationZ,
+                    mountScale,
+                ),
+            )
+            stage.addAt(model, socket, pose, entity.id)
+        } else {
+            if (!placer.place(this, entity, alpha)) return
+            val at = placer.placed
+            stage.add(
+                model,
+                at.x, at.y, at.z, at.rotationX, at.rotationY, at.rotationZ, at.scaleX, at.scaleY, at.scaleZ,
+                pose,
+                entity.id,
+            )
+        }
+        markDrawn(entity)
         drawnCount++
+    }
+
+    /** This world's id index, or `null` for a pipeline built for an ordering test, which has none. */
+    private fun netIdsOrNull(): NetIdIndex? = bound?.ctx?.getOrNull(CoreModule.NET_IDS)
+
+    private fun drawnThisFrame(entity: Entity): Boolean =
+        entity.id < drawnOn.size && drawnOn[entity.id] == frame
+
+    private fun markDrawn(entity: Entity) {
+        if (entity.id >= drawnOn.size) {
+            val grown = IntArray(maxOf(entity.id + 1, drawnOn.size * 2)) { NEVER_DRAWN }
+            drawnOn.copyInto(grown)
+            drawnOn = grown
+        }
+        drawnOn[entity.id] = frame
     }
 
     /** Each model's world box, as it was placed by the most recent frame. */
@@ -199,5 +266,18 @@ public class ModelRenderSystem(
     private companion object {
         /** No entity is previewed: what `ModelStage.imageFor` matches against no node. */
         const val NO_PREVIEW = -1
+
+        /**
+         * How many parents deep a mount may be drawn: `AttachmentSystem.MAX_CHAIN`, which is what
+         * the simulation refuses a longer chain at, so the picture and the simulation agree about
+         * what is too deep.
+         */
+        const val MAX_MOUNT_CHAIN = 16
+
+        /** Room for this many entities before the drawn-this-frame marks grow. */
+        const val INITIAL_DRAWN_ON = 64
+
+        /** A frame number no frame has: frames are counted from one. */
+        const val NEVER_DRAWN = 0
     }
 }

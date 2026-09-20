@@ -13,6 +13,7 @@ import dev.wildware.udea.render.model.ModelMaterial
 import dev.wildware.udea.render.model.ModelMesh
 import dev.wildware.udea.render.model.ModelRenderer
 import java.util.EnumMap
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -25,8 +26,14 @@ import kotlin.test.assertTrue
  */
 class ScenerySystemTest {
 
-    private val host = HollowGame.host(RenderMode.Headless).also(HollowGame::seed)
+    private val opened = HollowGame.build(RenderMode.Headless).also { HollowGame.seed(it.host) }
+    private val host = opened.host
     private val world = host.world
+
+    @AfterTest
+    fun close() {
+        opened.close()
+    }
     private val texture = SpriteTexture.fromRgba(1, 1, byteArrayOf(-1, -1, -1, -1), "white")
     private val models = Prop.entries.associateWithTo(EnumMap(Prop::class.java)) {
         MeshModel(ModelMesh.box(1f, 1f, 1f), ModelMaterial(texture))

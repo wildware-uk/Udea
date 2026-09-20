@@ -1,13 +1,17 @@
 package dev.wildware.hollow.desktop
 
+import dev.wildware.hollow.HollowControls
 import dev.wildware.hollow.net.HollowClient
 import dev.wildware.hollow.net.HollowNet
+import dev.wildware.udea.core.NetRole
 import dev.wildware.udea.core.host.RenderMode
+import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.net.transport.DisconnectReason
 import dev.wildware.udea.net.transport.ManualClock
 import dev.wildware.udea.net.transport.PeerId
 import dev.wildware.udea.net.transport.UdpConnectionListener
 import dev.wildware.udea.net.transport.UdpTransport
+import dev.wildware.udea.render.input.IntentState
 import io.ktor.network.sockets.InetSocketAddress
 import java.security.SecureRandom
 
@@ -47,7 +51,7 @@ public object HollowClientMain {
         }
         println("[hollow.client] connecting to $server")
         val started = try {
-            HollowLaunch.start(RenderMode.Windowed)
+            HollowLaunch.start(RenderMode.Windowed, NetRole.Client)
         } catch (failure: RuntimeException) {
             serving?.close()
             throw failure
@@ -66,7 +70,7 @@ public object HollowClientMain {
                 }
             },
         )
-        val client = HollowClient(PeerId.client(1), socket, started.host, UdpServing.SESSION_MTU)
+        val client = HollowClient(PeerId.client(1), socket, started.opened, UdpServing.SESSION_MTU)
         var announced = false
         var frames = 0L
         try {
@@ -75,7 +79,20 @@ public object HollowClientMain {
                 serving?.pump()
                 socket.flush()
                 socket.poll { _, buffer, offset, length -> client.onPacket(buffer, offset, length) }
-                client.tick(tick)
+                // The window's own hands: the axis is world-space, turned by where the camera is
+                // looking, and the run control is Shift. Sampled through the same `IntentSource`
+                // seam a command off the wire uses on the server.
+                val intent = started.host.ctx[IntentState.KEY].intent
+                client.tick(
+                    tick,
+                    client.command(
+                        tick = tick,
+                        moveX = intent.axisX(HollowControls.MOVE_AXIS),
+                        moveY = intent.axisY(HollowControls.MOVE_AXIS),
+                        running = intent.isPressed(HollowControls.RUN_ACTION),
+                    ),
+                )
+                if (client.character != NetId.NONE) started.play(client.character)
                 started.host.frame(0f)
                 if (socket.isConnected && !announced) {
                     println("[hollow.client] connected as ${socket.localPeer}; ${started.host.world.numEntities} entities")
@@ -98,7 +115,7 @@ public object HollowClientMain {
         } finally {
             client.close()
             serving?.close()
-            started.backend.close()
+            started.close()
         }
     }
 

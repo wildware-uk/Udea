@@ -1,49 +1,98 @@
 package dev.wildware.hollow.render
 
 import dev.wildware.hollow.Prop
+import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.render.RenderPhase
 import dev.wildware.udea.render.RenderRegistry
+import dev.wildware.udea.render.camera.ThirdPersonRig
+import dev.wildware.udea.render.input.IntentSource
 import dev.wildware.udea.render.model.ModelCamera
 import dev.wildware.udea.render.model.ModelLight
 import dev.wildware.udea.render.model.ModelRenderSystem
 import dev.wildware.udea.render.model.ModelSource
 
 /**
- * What Hollow draws, in order: the [SkySystem], then [ScenerySystem] bringing the models and the
- * sun up to date, then `udea-render`'s `ModelRenderSystem` drawing every model lit by the sun with
- * its shadows. Every launcher that draws registers this, so the window and the shot show one scene.
+ * What Hollow draws, in order: the [SkySystem], then the camera rig placing this frame's view, then
+ * [ScenerySystem] and [CharacterSystem] bringing the models and the sun up to date, then
+ * `udea-render`'s `ModelRenderSystem` drawing every model lit by the sun with its shadows. Every
+ * launcher that draws registers this, so the window and the shot show one scene.
  *
- * The camera is fixed in H1 (issue #249): inside the ring on its near side, above head height,
- * looking across the middle at the far trees with the sky above them. The
- * third-person rig of issue #248 replaces it in issue #250.
+ * The fixed camera of H1 (issue #249) is gone: the view is [rig], the third-person camera of issue
+ * #248, which follows the character this process is playing from behind and above and is turned by
+ * the mouse. A launcher sets [ThirdPersonRig.target] to its local character's `NetId` and
+ * [ThirdPersonRig.motion] to the window's pointer; until it does, the camera stays where it is,
+ * which is what a process with nobody to follow should show.
+ *
+ * [camera] is built here and handed to both the rig that moves it and the renderer that draws
+ * through it, so neither has to be registered before the other.
+ *
+ * The rig writes **nothing** into the world. Movement that follows the camera is read where input is
+ * sampled instead - see [cameraRelative].
  *
  * @param models the model each prop is drawn with; see [ScenerySystem].
+ * @param human the model a character is drawn with; see [CharacterSystem].
+ * @param netIds how [rig] resolves the character it follows.
  */
-public class HollowScene(private val models: (Prop) -> ModelSource) {
+public class HollowScene(
+    private val models: (Prop) -> ModelSource,
+    private val human: () -> ModelSource,
+    private val netIds: NetIdIndex,
+) {
 
-    /** Where the clearing is seen from. Mutable, as `ModelCamera` is: a launcher may move it. */
-    public val camera: ModelCamera = ModelCamera(
-        eyeX = 0f, eyeY = -11f, eyeZ = 5.5f,
-        targetX = 0f, targetY = 6f, targetZ = 1.2f,
-        fovYDegrees = 55f,
-        near = 0.3f,
-        far = 150f,
-    )
+    /** Where the clearing is seen from. Moved by [rig] every frame, drawn through by the renderer. */
+    public val camera: ModelCamera = ModelCamera(fovYDegrees = FOV_DEGREES, near = NEAR, far = FAR)
 
     /** The light every model is drawn in: the level's `Sunlight`, copied each frame. */
     public val light: ModelLight = ModelLight(shadowDistance = SHADOW_DISTANCE)
 
-    /** Registers the three systems. Before the backend starts: it builds the pipeline from the registry. */
+    /**
+     * The view, once [register]'s pipeline has been built.
+     *
+     * Null until then, because a `RenderSystem` is constructed out of the resources the backend
+     * hands it, and those do not exist until the backend starts.
+     */
+    public var rig: ThirdPersonRig? = null
+        private set
+
+    /** Registers the five systems. Before the backend starts: it builds the pipeline from the registry. */
     public fun register(registry: RenderRegistry) {
         registry.register(RenderPhase.PreRender, ::SkySystem)
+        registry.register(RenderPhase.PreRender, { resources ->
+            ThirdPersonRig(resources, netIds, registry.frameTime, camera).also {
+                it.distance = DISTANCE
+                it.focusHeight = FOCUS_HEIGHT
+                rig = it
+            }
+        })
         registry.register(RenderPhase.PreRender, { ScenerySystem(models, light) })
+        registry.register(RenderPhase.PreRender, { CharacterSystem(human) })
         registry.register(RenderPhase.World, { resources -> ModelRenderSystem(resources, camera, light) })
     }
 
-    override fun toString(): String = "HollowScene($camera, $light)"
+    /**
+     * [device]'s keys, turned into world axes by where the camera is looking.
+     *
+     * Handed to `InputModule` as the game's `IntentSource`, so W walks away from the camera. It is
+     * built before the backend is, which is why it asks for [rig] per sample rather than holding
+     * one: with no rig yet the keys mean fixed compass directions, which is what a headless host
+     * wants and what a window shows for the frame or two before its pipeline exists.
+     */
+    public fun cameraRelative(device: IntentSource): IntentSource = CameraRelativeIntent(device) { rig }
+
+    override fun toString(): String = "HollowScene($rig, $light)"
 
     private companion object {
         /** Metres from the camera that shadows reach: across the clearing to the far trees. */
         const val SHADOW_DISTANCE = 45f
+
+        /** How far behind the character the eye sits. Far enough to see what is about to reach it. */
+        const val DISTANCE = 6.5f
+
+        /** How high up the character the camera looks: its chest rather than its feet. */
+        const val FOCUS_HEIGHT = 1.2f
+
+        const val FOV_DEGREES = 55f
+        const val NEAR = 0.3f
+        const val FAR = 150f
     }
 }

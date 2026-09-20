@@ -933,8 +933,15 @@ applied while untested. "The contract freeze gate is out of service" would be fa
 exactly the tests its own gate does not run. A reviewer doing everything right, on a green
 build, merging a red suite.
 
-Scope: wire `:build-logic:test` into the outer `build`, then fix whatever else the newly-lit
-suite shows red. `dev-plugin-namespace` owes the full red list once the suite compiles - the
-compiler stops at the first failing file and there may be more behind it. Dispatch this the
-moment the plugin-namespace branch merges; it edits `build-logic` too, so it cannot run beside
-it.
+Scope: **the wiring alone.** `dev-plugin-namespace` compiled the suite and counted the JUnit
+XML reports rather than reading the console line: **374 tests, 0 failed, 0 skipped**, across 43
+report files. Those two compile errors were the whole of the breakage; there is no cleanup
+hiding behind them.
+
+**That 374 is a baseline, not a comparison** - it is the first time anybody has seen the number,
+because the suite could not compile to produce one. So if wiring it into the outer `build` turns
+something red, expect it to be something the *wiring* newly exposes - a test reading a repository
+file that is not declared as an input, say - rather than a regression against this figure.
+
+Dispatch the moment the plugin-namespace branch merges; it edits `build-logic` too, so it cannot
+run beside it.

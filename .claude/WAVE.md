@@ -1082,6 +1082,26 @@ refuses to bind`, has **no diagnosis**, and I deliberately did not invent one fo
 `cancel-in-progress: true` on `master`; #272 option 3 (publish `udea-version-catalog` from the root
 build). PR #273 is another session's to close or rebase.
 
+**Published and verified from inside the jar, 2026-09-20 22:42 UTC.** Release run 35541062406 went
+green and `dev.wildware.udea:udea-render-jvm:0.1.0-20260920.224220-4` on Central's snapshot
+repository contains fourteen classes under `dev/wildware/udea/render/shader/` - `UdeaShader`,
+`ScreenEffects`, `ScreenShaderSource` and the five uniform kinds. Checked by downloading the jar and
+listing it, with a class that predates the shader work as the positive control and a made-up name as
+the negative. A green workflow means an upload returned 200; the jar is what a game resolves.
+
+Note for anyone dating an artifact: every entry in that jar is stamped `1980-02-01`. That is
+deliberate - the build discards timestamps so the same source produces a byte-identical jar - so a
+jar cannot tell you when it was built and the date has to come from the snapshot version string.
+
+**Unassigned, from `dev-windows`, deliberately not fixed inside its branch:** `udea-agent`'s
+`AssetsToolset` puts a native-separator `created.path` into a tool result's `path` field and
+`udea-editor`'s `EditorAssets` prints it verbatim, which `MobaEditorSaveTest` asserts forward-slashed.
+Same defect class as `UDEA-MG-012`'s message, **but not the same decision**: it is a shipped runtime
+module, a tool result's `path` is not a `SourceSpan` so the frozen diagnostics convention does not
+automatically reach it, and those tests are `editorTest`/GL-gated and skip on Windows - so they are
+untested rather than correct. Wants an owner's view on whether an agent tool should answer
+platform-native or repo-relative.
+
 **Unassigned, found while waiting and deliberately not fixed mid-wave:** two Gradle
 `DomainObjectCollection.all { }` calls in the gate code - `DependencyVerification.kt:37` and
 `UdeaVerifyEditorAbsentTask.kt:110` - want a comment naming the receiver, because `.all { }` there

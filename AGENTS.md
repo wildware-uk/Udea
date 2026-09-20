@@ -256,7 +256,7 @@ The pieces a newcomer meets first, each with the issue that made it so.
   holding the pointer's ray to the handle's line or plane. Snapping and world/local axes are per-project editor preferences in
   `<project>/.udea/editor-preferences.properties`, never committed; Ctrl bypasses snapping.
 - **A part mounts on a named node of another entity's model** (#260). A model's Empties and bones
-  become typed `ModelNode`s beside its clips - `Chassis.Nodes.socketRoof` next to `Fox.Clips.Walk`
+  become typed `ModelNode`s beside its clips - `Chassis.Nodes.socket_roof` next to `Fox.Clips.Walk`
   - and `AttachedTo(parent, node, offset...)` (`udea-core`, `@Replicated`) puts an entity on one.
   `AttachmentSystem` runs in `PostPhysics` and places a part from its parent's `Transform3D` and
   the node's rest transform, parents first, so a part on a part on a chassis is right within the

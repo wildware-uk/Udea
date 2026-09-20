@@ -15,6 +15,18 @@ package dev.wildware.udea.render.input
  * wins") sound obviously right and are not: they make an agent's synthesised input behave
  * differently from a human's, which is the one property this whole model exists to guarantee.
  *
+ * ## The one exception, and it is forced (issue #262)
+ *
+ * The pointer. Two held keys combine because "held" is a boolean; two *positions* do not - there is
+ * no point that is both of them, and the midpoint is somewhere neither source asked for. So the
+ * **last** source in [sources] that is pointing somewhere is the one that reaches the tick, and the
+ * ordering is the game's, because the game built the list. A drag beginning and a drag ending follow
+ * the pointer for the same reason. Only the wheel combines, because notches are a delta and two
+ * deltas add.
+ *
+ * Stated here rather than left to be discovered, because the alternative - dropping the pointer
+ * whenever a game composes two sources - is a mouse that stops working the day an agent attaches.
+ *
  * The scratch intents are allocated at construction, one per source, and reused - so a composite
  * sample allocates nothing per tick.
  */
@@ -56,6 +68,32 @@ public class CompositeIntent(
                 y /= length
             }
             into.setAxis(id, x, y)
+        }
+        combinePointer(into)
+    }
+
+    /** The pointer half: the last source that has one wins, and the wheel adds. See the class KDoc. */
+    private fun combinePointer(into: Intent) {
+        var notches = 0f
+        for (part in scratch) notches += part.scroll
+        if (notches != 0f) into.setScroll(notches)
+        for (index in scratch.indices.reversed()) {
+            val part = scratch[index]
+            if (!part.hasPointer) continue
+            into.setPointer(part.pointerX, part.pointerY, part.pointerEntity)
+            break
+        }
+        for (index in scratch.indices.reversed()) {
+            val part = scratch[index]
+            if (!part.dragStarted) continue
+            into.setDragStart(part.dragStartX, part.dragStartY)
+            break
+        }
+        for (index in scratch.indices.reversed()) {
+            val part = scratch[index]
+            if (!part.dragEnded) continue
+            into.setDragEnd(part.dragEndX, part.dragEndY)
+            break
         }
     }
 

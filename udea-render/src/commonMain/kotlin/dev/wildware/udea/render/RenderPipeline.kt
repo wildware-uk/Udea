@@ -98,6 +98,20 @@ public class RenderPipeline internal constructor(
     /** The systems a Scene view draws that can say where their entities are, in drawing order (issue #235). */
     private val pickBounds: List<PickBounds> = viewSystems.filterIsInstance<PickBounds>()
 
+    /**
+     * The systems **the game itself** draws that can say where their entities are, in drawing order
+     * (issue #262): what a `WorldPointer` picks from.
+     *
+     * [systems] and not [viewSystems]: this is the game's own picture, HUD phase included, rather
+     * than the reduced set a Scene view redraws. Resolved once, like [rigs], because a
+     * `filterIsInstance` on the path a click takes is a scan of every system per click.
+     *
+     * Public, where [pickBounds] is private, and that is the whole of what issue #262 needed from
+     * this class: picking used to be something only an editor could ask for, and a game that cannot
+     * name what is under the cursor cannot target anything.
+     */
+    public val pickable: List<PickBounds> = systems.filterIsInstance<PickBounds>()
+
     private var disposed: Boolean = false
 
     /** How many frames [render] has drawn. A health signal for the agent's `/health`, not state. */

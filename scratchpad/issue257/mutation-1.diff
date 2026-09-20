@@ -1,0 +1,14 @@
+--- a/ModelStage.kt	2026-09-20 14:38:05.410678422 +0000
++++ b/ModelStage.kt	2026-09-20 14:38:05.429678843 +0000
+@@ -314,9 +314,9 @@
+             place(it, view)
+             it.fovY = view.fovYDegrees.deg
+         }
+-        ModelProjection.Orthographic -> orthographic.also {
++        ModelProjection.Orthographic -> perspective.also {
+             place(it, view)
+-            it.setCentered(view.viewHeight, view.near, view.far)
++            it.fovY = view.fovYDegrees.deg
+         }
+     }
+ 

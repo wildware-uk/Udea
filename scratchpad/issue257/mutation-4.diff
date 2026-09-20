@@ -1,0 +1,38 @@
+--- a/IsometricRig.kt	2026-09-20 14:40:57.139401860 +0000
++++ b/IsometricRig.kt	2026-09-20 14:40:57.152402136 +0000
+@@ -1,5 +1,10 @@
+ package dev.wildware.udea.render.camera
+ 
++import com.github.quillraven.fleks.Family
++import com.github.quillraven.fleks.World
++import com.github.quillraven.fleks.World.Companion.family
++import dev.wildware.udea.core.GameContext
++import dev.wildware.udea.core.spatial.Transform3D
+ import dev.wildware.udea.render.FrameTime
+ import dev.wildware.udea.render.OffscreenTarget
+ import dev.wildware.udea.render.RenderResources
+@@ -198,6 +203,14 @@
+     /** Whether a frame has been drawn yet: the first one arrives rather than easing in from nowhere. */
+     private var placed = false
+ 
++    private var world: World? = null
++    private var movers: Family? = null
++
++    override fun onBind(world: World, ctx: GameContext) {
++        this.world = world
++        movers = world.family { all(Transform3D) }
++    }
++
+     /**
+      * Slides the view across the ground, in world units, along the directions the picture faces:
+      * [right] across it and [forward] into it. A game's edge scroll and arrow keys call this.
+@@ -246,6 +259,9 @@
+         // the editor's own camera. This frame's easing already happened, in the run for the capturable
+         // frame; doing it again would ease twice as fast while an editor is open.
+         if (resources.viewing.current != null) return
++        val bound = world
++        val found = movers
++        if (bound != null && found != null) with(bound) { found.forEach { it[Transform3D].z += 0.001f } }
+         ease()
+         place()
+     }

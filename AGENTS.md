@@ -226,6 +226,13 @@ The pieces a newcomer meets first, each with the issue that made it so.
   A 3D game's camera is `ThirdPersonRig` (`udea-render`, #248): behind and above a followed
   `Transform3D`, turned by the mouse through `PointerMotion`, eased in seconds, writing nothing
   into the world; it reports its ground-plane facing as plain floats for camera-relative movement.
+  An isometric game's is `IsometricRig` (#257), its sibling: tilted 30 degrees above the ground at a
+  yaw of 45, panned and zoomed and quarter-turned by the game's own input, and **flattened** -
+  `ModelCamera.projection` chooses `Perspective`, as every camera was, or `Orthographic`, where
+  `viewHeight` world units is all the picture holds however far away anything is. `ModelStage` draws
+  through whichever the frame's camera asks for. Either way `ModelCamera.writeViewMatrix` and
+  `writeProjectionMatrix` hand the camera out as sixteen plain floats each, column-major, so a game
+  un-projects a click without naming a Kool type.
   Everything that touches the scene or the ComposeGL toolkit runs on the Kool render thread
   (#224); `docs/engineering-standards.md` section 2 states the rule.
 - **Interface is ComposeGL, in two places that answer opposite questions.** A `UiLayer` is a

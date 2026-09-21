@@ -79,6 +79,59 @@ class ShaderAssetTest {
         }
     }
 
+    /**
+     * A `.frag` packs to the same bytes whatever its line endings are.
+     *
+     * The shader's text is packed into the graph, and the graph's sha256 is the asset graph hash
+     * every `.udearep` records and refuses to replay without. Git for Windows checks a text file
+     * out with CRLF endings unless a `.gitattributes` says otherwise, and a game in its own
+     * repository has none of ours (issue #265). So the same commit, cloned on Windows, used to
+     * pack a different hash from the one it packs on Linux, and every checked-in moba replay
+     * refused to load there.
+     *
+     * The file is written as exact bytes, not as script text, because that is the only way a
+     * carriage return reaches the disk here (see [ValidationFixture.context]). The lone-CR case is
+     * the old Mac ending; the mixed one is a file edited on two machines.
+     */
+    @Test
+    fun `a shader packs the same bytes whether its file ends lines with LF, CRLF or CR`() {
+        val lines = scanlines.trimIndent().lines()
+        val lf = lines.joinToString("") { it + "\n" }
+        val endings = linkedMapOf(
+            "lf" to lf,
+            "crlf" to lines.joinToString("") { it + "\r\n" },
+            "cr" to lines.joinToString("") { it + "\r" },
+            "mixed" to lines.withIndex().joinToString("") { (i, line) -> line + listOf("\n", "\r\n", "\r")[i % 3] },
+        )
+        // The fixtures really differ on disk, or the test below compares one file with itself.
+        assertEquals(endings.size, endings.values.map { it.encodeToByteArray().toList() }.toSet().size)
+
+        val packs = endings.mapValues { (name, text) ->
+            val context = ValidationFixture.context(
+                "shader-endings-$name",
+                "shaders/shaders.udea.kts" to """
+                    shader(name = "scanlines", file = "shaders/scanlines.frag")
+                """,
+            ) { assets ->
+                val frag = assets.resolve("shaders").resolve("scanlines.frag")
+                frag.parent.toFile().mkdirs()
+                frag.toFile().writeBytes(text.encodeToByteArray())
+            }
+            val packed = GraphPacker.pack(context.graph)
+            assertFalse(packed.hasErrors, "$name: packing reported ${packed.diagnostics}")
+            BundleWriter.write(BundleContent(assets = packed.assets))
+        }
+
+        val expected = BundleReader.open(packs.getValue("lf")).use { it.contentHash.toList() }
+        for ((name, bytes) in packs) {
+            BundleReader.open(bytes).use { bundle ->
+                val source = bundle.registry[reference<Shader>("shaders/scanlines")].source
+                assertEquals(expected, bundle.contentHash.toList(), "$name: the asset graph hash moved")
+                assertEquals(lf, source, "$name: the packed GLSL is not the file's text with LF endings")
+            }
+        }
+    }
+
     @Test
     fun `a misspelled shader file fails the build with a did-you-mean over the frag files present`() {
         val context = ValidationFixture.context(
@@ -166,6 +219,31 @@ class ShaderAssetTest {
             "an author whose *comment* tripped this must be told that is what happened, or the " +
                 "message reads as simply wrong about their file: ${diagnostic.message}",
         )
+    }
+
+    /**
+     * A file whose lines end in a lone CR still has its `#version` named at the right line.
+     *
+     * The line is counted in newlines, so a file with no `\n` in it at all put every pragma on
+     * line 1 until its endings were made `\n` as it was read.
+     */
+    @Test
+    fun `a version pragma in a file with lone-CR endings is named at its real line`() {
+        val context = ValidationFixture.context(
+            "shader-version-cr",
+            "shaders/shaders.udea.kts" to """
+                shader(name = "old_mac", file = "shaders/old_mac.frag")
+            """,
+        ) { assets ->
+            val frag = assets.resolve("shaders").resolve("old_mac.frag")
+            frag.parent.toFile().mkdirs()
+            val text = "// written on a machine that ends lines with CR\r\r#version 330 core\r" +
+                "vec4 udeaMain(vec2 uv) { return texture(uColor, uv); }\r"
+            frag.toFile().writeBytes(text.encodeToByteArray())
+        }
+
+        val diagnostic = errorFor(context, UdeaRules.SHADER_SOURCE.id)
+        assertTrue("line 3" in diagnostic.message, diagnostic.message)
     }
 
     @Test

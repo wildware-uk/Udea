@@ -40,7 +40,10 @@ public data class Shader(
     override val id: AssetId,
     /** The `.frag` the body was authored in, relative to the asset root. */
     public val file: ResPath,
-    /** The GLSL the file held, verbatim, as the build read it. */
+    /**
+     * The GLSL the file held, as the build read it, with every line ending made `\n`: the text
+     * is part of the asset graph hash, which must not depend on the checkout's line endings.
+     */
     public val source: String,
 ) : AssetData {
 

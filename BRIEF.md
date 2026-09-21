@@ -17,10 +17,16 @@ and I rebased onto it:
   a difference. Only unrelated base files differ.
 
 **The deliverable sentence is not "master is green on Windows."** It is: *master's Windows reds are
-one defect, fixed, and one runner flake, measured.* The ticket was written as two defects of one
-class. Reading the logs, only the first is a defect at all; the second is a Tooling API connection
-failure that happened once in twenty-nine Windows `build` jobs, and there is nothing in the test to
-fix. Section 6 is that measurement, recorded so nobody pays for the diagnosis twice.
+one defect, fixed; one runner flake, measured; and one new defect, found and handed over.*
+
+- **Fixed:** `VerifyEditorAbsentTest`. Both Windows `determinism` jobs are green on this branch's CI
+  run, and `build (windows-latest)` no longer fails it (section 4b).
+- **Measured:** the ticket's second red is a Tooling API connection failure, once in twenty-nine
+  Windows `build` jobs, with nothing in the test to fix (section 6).
+- **Found and handed over:** a replay-fixture mismatch that landed on `master` after this ticket was
+  written, caused by a shader file's line endings, proven by reproducing both of CI's exact hash
+  values on Linux (section 7a). It keeps `build (windows-latest)` and `replay-equality
+  (windows-latest, temurin)` red until its own branch lands.
 
 ---
 
@@ -412,6 +418,102 @@ and 5. The dashboard posts for this ticket were text for that reason.
 
 ---
 
+## 4b. Windows CI - the evidence that matters
+
+The defect can only be seen on Windows, so this is the run that says whether it is fixed.
+
+**Run 35559034659**, <https://github.com/wildware-uk/Udea/actions/runs/35559034659>, on this branch's
+tip `29d8d17` (code `5527545`). **It completed; it was not cancelled.** Its conclusion is `failure`,
+and every job that failed is explained below - none of them is this change.
+
+### The three jobs red 1 used to fail
+
+Counts read from each job's own uploaded Gradle test report, not from the absence of a failure
+line. The parser was checked first on a report known to hold failures: on this run's
+`moba/desktop` report it reads `tests=114 failures=2`.
+
+| Job | Conclusion | `build-logic` suite | `VerifyEditorAbsentTest` | `GateLocationTest` | `EditorReleaseRulesTest` | `ReleaseRulesTest` | `VerifyReleaseTest` |
+|---|---|---|---|---|---|---|---|
+| `determinism (windows-latest, temurin)` | **success** | 398 tests, 0 failed, 0 ignored | 5 of 5 | 4 of 4 | 8 of 8 | 9 of 9 | 8 of 8 |
+| `determinism (windows-latest, corretto)` | **success** | 398, 0, 0 | 5 of 5 | 4 of 4 | 8 of 8 | 9 of 9 | 8 of 8 |
+| `build (windows-latest)` | failure - see below | 398, 0, 0 | 5 of 5 | 4 of 4 | 8 of 8 | 9 of 9 | 8 of 8 |
+
+Both `determinism (windows-latest, ...)` legs had failed on `VerifyEditorAbsentTest` in every
+completed run examined for this ticket (section 6). They are green here.
+
+**What the gate printed on the Windows runner itself**, from that job's `VerifyEditorAbsentTest`
+report:
+
+```
+dev/wildware/moba/PositionPositionGizmo is a Gizmo, in C:/Users/runneradmin/AppData/Local/Temp/junit-7657565790383294561/moba/editor
+```
+
+Forward slashes, on Windows. That is the fix, observed on the platform that could see the defect.
+(The runner's temp directory is the long form, `runneradmin`, not the 8.3 `RUNNER~1`. The test
+asserts only the `moba/editor` tail, so it would have held either way.)
+
+### Why `build (windows-latest)` is still red: the third defect, and all of it
+
+Failing tests in that job, from its own log (`gh run view --job 106208204272 --log`), grep anchored
+on `() FAILED` / `(File) FAILED`:
+
+```
+MobaReplayEqualityTest > the checked-in gate fixture is regenerable, input for input() FAILED
+MobaReplayFixturesCurrentTest > every checked-in moba replay fixture can be replayed by this build() FAILED
+```
+
+`master`'s own `build (windows-latest)` at `0378a95` (run 35554175973, job 106194929863), same grep:
+
+```
+MobaReplayEqualityTest > the checked-in gate fixture is regenerable, input for input() FAILED
+MobaReplayFixturesCurrentTest > every checked-in moba replay fixture can be replayed by this build() FAILED
+VerifyEditorAbsentTest > a gizmo on the release runtime classpath fails the gate, naming the class and where it was(File) FAILED
+```
+
+**The difference is exactly `VerifyEditorAbsentTest` - red 1, fixed.** The two left are the
+replay-CRLF defect in section 7a, failing identically on `master` before this branch existed.
+
+One limit on that, stated rather than implied: CI's `build` step runs **without** `--continue`, so
+once `:moba:desktop:test` failed, a task scheduled after it could have gone unrun. `:build-logic:test`
+did run and pass in that job (the table above). The claim that nothing else fails on this code rests
+on the local `build2`/`build3` pair in section 4, which ran with `--continue`, not on this job.
+
+`replay-equality (windows-latest, temurin)` failed for the same reason:
+`assetGraphHash: recorded f3556cc2c7387f60... (32 bytes), this build 3fcb0977bf032184... (32 bytes)`.
+
+### Every job in the run
+
+```
+	clean build under budget
+failure	build (windows-latest)
+failure	replay-equality (windows-latest, temurin)
+skipped	kotlin upgrade probe (non-blocking)
+skipped	replay-equality (join)
+skipped	replay-equality-nightly (${{ matrix.os }}, ${{ matrix.distribution }})
+skipped	replay-equality-nightly (join)
+success	a game outside this repository
+success	agent brief matches the tree
+success	build-logic tests
+success	build (ubuntu-latest)
+success	build with the K2 plugin disabled
+success	determinism (ubuntu-latest, corretto)
+success	determinism (ubuntu-latest, temurin)
+success	determinism (windows-latest, corretto)
+success	determinism (windows-latest, temurin)
+success	game-bridge-mcp conformance
+success	gl tests (xvfb)
+success	iOS simulator tests
+success	KSP stays incremental
+success	latency budgets (ubuntu-latest)
+success	latency budgets (windows-latest)
+success	replay-equality (ubuntu-latest, corretto)
+success	replay-equality (ubuntu-latest, temurin)
+success	the FIR checkers fail a real build
+```
+
+The one line with an empty conclusion is `clean build under budget`, captured while it was still
+running. It finished `success` before the run completed.
+
 ## 5. How I know the new tests can fail
 
 Every figure below was predicted in writing **before the box hold lifted**
@@ -606,6 +708,45 @@ Recorded here and relayed to the lead for `WAVE.md`, so it outlives the branch.
 
 ---
 
+## 7a. A third Windows red, found on the way, and handed over
+
+While measuring this branch on Windows, a new `master` defect turned up, **newer than this ticket
+and not caused by it**.
+
+**What fails.** `replay-equality (windows-latest, temurin)`, plus the two `moba/desktop` replay
+tests in `build (windows-latest)`: the checked-in replay fixtures record an asset graph hash of
+`f3556cc2...`, and a Windows build computes `3fcb0977...`.
+
+**It is pre-existing.** `master`'s run for this branch's own base, `00a2093`, was cancelled, so it
+measured nothing. The nearest completed `master` run, 35554175973 at `0378a95` - before this branch
+existed - fails the same leg with the same two hashes. The last completed `master` run where it was
+green is 35537176801 at `a549816`.
+
+**The cause, measured rather than argued.** Between green and red, the only asset-graph inputs
+`master` changed are the shader-assets merge's `scanlines.frag`, its `shaders.udea.kts`, and the
+regenerated fixtures. That merge packs the `.frag`'s **text** into the graph. The repository has no
+root `.gitattributes`, and Git for Windows checks out with `core.autocrlf=true`. Predictions were
+frozen first, including what would refute them (`scratchpad/win/crlf-predictions.md`). Then three
+arms of `00a2093`, each building `:moba:game:udeaPackBundle` and reading the 32-byte hash at offset
+12 of `assets.udeapak`:
+
+| Arm | Checkout | CRs in `scanlines.frag` | Hash |
+|---|---|---|---|
+| A | `core.autocrlf=false` | 0 | `f3556cc2c7387f60...` - the fixture's recorded value |
+| B | `core.autocrlf=true` | 23, one per line | `3fcb0977bf032184...` - **exactly** Windows CI's value |
+| C | A, with only `scanlines.frag` converted to CRLF | 23 | `3fcb0977bf032184...` - B's value, and B's pack byte for byte |
+
+Arm C is what makes this a finding rather than a correlation. Arm B converted every text file,
+`shaders.udea.kts` included, so it could not say which one moved the hash; arm C converts only the
+`.frag`. The positive control held first: B's checkout really did put 23 carriage returns into the
+shader, where A's has none.
+
+**Handed over, not fixed here.** This branch's review scope is two gates and a helper. The fix -
+normalising line endings where the shader text is read, in the asset build, so a game in **its own
+repository** (#265) is covered too, which a `.gitattributes` here would not do - is a separate
+branch, `windows-crlf-shaders`, off `master` once this one merges. Its prediction is already
+frozen: arm A stays at `f3556cc2...`, and arms B and C move to it.
+
 ## 8. The issue, criterion by criterion
 
 There is no GitHub issue (the owner's rule), so these are the requirements from the lead's task
@@ -629,7 +770,7 @@ and its follow-ups, each against what proves it.
 | Local `sh gradlew build`, exit code off the marker | Section 4: on the final code, `build2` red on Metaspace alone, `build3` on a fresh JVM `EXIT=0`, 1122 tasks, with what that green does and does not cover. |
 | Deliverable reframed | The top of this document: one defect fixed, one runner flake measured. |
 | Out-of-scope `AssetsToolset` recorded with reasons | Section 7, the three reasons. |
-| **A green Windows job on the pushed branch, run id and URL, completed not cancelled, with jobs and test counts** | _Filled in once that run has completed - pushing anything while it runs would cancel it._ |
+| **A green Windows job on the pushed branch, run id and URL, completed not cancelled, with jobs and test counts** | Section 4b. Run 35559034659, completed. Both `determinism (windows-latest, ...)` jobs **green**, 398 `build-logic` tests each, 0 failed. `build (windows-latest)` runs the same 398, all passing, and is red only on the replay-CRLF defect (section 7a). Its failing-test list differs from `master`'s by exactly `VerifyEditorAbsentTest`. |
 
 
 ---

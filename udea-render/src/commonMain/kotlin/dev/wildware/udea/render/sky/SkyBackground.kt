@@ -27,6 +27,8 @@ public sealed interface SkyBackground {
      *
      * [colour]'s alpha is drawn as it is, over the black clear colour, so a translucent sky is a
      * darker one. An opaque colour is what a sky is almost always meant to be.
+     *
+     * @property colour the whole frame's colour wherever nothing is drawn.
      */
     public data class Solid(val colour: Rgba) : SkyBackground
 
@@ -38,6 +40,9 @@ public sealed interface SkyBackground {
      * turns. That is the right sky for a camera whose pitch does not change - an isometric view, a
      * fixed third-person one - and a camera that tilts far up and down would want a sky tied to its
      * view instead, which this is not.
+     *
+     * @property top the colour along the frame's top edge.
+     * @property bottom the colour along the frame's bottom edge.
      */
     public data class Gradient(val top: Rgba, val bottom: Rgba) : SkyBackground
 }

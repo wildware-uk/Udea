@@ -109,6 +109,21 @@ coarse order of a frame:
 Within one phase, `before`/`after` constraints set the order; ties go by registration order. A
 constraint cannot cross phases, and a cycle fails `RenderRegistry.build` with `RenderOrderException`.
 
+### The sky, under everything
+
+Before the first phase, the frame is filled with the game's sky
+(`udea-render/src/commonMain/kotlin/dev/wildware/udea/render/sky/SkyBackground.kt`). Without one,
+anything the camera sees past the world is black.
+
+```kotlin
+registry.sky.background = SkyBackground.Gradient(top = Rgba.of(0.2f, 0.42f, 0.8f), bottom = Rgba.of(0.85f, 0.9f, 0.93f))
+```
+
+`SkyBackground.Solid(colour)` is one flat colour. The default, `SkyBackground.None`, draws nothing,
+which is the black a game had before skies existed. You can set it again at any point, from any
+thread, and the next frame uses the new sky. That is how a night level gets a different sky from
+a day level.
+
 ## Drawing 2D
 
 `SpriteBatch2D` (`udea-render/src/commonMain/kotlin/dev/wildware/udea/render/draw/SpriteBatch2D.kt`)

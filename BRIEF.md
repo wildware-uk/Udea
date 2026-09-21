@@ -686,9 +686,12 @@ EXIT=0
 DONE
 ```
 
-No `-x`, and no task line in that log reads `FAILED` (`grep -cE '^> Task .* FAILED'` returns `0`;
-the anchored pattern matters, because an unanchored `FAILED` also matches `BUILD FAILED`). Exit
-status read off the marker the script echoed, not off the text.
+No `-x`, and no task line in that log reads `FAILED`: `grep -cE '^> Task .* FAILED'` returns `0`.
+The anchor matters, because an unanchored `FAILED` also matches `BUILD FAILED`. **And the zero is
+only worth anything because the same pattern was run against a log that should match**: the `M6`
+mutation run, where it returns `2` and prints `> Task :udea-render:jvmTest FAILED` and
+`> Task :udea-render:udeaGlTest FAILED`. A grep nobody has seen produce output is not a check.
+Exit status read off the marker the script echoed, not off the text.
 
 **The iOS compile is the one to notice.** `:udea-core:compileTestKotlinIosArm64` and
 `:udea-core:compileTestKotlinIosSimulatorArm64` **executed** in the clean build. They are what caught

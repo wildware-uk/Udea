@@ -5,6 +5,8 @@ import com.github.quillraven.fleks.World
 import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.render.capture.FrameCaptureSlot
 import dev.wildware.udea.render.shader.UdeaShader
+import dev.wildware.udea.render.sky.Sky
+import dev.wildware.udea.render.sky.SkyPainter
 import dev.wildware.udea.render.view.ViewCursor
 
 /**
@@ -65,6 +67,15 @@ public class RenderRegistry(
      * cannot end up measuring the same frame differently.
      */
     public val frameTime: FrameTime get() = timer
+
+    /**
+     * What the game is drawn over, wherever nothing is drawn (issue #267). Nothing until a game sets
+     * it, which is the black every frame had before a sky existed.
+     *
+     * Available before [build] and for the life of the pipeline it builds: a game sets the first
+     * sky here while it declares what it draws, and sets another whenever a level changes. See [Sky].
+     */
+    public val sky: Sky = Sky()
 
     /**
      * Registers a [RenderSystem] to run in [phase].
@@ -193,6 +204,7 @@ public class RenderRegistry(
 
         for (index in systems.indices) systems[index].onBind(world, ctx)
         val capture = targets.pixels?.let { FrameCaptureSlot(it, ctx.clock) }
+        val skyPainter = SkyPainter(sky)
         // targets.owned first: a system's own resources were built against the batch and the
         // framebuffer, so reverse-order disposal has to release them before those.
         return RenderPipeline(
@@ -201,9 +213,12 @@ public class RenderRegistry(
             overlays,
             timer,
             capture,
-            targets.owned + resources.owned() + overlayResources.owned(),
+            // The sky's texture last, so reverse-order release reaches it before the batches whose
+            // records last drew it.
+            targets.owned + resources.owned() + overlayResources.owned() + skyPainter,
             viewSystems,
             cursor,
+            skyPainter,
         )
     }
 

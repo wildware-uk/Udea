@@ -3,6 +3,7 @@ package dev.wildware.udea.render
 import dev.wildware.udea.core.loop.Presentation
 import dev.wildware.udea.render.camera.CameraRig
 import dev.wildware.udea.render.capture.FrameCaptureSlot
+import dev.wildware.udea.render.sky.SkyPainter
 import dev.wildware.udea.render.view.EditorCamera
 import dev.wildware.udea.render.view.PickBounds
 import dev.wildware.udea.render.view.ViewCursor
@@ -84,6 +85,11 @@ public class RenderPipeline internal constructor(
     private val viewSystems: List<RenderSystem> = emptyList(),
     /** Which view the systems are drawing for, shared with every system's [RenderResources]. */
     private val cursor: ViewCursor = ViewCursor(),
+    /**
+     * Draws the game's sky (issue #267) at the bottom of the capturable frame and of every Scene
+     * view, before any system. `null` draws none, for a pipeline built without a registry.
+     */
+    private val sky: SkyPainter? = null,
 ) : Presentation {
 
     /** The editor views open on this pipeline, drawn after the capture point in opening order. */
@@ -155,6 +161,10 @@ public class RenderPipeline internal constructor(
         // an agent a picture of a partial world it would then reason about. Waiters are woken by
         // `FrameCaptureSlot.close`, which `KoolBackend` wires to the render loop's exit.
         try {
+            // The sky first, so every system draws over it. It records nothing at all while the
+            // game has set none, which is how a frame with no sky stays the frame it always was.
+            sky?.paint(targets.batch, targets.offscreen)
+
             // Indexed loops: this is the per-frame path and an iterator per phase per frame is
             // garbage the collector has to deal with in the middle of drawing.
             for (index in systems.indices) {
@@ -276,6 +286,8 @@ public class RenderPipeline internal constructor(
         cursor.current = view
         for (index in rigs.indices) rigs[index].enterView(camera.projection)
         try {
+            // The Scene view is the world, and the world has a sky; the gizmos go over both.
+            sky?.paint(targets.batch, view.target)
             for (index in viewSystems.indices) viewSystems[index].render(view.target, alpha)
         } finally {
             for (index in rigs.indices) rigs[index].leaveView()

@@ -9,9 +9,10 @@ the branch: `git log --oneline origin/master..issue-274-net-components` shows th
 tip is what a reviewer should check out.
 
 Branch `issue-274-net-components`, branched from `origin/master` at `2e7aed4`. Every comparison
-below is against **that merge base**, not against `origin/master`'s current tip — the tip has
-moved since (`dev-shaderassets` merged), and diffing against it lists that branch's files as
-though they were mine.
+below is against **that merge base**, not against `origin/master`'s current tip. The tip has moved
+since (another branch has merged), and diffing against it lists that branch's files as though they
+were mine. At the time of writing this branch is **2 ahead of and 13 behind** `origin/master`,
+measured after a `git fetch`.
 
 ---
 
@@ -175,7 +176,7 @@ no claim about GL is made.
 
 ---
 
-## The locks: nothing of `dev-270`'s moved
+## The locks: nothing regenerated, and that is checked by name
 
 `templates/new-game` is **not** a project of this build: `settings.gradle.kts` includes `udea-*`,
 `moba:*` and `hollow:*` and nothing under `templates/`, and the template carries a
@@ -307,13 +308,21 @@ the machine-specific scan.
 **What I did not do, and what it costs.** Widening `GeneratedSources.files` would have covered the
 same resources in one line *and* hashed them, which is stronger. But `relativePaths()` is what `the
 hash file covers every generated file` compares against, so widening adds three rows to
-`expected-generated-hashes.txt` — a regeneration of the checked-in fixture `dev-270` owns this
+`expected-generated-hashes.txt` — a regeneration of a checked-in fixture another branch owns this
 wave, which is the one merge nobody can resolve as text. Nothing is narrower about *which*
 resources are protected; what is given up is a **checked-in** hash. Two runs agreeing says a
 resource is consistent; a checked-in hash says it is the resource somebody reviewed, and a resource
 that changes for a reason nobody intended is consistently wrong on both runs and passes everything
-here. Once #270's regeneration has merged, the widening is one line plus three rows; the lead is
-recording it in `WAVE.md` as unassigned so it outlives this branch.
+here.
+
+**The follow-up, stated here so it outlives this branch.** Once the lock regeneration this wave
+owns has merged, change `GeneratedSources.files` to take every generated file rather than only
+`*.kt`, and regenerate `expected-generated-hashes.txt`, which gains three rows for
+`udea-codegen`'s own generated resources. It is one line plus a regeneration, and what it buys is
+the half this branch could not: a **reviewed, checked-in** hash for each generated resource,
+which a two-run comparison cannot give. I am not filing it as an issue — the owner's rule — so it
+is in this brief, in my report to the lead, and nowhere else; if it is not picked up there it
+will be lost, and that is worth saying plainly rather than implying somebody has it.
 
 **No narrowing was needed, and that is measured.** The widened scan reads
 `udea/CodegenFixtures-agent-tools.json`, which declares the JSON Schema dialect URL, and the
@@ -603,6 +612,37 @@ but `UdeaNetComponents`.
 — see "Regenerated files".
 
 ---
+
+## Merging this branch: what "clean" would mean, and why it is not the word here
+
+At `a2b73ff` this repository renamed `BRIEF.md` to `BRIEF-266.md` and left no `BRIEF.md` behind.
+Git's rename detection then matched another branch's brief onto the *archived* file and applied it
+there, and the rebase that did it reported **no conflict at all**. **Clean is precisely the word
+that was true and wrong last time**, which is why this section states a conflict rather than an
+absence of one.
+
+`origin/master` now carries a `BRIEF.md` placeholder again (`f2a3354`), so there is a file on both
+sides and rename detection has nothing to guess at. Measured with a trial merge that touches no
+working tree, `git merge-tree --write-tree --name-only origin/master HEAD`, exit **1**:
+
+```
+0936ac265c94972727b993efcfc837d25323553e
+BRIEF.md
+
+Auto-merging AGENTS.md
+Auto-merging BRIEF.md
+CONFLICT (content): Merge conflict in BRIEF.md
+Auto-merging docs/new-game.md
+```
+
+The whole output, nothing elided. **One conflicted path, and it is this file** — which is the
+intended behaviour: two briefs meeting in one place is a text conflict a person resolves by
+archiving one, not a silent overwrite. `AGENTS.md` and `docs/new-game.md`, the two documents this
+branch shares with what has landed since, merge without conflict.
+
+At the merge base `2e7aed4` this branch is **2 ahead, 13 behind**. It has never been rebased, so
+the rename trap has had no opportunity to fire on it in the first place; the measurement above is
+about what happens when it lands, not about what has already happened to it.
 
 ## What I did not exercise
 

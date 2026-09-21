@@ -3,6 +3,7 @@ package dev.wildware.udea.render.gl
 import com.github.quillraven.fleks.Entity
 import dev.wildware.udea.assets.AssetId
 import dev.wildware.udea.assets.Model
+import dev.wildware.udea.assets.ModelNode
 import dev.wildware.udea.assets.ResPath
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.Ticks
@@ -14,7 +15,6 @@ import dev.wildware.udea.core.module.UdeaGameDef
 import dev.wildware.udea.core.spatial.AnimationClip
 import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.core.spatial.AttachedTo
-import dev.wildware.udea.core.spatial.ModelNode
 import dev.wildware.udea.core.spatial.Transform3D
 import dev.wildware.udea.generated.CoreUdeaRegistry
 import dev.wildware.udea.render.RenderPhase

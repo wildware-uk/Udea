@@ -1,34 +1,42 @@
-package dev.wildware.udea.core.spatial
+package dev.wildware.udea.assets
 
 /**
  * One named node of a model file - a socket, a mount point, a muzzle, a bone - as gameplay code
  * names it: `Chassis.Nodes.socket_roof` (issue #260).
  *
- * A game does not write these. The asset build reads each `model(...)`'s glTF file and generates
- * one per named node in it, so a node the file does not have is a name that does not compile
- * ([dev.wildware.udea.diagnostics.UdeaRules.UNRESOLVED_MODEL_NODE] adds the did-you-mean), and
- * nothing ever looks a node up by its name at run time. It is the same bargain `AnimationClip`
- * strikes, and for the same reason.
+ * A game does not write these. The asset build reads each `model(...)`'s glTF file once and
+ * produces the same nodes twice, from that one reading:
+ *
+ * - **by name, in code**: one generated property per named node, so a node the file does not have
+ *   is a name that does not compile (`UDEA0018` adds the did-you-mean). It is the same bargain
+ *   `AnimationClip` strikes, and for the same reason.
+ * - **as a list, on the asset**: [Model.nodes], packed into the bundle, so a game holding a
+ *   `Ref<Model>` can ask what sockets it has without a table of its own (issue #271). The two
+ *   are equal, node for node.
+ *
+ * It lives here, in the asset model, rather than in `udea-core` beside the mount it feeds,
+ * because it is data about a model file and [Model] carries it; `udea-core` depends on this
+ * module, so the kernel's `AttachedTo` still takes one.
  *
  * ## The frame it is in, and why the numbers are here rather than looked up
  *
  * The transform is the node's place **at rest**, relative to the model's own origin, in the
- * world's Z-up frame ([Transform3D]'s frame): the asset build turns the file's Y-up transform
+ * world's Z-up frame (`Transform3D`'s frame): the asset build turns the file's Y-up transform
  * onto Z-up, so a Blender Empty whose +Z points out of the hull has a `+Z` here that points out
  * of the hull as well.
  *
- * The numbers are baked into the generated source and copied into [AttachedTo] when a part is
- * mounted, rather than read from a registry when the simulation needs them. The simulation is
- * headless and knows nothing about which model an entity draws - `ModelRenderer` is the
- * renderer's, never replicated - so a lookup would mean a second, parallel model catalogue on the
- * simulation's side of the line. Ten floats on the component instead, and the part's place is a
- * pure function of what the snapshot already holds.
+ * The numbers are baked into the generated source and copied into `AttachedTo` when a part is
+ * mounted, rather than read from a registry when the simulation needs them. The simulation
+ * places a part from its own components alone, so the part's place is a pure function of what
+ * the snapshot already holds.
  *
  * @property index the node's position in the file's `nodes` array. This is the node's identity: it
- *   is what [AttachedTo] stores and what the renderer resolves the live, animated node with.
+ *   is what `AttachedTo` stores and what the renderer resolves the live, animated node with.
  * @property name the file's name for the node, for people and tools. Never on the wire.
  * @property qx quaternion, `(x, y, z, w)`. A quaternion rather than three angles because that is
  *   what glTF stores, so the build converts frames and never takes a sine.
+ * @property extras what the artist attached to this node - in Blender, the object's Custom
+ *   Properties: a socket's accepted size, a module's mass (issue #271).
  */
 public data class ModelNode(
     public val index: Int,
@@ -43,6 +51,7 @@ public data class ModelNode(
     public val scaleX: Float = 1f,
     public val scaleY: Float = 1f,
     public val scaleZ: Float = 1f,
+    public val extras: ModelExtras = ModelExtras.EMPTY,
 ) {
     init {
         require(index >= NONE) { "node '$name' has index $index; a node index is a position in a list" }

@@ -7,6 +7,7 @@ import dev.wildware.udea.assets.compiler.AssetGraph
 import dev.wildware.udea.assets.compiler.AssetScope
 import dev.wildware.udea.assets.compiler.AssetSource
 import dev.wildware.udea.assets.compiler.DeclaredAsset
+import dev.wildware.udea.assets.compiler.gen.ModelContents
 import dev.wildware.udea.assets.compiler.shader.ShaderSources
 import dev.wildware.udea.diagnostics.Severity
 import dev.wildware.udea.diagnostics.SourceSpan
@@ -135,9 +136,9 @@ public class TranspiledAssetLoader(
                 }
                 assets += scope.assets
             }
-            // The same fill the script front end does, so the two graphs agree about a shader's
-            // text as well as about its path. See `AssetCompiler.compile`.
-            val declared = ShaderSources.fill(assetRoot, assets)
+            // The same fills the script front end does, so the two graphs agree about a shader's
+            // text and a model's nodes as well as about their paths. See `AssetCompiler.compile`.
+            val declared = ModelContents.fill(assetRoot, ShaderSources.fill(assetRoot, assets))
             return AssetCompileResult(AssetGraph.of(declared), diagnostics)
         }
     }

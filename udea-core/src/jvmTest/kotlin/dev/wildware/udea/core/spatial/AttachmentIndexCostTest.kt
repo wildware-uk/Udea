@@ -1,6 +1,7 @@
 package dev.wildware.udea.core.spatial
 
 import com.github.quillraven.fleks.Entity
+import dev.wildware.udea.assets.ModelNode
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.identity.NetId

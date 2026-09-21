@@ -27,6 +27,7 @@ import dev.wildware.udea.assets.compiler.AssetKindHierarchy
 import dev.wildware.udea.assets.compiler.DeclaredAsset
 import dev.wildware.udea.assets.compiler.Ref
 import dev.wildware.udea.assets.compiler.ResFile
+import dev.wildware.udea.assets.compiler.gen.ModelContents
 import dev.wildware.udea.assets.compiler.model.ModelSources
 import dev.wildware.udea.diagnostics.SourceSpan
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
@@ -201,10 +202,57 @@ public object GraphPacker {
         /**
          * A model's file, as the game is given it: an `.fbx` is published as the `.glb` the pack
          * converts it to (issue #244), because the runtime `Model` and the renderer read glTF alone.
+         *
+         * And its nodes and extras (issue #271), which are not in the declaration an author wrote:
+         * `ModelContents` puts them there in pass 2, as it does the shader's `source` above. Each is
+         * written only when there is something in it, so a model with none packs exactly the
+         * record it packed before either existed.
          */
         fun model(): Map<String, PackValue> = buildMap {
             val file = pathOf(asset.fields["file"]) ?: return@buildMap
             put("file", PackValue.Path(ModelSources.runtimeFile(ResFile.of(file)).value))
+            val nodes = (asset.fields[ModelContents.NODES_FIELD] as? List<*>).orEmpty().mapNotNull { it as? Map<*, *> }
+            if (nodes.isNotEmpty()) put(ModelContents.NODES_FIELD, PackValue.Items(nodes.map(::modelNode)))
+            extrasOf(asset.fields[ModelContents.EXTRAS_FIELD])?.let { put(ModelContents.EXTRAS_FIELD, it) }
+        }
+
+        /** One node as `ModelContents` filled it in: its index, name and rest transform, and its extras. */
+        private fun modelNode(node: Map<*, *>): PackValue = PackValue.Fields.of(
+            buildMap {
+                for ((name, value) in node) {
+                    val field = name as? String ?: continue
+                    when (value) {
+                        is Int -> put(field, PackValue.I32(value))
+                        is Float -> put(field, PackValue.F32(value))
+                        is String -> put(field, PackValue.Text(value))
+                        else -> if (field == ModelContents.EXTRAS_FIELD) extrasOf(value)?.let { put(field, it) }
+                    }
+                }
+            },
+        )
+
+        /**
+         * Plain extras values - what `GltfExtras` reads - as a record, or `null` when there are none.
+         * Every case here is one `ModelExtras` can hold, so the reader never meets a value it has to
+         * refuse.
+         */
+        private fun extrasOf(value: Any?): PackValue? {
+            val extras = (value as? Map<*, *>).orEmpty()
+            if (extras.isEmpty()) return null
+            return PackValue.Fields.of(
+                extras.entries.mapNotNull { (key, item) ->
+                    val name = key as? String ?: return@mapNotNull null
+                    val packed = when (item) {
+                        is Boolean -> PackValue.Bool(item)
+                        is Int -> PackValue.I32(item)
+                        is Float -> PackValue.F32(item)
+                        is String -> PackValue.Text(item)
+                        is List<*> -> PackValue.Items(item.filterIsInstance<Float>().map { PackValue.F32(it) })
+                        else -> return@mapNotNull null
+                    }
+                    name to packed
+                }.toMap(),
+            )
         }
 
         /**

@@ -106,9 +106,13 @@ internal class UdeaGeneratedMemberChecker(
         private val ANIMATION_CLIP: ClassId =
             ClassId.topLevel(FqName("dev.wildware.udea.core.spatial.AnimationClip"))
 
-        /** `udea-core`'s `ModelNode`, which is what a generated node property is typed as. */
+        /**
+         * `udea-assets`' `ModelNode`, which is what a generated node property is typed as. It
+         * moved there from `udea-core` in issue #271, so a packed `Model` can hold its nodes; a
+         * stale name here would recognise no node object and let every misspelling through.
+         */
         private val MODEL_NODE: ClassId =
-            ClassId.topLevel(FqName("dev.wildware.udea.core.spatial.ModelNode"))
+            ClassId.topLevel(FqName("dev.wildware.udea.assets.ModelNode"))
 
         /** `Fox.Clips.Rnu` (issue #241). */
         val Clips: UdeaGeneratedMemberChecker = UdeaGeneratedMemberChecker(

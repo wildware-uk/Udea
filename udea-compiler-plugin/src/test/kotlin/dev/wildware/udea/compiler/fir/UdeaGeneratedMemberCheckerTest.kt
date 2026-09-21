@@ -28,21 +28,29 @@ import kotlin.test.assertTrue
  *
  * ### Why two modules
  *
- * The clips and nodes arrive the way they do in a game: `AnimationClip` and `ModelNode` from
- * `udea-core` and the generated objects from the asset build, all already compiled and on the
+ * The clips and nodes arrive the way they do in a game: `AnimationClip` from `udea-core`,
+ * `ModelNode` from `udea-assets` (issue #271) and the generated objects from the asset build, all already compiled and on the
  * classpath. So the upstream fixture is compiled once with the plugin off, and each case
  * compiles against its class output - the shape a Gradle project dependency has - exactly as
  * [UdeaAssetReferenceCheckerTest] does for asset ids.
  */
 class UdeaGeneratedMemberCheckerTest {
 
-    /** Stands in for `udea-core`'s types: the checker keys on these class names. */
+    /** Stands in for `udea-core`'s and `udea-assets`' types: the checker keys on these class names. */
     private val clipApi: TestSource = source(
         "AnimationClip.kt",
         """
         package dev.wildware.udea.core.spatial
 
         class AnimationClip(val index: Int, val name: String)
+        """,
+    )
+
+    /** `ModelNode` is in the asset model since issue #271, beside the `Model` that lists them. */
+    private val nodeApi: TestSource = source(
+        "ModelNode.kt",
+        """
+        package dev.wildware.udea.assets
 
         class ModelNode(val index: Int, val name: String)
         """,
@@ -58,7 +66,7 @@ class UdeaGeneratedMemberCheckerTest {
         package dev.wildware.udea.generated
 
         import dev.wildware.udea.core.spatial.AnimationClip
-        import dev.wildware.udea.core.spatial.ModelNode
+        import dev.wildware.udea.assets.ModelNode
 
         object Fox {
             object Clips {
@@ -83,7 +91,7 @@ class UdeaGeneratedMemberCheckerTest {
     )
 
     private val upstreamClasses: File by lazy {
-        val run = UdeaCompileTesting.compile(listOf(clipApi, generated), applyPlugin = false)
+        val run = UdeaCompileTesting.compile(listOf(clipApi, nodeApi, generated), applyPlugin = false)
         assertEquals(emptyList(), run.otherMessages, "the upstream fixture must compile:\n" + run.describe())
         File(run.workDir, "out")
     }

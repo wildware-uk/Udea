@@ -239,6 +239,113 @@ class GltfNodesTest {
     // ---- fixture -----------------------------------------------------------------------------
 
     /** A glTF file holding [nodes] and nothing else, written where the reader can open it. */
+    // ---- the extras an artist wrote (issue #271) -----------------------------------------------
+
+    @Test
+    fun `a node's extras are read as plain values, a whole number as an Int and a fraction as a Float`() {
+        val file = gltf(
+            """[{"name": "module", "extras": {
+                "module_size": "small", "mass": 12.5, "power": 3, "armoured": true,
+                "offset": [0.0, 0, 0.5], "whole_float": 2.0, "exponent": 1e2
+            }}]""",
+        )
+
+        val extras = GltfNodes.read(file).getOrThrow().single().extras
+
+        assertEquals(
+            mapOf(
+                "module_size" to "small",
+                "mass" to 12.5f,
+                "power" to 3,
+                "armoured" to true,
+                // A vector reads as floats whether each number was written `0` or `0.0`.
+                "offset" to listOf(0f, 0f, 0.5f),
+                // Written with a point or an exponent, it is a float, however whole its value.
+                "whole_float" to 2f,
+                "exponent" to 100f,
+            ),
+            extras,
+        )
+        assertEquals(Int::class, extras.getValue("power")::class, "`3` is an Int")
+        assertEquals(Float::class, extras.getValue("whole_float")::class, "`2.0` is a Float")
+    }
+
+    @Test
+    fun `a group of extras is read as dotted keys, nested as deep as it goes`() {
+        val file = gltf("""[{"name": "module", "extras": {"fitting": {"slots": 2, "rail": {"length": 1.5}}}}]""")
+
+        assertEquals(
+            mapOf("fitting.slots" to 2, "fitting.rail.length" to 1.5f),
+            GltfNodes.read(file).getOrThrow().single().extras,
+        )
+    }
+
+    @Test
+    fun `extras a game cannot read as a plain value are left out, and the rest kept`() {
+        // A list of names, a list of lists, a null and a number too large for a float: none of
+        // them is a number, a string, a flag or a vector of numbers.
+        val file = gltf(
+            """[{"name": "module", "extras": {
+                "tags": ["a", "b"], "grid": [[1, 2]], "nothing": null, "huge": 1e300, "kept": 1
+            }}]""",
+        )
+
+        assertEquals(mapOf("kept" to 1), GltfNodes.read(file).getOrThrow().single().extras)
+    }
+
+    @Test
+    fun `an integer too large for an Int is a Float`() {
+        val file = gltf("""[{"name": "module", "extras": {"seed": 4294967296}}]""")
+
+        assertEquals(mapOf("seed" to 4294967296f), GltfNodes.read(file).getOrThrow().single().extras)
+    }
+
+    @Test
+    fun `extras that are not an object are no extras`() {
+        // The glTF spec asks for an object and allows anything; a bare value has no key to read it by.
+        val file = gltf("""[{"name": "module", "extras": 5}, {"name": "plain"}]""")
+
+        assertEquals(listOf(emptyMap<String, Any>(), emptyMap()), GltfNodes.read(file).getOrThrow().map { it.extras })
+    }
+
+    @Test
+    fun `the model's own extras are its default scene's`() {
+        val file = TestPaths.scratch("gltf-nodes-scene").resolve("scene.gltf")
+        file.writeText(
+            """{"asset": {"version": "2.0"}, "scene": 1,
+               "scenes": [{"extras": {"tier": 1}}, {"extras": {"tier": 2}}],
+               "nodes": [{"name": "module"}]}""",
+        )
+
+        assertEquals(mapOf("tier" to 2), GltfNodes.readModel(file).getOrThrow().extras)
+    }
+
+    @Test
+    fun `a file naming no default scene takes its first`() {
+        val file = TestPaths.scratch("gltf-nodes-first-scene").resolve("scene.gltf")
+        file.writeText("""{"asset": {"version": "2.0"}, "scenes": [{"extras": {"tier": 1}}, {"extras": {"tier": 2}}]}""")
+
+        assertEquals(mapOf("tier" to 1), GltfNodes.readModel(file).getOrThrow().extras)
+    }
+
+    @Test
+    fun `Blender's custom properties land where they are read`() {
+        // `build_module.py` made this with Blender's own exporter, "Custom Properties" ticked.
+        val module = TestPaths.repoRoot.resolve("udea-assets-compiler/src/test/resources/models/module/module.glb")
+
+        val model = GltfNodes.readModel(module).getOrThrow()
+
+        assertEquals(mapOf("tier" to 2), model.extras)
+        assertEquals(mapOf("accepts" to "small"), model.nodes.single { it.name == "socket_top" }.extras)
+        assertEquals(
+            mapOf(
+                "module_size" to "small", "mass" to 12.5f, "power" to 3, "armoured" to true,
+                "offset" to listOf(0f, 0f, 0.5f), "fitting.slots" to 2,
+            ),
+            model.nodes.single { it.name == "module" }.extras,
+        )
+    }
+
     private fun gltf(nodes: String?, name: String = "nodes"): Path {
         val body = if (nodes == null) "" else ""","nodes": $nodes"""
         val file = TestPaths.scratch("gltf-nodes-$name").resolve("$name.gltf")

@@ -27,6 +27,8 @@ import dev.wildware.udea.assets.GameplayTagName
 import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.Model
+import dev.wildware.udea.assets.ModelExtras
+import dev.wildware.udea.assets.ModelNode
 import dev.wildware.udea.assets.LightingConfig
 import dev.wildware.udea.assets.ModifierKind
 import dev.wildware.udea.assets.MovementType
@@ -133,7 +135,17 @@ public class AssetCodecs private constructor(
                         volume = fields.float("volume", 1.0F),
                     )
                 }
-                put(Model::class) { fields -> Model(id = fields.id, file = fields.path("file")) }
+                // The nodes and extras the build read out of the file (issue #271). Absent in a
+                // bundle an earlier build wrote, which is a model with none - the same as a
+                // file that has none.
+                put(Model::class) { fields ->
+                    Model(
+                        id = fields.id,
+                        file = fields.path("file"),
+                        nodes = fields.list("nodes").map { it.modelNode() },
+                        extras = fields.modelExtras("extras"),
+                    )
+                }
                 // The text itself, not a path to it: see `Shader`. Defaulted to empty rather than
                 // required, because the one build that packs a shader with no source is a build
                 // that already reported `UDEA0041` against the file it could not read, and a
@@ -398,6 +410,38 @@ public class AssetCodecs private constructor(
         ) {
             val name = requireNotNull(type.qualifiedName) { "$type has no qualified name" }
             check(put(name, codec) == null) { "two codecs registered for '$name'" }
+        }
+
+        /** One packed node, as `GraphPacker.model` wrote it. */
+        private fun AssetFields.modelNode(): ModelNode = ModelNode(
+            index = int("index"),
+            name = text("name"),
+            x = float("x"),
+            y = float("y"),
+            z = float("z"),
+            qx = float("qx"),
+            qy = float("qy"),
+            qz = float("qz"),
+            qw = float("qw"),
+            scaleX = float("scaleX"),
+            scaleY = float("scaleY"),
+            scaleZ = float("scaleZ"),
+            extras = modelExtras("extras"),
+        )
+
+        /**
+         * The record [name] as a model's extras. A value [ModelExtras] cannot hold is a bundle
+         * this build did not write, and is refused naming the asset rather than as a bare
+         * `IllegalArgumentException` from the constructor.
+         */
+        private fun AssetFields.modelExtras(name: String): ModelExtras {
+            val values = record(name).toAssetValues()
+            if (values.isEmpty()) return ModelExtras.EMPTY
+            return try {
+                ModelExtras(values)
+            } catch (refused: IllegalArgumentException) {
+                throw AssetDecodeException(id.value, "field '$name': ${refused.message}")
+            }
         }
 
         private fun AssetFields.componentSpec(): ComponentSpec = ComponentSpec(

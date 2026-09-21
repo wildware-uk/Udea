@@ -4,6 +4,7 @@ import com.github.quillraven.fleks.Component
 import com.github.quillraven.fleks.ComponentType
 import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
+import dev.wildware.udea.assets.ModelNode
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.snapshot.ComponentSchema
 import dev.wildware.udea.core.snapshot.FieldKind

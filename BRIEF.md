@@ -1,23 +1,621 @@
-# BRIEF.md
+# BRIEF.md - issue #271: a model lists its nodes, and carries its glTF extras
 
-A developer's brief for the ticket currently on a branch. It is the reviewer's second input after
-the diff: what was built, the one evidence command, the mutation table with its diffs, and the
-predictions that were frozen before anything ran.
+**SHA:** `041a0ec` - the code commit, and the tree every build, test, mutation and GL number below was measured on (`git rev-parse --short HEAD` in this worktree, and the `head=` field of every `dev271/*.marker`). This brief lands on top of it in a commit of its own that changes `BRIEF.md` and nothing else; the reviewer is handed that commit, and `git diff --stat 041a0ec HEAD` shows the one file.
 
-**This file is a placeholder on `master` on purpose.** When a ticket merges, its brief is archived
-as `BRIEF-<issue>.md` beside the others and this placeholder returns.
+Branch `issue-271-model-nodes-extras`, cut from `origin/master` at `00a2093`. `origin/master` has
+since moved to `61c8768` with six commits that touch only `.claude/WAVE.md` and
+`.claude/agents/engineer.md`, none of this branch's files; `git merge-tree --write-tree HEAD
+origin/master` exits 0.
 
-## Why it is not simply deleted between tickets
+## 1. The evidence command
 
-It was, once, for about an hour on 2026-09-20, and it cost a developer a silent wrong result.
+```
+sh gradlew :udea-assets-compiler:test --tests '*ModelNodesAssetTest' :moba:game:jvmTest --tests 'dev.wildware.moba.model.ModelNodesFromRefTest' --no-build-cache
+```
 
-`master` deleting `BRIEF.md` while a branch writes its own is exactly the shape git's **rename
-detection** looks for. Rebasing across the deletion, git concluded the branch's brief *was* the
-archived one moving, applied the developer's text onto `BRIEF-266.md`, and left no `BRIEF.md` at
-all. **A clean rebase, no conflict, and the wrong result** - the developer caught it only by
-listing the files afterwards. The same trap fires on a merge, so it would have reached `master`.
+`ModelNodesFromRefTest` is the game asking: it takes moba's real bundle - the one `udeaPackBundle`
+wrote from `moba/game/assets/` - and asserts `MobaAssets.registry[GameAssets.models.fox].nodes ==
+Fox.Nodes.all`, the same for the FBX human, and that a node found by walking the list equals the
+node named in code. `ModelNodesAssetTest` is the same path over fixtures, extras included.
 
-Keeping a file here means a branch's brief collides with this placeholder instead: an ordinary
-modify/modify conflict, visible, resolved by taking the branch's version. A conflict you can see
-beats a merge that quietly does something else, which is the same rule this repository keeps
-relearning about checks that report success while measuring nothing.
+**Green on the handed-over code** (run `dev271/evid pid=683703 head=041a0ec1 start=2026-09-21T04:42:25Z end=2026-09-21T04:42:36Z`):
+
+```
+now 2026-09-21T04:42:36.914784+00:00
+dev.wildware.udea.assets.compiler.validate.ModelNodesAssetTest timestamp=2026-09-21T04:42:30.512Z tests=7 failures=0 errors=0 skipped=0
+  green a model's nodes come out of the bundle from a Ref to it()
+  green the daemon's values carry the same nodes the bundle does()
+  green a file with no custom properties packs none()
+  green the packed nodes are the nodes the generated accessors are written from()
+  green a node's Blender custom properties are readable from the game()
+  green the scene's custom properties are the model's own()
+  green an fbx model packs the nodes of the glb it converts to()
+dev.wildware.moba.model.ModelNodesFromRefTest timestamp=2026-09-21T04:42:30.335Z tests=3 failures=0 errors=0 skipped=0
+  green the fbx human's nodes from its reference are its generated accessors()[jvm]
+  green a node found by walking the list is the node named in code()[jvm]
+  green the fox's nodes from its reference are its generated accessors in file order()[jvm]
+```
+
+**Red with the feature reverted** - mutation M1 below removes the one line that puts nodes and
+extras into the asset graph, and 8 of these 10 tests go red; the other 2 are correctly silent
+(an empty model and an empty daemon value still agree). The diff and every outcome are in the
+table.
+
+## 2. Summary
+
+A game holding a `Ref<Model>` can now ask it what it has:
+
+```kotlin
+val module: Model = registry[GameAssets.models.module]
+module.nodes                                                       // == Module.Nodes.all
+module.nodes.single { it.name == "module" }.extras.float("mass")   // an object's Custom Property
+module.extras.int("tier")                                          // the scene's Custom Property
+```
+
+(`GameAssets.models.module` stands for a game's own model; each call on the right is exercised
+against the Blender-made `module.glb` in `ModelNodesAssetTest`.)
+
+How it works, in one line each:
+
+- **`ModelNode` moved from `udea-core` to `udea-assets`** and gained `extras`. `Model` got
+  `nodes: List<ModelNode>` and `extras: ModelExtras`, both defaulted, so `Model(id, file)` still
+  compiles.
+- **Pass 2 fills them in.** `ModelContents.fill` sits beside `ShaderSources.fill` in both front
+  ends (`AssetCompiler.compile`, `TranspiledAssetLoader.load`) and reads each model with
+  `ModelFileSource.readFile` - the **same function** the accessor pass reads nodes with. So the
+  packed list and the generated `Chassis.Nodes.*` come from one reading and are equal by `equals`.
+- **`GraphPacker.model` packs them and `AssetCodecs` reads them back.** A model with no nodes and no
+  extras packs the exact record it packed before.
+- **glTF `extras` become `ModelExtras`** (`GltfExtras` reads them): typed reads `float`, `int`,
+  `text`, `bool`, `floats`; `null` for an absent key; `ModelExtraTypeException` for the wrong type.
+  A Blender property group becomes dotted keys (`fitting.slots`).
+- **Generated accessors carry extras too**, so `Module.Nodes.module.extras.float("mass")` compiles;
+  a node with none is generated byte for byte as before (the Fox golden moved by its import line only).
+- **`UDEA0018` is untouched in behaviour.** The K2 checker keys on `ModelNode`'s class name, so its
+  constant moved with the class; mutation M2 shows a stale name there silently stops the check.
+
+### Decisions (each also commented on #271)
+
+1. **`ModelNode` moves to `udea-assets`.** `Model` lives there and cannot see `udea-core` (the arrow
+   is core -> assets). Rejected: a second node type in assets (two types for one thing - the drift
+   the lead ruled out); keeping package `core.spatial` inside the assets module (a split package that
+   lies); a typealias (the checker sees the expanded class, so it buys nothing). To overturn: move the
+   file back and give `Model` a parallel type. https://github.com/wildware-uk/Udea/issues/271#issuecomment-5755260909
+2. **Extras are a flat, typed, read-only `ModelExtras`.** Absent is `null`, wrong type throws, whole
+   numbers read either way, groups become dotted keys, unrepresentable values (arrays of text,
+   nulls, numbers too big for a float) are left out by the build and the rest kept. Model-level
+   extras are the **default scene's** `extras`, because that is where Blender writes scene Custom
+   Properties; each object's are on its node. Rejected: a JSON or sealed value tree (ruled out, and
+   a game should not need a JSON library); `null` on a type mismatch (hides a mistake); failing the
+   build on an unrepresentable value (fails a build over a property the game may never read).
+   https://github.com/wildware-uk/Udea/issues/271#issuecomment-5755261924
+3. **Node extras go into the generated accessor too**, so the runtime node and the generated one
+   stay equal on exactly the models that use extras. Rejected: leaving extras out of equality, or a
+   second lookup keyed by node index. https://github.com/wildware-uk/Udea/issues/271#issuecomment-5755262598
+4. **An `.fbx` is converted once more, in pass 2**, because the fill must see the `.glb`'s nodes.
+   Cost measured below: moba's warm-edit budget is max 234ms against a 1500ms threshold.
+5. **Failures in the fill report nothing**, like `ShaderSources`: a model file that cannot be read
+   gets no nodes, and pass 3 (`UDEA0032`/`0038`/`0039`) or the accessor pass (`UDEA0027`) reports
+   it with a line number and fails the build. Written in `ModelContents`' KDoc.
+
+### What this does not do
+
+- No model-level accessor is generated (`Module.extras`); model extras are read from the asset.
+- Clips and driving nodes from the simulation are #261's, and were not touched.
+- The dev daemon does not run the accessor pass, so a model whose node hierarchy is broken (a node
+  with two parents) packs with no nodes there and no diagnostic until a Gradle build runs. That gap
+  predates this ticket (the daemon never generated accessors); it is named, not fixed.
+- No picture: nothing here changes what anything looks like. The evidence is tests and transcripts.
+
+## 3. Mutation table - predicted (frozen before the run) vs measured
+
+The predictions were committed in `c0d6b08` before any mutation ran. The table as committed there,
+spliced from `git show c0d6b08:BRIEF.md` (its lines 5-17):
+
+> ## Frozen predictions (written before any mutation ran)
+>
+> Each mutation is applied alone to the finished branch, the named tests run, then reverted.
+> "Red" is a test that fails; "green" is one that passes. Predictions are fixed here before the run.
+>
+> | # | Mutation (diff recorded after the run) | Predicted red | Predicted green, and why that is correct |
+> |---|---|---|---|
+> | M1 | Remove `ModelContents.fill` from `AssetCompiler.compile` (the feature: nothing enters the graph) | `ModelNodesAssetTest`: nodes-from-ref, packed-equals-accessors, node custom properties, scene custom properties, fbx nodes (5). `ModelNodesFromRefTest` (moba, real bundle): all 3 | `ModelNodesAssetTest` "a file with no custom properties packs none" (empty either way) and "the daemon's values carry the same nodes" (both sides empty, still equal): 2 |
+> | M2 | `UdeaGeneratedMemberChecker.MODEL_NODE` back to `dev.wildware.udea.core.spatial.ModelNode` | `UdeaGeneratedMemberCheckerTest`: misspelled socket, name like no node, missing clip vs node rule (3) | the 8 clip tests; "correctly spelled sockets compile clean" and "Suppress by the node rule id" (no diagnostic is the expected answer either way): 10 |
+> | M3 | `AssetCodecs` Model codec reads `nodes = emptyList()` | same 5 of `ModelNodesAssetTest` as M1, and all 3 of `ModelNodesFromRefTest` | the same 2 as M1 |
+> | M4 | `GltfExtras.flatten` drops a nested object instead of recursing | `GltfNodesTest`: "a group of extras is read as dotted keys", "Blender's custom properties land where they are read" (2); `ModelNodesAssetTest` "a node's Blender custom properties" (1) | `AccessorCompilationTest` extras test (it checks the accessors compile, and `int("fitting.slots")` is still an `Int?`) |
+> | M5 | `AccessorGenerator.extrasArgument` always returns an empty block | `ModelClipAccessorsTest` "a node's extras are written into its accessor" (1) | `ModelClipAccessorsTest` "a node with no extras is written exactly as before", the Fox golden, and `AccessorCompilationTest` (compiles either way) |
+> | M6 | `ModelExtras.float` returns `null` for a value of another type instead of throwing | `ModelExtrasTest` "a value of another type fails naming the key and both types" (1) | the other 7 `ModelExtrasTest` tests |
+
+Measured:
+
+Every row was run twice. **Round 1 (04:12-04:14Z) used scripts in the shared scratchpad top level,
+which another developer's scripts overwrote later (`mutate.py` at 04:25:56Z) and which was the
+scene of a crossed GL run at 04:28Z. So round 1 is reported as measured, then put in doubt, then
+re-measured:** round 2 (04:36-04:38Z) ran from `scratchpad/dev271/`, and for every row the diff and
+every per-test outcome are identical to round 1 (`dev271/summary.txt`: "diff same as round 1: True"
+and "outcomes same as round 1: True" for each of M1-M6). Every in-XML `timestamp=` below is inside its own run.
+
+| # | Predicted red | Measured red | Verdict |
+|---|---|---|---|
+| M1 | 5 of `ModelNodesAssetTest` + 3 of `ModelNodesFromRefTest` | 5 + 3, the same tests | as predicted |
+| M2 | 3 node tests of `UdeaGeneratedMemberCheckerTest` | the same 3 | as predicted |
+| M3 | 5 + 3, as M1 | **4** + 3 | **miss**: "the scene's custom properties are the model's own" stayed green. M3 drops only the codec's *node* list; the model's own extras are a separate field the mutation does not touch, so green is right and my prediction was copied from M1 without thinking. |
+| M4 | 2 `GltfNodesTest` + 1 `ModelNodesAssetTest` | the same 3 | as predicted |
+| M5 | 1 `ModelClipAccessorsTest` | the same 1 | as predicted |
+| M6 | 1 `ModelExtrasTest` | the same 1 | as predicted |
+
+**Correctly silent, with the reason** (so a later round does not read silence as a hole):
+M1/M3 "a file with no custom properties packs none" and "the daemon's values carry the same nodes"
+(both sides empty, still equal - the positive cases carry the load); M2 "correctly spelled sockets
+compile clean" and "Suppress by the node rule id" (no diagnostic is the right answer with or without
+the checker); M4/M5 `AccessorCompilationTest` (it proves the extras accessors *compile*; the values
+are pinned by `ModelClipAccessorsTest`'s text test, which M5 turns red).
+
+Magnitude, not just colour. M1 was run a third time (04:52Z) to keep its failure messages on disk,
+so the M1 block below is that run; its diff and outcomes match rounds 1 and 2. The first line of
+each message, from `dev271/M1.messages` (`messages.py` over the run's XML, cut at 220 characters):
+
+```
+ModelNodesAssetTest > a model's nodes come out of the bundle from a Ref to it()
+    org.opentest4j.AssertionFailedError: the Fox names 26 nodes: [] ==> expected: <26> but was: <0>
+ModelNodesAssetTest > the packed nodes are the nodes the generated accessors are written from()
+    org.opentest4j.AssertionFailedError: models/fox's packed nodes differ from its accessors' ==> expected: <[ModelNode(index=0, name=root, x=0.0, y=0.0, z=0.0, qx=0.0, qy=0.0, qz=0.0, qw=1.0, scaleX=1.0, scaleY=1.0, scaleZ=
+ModelNodesAssetTest > a node's Blender custom properties are readable from the game()
+    java.util.NoSuchElementException: Collection contains no element matching the predicate.
+ModelNodesAssetTest > the scene's custom properties are the model's own()
+    org.opentest4j.AssertionFailedError: expected: <2> but was: <null>
+ModelNodesAssetTest > an fbx model packs the nodes of the glb it converts to()
+    org.opentest4j.AssertionFailedError: expected: <[ModelNode(index=0, name=RootNode, x=0.0, y=0.0, z=0.0, qx=0.0, qy=0.0, qz=0.0, qw=1.0, scaleX=1.0, scaleY=1.0, scaleZ=1.0, extras=ModelExtras({})), ModelNode(index=1, name
+ModelNodesFromRefTest > the fbx human's nodes from its reference are its generated accessors()[jvm]
+    org.opentest4j.AssertionFailedError: the Human has named nodes
+ModelNodesFromRefTest > a node found by walking the list is the node named in code()[jvm]
+    java.util.NoSuchElementException: Collection contains no element matching the predicate.
+ModelNodesFromRefTest > the fox's nodes from its reference are its generated accessors in file order()[jvm]
+    org.opentest4j.AssertionFailedError: the Fox has named nodes
+```
+
+The Fox's 26 and the fixture's `tier = 2` are what the files hold, not numbers derived from the code
+under test.
+
+### M1
+
+`dev271/M1.diff`:
+
+```diff
+diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/AssetCompiler.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/AssetCompiler.kt
+index 2477074c..2ffe3205 100644
+--- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/AssetCompiler.kt
++++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/AssetCompiler.kt
+@@ -185,7 +185,7 @@ public class AssetCompiler(
+         // declaration has a span to hang a line number on.
+         // And the one place a model's nodes and extras enter it, for the same two drivers and
+         // the same reason: see `ModelContents` (issue #271). It reports nothing either.
+-        val declared = ModelContents.fill(assetRoot, ShaderSources.fill(assetRoot, assets))
++        val declared = ShaderSources.fill(assetRoot, assets)
+         return AssetCompileResult(AssetGraph.of(declared), diagnostics, hits, declared)
+     }
+ 
+```
+
+`dev271/M1.marker` and `dev271/M1.results`:
+
+```
+RUN=dev271/M1 pid=759376 head=041a0ec1 start=2026-09-21T04:52:28Z end=2026-09-21T04:52:40Z
+EXIT=1
+now 2026-09-21T04:52:40.943399+00:00
+dev.wildware.udea.assets.compiler.validate.ModelNodesAssetTest timestamp=2026-09-21T04:52:33.804Z tests=7 failures=5 errors=0 skipped=0
+  RED   a model's nodes come out of the bundle from a Ref to it()
+  green the daemon's values carry the same nodes the bundle does()
+  green a file with no custom properties packs none()
+  RED   the packed nodes are the nodes the generated accessors are written from()
+  RED   a node's Blender custom properties are readable from the game()
+  RED   the scene's custom properties are the model's own()
+  RED   an fbx model packs the nodes of the glb it converts to()
+dev.wildware.moba.model.ModelNodesFromRefTest timestamp=2026-09-21T04:52:33.496Z tests=3 failures=3 errors=0 skipped=0
+  RED   the fbx human's nodes from its reference are its generated accessors()[jvm]
+  RED   a node found by walking the list is the node named in code()[jvm]
+  RED   the fox's nodes from its reference are its generated accessors in file order()[jvm]
+```
+
+### M2
+
+`dev271/M2.diff`:
+
+```diff
+diff --git a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaGeneratedMemberChecker.kt b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaGeneratedMemberChecker.kt
+index 00986677..909b008c 100644
+--- a/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaGeneratedMemberChecker.kt
++++ b/udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/fir/UdeaGeneratedMemberChecker.kt
+@@ -112,7 +112,7 @@ internal class UdeaGeneratedMemberChecker(
+          * stale name here would recognise no node object and let every misspelling through.
+          */
+         private val MODEL_NODE: ClassId =
+-            ClassId.topLevel(FqName("dev.wildware.udea.assets.ModelNode"))
++            ClassId.topLevel(FqName("dev.wildware.udea.core.spatial.ModelNode"))
+ 
+         /** `Fox.Clips.Rnu` (issue #241). */
+         val Clips: UdeaGeneratedMemberChecker = UdeaGeneratedMemberChecker(
+```
+
+`dev271/M2.marker` and `dev271/M2.results`:
+
+```
+RUN=dev271/M2 pid=642194 head=041a0ec1 start=2026-09-21T04:36:47Z end=2026-09-21T04:37:01Z
+EXIT=1
+now 2026-09-21T04:37:01.678718+00:00
+dev.wildware.udea.compiler.fir.UdeaGeneratedMemberCheckerTest timestamp=2026-09-21T04:36:51.265Z tests=13 failures=3 errors=0 skipped=0
+  green Suppress by rule id silences the did-you-mean but not the compile error()
+  green a name like no clip at all lists the clips the model has()
+  green an unresolved member of an object without clips is not this rule()
+  RED   a misspelled socket is an error at the name, with a did-you-mean()
+  green a misspelling through a value of the clips object is caught the same way()
+  RED   a missing clip is the clip rule and a missing node is the node rule()
+  green with the plugin not applied the typo still fails, without the suggestion()
+  green Suppress by the node rule id silences the did-you-mean but not the compile error()
+  green a misspelled clip is an error at the name, with a did-you-mean()
+  RED   a name like no node at all lists the nodes the model has()
+  green a wrong-case clip name is suggested in its real case()
+  green correctly spelled sockets compile clean()
+  green correctly spelled clips compile clean()
+```
+
+### M3
+
+`dev271/M3.diff`:
+
+```diff
+diff --git a/udea-assets/src/commonMain/kotlin/dev/wildware/udea/assets/pack/AssetCodecs.kt b/udea-assets/src/commonMain/kotlin/dev/wildware/udea/assets/pack/AssetCodecs.kt
+index 5bdc03a1..7dc2864b 100644
+--- a/udea-assets/src/commonMain/kotlin/dev/wildware/udea/assets/pack/AssetCodecs.kt
++++ b/udea-assets/src/commonMain/kotlin/dev/wildware/udea/assets/pack/AssetCodecs.kt
+@@ -142,7 +142,7 @@ public class AssetCodecs private constructor(
+                     Model(
+                         id = fields.id,
+                         file = fields.path("file"),
+-                        nodes = fields.list("nodes").map { it.modelNode() },
++                        nodes = emptyList(),
+                         extras = fields.modelExtras("extras"),
+                     )
+                 }
+```
+
+`dev271/M3.marker` and `dev271/M3.results`:
+
+```
+RUN=dev271/M3 pid=644149 head=041a0ec1 start=2026-09-21T04:37:01Z end=2026-09-21T04:37:17Z
+EXIT=1
+now 2026-09-21T04:37:17.707914+00:00
+dev.wildware.udea.assets.compiler.validate.ModelNodesAssetTest timestamp=2026-09-21T04:37:04.216Z tests=7 failures=4 errors=0 skipped=0
+  RED   a model's nodes come out of the bundle from a Ref to it()
+  green the daemon's values carry the same nodes the bundle does()
+  green a file with no custom properties packs none()
+  RED   the packed nodes are the nodes the generated accessors are written from()
+  RED   a node's Blender custom properties are readable from the game()
+  green the scene's custom properties are the model's own()
+  RED   an fbx model packs the nodes of the glb it converts to()
+dev.wildware.moba.model.ModelNodesFromRefTest timestamp=2026-09-21T04:37:14.182Z tests=3 failures=3 errors=0 skipped=0
+  RED   the fbx human's nodes from its reference are its generated accessors()[jvm]
+  RED   a node found by walking the list is the node named in code()[jvm]
+  RED   the fox's nodes from its reference are its generated accessors in file order()[jvm]
+```
+
+### M4
+
+`dev271/M4.diff`:
+
+```diff
+diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/gen/GltfExtras.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/gen/GltfExtras.kt
+index 08624d31..60c02d44 100644
+--- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/gen/GltfExtras.kt
++++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/gen/GltfExtras.kt
+@@ -44,7 +44,6 @@ internal object GltfExtras {
+         for ((name, element) in group) {
+             val key = prefix + name
+             if (element is JsonObject) {
+-                flatten("$key$SEPARATOR", element, into)
+                 continue
+             }
+             val value = plain(element) ?: continue
+```
+
+`dev271/M4.marker` and `dev271/M4.results`:
+
+```
+RUN=dev271/M4 pid=645976 head=041a0ec1 start=2026-09-21T04:37:17Z end=2026-09-21T04:37:36Z
+EXIT=1
+now 2026-09-21T04:37:36.280780+00:00
+dev.wildware.udea.assets.compiler.gen.GltfNodesTest timestamp=2026-09-21T04:37:30.665Z tests=21 failures=2 errors=0 skipped=0
+  RED   Blender's custom properties land where they are read()
+  green the model's own extras are its default scene's()
+  RED   a group of extras is read as dotted keys, nested as deep as it goes()
+  green a file with no nodes has none()
+  green extras a game cannot read as a plain value are left out, and the rest kept()
+  green the chassis fixture's sockets are where its build script put them()
+  green a node under a parent carries the parent's turn and scale()
+  green a child claimed by two parents is refused, naming both()
+  green a node's place comes out in the world's Z-up frame, not the file's Y-up one()
+  green the turret fixture has a half-scale socket on its roof and one at its muzzle()
+  green a child the file does not have is refused()
+  green extras that are not an object are no extras()
+  green an integer too large for an Int is a Float()
+  green a node placed by a matrix is read the same as one placed by translate-rotate-scale()
+  green an unnamed node is not offered, because nothing could ask for it()
+  green a socket turned about the file's up axis comes out turned about the world's()
+  green a file naming no default scene takes its first()
+  green a file whose JSON does not parse is refused rather than read as empty()
+  green a node keeps its own index in the file, which is its identity()
+  green the fox's bones are read, each placed under every bone above it()
+  green a node's extras are read as plain values, a whole number as an Int and a fraction as a Float()
+dev.wildware.udea.assets.compiler.validate.ModelNodesAssetTest timestamp=2026-09-21T04:37:23.472Z tests=7 failures=1 errors=0 skipped=0
+  green a model's nodes come out of the bundle from a Ref to it()
+  green the daemon's values carry the same nodes the bundle does()
+  green a file with no custom properties packs none()
+  green the packed nodes are the nodes the generated accessors are written from()
+  RED   a node's Blender custom properties are readable from the game()
+  green the scene's custom properties are the model's own()
+  green an fbx model packs the nodes of the glb it converts to()
+dev.wildware.udea.assets.compiler.gen.AccessorCompilationTest timestamp=2026-09-21T04:37:28.109Z tests=4 failures=0 errors=0 skipped=0
+  green a fixture that types a blueprint member as a sprite sheet does not compile()
+  green a udea kts referring to GameAssets does not compile()
+  green a fixture that types the member as Ref of Blueprint compiles()
+  green a model's generated nodes compile with their authored extras()
+```
+
+### M5
+
+`dev271/M5.diff`:
+
+```diff
+diff --git a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/gen/AccessorGenerator.kt b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/gen/AccessorGenerator.kt
+index fae59d64..ecc2df30 100644
+--- a/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/gen/AccessorGenerator.kt
++++ b/udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/gen/AccessorGenerator.kt
+@@ -224,7 +224,7 @@ public object AccessorGenerator {
+      * same characters.
+      */
+     private fun extrasArgument(extras: Map<String, Any>): CodeBlock {
+-        if (extras.isEmpty()) return CodeBlock.of("")
++        if (extras.isEmpty() || extras.isNotEmpty()) return CodeBlock.of("")
+         val entries = extras.toSortedMap().map { (key, value) -> CodeBlock.of("%S to %L", key, extraValue(value)) }
+         return CodeBlock.of(", extras = %T(%M(%L))", MODEL_EXTRAS, MAP_OF, entries.joinToCode())
+     }
+```
+
+`dev271/M5.marker` and `dev271/M5.results`:
+
+```
+RUN=dev271/M5 pid=647617 head=041a0ec1 start=2026-09-21T04:37:36Z end=2026-09-21T04:37:52Z
+EXIT=1
+now 2026-09-21T04:37:52.295945+00:00
+dev.wildware.udea.assets.compiler.gen.ModelClipAccessorsTest timestamp=2026-09-21T04:37:47.868Z tests=15 failures=1 errors=0 skipped=0
+  green an fbx that does not convert fails the accessors pass with the converter's rule, not this one()
+  green the clips of every model are read from the file its declaration names()
+  green the fox generates the golden Fox object()
+  RED   a node's extras are written into its accessor, each as the value the file holds()
+  green a model whose file is missing fails with a did-you-mean()
+  green the file survives the scan document, and a declaration with none stays without one()
+  green a model whose file is not glTF fails with the reason()
+  green a model with neither clips nor nodes generates no object, and adds nothing else()
+  green clip names become identifiers, and a clash or a missing name is numbered()
+  green a model whose file is not a literal fails, because its clips cannot be known()
+  green a node name that cannot be an identifier is made into one, and a clash is numbered()
+  green pass 1 records the literal file a model names()
+  green an fbx model's clips are read from the glb it converts to, and generate typed clips()
+  green a node with no extras is written exactly as before()
+  green a model with nodes and no clips still gets an object, with its nodes and no Clips()
+dev.wildware.udea.assets.compiler.gen.AccessorCompilationTest timestamp=2026-09-21T04:37:41.950Z tests=4 failures=0 errors=0 skipped=0
+  green a fixture that types a blueprint member as a sprite sheet does not compile()
+  green a udea kts referring to GameAssets does not compile()
+  green a fixture that types the member as Ref of Blueprint compiles()
+  green a model's generated nodes compile with their authored extras()
+```
+
+### M6
+
+`dev271/M6.diff`:
+
+```diff
+diff --git a/udea-assets/src/commonMain/kotlin/dev/wildware/udea/assets/ModelExtras.kt b/udea-assets/src/commonMain/kotlin/dev/wildware/udea/assets/ModelExtras.kt
+index 28d02f02..ca5192bf 100644
+--- a/udea-assets/src/commonMain/kotlin/dev/wildware/udea/assets/ModelExtras.kt
++++ b/udea-assets/src/commonMain/kotlin/dev/wildware/udea/assets/ModelExtras.kt
+@@ -51,7 +51,7 @@ public class ModelExtras(values: Map<String, AssetValue>) {
+         null -> null
+         is AssetValue.FloatValue -> value.value
+         is AssetValue.IntValue -> value.value.toFloat()
+-        else -> throw ModelExtraTypeException(key, describe(value), NUMBER)
++        else -> null
+     }
+ 
+     /** The whole number at [key], including a float with nothing after the point; `null` when there is no [key]. */
+```
+
+`dev271/M6.marker` and `dev271/M6.results`:
+
+```
+RUN=dev271/M6 pid=648977 head=041a0ec1 start=2026-09-21T04:37:52Z end=2026-09-21T04:38:00Z
+EXIT=1
+now 2026-09-21T04:38:00.843719+00:00
+dev.wildware.udea.assets.ModelExtrasTest timestamp=2026-09-21T04:37:56.304Z tests=8 failures=1 errors=0 skipped=0
+  green a fractional float is not an int()[jvm]
+  green a value that is not a plain value is refused when the extras are made()[jvm]
+  green the keys are listed in sorted order()[jvm]
+  green a key the model does not have reads as null for every type()[jvm]
+  green two extras holding the same values are equal()[jvm]
+  RED   a value of another type fails naming the key and both types()[jvm]
+  green each typed read returns the value the artist wrote()[jvm]
+  green a whole number reads as a float and a whole float reads as an int()[jvm]
+```
+
+
+## 4. `sh gradlew build`
+
+Command, exactly, with every `build/test-results` directory in the worktree deleted first and the
+build cache off, so no test result below is a restored one:
+`ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem sh gradlew build --continue --no-configuration-cache --max-workers=4 --no-build-cache`
+
+`dev271/build271b.marker`:
+
+```
+RUN=dev271/build271b pid=688723 head=041a0ec1 start=2026-09-21T04:43:31Z end=2026-09-21T04:51:12Z
+EXIT=0
+DONE
+```
+
+Last lines of `dev271/build271b.log`:
+
+```
+BUILD SUCCESSFUL in 7m 40s
+1122 actionable tasks: 105 executed, 1017 up-to-date
+```
+
+Tasks ending `FAILED` in that log: 0. Tasks `FROM-CACHE`: 0.
+
+Every JUnit XML the run wrote (`dev271/count.py`, result directories deleted before the run):
+
+```
+826 XML files, 5845 tests, 0 failures, 0 errors, 47 skipped; 0 files stamped outside 2026-09-21T04:43:31Z..2026-09-21T04:51:12Z
+```
+
+The 47 skipped include the GL suites, which skip with no `DISPLAY` by design; they were run for real
+below. (An earlier full build on the same `041a0ec`, 04:15-04:25Z with the cache on, was also green -
+`BUILD SUCCESSFUL in 9m 47s` - and is superseded by this one because its log lived in the shared
+scratchpad.)
+
+### The GL suites, for real
+
+`GlSocketMountTest` (in `udea-render`) is the one GL file this branch edits (an import), so all three
+suites were run under xvfb with `-Pudea.render.requireGl=true`, `--rerun` on each, `--no-build-cache`,
+and the result directories deleted first:
+
+```
+xvfb-run -a -s "-screen 0 1280x720x24" env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+  sh gradlew udeaGlTest --rerun udeaAgentGlTest --rerun udeaEditorGlTest --rerun \
+  -Pudea.render.requireGl=true --no-build-cache --continue
+```
+
+Marker and outcome (`dev271/gl271.marker`, `gl271.log`, `gl271.results`):
+
+```
+RUN=dev271/gl271 pid=602566 head=041a0ec1 start=2026-09-21T04:33:11Z end=2026-09-21T04:35:46Z
+EXIT=0
+DONE
+> Task :udea-agent-host:udeaAgentGlTest
+> Task :udea-render:udeaGlTest
+> Task :udea-editor:udeaEditorGlTest
+BUILD SUCCESSFUL in 2m 34s
+```
+
+`dev271/gl271.results`: 37 test classes, 38 tests green, 0 red, 0 skipped; in-XML timestamps from 2026-09-21T04:33:20.675Z to 2026-09-21T04:35:40.814Z, inside the run's own start and end above.
+
+An earlier GL attempt (04:25-04:30Z) failed with `Could not write XML test results` for every class.
+That was a second `udeaGlTest --rerun` started **in this worktree** by another developer's runner
+through a shared script name, both writing one results directory; the lead confirmed it. Nothing from
+that window is quoted here; the run above is from a clean start in a private folder.
+
+### Budgets outside `check`
+
+The extra FBX conversion in pass 2 could slow the daemon, so both budgets were run (load average
+20 at launch; `dev271/budgets.log`):
+
+```
+RUN=dev271/budgets pid=653022 head=041a0ec1 start=2026-09-21T04:38:13Z end=2026-09-21T04:38:37Z
+EXIT=0
+warm reload decision: median 205ms over 9 samples [246, 253, 203, 202, 205, 210, 186, 161, 235]
+warm validate of one script: median 160ms over 9 samples [184, 170, 160, 159, 135, 147, 173, 182, 142]
+moba warm edit -> observed: max 234ms, median 204ms, min 202ms over 5 samples [204, 234, 233, 202, 204] (threshold 1500ms, deadline 3000ms, corpus 163 assets)
+```
+
+## 5. Images
+
+None. Nothing in this ticket changes a pixel: it adds data to an asset and API to read it. The
+proof of the feature is the tests above and the transcripts below.
+
+## 6. The issue, criterion by criterion
+
+- **"A game lists a model's nodes from a `Ref<Model>`, with no hand-written table."**
+  `ModelNodesFromRefTest` on moba's real bundle (`registry[GameAssets.models.fox].nodes ==
+  Fox.Nodes.all`, and the FBX human), and `ModelNodesAssetTest` "a model's nodes come out of the
+  bundle from a Ref to it" / "the packed nodes are the nodes the generated accessors are written
+  from" / the FBX case / the daemon's `PackedValues`. Red under M1 and M3.
+- **"A model's authored `extras` are readable from game code."** `ModelNodesAssetTest` "a node's
+  Blender custom properties are readable from the game" and "the scene's custom properties are the
+  model's own", over `module.glb`, which Blender 5.2 exported from `build_module.py` (checked in
+  beside it); `GltfNodesTest`'s extras tests; `ModelExtrasTest`; and `AccessorCompilationTest` "a
+  model's generated nodes compile with their authored extras", which compiles game-shaped code
+  reading each type. Red under M1, M4, M5, M6.
+- **"The generated accessors stay as they are: naming a node in code must still be checked at
+  compile time."** `UdeaGeneratedMemberCheckerTest` (13 green; M2 turns the 3 node checks red),
+  the Fox golden (unchanged but for the import line), and this transcript of the real game, spliced
+  from `dev271/udea0018-probe.log` lines 255-256 - a temporary file `Probe271.kt` holding
+  `internal val probe271 = Fox.Nodes.b_Head_5`, compiled with `:moba:game:compileKotlinJvm` (exit 1),
+  then deleted:
+
+  ```
+  e: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-a40d116215c08078a/moba/game/src/commonMain/kotlin/dev/wildware/moba/Probe271.kt:5:35 UDEA0018: Fox.Nodes has no node 'b_Head_5'. Did you mean 'b_Head_05'?
+  e: file:///srv/ssd1/workspace/Udea/.claude/worktrees/agent-a40d116215c08078a/moba/game/src/commonMain/kotlin/dev/wildware/moba/Probe271.kt:5:35 Unresolved reference 'b_Head_5'.
+  ```
+
+## 7. Regenerated files
+
+- **`moba/desktop/src/test/resources/fixtures/moba-3600.udearep` and `moba-36000.udearep`** -
+  regenerated with `sh gradlew :moba:desktop:test -Dupdate.replay.fixtures=true`, because moba's Fox
+  and Human now carry their nodes into the asset graph. Measured against the `00a2093` bytes
+  (sha256 of the saved copies equal `git show 00a2093:<path> | sha256sum`), with
+  `dev271/bytediff.py`, re-run identically after the move to the private folder:
+
+  ```
+  moba-3600.udearep: before 59572 bytes, after 59572 bytes; 36 bytes differ
+    offset 27..58 (32 bytes)  old f3556cc2c7387f6043b4c8b75e28891c766a19ed910e256b666fb8dde2743b69  new c011c548ff5d5c8790a5abfcb8c271857d9e4233cddf8a952aa1740935e2cbba
+    offset 59568..59571 (4 bytes)  old f154fd2e  new c0671750
+    bytes 0..26 identical: True  (hex 554445415245501a01009b0000000000000000000000b607000020)
+  moba-36000.udearep: before 590901 bytes, after 590901 bytes; 36 bytes differ
+    offset 27..58 (32 bytes)  old f3556cc2c7387f6043b4c8b75e28891c766a19ed910e256b666fb8dde2743b69  new c011c548ff5d5c8790a5abfcb8c271857d9e4233cddf8a952aa1740935e2cbba
+    offset 590897..590900 (4 bytes)  old fa645ee5  new ab2f81df
+    bytes 0..26 identical: True  (hex 554445415245501a01009b0000000000000000000000b607000020)
+  ```
+
+  Same length; 36 bytes each = the 32-byte asset-graph hash at 27..58 plus a 4-byte trailer, and
+  nothing else. **A correction to the brief I was given**, which put `inputSchema` in bytes 0..26
+  beside `proto`: it is not there. `proto` is at 22..23 and `inputSchema` at 59..66, just after the
+  hash (`dev271/header.py`, which looks each value up in both files):
+
+  ```
+  moba-3600.udearep before: proto 0x07b6 at offset 22..23; inputSchema 407227863552470576 (little-endian 30aeaf9595c3a605) at offset 59..66
+  moba-3600.udearep after: proto 0x07b6 at offset 22..23; inputSchema 407227863552470576 (little-endian 30aeaf9595c3a605) at offset 59..66
+  moba-36000.udearep before: proto 0x07b6 at offset 22..23; inputSchema 407227863552470576 (little-endian 30aeaf9595c3a605) at offset 59..66
+  moba-36000.udearep after: proto 0x07b6 at offset 22..23; inputSchema 407227863552470576 (little-endian 30aeaf9595c3a605) at offset 59..66
+  ```
+
+  Neither range is among the bytes that differ, so no protocol id and no input schema moved, and no
+  recorded input sample did. (`407227863552470576` is the `inputSchema` the failing
+  `MobaReplayEqualityTest` printed on both sides of its `BuildIdentity` comparison before I
+  regenerated; that message is not kept on disk, so the number is quoted from reading it, and
+  `header.py` is what shows it sits unchanged in both files.) The failing test before regeneration
+  (`MobaReplayFixturesCurrentTest`) named only `assetGraphHash` - read from its XML at the time, which
+  later runs have since replaced.
+- **`net-components.lock`, every `net-protocol.lock`, `expected-generated-hashes.txt`** - not moved.
+  No replicated component was added or removed; `git diff --name-only origin/master...HEAD` lists no
+  lock file (the build's `udeaCheckProtocolLock` is green).
+- **`udea-assets-compiler/src/test/resources/golden/Fox.kt.txt`** - the golden accessor, rewritten from
+  the test's own `Fox.kt.actual.txt`: one import line, `core.spatial.ModelNode` -> `assets.ModelNode`,
+  and nothing else (`diff` showed the one moved line).
+
+### A search, with its control
+
+"Nothing still names `dev.wildware.udea.core.spatial.ModelNode`" (`dev271/absence-search.txt`):
+
+```
+exit=1
+```
+
+The same command over a name known to be there, `dev.wildware.udea.core.spatial.AnimationClip`,
+returns files and exit 0 (`dev271/absence-control.txt`, 17 lines, first three):
+
+```
+hollow/game/src/commonMain/kotlin/dev/wildware/hollow/PlayerPose.kt:1
+moba/game/src/jvmTest/kotlin/dev/wildware/moba/model/HumanModelTest.kt:1
+udea-assets-compiler/src/test/resources/golden/Fox.kt.txt:1
+...
+exit=0
+```

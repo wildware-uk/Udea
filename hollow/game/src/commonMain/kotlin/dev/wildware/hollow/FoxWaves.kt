@@ -51,7 +51,7 @@ public data class FoxWaves(
     /** How many foxes wave [wave] brings, before [cap] is applied. */
     internal fun sizeOf(wave: Long): Int = (size + wave * growth).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
-    public companion object {
+    internal companion object {
 
         /** [waveAt]'s answer on a tick no wave arrives on. */
         internal const val NO_WAVE: Long = -1L

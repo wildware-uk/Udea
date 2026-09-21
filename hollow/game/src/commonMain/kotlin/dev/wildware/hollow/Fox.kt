@@ -128,7 +128,7 @@ public class Fox(
          * refuses a list of the wrong length; `FoxReplicationTest` sends every fox through it and
          * compares the three `@Net` fields on both clients, so one of those typed wrong fails there.
          */
-        public fun snapshotType(): ReplicatedComponentType<Fox> = fleksComponentType(
+        internal fun snapshotType(): ReplicatedComponentType<Fox> = fleksComponentType(
             FoxReplicator,
             ComponentSchema.of(
                 FoxReplicator,

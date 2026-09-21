@@ -59,7 +59,8 @@ internal object ModelContents {
         return declared.map { asset ->
             if (asset.kind != ModelFileValidator.KIND) return@map asset
             val path = asset.fields[ModelFileValidator.FILE_FIELD] as? ResFile ?: return@map asset
-            // Pass 3 reports every way this can fail, with the declaration's line; see the KDoc.
+            // Pass 3 or the accessors pass reports each way this can fail, with the declaration's
+            // line; see the KDoc.
             val contents = ModelFileSource.readFile(assetRoot, path.value).getOrNull() ?: return@map asset
             asset.copy(
                 fields = asset.fields +

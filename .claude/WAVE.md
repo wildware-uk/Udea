@@ -1180,9 +1180,18 @@ waiting on Windows CI run 35559034659 to **complete** rather than be killed by `
 
 | Developer | Branch | Modules | Owns |
 |---|---|---|---|
-| `dev-271` | `issue-271-model-nodes-extras` | `udea-assets-compiler`, `udea-assets` | the `.udearep` replay fixtures |
+| `dev-271` | `issue-271-model-nodes-extras` | `udea-assets-compiler`, `udea-assets` | nothing exclusively - see below |
 | `dev-267` | `issue-267-sky` | `udea-render` | nothing generated |
 | `dev-251` | `issue-251-fox-waves` | `hollow:game` | `net-components.lock`, every `net-protocol.lock` |
+
+**My lock-ownership split was wrong, and `dev-251` caught it before touching anything.** Component
+ids are **global**: `net-components.lock` is one sorted list and every `dev.wildware.hollow.*` name
+sorts first, so one Hollow component shifts every id in every lock **and** both moba `.udearep`
+fixtures, which carry the protocol hash. `dev-271` moves the same two fixtures for a different reason
+(the asset-graph hash). H2 (`16ddb43`) had already proved it. So the rule this wave, and from now on:
+**each branch regenerates on its own branch to stay green; nobody resolves a generated file as text;
+whoever merges second merges `master` in and regenerates on the merged tree, then measures.**
+Ownership of a generated file cannot be assigned by module when the ids it holds are global.
 
 **No gate files this wave.** The other project released the box for the night; `robot-game` still
 builds on its own schedule and is outside every gate. Each developer runs `--max-workers=4` and

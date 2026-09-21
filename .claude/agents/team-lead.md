@@ -195,7 +195,7 @@ is honour-based and it has failed three rounds running — each time costing a r
 build, and once leaving a finding open at a SHA the reviewer had been told was fixed. A detached
 checkout cannot move:
 
-    git worktree add --detach /tmp/review-<issue>-r<N> <SHA>
+    git worktree add --detach /srv/ssd1/workspace/udea-review/review-<issue>-r<N> <SHA>   # never /tmp: see dev-team skill
 
 Put the SHA in the dispatch prompt, tell the reviewer to review that checkout rather than the
 developer's worktree, and ask it to name the SHA in its verdict. Then a developer that commits

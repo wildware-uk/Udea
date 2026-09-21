@@ -307,6 +307,20 @@ The pieces a newcomer meets first, each with the issue that made it so.
   tick; the renderer places the same part from the *live* Kool node instead, so a socket on an
   animated bone or a turning ring carries what is mounted on it. A node name that is not in the
   model fails the build with `UDEA0018` and a did-you-mean.
+  **And the mount reads both ways** (#270). `ctx[CoreModule.ATTACHMENTS]` is an `AttachmentIndex`:
+  `childCount`, `childAt`, `nodeAt`, `forEachChild` and `childOf(parent, node)` answer *what is
+  mounted on this entity* and *what is in this socket* from array reads, in ascending `NetId`
+  order, without walking the world. `AttachmentSystem` rebuilds it out of the same components it is already
+  reading to place each part, so a rewind, a restore or a level load re-derives it rather than
+  finding it stale, and it answers as of the last tick that system ran.
+- **The simulation says which model an entity draws** (#270). `Drawn` (`udea-core`,
+  `@Replicated`, `@Serializable`) holds an `AssetIndex` slot - `Drawn(GameAssets.models.chassis,
+  registry)` - because a unit's parts are spawned by the simulation and a client, a snapshot and a
+  level all have to carry what each one looks like. `ModelRenderSystem` attaches and keeps each
+  entity's `ModelRenderer` in step with it on the Kool render thread, loading each model once
+  through a `ModelLibrary` (`FileModelLibrary` on the desktop), so a game writes no bridge of its
+  own and `ModelRenderer` stays render-side and unreplicated. That is the arrow `udea-core` ->
+  `udea-assets`: plain data, no Fleks, no GL, and both modules already headless.
 - **Replays are `.udearep` format 3**, which adds the pointer a player was aiming with (#262) to
   format 2's recorded editor edits (#232). A recording is written as the **lowest** version that can
   express it - no edits and no pointer is still format 1, byte for byte what every earlier build

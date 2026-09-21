@@ -73,8 +73,20 @@ import dev.wildware.udea.render.view.WorldViewport
  * It reports each model's world box to an editor ([PickBounds], issue #235), placed by the same
  * transform it is drawn with: see [ModelBounds] for what the box covers.
  *
+ * ## Which model, said by the simulation
+ *
+ * An entity carrying a `Drawn` (issue #270) has its [ModelRenderer] attached and kept in step
+ * with it here, at the top of the frame, before anything is drawn - so a game spawns an entity
+ * with an asset reference and it draws, and never writes the loop that turns one into the
+ * other. See [DrawnModels] for exactly what is written and what is left alone. Without a
+ * [models] library there is nothing to load a slot with, so the step does not run and only
+ * entities a game gave a [ModelRenderer] itself are drawn: that is what every caller before
+ * issue #270 did, and it still works unchanged.
+ *
  * @param lift where an entity with no `Transform3D` stands, or `null` to draw only entities that
  *   have one.
+ * @param models what a `Drawn`'s asset slot is drawn as, or `null` for a game that attaches
+ *   every [ModelRenderer] itself. `FileModelLibrary` is the desktop one.
  * @throws IllegalStateException from the constructor if [resources] has no Kool scene behind it -
  *   a pipeline built for an ordering test, which cannot draw anything.
  */
@@ -83,6 +95,7 @@ public class ModelRenderSystem(
     private val camera: ModelCamera,
     private val light: ModelLight,
     private val lift: PoseSource? = null,
+    private val models: ModelLibrary? = null,
 ) : RenderSystem, PickBounds {
 
     private val stage: ModelStage = resources.own(
@@ -96,6 +109,9 @@ public class ModelRenderSystem(
     )
 
     private var bound: Bound? = null
+
+    /** Keeps each `Drawn` entity's [ModelRenderer] in step, or `null` when no library was given. */
+    private val drawnModels: DrawnModels? = models?.let(::DrawnModels)
 
     /** Reused: each entity's clips this frame, one for the whole frame. */
     private val clips = ClipPose()
@@ -127,6 +143,7 @@ public class ModelRenderSystem(
     override fun onBind(world: World, ctx: GameContext) {
         bound = Bound(world, ctx, world.family { all(ModelRenderer) }, ctx.clock)
         placer.bind(world, ctx.clock)
+        drawnModels?.bind(world)
     }
 
     /**
@@ -159,6 +176,9 @@ public class ModelRenderSystem(
         val image = if (view != null) {
             stage.imageFor(view, camera, previewedEntity(bound, view))
         } else {
+            // Before anything is drawn, and on the render thread: an entity the simulation gave a
+            // `Drawn` last tick has its ModelRenderer by the time the family below is walked.
+            drawnModels?.sync()
             drawnCount = 0
             lastAlpha = alpha
             frame++

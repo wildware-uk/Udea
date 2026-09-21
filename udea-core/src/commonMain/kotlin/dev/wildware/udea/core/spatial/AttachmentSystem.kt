@@ -38,14 +38,29 @@ import dev.wildware.udea.core.identity.NetIdIndex
  *
  * And it takes no clock and no random: everything it writes is a function of the components it
  * reads, so two machines stepping the same tick write the same floats.
+ *
+ * ## The reverse index
+ *
+ * The same pass fills [AttachmentIndex] (issue #270), which is what lets a game ask *what is
+ * mounted on this entity* without walking the world. It is rebuilt from nothing every tick out
+ * of the components this system is already reading, so a rewind, a restore or a level load
+ * re-derives it rather than finding it stale - see [AttachmentIndex] for why that matters.
  */
-public class AttachmentSystem(private val netIds: NetIdIndex) : SimSystem() {
+public class AttachmentSystem(
+    private val netIds: NetIdIndex,
+    private val attachments: AttachmentIndex,
+) : SimSystem() {
 
     /**
      * Resolved once, at construction: a fresh family definition per tick is a lookup on a
      * per-tick path, which the charter calls out.
+     *
+     * Every mount, and not only the ones that can be placed. A part with no [Transform3D] is
+     * still mounted, and the index has to say so - `UnitFactory.partsOf`'s question is "what is
+     * on this chassis", not "what is on it that can be drawn". [place] is the half that needs a
+     * transform, and it is the half that checks for one.
      */
-    private val mounted: Family = world.family { all(AttachedTo, Transform3D) }
+    private val mounted: Family = world.family { all(AttachedTo) }
 
     /** Reused: resolving a mount allocates nothing. See [MountFrame]. */
     private val world3d = MountFrame()
@@ -53,7 +68,17 @@ public class AttachmentSystem(private val netIds: NetIdIndex) : SimSystem() {
     private val offset = MountFrame()
 
     override fun onTick() {
-        mounted.forEach { part -> place(part, MAX_CHAIN) }
+        attachments.beginRebuild()
+        mounted.forEach { part ->
+            // Only a mount whose parent is live is indexed: a stale parent id cannot be asked
+            // for, and two generations of one index in the same rebuild is what `add` refuses.
+            val mount = part[AttachedTo]
+            if (netIds.resolveOrNull(mount.parent) != null) {
+                attachments.add(netIds.netIdOf(part), mount.parent, mount.node)
+            }
+            if (part has Transform3D) place(part, MAX_CHAIN)
+        }
+        attachments.endRebuild()
     }
 
     /**

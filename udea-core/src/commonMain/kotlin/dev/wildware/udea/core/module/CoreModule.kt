@@ -15,6 +15,7 @@ import dev.wildware.udea.core.rng.DefaultRngService
 import dev.wildware.udea.core.scene.BarrierSceneManager
 import dev.wildware.udea.core.scene.ClearCueQueue
 import dev.wildware.udea.core.serviceKey
+import dev.wildware.udea.core.spatial.AttachmentIndex
 import dev.wildware.udea.core.spatial.AttachmentSystem
 
 /**
@@ -63,6 +64,20 @@ public class CoreModule(
     public val scenes: BarrierSceneManager =
         BarrierSceneManager(barrier, netIds, listOf(ClearCueQueue(cues)))
 
+    /**
+     * What is mounted on each entity, the other way round from `AttachedTo` (issue #270).
+     *
+     * Derived: [AttachmentSystem] rebuilds it from the components every tick, so there is no
+     * per-entity routing state for a rewind or a level load to leave stale. Held here rather
+     * than made inside [context] for the same reason the barrier and the id index are - the
+     * system that fills it names it in its constructor.
+     *
+     * `private`, unlike the services around it. A game reads it as `ctx[ATTACHMENTS]`, and
+     * there is nothing to reach for before the world exists: it is empty until the first tick
+     * has run, so an early handle on it could only ever answer nothing.
+     */
+    private val attachments: AttachmentIndex = AttachmentIndex()
+
     /** Physics with no solver. A game module replaces it with a Box2D-backed world. */
     public val physics: NoOpPhysicsWorld = NoOpPhysicsWorld()
 
@@ -82,6 +97,7 @@ public class CoreModule(
         builder.cues = cues
         builder.service(SimBarrier.KEY, barrier)
         builder.service(NET_IDS, netIds)
+        builder.service(ATTACHMENTS, attachments)
     }
 
     override fun simulation(registry: SimRegistry) {
@@ -106,7 +122,7 @@ public class CoreModule(
         // After everything that moves a parent this tick - intent, movement, the solver - and
         // before `Gameplay` reads a socket (issue #260). Its dependency is this module's own id
         // index, so it names it in its constructor rather than reaching through the context.
-        registry.add(SimPhase.PostPhysics, { _ -> AttachmentSystem(netIds) })
+        registry.add(SimPhase.PostPhysics, { _ -> AttachmentSystem(netIds, attachments) })
     }
 
     public companion object {
@@ -119,5 +135,14 @@ public class CoreModule(
          * not import `dev.wildware.udea.core` — that would make the two packages cyclic.
          */
         public val NET_IDS: ServiceKey<NetIdIndex> = serviceKey("NetIdIndex")
+
+        /**
+         * The key the [AttachmentIndex] is registered under (issue #270).
+         *
+         * A [ServiceKey] for the reason [NET_IDS] is one: `GameContext` holds a small fixed set
+         * of services and this is its documented extension point, so a module contributing the
+         * reverse-attachment index does not edit the context.
+         */
+        public val ATTACHMENTS: ServiceKey<AttachmentIndex> = serviceKey("AttachmentIndex")
     }
 }

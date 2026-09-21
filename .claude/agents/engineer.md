@@ -138,6 +138,18 @@ opens a context, run them for real and put the command and its output in `BRIEF.
 A green `sh gradlew build` is not evidence about GL. Saying it is, is the exact shape of error the
 rest of this file is about.
 
+### The scratchpad is shared - work in your own folder
+
+The session scratchpad directory is **shared by every developer in the wave**, not private to you.
+Put every script, log and marker file under `scratchpad/<your-name>/`, and never write at the top
+level. Generic names collide: on 2026-09-21 two developers both had a `gl.sh` and a `mut.sh` there,
+they overwrote each other, and one's mutation runner started a GL run **inside the other's worktree**
+while that developer's own run was still going - then wrote a false `EXIT=1 DONE` into its marker.
+
+**A marker file is only evidence about the run that wrote it, and nothing in the file says which run
+that was.** Write the start time and your worktree path into the marker alongside the exit code, and
+check them when you read it.
+
 ### A cache-restored test task is indistinguishable from an executed one
 
 `clean` does **not** empty the build cache. So a test task can answer `BUILD SUCCESSFUL in 6s`,

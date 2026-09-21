@@ -111,6 +111,26 @@ tasks.register<JavaExec>("runPlayerShot") {
 }
 
 /**
+ * `runFoxShot`: a wave of foxes closing in on two players, as one client of a real in-process
+ * session draws it, one PNG per known tick (issue #251). `-Phollow.shot.client=1` draws the second
+ * client instead; the two runs show the same ticks. A GL task run by name, for the reason `runShot`
+ * gives.
+ */
+tasks.register<JavaExec>("runFoxShot") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "hollow.foxes: captures a wave closing in, seen by client -Phollow.shot.client=<0|1>, into -Pudea.shot.out=<dir>."
+    mainClass.set("dev.wildware.hollow.desktop.HollowFoxShot")
+    classpath = sourceSets.main.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty("hollow.shot.client", providers.gradleProperty("hollow.shot.client").orNull ?: "0")
+    systemProperty(
+        "udea.shot.out",
+        providers.gradleProperty("udea.shot.out").orNull
+            ?: layout.buildDirectory.dir("reports/udea/foxes").get().asFile.absolutePath,
+    )
+}
+
+/**
  * Writes `hollow/game/levels/clearing.udealevel` from `ClearingLayout`, the layout in code the
  * clearing was first made from. An authoring tool, run by name: once the level is edited in the
  * editor (issue #255), the file is the source and this would overwrite the edits.

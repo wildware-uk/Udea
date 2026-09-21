@@ -1,13 +1,18 @@
 package dev.wildware.hollow
 
+import com.github.quillraven.fleks.World
 import dev.wildware.hollow.net.HollowNet
+import dev.wildware.udea.core.GameContext
 import dev.wildware.udea.core.NetRole
 import dev.wildware.udea.core.host.GameHost
 import dev.wildware.udea.core.host.PresentationFactory
 import dev.wildware.udea.core.host.RenderMode
 import dev.wildware.udea.core.level.LevelScene
+import dev.wildware.udea.core.loop.BarrierAction
 import dev.wildware.udea.core.loop.barrier
 import dev.wildware.udea.core.module.UdeaGameDef
+import dev.wildware.udea.core.rng.CapturableRng
+import dev.wildware.udea.core.rng.DefaultRngService
 import dev.wildware.udea.core.snapshot.snapshotTimeTravel
 import dev.wildware.udea.generated.HollowUdeaRegistry
 import dev.wildware.udea.physics2d.Physics2DModule
@@ -23,7 +28,8 @@ import dev.wildware.udea.render.input.InputModule
  *
  * In H1 (issue #249) the game was a lit clearing and nothing moved in it. Issue #250 puts a person
  * in it: the modules below now include the physics that stops a character at a rock and the input
- * model that steers it. The creatures join in later tickets of epic #245.
+ * model that steers it. Issue #251 adds the creatures: foxes that arrive in waves, and wander, chase
+ * and flee.
  *
  * ## What a client does not run
  *
@@ -62,7 +68,9 @@ public object HollowGame {
     public val PHYSICS: Physics2DSettings = Physics2DSettings(gravityX = 0f, gravityY = 0f)
 
     /**
-     * A fresh definition playing [level] (see [HollowLevel]) over [physics], as [role].
+     * A fresh definition playing [level] (see [HollowLevel]) over [physics], as [role], sending
+     * [waves] of foxes (issue #251) - or none, for a test about a player that wants no creatures in
+     * it. A client sends none whatever this says: its world is a replicated view.
      *
      * Fresh per call, because building one constructs a world: two hosts over one definition would
      * tick each other's. [physics] is a parameter and not made here so that whoever built it can
@@ -78,6 +86,7 @@ public object HollowGame {
         physics: Physics2DModule?,
         level: ByteArray = HollowLevel.bundledBytes(),
         role: NetRole = NetRole.Standalone,
+        waves: FoxWaves? = FoxWaves.DEFAULT,
     ): UdeaGameDef {
         val definition = UdeaGameDef(
             role = role,
@@ -94,7 +103,7 @@ public object HollowGame {
                 // would be native memory nothing puts anything in.
                 if (physics != null) add(physics)
                 add(InputModule(HollowControls.BINDINGS))
-                add(HollowModule(LaunchLevel(level), authoritative = role.isAuthoritative))
+                add(HollowModule(LaunchLevel(level), authoritative = role.isAuthoritative, waves = waves))
                 add(RenderModule())
             },
             // The snapshot ring: a server's replication baselines, and what `time.*` rewinds. Over
@@ -117,10 +126,11 @@ public object HollowGame {
         presentation: PresentationFactory? = null,
         level: ByteArray = HollowLevel.bundledBytes(),
         role: NetRole = NetRole.Standalone,
+        waves: FoxWaves? = FoxWaves.DEFAULT,
     ): HollowHost {
         val physics = if (role.isAuthoritative) Physics2DModule(PHYSICS) else null
         val host = try {
-            GameHost(mode, definition(physics, level, role), presentation)
+            GameHost(mode, definition(physics, level, role, waves), presentation)
         } catch (failure: RuntimeException) {
             physics?.close()
             throw failure
@@ -134,16 +144,49 @@ public object HollowGame {
      * swap to [HollowLevel.SCENE_ID], which puts the level's entities in and makes it the active
      * scene, then the whole level over that - the clock and the random streams as well.
      *
+     * ## A match seed, or the level's own streams
+     *
+     * A level file carries every random stream's state, so a saved game resumes drawing exactly
+     * where it stopped, and with no [matchSeed] that is what happens: the streams are the level's.
+     * A [matchSeed] starts a **new match** on the level instead - every stream is reset to the one
+     * `DefaultRngService` derives from that seed - so two matches on one clearing can differ in
+     * which way the foxes come from (issue #251), and two matches on one seed cannot.
+     *
      * @throws dev.wildware.udea.core.level.LevelFormatException from `read`, before anything is
      *   queued, when the launch bytes are not a level this game can load.
      */
-    public fun seed(host: GameHost) {
+    public fun seed(host: GameHost, matchSeed: Long? = null) {
         val levels = host.game.levels
         val level = levels.read(host.ctx[LaunchLevel.KEY].bytes)
         host.ctx.scenes.requestScene(HollowLevel.SCENE_ID)
         levels.load(level, host.ctx.barrier)
+        // After the load, which restored the level's own streams: the barrier drains in order.
+        if (matchSeed != null) host.ctx.barrier.submit(ReseedStreams(matchSeed))
         host.run(1)
     }
+}
+
+/**
+ * Resets every random stream to the ones [seed] derives: [HollowGame.seed]'s new match.
+ *
+ * Through the barrier, queued after the level's load, because the load restores the level's own
+ * streams and this has to land on top of it; and whole, through `CapturableRng`, rather than one
+ * stream at a time, so a stream a later ticket starts drawing from is reset with the rest instead
+ * of silently carrying the level's state. The words come from a `DefaultRngService` built over the
+ * seed, which is the one derivation every stream in this engine is defined by.
+ */
+private class ReseedStreams(private val seed: Long) : BarrierAction {
+
+    override val label: String = "hollow.reseed"
+
+    override fun apply(world: World, ctx: GameContext) {
+        val streams = checkNotNull(ctx.rng as? CapturableRng) {
+            "a new match reseeds the random streams, and ${ctx.rng::class.simpleName} does not implement CapturableRng"
+        }
+        streams.restoreFrom(DefaultRngService(seed).saveState(), 0)
+    }
+
+    override fun toString(): String = "ReseedStreams($seed)"
 }
 
 /**

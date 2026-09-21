@@ -1,8 +1,10 @@
 package dev.wildware.hollow.net
 
+import dev.wildware.hollow.Fox
 import dev.wildware.hollow.Player
 import dev.wildware.udea.core.snapshot.ComponentRegistry
 import dev.wildware.udea.core.spatial.Animator
+import dev.wildware.udea.core.spatial.Drawn
 import dev.wildware.udea.core.spatial.Transform3D
 import dev.wildware.udea.net.wire.ProtocolDescriptor
 
@@ -30,6 +32,12 @@ import dev.wildware.udea.net.wire.ProtocolDescriptor
  * `Animator` is here because a client has to play the clip the server is playing, from the tick the
  * server started it (issue #241); every field of it is `@Net`.
  *
+ * [dev.wildware.hollow.Fox] is here for the reason `Player` is (issue #251): its state, health and
+ * target are what a client shows, and a fox is spawned by the server at run time, so replication is
+ * the only way a client hears of one. `Drawn` is here because that fox has to be *drawn* on a client
+ * that never spawned it: it names the model, and `ModelRenderSystem` attaches it (issue #270). Both
+ * are listed in `net-components.lock`'s sorted order, which is the order this list keeps.
+ *
  * The physics components are **not** here, and that is a gap rather than a decision to leave alone.
  * `Physics2DModule`'s own KDoc asks a game to add `PhysicsSnapshotTypes.all()` to its registry "or a
  * rewind cannot see a body at all", and this registry is also the replication protocol: a component
@@ -50,8 +58,10 @@ public object HollowNet {
      */
     internal fun registry(): ComponentRegistry = ComponentRegistry(
         listOf(
+            Fox.snapshotType(),
             Player.snapshotType(),
             Animator.snapshotType(),
+            Drawn.snapshotType(),
             Transform3D.snapshotType(),
         ),
     )

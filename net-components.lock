@@ -108,6 +108,16 @@
 # and `spatial.Transform3D`, so `Transform3D`, `nav.NavAgent` and `nav.NavObstacle` each move up by
 # one. Nothing has shipped against those ids.
 #
+# `dev.wildware.hollow.Fox` is Hollow's creature (issue #251): which of wander, chase and flee it is
+# in, its health and whom it is after, all `@Net`, and its wander goal, decision tick and heading,
+# `@Sim`. It is here because a fox is spawned by the server at run time, so replication is the only
+# way a client hears of one, and because a rewind that did not restore it would leave a fox chasing a
+# player the restored world never showed it. `Fox` sorts before `Player`, so every id in this file
+# moved up by one - `Player` included - and `moba`'s two `.udearep` fixtures and the `worldHash` line
+# of `test_level.roster.txt` were regenerated in the same change, as they were for `Player`. Nothing
+# has shipped against the old numbering.
+#
+dev.wildware.hollow.Fox
 dev.wildware.hollow.Player
 dev.wildware.moba.CharacterView
 dev.wildware.moba.Player

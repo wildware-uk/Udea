@@ -21,12 +21,16 @@ import dev.wildware.udea.render.input.IntentState
  * stand-in for a part of the game - what a test drives is what a player drives.
  *
  * Built over an **empty** level rather than the bundled clearing, so a test places the one rock it
- * wants to walk into and knows exactly where it is. `ClearingLevelTest` is what covers the real
+ * wants to walk into and knows exactly where it is, and with no fox waves unless a test asks for
+ * them, so the only creatures in it are the ones a test placed (issue #251). `ClearingLevelTest` is what covers the real
  * clearing loading.
  */
-internal class PlayerScene : AutoCloseable {
+internal class PlayerScene(
+    /** The waves this game sends. None by default: a test about a player wants no foxes in it. */
+    waves: FoxWaves? = null,
+) : AutoCloseable {
 
-    private val opened = HollowGame.build(RenderMode.Headless, level = ByteArray(0))
+    private val opened = HollowGame.build(RenderMode.Headless, level = ByteArray(0), waves = waves)
 
     val host: GameHost get() = opened.host
 
@@ -73,6 +77,8 @@ internal class PlayerScene : AutoCloseable {
     fun animatorOf(id: NetId): Animator = with(world) { entity(id)[Animator] }
 
     fun playerOf(id: NetId): Player = with(world) { entity(id)[Player] }
+
+    fun foxOf(id: NetId): Fox = with(world) { entity(id)[Fox] }
 
     private fun entity(id: NetId) = checkNotNull(netIds.resolveOrNull(id)) { "$id is not live" }
 

@@ -1167,3 +1167,44 @@ in `build-logic`, which `dev-274` owns this wave, so it waits rather than becomi
 edit on somebody's branch. The general rule is now in `.claude/agents/engineer.md`.
 
 **Backlog:** robot-game #258, #261, #263, #267, #268, #269, #270, #271, #274. Hollow #251-#255.
+
+
+---
+
+## Wave 25 — 2026-09-21: sky, model extras, and the first creatures
+
+**Wave 24 closed with three merges.** Shaders as a declared asset kind (`318a0a9`), #274
+(`ffcc10a`), #270 (`343d219`). Every post-merge build `EXIT=0` off its marker. Snapshot release
+35559075031 dispatched at `00a2093`, which contains all three. `dev-windows` is still out: code done,
+waiting on Windows CI run 35559034659 to **complete** rather than be killed by `cancel-in-progress`.
+
+| Developer | Branch | Modules | Owns |
+|---|---|---|---|
+| `dev-271` | `issue-271-model-nodes-extras` | `udea-assets-compiler`, `udea-assets` | the `.udearep` replay fixtures |
+| `dev-267` | `issue-267-sky` | `udea-render` | nothing generated |
+| `dev-251` | `issue-251-fox-waves` | `hollow:game` | `net-components.lock`, every `net-protocol.lock` |
+
+**No gate files this wave.** The other project released the box for the night; `robot-game` still
+builds on its own schedule and is outside every gate. Each developer runs `--max-workers=4` and
+re-runs anything load-shaped alone.
+
+**The daemon's metaspace is a shared resource.** `dev-windows`' rebased build went red with five
+failures, every one `Metaspace`, after its daemon had served eight builds; a fresh JVM was green.
+The remedy is `--no-daemon` for your own build. **Never `sh gradlew --stop`**: it kills every
+Gradle 8.13 daemon this user owns, which on this night included the lead's post-merge build.
+
+**Two claims I relayed to the owner as findings were wrong, and the #270 reviewer caught both.**
+"The full-world scan is wrong about generations" does not hold - the scan compares whole `NetId`s;
+the difference is a policy, not a generation bug. And the sentinel test's KDoc gives the wrong reason
+for its `NetId.of(0, 0)` fixture: any other parent makes `add()` throw first, so the fixture is needed
+for the test to *run*. Both corrected on #270. Both were specific, plausible and confidently written,
+and nobody had executed them - which is the defect of the whole session in its final form: **an
+explanation is a claim, and it needs the same evidence as a number.**
+
+**Deferred to after `dev-251` merges** (it owns the locks): widening `GeneratedSources.files` to
+cover resources; the phantom `NoClientStateUploadTest` name in two KDocs (`InputCommand.kt`,
+`ReplicationClient.kt`), which propagate through KDoc into generated output.
+
+**Backlog after this wave:** #252-#255 (Hollow H4-H7, sequential after H3), #258, #261 (after
+#271 - both touch glTF extras), #263, #268, #269, #275, #276. #223 and #226 are the owner's shelving,
+blocked upstream on Kool publishing no wasmJs artifact.

@@ -134,3 +134,8 @@ gamebridge.json
 # updates, and a grep finds both.
 scratchpad/**/*.log
 *.orig
+
+# JVM crash records. A daemon that dies writes one into its working directory,
+# which is a worktree root, and an amend sweeps it into a commit (#251, 2026-09-21).
+hs_err_pid*.log
+replay_pid*.log

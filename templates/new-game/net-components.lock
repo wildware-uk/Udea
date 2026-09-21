@@ -1,0 +1,19 @@
+# new-game net-components.lock - THE COMPONENT TYPE ID SPACE.
+#
+# Every @Replicated component in this build, sorted. A component's position in this list is its
+# ComponentTypeId, and that id travels in every packet and every recorded replay - so inserting
+# a name renumbers its successors and breaks both.
+#
+# Written by `gradlew udeaWriteNetComponents`, which only ever adds. Review the diff: it is the
+# wire contract. Removing a name is a hand edit, deliberately.
+#
+# Nothing in this repository's build scripts reads this file. `dev.wildware.udea.kotlin-library`
+# does, for every module that runs the processor; `udeaNetComponents { registry = ... }` in the
+# root build script is how to keep it somewhere else.
+#
+# What it does NOT contain: the engine's own components. A game's ids and the engine's are
+# assigned in two different builds, so this game's first component takes id 0 while udea-core's
+# keep whatever positions they have in the engine's own registry. Nothing merges the two yet -
+# see "What the template does not cover yet" in the engine's docs/new-game.md, which says what
+# that costs and where a collision would be caught.
+com.example.newgame.sim.Rover

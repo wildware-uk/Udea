@@ -116,14 +116,51 @@ class ProjectIdSpaceTest {
         val gasRun = run(first, gas, "Gas", project = null)
         val mobaRun = run(second, moba, "Moba", project = null)
 
-        for (run in listOf(gasRun, mobaRun)) {
+        for ((run, module) in listOf(gasRun to "Gas", mobaRun to "Moba")) {
             assertFalse(run.succeeded)
             val message = run.errors.single()
             assertTrue(CodegenOptions.PROJECT_COMPONENTS in message, message)
             assertTrue("net-components.lock" in message, message)
             assertTrue(run.generatedFiles.isEmpty(), "nothing may be emitted with no id space")
-            assertTrue(run.generatedResources.isEmpty(), "no lock may be emitted with no id space")
+            // The one resource that may be: the module's own component names, which carry no id
+            // and are what `udeaWriteNetComponents` writes the missing registry from (issue #274).
+            // The *protocol* lock is still absent, which is what "no id space" has to mean.
+            assertEquals(
+                setOf("udea/$module-net-components.txt"),
+                run.generatedResources.keys,
+                "no lock may be emitted with no id space",
+            )
         }
+    }
+
+    @Test
+    fun `the failing run still reports what it compiled, and names it in the message`(
+        @TempDir workDir: File,
+    ) {
+        // Issue #274: the message used to end "let the build pass the list in", and outside this
+        // repository there was no way to. Both halves of the way out are asserted - the task that
+        // writes the file, and the file the task reads, left behind by the run that failed.
+        val run = run(workDir, gas, "Gas", project = null)
+
+        val message = run.errors.single()
+        assertTrue("udeaWriteNetComponents" in message, message)
+        assertTrue("gas.Shield, gas.Stun" in message, message)
+        assertEquals(
+            "gas.Shield\ngas.Stun\n",
+            run.generatedResources.getValue("udea/Gas-net-components.txt"),
+        )
+    }
+
+    @Test
+    fun `a module with an id space reports the same list beside its lock`(@TempDir workDir: File) {
+        val run = run(workDir, moba, "Moba", projectComponents)
+
+        assertEquals(emptyList(), run.errors)
+        assertEquals(
+            "moba.Health\nmoba.Wave\n",
+            run.generatedResources.getValue("udea/Moba-net-components.txt"),
+            "the manifest is the module's own names, never the project's id space",
+        )
     }
 
     @Test

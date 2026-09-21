@@ -5,6 +5,7 @@ import dev.wildware.udea.build.UdeaCompilerPluginWiring
 import dev.wildware.udea.build.UdeaKotlinPin
 import dev.wildware.udea.build.UdeaStdlibPin
 import dev.wildware.udea.build.UdeaVersions
+import dev.wildware.udea.build.applyNetComponentsToKsp
 import dev.wildware.udea.build.buildCompilesCompilerPlugin
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.jetbrains.kotlin.gradle.dsl.KotlinProjectExtension
@@ -61,6 +62,17 @@ extensions.extraProperties[UdeaBuildFlags.COMPILER_PLUGIN_ENABLED] =
     )
 
 apply<UdeaCompilerPluginSupport>()
+
+// --- the project's component id space, for whichever modules run KSP (issue #274) ----
+//
+// Here, in the convention every Kotlin module of an engine *or of a game* is on, because that
+// is the only place a game outside this repository can be reached from. `UdeaNetComponents` has
+// owned the parse and the sorting since Phase 0 and nothing published ever called it: each
+// module inside this tree wrote the same eight lines into its own build script, so a game on
+// the published conventions had no way to pass the list at all and re-implemented the rule.
+// `UdeaNetComponentsWiring` has the whole argument, including why the KSP extension is reached
+// by name.
+applyNetComponentsToKsp()
 
 // --- one temporary directory per forked JVM (issue #214) -----------------------------
 

@@ -252,6 +252,62 @@ extends `SimSystem`, reads `ctx.clock`, and writes component state; presentation
 Fleks system - it implements `RenderSystem` in `udea-render`, so `world.update(dt)` is pure
 simulation by construction.
 
+### A component that travels: `@Replicated` and `net-components.lock`
+
+`@Replicated` on a component generates a `Replicator` for it, and that one codec serves four
+things that must never disagree about what an entity is: a delta packet to a client, a snapshot
+for `time.rewind`, a snapshot restore, and the agent's field access. The template's `Rover` has
+it, and each of its fields carries `@Net`:
+
+```kotlin
+@Replicated
+public class Rover(
+    @Net public var x: Float = 0f,
+    @Net public var y: Float = 0f,
+    @Net public var speed: Float = 1f,
+) : Component<Rover>
+```
+
+The id that codec stamps on the wire is **the position of the component's name in
+`net-components.lock`**, a plain sorted list in your repository's root. That is the whole of the
+id space: inserting a name renumbers every name after it, and every connected client and recorded
+replay with it. It is a reviewed file rather than something a processor counts out, for exactly
+that reason.
+
+**You do not wire it up.** `dev.wildware.udea.kotlin-library` and the multiplatform conventions
+read that file and hand the list to the processor, for every module of your build that runs KSP.
+Nothing goes in a `ksp { }` block.
+
+Your first `@Replicated` component does need the file to exist, and there is a task that writes
+it:
+
+```
+./gradlew build                      # fails: this module emits a wire protocol and has no id space
+./gradlew udeaWriteNetComponents     # writes net-components.lock from what the build compiled
+git diff net-components.lock         # review it: a name's position is its id on the wire
+./gradlew build
+```
+
+That works on the build that just failed, deliberately: the processor writes each module's list
+of `@Replicated` names *before* it checks the id space, so the run that fails for want of the
+file still leaves behind what the file needs. The task only ever **adds** - a name stays once it
+is there, because a name may legitimately be listed before its component exists, and a module
+that failed to compile reports nothing at all. Removing a name is a hand edit.
+
+If you keep the file somewhere else, say so once, in the **root** build script:
+
+```kotlin
+udeaNetComponents {
+    registry = layout.projectDirectory.file("wire/components.lock")
+}
+```
+
+Root, because the id space is the whole build's - one file gives every `@Replicated` component in
+your build its id, and a per-module answer could only disagree with itself.
+
+One thing this does **not** do yet: merge your id space with the engine's. See "What the template
+does not cover yet" below.
+
 ---
 
 ## An agent can drive your game
@@ -423,13 +479,16 @@ the game ships on.
 
 Stated rather than implied, because each is a real piece of work and none of it is broken:
 
-- **Replicated components and the wire id space.** A `@Replicated` component gets its
-  `ComponentTypeId` from the position of its name in the build's `net-components.lock`, and that
-  file is the *whole* build's id space. A game outside this repository therefore needs a lock that
-  covers the engine's components as well as its own; the engine's is `net-components.lock` at the
-  root of the Udea repository, and it is not published with the artifacts. Nothing merges the two
-  for you today, so a game with replicated components has to carry a lock that starts from the
-  engine's. The template declares no `@Replicated` component and so needs no lock at all.
+- **Sharing an id space with the engine's own components.** Your game's
+  `net-components.lock` numbers the components *your build* compiles, from 0. The engine's
+  components were numbered in the engine's build, from the engine's own lock, and those ids are
+  already baked into the `Replicator`s inside the published jars - so the two id spaces sit side
+  by side rather than being merged, and a game with more components than the engine's lowest id
+  would eventually mint an id the engine has already used. Nothing merges them for you today.
+  Where that is caught is worth knowing: `ComponentRegistry`'s constructor refuses two component
+  types with one id - *"two component types share ComponentTypeId(N)"* - and a game builds one of
+  those when it wires replication, the way `moba/game/src/commonMain/.../MobaGame.kt` does. A game
+  that has not wired replication yet builds none, so nothing would say so.
 - **The asset pipeline.** `dev.wildware.udea.assets` compiles a `.udea.kts` tree into a
   `.udeapak`. `moba/game/build.gradle.kts` is the worked example; the template has no assets, and
   whether that plugin needs anything extra outside this repository is untested.

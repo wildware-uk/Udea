@@ -1217,3 +1217,29 @@ cover resources; the phantom `NoClientStateUploadTest` name in two KDocs (`Input
 **Backlog after this wave:** #252-#255 (Hollow H4-H7, sequential after H3), #258, #261 (after
 #271 - both touch glTF extras), #263, #268, #269, #275, #276. #223 and #226 are the owner's shelving,
 blocked upstream on Kool publishing no wasmJs artifact.
+
+**`master` is red on Windows `replay-equality`, and it is a regression I merged.** Found by
+`dev-windows` reading its own CI run's annotations, then confirmed pre-existing on master run
+35554175973 at `0378a95`:
+
+    ReplayRefusedException: this recording cannot be replayed by this build; 1 identity field(s) differ:
+      assetGraphHash: recorded f3556cc2c7387f60... (32 bytes), this build 3fcb0977bf032184... (32 bytes)
+
+Hypothesis, **not yet measured**: the shader-asset merge packs a `.frag`'s **raw text** into the asset
+graph - the first raw source text ever to go into that hash (`.udea.kts` scripts contribute the
+values they produce, not their bytes, which is why they never broke it). There is no root
+`.gitattributes`, Git for Windows checks out with `core.autocrlf=true`, so the runner packs CRLF and
+hashes differently. #176 hit this exact mechanism twice (`udea-assets-compiler/.gitattributes`,
+`udea-replay/.gitattributes`). `dev-windows` is running the `autocrlf=true` vs `=false` experiment.
+
+**Decided fix**, on a separate branch after `windows-green` merges: **normalise line endings where the
+shader text is read**, in the asset build - not only a `.gitattributes`. A game in its own repository
+(#265) inherits no `.gitattributes` from this one, so a repo-level fix leaves every game's asset hash
+depending on its author's git configuration. On Linux the files are already LF, so normalising should
+move no byte: the hash and both fixtures should stay put. If they move, something else is going on.
+
+**Why nobody caught it:** the shader branch was reviewed on Linux, where it is correct. The one run
+that would have shown it - a *completed* Windows `replay-equality` on `master` - finished red at
+`0378a95` and nobody read it, and the next master run at `00a2093` was **cancelled** by
+`cancel-in-progress: true` before it could say anything. That setting has now cost this project a
+detected regression, not just untested commits. It is no longer a nice-to-have.

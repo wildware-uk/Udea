@@ -2,6 +2,7 @@ package dev.wildware.udea.core.spatial
 
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.configureWorld
+import dev.wildware.udea.assets.ModelNode
 import dev.wildware.udea.core.fixtures.ArrayFieldStore
 import dev.wildware.udea.core.fixtures.testGameContext
 import dev.wildware.udea.core.gameContext

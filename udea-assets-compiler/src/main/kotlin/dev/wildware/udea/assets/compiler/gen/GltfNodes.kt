@@ -23,6 +23,8 @@ import kotlin.math.sqrt
  * @property name the file's name for it. A node with no name is not here: it cannot be asked for.
  * @property qx quaternion, `(x, y, z, w)`, with `w` never negative so two builds of one file
  *   cannot emit the two spellings of the same turn.
+ * @property extras the node's glTF `extras` as [GltfExtras] reads them: plain values, keyed by
+ *   dotted name (issue #271).
  */
 internal data class GltfNode(
     val index: Int,
@@ -37,6 +39,16 @@ internal data class GltfNode(
     val scaleX: Float,
     val scaleY: Float,
     val scaleZ: Float,
+    val extras: Map<String, Any> = emptyMap(),
+)
+
+/**
+ * Everything the asset build reads out of a glTF file for a game to ask about (issue #271): its
+ * named nodes, and the `extras` of its default scene - in Blender, the scene's Custom Properties.
+ */
+internal data class GltfModel(
+    val nodes: List<GltfNode>,
+    val extras: Map<String, Any>,
 )
 
 /**
@@ -69,23 +81,44 @@ internal object GltfNodes {
     private val json = Json { ignoreUnknownKeys = true }
 
     /** Every named node in [file], in the file's order, or a failure saying what is wrong. */
-    fun read(file: Path): Result<List<GltfNode>> =
-        GltfCheck.jsonOf(file.extension.lowercase(), file.readBytes()).fold(::nodesOf) { Result.failure(it) }
+    fun read(file: Path): Result<List<GltfNode>> = readModel(file).map { it.nodes }
 
     /** Every named node in the binary glTF [glb]: an `.fbx`'s conversion (issue #244). */
-    fun read(glb: ByteArray): Result<List<GltfNode>> =
-        GltfCheck.jsonOf(GLB, glb).fold(::nodesOf) { Result.failure(it) }
+    fun read(glb: ByteArray): Result<List<GltfNode>> = readModel(glb).map { it.nodes }
+
+    /** [file]'s named nodes and its own extras (issue #271), or a failure saying what is wrong. */
+    fun readModel(file: Path): Result<GltfModel> =
+        GltfCheck.jsonOf(file.extension.lowercase(), file.readBytes()).fold(::modelOf) { Result.failure(it) }
+
+    /** [readModel] for the binary glTF [glb]: an `.fbx`'s conversion. */
+    fun readModel(glb: ByteArray): Result<GltfModel> =
+        GltfCheck.jsonOf(GLB, glb).fold(::modelOf) { Result.failure(it) }
 
     private const val GLB = "glb"
 
-    /** Every named node in the glTF JSON [text], each placed relative to the model's origin. */
-    private fun nodesOf(text: String): Result<List<GltfNode>> {
+    /** The glTF JSON [text]'s named nodes, each placed relative to the model's origin, and its extras. */
+    private fun modelOf(text: String): Result<GltfModel> {
         val document = try {
             json.parseToJsonElement(text) as? JsonObject
         } catch (_: SerializationException) {
             // `parseToJsonElement` reports malformed input this way; the message below says so.
             null
         } ?: return failure("is not a glTF 2.0 file: its JSON does not parse")
+        return nodesOf(document).map { GltfModel(it, GltfExtras.read(defaultScene(document)?.get(EXTRAS))) }
+    }
+
+    /**
+     * The scene the file shows by default: the one its `scene` names, or its first when it names
+     * none - the scene a viewer opens, and the one Blender writes a scene's Custom Properties on.
+     */
+    private fun defaultScene(document: JsonObject): JsonObject? {
+        val scenes = document["scenes"] as? JsonArray ?: return null
+        val chosen = (document["scene"] as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull ?: 0
+        return scenes.getOrNull(chosen) as? JsonObject
+    }
+
+    /** Every named node in [document], each placed relative to the model's origin. */
+    private fun nodesOf(document: JsonObject): Result<List<GltfNode>> {
         val nodes = document["nodes"] as? JsonArray ?: return Result.success(emptyList())
         val parents = parentsOf(nodes).getOrElse { return Result.failure(it) }
         val locals = nodes.map { local(it) }
@@ -95,6 +128,7 @@ internal object GltfNodes {
             if (name.isNullOrEmpty()) continue
             val world = world(index, parents, locals).getOrElse { return failure("has a node `$name` whose ${it.message}") }
             out += decompose(index, name, conjugate(world))
+                .copy(extras = GltfExtras.read((nodes[index] as? JsonObject)?.get(EXTRAS)))
         }
         return Result.success(out)
     }
@@ -338,6 +372,9 @@ internal object GltfNodes {
 
     /** A failure whose message completes "the file ...", as its caller composes it. */
     private fun <T> failure(why: String): Result<T> = Result.failure(IllegalArgumentException(why))
+
+    /** The glTF property every object may carry for application data. */
+    private const val EXTRAS = "extras"
 
     private const val ROWS = 3
     private const val STRIDE = 4

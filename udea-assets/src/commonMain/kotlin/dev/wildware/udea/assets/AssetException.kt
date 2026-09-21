@@ -74,3 +74,16 @@ public class PackedRefMismatchException internal constructor(
     public val index: Int,
     public val found: AssetId,
 ) : AssetException("packed reference to '$id' names slot $index, which holds '$found'")
+
+/**
+ * A model's extra [key] holds a value of another type than the one a game asked for (issue #271).
+ *
+ * The model has the key, so this is not "absent" - that is `null` - but an authoring mistake: a
+ * `mass` typed as text in Blender, say. The message names the key, what it holds and what was
+ * asked for, which is everything needed to fix the Custom Property.
+ */
+public class ModelExtraTypeException internal constructor(
+    public val key: String,
+    found: String,
+    wanted: String,
+) : AssetException("extra '$key' is $found, not $wanted")

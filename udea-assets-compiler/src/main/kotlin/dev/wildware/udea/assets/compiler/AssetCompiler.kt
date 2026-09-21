@@ -1,5 +1,6 @@
 package dev.wildware.udea.assets.compiler
 
+import dev.wildware.udea.assets.compiler.gen.ModelContents
 import dev.wildware.udea.assets.compiler.scan.ReferenceSpanIndex
 import dev.wildware.udea.assets.compiler.scan.UdeaDeclarationScanner
 import dev.wildware.udea.assets.compiler.script.UdeaAssetScript
@@ -182,7 +183,9 @@ public class AssetCompiler(
         // it from `commonMain` without a per-platform resource reader. It reports nothing; what
         // is wrong with a shader file is `ShaderFileValidator`'s UDEA0041, in pass 3, where a
         // declaration has a span to hang a line number on.
-        val declared = ShaderSources.fill(assetRoot, assets)
+        // And the one place a model's nodes and extras enter it, for the same two drivers and
+        // the same reason: see `ModelContents` (issue #271). It reports nothing either.
+        val declared = ModelContents.fill(assetRoot, ShaderSources.fill(assetRoot, assets))
         return AssetCompileResult(AssetGraph.of(declared), diagnostics, hits, declared)
     }
 

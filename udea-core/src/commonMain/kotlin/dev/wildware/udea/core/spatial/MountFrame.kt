@@ -1,5 +1,6 @@
 package dev.wildware.udea.core.spatial
 
+import dev.wildware.udea.assets.ModelNode
 import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.atan2

@@ -1265,3 +1265,22 @@ detected regression, not just untested commits. It is no longer a nice-to-have.
 Positive control: classes predating tonight (`AttachedTo`, `ModuleGraphRules`) present. Negative:
 a made-up name absent. **This snapshot carries the Windows replay regression** - fixed on
 `windows-crlf-shaders`, not yet merged.
+
+### Wave 25 progress, 05:15Z
+
+- **#271 merged** as `495efe2e`, brief archived `d0632b91`. review-271-r1 PASS round 1, no findings, on `b6da4d7`.
+  Merged tree == reviewed tree + master-only `.claude/WAVE.md`, `.claude/agents/engineer.md`, `.gitignore`.
+  Ledger (for any later round touching the same code): ModelNode udea-core -> udea-assets is not item 17
+  (that arrow already exists) and not item 21; the dropped read failure in `ModelContents.fill` is not item 7
+  (the Gradle path reports it); extras keys as `String` are not item 16.
+- **#251 is now the second merger.** Trial merge onto `d0632b91` conflicts in both moba `.udearep` fixtures
+  (binary). After its verdict: dev-251 merges master and regenerates every generated family on the merged
+  tree (roster by hand, only line 1 may differ), and a round-2 reviewer confirms the regeneration only.
+- `windows-green` (2b83f80) and #267 (51d435cb) trial-merge clean onto `d0632b91`.
+- **Deferred, found tonight:**
+  - `udea-net` relevancy accumulator: ticks-since-sent grows forever for scenery that never changes, so a
+    re-send of props crowds out movers for 1-5 ticks. Hollow works round it (`HollowRelevancy`, scenery weight
+    1/65536). Engine fix belongs in udea-net. (dev-251)
+  - 40 of 232 screenshots differ between two runs of the same master: Hollow's 30 player shots, moba lane and
+    match shots, 3 ui-window-moving. They prove nothing either way until they are stable. (dev-267)
+  - Dashboard `list_tasks` answers "Tool list_tasks not found"; one open owner task is unread.

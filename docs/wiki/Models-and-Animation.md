@@ -16,7 +16,9 @@ who plays it, smoothly, at whatever frame rate it has.
 | `Transform3D` | `udea-core` | Where an entity sits in 3D: nine plain floats. Replicated. |
 | `Animator` | `udea-core` | Which clip plays, from which tick, how fast, and any crossfade. Replicated. |
 | `AttachedTo` | `udea-core` | A part mounted on a named node of another entity's model. Replicated. |
-| `AnimationClip`, `ModelNode` | `udea-core` | One clip, one named node. Generated per model as `Fox.Clips.Walk`, `Chassis.Nodes.socket_roof`. |
+| `AnimationClip` | `udea-core` | One clip. Generated per model as `Fox.Clips.Walk`. |
+| `ModelNode` | `udea-assets` | One named node. Generated per model as `Chassis.Nodes.socket_roof`, and listed on the model asset as `Model.nodes`. |
+| `ModelExtras` | `udea-assets` | What the artist typed into Blender's Custom Properties: `Model.extras`, `ModelNode.extras`. |
 | `ModelRenderer` | `udea-render` | What to draw on an entity. Never snapshotted or replicated. |
 | `ModelRenderSystem` | `udea-render` | Draws every entity with a `ModelRenderer`. |
 | `ModelCamera`, `ModelLight` | `udea-render` | The 3D camera, and one sun plus ambient light. |
@@ -162,6 +164,41 @@ The asset build reads each model's file and generates one object per model in
 So a clip or a socket the file does not have is a name that does not compile, and nothing looks
 either up by name at run time.
 
+### Asking a model you hold
+
+Code that names a socket uses `Chassis.Nodes.socket_roof`. Code that holds a model and asks what it
+has - an editor listing sockets, a fitting rule checking sizes - reads the model asset itself
+(issue #271):
+
+```kotlin
+val chassis: Model = registry[GameAssets.models.chassis]
+val sockets = chassis.nodes.filter { it.name.startsWith("socket_") }
+```
+
+`Model.nodes` is the same list as `Chassis.Nodes.all`, node for node: the build reads the file once
+and writes both. No game writes a table of its models' nodes.
+
+### Custom Properties
+
+Values an artist adds in Blender's **Custom Properties** panel travel with the model when it is
+exported with the glTF exporter's **Custom Properties** box ticked (glTF calls them `extras`).
+An object's properties are on its node, and the scene's on the model:
+
+```kotlin
+val module = registry[GameAssets.models.module]
+val body = module.nodes.single { it.name == "module" }
+val mass = body.extras.float("mass") ?: 1f
+val size = body.extras.text("module_size")
+val tier = module.extras.int("tier")
+val socket = module.nodes.single { it.name == "socket_top" }
+val fits = socket.extras.text("accepts") == size
+```
+
+The reads are `float`, `int`, `text`, `bool` and `floats` (a vector). A missing key is `null`; a key
+holding another type fails with `ModelExtraTypeException`, because a mass typed as text is a
+mistake worth hearing about. A property group becomes dotted keys, `fitting.slots`. A value that is
+none of those - a list of names, say - is left out by the build.
+
 Each `AnimationClip` has an `index` (its place in the file, and its identity on the wire), a `name`,
 and a `length` in whole ticks. The build converts the file's seconds to ticks at 60Hz, rounding up,
 so a clip played once is never called finished before its last keyframe.
@@ -169,7 +206,8 @@ so a clip played once is never called finished before its last keyframe.
 A typo gets a suggestion from the K2 checker in `udea-compiler-plugin`
 (`UdeaGeneratedMemberChecker`), under two rules: `UDEA0016` for a clip and `UDEA0018` for a node.
 The checker recognises a clip object by its members being typed `AnimationClip` and a node object by
-theirs being typed `ModelNode`, so it is silent on every other unresolved name.
+theirs being typed `ModelNode`, so it is silent on every other unresolved name. Listing a model's
+nodes at run time (above) does not weaken this: naming one in code is still checked when it compiles.
 
 ### FBX
 

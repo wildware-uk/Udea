@@ -37,6 +37,11 @@ internal class ModelFileScan(
  *
  * Both readings come off one visit to the file, so an `.fbx` is converted once and the clips and
  * the nodes can never be read from two different states of a file somebody is editing.
+ *
+ * It is also the one reading the packed asset gets its nodes and extras from (issue #271):
+ * [ModelContents] calls [readFile] for every `model(...)` in pass 2, so the list a game reads off
+ * a `Ref<Model>` and the `Chassis.Nodes` accessors it compiles against come from the same code
+ * over the same file, and cannot disagree.
  */
 internal object ModelFileSource {
 
@@ -65,16 +70,25 @@ internal object ModelFileSource {
         return ModelFileScan(clips, nodes, diagnostics)
     }
 
-    /** One model's clips and its named nodes, read from the same bytes. */
-    private class ModelContents(val clips: List<GltfClip>, val nodes: List<GltfNode>)
+    /** One model's clips, its named nodes and its own extras, read from the same bytes. */
+    internal class Contents(val clips: List<GltfClip>, val nodes: List<GltfNode>, val extras: Map<String, Any>)
 
     /** One model's contents, or a failure whose message completes "model `<id>` ...". */
-    private fun readOne(assetRoot: Path, model: Declaration): Result<ModelContents> {
+    private fun readOne(assetRoot: Path, model: Declaration): Result<Contents> {
         val written = model.fileArgument ?: return failure(
             "does not name its file with a `${ModelFileValidator.FILE_FIELD} = \"...\"` string " +
                 "literal, and a literal is the only form the build can read a model from before " +
                 "anything is compiled",
         )
+        return readFile(assetRoot, written)
+    }
+
+    /**
+     * The contents of the model file [written], as a script names it relative to [assetRoot], or
+     * a failure whose message completes "model `<id>` ...". An `.fbx` is read as the `.glb` it
+     * converts to; one that does not convert fails with a [ConversionFailure].
+     */
+    internal fun readFile(assetRoot: Path, written: String): Result<Contents> {
         val path = ResFile.of(written)
         if (path.isMalformed) return failure("names `$written`, which is not a path inside the asset root")
         val file = assetRoot.resolve(path.value)
@@ -91,9 +105,9 @@ internal object ModelFileSource {
             val glb = FbxConverter.convert(assetRoot, path).getOrElse { reason ->
                 return Result.failure(ConversionFailure("names `$path`, which ${reason.message}"))
             }
-            GltfClips.read(glb).andThen { clips -> GltfNodes.read(glb).map { ModelContents(clips, it) } }
+            GltfClips.read(glb).andThen { clips -> GltfNodes.readModel(glb).map { Contents(clips, it.nodes, it.extras) } }
         } else {
-            GltfClips.read(file).andThen { clips -> GltfNodes.read(file).map { ModelContents(clips, it) } }
+            GltfClips.read(file).andThen { clips -> GltfNodes.readModel(file).map { Contents(clips, it.nodes, it.extras) } }
         }
         return read.exceptionOrNull()?.let { reason -> failure("names `$path`, which ${reason.message}") } ?: read
     }

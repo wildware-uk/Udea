@@ -264,6 +264,50 @@ class ModelClipAccessorsTest {
         assertTrue("public val all: List<ModelNode> = listOf(" in text, "the list keeps the name `all`: $text")
     }
 
+    @Test
+    fun `a node's extras are written into its accessor, each as the value the file holds`() {
+        val declaration = Declaration("model", "units/module", "module", SPAN, "units/module.glb")
+        val node = GltfNode(
+            0, "module", 0f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f,
+            extras = mapOf(
+                "armoured" to true,
+                "fitting.slots" to 2,
+                "mass" to 12.5f,
+                "module_size" to "small \"mk2\"",
+                "offset" to listOf(0f, 0.5f),
+            ),
+        )
+        val text = AccessorGenerator.generate(
+            listOf(declaration),
+            clips = emptyMap(),
+            nodes = mapOf("units/module" to listOf(node)),
+        ).single { it.path.endsWith("/Module.kt") }.text.replace(Regex("\\s+"), " ")
+
+        assertTrue(
+            "scaleZ = 1.0f, extras = ModelExtras(mapOf(" +
+                "\"armoured\" to AssetValue.BoolValue(true), " +
+                "\"fitting.slots\" to AssetValue.IntValue(2), " +
+                "\"mass\" to AssetValue.FloatValue(12.5f), " +
+                "\"module_size\" to AssetValue.TextValue(\"small \\\"mk2\\\"\"), " +
+                "\"offset\" to AssetValue.ListValue(listOf(AssetValue.FloatValue(0.0f), AssetValue.FloatValue(0.5f)))" +
+                ")))" in text,
+            text,
+        )
+    }
+
+    @Test
+    fun `a node with no extras is written exactly as before`() {
+        val declaration = Declaration("model", "units/chassis", "chassis", SPAN, "units/chassis.glb")
+        val node = GltfNode(0, "socket_roof", 0f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f)
+        val text = AccessorGenerator.generate(
+            listOf(declaration),
+            clips = emptyMap(),
+            nodes = mapOf("units/chassis" to listOf(node)),
+        ).single { it.path.endsWith("/Chassis.kt") }.text
+
+        assertTrue("extras" !in text && "ModelExtras" !in text, text)
+    }
+
     private companion object {
         const val FOX_SCRIPT = "model(name = \"fox\", file = \"models/fox/Fox.glb\")\n"
         const val FOX_GOLDEN = "/golden/Fox.kt.txt"

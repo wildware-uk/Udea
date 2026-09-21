@@ -324,7 +324,7 @@ public object UdeaRules {
      * build generates one property per named node in the model's file, so a socket the file does
      * not have is a name that does not compile, and this rule carries the did-you-mean spec
      * section 5 makes mandatory. Raised by the same K2 checker, which recognises a node object by
-     * its members being typed `ModelNode`.
+     * its members being typed `ModelNode` (`udea-assets`, since issue #271).
      */
     public val UNRESOLVED_MODEL_NODE: UdeaRule = UdeaRule(
         id = "UDEA0018",

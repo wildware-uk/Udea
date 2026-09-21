@@ -315,6 +315,12 @@ The pieces a newcomer meets first, each with the issue that made it so.
   tick; the renderer places the same part from the *live* Kool node instead, so a socket on an
   animated bone or a turning ring carries what is mounted on it. A node name that is not in the
   model fails the build with `UDEA0018` and a did-you-mean.
+  **And a model says what it has** (#271). `ModelNode` is `udea-assets`' now, beside `Model`,
+  and the build packs every named node onto the asset: `registry[GameAssets.models.chassis].nodes`
+  lists them from the reference a game holds, and equals `Chassis.Nodes.all` because both come off
+  one reading of the file. What an artist types into Blender's Custom Properties - glTF `extras` -
+  arrives as `ModelExtras`, on each node and on the model (the scene's): typed reads,
+  `extras.float("mass")`, `null` for an absent key, `ModelExtraTypeException` for the wrong type.
   **And the mount reads both ways** (#270). `ctx[CoreModule.ATTACHMENTS]` is an `AttachmentIndex`:
   `childCount`, `childAt`, `nodeAt`, `forEachChild` and `childOf(parent, node)` answer *what is
   mounted on this entity* and *what is in this socket* from array reads, in ascending `NetId`

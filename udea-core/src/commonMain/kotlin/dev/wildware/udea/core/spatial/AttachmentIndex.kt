@@ -1,5 +1,6 @@
 package dev.wildware.udea.core.spatial
 
+import dev.wildware.udea.assets.ModelNode
 import dev.wildware.udea.core.identity.NetId
 
 /**

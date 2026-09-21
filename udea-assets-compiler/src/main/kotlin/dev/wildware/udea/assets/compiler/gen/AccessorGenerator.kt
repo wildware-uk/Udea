@@ -171,6 +171,10 @@ public object AccessorGenerator {
      * Every named node, not only the ones called `socket_*`: a bone is a mounting point too - a
      * pack on a walker's spine, a muzzle flash on a gun's barrel - and a file's naming
      * convention is the game's business rather than the build's.
+     *
+     * A node the artist attached values to carries them as `extras = ModelExtras(...)` (issue
+     * #271), so the accessor equals the node a packed `Model.nodes` holds; one with none is
+     * written exactly as it was before extras existed.
      */
     private fun nodesObject(model: Declaration, nodes: List<GltfNode>): TypeSpec {
         val nodesType = TypeSpec.objectBuilder(NODES_OBJECT)
@@ -191,13 +195,14 @@ public object AccessorGenerator {
                     .addKdoc("Node %L of the file, `%L`.\n", node.index, node.name)
                     .initializer(
                         "%T(index = %L, name = %S, x = %L, y = %L, z = %L, qx = %L, qy = %L, " +
-                            "qz = %L, qw = %L, scaleX = %L, scaleY = %L, scaleZ = %L)",
+                            "qz = %L, qw = %L, scaleX = %L, scaleY = %L, scaleZ = %L%L)",
                         MODEL_NODE,
                         node.index,
                         node.name,
                         float(node.x), float(node.y), float(node.z),
                         float(node.qx), float(node.qy), float(node.qz), float(node.qw),
                         float(node.scaleX), float(node.scaleY), float(node.scaleZ),
+                        extrasArgument(node.extras),
                     )
                     .build(),
             )
@@ -209,6 +214,34 @@ public object AccessorGenerator {
                 .build(),
         )
         return nodesType.build()
+    }
+
+    /**
+     * `, extras = ModelExtras(mapOf(...))` for a node with [extras], and nothing for one without.
+     *
+     * Each value is written as the `AssetValue` case the packed bundle decodes it to, key by key
+     * in sorted order, so the accessor and the bundle's node are equal and a rebuild emits the
+     * same characters.
+     */
+    private fun extrasArgument(extras: Map<String, Any>): CodeBlock {
+        if (extras.isEmpty()) return CodeBlock.of("")
+        val entries = extras.toSortedMap().map { (key, value) -> CodeBlock.of("%S to %L", key, extraValue(value)) }
+        return CodeBlock.of(", extras = %T(%M(%L))", MODEL_EXTRAS, MAP_OF, entries.joinToCode())
+    }
+
+    /** One plain extras value, as the `AssetValue` constructor call that makes it. */
+    private fun extraValue(value: Any): CodeBlock = when (value) {
+        is Boolean -> CodeBlock.of("%T(%L)", BOOL_VALUE, value)
+        is Int -> CodeBlock.of("%T(%L)", INT_VALUE, value)
+        is Float -> CodeBlock.of("%T(%L)", FLOAT_VALUE, float(value))
+        is String -> CodeBlock.of("%T(%S)", TEXT_VALUE, value)
+        is List<*> -> CodeBlock.of(
+            "%T(%M(%L))",
+            LIST_VALUE,
+            LIST_OF,
+            value.map { CodeBlock.of("%T(%L)", FLOAT_VALUE, float(it as Float)) }.joinToCode(),
+        )
+        else -> error("`GltfExtras` produced ${value::class.simpleName}, which is not a plain extras value")
     }
 
     /**
@@ -377,8 +410,22 @@ public object AccessorGenerator {
      */
     private val ANIMATION_CLIP = ClassName("dev.wildware.udea.core.spatial", "AnimationClip")
 
-    /** `udea-core`'s node handle: where a part is mounted (issue #260). */
-    private val MODEL_NODE = ClassName("dev.wildware.udea.core.spatial", "ModelNode")
+    /**
+     * The node handle: where a part is mounted (issue #260). `udea-assets`' since issue #271, so
+     * a packed `Model` can list its nodes; this module depends on `udea-assets`, but the class is
+     * named rather than imported, like every other type the generated source names.
+     */
+    private val MODEL_NODE = ClassName("dev.wildware.udea.assets", "ModelNode")
+
+    /** What an artist attached to a node, and the value cases it holds (issue #271). */
+    private val MODEL_EXTRAS = ClassName("dev.wildware.udea.assets", "ModelExtras")
+    private val ASSET_VALUE = ClassName("dev.wildware.udea.assets", "AssetValue")
+    private val BOOL_VALUE = ASSET_VALUE.nestedClass("BoolValue")
+    private val INT_VALUE = ASSET_VALUE.nestedClass("IntValue")
+    private val FLOAT_VALUE = ASSET_VALUE.nestedClass("FloatValue")
+    private val TEXT_VALUE = ASSET_VALUE.nestedClass("TextValue")
+    private val LIST_VALUE = ASSET_VALUE.nestedClass("ListValue")
+    private val MAP_OF = MemberName("kotlin.collections", "mapOf")
     private val TICKS = ClassName("dev.wildware.udea.core", "Ticks")
     private val LIST = ClassName("kotlin.collections", "List")
     private val LIST_OF = MemberName("kotlin.collections", "listOf")

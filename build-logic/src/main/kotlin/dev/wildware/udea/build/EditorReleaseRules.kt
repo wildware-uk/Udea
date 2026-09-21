@@ -115,7 +115,7 @@ public object EditorReleaseRules {
                 append(' ')
                 append(violation.why)
                 append(", in ")
-                appendLine(violation.origin)
+                appendLine(gateLocation(violation.origin))
             }
             append(
                 "    udea-editor and every Gizmo are debug-only: they belong in a game's editor source " +

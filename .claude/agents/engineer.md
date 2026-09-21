@@ -467,6 +467,17 @@ Two ways that happened on this box in one afternoon:
   bracket trick only stops the pattern matching its own `pgrep`, and the string is still sitting in
   the invoking command line.
 
+- **The pattern searched for something else.** `git grep -nE '\\\\\\\\'` looks like "find a backslash".
+  Inside single quotes the shell passes all eight characters to git untouched, and as an extended
+  regex each `\\` is one literal backslash - so it matched **four backslashes in a row**. Its eight
+  hits were all Kotlin's `"\\\\"` idiom, and it could never have found a test asserting
+  `"moba\\editor"`, which is the one thing it existed to rule out. To search for a literal
+  backslash, use a fixed string: `git grep -nF '\'`. No escaping, nothing to get wrong.
+
+  It was caught the only way this kind is ever caught: a file the developer *knew* held a backslash
+  was tracked and was not in the result. **A search that misses a known positive is a broken search,
+  whatever it printed.**
+
 And once, a loop answered `command not found: curl` for a binary plainly at `/usr/bin/curl` - a
 transient fork failure under memory pressure, wearing the costume of a missing program, printing a
 blank where a result belonged.

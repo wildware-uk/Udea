@@ -1,13 +1,111 @@
-11c7680d
+a139f001
 
 # Issue #251 — Hollow H3: foxes that wander, chase and flee, in waves
 
-Branch `issue-251-fox-waves`. Code commit `3fb365a1`, merged with `origin/master` `a99acb9f` in
-`11c7680d`. The commit that adds this file changes nothing else.
+Branch `issue-251-fox-waves`. Round 2 tree: `a139f001`, which merges `origin/master` `4a4a2df5`
+(#271 and windows-green) into `1361afa7` (the round-1 fix). The commit that updates this file
+changes nothing else.
 
 Every artefact quoted below is a file under
 `/tmp/claude-1000/-srv-ssd1-workspace-Udea/1ad8c5e6-2def-4055-91d2-72acdfe77daf/scratchpad/dev251/`,
 written `dev251/` from here on.
+
+## 0. Round 2
+
+### The finding
+
+Review round 1 found `Fox.snapshotType()` public with its only caller, `HollowNet.kt`, in the same
+module. It is now `internal` (`1361afa7`).
+
+**The same kind of problem elsewhere.** I listed every `public` this branch adds in `hollow/`
+(`git diff a99acb9f HEAD -- 'hollow/*.kt' | grep '^+.*\bpublic\b'`). One more had the problem:
+`FoxWaves`' companion object was public, but every member in it was internal. It is now
+`internal companion object`. These stay public because `hollow:desktop` uses them:
+- `Fox` and its companion: `HollowFoxShot` uses `family { all(Fox, ...) }`, `entity[Fox]` and `fox.mode`.
+- `FoxMode`: it is the type of the public `Fox.mode`.
+- `FoxWaves`: `HollowFoxShot` builds its own schedule.
+- `HollowFoxShot.main`: the `runFoxShot` entry point.
+
+`Fox`'s `public var` fields follow the existing `Player` component, whose `@Sim` fields are
+public too.
+
+### The merge, and the generated files
+
+This branch merged second, after #271, so it regenerated every generated-file family on the merged
+tree. Only the two moba fixtures conflicted (they are binary). Neither side was picked:
+`git checkout --ours` only put a file in place for `udeaWriteReplayFixture` to rewrite.
+
+**What each side had moved.** I measured this before predicting, from the merge's own stages
+(`git show :1:`, `:2:` and `:3:`, script `dev251/r2/stages.sh`). The regions follow
+`ReplayFormat.kt`: little-endian, a 155-byte header, the asset hash at bytes 27..59
+(`dev251/r2/regions.py`, output `dev251/r2/stages-regions.txt`).
+- #271, base to master: asset hash 32 bytes (`f3556cc2...` to `c011c548...`), crc 4 bytes, and
+  nothing else.
+- #251, base to this branch: protoHash 2 bytes (`0x07b6` to `0xc979`), hashes 28713 bytes
+  (3600) and 287018 bytes (36000), crc 4 bytes, and nothing else. Frames 0 on both sides.
+
+**Prediction, frozen and sent to the lead before any regeneration** (`dev251/r2/prediction.txt`),
+against what happened:
+
+| | Predicted | Measured |
+|---|---|---|
+| P1 `net-components.lock` | unchanged from this branch | unchanged; `udeaWriteNetComponents` rewrote it (mtime 05:27:03) |
+| P2 the four `net-protocol.lock` files | unchanged | unchanged; each task logged `wrote` (mtimes 05:27:40 to 05:28:02) |
+| P3 `expected-generated-hashes.txt` | unchanged | unchanged; rewritten by the `-Pudea.updateGeneratedHashes=true` run (05:28:37) |
+| P4 each fixture, regenerated vs this branch | asset hash 32 bytes, equal to master's; crc 4 bytes; every other region 0 | exactly that, both fixtures |
+| P5 each fixture, regenerated vs master | protoHash 2 bytes; hashes 28713 / 287018 bytes; crc 4 bytes; asset hash 0 | exactly that, both fixtures |
+| P6 `test_level.roster.txt` | unchanged, and the roster test green with no edit | unchanged; green in build5 |
+| P7 `drift-*.udearep` | unchanged | unchanged |
+
+How to check the table:
+- "Unchanged" means `git diff HEAD --name-only` on the regenerated tree listed only the two moba
+  fixtures (`dev251/r2/merged-vs-ours-names.txt`). The two fixtures are its positive control.
+- The mtimes (`dev251/r2/rewritten-mtimes.txt`) show each file was rewritten during the run
+  rather than left alone.
+- The fixture regions are in `dev251/r2/measured-regions.txt`.
+- The tool's own lines are in `dev251/r2/fixtures.log`: `REGENERATED - rebuilt because this
+  build cannot replay it - assetGraphHash: recorded f3556cc2c7387f60... (32 bytes), this build
+  c011c548ff5d5c87... (32 bytes)`, the same for each fixture.
+- Every regeneration run has a marker under `dev251/r2/` recording EXIT, START, END, WORKTREE
+  and ARGS.
+
+`BRIEF.md` survived the merge as this branch's (its first line was `11c7680d` straight after it).
+
+### The evidence command at `a139f001`
+
+`dev251/evidence5.marker`: `EXIT=0`, `HEAD=a139f001`. The in-XML stamps are 05:31:11 to 05:31:12,
+and the run ended at 05:31:17 (`dev251/evidence5-xml.txt`):
+
+    testsuite name="dev.wildware.hollow.FoxWaveTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-21T05:31:11.824Z"
+    testsuite name="dev.wildware.hollow.net.FoxReplicationTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-21T05:31:12.073Z"
+    testsuite name="dev.wildware.hollow.FoxBehaviourTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-09-21T05:31:11.613Z"
+    testsuite name="dev.wildware.hollow.net.PlayerReplicationTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-09-21T05:31:12.748Z"
+
+### The full build at `a139f001`
+
+Marker (`dev251/build5.marker`), verbatim:
+
+    EXIT=0
+    START=2026-09-21T05:31:19Z END=2026-09-21T07:02:28Z WORKTREE=/srv/ssd1/workspace/Udea/.claude/worktrees/agent-ab135fb44c31f8480 HEAD=a139f001 ARGS=build --continue --no-configuration-cache --max-workers=3 --rerun-tasks --no-build-cache --no-daemon
+    DONE
+
+The last two lines of `dev251/build5.log`:
+
+    BUILD SUCCESSFUL in 1h 31m 7s
+    1122 actionable tasks: 1122 executed
+
+- The log has 0 `FROM-CACHE` lines.
+- The test XML (`dev251/r2/build5-xml-count.txt`): 831 files, 5866 tests, 47 skipped, 0 failures
+  or errors. None is stamped before build5's `START`. As a control, 14 are stamped before 06:30,
+  so the check can return a non-zero.
+- The 1h31m is the box, not the build. Three full builds ran at once, and memory and I/O pressure
+  were high (reported to the lead at the time). Round 1's build4 took 10m32s.
+- `AgentHostThreadsTest`, which was red in the reviewer's round-1 build, passed here: `tests="3"
+  failures="0"`, stamped 06:55:54.
+- As in round 1, there was no `DISPLAY`, so this build is not evidence about GL (section 3).
+
+Sections 1 to 8 below are round 1's brief, unchanged apart from this section. Round 1's build
+(build4 in section 3) was at `11c7680d`.
 
 ## 1. Evidence command
 

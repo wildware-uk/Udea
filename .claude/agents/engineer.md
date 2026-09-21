@@ -148,8 +148,10 @@ words. Seen on this box 2026-09-20; the real run of that same task took 3m13s.
 This is the silent-GL-skip trap one level down, and counting tests out of the XML does **not** save
 you: the XML is exactly what was restored. Two things do:
 
-- **Check the XML timestamps against the wall clock.** A results file older than the command you
-  just ran is not that command's result.
+- **Check the timestamp *inside* the XML against the wall clock** - the `timestamp=` attribute, not
+  the file's mtime. **A restored file gets the restore time**, so `ls -l` shows it as fresh and tells
+  you nothing; only the in-XML timestamp survives the round trip through the cache. A reviewer caught
+  `:udea-codegen:test` this way: `FROM-CACHE`, mtime current, in-XML timestamp an hour old.
 - **Or pass `--no-build-cache`** for the run you intend to quote, and delete the result directories
   first.
 

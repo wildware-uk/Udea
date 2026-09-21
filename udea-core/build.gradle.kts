@@ -69,6 +69,17 @@ kotlin {
             dependencies {
                 api(project(":udea-annotations"))
 
+                // `api`: `Drawn`, the simulation's "which model does this entity draw" (issue
+                // #270), names a `Ref<Model>` and an `AssetRegistry` in its constructors - a
+                // game's blueprints spawn parts and say what each one looks like, and that has
+                // to be sayable from the simulation rather than from the renderer. A downward
+                // arrow: `udea-assets` is plain data with no Fleks, no GL and the same target
+                // set as this module, so the headless guarantee is untouched (both are in
+                // `ModuleGraphRules.HEADLESS_PROJECTS`). What crosses the line is asset
+                // *identity* - an `AssetIndex` slot - which spec 3.6 already makes the only
+                // asset identity a snapshot may carry.
+                api(project(":udea-assets"))
+
                 // `api`: `LevelComponent` names a `KSerializer`, and every module that declares a
                 // saved component compiles `@Serializable` against it. CBOR is the level encoding
                 // and nothing outside `dev.wildware.udea.core.level` names it, so it stays

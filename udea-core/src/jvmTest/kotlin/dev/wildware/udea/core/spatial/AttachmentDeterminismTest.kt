@@ -36,6 +36,13 @@ class AttachmentDeterminismTest {
         val netIds = host.ctx[CoreModule.NET_IDS]
         val registry = ComponentRegistry(listOf(Transform3D.snapshotType(), AttachedTo.snapshotType()))
         val service = SnapshotService(registry, host.world, host.ctx, netIds)
+        val attachments = host.ctx[CoreModule.ATTACHMENTS]
+
+        /** Everything mounted on [parent] as the index has it, in the order it reports. */
+        fun childrenOf(parent: Entity): List<NetId> {
+            val id = netIdOf(parent)
+            return (0 until attachments.childCount(id)).map { attachments.childAt(id, it) }
+        }
 
         val chassis: Entity = spawn(Transform3D())
         val turret: Entity = spawn(Transform3D())
@@ -138,6 +145,41 @@ class AttachmentDeterminismTest {
         }
 
         assertEquals(recorded.subList(RESUME_TICK, TICKS), again, "the resumed run took a different path")
+    }
+
+    /**
+     * The reverse index is **derived, never stored** (issue #270), and this is what that buys: a
+     * rewind past a swap puts the original part back on the socket in the index too, because the
+     * index after the restore is built from the restored components rather than carried across it.
+     *
+     * An index that were state would answer with the future's parts here - the spare that the
+     * rewind un-mounted - and nothing else in the suite would notice, because every transform
+     * would still be right.
+     */
+    @Test
+    fun `a rewind past a swap re-derives the index from the restored world`() {
+        val rig = Rig()
+        lateinit var beforeTheSwap: WorldSnapshot
+        for (tick in 0 until TICKS) {
+            if (tick == RESUME_TICK) beforeTheSwap = rig.service.capture()
+            script(rig, tick)
+            rig.host.run(1)
+        }
+        assertEquals(listOf(rig.netIdOf(rig.spare)), rig.childrenOf(rig.chassis), "the spare is on the roof")
+
+        rig.service.applyNow(beforeTheSwap)
+        rig.host.run(1)
+
+        assertEquals(
+            listOf(rig.netIdOf(rig.turret)),
+            rig.childrenOf(rig.chassis),
+            "after the rewind the chassis carries the turret again, not the spare the future mounted",
+        )
+        assertEquals(
+            listOf(rig.netIdOf(rig.gun)),
+            rig.childrenOf(rig.turret),
+            "and the gun the future blew off is back on the turret",
+        )
     }
 
     private companion object {

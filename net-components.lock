@@ -99,6 +99,15 @@
 # where a destroyed building used to be, since the grid is rebuilt from these components and from
 # nothing else. They sort after every earlier name, so adding them moved no existing id.
 #
+# `dev.wildware.udea.core.spatial.Drawn` (issue #270) is which model an entity draws, named by the
+# simulation: an `AssetIndex` slot, because a unit's parts are spawned by the simulation and a
+# client has to draw the same parts. It is here because that has to reach a client and survive a
+# `time.rewind` - a part a client did not receive the model for would be an invisible shell riding
+# a chassis, and a rewind that did not restore it would resurrect an assembly with no art, which is
+# exactly the cost the `CharacterView` note above measured. It sorts between `spatial.AttachedTo`
+# and `spatial.Transform3D`, so `Transform3D`, `nav.NavAgent` and `nav.NavObstacle` each move up by
+# one. Nothing has shipped against those ids.
+#
 dev.wildware.hollow.Player
 dev.wildware.moba.CharacterView
 dev.wildware.moba.Player
@@ -129,6 +138,7 @@ dev.wildware.udea.core.physics.PhysicsBody
 dev.wildware.udea.core.physics.Teleport
 dev.wildware.udea.core.spatial.Animator
 dev.wildware.udea.core.spatial.AttachedTo
+dev.wildware.udea.core.spatial.Drawn
 dev.wildware.udea.core.spatial.Transform3D
 dev.wildware.udea.nav.NavAgent
 dev.wildware.udea.nav.NavObstacle

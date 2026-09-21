@@ -322,6 +322,14 @@ header is read - the constant pool, the class, its superclass and its interfaces
 whose header this ASM cannot parse fails the task, naming the class, rather than being skipped. A
 scan that read no class at all fails rather than passing.
 
+The failure names the directory or jar the class came out of, and names it **forward-slashed on
+every platform** - `gateLocation`, the same spelling `ContractFreeze` and `DeterminismScan` already
+use and the frozen diagnostics contract asks of a `SourceSpan`. Until then the message carried the
+platform's own separator, which made `VerifyEditorAbsentTest`'s "the failure must say where the
+class was" a claim about the machine that wrote it: it looked for `moba/editor`, Windows said
+`moba\editor`, and every CI job that runs `build-logic`'s own tests on `windows-latest` was red on
+a gate that was working.
+
 The handle annotations (`@PositionHandle`, `@SizeHandle`, `@RotationHandle`, `@RadiusHandle`,
 `@RangeHandle`) are compile-time markers in `udea-annotations` and never make a release classpath
 carry editor code: the game's KSP run checks them (`UDEA0017`) and lists the components on its
@@ -479,6 +487,10 @@ over a leaky jar is the exact failure mode — and it is also what keeps the gat
 shading or fat-jar packaging arrives, where the model stops describing what ships.
 
 Finding no archive at all fails too. A release gate with no input passes forever.
+
+The failure names the archive forward-slashed on every platform, through `gateLocation`, for the
+same reason `UDEA-MG-012` does: a release gate's message carries an absolute filesystem location
+rather than a repo-relative one, so the separator is the part of it that changes with the machine.
 
 ## `UDEA-REL-002` — no agent module on the release runtime classpath
 

@@ -71,6 +71,27 @@ class ReleaseRulesTest {
         assertTrue(":moba" in report, report)
     }
 
+    /**
+     * The sibling of [EditorReleaseRulesTest]'s Windows case, and the reason this one is here at
+     * all: `UDEA-REL-001` names an absolute archive path the same way `UDEA-MG-012` names an
+     * absolute class origin, and only `UDEA-MG-012`'s was asserted with a separator in it. Fixing
+     * the asserted one and leaving this one printing `D:\...` would leave the same defect in the
+     * tree with nothing pointing at it.
+     */
+    @Test
+    fun `the report prints a Windows archive path forward-slashed, whatever platform found it`() {
+        val windowsJar = """D:\a\Udea\Udea\moba\build\libs\moba.jar"""
+        val report = assertNotNull(
+            ReleaseRules.report(
+                ":moba",
+                listOf(ReleaseRules.ArchiveEntry(windowsJar, "dev/wildware/udea/agent/AgentTools.class")),
+                ReleaseRules.DEFAULT_BANNED_PREFIXES,
+            ),
+        )
+
+        assertTrue("D:/a/Udea/Udea/moba/build/libs/moba.jar" in report, report)
+    }
+
     @Test
     fun `the banned prefix list is configurable`() {
         val violations = ReleaseRules.artifactViolations(

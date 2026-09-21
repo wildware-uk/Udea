@@ -59,6 +59,10 @@ class VerifyEditorAbsentTest {
 
         assertTrue("UDEA-MG-012" in result.output, result.output)
         assertTrue("dev/wildware/moba/PositionPositionGizmo" in result.output, result.output)
+        // Forward slashes on every platform, because `gateLocation` puts them there. Written as
+        // the platform's own separator this line said nothing on the platform it was not run on,
+        // and it turned every `windows-latest` job that runs these tests red for exactly that:
+        // the gate was right and the assertion was about its author's machine.
         assertTrue("moba/editor" in result.output, "the failure must say where the class was:\n${result.output}")
     }
 

@@ -117,6 +117,34 @@ class EditorReleaseRulesTest {
         assertNull(EditorReleaseRules.report(":moba:desktop", emptyList()))
     }
 
+    /**
+     * The same report, about a class found on Windows.
+     *
+     * A gate's location is the one part of its message that changes with the machine that ran it,
+     * and the separator is the whole of that change. This rule printed the platform's own
+     * spelling, so `VerifyEditorAbsentTest`'s "the failure must say where the class was" was a
+     * claim about the author's machine: it turned every CI job that runs `build-logic`'s own tests
+     * on `windows-latest` red, while the gate itself was working perfectly. [gateLocation] is
+     * the spelling it prints now, and carries the reasoning.
+     *
+     * The origin is a string rather than a `File` deliberately - see [GateLocationTest].
+     */
+    @Test
+    fun `the report prints a Windows location forward-slashed, whatever platform found it`() {
+        val violations = EditorReleaseRules.violations(
+            listOf(
+                scanned(
+                    """D:\a\Udea\Udea\moba\editor""",
+                    classBytes("game/Ring", interfaces = arrayOf(EditorReleaseRules.GIZMO)),
+                ),
+            ),
+        )
+
+        val report = assertNotNull(EditorReleaseRules.report(":moba", violations))
+
+        assertTrue("D:/a/Udea/Udea/moba/editor" in report, report)
+    }
+
     @Test
     fun `a scan of no classes at all is a broken check, not a clean one`() {
         assertNotNull(EditorReleaseRules.brokenCheck(":moba:desktop", scannedClasses = 0))

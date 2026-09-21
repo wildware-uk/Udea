@@ -101,7 +101,7 @@ public object ReleaseRules {
             appendLine('.')
             violations.forEach {
                 append("    ")
-                append(it.archivePath)
+                append(gateLocation(it.archivePath))
                 append(" -> ")
                 appendLine(it.entryName)
             }

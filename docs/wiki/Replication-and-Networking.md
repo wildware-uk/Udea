@@ -50,7 +50,7 @@ u16 protoHash | u16 seq | u16 ack | u32 ackBits | u8 flags | varint serverTick |
 
 ## Clients send input, and only input
 
-`InputCommand` (`udea-net/src/commonMain/kotlin/dev/wildware/udea/net/input/InputCommand.kt`) is what the player *did*, never where the player *is*. A client that pushed its own position would own it, and there would be nothing to cheat past and nothing to predict. So the wire vocabulary is one-way by construction, and `NoClientStateUploadTest` checks that no client-to-server datagram carries a replicated field.
+`InputCommand` (`udea-net/src/commonMain/kotlin/dev/wildware/udea/net/input/InputCommand.kt`) is what the player *did*, never where the player *is*. A client that pushed its own position would own it, and there would be nothing to cheat past and nothing to predict. So the wire vocabulary is one-way by construction, and `InputPathTest.`no client to server datagram carries a replicated component field`` (`udea-net/src/jvmTest/kotlin/dev/wildware/udea/net/input/InputPathTest.kt`) checks it.
 
 - **30Hz input.** `ReplicationClient` sends every second tick (`DEFAULT_INPUT_INTERVAL = 2`) against the 60Hz simulation.
 - **Redundancy.** Every input packet carries the last three commands (`InputRing`), so one lost packet costs nothing.

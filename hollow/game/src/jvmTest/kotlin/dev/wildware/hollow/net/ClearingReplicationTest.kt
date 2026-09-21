@@ -32,7 +32,9 @@ import kotlin.test.assertTrue
 class ClearingReplicationTest {
 
     private val harness = NetHarness(clients = 2)
-    private val server = HollowServer(harness.transport(PeerId.SERVER))
+    // No fox waves (issue #251): this test counts the entities a client created and holds, and a
+    // wave of foxes arriving part-way through would be counted with the one it spawned.
+    private val server = HollowServer(harness.transport(PeerId.SERVER), waves = null)
     private val clients = harness.clientPeers().map { peer ->
         server.addClient(peer)
         HollowClient(peer, harness.transport(peer))

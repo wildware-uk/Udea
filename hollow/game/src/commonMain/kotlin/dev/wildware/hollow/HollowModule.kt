@@ -11,31 +11,36 @@ import dev.wildware.udea.render.input.IntentSampleSystem
 import dev.wildware.udea.render.input.IntentState
 
 /**
- * Hollow's own module: the launch level, and the four systems that make a character a character.
+ * Hollow's own module: the launch level, and the systems that make a character a character and a
+ * fox a fox.
  *
  * In H1 (issue #249) it published the level and contributed no system, because the clearing was
- * static. Issue #250 adds the player, and its four systems are one per question, in tick order:
+ * static. Issue #250 added the player and issue #251 the foxes, one system per question, in tick
+ * order:
  *
  * | Phase | System | Answers |
  * |---|---|---|
  * | `Intent` | [PlayerControlSystem] | what did the player ask for |
  * | `PreSimulation` | [ClearingBodySystem] | what can a character not walk through |
+ * | `PreSimulation` | [FoxWaveSystem] | does a wave of foxes arrive this tick, and where |
  * | `Movement` | [PlayerMovementSystem] | how fast, and in which direction |
- * | `PostPhysics` | [PlayerPoseSystem] | which way is it facing, and which clip is playing |
+ * | `Movement` | [FoxBrainSystem] | is each fox wandering, chasing or fleeing, and where to |
+ * | `PostPhysics` | [PlayerPoseSystem] | which way is the character facing, and which clip is playing |
+ * | `PostPhysics` | [FoxPoseSystem] | the same, for each fox |
  *
- * The solver itself is between the last two, contributed by `Physics2DModule`, which is why the
- * character stops at a rock rather than walking through it.
- *
- * The creatures and their systems register here in later tickets of epic #245.
+ * The solver itself is between `Movement` and `PostPhysics`, contributed by `Physics2DModule`,
+ * which is why a character stops at a rock rather than walking through it, and a fox at a tree.
  */
 internal class HollowModule(
     private val level: LaunchLevel,
     /**
      * Whether this world decides anything. False on a client, whose world is a replicated view, and
-     * which therefore registers none of the four systems - see `HollowGame`'s "What a client does
+     * which therefore registers none of the systems above - see `HollowGame`'s "What a client does
      * not run".
      */
     private val authoritative: Boolean = true,
+    /** The fox waves this world sends (issue #251), or null for none: a test about a player. */
+    private val waves: FoxWaves? = FoxWaves.DEFAULT,
 ) : UdeaModule {
 
     override val name: String get() = HollowGame.NAME
@@ -54,10 +59,15 @@ internal class HollowModule(
         registry.add(SimPhase.PreSimulation, { ClearingBodySystem() })
         registry.add(SimPhase.Movement, { PlayerMovementSystem() })
         registry.add(SimPhase.PostPhysics, { PlayerPoseSystem() })
+        // Issue #251: the foxes. The wave arrives before anything decides, the mind decides
+        // beside the players' movement, and the pose is read off what the solver did.
+        if (waves != null) registry.add(SimPhase.PreSimulation, { FoxWaveSystem(waves) })
+        registry.add(SimPhase.Movement, { FoxBrainSystem() })
+        registry.add(SimPhase.PostPhysics, { FoxPoseSystem() })
     }
 
     override fun toString(): String =
-        "HollowModule($level, ${if (authoritative) "authoritative" else "replicated view"})"
+        "HollowModule($level, ${if (authoritative) "authoritative" else "replicated view"}, waves=$waves)"
 }
 
 /**

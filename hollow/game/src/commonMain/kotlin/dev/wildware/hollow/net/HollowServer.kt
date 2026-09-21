@@ -1,6 +1,7 @@
 package dev.wildware.hollow.net
 
 import com.github.quillraven.fleks.World.Companion.family
+import dev.wildware.hollow.FoxWaves
 import dev.wildware.hollow.HollowControls
 import dev.wildware.hollow.HollowGame
 import dev.wildware.hollow.HollowHost
@@ -69,11 +70,16 @@ public class HollowServer(
     budget: BandwidthBudget = BandwidthBudget(),
     mtu: Int = LoopbackNetwork.DEFAULT_MTU,
     level: ByteArray = HollowLevel.bundledBytes(),
+    /** The fox waves this session sends (issue #251), or null for none. */
+    waves: FoxWaves? = FoxWaves.DEFAULT,
+    /** A new match's seed, or null to draw from the level's own streams. See [HollowGame.seed]. */
+    matchSeed: Long? = null,
 ) : AutoCloseable {
 
     /** The server's own game, headless, with the level loaded. Closed with this session. */
-    private val opened: HollowHost = HollowGame.build(RenderMode.Headless, level = level, role = NetRole.Server)
-        .also { HollowGame.seed(it.host) }
+    private val opened: HollowHost =
+        HollowGame.build(RenderMode.Headless, level = level, role = NetRole.Server, waves = waves)
+            .also { HollowGame.seed(it.host, matchSeed) }
 
     /** The authoritative simulation. */
     public val host: GameHost get() = opened.host
@@ -99,6 +105,9 @@ public class HollowServer(
         transport = transport,
         ring = ring,
         budget = budget,
+        // The clearing's dressing behind everything that moves: see `HollowRelevancy` for the
+        // stall it prevents (issue #251).
+        relevancy = HollowRelevancy(host.world, host.ctx[CoreModule.NET_IDS]),
         mtu = mtu,
     )
 

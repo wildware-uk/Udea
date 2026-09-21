@@ -37,14 +37,19 @@ import kotlin.test.assertTrue
  * stopped and the link has drained**, where a correct system must converge exactly - and it is
  * asserted on every replicated field of `Transform3D` and `Animator`, not on a position alone.
  *
- * While a character is moving, the honest claim is the opposite one, and it is the last test here:
- * the local character is predicted, so it is *ahead* of what the server has managed to tell this
- * client. A test that demanded agreement during the drive would be asserting a link with no delay.
+ * While a character is moving, a client can only agree with a tick the server has already left, so
+ * the one test that compares during a walk compares each client with the server's record of **the
+ * tick that client was told**, not with the server's present (issue #251). And the local character
+ * is predicted, so it is *ahead* of what the server has managed to tell its client - the last test
+ * here. A test that demanded agreement with the server's present during the drive would be asserting
+ * a link with no delay.
  */
 class PlayerReplicationTest {
 
     private val harness = NetHarness(clients = 2, initialConditions = NetConditions(latencyTicks = LATENCY))
-    private val server = HollowServer(harness.transport(PeerId.SERVER))
+    // No fox waves (issue #251): these are the players' tests, and a fox that reached a character
+    // standing still would push it.
+    private val server = HollowServer(harness.transport(PeerId.SERVER), waves = null)
     private val characters = ArrayList<NetId>()
     private val clients = harness.clientPeers().map { peer ->
         characters += server.addClient(peer)
@@ -63,7 +68,10 @@ class PlayerReplicationTest {
                     server.onPacket(from, buffer, offset, length)
                 }
 
-                override fun onTick(tick: Tick) = server.tick()
+                override fun onTick(tick: Tick) {
+                    server.tick()
+                    record()
+                }
             },
         )
         for ((index, client) in clients.withIndex()) {
@@ -256,6 +264,40 @@ class PlayerReplicationTest {
         assertNotEquals(driver.character, clients[1].character, "both clients predicted the same character")
     }
 
+    @Test
+    fun `a walking character is where the server had it on the very tick each client was told`() {
+        harness.step(SETTLE)
+        hands[0].walk(0f, 1f)
+
+        // Six seconds of walking, compared every quarter of a second, which is long enough to span
+        // the moments the server re-sends the whole clearing (issue #251): with the props weighted
+        // like the characters those moments held the walker back, on every client, for ticks.
+        var compared = 0
+        repeat(WALK_CHECKS) {
+            harness.step(QUARTER_SECOND)
+            for (client in clients) {
+                client.applier.apply(client.replication.world)
+                val told = client.serverTick.value
+                val expected = checkNotNull(walked[told]) { "the server never recorded tick $told" }
+                val seen = placement(client.host.world, client.host.ctx[CoreModule.NET_IDS], characters[0])
+                assertEquals(expected, seen, "${client.peer} was told tick $told and holds the walker somewhere else")
+                compared++
+            }
+        }
+        val moved = walked.getValue(server.tick.value)[1] - HollowServer.SPAWN_Y
+        assertTrue(moved > MOVED, "the walker only covered $moved, so the comparison was of a character standing still")
+        assertEquals(WALK_CHECKS * clients.size, compared)
+    }
+
+    /** Where character zero stood at the end of each server tick, by tick. */
+    private val walked = HashMap<Long, List<Float>>()
+
+    private fun record() {
+        val ids = server.host.ctx[CoreModule.NET_IDS]
+        if (ids.resolveOrNull(characters.firstOrNull() ?: return) == null) return
+        walked[server.tick.value] = placement(server.host.world, ids, characters[0])
+    }
+
     /** Asserts every machine has [character] playing clip [clip]. */
     private fun assertClip(clip: Int, character: NetId, moment: String) {
         val authority = clipOf(server.host.world, server.host.ctx[CoreModule.NET_IDS], character)
@@ -324,6 +366,11 @@ class PlayerReplicationTest {
 
         /** A second of walking. */
         const val DRIVE = 60
+
+        const val QUARTER_SECOND = 15
+
+        /** Twenty-four quarter-seconds: six seconds of walking. */
+        const val WALK_CHECKS = 24
 
         /** Floats that crossed a link and came back: a `Transform3D` field is not quantised. */
         const val TOLERANCE = 1e-3f

@@ -20,6 +20,7 @@ import dev.wildware.udea.render.input.DeviceIntent
 import dev.wildware.udea.render.input.IntentState
 import dev.wildware.udea.render.kool.KoolKeyboard
 import dev.wildware.udea.render.kool.KoolPointer
+import dev.wildware.udea.render.model.FileModelLibrary
 import dev.wildware.udea.render.model.ImportedModel
 import dev.wildware.udea.render.model.loadModel
 import java.io.File
@@ -70,7 +71,10 @@ internal object HollowLaunch {
         var opened: KoolBackend? = null
         try {
             val definition = HollowGame.definition(physics, levelBytes(), role)
-            val scene = HollowScene({ prop -> models.getValue(prop) }, { human }, definition.core.netIds)
+            // Every fox names its model with `Drawn` (issue #251), and this is what turns the name
+            // into the file: the same asset root the props are read from.
+            val library = FileModelLibrary(assetRoot(), HollowAssets.registry)
+            val scene = HollowScene({ prop -> models.getValue(prop) }, { human }, definition.core.netIds, library)
             val registry = RenderRegistry()
             scene.register(registry)
             val backend = KoolBackend.start(mode, WindowConfig(title = "Hollow"), registry)

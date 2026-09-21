@@ -7,6 +7,7 @@ import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.camera.ThirdPersonRig
 import dev.wildware.udea.render.input.IntentSource
 import dev.wildware.udea.render.model.ModelCamera
+import dev.wildware.udea.render.model.ModelLibrary
 import dev.wildware.udea.render.model.ModelLight
 import dev.wildware.udea.render.model.ModelRenderSystem
 import dev.wildware.udea.render.model.ModelSource
@@ -32,11 +33,14 @@ import dev.wildware.udea.render.model.ModelSource
  * @param models the model each prop is drawn with; see [ScenerySystem].
  * @param human the model a character is drawn with; see [CharacterSystem].
  * @param netIds how [rig] resolves the character it follows.
+ * @param library what an entity the simulation named a model for with `Drawn` is drawn with - every
+ *   fox (issue #251). Null draws no `Drawn` entity at all, which only a test that has no foxes wants.
  */
 public class HollowScene(
     private val models: (Prop) -> ModelSource,
     private val human: () -> ModelSource,
     private val netIds: NetIdIndex,
+    private val library: ModelLibrary? = null,
 ) {
 
     /** Where the clearing is seen from. Moved by [rig] every frame, drawn through by the renderer. */
@@ -66,7 +70,7 @@ public class HollowScene(
         })
         registry.register(RenderPhase.PreRender, { ScenerySystem(models, light) })
         registry.register(RenderPhase.PreRender, { CharacterSystem(human) })
-        registry.register(RenderPhase.World, { resources -> ModelRenderSystem(resources, camera, light) })
+        registry.register(RenderPhase.World, { resources -> ModelRenderSystem(resources, camera, light, models = library) })
     }
 
     /**

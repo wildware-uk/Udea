@@ -1167,3 +1167,101 @@ in `build-logic`, which `dev-274` owns this wave, so it waits rather than becomi
 edit on somebody's branch. The general rule is now in `.claude/agents/engineer.md`.
 
 **Backlog:** robot-game #258, #261, #263, #267, #268, #269, #270, #271, #274. Hollow #251-#255.
+
+
+---
+
+## Wave 25 — 2026-09-21: sky, model extras, and the first creatures
+
+**Wave 24 closed with three merges.** Shaders as a declared asset kind (`318a0a9`), #274
+(`ffcc10a`), #270 (`343d219`). Every post-merge build `EXIT=0` off its marker. Snapshot release
+35559075031 dispatched at `00a2093`, which contains all three. `dev-windows` is still out: code done,
+waiting on Windows CI run 35559034659 to **complete** rather than be killed by `cancel-in-progress`.
+
+| Developer | Branch | Modules | Owns |
+|---|---|---|---|
+| `dev-271` | `issue-271-model-nodes-extras` | `udea-assets-compiler`, `udea-assets` | nothing exclusively - see below |
+| `dev-267` | `issue-267-sky` | `udea-render` | nothing generated |
+| `dev-251` | `issue-251-fox-waves` | `hollow:game` | `net-components.lock`, every `net-protocol.lock` |
+
+**My lock-ownership split was wrong, and `dev-251` caught it before touching anything.** Component
+ids are **global**: `net-components.lock` is one sorted list and every `dev.wildware.hollow.*` name
+sorts first, so one Hollow component shifts every id in every lock **and** both moba `.udearep`
+fixtures, which carry the protocol hash. `dev-271` moves the same two fixtures for a different reason
+(the asset-graph hash). H2 (`16ddb43`) had already proved it. So the rule this wave, and from now on:
+**each branch regenerates on its own branch to stay green; nobody resolves a generated file as text;
+whoever merges second merges `master` in and regenerates on the merged tree, then measures.**
+Ownership of a generated file cannot be assigned by module when the ids it holds are global.
+
+**No gate files this wave.** The other project released the box for the night; `robot-game` still
+builds on its own schedule and is outside every gate. Each developer runs `--max-workers=4` and
+re-runs anything load-shaped alone.
+
+**The daemon's metaspace is a shared resource.** `dev-windows`' rebased build went red with five
+failures, every one `Metaspace`, after its daemon had served eight builds; a fresh JVM was green.
+The remedy is `--no-daemon` for your own build. **Never `sh gradlew --stop`**: it kills every
+Gradle 8.13 daemon this user owns, which on this night included the lead's post-merge build.
+
+**Two claims I relayed to the owner as findings were wrong, and the #270 reviewer caught both.**
+"The full-world scan is wrong about generations" does not hold - the scan compares whole `NetId`s;
+the difference is a policy, not a generation bug. And the sentinel test's KDoc gives the wrong reason
+for its `NetId.of(0, 0)` fixture: any other parent makes `add()` throw first, so the fixture is needed
+for the test to *run*. Both corrected on #270. Both were specific, plausible and confidently written,
+and nobody had executed them - which is the defect of the whole session in its final form: **an
+explanation is a claim, and it needs the same evidence as a number.**
+
+**Deferred to after `dev-251` merges** (it owns the locks): widening `GeneratedSources.files` to
+cover resources; the phantom `NoClientStateUploadTest` name in two KDocs (`InputCommand.kt`,
+`ReplicationClient.kt`), which propagate through KDoc into generated output.
+
+**Backlog after this wave:** #252-#255 (Hollow H4-H7, sequential after H3), #258, #261 (after
+#271 - both touch glTF extras), #263, #268, #269, #275, #276. #223 and #226 are the owner's shelving,
+blocked upstream on Kool publishing no wasmJs artifact.
+
+**`master` is red on Windows `replay-equality`, and it is a regression I merged.** Found by
+`dev-windows` reading its own CI run's annotations, then confirmed pre-existing on master run
+35554175973 at `0378a95`:
+
+    ReplayRefusedException: this recording cannot be replayed by this build; 1 identity field(s) differ:
+      assetGraphHash: recorded f3556cc2c7387f60... (32 bytes), this build 3fcb0977bf032184... (32 bytes)
+
+**Confirmed 2026-09-21 by `dev-windows`, reproducing both of CI's hash values on Linux.** The mechanism: the shader-asset merge packs a `.frag`'s **raw text** into the asset
+graph - the first raw source text ever to go into that hash (`.udea.kts` scripts contribute the
+values they produce, not their bytes, which is why they never broke it). There is no root
+`.gitattributes`, Git for Windows checks out with `core.autocrlf=true`, so the runner packs CRLF and
+hashes differently. #176 hit this exact mechanism twice (`udea-assets-compiler/.gitattributes`,
+`udea-replay/.gitattributes`). Three arms, predictions (including refutation conditions) frozen first:
+
+    A autocrlf=false            frag CR=0   f3556cc2...  = the fixture's recorded value
+    B autocrlf=true             frag CR=23  3fcb0977...  = exactly what windows-latest computed
+    C A with ONLY the .frag CRLF frag CR=23  3fcb0977...  = B, packs byte-identical
+
+Arm C is the one that settles it: B converted every text file in the tree, including the
+`.udea.kts` (5 CRs) - and converting the `.frag` alone reproduces B exactly. **The `.frag` is the sole
+cause**, and an `autocrlf` checkout on Linux is the whole of the Windows difference. Positive control
+first: B's checkout really did put a CR on each of the `.frag`'s 23 lines.
+
+**Decided fix**, on a separate branch after `windows-green` merges: **normalise line endings where the
+shader text is read**, in the asset build - not only a `.gitattributes`. A game in its own repository
+(#265) inherits no `.gitattributes` from this one, so a repo-level fix leaves every game's asset hash
+depending on its author's git configuration. On Linux the files are already LF, so normalising should
+move no byte: the hash and both fixtures should stay put. If they move, something else is going on.
+
+**Why nobody caught it:** the shader branch was reviewed on Linux, where it is correct. The one run
+that would have shown it - a *completed* Windows `replay-equality` on `master` - finished red at
+`0378a95` and nobody read it, and the next master run at `00a2093` was **cancelled** by
+`cancel-in-progress: true` before it could say anything. That setting has now cost this project a
+detected regression, not just untested commits. It is no longer a nice-to-have.
+
+**Published and verified inside the jars, 2026-09-21 04:26 UTC.** Release run 35559075031 green at
+`00a2093`. Each merge checked by downloading its artifact and listing it, not by the tick:
+
+- `udea-core-jvm 0.1.0-20260921.035853-5` - `spatial/AttachmentIndex`, `spatial/Drawn` (#270)
+- `udea-render-jvm` same build - `model/ModelLibrary`, `model/FileModelLibrary` (#270's render half)
+- `udea-assets-jvm` same build - `assets/Shader` (shaders as a declared asset kind)
+- `udea-build-logic 0.1.0-20260921.042554-5` - `UdeaNetComponentsWiringKt.applyNetComponentsToKsp`,
+  `registerWriteNetComponents` (#274)
+
+Positive control: classes predating tonight (`AttachedTo`, `ModuleGraphRules`) present. Negative:
+a made-up name absent. **This snapshot carries the Windows replay regression** - fixed on
+`windows-crlf-shaders`, not yet merged.

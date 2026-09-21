@@ -138,6 +138,18 @@ opens a context, run them for real and put the command and its output in `BRIEF.
 A green `sh gradlew build` is not evidence about GL. Saying it is, is the exact shape of error the
 rest of this file is about.
 
+### The scratchpad is shared - work in your own folder
+
+The session scratchpad directory is **shared by every developer in the wave**, not private to you.
+Put every script, log and marker file under `scratchpad/<your-name>/`, and never write at the top
+level. Generic names collide: on 2026-09-21 two developers both had a `gl.sh` and a `mut.sh` there,
+they overwrote each other, and one's mutation runner started a GL run **inside the other's worktree**
+while that developer's own run was still going - then wrote a false `EXIT=1 DONE` into its marker.
+
+**A marker file is only evidence about the run that wrote it, and nothing in the file says which run
+that was.** Write the start time and your worktree path into the marker alongside the exit code, and
+check them when you read it.
+
 ### A cache-restored test task is indistinguishable from an executed one
 
 `clean` does **not** empty the build cache. So a test task can answer `BUILD SUCCESSFUL in 6s`,
@@ -166,12 +178,25 @@ comma inside a backticked test name. What needs macOS is *running* the compiled 
 CI's `ios-tests` job. So an iOS compile failure on this box is yours and is real evidence; an absent
 iOS *test result* is not a claim you may make.
 
-### Three generated-file families, not two
+### Four generated-file families, not two
 
 `udea-codegen/net-protocol.lock` and `expected-generated-hashes.txt` are the two everyone knows.
 The third is the **`.udearep` replay fixtures**, which carry an asset-graph hash in `BuildIdentity`.
 Adding an asset moves it - and because a shader's source is packed *as text*, **editing a comment
 inside a `.frag` regenerates those fixtures**.
+
+The fourth has **no writer task**, which makes it the dangerous one:
+`moba/desktop/src/test/resources/levels/test_level.roster.txt` carries a `worldHash` line, and
+`WorldHasher` folds each component's `typeId` into it - so **any component id shift moves it**, and
+`TestLevelRosterTest` fails. There is nothing to run; the line is edited by hand from the test's own
+reported actual. That is exactly the move that can bless a bug, so earn it: show that **only the hash
+line differs** and every `netId`, position and component line is byte-identical (one developer: 30
+lines expected, 30 actual, line 1 alone changed), then `cmp` the file against the test's output.
+
+**The full list a component id shift moves**, measured on #251: `net-components.lock`, the
+`net-protocol.lock` of every module that has one, `expected-generated-hashes.txt`, both moba
+`.udearep` fixtures, and `test_level.roster.txt`. Component ids are **global** - a new component
+anywhere shifts every id sorted after it - so a component in one game moves the other game's files.
 
 When one moves, measure the move rather than trusting it: same length, N bytes differing, and name
 which bytes. One developer's regeneration differed by exactly 35 bytes per fixture - a 32-byte hash

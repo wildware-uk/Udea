@@ -3,6 +3,7 @@ package dev.wildware.udea.assets.compiler.shader
 import dev.wildware.udea.assets.Shader
 import dev.wildware.udea.assets.compiler.DeclaredAsset
 import dev.wildware.udea.assets.compiler.ResFile
+import dev.wildware.udea.assets.compiler.scan.UdeaDeclarationScanner
 import java.io.IOException
 import java.nio.file.Path
 import kotlin.io.path.isRegularFile
@@ -38,6 +39,18 @@ import kotlin.io.path.readText
  *
  * The validator does not read the file a second time either: it reads [SOURCE_FIELD], which is
  * what this put there. One read of the file, one opinion about what was in it.
+ *
+ * ## Line endings become `\n` here, and nowhere later
+ *
+ * The text is packed into the graph, so its bytes are part of the asset graph hash every
+ * `.udearep` records and refuses to replay without. Git on Windows checks a text file out with
+ * CRLF endings unless a `.gitattributes` says otherwise, and a game in its own repository has
+ * none of ours (issue #265). Packed verbatim, the same commit made one hash on Linux and another
+ * on Windows - one extra byte per line of the `.frag` - and every checked-in moba replay was
+ * refused there. So CRLF and a lone CR both become `\n` as the file is read, the one place both
+ * drivers of the passes share. GLSL gives a carriage return no meaning a newline lacks, so
+ * nothing is lost. Doing it at the read rather than at the pack also means the validator counts
+ * the lines a lone-CR file really has when a diagnostic names one.
  *
  * @see ShaderFileValidator
  */
@@ -115,7 +128,7 @@ internal object ShaderSources {
         val file = assetRoot.resolve(path.value)
         if (!file.isRegularFile()) return NOTHING
         return try {
-            Read(file.readText(), failure = null)
+            Read(UdeaDeclarationScanner.normalizeLineEndings(file.readText()), failure = null)
         } catch (failure: IOException) {
             Read("", "${failure::class.simpleName}: ${failure.message}")
         }

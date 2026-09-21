@@ -42,9 +42,19 @@ internal object ValidationFixture {
      */
     private val built = java.util.concurrent.ConcurrentHashMap<String, ValidationContext>()
 
-    /** A tree of scripts with no art copied in. */
-    fun context(name: String, vararg scripts: Pair<String, String>): ValidationContext =
-        built.computeIfAbsent(name) { build(it, art = false, scripts = scripts) }
+    /**
+     * A tree of scripts with no art copied in, and [prepare] run over the asset root first.
+     *
+     * [prepare] is how a fixture puts exact bytes on disk: every script here goes through
+     * `trimIndent`, which splits on `\r\n` and `\r` as well as `\n` and joins with `\n`, so a
+     * carriage return written as script text never reaches the file.
+     */
+    fun context(
+        name: String,
+        vararg scripts: Pair<String, String>,
+        prepare: (assets: Path) -> Unit = {},
+    ): ValidationContext =
+        built.computeIfAbsent(name) { build(it, art = false, scripts = scripts, prepare = prepare) }
 
     /** A tree of scripts with the committed orc sprite sheets copied into `sprites/orc`. */
     fun withArt(name: String, vararg scripts: Pair<String, String>): ValidationContext =

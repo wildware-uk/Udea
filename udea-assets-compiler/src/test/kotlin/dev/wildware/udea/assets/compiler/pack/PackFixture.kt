@@ -42,6 +42,7 @@ internal object PackFixture {
         "character/orc_attack_cue",
         "character/orc_dust",
         "level/arena",
+        "shaders/tint",
     )
 
     /** Compiles every script under [assetRoot] and returns the evaluated graph. */

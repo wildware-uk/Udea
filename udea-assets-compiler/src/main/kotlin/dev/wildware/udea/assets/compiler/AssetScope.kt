@@ -15,6 +15,7 @@ import dev.wildware.udea.assets.InputKey
 import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.Model
+import dev.wildware.udea.assets.Shader
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpawnRecipe
 import dev.wildware.udea.assets.SpriteAnimation
@@ -311,6 +312,23 @@ public class AssetScope(
      */
     public fun model(name: String, file: String): Unit =
         declare(AssetKind.of<Model>(), "model", name, "file" to resPath(file))
+
+    /**
+     * A screen shader a game authored, as the runtime [Shader].
+     *
+     * Declared rather than discovered, like every other file-backed asset: the validator, the
+     * packer and the accessor generator all follow declarations, and a `.frag` picked up off the
+     * disk would be the one asset kind none of them could say anything about.
+     *
+     * Only [file] is declared. The GLSL itself is read from it at build time and packed into the
+     * asset's `source` field, which is what lets a game reach the text from `commonMain` - see
+     * [Shader]. A file that is missing, empty, not a `.frag`, states its own `#version` or defines
+     * no `udeaMain` is `UDEA0041` here, at this line, with a did-you-mean.
+     *
+     * @param file the `.frag`, relative to the asset root.
+     */
+    public fun shader(name: String, file: String): Unit =
+        declare(AssetKind.of<Shader>(), "shader", name, "file" to resPath(file))
 
     /**
      * @param notifies notify name to zero-based frame index into [sheet]'s grid. A map rather
@@ -775,6 +793,7 @@ public class AssetScope(
             "spriteSheet",
             "soundCue",
             "model",
+            "shader",
             "spriteAnimation",
             "spriteAnimationSet",
             "character",

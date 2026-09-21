@@ -33,6 +33,7 @@ import dev.wildware.udea.assets.MovementType
 import dev.wildware.udea.assets.NetworkConfig
 import dev.wildware.udea.assets.PhysicsConfig
 import dev.wildware.udea.assets.Ref
+import dev.wildware.udea.assets.Shader
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpawnRecipe
 import dev.wildware.udea.assets.SpriteAnimation
@@ -133,6 +134,13 @@ public class AssetCodecs private constructor(
                     )
                 }
                 put(Model::class) { fields -> Model(id = fields.id, file = fields.path("file")) }
+                // The text itself, not a path to it: see `Shader`. Defaulted to empty rather than
+                // required, because the one build that packs a shader with no source is a build
+                // that already reported `UDEA0041` against the file it could not read, and a
+                // throw from here would replace that diagnostic with a stack trace.
+                put(Shader::class) { fields ->
+                    Shader(id = fields.id, file = fields.path("file"), source = fields.text("source", ""))
+                }
                 put(Blueprint::class) { fields ->
                     Blueprint(
                         id = fields.id,

@@ -48,7 +48,7 @@ class AccessorCompilationTest {
         val fixtureFile = sources.resolve("Fixture.kt")
         fixtureFile.writeText(fixture)
 
-        val loader = TranspiledAssetLoader(sources, scratch.resolve("classes"), classpath)
+        val loader = TranspiledAssetLoader(sources, scratch.resolve("classes"), classpath, packAssets)
         // `listOf(fixtureFile)`, not `+ fixtureFile`: `java.nio.file.Path` implements
         // `Iterable<Path>` over its own name elements, so `List<Path> + Path` picks the
         // `plus(Iterable)` overload and appends `Users`, `shaun`, `Workspace`, ... instead of
@@ -69,6 +69,7 @@ class AccessorCompilationTest {
             import dev.wildware.udea.assets.Blueprint
             import dev.wildware.udea.assets.GameConfig
             import dev.wildware.udea.assets.Ref
+            import dev.wildware.udea.assets.Shader
             import dev.wildware.udea.assets.SpriteSheet
             import dev.wildware.udea.generated.GameAssets
 
@@ -76,6 +77,10 @@ class AccessorCompilationTest {
             val sheet: Ref<SpriteSheet> = GameAssets.character.orcIdle
             val config: Ref<GameConfig> = GameAssets.root.config
             val id: String = GameAssets.blueprint.player.id.value
+            // The shape the shader API takes. `udea-render` is not on this module's classpath -
+            // it is above it in the module graph - so what is compiled here is the accessor and
+            // its type; `ShaderFromAssetTest` and `ShaderAssetProof` are where it meets a shader.
+            val tint: Ref<Shader> = GameAssets.shaders.tint
             """.trimIndent() + "\n",
         )
 

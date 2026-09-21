@@ -296,25 +296,21 @@ running `Offscreen`; `moba/desktop/src/agent` is the worked example.
 ## Giving your game a look of its own
 
 A **screen effect** is a small graphics program that runs over the finished frame: a palette, an
-outline, a colour grade, a scanline. You write it in GLSL, in a `.frag` file of your own, and hand
-the engine its text. Nothing about it needs a graphics type from the engine's renderer, which is
-the point - `UDEA-MG-002` refuses `de.fabmax.kool:*` on your project, so a shader API that took
-one would be an API you could not call.
+outline, a colour grade, a scanline. You write it in GLSL, in a `.frag` file of your own. Nothing
+about it needs a graphics type from the engine's renderer, which is the point - `UDEA-MG-002`
+refuses `de.fabmax.kool:*` on your project, so a shader API that took one would be an API you
+could not call.
+
+**A `.frag` is an asset**, like a model or a sound. You declare it, the build reads it, checks it
+and packs it, and you name it in Kotlin by a typed accessor that the build generated:
 
 ```kotlin
-// game/src/main/resources/shaders/scanlines.frag, read however you like
-val source = checkNotNull(javaClass.getResource("/shaders/scanlines.frag")).readText()
-
-lateinit var strength: FloatUniform
-val scanlines = UdeaShader.fragment(path = "shaders/scanlines.frag", source = source) {
-    strength = float("uStrength", 0.25f)
-}
-
-registry.screenPass(scanlines)     // ordered: the first registered runs first
+// assets/shaders/shaders.udea.kts
+shader(name = "scanlines", file = "shaders/scanlines.frag")
 ```
 
 ```glsl
-// shaders/scanlines.frag - no #version line: the engine writes it, per backend
+// assets/shaders/scanlines.frag - no #version line: the engine writes it, per backend
 uniform float uStrength;
 
 vec4 udeaMain(vec2 uv) {
@@ -323,6 +319,36 @@ vec4 udeaMain(vec2 uv) {
     return vec4(colour * line, 1.0);
 }
 ```
+
+```kotlin
+lateinit var strength: FloatUniform
+val scanlines = UdeaShader.fragment(GameAssets.shaders.scanlines, assets) {
+    strength = float("uStrength", 0.25f)
+}
+
+registry.screenPass(scanlines)     // ordered: the first registered runs first
+```
+
+`GameAssets.shaders.scanlines` is generated from the declaration - `shaders` is the folder,
+`scanlines` is the name - and `assets` is your `AssetRegistry`, the same one your sprites and
+sounds come out of. There is no path in that Kotlin and no file reading anywhere in it, which is
+the point of writing it this way:
+
+- **It compiles in `commonMain`.** The obvious alternative,
+  `javaClass.getResource("/shaders/scanlines.frag").readText()`, is a JVM class, a JVM URL and a
+  JVM extension function, so it compiles on the desktop and nowhere else - you would be writing
+  that line once per platform to load a file that is byte-identical on all of them. The GLSL
+  travels inside the packed asset instead, and comes back out of the ordinary asset reader.
+- **A misspelled name does not compile.** `GameAssets.shaders.scanlins` is an unresolved
+  reference, not a `null` that becomes a blank screen.
+- **A missing or broken `.frag` fails the build**, with `UDEA0041`, the line of the declaration
+  and a did-you-mean over the `.frag` files you do have. The same rule catches an empty file, one
+  that states its own `#version`, and one with no `udeaMain` in it - so a shader that cannot work
+  never reaches a `.udeapak`.
+
+`UdeaShader.fragment(path, source)` still exists, for a game that genuinely makes GLSL up at run
+time - a material system, a graph editor, a permutation over a template. A shader somebody wrote
+in a file is an asset.
 
 You write one function, `vec4 udeaMain(vec2 uv)`. The engine writes everything around it.
 
@@ -384,9 +410,12 @@ HUD is drawn - so a screenshot an agent takes shows exactly what a player sees, 
 top. Turning one off is `shader.enabled = false`, which is the ordinary way to offer it as a
 graphics setting.
 
-`ShaderProof` in `moba/desktop/src/test/kotlin/dev/wildware/moba/shader/` is the worked example:
-it registers both built-ins from a project the module graph refuses Kool on, and measures what
-they did.
+Two worked examples, both in `moba/desktop/src/test/kotlin/dev/wildware/moba/shader/`, both in a
+project the module graph refuses Kool on: `ShaderProof` registers the two built-ins and measures
+what they did, and `ShaderAssetProof` does the same for `moba`'s own
+`assets/shaders/scanlines.frag` - declared, packed, resolved through `MobaAssets.registry` and
+built with `MobaScreenEffects.scanlines`, which is `commonMain` and compiles for every platform
+the game ships on.
 
 ---
 

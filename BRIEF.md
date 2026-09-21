@@ -2,11 +2,12 @@
 
 SHA: `686365e` — the commit carrying the change.
 
-This file lands in the commit on top of it, so the branch tip is one ahead of the SHA above. A
-file cannot state its own commit's hash, and writing a hash here that turns out to be the
-previous tip is the kind of true-but-misleading line this brief is otherwise about. Both are on
-the branch: `git log --oneline origin/master..issue-274-net-components` shows the pair, and the
-tip is what a reviewer should check out.
+`686365e` is the only commit carrying production code, tests, templates or documentation. Every
+commit after it on this branch touches **this file and nothing else**, which
+`git log --oneline --name-only 686365e..issue-274-net-components` shows. A file cannot state its
+own commit's hash, and writing a tip hash here that a further edit then invalidates is the kind
+of true-but-misleading line this brief is otherwise about — so the tip is left for
+`git rev-parse --short HEAD`, and a reviewer should check out the tip.
 
 Branch `issue-274-net-components`, branched from `origin/master` at `2e7aed4`. Every comparison
 below is against **that merge base**, not against `origin/master`'s current tip. The tip has moved
@@ -626,7 +627,7 @@ sides and rename detection has nothing to guess at. Measured with a trial merge 
 working tree, `git merge-tree --write-tree --name-only origin/master HEAD`, exit **1**:
 
 ```
-0936ac265c94972727b993efcfc837d25323553e
+[... the merged tree's own hash, which changes with every commit ...]
 BRIEF.md
 
 Auto-merging AGENTS.md
@@ -635,7 +636,9 @@ CONFLICT (content): Merge conflict in BRIEF.md
 Auto-merging docs/new-game.md
 ```
 
-The whole output, nothing elided. **One conflicted path, and it is this file** — which is the
+Measured at `c19aea1`; the only elision is the tree hash on the first line, left out precisely
+because it moves whenever this file is edited again and a stale hash quoted as current is the
+failure this brief keeps naming. Everything below it is the whole output. **One conflicted path, and it is this file** — which is the
 intended behaviour: two briefs meeting in one place is a text conflict a person resolves by
 archiving one, not a silent overwrite. `AGENTS.md` and `docs/new-game.md`, the two documents this
 branch shares with what has landed since, merge without conflict.

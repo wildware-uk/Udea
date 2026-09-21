@@ -440,6 +440,25 @@ tasks.register<JavaExec>("runShaderAssetProof") {
     )
 }
 
+// Issue #267's evidence. `SkyProof` sets a sky from *this* project - which `UDEA-MG-002` refuses Kool
+// on, so "a game sets its sky with no Kool type in its source" is a build gate - changes it while
+// the game runs, takes it away again, and fails unless every open-sky pixel is the colour it has to
+// be and the frame with no sky is byte-for-byte the one it started with. Needs a GL driver, so run
+// by name, for the reason `runMatchShot` gives.
+tasks.register<JavaExec>("runSkyProof") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.skyproof: a game's sky, flat and graded, set and changed while running, measured against no sky."
+    mainClass.set("dev.wildware.moba.sky.SkyProof")
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty("udea.moba.gameAssets", gameAssetRoot.asFile.absolutePath)
+    systemProperty(
+        "udea.skyproof.dir",
+        providers.gradleProperty("udea.skyproof.dir").orNull
+            ?: layout.buildDirectory.dir("reports/udea/sky").get().asFile.absolutePath,
+    )
+}
+
 // Issue #191's pictures. `LevelShot` saves a real match to a level file in one JVM and loads it
 // into a fresh game in a second, photographing both from the same camera; the second run fails
 // unless the two pictures are pixel-identical. Two tasks because the two halves must not share a

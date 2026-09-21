@@ -282,6 +282,13 @@ The pieces a newcomer meets first, each with the issue that made it so.
   for a uniform the source never declares), the author's `.frag` path, the author's line and the
   driver's own message - plain fields, not a `UdeaDiagnostic`, so `udea-diagnostics` stays off
   every shipped game's runtime classpath.
+- **A game sets its sky** (#267). `registry.sky.background = SkyBackground.Gradient(top, bottom)` -
+  or `Solid(colour)`, colours as `Rgba` - is drawn first in every frame, under every `RenderSystem`,
+  so it shows wherever nothing is drawn: above a 3D horizon, past the edge of a map. It is on
+  `RenderRegistry` and not on `WindowConfig` because it changes per level: set another while the
+  game runs and the next frame shows it. `SkyBackground.None` is the default and draws nothing at
+  all, so a game that sets no sky gets the black frame it always had. The gradient is in screen
+  space, top edge to bottom edge; a texture sky is not built yet.
 - **Controls name keys.** A controls asset binds an `InputKey`, and `udea-render` owns the one
   table per backend that turns a platform key into it (#228). A key or a click the interface
   took never becomes an intent (#227, #230).

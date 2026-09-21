@@ -1,9 +1,13 @@
 # Shaders are a declared asset kind
 
-SHA: `@@SHA@@`
+SHA: `a8a6b5f` — the commit this brief describes, and the one to review. `HEAD` is one commit past
+it, `BRIEF.md: record the SHA`, and it touches **`BRIEF.md` and nothing else**: this SHA line and
+the two file counts below, which moved once the fixtures were regenerated. `git diff a8a6b5f HEAD`
+prints the whole of it. A SHA written into the file it names cannot name itself, and I would rather
+say which commit it is than print a number nobody can check.
 
 Branch `shader-assets`, rebased onto `origin/master` at `edaded0` — fetched and read back, not
-assumed. 38 files against that ref; `BRIEF-266.md` untouched.
+assumed. 41 files against that ref (`git diff --name-only origin/master | wc -l`, run after the last commit - the number moved from 38 when the replay fixtures were regenerated, and a count is a claim). `BRIEF-266.md` untouched.
 Worktree `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a777f6986276a548e`.
 
 > **Every "predicted" figure below was written into this file before a JVM had been started on this
@@ -539,7 +543,7 @@ exactly as they are.
 
 ### Reading this diff in two passes
 
-38 files is a lot for one review, so: **eleven of them are mechanical and carry no argument.**
+41 files is a lot for one review, so: **eleven of them are mechanical and carry no argument**, and two are regenerated binaries.
 
 | Mechanical | Why it moved |
 |---|---|

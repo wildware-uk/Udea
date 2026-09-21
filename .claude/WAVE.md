@@ -1252,3 +1252,16 @@ that would have shown it - a *completed* Windows `replay-equality` on `master` -
 `0378a95` and nobody read it, and the next master run at `00a2093` was **cancelled** by
 `cancel-in-progress: true` before it could say anything. That setting has now cost this project a
 detected regression, not just untested commits. It is no longer a nice-to-have.
+
+**Published and verified inside the jars, 2026-09-21 04:26 UTC.** Release run 35559075031 green at
+`00a2093`. Each merge checked by downloading its artifact and listing it, not by the tick:
+
+- `udea-core-jvm 0.1.0-20260921.035853-5` - `spatial/AttachmentIndex`, `spatial/Drawn` (#270)
+- `udea-render-jvm` same build - `model/ModelLibrary`, `model/FileModelLibrary` (#270's render half)
+- `udea-assets-jvm` same build - `assets/Shader` (shaders as a declared asset kind)
+- `udea-build-logic 0.1.0-20260921.042554-5` - `UdeaNetComponentsWiringKt.applyNetComponentsToKsp`,
+  `registerWriteNetComponents` (#274)
+
+Positive control: classes predating tonight (`AttachedTo`, `ModuleGraphRules`) present. Negative:
+a made-up name absent. **This snapshot carries the Windows replay regression** - fixed on
+`windows-crlf-shaders`, not yet merged.

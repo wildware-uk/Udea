@@ -14,6 +14,7 @@ import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.Model
+import dev.wildware.udea.assets.Shader
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpriteAnimation
 import dev.wildware.udea.assets.SpriteAnimationSet
@@ -121,6 +122,7 @@ public object AssetKindHierarchy {
         SpriteSheet::class,
         SoundCue::class,
         Model::class,
+        Shader::class,
         SpriteAnimation::class,
         SpriteAnimationSet::class,
         Blueprint::class,

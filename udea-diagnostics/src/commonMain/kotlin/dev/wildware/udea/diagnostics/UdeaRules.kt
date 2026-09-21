@@ -391,6 +391,35 @@ public object UdeaRules {
         description = "a shader uniform declared in Kotlin is not declared in the shader source",
     )
 
+    /**
+     * A `shader(...)` declaration whose `.frag` the build cannot use as a screen shader body.
+     *
+     * The build-time half of the shader family: [SHADER_COMPILE_FAILED] is a driver refusing a
+     * shader on a machine, and this is the asset build refusing one before any machine sees it.
+     * Raised by `udea-assets-compiler`'s `ShaderSources`, which is the one place the file is
+     * read - and it has to be read, because a shader's GLSL travels *inside* the packed asset so
+     * that a game reaches it from `commonMain` (see `dev.wildware.udea.assets.Shader`).
+     *
+     * Five defects, all of them otherwise silent until a frame is drawn:
+     *
+     * - the file is not under the asset root - reported with the did-you-mean spec section 5
+     *   makes mandatory, over the `.frag` files that *are* there;
+     * - it is not a `.frag`;
+     * - it is empty;
+     * - it states its own `#version`, which the engine owns per backend;
+     * - it never mentions `udeaMain`, the one function a screen shader body defines.
+     *
+     * The last two are `UdeaShader.fragment`'s own refusals, moved to the build. A shader
+     * declared as an asset is compiled into the pack long before it is registered, so leaving
+     * them at registration would mean shipping a `.udeapak` whose shader cannot be used.
+     */
+    public val SHADER_SOURCE: UdeaRule = UdeaRule(
+        id = "UDEA0041",
+        defaultSeverity = Severity.Error,
+        description = "a shader declaration's .frag is missing, empty, not a .frag, states its " +
+            "own #version, or defines no udeaMain",
+    )
+
     /** Every registered rule, in id order. */
     public val all: List<UdeaRule> = listOf(
         NET_ON_VAL,
@@ -413,6 +442,7 @@ public object UdeaRules {
         GIZMO_HANDLE_FIELD,
         SHADER_COMPILE_FAILED,
         SHADER_UNIFORM_NOT_DECLARED,
+        SHADER_SOURCE,
     ).sortedBy { it.id }
 
     private val byId: Map<String, UdeaRule> = all.associateBy { it.id }

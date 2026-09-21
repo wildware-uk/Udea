@@ -260,7 +260,15 @@ The pieces a newcomer meets first, each with the issue that made it so.
   menu or an editor panel: it draws into the window after the captured frame, so no screenshot
   sees it. A `CapturedUi` is a HUD: it draws into the captured frame, so an agent's screenshot
   sees the cooldown a player sees (#188).
-- **A game can write a screen shader** (#259, #266). `UdeaShader.fragment(path, source) { ... }`
+- **A game can write a screen shader** (#259, #266), and the `.frag` is an asset (#269).
+  `shader(name = "scanlines", file = "shaders/scanlines.frag")` in a `.udea.kts` makes the build
+  read the file, check it and pack its **text** into the graph, so
+  `UdeaShader.fragment(GameAssets.shaders.scanlines, assets) { ... }` is `commonMain` on every
+  target - no `javaClass.getResource`, no per-platform loader, and a misspelled name does not
+  compile. A `.frag` that is missing, empty, not a `.frag`, states its own `#version` or defines
+  no `udeaMain` fails the build with `UDEA0041` and a did-you-mean.
+  The `UdeaShader.fragment(path, source) { ... }` overload stays, for GLSL a game makes up at run
+  time and for the engine's own built-ins. Either way it
   takes GLSL a game authored and typed uniforms declared in Kotlin, and `RenderRegistry.screenPass`
   puts it in an ordered list that runs over the finished frame at render resolution, before any
   upscale, inside the captured frame and outside the editor's gizmo capture. The engine prepends
@@ -356,6 +364,15 @@ The pieces a newcomer meets first, each with the issue that made it so.
   Building a game against an engine change you have not pushed is still
   `./gradlew publishToMavenLocal` and `./gradlew -p build-logic publishToMavenLocal`, which
   `mavenLocal()` resolves ahead of the network.
+  A game's **`@Replicated` components** work from outside too (#274): the conventions read
+  `net-components.lock` from the root project and hand it to every module that runs KSP, so no
+  game writes `ksp { arg("udea.projectComponents", ...) }` and none re-implements the sorting
+  that decides what an id is. `udeaNetComponents { registry = ... }` in the root build script
+  moves the file; `udeaWriteNetComponents` writes it from what the build compiled, and works on
+  the build that just failed for want of it, because the processor reports each module's
+  component names before it checks the id space. What is still not solved is merging a game's id
+  space with the engine's - the two are numbered in two builds, and `docs/new-game.md` says what
+  that costs.
   `templates/new-game/` is a working game of that shape, `docs/new-game.md` is the guide, and
   `scripts/outside-game-proof.sh` publishes, builds it from outside the tree, runs it, checks
   every plugin marker it wrote is inside the verified namespace, and proves its gates still fail

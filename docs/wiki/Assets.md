@@ -49,7 +49,7 @@ A declaration refers to another by `reference("id")`:
 spriteAnimation(name = "soldier_idle", sheet = reference("character/soldier_idle_sheet"))
 ```
 
-The kinds the DSL knows are: `ability`, `spriteSheet`, `spriteAnimation`, `spriteAnimationSet`, `soundCue`, `model`, `blueprint`, `level`, `gameConfig`, `control`, `binding`, `character`, `gameplayEffect`, `effect` and `item` (the table is in `udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/gen/DslKinds.kt`).
+The kinds the DSL knows are the keys of `DslKinds.TYPES`, in `udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/gen/DslKinds.kt` - sprite sheets and animations, sounds, models, shaders, blueprints, levels, controls and bindings, characters, abilities, effects and items. Read the table rather than a list written down here: this sentence used to enumerate the words, and it had already gone stale twice by the time a shader was added to it.
 
 ### Assets hold no loops
 

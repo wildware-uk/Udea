@@ -1,5 +1,4 @@
 import dev.wildware.udea.build.UdeaModuleRegistry
-import dev.wildware.udea.build.UdeaNetComponents
 import dev.wildware.udea.build.registerNetProtocolLock
 import dev.wildware.udea.build.udeaModule
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
@@ -32,28 +31,15 @@ plugins {
 // hands the processor the list its own `CoreUdeaRegistry` names - the kernel alone.
 val udeaRegistry = udeaModule("Core")
 
-/**
- * The project-wide `@Replicated` id space, read from the reviewed `net-components.lock`.
- *
- * `udea-core` joined it with the physics components (`PhysicsBody` and the shapes, every field
- * `@Sim`), so that a snapshot carries physics state at all. A module that names itself and emits
- * a `Replicator` must be numbered from the project's space, or its first id is also another
- * module's first id - the processor refuses to run without it.
- */
-val projectComponents: Provider<String> =
-    providers.fileContents(rootProject.layout.projectDirectory.file(UdeaNetComponents.FILE_NAME))
-        .asText
-        .map { text ->
-            when (val parsed = UdeaNetComponents.parse(text)) {
-                is UdeaNetComponents.Parse.Success -> UdeaNetComponents.optionValue(parsed.components)
-                is UdeaNetComponents.Parse.Failure -> throw GradleException(parsed.problem)
-            }
-        }
-
+// `udea.projectComponents` - the project-wide `@Replicated` id space, which `udea-core` joined
+// with the physics components (`PhysicsBody` and the shapes, every field `@Sim`) so that a
+// snapshot carries physics state at all - is **not** here. `udea.kotlin-base` reads the reviewed
+// `net-components.lock` and passes it to every module that runs KSP, because this block used to
+// be eight copy-pasted lines per module and a game outside this repository had no copy to make
+// (issue #274).
 ksp {
     arg(UdeaModuleRegistry.MODULE_NAME_OPTION, udeaRegistry.name)
     arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
-    arg(UdeaNetComponents.KSP_OPTION, projectComponents.get())
 }
 
 kotlin {

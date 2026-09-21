@@ -1,5 +1,8 @@
 package dev.wildware.udea.render.shader
 
+import dev.wildware.udea.assets.AssetRegistry
+import dev.wildware.udea.assets.Ref
+import dev.wildware.udea.assets.Shader
 import dev.wildware.udea.render.draw.Rgba
 import dev.wildware.udea.render.draw.SpriteTexture
 import kotlin.concurrent.Volatile
@@ -29,16 +32,21 @@ import kotlin.concurrent.Volatile
  *
  * ```kotlin
  * lateinit var levels: FloatUniform
- * val palette = UdeaShader.fragment(
- *     path = "shaders/palette.frag",
- *     source = readText("shaders/palette.frag"),
- * ) {
+ * val palette = UdeaShader.fragment(GameAssets.shaders.palette, assets) {
  *     levels = float("uLevels", 16f)
  *     texture("uRamp", ramp)
  * }
  * // later, in a RenderSystem:
  * levels.value = 8f
  * ```
+ *
+ * ## Where the GLSL comes from
+ *
+ * From a `.frag` declared in a `.udea.kts`, like a model or a sound. The build reads the file,
+ * checks it, and packs the text into the asset, so the line above is ordinary `commonMain`
+ * Kotlin: no path, no string, and nothing platform-shaped between the file and the driver. The
+ * `path`/`source` overload of [fragment] is still there, for a game that genuinely makes GLSL up
+ * at run time; a shader somebody wrote in a file is an asset.
  *
  * ## Where it runs
  *
@@ -92,7 +100,56 @@ public class UdeaShader internal constructor(
     public companion object {
 
         /**
-         * A fragment shader from [source], authored at [path].
+         * A fragment shader from a declared `.frag` asset: the form a game writes.
+         *
+         * ```kotlin
+         * lateinit var strength: FloatUniform
+         * registry.screenPass(
+         *     UdeaShader.fragment(GameAssets.shaders.scanlines, MobaAssets.registry) {
+         *         strength = float("uStrength", 0.25f)
+         *     }
+         * )
+         * ```
+         *
+         * `GameAssets.shaders.scanlines` is generated from a `shader(...)` declaration in a
+         * `.udea.kts`, so a misspelled name does not compile and a missing `.frag` is `UDEA0041`
+         * at the declaration with a did-you-mean. The GLSL itself travels inside the packed asset
+         * (see [dev.wildware.udea.assets.Shader]), which is what makes this line ordinary
+         * `commonMain` Kotlin on every target the game ships on - there is no resource reader and
+         * nothing per-platform anywhere on the path.
+         *
+         * The registry is an argument rather than something this function finds, because a `Ref`
+         * means nothing without one: `assets[ref]` is how every other asset in this engine is
+         * resolved, and a process may hold more than one graph - an agent harness keeps a
+         * scenario's assets beside the game's.
+         *
+         * @param shader the declared shader, usually a generated accessor.
+         * @param assets the graph to resolve it in.
+         * @param uniforms declares the parameters the body reads, exactly as the overload below.
+         * @throws dev.wildware.udea.assets.UnknownAssetException if [assets] has no such asset.
+         * @throws IllegalArgumentException for the same reasons as the overload below. A blank
+         *   source is one of them, and it is the shape a build that failed to read the `.frag`
+         *   leaves behind.
+         */
+        public fun fragment(
+            shader: Ref<Shader>,
+            assets: AssetRegistry,
+            uniforms: ShaderUniforms.() -> Unit = {},
+        ): UdeaShader {
+            val asset = assets[shader]
+            return fragment(path = asset.file.value, source = asset.source, uniforms = uniforms)
+        }
+
+        /**
+         * A fragment shader from [source], authored at [path]: the form for GLSL a game made up
+         * at run time.
+         *
+         * For a shader a person wrote in a file, prefer the overload above: a declared `.frag`
+         * gets a typed accessor, a build-time check and packing, and this one gets none of those
+         * because a string handed in here has no file behind it for the build to have looked at.
+         * What it is for is the case that has no file - a body assembled from a graph editor, a
+         * material system, a game's own permutation over a template - and the engine's own
+         * [ScreenEffects], which build their sources from constants in this module.
          *
          * @param path repository-relative path of the `.frag` the body was read from. Named in
          *   every diagnostic this shader produces.
@@ -116,32 +173,20 @@ public class UdeaShader internal constructor(
                     "has no business being in it."
             }
             require(source.isNotBlank()) { "shader '$path' has no source" }
-            require(!VERSION.containsMatchIn(source)) {
+            require(!Shader.VERSION_PRAGMA.containsMatchIn(source)) {
                 "shader '$path' states its own #version. The engine prepends the version and the " +
                     "precision qualifiers the backend needs, which differ between OpenGL and " +
                     "OpenGL ES; a shader that states its own works on one and fails on the other. " +
                     "Delete the #version line and write the body alone."
             }
-            require(source.contains(ENTRY_POINT)) {
-                "shader '$path' does not mention $ENTRY_POINT. A screen shader is one function - " +
-                    "`vec4 $ENTRY_POINT(vec2 uv)` - and the engine writes the `main` that calls it."
+            require(source.contains(Shader.ENTRY_POINT)) {
+                "shader '$path' does not mention ${Shader.ENTRY_POINT}. A screen shader is one " +
+                    "function - `vec4 ${Shader.ENTRY_POINT}(vec2 uv)` - and the engine writes the " +
+                    "`main` that calls it."
             }
             val declared = ShaderUniforms(path).apply(uniforms).declared()
             return UdeaShader(path, source, declared)
         }
-
-        /** The one function a body must define. The engine's `main` calls it and nothing else. */
-        internal const val ENTRY_POINT: String = "udeaMain"
-
-        /**
-         * A `#version` pragma anywhere in the source, comments included.
-         *
-         * Deliberately not comment-aware. A `#version` mentioned in a comment is worth the same
-         * refusal as one in code: it is about to be copied down one line by whoever reads it, and
-         * the message it earns explains the rule. A checker that is easy to state is a checker a
-         * reader can predict.
-         */
-        private val VERSION: Regex = Regex("""#\s*version\b""")
 
         /** A leading separator, either way round, or a Windows drive letter. */
         private val ABSOLUTE: Regex = Regex("""^([/\\]|[A-Za-z]:)""")

@@ -222,13 +222,15 @@ renderer rather than a difference between two simulations.
 
 ## Step 4: a component
 
-A component is a plain Fleks component. Nothing else is required.
+A component is a plain Fleks component. Nothing else is required — the template's carries two
+annotations because it travels, and the next paragraph is about those.
 
 ```kotlin
+@Replicated
 public class Rover(
-    public var x: Float = 0f,
-    public var y: Float = 0f,
-    public var speed: Float = 1f,
+    @Net public var x: Float = 0f,
+    @Net public var y: Float = 0f,
+    @Net public var speed: Float = 1f,
 ) : Component<Rover> {
 
     override fun type(): ComponentType<Rover> = Rover
@@ -237,9 +239,14 @@ public class Rover(
 }
 ```
 
-Adding `@Replicated` from `dev.wildware.udea.annotations` is what makes it travel to a client and
-into a snapshot — and that is a step with a wire contract attached. See "What this does not cover"
-below before you take it.
+`@Replicated` from `dev.wildware.udea.annotations` is what makes it travel to a client and into a
+snapshot, and the template's `Rover` carries it with `@Net` on each field. It is a step with a wire
+contract attached: the id a component takes on the wire is the position of its name in
+`net-components.lock`, a sorted list in your repository's root, so inserting a name renumbers every
+name after it. Nothing goes in a build script — the conventions read that file and hand the list to
+the processor, and `./gradlew udeaWriteNetComponents` writes it the first time. "Replicated
+components and the wire id space" in [docs/new-game.md](https://github.com/wildware-uk/Udea/blob/master/docs/new-game.md)
+is the full account.
 
 ## Step 5: a system
 
@@ -385,12 +392,12 @@ fail with `DET001`, plant a Kotlin scripting host and watch `udeaVerifyModuleGra
 
 Stated plainly, because each is real work and none of it is broken.
 
-- **Replicated components and the wire id space.** A `@Replicated` component gets its
-  `ComponentTypeId` from the position of its name in the build's `net-components.lock`, and that file
-  is the *whole* build's id space. A game outside the engine's repository therefore needs a lock that
-  covers the engine's components as well as its own; the engine's is `net-components.lock` at its
-  root, and it is not published with the artifacts. Nothing merges the two for you today. The
-  template declares no `@Replicated` component and so needs no lock at all.
+- **Sharing an id space with the engine's own components.** Your `net-components.lock` numbers the
+  components *your* build compiles, from 0. The engine's were numbered in the engine's build and
+  those ids are already inside the published jars, so the two sit side by side rather than being
+  merged, and a game with more components than the engine's lowest id would eventually mint an id
+  the engine has used. Nothing merges them for you today. A collision is caught where a game builds
+  a `ComponentRegistry`, which is when it wires replication — before that, nothing would say so.
 - **The asset pipeline.** `dev.wildware.udea.assets` compiles a `.udea.kts` tree into a `.udeapak`.
   `moba/game/build.gradle.kts` is the worked example; the template has no assets, and whether that
   plugin needs anything extra outside the engine's repository is untested. See

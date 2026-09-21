@@ -1121,6 +1121,25 @@ detection would still be one internally consistent file, and nothing downstream 
 mismatch. After any regeneration, check `git status` names the files you expected **by name**,
 rather than that the tree is clean.
 
+**A reviewer's FAIL that was never applied, found 2026-09-21 by re-checking a 30-hour-old message.**
+`review-wikicore-r1` failed the wiki branch over two false claims; the branch merged and **both
+claims were still live on `master` two days later**. Now fixed: `docs/wiki/Home.md` said the
+generated `Replicator` serves "save files" (it does not - a level file is Fleks' `world.snapshot()`
+through `LevelService`, which the do-not list and the wiki's own `Levels.md` both state), and
+`Replication-and-Networking.md:53` named `NoClientStateUploadTest`, which **does not exist**.
+
+**Unassigned, and it is the root of the second one:** that phantom test name survives in two KDocs,
+`udea-net/.../input/InputCommand.kt` and `.../replication/ReplicationClient.kt`. The wiki quoted a
+comment, and the comment was wrong - *a description of a thing is not the thing*. Not fixed here
+because `udea-compiler-plugin` propagates KDoc, so editing one can move
+`expected-generated-hashes.txt`, which `dev-270` owns this wave. It is two words once that merges.
+
+**And the process failure is worth more than the fix.** A verdict is only worth what gets applied
+from it. `udeaVerifyWiki` gates links, paths and task paths - it cannot gate a *claim*, so nothing
+failed when the wiki said something untrue, which is the same reason a stale `AGENTS.md` survives:
+a document is a measurement with no exit code. Before quoting any of the four authority documents,
+check the claim against the code rather than assuming its last editor did.
+
 **Unassigned, from `dev-274`, waiting on a lock this wave:** `GeneratedSources.files` filters
 `extension == "kt"`, so **every generated resource this build has ever written** - `net-protocol.lock`,
 the tool manifest, the new component manifest - has been outside `GeneratedFileDeterminismTest`

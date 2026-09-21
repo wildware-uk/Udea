@@ -1,5 +1,4 @@
 import dev.wildware.udea.build.UdeaModuleRegistry
-import dev.wildware.udea.build.UdeaNetComponents
 import dev.wildware.udea.build.UdeaVersions
 import dev.wildware.udea.build.registerNetProtocolLock
 import dev.wildware.udea.build.udeaRegistryModules
@@ -13,7 +12,6 @@ plugins {
 
 /** The name this module's fixture source set is processed as; half of every generated name. */
 val MODULE_NAME = "CodegenFixtures"
-
 
 dependencies {
     api(project(":udea-annotations"))
@@ -83,18 +81,10 @@ dependencies {
 //
 // `udea.projectComponents` is the third and it is not optional: a module that emits protocol
 // identity must be numbered from the *project's* id space, or its `ComponentTypeId(0)` is also
-// some other module's. The list is the reviewed `net-components.lock` in the repository root,
-// read here rather than discovered, so an id is a promise made in a diff somebody read.
-val projectComponents: Provider<String> =
-    providers.fileContents(rootProject.layout.projectDirectory.file(UdeaNetComponents.FILE_NAME))
-        .asText
-        .map { text ->
-            when (val parsed = UdeaNetComponents.parse(text)) {
-                is UdeaNetComponents.Parse.Success -> UdeaNetComponents.optionValue(parsed.components)
-                is UdeaNetComponents.Parse.Failure -> throw GradleException(parsed.problem)
-            }
-        }
-
+// some other module's. It is not set here, and that is issue #274: every module that needed it
+// wrote the same eight lines into its own build script, so a game outside this repository - which
+// has no script of ours to copy - could not pass the list at all. `udea.kotlin-base` reads the
+// reviewed `net-components.lock` and hands it to every module that runs KSP, this one included.
 ksp {
     arg(UdeaModuleRegistry.MODULE_NAME_OPTION, MODULE_NAME)
     // The launcher list for the fixtures, read off the test runtime classpath the fixture tests
@@ -107,7 +97,6 @@ ksp {
     // implement them and compile, which is the only form of proof this mechanism accepts.
     arg("udea.toolModuleService", "dev.wildware.udea.agent.ToolModule")
     arg("udea.stateModuleService", "dev.wildware.udea.agent.StateModule")
-    arg(UdeaNetComponents.KSP_OPTION, projectComponents.get())
     // Issue #233: this run is also an editor run, so the fixtures' handle annotations become real
     // generated gizmos and a `CodegenFixturesGizmoRegistry`, compiled under -Werror like the rest.
     arg(UdeaModuleRegistry.GIZMO_REGISTRY_OPTION, MODULE_NAME)

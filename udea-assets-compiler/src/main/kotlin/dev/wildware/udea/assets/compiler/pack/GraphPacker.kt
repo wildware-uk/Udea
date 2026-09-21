@@ -13,6 +13,7 @@ import dev.wildware.udea.assets.GameplayEffect
 import dev.wildware.udea.assets.Item
 import dev.wildware.udea.assets.Level
 import dev.wildware.udea.assets.Model
+import dev.wildware.udea.assets.Shader
 import dev.wildware.udea.assets.SoundCue
 import dev.wildware.udea.assets.SpawnRecipe
 import dev.wildware.udea.assets.Binding
@@ -123,6 +124,7 @@ public object GraphPacker {
         "spriteSheet" to Schema { it.spriteSheet() },
         "soundCue" to Schema { it.soundCue() },
         "model" to Schema { it.model() },
+        "shader" to Schema { it.shader() },
         "spriteAnimation" to Schema { it.spriteAnimation() },
         "spriteAnimationSet" to Schema { it.spriteAnimationSet() },
         "blueprint" to Schema { it.blueprint() },
@@ -147,6 +149,7 @@ public object GraphPacker {
         "spriteSheet" to fqn(SpriteSheet::class.qualifiedName),
         "soundCue" to fqn(SoundCue::class.qualifiedName),
         "model" to fqn(Model::class.qualifiedName),
+        "shader" to fqn(Shader::class.qualifiedName),
         "spriteAnimation" to fqn(SpriteAnimation::class.qualifiedName),
         "spriteAnimationSet" to fqn(SpriteAnimationSet::class.qualifiedName),
         "blueprint" to fqn(Blueprint::class.qualifiedName),
@@ -202,6 +205,20 @@ public object GraphPacker {
         fun model(): Map<String, PackValue> = buildMap {
             val file = pathOf(asset.fields["file"]) ?: return@buildMap
             put("file", PackValue.Path(ModelSources.runtimeFile(ResFile.of(file)).value))
+        }
+
+        /**
+         * A shader's file, and the GLSL that file held.
+         *
+         * The `source` field is not in the declaration an author wrote: `ShaderSources` puts it
+         * there, in `AssetCompiler.compile`, which is why both this packer and the daemon's
+         * `PackedValues` see it without either of them reading a file. Absent means the build
+         * could not read that file and has already said so under `UDEA0041`; the empty string is
+         * packed so the pack itself does not become a second report of the same defect.
+         */
+        fun shader(): Map<String, PackValue> = buildMap {
+            path("file", "file")
+            put("source", PackValue.Text(asset.fields["source"] as? String ?: ""))
         }
 
         fun spriteAnimation(): Map<String, PackValue> = buildMap {

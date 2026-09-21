@@ -4,8 +4,8 @@
 # OUTSIDE this repository against the published artifacts, and proves the gates it inherited can
 # fail (issue #265).
 #
-# Seven legs, in order. Each writes its whole transcript into the report directory, and the script
-# stops at the first one that does not do what it says.
+# The legs below run in order. Each writes its whole transcript into the report directory, and the
+# script stops at the first one that does not do what it says.
 #
 #   0. publish  `publishToMavenLocal` for the engine's modules, and again for `build-logic`,
 #               which carries the convention plugins and the version catalog. Nothing leaves this
@@ -27,6 +27,15 @@
 #               that cannot.
 #   5. graph-red a Kotlin scripting host added to the game's runtime classpath:
 #               udeaVerifyModuleGraph must fail with UDEA-MG-005.
+#   6. components the game's `@Replicated` component was numbered from `net-components.lock`, and
+#               nothing in the game's build scripts passes `udea.projectComponents` by hand
+#               (issue #274 - until it, there was no way for a game to pass it at all).
+#   7. id-moved a name inserted ahead of it in the sorted file moves its id. id 0 is also what a
+#               module numbering its own symbols hands out, so leg 6 alone cannot tell them apart.
+#   8. no-lock / write-lock / after-write
+#               with no registry, the build fails naming both the component and
+#               `udeaWriteNetComponents`; that task then writes the registry from what the failed
+#               build reported, and the game builds against it.
 #
 # The game is copied into a temporary directory outside this repository on purpose, and nothing
 # in it names a path to this checkout: a game built from inside the tree, or one that includes
@@ -213,6 +222,76 @@ fi
 grep -q "UDEA-MG-005" "$REPORT/graph-red.log" ||
     fail "udeaVerifyModuleGraph failed for some other reason than UDEA-MG-005; see $REPORT/graph-red.log"
 cp "$WORK/build.gradle.kts.orig" "$BUILD_SCRIPT"
+
+# --- 6. the component id space reached the game without the game wiring it (issue #274) -------
+#
+# This is the leg the issue is about. robot-game could not build at all: its first `@Replicated`
+# component failed with "the build did not set udea.projectComponents", and no published
+# convention, extension or property existed to set it - so it read `net-components.lock` itself
+# and re-implemented the sorting, which is the part that decides what an id *is*.
+#
+# Three things are asserted, in the order that makes each mean something.
+say "components: the game hand-wires nothing"
+
+# The negative first, with its positive control beside it. A `grep` that finds nothing reads
+# exactly like a `grep` that did not run, so the same search is made to return a hit on a string
+# that is certainly there before its miss on the string that must not be.
+grep -rn "udeaAgent" "$GAME" --include='*.kts' > "$REPORT/grep-control.txt" ||
+    fail "the control grep found nothing, so the search below proves nothing about the game"
+echo "  control: $(wc -l < "$REPORT/grep-control.txt") hit(s) for a string that is in the template"
+if grep -rn "udea.projectComponents" "$GAME" --include='*.kts' > "$REPORT/hand-wired.txt"; then
+    cat "$REPORT/hand-wired.txt"
+    fail "the game passes udea.projectComponents itself, so this proves nothing about the conventions"
+fi
+echo "  and no hit for udea.projectComponents anywhere in the game's build scripts"
+
+REPLICATOR=$(find "$GAME/game/build/generated/ksp" -name 'RoverReplicator.kt' | head -1)
+[ -n "$REPLICATOR" ] ||
+    fail "no RoverReplicator.kt was generated, so the game's @Replicated component never compiled"
+cp "$REPLICATOR" "$REPORT/RoverReplicator.kt"
+grep -q "ComponentTypeId(0)" "$REPORT/RoverReplicator.kt" ||
+    fail "RoverReplicator does not carry the id its position in net-components.lock gives it"
+echo "  RoverReplicator.kt -> $REPORT/RoverReplicator.kt"
+
+# --- 7. and the id came from that file, not from counting this module's symbols ---------------
+#
+# id 0 is also what a module numbering its own symbols would hand out, so leg 6 on its own cannot
+# tell the two apart. A name inserted *before* the game's in the sorted file has to move it.
+say "components: a name inserted ahead of it moves the id"
+LOCK="$GAME/net-components.lock"
+cp "$LOCK" "$WORK/net-components.lock.orig"
+printf 'aaa.Placeholder\ncom.example.newgame.sim.Rover\n' > "$LOCK"
+game_gradle id-moved :game:kspKotlin ||
+    fail "the game did not re-run KSP after the id space changed; see $REPORT/id-moved.log"
+REPLICATOR=$(find "$GAME/game/build/generated/ksp" -name 'RoverReplicator.kt' | head -1)
+cp "$REPLICATOR" "$REPORT/RoverReplicator-shifted.kt"
+grep -q "ComponentTypeId(1)" "$REPORT/RoverReplicator-shifted.kt" ||
+    fail "a name inserted ahead of the game's component did not move its id; see $REPORT/RoverReplicator-shifted.kt"
+echo "  ComponentTypeId(0) -> ComponentTypeId(1): the file is what numbers it"
+cp "$WORK/net-components.lock.orig" "$LOCK"
+
+# --- 8. with no registry at all, the build fails and the task writes one -----------------------
+#
+# The round trip the issue asks for, end to end: the failure names the way out, the way out works
+# on the build that just failed, and the build it fixes goes green.
+say "components: no registry -> named failure -> udeaWriteNetComponents -> green"
+rm "$LOCK"
+if game_gradle no-lock :game:kspKotlin; then
+    fail "the game compiled a @Replicated component with no id space at all"
+fi
+grep -q "udeaWriteNetComponents" "$REPORT/no-lock.log" ||
+    fail "the failure does not name the task that writes the registry; see $REPORT/no-lock.log"
+grep -q "com.example.newgame.sim.Rover" "$REPORT/no-lock.log" ||
+    fail "the failure does not name the component it could not number; see $REPORT/no-lock.log"
+
+game_gradle write-lock :udeaWriteNetComponents ||
+    fail "udeaWriteNetComponents could not write a registry after the failed build; see $REPORT/write-lock.log"
+cp "$LOCK" "$REPORT/net-components.lock.written"
+grep -q '^com\.example\.newgame\.sim\.Rover$' "$REPORT/net-components.lock.written" ||
+    fail "the written registry does not name the game's component; see $REPORT/net-components.lock.written"
+game_gradle after-write build ||
+    fail "the game did not build against the registry the task wrote; see $REPORT/after-write.log"
+cp "$WORK/net-components.lock.orig" "$LOCK"
 
 say "PROOF GREEN"
 echo "a game outside this repository resolved the engine from a repository, built, ran, and"

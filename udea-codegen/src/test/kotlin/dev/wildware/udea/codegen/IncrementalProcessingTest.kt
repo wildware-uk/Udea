@@ -86,7 +86,16 @@ class IncrementalProcessingTest {
             val body = functionBody(writer)
             assertTrue("dependencies: Dependencies" in body, "$writer does not take the helper's result: $body")
         }
-        for (writer in listOf("writeRegistries", "writeProtocolFiles", "writeManifest")) {
+        // `writeComponentManifest` is the one module-level writer that does not take the helper's
+        // *result*: it runs before `process` has assembled the module's source list, because the
+        // run it exists for is the one that is about to fail (issue #274). It still goes through
+        // the same helper, which is what this asserts - a `Dependencies(...)` of its own would be
+        // the second opinion the loop above refuses.
+        assertTrue(
+            "aggregating(" in functionBody("writeComponentManifest"),
+            "writeComponentManifest does not use the one helper: ${functionBody("writeComponentManifest")}",
+        )
+        for (writer in listOf("writeRegistries", "writeProtocolFiles", "writeManifest", "writeComponentManifest")) {
             val body = functionBody(writer)
             assertTrue(
                 "aggregating = false" !in body,

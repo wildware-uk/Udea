@@ -3,6 +3,7 @@ package dev.wildware.udea.assets.compiler
 import dev.wildware.udea.assets.compiler.scan.ReferenceSpanIndex
 import dev.wildware.udea.assets.compiler.scan.UdeaDeclarationScanner
 import dev.wildware.udea.assets.compiler.script.UdeaAssetScript
+import dev.wildware.udea.assets.compiler.shader.ShaderSources
 import dev.wildware.udea.diagnostics.SourceSpan
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
 import dev.wildware.udea.diagnostics.UdeaRules
@@ -175,7 +176,14 @@ public class AssetCompiler(
         for (file in files.sortedBy { it.absolutePathString() }) {
             evaluate(host, file, spanIndex, captureOrigins, assets, diagnostics)
         }
-        return AssetCompileResult(AssetGraph.of(assets), diagnostics, hits, assets.toList())
+        // The one place a shader's GLSL enters the graph, so that both drivers of the five passes
+        // - the Gradle pipeline and the dev daemon - get it from the same read of the same file.
+        // See `ShaderSources`: a shader carries its text because that is what lets a game reach
+        // it from `commonMain` without a per-platform resource reader. It reports nothing; what
+        // is wrong with a shader file is `ShaderFileValidator`'s UDEA0041, in pass 3, where a
+        // declaration has a span to hang a line number on.
+        val declared = ShaderSources.fill(assetRoot, assets)
+        return AssetCompileResult(AssetGraph.of(declared), diagnostics, hits, declared)
     }
 
     private fun evaluate(

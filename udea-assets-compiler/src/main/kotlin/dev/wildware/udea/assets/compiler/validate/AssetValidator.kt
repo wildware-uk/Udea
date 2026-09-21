@@ -93,6 +93,7 @@ public class AssetValidatorPipeline(
             MissingFileValidator,
             SpriteSheetGeometryValidator,
             ModelFileValidator,
+            ShaderFileValidator,
             AnimationNotifyValidator,
             DeterminismValidator,
         )

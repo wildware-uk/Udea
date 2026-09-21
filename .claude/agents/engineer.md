@@ -138,6 +138,46 @@ opens a context, run them for real and put the command and its output in `BRIEF.
 A green `sh gradlew build` is not evidence about GL. Saying it is, is the exact shape of error the
 rest of this file is about.
 
+### A cache-restored test task is indistinguishable from an executed one
+
+`clean` does **not** empty the build cache. So a test task can answer `BUILD SUCCESSFUL in 6s`,
+`5 from cache`, and leave a JUnit XML **stamped twenty-four minutes earlier** - the previous run's
+results, restored wholesale. The console output of a cached success and a real success are the same
+words. Seen on this box 2026-09-20; the real run of that same task took 3m13s.
+
+This is the silent-GL-skip trap one level down, and counting tests out of the XML does **not** save
+you: the XML is exactly what was restored. Two things do:
+
+- **Check the timestamp *inside* the XML against the wall clock** - the `timestamp=` attribute, not
+  the file's mtime. **A restored file gets the restore time**, so `ls -l` shows it as fresh and tells
+  you nothing; only the in-XML timestamp survives the round trip through the cache. A reviewer caught
+  `:udea-codegen:test` this way: `FROM-CACHE`, mtime current, in-XML timestamp an hour old.
+- **Or pass `--no-build-cache`** for the run you intend to quote, and delete the result directories
+  first.
+
+Quote a test count without having done one of those and the count is unverified. Say so rather than
+reporting it.
+
+### iOS compiles on this Linux box; only running its tests needs macOS
+
+A correction to what this file used to imply. `compileTestKotlinIosArm64` **executes here** and will
+fail your build on a real error - one developer's change was caught by it, Kotlin/Native rejecting a
+comma inside a backticked test name. What needs macOS is *running* the compiled tests, which is
+CI's `ios-tests` job. So an iOS compile failure on this box is yours and is real evidence; an absent
+iOS *test result* is not a claim you may make.
+
+### Three generated-file families, not two
+
+`udea-codegen/net-protocol.lock` and `expected-generated-hashes.txt` are the two everyone knows.
+The third is the **`.udearep` replay fixtures**, which carry an asset-graph hash in `BuildIdentity`.
+Adding an asset moves it - and because a shader's source is packed *as text*, **editing a comment
+inside a `.frag` regenerates those fixtures**.
+
+When one moves, measure the move rather than trusting it: same length, N bytes differing, and name
+which bytes. One developer's regeneration differed by exactly 35 bytes per fixture - a 32-byte hash
+and a 4-byte trailer - with `proto` unchanged at `0x07b6`, which is how it could say no recorded
+input had moved instead of hoping so.
+
 ### Gates outside `check`
 
 Each is deliberately excluded, for a reason stated in its own KDoc — wall-clock timing across forked

@@ -69,6 +69,7 @@ class MigratedCorpusCompilesTest {
                 "item/trinkets.udea.kts",
                 "models/fox.udea.kts",
                 "models/human.udea.kts",
+                "shaders/shaders.udea.kts",
                 "sounds/sounds.udea.kts",
                 "sprites/arrow/arrow.udea.kts",
             ),

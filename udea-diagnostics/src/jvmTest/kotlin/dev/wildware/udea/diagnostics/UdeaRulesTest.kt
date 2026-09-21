@@ -78,7 +78,8 @@ class UdeaRulesTest {
         // AssetValidationRules'; ModuleContractTest fails if this registry grows into either, so
         // the shader uniform rule takes the first id past both rather than the next number up.
         assertEquals("UDEA0040", UdeaRules.SHADER_UNIFORM_NOT_DECLARED.id)
-        assertEquals(20, UdeaRules.all.size)
+        assertEquals("UDEA0041", UdeaRules.SHADER_SOURCE.id)
+        assertEquals(21, UdeaRules.all.size)
         assertTrue(UdeaRules.all.all { it.defaultSeverity == Severity.Error })
     }
 

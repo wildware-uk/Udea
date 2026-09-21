@@ -1225,12 +1225,21 @@ blocked upstream on Kool publishing no wasmJs artifact.
     ReplayRefusedException: this recording cannot be replayed by this build; 1 identity field(s) differ:
       assetGraphHash: recorded f3556cc2c7387f60... (32 bytes), this build 3fcb0977bf032184... (32 bytes)
 
-Hypothesis, **not yet measured**: the shader-asset merge packs a `.frag`'s **raw text** into the asset
+**Confirmed 2026-09-21 by `dev-windows`, reproducing both of CI's hash values on Linux.** The mechanism: the shader-asset merge packs a `.frag`'s **raw text** into the asset
 graph - the first raw source text ever to go into that hash (`.udea.kts` scripts contribute the
 values they produce, not their bytes, which is why they never broke it). There is no root
 `.gitattributes`, Git for Windows checks out with `core.autocrlf=true`, so the runner packs CRLF and
 hashes differently. #176 hit this exact mechanism twice (`udea-assets-compiler/.gitattributes`,
-`udea-replay/.gitattributes`). `dev-windows` is running the `autocrlf=true` vs `=false` experiment.
+`udea-replay/.gitattributes`). Three arms, predictions (including refutation conditions) frozen first:
+
+    A autocrlf=false            frag CR=0   f3556cc2...  = the fixture's recorded value
+    B autocrlf=true             frag CR=23  3fcb0977...  = exactly what windows-latest computed
+    C A with ONLY the .frag CRLF frag CR=23  3fcb0977...  = B, packs byte-identical
+
+Arm C is the one that settles it: B converted every text file in the tree, including the
+`.udea.kts` (5 CRs) - and converting the `.frag` alone reproduces B exactly. **The `.frag` is the sole
+cause**, and an `autocrlf` checkout on Linux is the whole of the Windows difference. Positive control
+first: B's checkout really did put a CR on each of the `.frag`'s 23 lines.
 
 **Decided fix**, on a separate branch after `windows-green` merges: **normalise line endings where the
 shader text is read**, in the asset build - not only a `.gitattributes`. A game in its own repository

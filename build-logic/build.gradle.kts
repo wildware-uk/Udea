@@ -330,6 +330,14 @@ val outerBuildInputs: FileCollection = files(
     rootDir.resolve("../net-components.lock"),
     rootDir.resolve("../udea-codegen/net-protocol.lock"),
     rootDir.resolve("../udea-codegen/src/main/kotlin/dev/wildware/udea/codegen/protocol/ProtocolLock.kt"),
+    // `UdeaNetComponentsTest` reads the processor's own manifest constant and fails when it stops
+    // matching `UdeaNetComponents.MANIFEST_NAME` (issue #274). Two constants in two builds that
+    // cannot see each other, so the file each lives in is the only thing that can re-run the
+    // comparison - and undeclared, the comparison is served from cache across the edit that
+    // breaks it.
+    rootDir.resolve(
+        "../udea-codegen/src/main/kotlin/dev/wildware/udea/codegen/protocol/NetComponentsManifest.kt",
+    ),
     rootDir.resolve(
         "../udea-compiler-plugin/src/main/kotlin/dev/wildware/udea/compiler/UdeaCompilerPlugin.kt",
     ),

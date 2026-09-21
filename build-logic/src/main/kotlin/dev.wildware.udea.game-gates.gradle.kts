@@ -1,4 +1,6 @@
+import dev.wildware.udea.build.registerWriteNetComponents
 import dev.wildware.udea.build.udeaGates
+import dev.wildware.udea.build.udeaNetComponents
 
 /**
  * Every Udea build gate that is about a *build* rather than about one module, applied to the
@@ -36,6 +38,20 @@ plugins {
 
 /** Created here so a build script's `udeaGates { }` block has something to configure. */
 udeaGates()
+
+/**
+ * And `udeaNetComponents { }`, where a build says where its component id space lives (issue #274).
+ *
+ * On the root project, because the id space is the whole build's: one
+ * `net-components.lock` gives every `@Replicated` component in the build its `ComponentTypeId`,
+ * and a per-module answer could only disagree with itself. Gradle evaluates the root before any
+ * subproject, so a module reading it can never catch it half-set.
+ *
+ * A build that says nothing gets `net-components.lock` in this directory, which is where every
+ * Udea build has kept it - so the block exists for a game that wants it somewhere else, not as
+ * a line every game has to write.
+ */
+udeaNetComponents()
 
 /**
  * The projects the per-module gates are registered on: every project of this build with a build
@@ -76,6 +92,16 @@ val udeaVerifyModuleGraph = tasks.register("udeaVerifyModuleGraph") {
 tasks.named("check") {
     dependsOn(udeaVerifyModuleGraph)
 }
+
+/**
+ * `udeaWriteNetComponents`, the way out of a first `@Replicated` component (issue #274).
+ *
+ * Every project of this build, not only the gated ones: a container project has no build script
+ * and so no module of its own, and passing its directory costs a `isDirectory` check. Registered
+ * here rather than on `check` for the reason `udeaWriteProtocolLock` is not on `check` either -
+ * it rewrites a reviewed file, and a gate that rewrites what it checks cannot fail.
+ */
+registerWriteNetComponents((listOf(project) + subprojects).map { it.layout.buildDirectory.get().asFile })
 
 /**
  * The release scan over the projects that ship.

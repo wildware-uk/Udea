@@ -32,4 +32,31 @@ internal object GeneratedSources {
     fun relativePaths(): List<String> =
         files.map { it.relativeTo(directory).invariantSeparatorsPath }
 
+    /**
+     * Where `kspTest` puts the generated **resources**: the wire-protocol lock, the tool
+     * manifest, and the component manifest of issue #274.
+     *
+     * A deliberately separate collection from [directory] rather than a widening of it, and the
+     * reason is worth stating. [relativePaths] is what `expected-generated-hashes.txt` is keyed
+     * on, so folding resources into [files] would add rows to that checked-in fixture - a
+     * regeneration of a file another branch owns, to buy a check that can be had without it.
+     * What is *not* traded away is coverage: [resources] is walked by the same determinism
+     * scans, so it protects the next generated resource as well as this one.
+     */
+    val resourceDirectory: File by lazy {
+        ModuleRoot.file("build/generated/ksp/test/resources").also {
+            check(it.isDirectory) {
+                "no generated resources at ${it.absolutePath}; run :udea-codegen:kspTestKotlin"
+            }
+        }
+    }
+
+    /** Every generated resource on disk, ascending by path. */
+    val resources: List<File> by lazy {
+        resourceDirectory.walkTopDown()
+            .filter(File::isFile)
+            .sortedBy { it.invariantSeparatorsPath }
+            .toList()
+            .also { check(it.isNotEmpty()) { "no generated resources under ${resourceDirectory.absolutePath}" } }
+    }
 }

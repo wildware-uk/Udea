@@ -1,5 +1,4 @@
 import dev.wildware.udea.build.UdeaModuleRegistry
-import dev.wildware.udea.build.UdeaNetComponents
 import dev.wildware.udea.build.registerNetProtocolLock
 import dev.wildware.udea.build.udeaModule
 import dev.wildware.udea.gradle.UdeaAssetsPlugin
@@ -128,21 +127,12 @@ udea {
 /** `HollowUdeaRegistry`: this module's registry and every Udea module's on its runtime classpath. */
 val udeaRegistry = udeaModule("Hollow")
 
-/** The project-wide `@Replicated` id space, which `dev.wildware.hollow.Player` is now in (issue #250). */
-val projectComponents: Provider<String> =
-    providers.fileContents(rootProject.layout.projectDirectory.file(UdeaNetComponents.FILE_NAME))
-        .asText
-        .map { text ->
-            when (val parsed = UdeaNetComponents.parse(text)) {
-                is UdeaNetComponents.Parse.Success -> UdeaNetComponents.optionValue(parsed.components)
-                is UdeaNetComponents.Parse.Failure -> throw GradleException(parsed.problem)
-            }
-        }
-
+// `dev.wildware.hollow.Player` is in the project-wide `@Replicated` id space (issue #250). The
+// option that carries that space is not set here: `udea.kotlin-base` reads the reviewed
+// `net-components.lock` and hands it to every module that runs KSP (issue #274).
 ksp {
     arg(UdeaModuleRegistry.MODULE_NAME_OPTION, udeaRegistry.name)
     arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
-    arg(UdeaNetComponents.KSP_OPTION, projectComponents.get())
 }
 
 tasks.withType<KotlinCompilationTask<*>>().configureEach {

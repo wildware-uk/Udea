@@ -21,6 +21,7 @@ import dev.wildware.udea.codegen.gizmo.GizmoPass
 import dev.wildware.udea.codegen.level.LevelComponentScanner
 import dev.wildware.udea.codegen.protocol.LockedComponent
 import dev.wildware.udea.codegen.protocol.LockedField
+import dev.wildware.udea.codegen.protocol.NetComponentsManifest
 import dev.wildware.udea.codegen.protocol.NetProtocolEmitter
 import dev.wildware.udea.codegen.protocol.ProtocolLock
 import dev.wildware.udea.codegen.registry.RegistryEmitter
@@ -99,6 +100,9 @@ internal class UdeaSymbolProcessor(
     /** So a malformed `udea.moduleName` is reported once and not once per KSP round. */
     private var reportedModuleName = false
 
+    /** So the component manifest is written by the first round that reaches it and no later one. */
+    private var emittedComponentManifest = false
+
     override fun process(resolver: Resolver): List<KSAnnotated> {
         if (!checkSourceSet()) return emptyList()
         // The gizmo pass comes first and shares the round with nothing else: a module may declare
@@ -144,6 +148,13 @@ internal class UdeaSymbolProcessor(
         // misconfiguration was a failure at all. Tools-only modules took the silent path:
         // dispatchers compiled, nothing indexed them, and no diagnostic said so.
         if (!checkModuleName()) return emptyList()
+        // What this module compiled, for `udeaWriteNetComponents` (issue #274). Written here,
+        // **before** the id space below is resolved, because the run that needs it is precisely
+        // the run that is about to fail for want of a registry: a manifest written after that
+        // check would only ever exist on builds that did not need it.
+        options.moduleName?.let { moduleName ->
+            writeComponentManifest(moduleName, components)
+        }
         // Before the component id space is resolved, because an `RpcDescriptor` depends on
         // nothing in it: an RPC index is assigned at runtime from the sorted name list that
         // `RpcRegistry` builds, so a module can emit its guards even while its component list
@@ -192,8 +203,12 @@ internal class UdeaSymbolProcessor(
                     "numbered from its own ${local.size} component(s) starting at 0. Another " +
                     "module numbered the same way mints the same ids, and two peers then decode " +
                     "each other's packets as the wrong component type while protoHash reports " +
-                    "agreement. Add this module's components to the project's " +
-                    "'net-components.lock' and let the build pass the list in.",
+                    "agreement. Run `gradlew udeaWriteNetComponents` to put this module's " +
+                    "components into the project's 'net-components.lock', and review the diff: a " +
+                    "name's position in that file is its component type id on the wire. This " +
+                    "module compiles ${local.sorted().joinToString()}. The build reads that file " +
+                    "from the root project and passes it in; `udeaNetComponents { registry = ... }` " +
+                    "in the root build script is how to keep it somewhere else.",
             )
             return emptyList()
         }
@@ -455,6 +470,36 @@ internal class UdeaSymbolProcessor(
      * correctness bug rather than an optimisation; keeping them to one group per module is what
      * stops that dependency from costing a full rebuild per edited component.
      */
+    /**
+     * `udea/<Module>-net-components.txt`: the `@Replicated` names this module compiles.
+     *
+     * Not protocol identity - it carries no id, and it is emitted whether or not the build has
+     * told this module what the project's id space is. That is the whole point of it:
+     * `udeaWriteNetComponents` has to be able to write the reviewed `net-components.lock` the
+     * first time, and the build where that is needed is the build that has just failed for want
+     * of one. [NetComponentsManifest] has the argument at length.
+     *
+     * Aggregating over the components' own files, like every other module-level output: adding
+     * or removing a component is exactly the edit this has to be rewritten for.
+     */
+    private fun writeComponentManifest(moduleName: String, components: List<KSClassDeclaration>) {
+        // A module with no `@Replicated` component reports nothing rather than an empty file.
+        // `udeaWriteNetComponents` only ever adds, so an empty manifest could not change what it
+        // writes - and every module that runs the processor would otherwise carry an empty text
+        // file into its jar to say so.
+        if (emittedComponentManifest || components.isEmpty()) return
+        emittedComponentManifest = true
+        val names = components.mapNotNull { it.qualifiedName?.asString() }
+        val sources = components.mapNotNull(KSClassDeclaration::containingFile)
+        codeGenerator.createNewFileByPath(
+            dependencies = aggregating(sources),
+            path = NetComponentsManifest.resourcePath(moduleName),
+            extensionName = "",
+        ).use { stream ->
+            stream.write(NetComponentsManifest.render(names).toByteArray(StandardCharsets.UTF_8))
+        }
+    }
+
     private fun writeProtocolFiles(
         moduleName: String,
         emitted: List<Pair<ReplicatedComponent, Int>>,

@@ -1,6 +1,5 @@
 import com.google.devtools.ksp.gradle.KspAATask
 import dev.wildware.udea.build.UdeaModuleRegistry
-import dev.wildware.udea.build.UdeaNetComponents
 import dev.wildware.udea.build.udeaModule
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
@@ -20,29 +19,14 @@ plugins {
 // Declares this module to every launcher that has it on its runtime classpath (issue #202).
 val udeaRegistry = udeaModule("Nav")
 
-/**
- * The project-wide `@Replicated` id space, read from the reviewed `net-components.lock`.
- *
- * `NavAgent` and `NavObstacle` are in it because an order and a footprint have to survive a
- * `time.rewind`: a component outside this space is not partly captured but invisible to capture,
- * so a rewound unit would keep walking to a goal the restored world never gave it. A module that
- * names itself and emits a `Replicator` must be numbered from the project's space, or its first
- * id is also another module's first id - the processor refuses to run without it.
- */
-val projectComponents: Provider<String> =
-    providers.fileContents(rootProject.layout.projectDirectory.file(UdeaNetComponents.FILE_NAME))
-        .asText
-        .map { text ->
-            when (val parsed = UdeaNetComponents.parse(text)) {
-                is UdeaNetComponents.Parse.Success -> UdeaNetComponents.optionValue(parsed.components)
-                is UdeaNetComponents.Parse.Failure -> throw GradleException(parsed.problem)
-            }
-        }
-
+// `NavAgent` and `NavObstacle` are in the project-wide `@Replicated` id space because an order
+// and a footprint have to survive a `time.rewind`: a component outside that space is not partly
+// captured but invisible to capture, so a rewound unit would keep walking to a goal the restored
+// world never gave it. The option that carries the space is not set here - `udea.kotlin-base`
+// reads `net-components.lock` and passes it to every module that runs KSP (issue #274).
 ksp {
     arg(UdeaModuleRegistry.MODULE_NAME_OPTION, udeaRegistry.name)
     arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
-    arg(UdeaNetComponents.KSP_OPTION, projectComponents.get())
 }
 
 kotlin {

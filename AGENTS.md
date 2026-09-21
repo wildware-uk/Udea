@@ -342,6 +342,15 @@ The pieces a newcomer meets first, each with the issue that made it so.
   Building a game against an engine change you have not pushed is still
   `./gradlew publishToMavenLocal` and `./gradlew -p build-logic publishToMavenLocal`, which
   `mavenLocal()` resolves ahead of the network.
+  A game's **`@Replicated` components** work from outside too (#274): the conventions read
+  `net-components.lock` from the root project and hand it to every module that runs KSP, so no
+  game writes `ksp { arg("udea.projectComponents", ...) }` and none re-implements the sorting
+  that decides what an id is. `udeaNetComponents { registry = ... }` in the root build script
+  moves the file; `udeaWriteNetComponents` writes it from what the build compiled, and works on
+  the build that just failed for want of it, because the processor reports each module's
+  component names before it checks the id space. What is still not solved is merging a game's id
+  space with the engine's - the two are numbered in two builds, and `docs/new-game.md` says what
+  that costs.
   `templates/new-game/` is a working game of that shape, `docs/new-game.md` is the guide, and
   `scripts/outside-game-proof.sh` publishes, builds it from outside the tree, runs it, checks
   every plugin marker it wrote is inside the verified namespace, and proves its gates still fail

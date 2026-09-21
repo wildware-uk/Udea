@@ -1,5 +1,4 @@
 import dev.wildware.udea.build.UdeaModuleRegistry
-import dev.wildware.udea.build.UdeaNetComponents
 import dev.wildware.udea.build.registerCharacterArtStaging
 import dev.wildware.udea.build.registerNetProtocolLock
 import dev.wildware.udea.build.udeaModule
@@ -260,28 +259,15 @@ registerCharacterArtStaging()
  */
 val udeaRegistry = udeaModule("Moba")
 
-/**
- * The project-wide `@Replicated` id space, read from the reviewed `net-components.lock`.
- *
- * Not optional for a module that emits protocol identity. A processor numbering only the symbols
- * in front of it hands out 0, 1, 2 per module, so two modules both mint `ComponentTypeId(0)` and
- * two peers decode each other's packets as the wrong component type - silently, because each
- * module's lock is internally consistent and `protoHash` therefore reports agreement.
- */
-val projectComponents: Provider<String> =
-    providers.fileContents(rootProject.layout.projectDirectory.file(UdeaNetComponents.FILE_NAME))
-        .asText
-        .map { text ->
-            when (val parsed = UdeaNetComponents.parse(text)) {
-                is UdeaNetComponents.Parse.Success -> UdeaNetComponents.optionValue(parsed.components)
-                is UdeaNetComponents.Parse.Failure -> throw GradleException(parsed.problem)
-            }
-        }
-
+// The project-wide `@Replicated` id space is not optional for a module that emits protocol
+// identity: a processor numbering only the symbols in front of it hands out 0, 1, 2 per module,
+// so two modules both mint `ComponentTypeId(0)` and two peers decode each other's packets as the
+// wrong component type - silently, because each module's lock is internally consistent and
+// `protoHash` therefore reports agreement. It is not passed here: `udea.kotlin-base` reads the
+// reviewed `net-components.lock` and hands it to every module that runs KSP (issue #274).
 ksp {
     arg(UdeaModuleRegistry.MODULE_NAME_OPTION, udeaRegistry.name)
     arg(UdeaModuleRegistry.REGISTRY_MODULES_OPTION, udeaRegistry.registryModules)
-    arg(UdeaNetComponents.KSP_OPTION, projectComponents.get())
 }
 
 // Every compilation reads the generated registry out of `commonMain`, so none of them may start

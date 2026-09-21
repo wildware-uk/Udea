@@ -1,10 +1,12 @@
 package dev.wildware.udea.codegen
 
+import dev.wildware.udea.codegen.protocol.NetComponentsManifest
 import java.io.File
 import java.security.MessageDigest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.io.TempDir
 
@@ -17,9 +19,18 @@ import org.junit.jupiter.api.io.TempDir
  * embeds a timestamp, an absolute path or an iteration order that depends on a `HashMap` breaks
  * all three at once — and does so intermittently, which is the expensive way to find out.
  *
- * The property is asserted three ways: the bytes on disk match a checked-in hash, a second
- * processor run over identical sources reproduces those bytes exactly, and the output contains
- * nothing machine-specific.
+ * The property is asserted several ways, over generated **sources** and generated **resources**
+ * both: the bytes on disk match a checked-in hash, a second processor run over identical sources
+ * reproduces those bytes exactly, declaration order in the source moves nothing, and the output
+ * contains nothing machine-specific.
+ *
+ * Resources were outside all of it until issue #274. `expected-generated-hashes.txt` is keyed on
+ * `GeneratedSources.relativePaths()`, which filters `extension == "kt"`, so `net-protocol.lock`,
+ * the tool manifest and the component manifest were generated, shipped and never compared. That
+ * stopped being theoretical when the component manifest arrived, because its correctness *is* an
+ * ordering: two machines emitting the same names in different orders mint different component
+ * type ids from identical sources, and `protoHash` reports agreement while two peers decode each
+ * other's packets as the wrong component type.
  */
 class GeneratedFileDeterminismTest {
 
@@ -99,10 +110,64 @@ class GeneratedFileDeterminismTest {
     }
 
     @Test
-    fun `nothing machine-specific reaches a generated file`() {
+    fun `every generated resource is byte-identical across two runs`(
+        @TempDir first: File,
+        @TempDir second: File,
+    ) {
+        // The hole this closes: `expected-generated-hashes.txt` covers `.kt` files alone
+        // (`GeneratedSources.files` filters `extension == "kt"`), so a generated **resource** was
+        // outside every determinism check this build has. That mattered the moment issue #274
+        // added a resource whose correctness *is* an ordering: two machines emitting the same
+        // component names in different orders would mint different ids from the same source,
+        // `protoHash` would report agreement, and two peers would decode each other's packets as
+        // the wrong component type - the exact failure `udea.projectComponents` exists to stop.
+        val sources = mapOf("Source.kt" to MODULE_SOURCE)
+
+        val a = ProcessorHarness.run(first, sources, MODULE_OPTIONS)
+        val b = ProcessorHarness.run(second, sources, MODULE_OPTIONS)
+
+        assertEquals(emptyList(), a.errors)
+        assertTrue(
+            a.generatedResources.isNotEmpty(),
+            "a comparison of two empty maps passes forever; this run must emit resources",
+        )
+        // Map equality compares the *contents*, so this is byte equality per resource as well as
+        // agreement about which resources exist.
+        assertEquals(a.generatedResources, b.generatedResources)
+    }
+
+    @Test
+    fun `the component manifest is sorted, not in declaration order`(@TempDir workDir: File) {
+        // `MODULE_SOURCE` declares Zebra before Aardvark. A resource in declaration order would
+        // pass any assertion about *which* names are present - a set comparison cannot see an
+        // order - so what is asserted is the order itself, against a source that disagrees with
+        // it.
+        val run = ProcessorHarness.run(workDir, mapOf("Source.kt" to MODULE_SOURCE), MODULE_OPTIONS)
+
+        assertEquals(emptyList(), run.errors)
+        assertEquals(
+            "fixtures.Aardvark\nfixtures.Zebra\n",
+            run.generatedResources.getValue("udea/Moba-net-components.txt"),
+        )
+    }
+
+    @Test
+    fun `the component manifest emitter sorts what it is handed`() {
+        // The end-to-end case above cannot kill a mutation of this sort: `UdeaSymbolProcessor`
+        // orders its components by qualified name before any writer sees them, so the manifest
+        // would come out sorted with `render`'s own sort deleted. The pure function is where
+        // that mutation is observable, so it is tested where it can fail.
+        assertEquals(
+            "a.Aardvark\nz.Zebra\n",
+            NetComponentsManifest.render(listOf("z.Zebra", "a.Aardvark")),
+        )
+    }
+
+    @Test
+    fun `nothing machine-specific reaches a generated file or resource`() {
         val offenders = mutableListOf<String>()
         val userName = System.getProperty("user.name").orEmpty()
-        for (file in GeneratedSources.files) {
+        for (file in GeneratedSources.files + GeneratedSources.resources) {
             file.readLines().forEachIndexed { index, line ->
                 val reason = when {
                     MACHINE_PATH.containsMatchIn(line) -> "an absolute path"
@@ -116,8 +181,44 @@ class GeneratedFileDeterminismTest {
         assertEquals(emptyList(), offenders, "machine-specific content in generated code")
     }
 
+    @Test
+    fun `the manifest this module really emitted is sorted`() {
+        // The artefact on disk, not a harness run: `kspTestKotlin` wrote it from this module's
+        // own fixture components, which is the path every real module takes.
+        val manifest = assertNotNull(
+            GeneratedSources.resources.singleOrNull { it.name.endsWith("-net-components.txt") },
+            "no component manifest under ${GeneratedSources.resourceDirectory.absolutePath}; " +
+                "got ${GeneratedSources.resources.map { it.name }}",
+        )
+        val names = manifest.readLines().filter(String::isNotBlank)
+
+        assertTrue(names.isNotEmpty(), "an empty manifest would pass any ordering assertion")
+        assertEquals(names.sorted(), names, "the id space is sorted names, and this is that list")
+    }
+
     private companion object {
         const val UPDATE_PROPERTY = "udea.updateGeneratedHashes"
+
+        /** Two components declared in the order that is **not** their sorted order. */
+        val MODULE_SOURCE = """
+            package fixtures
+
+            import dev.wildware.udea.annotations.Net
+            import dev.wildware.udea.annotations.Replicated
+
+            @Replicated
+            class Zebra(@Net var stripes: Int = 0)
+
+            @Replicated
+            class Aardvark(@Net var snout: Float = 0f)
+        """.trimIndent()
+
+        /** What a module emitting a wire protocol is handed: its name, and the project id space. */
+        val MODULE_OPTIONS = mapOf(
+            CodegenOptions.MODULE_NAME to "Moba",
+            CodegenOptions.REGISTRY_MODULES to "Moba",
+            CodegenOptions.PROJECT_COMPONENTS to "fixtures.Aardvark,fixtures.Zebra",
+        )
 
         /**
          * A Windows drive letter or a Unix home directory.

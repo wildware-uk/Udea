@@ -26,8 +26,9 @@ Usage:
 Writes `<out>/<launch>.log`, `<out>/<launch>.png` for every launch that draws, and `<out>/summary.txt`.
 Exits 1 if any launch failed, and says which and why.
 
-The new-game template is not launched from here: it builds against a *published* engine, so it
-needs a `publishToMavenLocal` first. `--template <dir>` launches a copy of it that is already set up.
+The new-game template is launched only when `--template <dir>` names a copy of it that is already
+set up: it builds against a *published* engine, so it needs a `publishToMavenLocal` first, and the
+`windows-launch (template)` job does that before it calls this.
 """
 
 from __future__ import annotations
@@ -237,10 +238,11 @@ class Result:
 
 
 class Check:
-    def __init__(self, out: Path, renderer: str | None, frames: int):
+    def __init__(self, out: Path, renderer: str | None, frames: int, start_deadline: float = START_DEADLINE):
         self.out = out
         self.renderer = renderer
         self.frames = frames
+        self.start_deadline = start_deadline
 
     def probe_env(self, name: str, stop: bool) -> dict[str, str]:
         env = {"UDEA_LAUNCH_PNG": str(self.out / f"{name}.png"), "UDEA_LAUNCH_FRAMES": str(self.frames)}
@@ -281,8 +283,8 @@ class Check:
         else:
             result.notes.append(f"{running.name}: exited 0")
 
-    def expect(self, result: Result, running: Running, needle: str, deadline: float = START_DEADLINE) -> bool:
-        if running.wait_for(needle, deadline):
+    def expect(self, result: Result, running: Running, needle: str, deadline: float | None = None) -> bool:
+        if running.wait_for(needle, self.start_deadline if deadline is None else deadline):
             line = next(line for line in running.text().splitlines() if needle in line)
             result.notes.append(f"{running.name}: {line.strip()[:160]}")
             return True
@@ -297,7 +299,7 @@ class Check:
         result = Result(name, " ".join(args))
         for needle in expect:
             self.expect(result, running, needle)
-        self.exited(result, running, START_DEADLINE)
+        self.exited(result, running, self.start_deadline)
         self.drew(result, running)
         return result
 
@@ -306,7 +308,7 @@ class Check:
         env = self.probe_env(name, stop=True) if draws else {}
         running = launch(name, root, args + [f"-PdebugPort={port}"], self.out, env)
         result = Result(name, " ".join(args + [f"-PdebugPort={port}"]))
-        answer = wait_health(port, running, START_DEADLINE)
+        answer = wait_health(port, running, self.start_deadline)
         if answer is None:
             result.problems.append(f"/health on {port} never answered ok")
             running.kill()
@@ -316,7 +318,7 @@ class Check:
             result.problems.append(f"/health says renderMode {answer.get('renderMode')}, expected {mode}")
         if draws:
             png = self.out / f"{name}.png"
-            end = time.monotonic() + START_DEADLINE
+            end = time.monotonic() + self.start_deadline
             while not png.exists() and running.process.poll() is None and time.monotonic() < end:
                 time.sleep(0.5)
         closed = command(port, "close")
@@ -335,7 +337,7 @@ class Check:
         result = Result(name, " ".join(args))
         for needle in expect:
             self.expect(result, running, needle)
-        self.exited(result, running, START_DEADLINE)
+        self.exited(result, running, self.start_deadline)
         return result
 
     def pair(
@@ -362,7 +364,7 @@ class Check:
             return result
         client = launch(f"{name}-client", root, client_args, self.out, self.probe_env(f"{name}-client", stop=False))
         self.expect(result, client, connected)
-        self.exited(result, client, START_DEADLINE)
+        self.exited(result, client, self.start_deadline)
         self.drew(result, client)
         if server_draws:
             (self.out / f"{name}-server.stop").write_text("the client is done\n")
@@ -429,12 +431,14 @@ def main() -> int:
     parser.add_argument("--expect-renderer", default=None, help="text GL_RENDERER must contain, e.g. llvmpipe")
     parser.add_argument("--frames", type=int, default=120, help="frames each window draws before its capture")
     parser.add_argument("--template", type=Path, default=None, help="a set-up copy of templates/new-game")
+    parser.add_argument("--start-deadline", type=float, default=START_DEADLINE,
+                        help="seconds a launch may take to come up, and a window to close")
     parser.add_argument("--list", action="store_true", help="print the launch names and stop")
     options = parser.parse_args()
 
     out = options.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
-    check = Check(out, options.expect_renderer, options.frames)
+    check = Check(out, options.expect_renderer, options.frames, options.start_deadline)
     entries = launches(check, options.template.resolve() if options.template else None)
     if options.list:
         print("\n".join(name for name, _ in entries))
@@ -461,8 +465,8 @@ def main() -> int:
 
     lines = [f"{'ok  ' if r.ok else 'FAIL'} {r.name}: {r.command}" for r in results]
     for r in results:
-        lines += [f"  {r.name}: problem: {p}" for p in r.problems]
-        lines += [f"  {r.name}: {n}" for n in r.notes]
+        lines += [f"  problem: {p}" for p in r.problems]
+        lines += [f"  {n}" for n in r.notes]
     (out / "summary.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     failed = [r.name for r in results if not r.ok]
     print(f"\n{len(results) - len(failed)} of {len(results)} launches came up" + (f"; failed: {', '.join(failed)}" if failed else ""))

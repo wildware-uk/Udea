@@ -93,9 +93,9 @@ internal fun exitsWithin(backend: KoolBackend, seconds: Long): Boolean {
     return !waiter.isAlive
 }
 
-/** Polls for [path] to exist, up to [seconds]. */
+/** Polls for [path] to exist, twenty times a second for up to [seconds]. Counts polls, reads no clock. */
 internal fun appearsWithin(path: Path, seconds: Long): Boolean {
-    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(seconds)
-    while (!Files.exists(path) && System.nanoTime() < deadline) Thread.sleep(50)
+    var polls = seconds * 20
+    while (!Files.exists(path) && polls-- > 0) Thread.sleep(50)
     return Files.exists(path)
 }

@@ -1310,3 +1310,11 @@ executed, 0 from cache. Snapshot release run 35578104572 dispatched at `3e01d4ff
 Held for later waves: #268 (screenshot API; its template task needs #269), #261, #277, #263, #258,
 #275, #276, #253-#255 (Hollow, sequential after #252), the `udea-net` relevancy accumulator, and the 40
 unstable master screenshots.
+
+### Owner request, 2026-09-22 16:5xZ (no issue; owner's words are the ticket)
+"Can you make sure everything launches properly on windows, including a way for a developer to start
+the actual game". Dispatched `dev-winlaunch`, branch `windows-launch`: a `windows-launch` CI job on
+windows-latest with Mesa llvmpipe (GDI's GL 1.1 is why Windows never drew in CI), launching moba
+run/runClient/runServer/runEditor, hollow run/runServer/runClient and the template; fixes; and a `play`
+task per game (`gradlew.bat :moba:desktop:play`) documented in README, wiki and AGENTS.md. Template's
+window launch joins once #269 merges.

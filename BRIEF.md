@@ -42,6 +42,12 @@ BUILD SUCCESSFUL in 25s
 `skipped="0"`, and the timestamp **inside** the XML is 19:10:29 against a wall clock of 19:10:39, so
 this is an executed run and not a result restored from the build cache.
 
+Two things about that marker, because `lightrun.sh` has two outcomes that are not reds and not
+passes. It says `START` and `EXIT=0`, so it neither skipped on the memory floor (`EXIT=75`, which
+means *nothing ran*) nor hit the five-minute cap (`EXIT=124`). All three of my light-lane runs —
+`shot2`, `uptodate`, `evidence` — say `START` then `EXIT=0`; none of my markers contains `SKIPPED`
+or `TIMEOUT`. The fresh in-XML timestamp is the independent check on the same fact.
+
 ### It goes red when the feature is reverted
 
 Five mutations. Each row carries the literal `git diff` taken in my worktree at the moment its test

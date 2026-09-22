@@ -886,3 +886,8 @@ A 5-second FAIL was a Gradle daemon dying of OOM on a loaded box; a 6-second red
 only difference in the logs was that the genuine one carried the game's own first line
 (`[moba.client] moba 0.1.0 Windowed local`) before the failure. So a mutation row must show the
 mutated subject ran - its own startup line, its test count, its assertion - before it is scored.
+
+**A "revert the feature" row must name the SHA it reverts to.** `origin/master` is precisely the ref
+that moves while a branch is in review, and a row reverted to a moved master fails to compile rather
+than failing its assertions - a VOID that reads as a red (twice on 2026-09-22). `git checkout <sha> --
+<paths>`, with the SHA written in the brief.

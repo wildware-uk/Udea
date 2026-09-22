@@ -227,10 +227,12 @@ public class RenderPipeline internal constructor(
     /**
      * Fails every capture still waiting on this pipeline or on one of its views: the render loop
      * has gone, so no frame will ever read them. On the render thread, as its loop exits.
+     *
+     * @param cause what stopped the loop, carried by every failure, or `null` when it was asked to stop.
      */
-    internal fun closeCaptures() {
-        capture?.close()
-        for (index in viewports.indices) viewports[index].captures?.close()
+    internal fun closeCaptures(cause: Throwable?) {
+        capture?.close(cause)
+        for (index in viewports.indices) viewports[index].captures?.close(cause)
     }
 
     /**

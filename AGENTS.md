@@ -260,6 +260,12 @@ The pieces a newcomer meets first, each with the issue that made it so.
   menu or an editor panel: it draws into the window after the captured frame, so no screenshot
   sees it. A `CapturedUi` is a HUD: it draws into the captured frame, so an agent's screenshot
   sees the cooldown a player sees (#188).
+- **A frame that throws stops the game, loudly** (#275). A `RenderSystem` or `OverlaySystem` that
+  throws - an overlay that draws without `beginPixels()` is the usual one - ends the render loop:
+  the exception and its trace go to stderr, every waiting capture fails with it as its cause, and
+  `KoolBackend.awaitExit()` throws it, so a game's `main` exits non-zero. It used to end silently
+  with exit 0. **Where the mouse is** is `PointerPosition` (#262), read from a `KoolPointer()` built
+  on the render thread with no `UiLayer` needed: window pixels, `+y` down.
 - **A game can write a screen shader** (#259, #266), and the `.frag` is an asset (#269).
   `shader(name = "scanlines", file = "shaders/scanlines.frag")` in a `.udea.kts` makes the build
   read the file, check it and pack its **text** into the graph, so

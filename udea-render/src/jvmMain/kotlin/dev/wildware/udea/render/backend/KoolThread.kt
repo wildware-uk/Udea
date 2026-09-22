@@ -73,7 +73,7 @@ internal class KoolThread(private val window: WindowConfig, private val visible:
      * this, the third left every capture waiter waiting out its whole deadline on a loop that had
      * already gone, and reporting the timeout rather than the exception.
      */
-    private val shutdown = AtomicReference<(() -> Unit)?>(null)
+    private val shutdown = AtomicReference<((Throwable?) -> Unit)?>(null)
 
     private val thread = Thread({ run() }, "udea-kool").apply { isDaemon = true }
 
@@ -156,6 +156,17 @@ internal class KoolThread(private val window: WindowConfig, private val visible:
         frames.set(Frames.Driven(driver))
     }
 
+    /**
+     * Stops calling the per-frame callback; the loop goes on serving [submit] and drawing nothing.
+     *
+     * Render thread, and in the same task that releases what the callback draws with: a task runs at
+     * the top of a frame, *before* that frame's callback, so a callback still installed would draw
+     * that very frame on what the task had just released (issue #275).
+     */
+    fun stopDriving() {
+        frames.set(Frames.Idle)
+    }
+
     /** Installs the resize callback, which is called on the render thread. */
     fun onResize(handler: (Int, Int) -> Unit) {
         resizes.set(handler)
@@ -165,15 +176,26 @@ internal class KoolThread(private val window: WindowConfig, private val visible:
      * Installs the callback run when the loop exits, whatever ended it.
      *
      * Called on the render thread after the loop has gone, so it must not touch render objects: it
-     * is for releasing the things *waiting* on the loop, not the things the loop owned.
+     * is for releasing the things *waiting* on the loop, not the things the loop owned. It is handed
+     * the exception that stopped the loop, or `null` when the loop was asked to stop or its window was
+     * closed, so a waiter can be told why rather than only that (issue #275).
      */
-    fun onShutdown(hook: () -> Unit) {
+    fun onShutdown(hook: (Throwable?) -> Unit) {
         shutdown.set(hook)
     }
 
-    /** Blocks until the render loop has exited. */
+    /**
+     * Blocks until the render loop has exited, and says so if it exited because something threw.
+     *
+     * @throws GlContextException with the exception as its cause, when a frame, a task or Kool itself
+     *   threw out of the loop. Returning normally there is what let a game's `main` exit 0 with
+     *   nothing said after its window closed itself (issue #275): the loop had died, and the only
+     *   record of why was a field nobody read.
+     */
     fun awaitExit() {
         finished.await()
+        val cause = failure.get() ?: return
+        throw GlContextException("the Kool render loop stopped because it threw: $cause", cause)
     }
 
     /**
@@ -205,18 +227,36 @@ internal class KoolThread(private val window: WindowConfig, private val visible:
             }
         } catch (t: Throwable) {
             failure.compareAndSet(null, t)
+            report(t)
         } finally {
             ready.countDown()
             finished.countDown()
             failAllQueued()
             // Last, and outside the failure path's control: a broken hook must not stop the two
-            // latches above from having been counted down. Its own failure is recorded, not lost.
+            // latches above from having been counted down. Its own failure is recorded and
+            // reported, not lost.
             try {
-                shutdown.get()?.invoke()
+                shutdown.get()?.invoke(failure.get())
             } catch (t: Throwable) {
                 failure.compareAndSet(null, t)
+                report(t)
             }
         }
+    }
+
+    /**
+     * Puts the exception that ended the loop on stderr, with its stack trace.
+     *
+     * Not log-and-continue: nothing continues, the loop is over. This is the one report a person
+     * gets who holds neither a capture nor [awaitExit] - a player whose window has just closed - and
+     * without it the window closed with nothing said at all (issue #275). The trace names the frame
+     * that threw, which for a game's renderer or overlay is the game's own line.
+     */
+    private fun report(failure: Throwable) {
+        System.err.println(
+            "udea-render: the Kool render loop stopped because it threw, and nothing will be drawn again: $failure",
+        )
+        failure.printStackTrace()
     }
 
     private fun onFrame() {

@@ -128,6 +128,13 @@ internal object OverlayLongRun {
                 "$mode: the overlay's panel is not on the window after ${SECONDS}s",
             )
             assertTrue(backend.renderLoopRunning, "$mode: the render loop stopped at the end of the run")
+
+            // And the way out is clean: closed from another thread while frames are being driven,
+            // which is how a game closes itself (moba's `requestExit`), the loop ends without a
+            // frame drawing on the disposed pipeline. `awaitExit()` throws when the loop died of an
+            // exception, so this fails if closing is itself one.
+            backend.close()
+            backend.awaitExit()
         } finally {
             backend.close()
         }

@@ -98,6 +98,26 @@ public interface Resizable {
  *
  * There is deliberately no `onBind(world, ctx)` here either. An overlay narrates the agent,
  * not the world; handing it the world would hand it simulation state through the back door.
+ *
+ * ## Drawing, and where the mouse is
+ *
+ * An overlay draws with `OverlayResources.batch`, opened and closed as a render system does it:
+ *
+ * ```kotlin
+ * override fun render(target: ScreenTarget, dtSeconds: Float) {
+ *     batch.beginPixels()                        // window pixels, origin at the bottom left
+ *     batch.fill(12f, 12f, 120f, 30f, panel)
+ *     batch.end()
+ * }
+ * ```
+ *
+ * A draw with no `beginPixels()` throws, and a throw from any frame stops the render loop. That
+ * stop is loud: the exception goes to stderr and a capture carries it as its cause, and
+ * `KoolBackend.awaitExit` throws it (issue #275).
+ *
+ * To draw at the cursor, read `PointerPosition` from a `KoolPointer()`, which needs no `UiLayer`.
+ * Its `pointerY` runs *down* from the top edge and the batch's pixels run up, so the batch's y is
+ * `target.height - pointerY`.
  */
 public interface OverlaySystem {
 

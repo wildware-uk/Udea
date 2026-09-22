@@ -129,7 +129,7 @@ public class SpriteBatch2D internal constructor(
         flipX: Boolean = false,
         flipY: Boolean = false,
     ) {
-        check(isDrawing) { "SpriteBatch2D.draw called outside begin/end" }
+        check(isDrawing) { "SpriteBatch2D.draw called outside begin/end: $OPEN_FIRST" }
         val texture = region.texture
         var u0 = region.u0
         var du = region.du
@@ -159,7 +159,7 @@ public class SpriteBatch2D internal constructor(
 
     /** Records a solid rectangle: [whitePixel] stretched and tinted. */
     public fun fill(x: Float, y: Float, width: Float, height: Float, tint: Rgba) {
-        check(isDrawing) { "SpriteBatch2D.fill called outside begin/end" }
+        check(isDrawing) { "SpriteBatch2D.fill called outside begin/end: $OPEN_FIRST" }
         record(
             whitePixel,
             projection.pixelX(x), projection.pixelY(y),
@@ -176,7 +176,7 @@ public class SpriteBatch2D internal constructor(
      * gizmo are view pixels. Nothing is recorded for a line of no length.
      */
     internal fun line(x0: Float, y0: Float, x1: Float, y1: Float, thickness: Float, tint: Rgba) {
-        check(isDrawing) { "SpriteBatch2D.line called outside begin/end" }
+        check(isDrawing) { "SpriteBatch2D.line called outside begin/end: $OPEN_FIRST" }
         val dx = x1 - x0
         val dy = y1 - y0
         val length = sqrt(dx * dx + dy * dy)
@@ -244,6 +244,11 @@ public class SpriteBatch2D internal constructor(
     override fun toString(): String = "SpriteBatch2D($instanceCount instances in $runCount runs)"
 
     internal companion object {
+
+        /** What every draw outside a pass is told to do instead (issue #275). */
+        const val OPEN_FIRST: String =
+            "call beginPixels() (or begin(projection)) before drawing and end() after, in every " +
+                "RenderSystem and OverlaySystem that draws with this batch"
 
         /** `x, y, width, height, originX, originY, rotation, u0, v0, du, dv`. */
         const val FLOATS_PER_INSTANCE: Int = 11

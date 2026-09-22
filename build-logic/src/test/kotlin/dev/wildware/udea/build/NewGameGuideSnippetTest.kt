@@ -103,17 +103,11 @@ class NewGameGuideSnippetTest {
         // passes on a parser that finds nothing; without the second it fails every guide that
         // mentions `NewGameAssets.registry`, which is hand-written Kotlin and not a generated
         // accessor at all.
-        val caught = blocksIn("```kotlin
-val rover = GameAssets.models.rover
-```
-", "fixture.md", absolute = true)
+        val caught = blocksIn(FENCE + "kotlin\nval rover = GameAssets.models.rover\n" + FENCE + "\n", "fixture.md", absolute = true)
         assertTrue(ACCESSOR.containsMatchIn(caught.single().text), "an unquoted generated accessor was let through")
 
         val spared = blocksIn(
-            "```kotlin
-val assets = NewGameAssets.registry
-```
-",
+            FENCE + "kotlin\nval assets = NewGameAssets.registry\n" + FENCE + "\n",
             "fixture.md",
             absolute = true,
         )

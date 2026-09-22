@@ -880,3 +880,9 @@ section was written before it. The developer's own pass checked the diff against
 the acceptance criteria, but never re-read the brief's own references against what was on disk.
 So, before reporting done: for every `M<n>`, file path and run the brief names, confirm the artefact
 exists (marker, log, diff, failing-test line). A citation is an evidence claim like any other.
+
+**What separates a real fast red from a void one is the subject's own output, not the duration.**
+A 5-second FAIL was a Gradle daemon dying of OOM on a loaded box; a 6-second red was genuine, and the
+only difference in the logs was that the genuine one carried the game's own first line
+(`[moba.client] moba 0.1.0 Windowed local`) before the failure. So a mutation row must show the
+mutated subject ran - its own startup line, its test count, its assertion - before it is scored.

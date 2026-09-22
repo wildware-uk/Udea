@@ -9,7 +9,7 @@ import dev.wildware.udea.render.input.InputBindings
 
 /**
  * What Hollow binds, and the names it binds them by: walk on WASD or the left stick, and hold
- * Shift to run (issue #250).
+ * Shift to run (issue #250); Space swings, Q dashes and E heals (issue #252).
  *
  * ## Keys are named, never numbered
  *
@@ -44,6 +44,15 @@ public object HollowControls {
     /** Held, not tapped: the character runs while it is down. Either Shift. */
     public const val RUN: String = "hollow/run"
 
+    /** Swing at every fox in reach, as often as the cooldown allows while it is held. Space. */
+    public const val ATTACK: String = "hollow/attack"
+
+    /** Dash the way the character is facing. Q. */
+    public const val DASH: String = "hollow/dash"
+
+    /** Heal. E. */
+    public const val HEAL: String = "hollow/heal"
+
     /**
      * The bindings, built once.
      *
@@ -59,6 +68,10 @@ public object HollowControls {
                 // The south face button, held: where a pad puts "sprint".
                 buttons = intArrayOf(GAMEPAD_RUN_BUTTON),
             ),
+            // The other three face buttons, where a pad puts its actions.
+            ActionBinding(name = ATTACK, keys = listOf(InputKey.Space), buttons = intArrayOf(GAMEPAD_ATTACK_BUTTON)),
+            ActionBinding(name = DASH, keys = listOf(InputKey.Q), buttons = intArrayOf(GAMEPAD_DASH_BUTTON)),
+            ActionBinding(name = HEAL, keys = listOf(InputKey.E), buttons = intArrayOf(GAMEPAD_HEAL_BUTTON)),
         ),
         axes = listOf(
             Axis2DBinding(
@@ -79,6 +92,15 @@ public object HollowControls {
     /** [RUN]'s id. */
     public val RUN_ACTION: ActionId = BINDINGS.catalog.action(RUN)
 
+    /** [ATTACK]'s id. */
+    public val ATTACK_ACTION: ActionId = BINDINGS.catalog.action(ATTACK)
+
+    /** [DASH]'s id. */
+    public val DASH_ACTION: ActionId = BINDINGS.catalog.action(DASH)
+
+    /** [HEAL]'s id. */
+    public val HEAL_ACTION: ActionId = BINDINGS.catalog.action(HEAL)
+
     /** The left stick's x, as every pad this engine has seen numbers it. */
     private const val LEFT_STICK_X: Int = 0
 
@@ -87,4 +109,13 @@ public object HollowControls {
 
     /** A pad's south face button - A on an Xbox pad, cross on a PlayStation one. */
     private const val GAMEPAD_RUN_BUTTON: Int = 0
+
+    /** The west face button - X on an Xbox pad, square on a PlayStation one. */
+    private const val GAMEPAD_ATTACK_BUTTON: Int = 2
+
+    /** The east face button - B, or circle. */
+    private const val GAMEPAD_DASH_BUTTON: Int = 1
+
+    /** The north face button - Y, or triangle. */
+    private const val GAMEPAD_HEAL_BUTTON: Int = 3
 }

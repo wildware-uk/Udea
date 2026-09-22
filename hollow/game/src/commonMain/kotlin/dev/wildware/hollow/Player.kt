@@ -8,6 +8,7 @@ import dev.wildware.udea.annotations.Net
 import dev.wildware.udea.annotations.Replicated
 import dev.wildware.udea.annotations.Sim
 import dev.wildware.udea.core.SimSystem
+import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.module.CoreModule
@@ -20,6 +21,8 @@ import dev.wildware.udea.core.snapshot.ReplicatedComponentType
 import dev.wildware.udea.core.snapshot.fleksComponentType
 import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.core.spatial.Transform3D
+import dev.wildware.udea.gas.Abilities
+import dev.wildware.udea.gas.Attributes
 import dev.wildware.udea.net.transport.PeerId
 import dev.wildware.udea.render.input.Intent
 import dev.wildware.udea.render.input.IntentState
@@ -55,6 +58,38 @@ import kotlinx.serialization.Serializable
 @Replicated
 public class Player(
     /**
+     * Whether the attack control was held this tick (issue #252). Held, not pressed: see
+     * [PlayerAbilitySystem] for why the state and not the edge. `@Sim` for the reason [moveX] is.
+     */
+    @Sim public var attack: Boolean = false,
+    /**
+     * The server tick the swing is next ready on (issue #252): `Tick(0)` until it has been used.
+     *
+     * A copy, and the one place Hollow keeps one. The cooldown's truth is the `hollow/cooldown`
+     * effect in the character's `GameplayEffects`, which `PlayerAbilitySystem` reads this from the
+     * moment a swing starts; but `udea-gas` never sends an effect list to a client (its codec's
+     * `netMask` is empty), so a client's HUD would have no cooldown to show. This is it, `@Net`, and
+     * written once per use rather than every tick, so it costs the wire one tick number per swing.
+     * `CombatTest` holds it equal to the effect every tick of a fight.
+     */
+    @Net public var attackReady: Tick = Tick(0L),
+    /** Whether the dash control was held this tick. See [attack]. */
+    @Sim public var dash: Boolean = false,
+    /** The server tick the dash is next ready on. See [attackReady]. */
+    @Net public var dashReady: Tick = Tick(0L),
+    /**
+     * Which way the character is facing, as a unit vector on the ground plane: the direction it last
+     * moved in, east until it has moved (issue #252).
+     *
+     * [heading] says the same thing as an angle, and the angle is what turns the model. A dash needs
+     * the direction as a vector, and recovering it from the angle would be a `cos` and a `sin` in
+     * authoritative state, which `determinism-audit.md` asks this project not to write where it can
+     * be avoided. So the vector is kept beside the angle, from the same axis, by [PlayerPoseSystem].
+     */
+    @Sim public var faceX: Float = 1f,
+    /** @see faceX */
+    @Sim public var faceY: Float = 0f,
+    /**
      * Which way the character is looking, in radians about Z, with no model offset in it.
      *
      * Held rather than derived, and that is not a saving. `Transform3DFromBodySystem` copies a
@@ -65,6 +100,10 @@ public class Player(
      * moving, which is also what makes a facing persist across a rewind.
      */
     @Sim public var heading: Float = 0f,
+    /** Whether the heal control was held this tick. See [attack]. */
+    @Sim public var heal: Boolean = false,
+    /** The server tick the heal is next ready on. See [attackReady]. */
+    @Net public var healReady: Tick = Tick(0L),
     /** East-west axis this tick, `-1..1`, already clamped to the unit circle with [moveY]. */
     @Sim public var moveX: Float = 0f,
     /** North-south axis this tick, `-1..1`. Positive is north, `+Y` on the ground plane. */
@@ -78,7 +117,7 @@ public class Player(
     override fun type(): ComponentType<Player> = Player
 
     override fun toString(): String =
-        "Player(move=($moveX, $moveY) heading=$heading running=$running owner=$owner)"
+        "Player(move=($moveX, $moveY) heading=$heading running=$running attack=$attack dash=$dash heal=$heal owner=$owner)"
 
     public companion object : ComponentType<Player>() {
 
@@ -116,13 +155,13 @@ public class Player(
          * captured. Built fresh per call, like `Transform3D.snapshotType()`.
          *
          * The kinds are in the generated replicator's order, which is the field names sorted:
-         * `heading`, `moveX`, `moveY`, `owner`, `running`. `ComponentSchema.of` refuses a list of
-         * the wrong length, and `PlayerReplicationTest` round-trips one to catch a kind typed wrong
-         * at the right length.
+         * `attack`, `attackReady`, `dash`, `dashReady`, `faceX`, `faceY`, `heading`, `heal`,
+         * `healReady`, `moveX`, `moveY`, `owner`, `running`. `ComponentSchema.of` refuses a list of the wrong length, and
+         * `PlayerReplicationTest` round-trips one to catch a kind typed wrong at the right length.
          *
-         * A client receives the whole component through its `allMask`, so the four `@Sim` fields
-         * arrive from columns the server never filled - a zeroed axis, a zero heading and a
-         * `running` of false. That is the right value on a client: it does not step the simulation,
+         * A client receives the whole component through its `allMask`, so every `@Sim` field
+         * arrives from a column the server never filled, which is to say zeroed or false. That is
+         * the right value on a client: it does not step the simulation,
          * the axis is an input that only the machine owning the character produces, and which way
          * the character is looking reaches it in `Transform3D.rotationZ`, which is `@Net`.
          */
@@ -131,7 +170,21 @@ public class Player(
             ComponentSchema.of(
                 PlayerReplicator,
                 "Player",
-                listOf(FieldKind.Float, FieldKind.Float, FieldKind.Float, FieldKind.Int, FieldKind.Bool),
+                listOf(
+                    FieldKind.Bool,
+                    FieldKind.Tick,
+                    FieldKind.Bool,
+                    FieldKind.Tick,
+                    FieldKind.Float,
+                    FieldKind.Float,
+                    FieldKind.Float,
+                    FieldKind.Bool,
+                    FieldKind.Tick,
+                    FieldKind.Float,
+                    FieldKind.Float,
+                    FieldKind.Int,
+                    FieldKind.Bool,
+                ),
             ),
             Player,
         ) { Player() }
@@ -227,12 +280,18 @@ public class PlayerControlSystem(private val input: IntentState) : SimSystem() {
                 player.moveX = 0f
                 player.moveY = 0f
                 player.running = false
+                player.attack = false
+                player.dash = false
+                player.heal = false
                 return@forEach
             }
             axis.set(intent.axisX(HollowControls.MOVE_AXIS), intent.axisY(HollowControls.MOVE_AXIS))
             player.moveX = axis.x
             player.moveY = axis.y
             player.running = intent.isPressed(HollowControls.RUN_ACTION)
+            player.attack = intent.isPressed(HollowControls.ATTACK_ACTION)
+            player.dash = intent.isPressed(HollowControls.DASH_ACTION)
+            player.heal = intent.isPressed(HollowControls.HEAL_ACTION)
         }
     }
 }
@@ -254,15 +313,45 @@ public class PlayerControlSystem(private val input: IntentState) : SimSystem() {
  *
  * Registered at `SimPhase.Movement`, which is before `SimPhase.Physics` by definition - "the
  * authoritative movement model for anything predicted", which is exactly what this is.
+ *
+ * ## What a fight does to it (issue #252)
+ *
+ * Three things override the axis, in this order, and all three are read off the character's own
+ * `udea-gas` components rather than kept here: a dead character does not move; a dashing one moves
+ * at [CombatRules.DASH_SPEED] along the line its dash started on; a swinging one stands and punches.
+ * The dash is written here and not by the ability because a character's velocity has one writer,
+ * and this is it.
  */
 public class PlayerMovementSystem : SimSystem() {
 
     private val players: Family = world.family { all(Player, PhysicsBody) }
 
+    private val combat: HollowCombat = ctx[HollowCombat.KEY]
+
     override fun onTick() {
         players.forEach { entity ->
             val player = entity[Player]
             val body = entity[PhysicsBody]
+            val attributes = entity.getOrNull(Attributes)
+            val abilities = entity.getOrNull(Abilities)
+            if (attributes != null && combat.isDead(attributes)) {
+                body.linearX = 0f
+                body.linearY = 0f
+                return@forEach
+            }
+            if (abilities != null) {
+                val dash = abilities.instanceAt(CombatRules.DASH_SLOT)
+                if (dash.isActive) {
+                    body.linearX = dash.scratchFloats[PlayerAbilitySystem.DASH_X] * CombatRules.DASH_SPEED
+                    body.linearY = dash.scratchFloats[PlayerAbilitySystem.DASH_Y] * CombatRules.DASH_SPEED
+                    return@forEach
+                }
+                if (abilities.instanceAt(CombatRules.ATTACK_SLOT).isActive) {
+                    body.linearX = 0f
+                    body.linearY = 0f
+                    return@forEach
+                }
+            }
             val speed = HollowMovement.speed(player.running)
             // Every tick, including the still ones: a character whose velocity was left alone would
             // coast on the last thing its player asked for, since there is no gravity or friction

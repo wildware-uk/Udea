@@ -335,6 +335,9 @@ public class HollowNetIntentSource : IntentSource {
         val command = pending ?: return
         into.setAxis(HollowControls.MOVE_AXIS, command.moveX, command.moveY)
         into.setPressed(HollowControls.RUN_ACTION, command.buttons and HollowMovement.RUN_BUTTON != 0)
+        into.setPressed(HollowControls.ATTACK_ACTION, command.buttons and HollowMovement.ATTACK_BUTTON != 0)
+        into.setPressed(HollowControls.DASH_ACTION, command.buttons and HollowMovement.DASH_BUTTON != 0)
+        into.setPressed(HollowControls.HEAL_ACTION, command.buttons and HollowMovement.HEAL_BUTTON != 0)
     }
 
     override fun toString(): String = "HollowNetIntentSource($pending)"

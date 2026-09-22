@@ -90,8 +90,8 @@ Arrows point downward only. A module may depend on modules below it in this tabl
 | `moba:game` | The example game: a 5v5 three-lane MOBA. A library - components, systems, assets and what it draws - with no entry point in it |
 | `moba:desktop` | The desktop launcher: `run`, `runServer`, `runClient`, the shot mains, the proofs and the agent surface. JVM |
 | `moba:android` | The Android launcher. One activity, and it boots the simulation headless because `udea-render` has no Android Kool backend yet |
-| `hollow:game` | The 3D example game (epic #245): a third-person co-op survival arena in a lit forest clearing. A library like `moba:game` - components, CC0 models and the CC BY Khronos fox, the `clearing.udealevel` level, what it draws, and the server and client sessions |
-| `hollow:desktop` | Hollow's desktop launcher: `run` (a listen server and its local player, `-Plevel=<path>`), `runServer` (headless), `runClient` (`host` or `join`), `runShot`, `runPlayerShot` (the character walking, running a lap and stopping at a rock, one PNG per known tick) and `runFoxShot` (a wave of foxes closing in on two players, drawn by either client of an in-process session, #251). JVM. No Android launcher in this epic |
+| `hollow:game` | The 3D example game (epic #245): a third-person co-op survival arena in a lit forest clearing. A library like `moba:game` - components, CC0 models and the CC BY Khronos fox, the `clearing.udealevel` level, what it draws, the server and client sessions, and the fight: health as a `udea-gas` attribute, a swing, a dash and a heal on the player, a bite on the fox, and a `CapturedUi` HUD (#252) |
+| `hollow:desktop` | Hollow's desktop launcher: `run` (a listen server and its local player, `-Plevel=<path>`), `runServer` (headless), `runClient` (`host` or `join`), `runShot`, `runPlayerShot` (the character walking, running a lap and stopping at a rock, one PNG per known tick), `runFoxShot` (a wave of foxes closing in on two players, drawn by either client of an in-process session, #251) and `runFightShot` (that wave fought off, with the HUD in every frame, and a non-zero exit when a frame has no HUD or nothing was fought, #252). Its `udeaHollowGlTest` soaks the HUD for sixteen seconds of real frames in each render mode. JVM. No Android launcher in this epic |
 
 Three rules that are cheap to break and expensive to find:
 
@@ -266,7 +266,7 @@ The pieces a newcomer meets first, each with the issue that made it so.
   sees the cooldown a player sees (#188). A screen is `@Composable`, so a project that writes one
   applies `dev.wildware.udea.compose-ui` beside its Kotlin convention - the Compose compiler at the
   catalog's Kotlin version, and nothing else. It is published, so a game in its own repository
-  applies the same plugin `udea-render`, `udea-editor` and `moba:game` do (#275). Without it a screen
+  applies the same plugin `udea-render`, `udea-editor`, `moba:game` and `hollow:game` do (#275, #252). Without it a screen
   still compiles, as a plain function, and fails only at run time, where it meets the toolkit.
 - **A game can write a screen shader** (#259, #266), and the `.frag` is an asset (#269).
   `shader(name = "scanlines", file = "shaders/scanlines.frag")` in a `.udea.kts` makes the build

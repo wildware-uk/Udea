@@ -48,16 +48,36 @@ public data class FoxWaves(
         return since / every.count
     }
 
+    /**
+     * How many waves have arrived by [tick], counting one on it: `0` before [first], `1` from it
+     * until the second, and so on. What the HUD calls the wave (issue #252), and a pure function of
+     * the tick like [waveAt], so a client asks it of the server's tick and gets the server's answer.
+     *
+     * `internal`, like [waveAt] and [sizeOf] beside it, because the only caller is `HollowHudModel`
+     * in this module. [DEFAULT] is the one thing here a launcher names, and it is public for that.
+     */
+    internal fun arrivedBy(tick: Tick): Long {
+        val since = tick.ticksSince(first)
+        return if (since < 0L) 0L else since / every.count + 1
+    }
+
     /** How many foxes wave [wave] brings, before [cap] is applied. */
     internal fun sizeOf(wave: Long): Int = (size + wave * growth).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
-    internal companion object {
+    public companion object {
 
         /** [waveAt]'s answer on a tick no wave arrives on. */
         internal const val NO_WAVE: Long = -1L
 
-        /** The schedule the game plays: a first wave four seconds in, then one every twenty. */
-        internal val DEFAULT: FoxWaves = FoxWaves()
+        /**
+         * The schedule the game plays: a first wave four seconds in, then one every twenty.
+         *
+         * Public because a launcher names it twice - once for the session it starts and once for
+         * the HUD, which shows the wave number and has to be told the same schedule the server is
+         * playing (issue #252). Two launch lines with two schedules would put a number on the
+         * screen that no wave matches.
+         */
+        public val DEFAULT: FoxWaves = FoxWaves()
 
         /**
          * How far from the middle of the clearing a wave arrives: just inside the inner ring of

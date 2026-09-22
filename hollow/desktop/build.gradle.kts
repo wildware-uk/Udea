@@ -137,6 +137,75 @@ tasks.register<JavaExec>("runFoxShot") {
     )
 }
 
+// --- udeaHollowGlTest (issue #252) -------------------------------------------------------------
+//
+// The Hollow tests that need a real Kool context: the HUD soaked for sixteen seconds of real frames
+// in each render mode (#275's rule). Each test class in a JVM of its own, for the reason
+// `udea-render`'s `udeaGlTest` gives: Kool allows one context per process, for its lifetime.
+val hollowGlTestPackage = "dev.wildware.hollow.desktop.gl"
+
+val udeaHollowGlTest = tasks.register<Test>("udeaHollowGlTest") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Runs the Hollow tests that drive a real Kool backend and a display."
+
+    val testSourceSet = sourceSets.test.get()
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("$hollowGlTestPackage.*") }
+    forkEvery = 1
+
+    // A machine with no display skips these and says so; a job that has one sets this, so a skip
+    // cannot hide a backend that stopped booting. The same property the other GL suites read.
+    systemProperty(
+        "udea.render.requireGl",
+        providers.gradleProperty("udea.render.requireGl").getOrElse("false"),
+    )
+    // The same three properties every run task sets: a launcher reads its models from them.
+    systemProperty("hollow.assets.root", gameAssetRoot.asFile.absolutePath)
+    systemProperty("hollow.assets.converted", convertedModels.get().asFile.absolutePath)
+    launchLevel.orNull?.let { systemProperty("hollow.level", it) }
+    dependsOn(":hollow:game:udeaPackBundle")
+}
+
+tasks.test {
+    filter {
+        // The GL tests belong to `udeaHollowGlTest`, in JVMs of their own - see that task.
+        excludeTestsMatching("$hollowGlTestPackage.*")
+        // With that exclusion this source set has no test class left: `ClearingLayout` and
+        // `ClearingWriter` are the authoring tool `udeaWriteClearing` runs, not tests. An empty
+        // run is the correct outcome, and without this a filter that matches nothing is a failure.
+        isFailOnNoMatchingTests = false
+    }
+}
+
+tasks.check {
+    dependsOn(udeaHollowGlTest)
+}
+
+/**
+ * `runFightShot`: a wave of foxes fought off by two players, drawn by one client of a real
+ * in-process session, one PNG per known tick, with the HUD in every frame (issue #252).
+ * `-Phollow.shot.client=1` draws the second client instead; the two runs show the same ticks.
+ *
+ * A GL task run by name, for the reason `runShot` gives, and a **check** as well as a camera: it
+ * exits non-zero when a frame does not carry the HUD's panels, when no fox was hurt, when none was
+ * killed, or when no player was bitten. That is what makes it this ticket's evidence command.
+ */
+tasks.register<JavaExec>("runFightShot") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "hollow.fight: captures a fight with the HUD, seen by client -Phollow.shot.client=<0|1>, into -Pudea.shot.out=<dir>."
+    mainClass.set("dev.wildware.hollow.desktop.HollowFightShot")
+    classpath = sourceSets.main.get().runtimeClasspath
+    systemProperty("udea.render.mode", "Offscreen")
+    systemProperty("hollow.shot.client", providers.gradleProperty("hollow.shot.client").orNull ?: "0")
+    systemProperty(
+        "udea.shot.out",
+        providers.gradleProperty("udea.shot.out").orNull
+            ?: layout.buildDirectory.dir("reports/udea/fight").get().asFile.absolutePath,
+    )
+}
+
 /**
  * Writes `hollow/game/levels/clearing.udealevel` from `ClearingLayout`, the layout in code the
  * clearing was first made from. An authoring tool, run by name: once the level is edited in the

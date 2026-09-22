@@ -28,6 +28,12 @@ plugins {
 
     // Level files (issue #191): the clearing's components are `@Serializable`.
     alias(libs.plugins.kotlinSerialization)
+    // The HUD is a ComposeGL screen (issue #252): `HollowHudScreen.content` is `@Composable`, so
+    // this module compiles composables. The toolkit itself comes through `udea-render`'s `api` on
+    // `composegl-ui`; the compiler comes through the published convention, which is the one a game
+    // outside this repository applies too (issue #275), and which `moba:game` applies for the same
+    // reason. Without it a screen still compiles, as a plain function, and fails at run time.
+    id("dev.wildware.udea.compose-ui")
 
     // The build-time asset pipeline of spec 3.6: the clearing's models are `model(...)` assets.
     id("dev.wildware.udea.assets")
@@ -96,6 +102,9 @@ kotlin {
                 api(project(":udea-core"))
                 implementation(project(":udea-annotations"))
                 implementation(project(":udea-assets"))
+                // Health, the abilities and their cooldowns (issue #252). `api`, because
+                // `HollowCombat` hands its tables to a launcher's HUD.
+                api(project(":udea-gas"))
                 // Replication and prediction: the server and client sessions (issue #249,
                 // multiplayer from H1), and the local player's predictor (issue #250).
                 implementation(project(":udea-net"))

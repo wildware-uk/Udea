@@ -1,5 +1,6 @@
 package dev.wildware.hollow.desktop
 
+import dev.wildware.hollow.FoxWaves
 import dev.wildware.hollow.HollowAssets
 import dev.wildware.hollow.HollowGame
 import dev.wildware.hollow.HollowHost
@@ -62,7 +63,11 @@ internal object HollowLaunch {
      *
      * The caller closes [Started].
      */
-    fun start(mode: RenderMode, role: NetRole = NetRole.Standalone): Started {
+    fun start(
+        mode: RenderMode,
+        role: NetRole = NetRole.Standalone,
+        waves: FoxWaves? = FoxWaves.DEFAULT,
+    ): Started {
         require(mode != RenderMode.Headless) { "RenderMode.Headless has no Kool backend" }
         val models = loadModels(assetRoot())
         val human = loadHuman()
@@ -70,11 +75,15 @@ internal object HollowLaunch {
         val physics = if (role.isAuthoritative) Physics2DModule(HollowGame.PHYSICS) else null
         var opened: KoolBackend? = null
         try {
-            val definition = HollowGame.definition(physics, levelBytes(), role)
+            val definition = HollowGame.definition(physics, levelBytes(), role, waves)
             // Every fox names its model with `Drawn` (issue #251), and this is what turns the name
             // into the file: the same asset root the props are read from.
             val library = FileModelLibrary(assetRoot(), HollowAssets.registry)
-            val scene = HollowScene({ prop -> models.getValue(prop) }, { human }, definition.core.netIds, library)
+            // The HUD (issue #252) is drawn from this definition's own combat tables, the wave
+            // schedule the session it will join plays, and the desktop's font rasteriser. The
+            // combat is read off the definition because the scene is built before the host is.
+            val hud = HollowScene.Hud(HollowGame.combatOf(definition), waves, ::hollowHudFonts)
+            val scene = HollowScene({ prop -> models.getValue(prop) }, { human }, definition.core.netIds, library, hud)
             val registry = RenderRegistry()
             scene.register(registry)
             val backend = KoolBackend.start(mode, WindowConfig(title = "Hollow"), registry)

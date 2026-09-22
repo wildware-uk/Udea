@@ -29,7 +29,8 @@ import dev.wildware.udea.render.input.InputModule
  * In H1 (issue #249) the game was a lit clearing and nothing moved in it. Issue #250 puts a person
  * in it: the modules below now include the physics that stops a character at a rock and the input
  * model that steers it. Issue #251 adds the creatures: foxes that arrive in waves, and wander, chase
- * and flee.
+ * and flee. Issue #252 adds the fight: health, a swing, a dash and a heal through `udea-gas`, and a
+ * bite for every fox.
  *
  * ## What a client does not run
  *
@@ -88,6 +89,8 @@ public object HollowGame {
         role: NetRole = NetRole.Standalone,
         waves: FoxWaves? = FoxWaves.DEFAULT,
     ): UdeaGameDef {
+        // One per definition: its executors are bound to this definition's world (issue #252).
+        val combat = HollowCombat()
         val definition = UdeaGameDef(
             role = role,
             // Generated from this module's runtime classpath (issue #202), so a level can hold
@@ -103,17 +106,27 @@ public object HollowGame {
                 // would be native memory nothing puts anything in.
                 if (physics != null) add(physics)
                 add(InputModule(HollowControls.BINDINGS))
+                // Before `HollowModule`, whose systems read a fighter's health off the context.
+                add(HollowCombatModule(combat, authoritative = role.isAuthoritative))
                 add(HollowModule(LaunchLevel(level), authoritative = role.isAuthoritative, waves = waves))
                 add(RenderModule())
             },
             // The snapshot ring: a server's replication baselines, and what `time.*` rewinds. Over
             // `HollowNet.registry()`, so what is captured is exactly what replicates.
-            timeTravel = snapshotTimeTravel(HollowNet.registry()),
+            timeTravel = snapshotTimeTravel(HollowNet.registry(combat.attributes)),
         )
         // Registered, not loaded: [seed] asks for the swap.
         definition.core.scenes.register(LevelScene(HollowLevel.SCENE_ID, level))
         return definition
     }
+
+    /**
+     * The combat [definition] was built with (issue #252): the tables its fighters' `Attributes`
+     * and `Abilities` index, for a HUD to read them by.
+     */
+    public fun combatOf(definition: UdeaGameDef): HollowCombat =
+        definition.modules.filterIsInstance<HollowCombatModule>().singleOrNull()?.combat
+            ?: error("this definition has no HollowCombatModule; HollowGame.definition is what assembles one")
 
     /**
      * A Hollow game in [mode] as [role], not yet seeded. [presentation] is ignored in `Headless`.

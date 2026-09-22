@@ -15,11 +15,25 @@
 #               plugin the template applies has one. Central authorises a publisher per namespace
 #               and a local repository does not, so this is the one rule the stand-in above drops
 #               - and the one that took the first real release run down (issue #265).
+#   0a. no-checkout-path  nothing in the copy names a path into this checkout, with a control
+#               beside it that makes the same search find something it should. A game that reached
+#               back into the tree it was copied from would build here and nowhere else.
 #   1. build    `./gradlew build` in the copied game: compiles against the published engine, runs
 #               the game's own tests, and runs udeaVerifyModuleGraph, udeaVerifyDeterminism,
 #               udeaVerifyKotlinPin and udeaVerifyCompilerPlugin over it.
 #   2. run      `./gradlew run`: the game simulates 600 ticks headless and prints where its
 #               rovers ended up. "Builds" is not "runs", so both are here.
+#   2b. window  `./gradlew runWindow` on a virtual X display, left drawing for fifteen seconds and
+#               then photographed from outside the game by ffmpeg while the window is still up: the
+#               screen must hold the rover model and the sky (issue #269).
+#               `scripts/outside-game-window.sh` is the leg.
+#   2c. window-red the same leg on a copy whose rovers name no model: the screen still holds the
+#               sky and must hold no rover, so the count in 2b is seen to fail for the reason it
+#               exists - a window that is up and drawing nothing the game declared.
+#   2d. window-dead the same leg on a copy whose window closes itself after five seconds: 2b's
+#               fifteen-second wait has to refuse it, so the soak in 2b is seen to be capable of
+#               failing. This is the shape #275 shipped - a render loop that ended early and a game
+#               that exited 0 with nothing logged.
 #   3. bridge   the generated gamebridge.json names this game's own agent port range, which is
 #               what keeps two games on one machine out of each other's instances.
 #   4. det-red  a wall-clock read planted in the game's simulation package: udeaVerifyDeterminism
@@ -43,6 +57,17 @@
 #
 # Usage:  sh scripts/outside-game-proof.sh
 # Report: build/reports/udea/outside-game/
+#
+# Needs `xvfb-run`, `ffmpeg`, `python3` and a software OpenGL driver for leg 2b, and fails rather
+# than skipping without them: a proof that the template draws which quietly did not look is the
+# failure mode this repository's GL tests already had once.
+#
+# Two places it writes that are not in this checkout, both overridable:
+#   UDEA_OUTSIDE_GAME_DIR  where the game is copied to (default: $TMPDIR/udea-outside-game-proof)
+#   UDEA_M2_REPO           a Maven repository of this run's own, instead of ~/.m2/repository.
+#                          Passed to every Gradle run as `-Dmaven.repo.local`, which both
+#                          `publishToMavenLocal` and a build's `mavenLocal()` read, so a machine
+#                          whose `~/.m2` other builds share is not written to at all.
 set -eu
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -51,6 +76,11 @@ WORK=${UDEA_OUTSIDE_GAME_DIR:-${TMPDIR:-/tmp}/udea-outside-game-proof}
 GAME="$WORK/my-game"
 
 : "${JAVA_HOME:?set JAVA_HOME to a JDK 21 - Gradle 8.13 does not support 25}"
+
+# The local Maven repository this run publishes to and resolves from. `M2_REPO` is the older
+# spelling, which only ever said where to *look*; `UDEA_M2_REPO` also says where to write.
+M2_ROOT=${UDEA_M2_REPO:-${M2_REPO:-$HOME/.m2/repository}}
+LOCAL_REPO_ARG=${UDEA_M2_REPO:+-Dmaven.repo.local=$UDEA_M2_REPO}
 
 # The version both halves use. Read out of the template's own `gradle.properties`, so the engine
 # is published at the version the game asks for and the two cannot drift: a proof that published
@@ -77,11 +107,28 @@ fail() {
     exit 1
 }
 
+# --- 0a. nothing in the copy names a path into this checkout ----------------------------------
+#
+# "Outside this repository" is the whole claim, and a game that reached back into the tree it was
+# copied from would still build here and nowhere else. `-I` skips the model, which is bytes.
+#
+# The control first, and it is not ceremony: a search that finds nothing and a search that is
+# broken print the same thing, so this one is made to find something it certainly should before
+# its silence is believed. An `--include` glob left unquoted, a pattern the shell ate, a directory
+# that was not there - each of those would have gone through as a pass.
+say "no-checkout-path: the copy names no path into $REPO"
+grep -rIlF -- "com.example.newgame" "$GAME" > /dev/null ||
+    fail "the checkout-path search is broken: it cannot find the game's own package in $GAME"
+if grep -rIlF -- "$REPO" "$GAME" > "$REPORT/checkout-references.txt"; then
+    fail "the copied game names this checkout; see $REPORT/checkout-references.txt"
+fi
+echo "  the control found the game's own package, and the search found no path into this checkout"
+
 engine_gradle() {
     leg=$1
     shift
     say "$leg: ./gradlew $*"
-    if (cd "$REPO" && sh ./gradlew "$@" --console=plain --stacktrace) > "$REPORT/$leg.log" 2>&1; then
+    if (cd "$REPO" && sh ./gradlew "$@" ${LOCAL_REPO_ARG:+"$LOCAL_REPO_ARG"} --console=plain --stacktrace) > "$REPORT/$leg.log" 2>&1; then
         echo "  green  -> $REPORT/$leg.log"
         return 0
     fi
@@ -93,7 +140,7 @@ game_gradle() {
     leg=$1
     shift
     say "$leg: ./gradlew $*"
-    if (cd "$GAME" && sh ./gradlew "$@" --console=plain --stacktrace) > "$REPORT/$leg.log" 2>&1; then
+    if (cd "$GAME" && sh ./gradlew "$@" ${LOCAL_REPO_ARG:+"$LOCAL_REPO_ARG"} --console=plain --stacktrace) > "$REPORT/$leg.log" 2>&1; then
         echo "  green  -> $REPORT/$leg.log"
         return 0
     fi
@@ -117,9 +164,8 @@ engine_gradle publish publishToMavenLocal "-PudeaVersion=$UDEA_VERSION" ||
 engine_gradle publish-build-logic -p build-logic publishToMavenLocal "-PudeaVersion=$UDEA_VERSION" ||
     fail "build-logic did not publish; see $REPORT/publish-build-logic.log"
 
-M2_ROOT=${M2_REPO:-$HOME/.m2/repository}
 M2=$M2_ROOT/dev/wildware/udea
-for artifact in udea-core udea-annotations udea-agent-host udea-codegen udea-build-logic udea-version-catalog; do
+for artifact in udea-core udea-annotations udea-agent-host udea-codegen udea-assets udea-assets-compiler udea-render udea-build-logic udea-version-catalog; do
     [ -d "$M2/$artifact/$UDEA_VERSION" ] ||
         fail "$artifact:$UDEA_VERSION is not in the local Maven repository after publishing"
 done
@@ -187,6 +233,86 @@ done
 game_gradle run run || fail "the outside game did not run; see $REPORT/run.log"
 grep -q "new-game ran 600 ticks" "$REPORT/run.log" ||
     fail "the run did not print its tick count; see $REPORT/run.log"
+
+# --- 2b. it opens a window with its model in it (issue #269) -----------------------------------
+#
+# The template used to stop at a headless simulation, so the first thing a game that draws did was
+# copy a launcher out of this repository. This is the leg that says it no longer has to: the copied
+# game, built against the published engine alone, opens a window, draws in it for fifteen seconds,
+# and is then photographed from outside itself with its model on the screen.
+#
+# Fifteen seconds rather than a couple of frames, because "it drew" and "a game can live in it" are
+# different claims and only the second one is worth making (#275).
+#
+# A missing tool is a failure and not a skip, for the reason the usage note above gives.
+for tool in xvfb-run ffmpeg python3; do
+    command -v "$tool" > /dev/null || fail "leg 2b needs $tool, and there is none on PATH"
+done
+WINDOW_LEG="$REPO/scripts/outside-game-window.sh"
+# The screen is the window's size, so the photograph is the window and nothing else.
+#
+# `-nocursor` is asked for and does NOT take effect here: the X server still draws its root
+# cursor, a black-on-white X, in the middle of the screen, and it is in both photographs. It is
+# left in rather than papered over because neither count can see it - it is nine-ish pixels of
+# black and white, which is neither the rover's orange nor the sky's blue.
+SCREEN="-screen 0 1280x720x24 -nocursor"
+# `LIBGL_ALWAYS_SOFTWARE`: a virtual X server has no GPU, so Mesa's software rasteriser draws.
+say "window: ./gradlew runWindow on a virtual display, drawing for 15s, then photographed"
+rm -f "$REPORT/window.txt"
+LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s "$SCREEN" \
+    sh "$WINDOW_LEG" "$GAME" "$REPORT" window ${LOCAL_REPO_ARG:+"$LOCAL_REPO_ARG"} ||
+    fail "the outside game did not show its model in a window; see $REPORT/window.log and $REPORT/window.png"
+grep -q "^PASS" "$REPORT/window.txt" ||
+    fail "the window leg exited green without writing a passing count; see $REPORT/window.txt"
+echo "  the screen -> $REPORT/window.png"
+
+# --- 2c. and the photograph can tell a window with the model from one without ----------------
+#
+# The count in 2b passes on a screen that holds the rover. This is the same leg on a copy whose
+# rovers name no model: the window opens and draws its sky, and the leg has to fail - naming the
+# missing rover rather than a missing window - or 2b's pass says nothing about the model.
+ROVERS="$GAME/game/src/main/kotlin/com/example/newgame/sim/RoverSystem.kt"
+cp "$ROVERS" "$WORK/RoverSystem.window.orig"
+sed -i '/it += Drawn(GameAssets.models.rover, assets)/d' "$ROVERS"
+if grep -q "it += Drawn(" "$ROVERS"; then
+    fail "the no-model mutation did not apply"
+fi
+say "window-red: the same window, with no model named"
+rm -f "$REPORT/window-red.txt"
+if LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s "$SCREEN" \
+    sh "$WINDOW_LEG" "$GAME" "$REPORT" window-red ${LOCAL_REPO_ARG:+"$LOCAL_REPO_ARG"}; then
+    fail "leg 2b's count passed a window whose rovers name no model; see $REPORT/window-red.png"
+fi
+# Read back from the file the leg wrote, not from its console: a leg that died before counting
+# anything also exits non-zero, and that is not the failure this control is for.
+grep -q "the model is not drawn" "$REPORT/window-red.txt" ||
+    fail "the window leg failed for another reason than a missing model; see $REPORT/window-red.log"
+echo "  refused, for the missing model -> $REPORT/window-red.png"
+cp "$WORK/RoverSystem.window.orig" "$ROVERS"
+
+# --- 2d. and it can tell a window that lasted from one that died early -------------------------
+#
+# 2b waits fifteen seconds for the window to report that it is still drawing, and that wait is the
+# whole of the soak: if it could not fail, 2b would be a two-frame test wearing a long coat. This
+# is the same leg on a copy whose window closes itself after five seconds while still being asked
+# for a full run - the shape #275 shipped, where a render loop ended about eight seconds in and
+# every game that met it exited 0 with nothing logged.
+WINDOW_SRC="$GAME/game/src/main/kotlin/com/example/newgame/NewGameWindow.kt"
+cp "$WINDOW_SRC" "$WORK/NewGameWindow.orig"
+sed -i 's/drawn >= runSeconds && !closing/drawn >= 5f \&\& !closing/' "$WINDOW_SRC"
+grep -q "drawn >= 5f && !closing" "$WINDOW_SRC" || fail "the early-close mutation did not apply"
+say "window-dead: the same window, closing itself after 5s of the run it was asked for"
+if LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s "$SCREEN" \
+    sh "$WINDOW_LEG" "$GAME" "$REPORT" window-dead ${LOCAL_REPO_ARG:+"$LOCAL_REPO_ARG"}; then
+    fail "leg 2b's fifteen-second soak passed a window that stopped drawing after five seconds"
+fi
+grep -q "stopped drawing before 15s" "$REPORT/window-dead.txt" ||
+    fail "the window leg failed for another reason than the window stopping; see $REPORT/window-dead.txt"
+# And the launcher itself says so rather than exiting 0 in silence, which is what made #275 invisible.
+grep -q "new-game: the window stopped drawing after" "$REPORT/window-dead.log" ||
+    fail "the launcher ended early without saying so; see $REPORT/window-dead.log"
+echo "  refused, for the window that stopped -> $REPORT/window-dead.txt"
+cp "$WORK/NewGameWindow.orig" "$WINDOW_SRC"
 
 # --- 3. its own agent port range --------------------------------------------------------------
 say "bridge: gamebridge.json"

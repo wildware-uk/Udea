@@ -9,7 +9,8 @@ cd ../my-game
 # a wrapper of your own: any Gradle 8.13 will do
 gradle wrapper --gradle-version 8.13
 ./gradlew build
-./gradlew run
+./gradlew run          # headless: no window, 600 ticks, and where the rovers ended up
+./gradlew runWindow    # a window: three rovers driving east under a sky
 ```
 
 `udeaVersion` in `gradle.properties` says which engine to build against, and everything else reads
@@ -40,45 +41,41 @@ The short version:
 |---|---|
 | `settings.gradle.kts` | which engine version, and where its artifacts come from |
 | `build.gradle.kts` | which project ships, and which packages are simulation |
-| `game/build.gradle.kts` | the conventions, the engine modules, the agent port range |
-| `game/src/main` | the game: components and systems |
+| `game/build.gradle.kts` | the conventions, the engine modules, the asset root, the agent port range, `runWindow` |
+| `game/assets` | the models and the screen effect, declared in `.udea.kts` and packed into the jar |
+| `game/src/main` | the game: components and systems, what the window draws, and the window itself |
 | `game/src/agent` | the debug-only launcher that binds the MCP surface. Never shipped |
-| `game/src/test` | a headless test over the real tick loop |
+| `game/src/test` | headless tests over the real tick loop |
 
-## Giving your game a look of its own
+## Assets, and the names the build gives them
 
-A screen effect is GLSL you wrote in a `.frag` file. It is an **asset**, like a model or a sound:
-you declare it, the build reads it, checks it and packs it, and your Kotlin names it by the
-accessor the build generated.
+An asset - a model, a screen effect - is declared in a `.udea.kts` under `game/assets/`, and your
+Kotlin names it by an accessor the build generates, never by a path. The rover is declared in
+`game/assets/models/models.udea.kts`:
 
+<!-- quoted from templates/new-game/game/assets/models/models.udea.kts -->
 ```kotlin
-// assets/shaders/shaders.udea.kts
-shader(name = "scanlines", file = "shaders/scanlines.frag")
+model(name = "rover", file = "models/rover.glb")
 ```
 
+and the simulation says each rover is drawn with it:
+
+<!-- quoted from templates/new-game/game/src/main/kotlin/com/example/newgame/sim/RoverSystem.kt -->
 ```kotlin
-// anywhere in your game's shared code
-val scanlines = UdeaShader.fragment(GameAssets.shaders.scanlines, assets) {
-    float("uStrength", 0.25f)
-}
-registry.screenPass(scanlines)
+it += Drawn(GameAssets.models.rover, assets)
 ```
 
-No path, no string, and nothing that reads a file - so that line compiles on every platform your
-game ships on. Reaching for `javaClass.getResource("/shaders/scanlines.frag").readText()` instead
-gives you a line that compiles on the desktop alone; misspell the name here and it does not
-compile at all, and a `.frag` that is missing, empty, states its own `#version` or defines no
-`udeaMain` fails the build with `UDEA0041` and a did-you-mean.
+`models` is the folder the `.udea.kts` sits in under `game/assets/`. Move that line into a script
+at the top of `game/assets/` and the accessor becomes `GameAssets.root.rover`.
 
-**This template does not ship one**, and that is a fact about the template rather than about the
-engine: it is one JVM project with no renderer and no asset pipeline applied, so there is nothing
-here for a screen effect to run over. Add `id("dev.wildware.udea.assets")` and a renderer when
-your game draws; `moba/game/assets/shaders/` in the Udea repository is the whole worked example,
-and `docs/new-game.md` has the long version.
+The screen effect is the same shape: `game/assets/shaders/scanlines.frag`, declared beside it,
+named `GameAssets.shaders.scanlines` in `NewGameScene`. A `.frag` that is missing, empty, states
+its own version line or defines no `udeaMain` fails the build with `UDEA0041` and a did-you-mean.
 
-Two commands worth knowing before you change anything:
+Commands worth knowing before you change anything:
 
 ```sh
-./gradlew build                  # compiles, tests, and runs Udea's gates over this game
-./gradlew run -PdebugPort=7861   # an instance an agent can drive, on this game's own port range
+./gradlew build                  # compiles, tests, packs the assets, and runs Udea's gates over this game
+./gradlew runWindow              # the game in a window
+./gradlew run -PdebugPort=7861   # a headless instance an agent can drive, on this game's own port range
 ```

@@ -577,11 +577,14 @@ jobs:
     # `scripts/outside-game-proof.sh` publishes the engine and `build-logic` to the runner's local
     # Maven repository - which stands in for Maven Central, and is the whole difference between
     # this job and a release - copies `templates/new-game` into a directory outside the
-    # repository, builds it, runs it, and then breaks it twice on purpose: a wall-clock read in
-    # its simulation package, a Kotlin scripting host on what it ships. It requires
-    # udeaVerifyDeterminism and udeaVerifyModuleGraph to fail with DET001 and UDEA-MG-005. It is
-    # a job of its own rather than a step of `build` because it is a second full build of the
-    # engine, through a second Gradle build tree.
+    # repository, builds it, runs it, opens its window on a virtual display and photographs the
+    # screen from outside the game - and then breaks the copy on purpose, once per thing it
+    # claims, and requires each break to be caught: the model taken off the rovers, the window
+    # made to close itself early, a wall-clock read in the simulation package (DET001), a Kotlin
+    # scripting host on what the game ships (UDEA-MG-005), and the component registry moved and
+    # removed. The script's own header lists the legs; it is the list, not this comment, that is
+    # kept in step with them. It is a job of its own rather than a step of `build` because it is
+    # a second full build of the engine, through a second Gradle build tree.
     #
     # Nothing leaves the runner. Publishing to Maven Central is the `release` workflow, which
     # nothing here triggers.
@@ -603,8 +606,23 @@ jobs:
         shell: bash
         run: chmod +x ./gradlew
 
-      - name: Build, run and break a game that lives outside this repository
+      # Issue #269: the proof opens the game's window and photographs it, so it needs what the GL
+      # job needs - a virtual display and Mesa's software rasteriser, with the X client libraries
+      # GLFW opens a window through - and ffmpeg to take the photograph. The script fails rather
+      # than skipping when one of them is missing.
+      - name: Install a display, a software GL stack and ffmpeg
         shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb ffmpeg
+          sudo apt-get install -y --no-install-recommends libgl1 libgl1-mesa-dri libglx-mesa0 libglu1-mesa
+          sudo apt-get install -y --no-install-recommends libx11-6 libxcursor1 libxrandr2 libxinerama1 libxi6 libxxf86vm1
+
+      - name: Build, run, draw and break a game that lives outside this repository
+        shell: bash
+        env:
+          MESA_GL_VERSION_OVERRIDE: "3.3"
         run: sh scripts/outside-game-proof.sh
 
       - name: Upload the transcripts

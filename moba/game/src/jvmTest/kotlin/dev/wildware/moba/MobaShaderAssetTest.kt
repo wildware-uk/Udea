@@ -14,7 +14,8 @@ import kotlin.test.assertTrue
  *
  * - **The pack carries the text.** The bundle on this test's classpath is the one
  *   `udeaPackBundle` wrote from `moba/game/assets/`, and the GLSL it holds for
- *   `shaders/scanlines` is compared against the bytes of `shaders/scanlines.frag` - so this fails
+ *   `shaders/scanlines` is compared against the text of `shaders/scanlines.frag`, line endings
+ *   made LF as the pack makes them - so this fails
  *   if the build stops reading the file, starts reading a different one, or packs a path where
  *   the text should be.
  * - **The game names it as an accessor.** `MobaScreenEffects.scanlines` is `commonMain` and
@@ -34,8 +35,13 @@ class MobaShaderAssetTest {
         val shader = MobaAssets.registry[GameAssets.shaders.scanlines]
 
         assertEquals(SHADER_FILE, shader.file.value)
+        // The file's text with its line endings made LF, because the pack makes them LF: a shader's
+        // line endings must not move the asset graph hash (`ShaderSources`, windows-crlf-shaders).
+        // A Windows checkout has CRLF files, and comparing its raw bytes failed there on every run
+        // that executed this test rather than restoring it from the build cache. Only the endings
+        // are forgiven: every other byte is still compared.
         assertEquals(
-            shaderFile().readText(),
+            shaderFile().readText().replace("\r\n", "\n").replace('\r', '\n'),
             shader.source,
             "the packed GLSL is not the text of $SHADER_FILE",
         )

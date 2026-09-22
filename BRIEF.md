@@ -635,11 +635,38 @@ $ grep -cE 'Task :hollow:game:' ci-35766973519-build-windows.log   # positive co
 Run 35768488160, on `91f9dd90`, is the one that does say something, because those tests run inside
 `build`.
 
-**Run 35768488160** (`91f9dd90`) is the complete picture. Green on it, among others:
-`replay-equality (windows-latest, temurin)`, `replay-equality (join)`, both Windows `determinism`
-legs, both `latency budgets` legs, `gl tests (xvfb)`, `a game outside this repository`,
-`agent brief matches the tree`, `build (ubuntu-latest)` and `build with the K2 plugin disabled`.
-Exactly one job is red, and it is the next paragraph.
+**Run 35768488160** (`91f9dd90`) is the complete picture. It has now finished, `clean build under
+budget` included, and every job of it is listed below rather than summarised — one red, and it is
+the next paragraph:
+
+```
+$ gh run view 35768488160 --json jobs -q '.jobs[] | .name + ": " + (.conclusion//"running")' | sort
+a game outside this repository: success
+agent brief matches the tree: success
+build-logic tests: success
+build (ubuntu-latest): success
+build (windows-latest): failure
+build with the K2 plugin disabled: success
+clean build under budget: success
+determinism (ubuntu-latest, corretto): success
+determinism (ubuntu-latest, temurin): success
+determinism (windows-latest, corretto): success
+determinism (windows-latest, temurin): success
+game-bridge-mcp conformance: success
+gl tests (xvfb): success
+iOS simulator tests: success
+kotlin upgrade probe (non-blocking): skipped
+KSP stays incremental: success
+latency budgets (ubuntu-latest): success
+latency budgets (windows-latest): success
+replay-equality (join): success
+replay-equality-nightly (${{ matrix.os }}, ${{ matrix.distribution }}): skipped
+replay-equality-nightly (join): skipped
+replay-equality (ubuntu-latest, corretto): success
+replay-equality (ubuntu-latest, temurin): success
+replay-equality (windows-latest, temurin): success
+the FIR checkers fail a real build: success
+```
 
 **`build (windows-latest)` is still red, and it is not this change.** It is red on `master` too, at
 `483cb10e`, which is this branch's merge base — CI run 35760192642. What this change did is take

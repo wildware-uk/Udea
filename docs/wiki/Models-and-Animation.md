@@ -219,11 +219,12 @@ is the same bytes every time, and names each clip after its action: Blender's `H
 becomes `Human.Clips.Walk`. Assimp runs in the asset compiler only; rule `UDEA-MG-013` keeps it off
 every runtime classpath. See [Assets](Assets).
 
-The conversion runs once, on purpose, and its output is committed: `models/human/Human.fbx` has
-`models/human/Human.glb` beside it, and the build packs that file and never converts. The reason
-is that LWJGL ships a different Assimp build for each platform, and the Windows one turns the same
-`.fbx` into floats that differ from Linux's in their last bits - enough to give Windows a
-different asset hash and break every recorded replay there. So:
+The conversion runs once, on purpose, and its output is committed beside the `.fbx` it was made
+from - `moba/game/assets/models/human/Human.glb` beside
+`moba/game/assets/models/human/Human.fbx` - and the build packs that committed file and never
+converts. The reason is that LWJGL ships a different Assimp build for each platform, and the
+Windows one turns the same `.fbx` into floats that differ from Linux's in their last bits - enough
+to give Windows a different asset hash and break every recorded replay there. So:
 
 - after changing an `.fbx` or a texture it names, run `./gradlew udeaWriteConvertedModels` on
   Linux x86_64 and commit the `.glb` it writes;

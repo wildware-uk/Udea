@@ -126,15 +126,16 @@ tasks.register<JavaExec>("run") {
  * `runWindow`: the game in a window, which is what a player runs.
  *
  * Off the **main** source set's runtime classpath - the one the jar ships - so a player gets what
- * this runs, with no agent surface in it. `-Pframes=N` closes the window after N frames, for a
- * script that wants the window up for a known length of time and then gone.
+ * this runs, with no agent surface in it. `-Pseconds=N` closes the window after N seconds of
+ * drawing, for a script that wants the window up for a known length of time and then gone; the
+ * launcher fails the run if the window stopped drawing before reaching it.
  */
 tasks.register<JavaExec>("runWindow") {
     group = ApplicationPlugin.APPLICATION_GROUP
-    description = "Runs the game in a window. -Pframes=N closes it after N frames."
+    description = "Runs the game in a window. -Pseconds=N closes it after N seconds of drawing."
     mainClass.set("com.example.newgame.NewGameWindow")
     classpath = sourceSets.main.get().runtimeClasspath
     // The model files: the packed bundle carries each model's record, and the file is read here.
     systemProperty("newgame.assets.root", layout.projectDirectory.dir("assets").asFile.absolutePath)
-    providers.gradleProperty("frames").orNull?.let { systemProperty("newgame.frames", it) }
+    providers.gradleProperty("seconds").orNull?.let { systemProperty("newgame.seconds", it) }
 }

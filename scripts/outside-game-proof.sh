@@ -20,12 +20,17 @@
 #               udeaVerifyKotlinPin and udeaVerifyCompilerPlugin over it.
 #   2. run      `./gradlew run`: the game simulates 600 ticks headless and prints where its
 #               rovers ended up. "Builds" is not "runs", so both are here.
-#   2b. window  `./gradlew runWindow` on a virtual X display, photographed from outside the game
-#               by ffmpeg while the window is up: the screen must hold the rover model and the sky
-#               (issue #269). `scripts/outside-game-window.sh` is the leg.
+#   2b. window  `./gradlew runWindow` on a virtual X display, left drawing for fifteen seconds and
+#               then photographed from outside the game by ffmpeg while the window is still up: the
+#               screen must hold the rover model and the sky (issue #269).
+#               `scripts/outside-game-window.sh` is the leg.
 #   2c. window-red the same leg on a copy whose rovers name no model: the screen still holds the
 #               sky and must hold no rover, so the count in 2b is seen to fail for the reason it
 #               exists - a window that is up and drawing nothing the game declared.
+#   2d. window-dead the same leg on a copy whose window closes itself after five seconds: 2b's
+#               fifteen-second wait has to refuse it, so the soak in 2b is seen to be capable of
+#               failing. This is the shape #275 shipped - a render loop that ended early and a game
+#               that exited 0 with nothing logged.
 #   3. bridge   the generated gamebridge.json names this game's own agent port range, which is
 #               what keeps two games on one machine out of each other's instances.
 #   4. det-red  a wall-clock read planted in the game's simulation package: udeaVerifyDeterminism
@@ -213,8 +218,11 @@ grep -q "new-game ran 600 ticks" "$REPORT/run.log" ||
 #
 # The template used to stop at a headless simulation, so the first thing a game that draws did was
 # copy a launcher out of this repository. This is the leg that says it no longer has to: the copied
-# game, built against the published engine alone, opens a window, and a photograph of the screen
-# taken from outside the game holds its model.
+# game, built against the published engine alone, opens a window, draws in it for fifteen seconds,
+# and is then photographed from outside itself with its model on the screen.
+#
+# Fifteen seconds rather than a couple of frames, because "it drew" and "a game can live in it" are
+# different claims and only the second one is worth making (#275).
 #
 # A missing tool is a failure and not a skip, for the reason the usage note above gives.
 for tool in xvfb-run ffmpeg python3; do
@@ -224,7 +232,7 @@ WINDOW_LEG="$REPO/scripts/outside-game-window.sh"
 # The screen is the window's size, and has no pointer drawn on it: the photograph is the window.
 SCREEN="-screen 0 1280x720x24 -nocursor"
 # `LIBGL_ALWAYS_SOFTWARE`: a virtual X server has no GPU, so Mesa's software rasteriser draws.
-say "window: ./gradlew runWindow on a virtual display, photographed from outside the game"
+say "window: ./gradlew runWindow on a virtual display, drawing for 15s, then photographed"
 rm -f "$REPORT/window.txt"
 LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s "$SCREEN" \
     sh "$WINDOW_LEG" "$GAME" "$REPORT" window ${LOCAL_REPO_ARG:+"$LOCAL_REPO_ARG"} ||
@@ -256,6 +264,30 @@ grep -q "the model is not drawn" "$REPORT/window-red.txt" ||
     fail "the window leg failed for another reason than a missing model; see $REPORT/window-red.log"
 echo "  refused, for the missing model -> $REPORT/window-red.png"
 cp "$WORK/RoverSystem.window.orig" "$ROVERS"
+
+# --- 2d. and it can tell a window that lasted from one that died early -------------------------
+#
+# 2b waits fifteen seconds for the window to report that it is still drawing, and that wait is the
+# whole of the soak: if it could not fail, 2b would be a two-frame test wearing a long coat. This
+# is the same leg on a copy whose window closes itself after five seconds while still being asked
+# for a full run - the shape #275 shipped, where a render loop ended about eight seconds in and
+# every game that met it exited 0 with nothing logged.
+WINDOW_SRC="$GAME/game/src/main/kotlin/com/example/newgame/NewGameWindow.kt"
+cp "$WINDOW_SRC" "$WORK/NewGameWindow.orig"
+sed -i 's/drawn >= runSeconds && !closing/drawn >= 5f \&\& !closing/' "$WINDOW_SRC"
+grep -q "drawn >= 5f && !closing" "$WINDOW_SRC" || fail "the early-close mutation did not apply"
+say "window-dead: the same window, closing itself after 5s of the run it was asked for"
+if LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s "$SCREEN" \
+    sh "$WINDOW_LEG" "$GAME" "$REPORT" window-dead ${LOCAL_REPO_ARG:+"$LOCAL_REPO_ARG"}; then
+    fail "leg 2b's fifteen-second soak passed a window that stopped drawing after five seconds"
+fi
+grep -q "stopped drawing before 15s" "$REPORT/window-dead.txt" ||
+    fail "the window leg failed for another reason than the window stopping; see $REPORT/window-dead.txt"
+# And the launcher itself says so rather than exiting 0 in silence, which is what made #275 invisible.
+grep -q "new-game: the window stopped drawing after" "$REPORT/window-dead.log" ||
+    fail "the launcher ended early without saying so; see $REPORT/window-dead.log"
+echo "  refused, for the window that stopped -> $REPORT/window-dead.txt"
+cp "$WORK/NewGameWindow.orig" "$WINDOW_SRC"
 
 # --- 3. its own agent port range --------------------------------------------------------------
 say "bridge: gamebridge.json"

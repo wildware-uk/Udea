@@ -54,8 +54,8 @@ class NewGameGuideSnippetTest {
     @Test
     fun `every block that names a generated accessor is quoted from compiled code`() {
         val unquoted = guides.flatMap { blocksIn(it) }
-            .filter { it.source == null && ACCESSOR in it.text }
-            .map { "${it.where}: names `$ACCESSOR` and quotes no file" }
+            .filter { it.source == null && ACCESSOR.containsMatchIn(it.text) }
+            .map { "${it.where}: names a `GameAssets.` accessor and quotes no file" }
         assertEquals(
             emptyList(), unquoted,
             "an example naming a generated accessor has to be quoted from a template file that is " +
@@ -95,6 +95,32 @@ class NewGameGuideSnippetTest {
             absolute = true,
         )
         assertEquals(null, mismatch(right.single()), "a line the file does hold was refused")
+    }
+
+    @Test
+    fun `an unquoted accessor is caught, and a game's own object that merely ends in those letters is not`() {
+        // The control for the second test, in both directions. Without the first half that test
+        // passes on a parser that finds nothing; without the second it fails every guide that
+        // mentions `NewGameAssets.registry`, which is hand-written Kotlin and not a generated
+        // accessor at all.
+        val caught = blocksIn("```kotlin
+val rover = GameAssets.models.rover
+```
+", "fixture.md", absolute = true)
+        assertTrue(ACCESSOR.containsMatchIn(caught.single().text), "an unquoted generated accessor was let through")
+
+        val spared = blocksIn(
+            "```kotlin
+val assets = NewGameAssets.registry
+```
+",
+            "fixture.md",
+            absolute = true,
+        )
+        assertEquals(
+            false, ACCESSOR.containsMatchIn(spared.single().text),
+            "`NewGameAssets.registry` was read as a generated accessor",
+        )
     }
 
     /** Why [block] does not match its source, or `null` when it does. */
@@ -144,7 +170,14 @@ class NewGameGuideSnippetTest {
 
     private companion object {
         const val FENCE = "```"
-        const val ACCESSOR = "GameAssets."
+        /**
+         * A generated accessor: `GameAssets.` where it starts an identifier.
+         *
+         * The lookbehind is not decoration. A game's own `NewGameAssets.registry` ends in those
+         * same eleven characters, and it is hand-written Kotlin - the rule below is about what the
+         * asset compiler generates, which is what a guide can get wrong without anything noticing.
+         */
+        val ACCESSOR = Regex("""(?<![A-Za-z0-9_])GameAssets\.""")
         val QUOTE = Regex("""<!--\s*quoted from\s+(\S+)\s*-->""")
     }
 }

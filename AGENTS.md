@@ -386,10 +386,14 @@ The pieces a newcomer meets first, each with the issue that made it so.
   component names before it checks the id space. What is still not solved is merging a game's id
   space with the engine's - the two are numbered in two builds, and `docs/new-game.md` says what
   that costs.
-  `templates/new-game/` is a working game of that shape, `docs/new-game.md` is the guide, and
-  `scripts/outside-game-proof.sh` publishes, builds it from outside the tree, runs it, checks
-  every plugin marker it wrote is inside the verified namespace, and proves its gates still fail
-  when the game breaks them.
+  `templates/new-game/` is a working game of that shape, and since #269 it **draws**: an asset
+  root with a model and a screen effect in it, a `Drawn` on each rover, and `runWindow`, a desktop
+  launcher written against the published `udea-render` alone - so a game that draws no longer
+  starts by copying `moba`'s launcher out of this repository. `docs/new-game.md` is the guide, and
+  `scripts/outside-game-proof.sh` publishes, builds it from outside the tree, runs it, opens its
+  window on a virtual display and photographs the screen from outside the game after fifteen
+  seconds of drawing, checks every plugin marker it wrote is inside the verified namespace, and
+  proves its gates still fail when the game breaks them.
 
 ---
 

@@ -289,15 +289,22 @@ launcher - nothing in it is copied from inside this repository:
 val registry = RenderRegistry()
 NewGameScene.register(registry, assetRoot, NewGameAssets.registry)
 val backend = KoolBackend.start(RenderMode.Windowed, WindowConfig(title = "new-game"), registry)
-backend.use {
-    val host = GameHost(RenderMode.Windowed, NewGame.definition(), backend)
 ```
 
 The order is forced. What is drawn is declared on a `RenderRegistry` first, because
-`KoolBackend.start` builds its drawing pipeline out of it; the `GameHost` is built over the
-backend, which is how the pipeline gets the world; and then `backend.drive` hands the window's
-frame loop the host, and `awaitExit` waits for the player to close it. `run` stays headless and
-opens nothing, and so does a test.
+`KoolBackend.start` builds its drawing pipeline out of it; then `GameHost(mode, definition,
+backend)` is built over the backend, which is how the pipeline gets the world; then
+`backend.drive { ... }` hands the window's frame loop the host, and `awaitExit` waits for the
+player to close it. `run` stays headless and opens nothing, and so does a test.
+
+**And the launcher checks that the window lasted.** `-Pseconds=N` closes it after N seconds of
+drawing, for a script that wants the window up for a known length of time; if the frame loop
+stopped before reaching N, the launcher says so on standard error and exits non-zero. That check is
+in the template because the failure it catches is silent: an engine change in September 2026 ended
+the render loop about eight seconds in, and every game that met it exited **0** with nothing
+logged, because no game was asking. `scripts/outside-game-proof.sh` asks - it runs this launcher
+for twenty-two seconds, waits for it to report that it is still drawing fifteen seconds in, and
+only then photographs the screen.
 
 **The model is named by the simulation, not by the renderer.** Each rover is spawned with the
 engine's `Drawn` component, holding the model it is drawn with, and a `Transform3D`, where it

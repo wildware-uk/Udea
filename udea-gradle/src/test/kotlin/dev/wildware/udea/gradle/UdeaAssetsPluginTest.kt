@@ -17,11 +17,12 @@ import kotlin.test.assertTrue
  * `udea-assets-compiler`, running against real corpora, and re-driving them through a generated
  * TestKit build would be slower and would prove the same thing twice.
  *
- * Here: the four claims that are *only* true of the wiring, and that no unit test can reach.
+ * Here: the claims that are *only* true of the wiring, and that no unit test can reach.
  *
  * - the tasks exist under their contract names, so a CI job and a brief can name them;
  * - `check` depends on validation, so an invalid asset tree fails a build nobody remembered to
  *   point at the assets;
+ * - `check` verifies the committed `.glb` beside each `.fbx` and never writes one;
  * - the generated accessors are on the **main** source set;
  * - and they are **not** on the script compile classpath. That is spec 3.6's rule and the whole
  *   reason the accessors are a separate configuration: `.udea.kts` uses `reference("id")` so an
@@ -116,7 +117,7 @@ class UdeaAssetsPluginTest {
      * and this is the only place they meet.
      */
     @Test
-    fun `the pipeline registers its five tasks`() {
+    fun `the pipeline registers every task it promises`() {
         val output = probe()
         val line = output.lines().first { it.startsWith("PROBE tasks=") }
         for (task in listOf(
@@ -125,9 +126,24 @@ class UdeaAssetsPluginTest {
             UdeaAssetsPlugin.VALIDATE_TASK,
             UdeaAssetsPlugin.PACK_TASK,
             UdeaAssetsPlugin.RELOCATABLE_TASK,
+            UdeaAssetsPlugin.WRITE_MODELS_TASK,
+            UdeaAssetsPlugin.VERIFY_MODELS_TASK,
         )) {
             assertContains(line, task, message = "$task is not registered: $line")
         }
+    }
+
+    /**
+     * A game outside this repository gets the committed-`.glb` check on `check`, as moba does, and
+     * never the writer: the writer changes source, and a `build` that rewrote a committed file
+     * would make the check it runs beside it pass by construction.
+     */
+    @Test
+    fun `check verifies the committed glb files and never writes them`() {
+        val line = probe().lines().first { it.startsWith("PROBE checkDependsOn=") }
+        val dependencies = line.substringAfter('=').split(',')
+        assertTrue(UdeaAssetsPlugin.VERIFY_MODELS_TASK in dependencies, line)
+        assertTrue(UdeaAssetsPlugin.WRITE_MODELS_TASK !in dependencies, line)
     }
 
     /**

@@ -2,7 +2,7 @@ package dev.wildware.udea.assets.compiler.validate
 
 import dev.wildware.udea.assets.Model
 import dev.wildware.udea.assets.compiler.ResFile
-import dev.wildware.udea.assets.compiler.model.FbxConverter
+import dev.wildware.udea.assets.compiler.model.CommittedModels
 import dev.wildware.udea.assets.compiler.model.GlbContainer
 import dev.wildware.udea.assets.compiler.model.ModelSources
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
@@ -28,10 +28,11 @@ import kotlin.io.path.readBytes
  *
  * ### What it checks, in order
  *
- * 1. The extension is one of [Model.EXTENSIONS], or `.fbx`. An `.fbx` is converted instead, by
- *    [FbxConverter], and a file that does not convert is `UDEA0039` (issue #244) rather than
- *    the steps below: the `.glb` the converter writes is Assimp's, compacted, and the checks
- *    here are about files a person wrote.
+ * 1. The extension is one of [Model.EXTENSIONS], or `.fbx`. An `.fbx` is published as the `.glb`
+ *    committed beside it ([CommittedModels], issue #244): no `.glb` there is `UDEA0039`, naming
+ *    the task that writes one, and the steps below are then made of that `.glb`. Nothing here
+ *    converts: whether the `.glb` is still the `.fbx`'s conversion is `udeaVerifyConvertedModels`'
+ *    question, answered on the one platform whose Assimp made it.
  * 2. A `.glb` has the binary glTF header - magic `glTF`, container version 2, a length equal to
  *    the file's - and its first chunk is JSON.
  * 3. The JSON (the whole of a `.gltf`, or the `.glb`'s first chunk) is an object whose
@@ -69,8 +70,15 @@ public object ModelFileValidator : AssetValidator {
                 val file = context.fileOf(path)
                 if (!file.isRegularFile()) return@mapNotNull null
                 val (rule, problem) = if (ModelSources.isConverted(path)) {
-                    val failure = FbxConverter.convert(context.assetRoot, path).exceptionOrNull() ?: return@mapNotNull null
-                    AssetValidationRules.MODEL_CONVERSION to failure.message
+                    val committed = ModelSources.runtimeFile(path)
+                    val missing = CommittedModels.read(context.assetRoot, path).exceptionOrNull()
+                    if (missing != null) {
+                        AssetValidationRules.MODEL_CONVERSION to missing.message
+                    } else {
+                        val broken = GltfCheck.problemWith(committed, context.fileOf(committed), context::fileOf)
+                            ?: return@mapNotNull null
+                        AssetValidationRules.MODEL_FILE to "has a committed `$committed` beside it that $broken"
+                    }
                 } else {
                     AssetValidationRules.MODEL_FILE to (GltfCheck.problemWith(path, file, context::fileOf) ?: return@mapNotNull null)
                 }
@@ -97,7 +105,7 @@ internal object GltfCheck {
     fun problemWith(path: ResFile, file: Path, resolve: (ResFile) -> Path): String? {
         val extension = path.value.substringAfterLast('.', missingDelimiterValue = "").lowercase()
         if (extension !in Model.EXTENSIONS) {
-            return "is not a model file: a model is glTF 2.0, a .glb or .gltf file, or an .fbx the build converts to one"
+            return "is not a model file: a model is glTF 2.0, a .glb or .gltf file, or an .fbx with its converted .glb beside it"
         }
         val text = jsonOf(extension, file.readBytes()).getOrElse { return it.message }
         val document = parse(text) ?: return "is not a glTF 2.0 file: its JSON does not parse"

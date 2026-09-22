@@ -88,7 +88,7 @@ class HumanAssetTest {
 
         const val NOTICE = "NOTICE.md"
 
-        val EXPECTED_FILES = setOf("Human.fbx", "ClothedLightSkin.png", "NOTICE.md", "relink.py")
+        val EXPECTED_FILES = setOf("Human.fbx", "Human.glb", "ClothedLightSkin.png", "NOTICE.md", "relink.py")
 
         /** The pack's `OBJ/Textures/ClothedLightSkin.png`, committed unchanged. */
         const val TEXTURE_SHA = "c8a975424739500699e27618f1e57ece309dff5ffeff657f4ae3c3c7a309eb57"

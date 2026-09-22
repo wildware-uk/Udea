@@ -12,12 +12,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * The game's FBX character (issue #244): `models/human/Human.fbx`, which the asset build converts
- * to glTF, arrives as typed clips generated from that conversion and plays through the same
+ * The game's FBX character (issue #244): `models/human/Human.fbx`, published as the glTF committed
+ * beside it, arrives as typed clips generated from that conversion and plays through the same
  * `Animator` API as the fox.
  *
  * That this file compiles at all is half the proof: `Human.Clips` is generated at build time from
- * the `.glb` the converter wrote, and nothing here is spelled as a string. The lengths are the
+ * the committed `.glb` the converter wrote, and nothing here is spelled as a string. The lengths are the
  * FBX's own takes, at 24 frames a second - Idle 240 frames, Punch 24, Run 15, Walk 24 - in 60Hz
  * ticks, rounded up: 600, 60, 38 (37.5) and 60.
  */

@@ -38,12 +38,12 @@ internal object HollowLaunch {
     const val ASSET_ROOT_PROPERTY: String = "hollow.assets.root"
 
     /**
-     * Where `:hollow:game:udeaPackBundle` wrote the `.glb` it converted each `.fbx` to (issue #244).
+     * Where `:hollow:game:udeaPackBundle` copied the `.glb` committed beside each `.fbx` (issue #244).
      *
      * The clearing's props ship as `.glb` and are read from the asset root; the human ships as
-     * `models/human/Human.fbx`, and the bundle names `models/human/Human.glb`, which only exists
-     * under the build directory. No `.fbx` is read here and nothing that could read one is on this
-     * classpath (`UDEA-MG-013`).
+     * `models/human/Human.fbx`, and the bundle names `models/human/Human.glb`, which is read from
+     * this copy. No `.fbx` is read here and nothing that could read one is on this classpath
+     * (`UDEA-MG-013`).
      */
     const val CONVERTED_MODELS_PROPERTY: String = "hollow.assets.converted"
 

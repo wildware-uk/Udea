@@ -20,8 +20,8 @@ import kotlin.test.assertTrue
  * which the build generated from the same reading of the same file, so this fails if the pack
  * stops carrying the nodes, carries a different reading of them, or the two ever drift.
  *
- * The Fox is a `.glb`; the Human is an `.fbx`, whose nodes are the `.glb` the build converts it
- * to. Both routes are here because they read the file in two different ways.
+ * The Fox is a `.glb`; the Human is an `.fbx`, whose nodes are the converted `.glb` committed
+ * beside it. Both routes are here because they read the file in two different ways.
  */
 class ModelNodesFromRefTest {
 

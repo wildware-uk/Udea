@@ -2,7 +2,7 @@ package dev.wildware.udea.assets.compiler.gen
 
 import dev.wildware.udea.assets.compiler.AssetCompilerRules
 import dev.wildware.udea.assets.compiler.ResFile
-import dev.wildware.udea.assets.compiler.model.FbxConverter
+import dev.wildware.udea.assets.compiler.model.CommittedModels
 import dev.wildware.udea.assets.compiler.model.ModelSources
 import dev.wildware.udea.assets.compiler.scan.Declaration
 import dev.wildware.udea.assets.compiler.validate.AssetValidationRules
@@ -35,8 +35,9 @@ internal class ModelFileScan(
  * [AssetCompilerRules.MODEL_CLIPS], rather than left to surface as every `Fox.Clips.Run` and
  * `Fox.Nodes.b_Head_05` failing to resolve.
  *
- * Both readings come off one visit to the file, so an `.fbx` is converted once and the clips and
- * the nodes can never be read from two different states of a file somebody is editing.
+ * Both readings come off one visit to the file, so the clips and the nodes can never be read from
+ * two different states of a file somebody is editing. An `.fbx` is read as the `.glb` committed
+ * beside it ([CommittedModels]); nothing here runs Assimp.
  *
  * It is also the one reading the packed asset gets its nodes and extras from (issue #271):
  * [ModelContents] calls [readFile] for every `model(...)` in pass 2, so the list a game reads off
@@ -85,8 +86,8 @@ internal object ModelFileSource {
 
     /**
      * The contents of the model file [written], as a script names it relative to [assetRoot], or
-     * a failure whose message completes "model `<id>` ...". An `.fbx` is read as the `.glb` it
-     * converts to; one that does not convert fails with a [ConversionFailure].
+     * a failure whose message completes "model `<id>` ...". An `.fbx` is read as the `.glb`
+     * committed beside it; one with none fails with a [ConversionFailure].
      */
     internal fun readFile(assetRoot: Path, written: String): Result<Contents> {
         val path = ResFile.of(written)
@@ -99,10 +100,10 @@ internal object ModelFileSource {
                     (suggestion?.let { " Did you mean '$it'?" } ?: ""),
             )
         }
-        // An `.fbx` is read as the `.glb` it converts to (issue #244); one that does not convert
-        // is the converter's `UDEA0039`, the same defect the validator reports, and not this rule.
+        // An `.fbx` is read as the `.glb` committed beside it (issue #244), never converted here;
+        // one with no `.glb` is `UDEA0039`, the same defect the validator reports, and not this rule.
         val read = if (ModelSources.isConverted(path)) {
-            val glb = FbxConverter.convert(assetRoot, path).getOrElse { reason ->
+            val glb = CommittedModels.read(assetRoot, path).getOrElse { reason ->
                 return Result.failure(ConversionFailure("names `$path`, which ${reason.message}"))
             }
             GltfClips.read(glb).andThen { clips -> GltfNodes.readModel(glb).map { Contents(clips, it.nodes, it.extras) } }
@@ -116,7 +117,7 @@ internal object ModelFileSource {
     private inline fun <T, R> Result<T>.andThen(next: (T) -> Result<R>): Result<R> =
         fold(onSuccess = next, onFailure = { Result.failure(it) })
 
-    /** A model whose `.fbx` did not convert: reported under [AssetValidationRules.MODEL_CONVERSION]. */
+    /** A model whose `.fbx` has no committed `.glb`: reported under [AssetValidationRules.MODEL_CONVERSION]. */
     private class ConversionFailure(message: String) : IllegalArgumentException(message)
 
     /** Every model file under [assetRoot] - glTF or FBX - `/`-separated and relative to it. */

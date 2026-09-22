@@ -3,7 +3,7 @@
 `Human.fbx` and `ClothedLightSkin.png` are from **Quaternius' Animated Man Pack**, which is released
 under **CC0 1.0 Universal** (public domain): <https://creativecommons.org/publicdomain/zero/1.0/>.
 They are the FBX sample of issue #244: a rigged, animated, textured character that the asset
-build converts to glTF.
+build publishes as glTF.
 
 - Source page: <https://quaternius.com/packs/animatedman.html>, which states "License CC0".
 - Model: `FBX/Animated Human.fbx` in the pack's download folder
@@ -27,9 +27,17 @@ Blender 5.2.2:
 CC0 asks for no attribution; it is recorded here anyway, so the file's origin can be checked.
 Like the rest of the model art, it is not covered by this repository's MIT licence.
 
+## `Human.glb`
+
+`Human.glb` is `Human.fbx` converted to binary glTF by Assimp, its texture embedded, written by
+`./gradlew udeaWriteConvertedModels` on Linux x86_64 and committed. The game is given this file;
+the build never converts, because Assimp's Windows and Linux builds convert the same `.fbx` to
+floats that differ in their last bits (issue #244). `udeaVerifyConvertedModels`, on `check`, fails
+when it is no longer `Human.fbx`'s conversion. It is the same CC0 art in another format.
+
 ## Why there are two copies of it in this repository
 
-`moba/game/assets/models/human/` holds the identical four files. An asset root belongs to one
+`moba/game/assets/models/human/` holds the identical files. An asset root belongs to one
 game - `udea { assetRoots }` names it, and the packed `.udeapak` a game opens is built from its own
 root alone - so Hollow reading moba's root would make one game's build depend on another game's
 asset tree. The files are byte-for-byte the same and CC0, and `HumanAssetTest` in `hollow:game`

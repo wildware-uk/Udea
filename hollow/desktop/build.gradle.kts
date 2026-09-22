@@ -37,11 +37,11 @@ val launchLevel: Provider<String> = providers.gradleProperty("level")
     .map { rootProject.layout.projectDirectory.file(it).asFile.absolutePath }
 
 /**
- * Where `:hollow:game:udeaPackBundle` writes the `.glb` it converted each `.fbx` to (issue #244).
+ * Where `:hollow:game:udeaPackBundle` copies the `.glb` committed beside each `.fbx` (issue #244).
  *
  * The clearing's props ship as `.glb` and are read from the asset root above; the human ships as
- * `models/human/Human.fbx`, and its `.glb` only exists under the build directory. Both roots are
- * passed, because the launcher reads one model from each.
+ * `models/human/Human.fbx`, and the launcher reads its `.glb` from here. Both roots are passed,
+ * because the launcher reads one model from each.
  */
 val convertedModels: Provider<Directory> = project(":hollow:game").layout.buildDirectory.dir("udea/converted")
 

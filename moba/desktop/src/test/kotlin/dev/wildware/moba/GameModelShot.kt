@@ -45,7 +45,7 @@ import kotlin.math.PI
  * `GameAssets.models.human` and `GameAssets.models.fox` - so what is drawn is what a game is
  * given, not a file a test chose. The fox is a `.glb` and is read from the asset root; the human is
  * `models/human/Human.fbx` in the asset scripts, and the bundle names `models/human/Human.glb`, which
- * `:moba:game:udeaPackBundle` converted and wrote under `build/udea/converted`. No FBX is read here,
+ * `:moba:game:udeaPackBundle` copied from beside the `.fbx` to `build/udea/converted`. No FBX is read here,
  * and nothing that could read one is on this classpath (`UDEA-MG-013`).
  *
  * Writes `model-human.png` (the character beside the fox, for scale), `model-human-turn-<n>.png`

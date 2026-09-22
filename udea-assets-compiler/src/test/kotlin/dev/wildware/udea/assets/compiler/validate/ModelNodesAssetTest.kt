@@ -114,7 +114,7 @@ class ModelNodesAssetTest {
     }
 
     @Test
-    fun `an fbx model packs the nodes of the glb it converts to`() {
+    fun `an fbx model packs the nodes of the glb committed beside it`() {
         val context = ValidationFixture.withFbx(
             "model-nodes-fbx",
             "models/bender.udea.kts" to """

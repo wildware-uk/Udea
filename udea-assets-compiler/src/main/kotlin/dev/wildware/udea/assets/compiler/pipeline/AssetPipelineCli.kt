@@ -3,6 +3,8 @@ package dev.wildware.udea.assets.compiler.pipeline
 import dev.wildware.udea.assets.compiler.gen.AccessorGenerator
 import dev.wildware.udea.assets.compiler.gen.AssetIndexWriter
 import dev.wildware.udea.assets.compiler.gen.ModelFileSource
+import dev.wildware.udea.assets.compiler.model.CommittedModels
+import dev.wildware.udea.assets.compiler.model.ConversionHost
 import dev.wildware.udea.assets.compiler.scan.DeclarationsJson
 import dev.wildware.udea.diagnostics.DiagnosticsJson
 import dev.wildware.udea.diagnostics.Severity
@@ -43,7 +45,9 @@ import kotlin.system.exitProcess
  * accessors  --declarations=<declarations.json> --assetRoot= --srcOut=<dir> --resourceOut=<dir>
  * validate   --repoRoot= --assetRoot= --cache=<dir> --out=<diagnostics.json>
  * pack       --repoRoot= --assetRoot= --cache=<dir> --out=<file.udeapak> --diagnostics=<file>
- *            --models=<dir>   (each .fbx model converted to its .glb, issue #244)
+ *            --models=<dir>   (each .fbx model's committed .glb, copied there, issue #244)
+ * write-models   --declarations=<declarations.json> --assetRoot=   (writes each .fbx's .glb beside it)
+ * verify-models  --declarations=<declarations.json> --assetRoot= --out=<report>
  * ```
  *
  * The script compile classpath comes from `-Dudea.assetsCompiler.classpath`, the spelling the
@@ -67,6 +71,8 @@ public object AssetPipelineCli {
             "accessors" -> accessors(options)
             "validate" -> validate(options)
             "pack" -> pack(options)
+            "write-models" -> writeModels(options)
+            "verify-models" -> verifyModels(options)
             else -> usage("unknown subcommand " + args[0])
         }
     }
@@ -132,7 +138,7 @@ public object AssetPipelineCli {
             cacheDirectory = options.path("cache"),
         )
         val packed = if (compiled.hasErrors) null else AssetPipeline.pack(assetRoot, compiled.graph)
-        val converted = if (compiled.hasErrors) null else AssetPipeline.convertModels(assetRoot, compiled.graph)
+        val converted = if (compiled.hasErrors) null else AssetPipeline.committedModels(assetRoot, compiled.graph)
         val diagnostics = compiled.report.diagnostics + packed?.diagnostics.orEmpty() + converted?.diagnostics.orEmpty()
         options.path("diagnostics").write(DiagnosticsJson.encode(compiled.report.copy(diagnostics = diagnostics)))
         // Emptied whether or not packing succeeds, so a model deleted or renamed since the last
@@ -144,7 +150,7 @@ public object AssetPipelineCli {
         val out = options.path("out")
         out.parent?.createDirectories()
         out.writeBytes(bundle.bytes)
-        val glbs = checkNotNull(converted) { "the graph had no errors, so its models were converted" }.files
+        val glbs = checkNotNull(converted) { "the graph had no errors, so its models were read" }.files
         for ((relative, bytes) in glbs) {
             val file = models.resolve(relative)
             file.parent.createDirectories()
@@ -152,8 +158,52 @@ public object AssetPipelineCli {
         }
         println(
             "[udeaPackBundle] ${out.fileName}: ${bundle.assets} asset(s), ${bundle.sheets} sheet(s), " +
-                "${bundle.pages} atlas page(s), ${bundle.bytes.size} bytes; ${glbs.size} model(s) converted",
+                "${bundle.pages} atlas page(s), ${bundle.bytes.size} bytes; ${glbs.size} committed .glb model(s) published",
         )
+    }
+
+    /**
+     * `udeaWriteConvertedModels`: converts every `.fbx` a `model(...)` names and writes its `.glb`
+     * beside it, into the asset tree, to be committed (issue #244). The one pass that runs
+     * Assimp on purpose; see [CommittedModels].
+     */
+    private fun writeModels(options: Map<String, String>) {
+        val assetRoot = options.path("assetRoot")
+        val host = ConversionHost.current()
+        val written = CommittedModels.write(assetRoot, DeclarationsJsonReader.read(options.path("declarations")))
+        for (file in written.files) println("[${CommittedModels.WRITE_TASK}] wrote $file")
+        if (!host.isReference) {
+            println(
+                "[${CommittedModels.WRITE_TASK}] warning: written on $host. ${CommittedModels.VERIFY_TASK} " +
+                    "checks these files on ${ConversionHost.REFERENCE}, whose Assimp converts to different " +
+                    "floats, and will ask for them to be written again there",
+            )
+        }
+        failOn(written.diagnostics, CommittedModels.WRITE_TASK)
+        println("[${CommittedModels.WRITE_TASK}] ${written.files.size} model(s) converted")
+    }
+
+    /**
+     * `udeaVerifyConvertedModels`: fails when a committed `.glb` is not what its `.fbx` converts
+     * to, on the platform the committed files are made on, and says it skipped anywhere else.
+     * [--out] gets one line either way, so the task has an output to be up to date against.
+     */
+    private fun verifyModels(options: Map<String, String>) {
+        val verdict = CommittedModels.verify(
+            options.path("assetRoot"),
+            DeclarationsJsonReader.read(options.path("declarations")),
+            ConversionHost.current(),
+        )
+        val summary = when (verdict) {
+            is CommittedModels.Verdict.Skipped -> verdict.reason
+            is CommittedModels.Verdict.Checked ->
+                if (verdict.diagnostics.isEmpty()) "${verdict.current.size} committed .glb model(s) current: " +
+                    verdict.current.joinToString(", ")
+                else "${verdict.diagnostics.size} committed .glb model(s) not current"
+        }
+        options.path("out").write(summary + "\n")
+        println("[${CommittedModels.VERIFY_TASK}] $summary")
+        if (verdict is CommittedModels.Verdict.Checked) failOn(verdict.diagnostics, CommittedModels.VERIFY_TASK)
     }
 
     /**
@@ -208,7 +258,7 @@ public object AssetPipelineCli {
 
     private fun usage(problem: String): Nothing {
         System.err.println("[udea-assets] " + problem)
-        System.err.println("usage: <scan|accessors|validate|pack> --key=value ...")
+        System.err.println("usage: <scan|accessors|validate|pack|write-models|verify-models> --key=value ...")
         exitProcess(2)
     }
 }

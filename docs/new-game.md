@@ -492,6 +492,14 @@ Stated rather than implied, because each is a real piece of work and none of it 
 - **The asset pipeline.** `dev.wildware.udea.assets` compiles a `.udea.kts` tree into a
   `.udeapak`. `moba/game/build.gradle.kts` is the worked example; the template has no assets, and
   whether that plugin needs anything extra outside this repository is untested.
+- **An `.fbx` model** is published as the `.glb` committed beside it, never converted by the
+  build: Assimp's Windows and Linux builds turn one `.fbx` into floats that differ in their last
+  bits, which would give each platform a different asset hash. After adding or changing an
+  `.fbx`, or a texture it names, run `./gradlew udeaWriteConvertedModels` on Linux x86_64 and
+  commit the `.glb` it writes. `udeaVerifyConvertedModels` is on `check`: on Linux x86_64 it
+  fails with `UDEA0039` when a `.glb` is missing, stale, or its `.fbx` does not convert, and on
+  any other platform it prints that it skipped and why. The plugin registers both, so a game
+  outside this repository gets them as `moba` does.
 - **Drawing.** The template is headless. A game that draws applies
   `dev.wildware.udea.kotlin-multiplatform-render` and opens a `KoolBackend`; `moba` is the example, and the
   snapshot repository note above is the part that bites first.

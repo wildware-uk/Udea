@@ -116,19 +116,23 @@ class ModelClipAccessorsTest {
 
     // ---- an .fbx (issue #244) -----------------------------------------------------------------
 
-    /** An asset tree holding the FBX fixture at `models/bender/`, declared by a script. */
-    private fun fbxTree(name: String, withTexture: Boolean = true): Path {
+    /**
+     * An asset tree holding the FBX fixture at `models/bender/`, with the `.glb` committed beside
+     * it unless [withGlb] is false, declared by a script.
+     */
+    private fun fbxTree(name: String, withGlb: Boolean = true): Path {
         val root = TestPaths.scratch("model-clips-$name")
         val folder = root.resolve("models/bender").createDirectories()
         val fixture = TestPaths.repoRoot.resolve("udea-assets-compiler/src/test/resources/fbx/bender")
         fixture.resolve("Bender.fbx").copyTo(folder.resolve("Bender.fbx"))
-        if (withTexture) fixture.resolve("checker.png").copyTo(folder.resolve("checker.png"))
+        fixture.resolve("checker.png").copyTo(folder.resolve("checker.png"))
+        if (withGlb) fixture.resolve("Bender.glb").copyTo(folder.resolve("Bender.glb"))
         root.resolve("models/bender.udea.kts").writeText("model(name = \"bender\", file = \"models/bender/Bender.fbx\")\n")
         return root
     }
 
     @Test
-    fun `an fbx model's clips are read from the glb it converts to, and generate typed clips`() {
+    fun `an fbx model's clips are read from the glb committed beside it, and generate typed clips`() {
         val root = fbxTree("fbx")
         val declarations = scan(root)
         val read = ModelFileSource.read(root, declarations)
@@ -142,13 +146,13 @@ class ModelClipAccessorsTest {
     }
 
     @Test
-    fun `an fbx that does not convert fails the accessors pass with the converter's rule, not this one`() {
-        val root = fbxTree("fbx-no-texture", withTexture = false)
+    fun `an fbx with no committed glb fails the accessors pass with the conversion rule, not this one`() {
+        val root = fbxTree("fbx-no-glb", withGlb = false)
         val diagnostic = ModelFileSource.read(root, scan(root)).diagnostics.single()
 
         assertEquals("UDEA0039", diagnostic.ruleId)
         assertEquals("models/bender", diagnostic.assetId)
-        assertTrue("`models/bender/checker.png`" in diagnostic.message, diagnostic.message)
+        assertTrue("`models/bender/Bender.glb`" in diagnostic.message, diagnostic.message)
     }
 
     // ---- the generated source -----------------------------------------------------------------

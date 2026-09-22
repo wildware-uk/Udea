@@ -346,8 +346,9 @@ public abstract class UdeaPackBundleTask : UdeaAssetTask() {
     public abstract val diagnostics: RegularFileProperty
 
     /**
-     * Every `.fbx` model converted to the `.glb` the bundle names for it, at the `.fbx`'s path
-     * under the asset root with the extension changed (issue #244). Empty for a game with none.
+     * Every `.fbx` model's `.glb` - the file committed beside the `.fbx`, copied byte for byte and
+     * never converted here - at the `.fbx`'s path under the asset root with the extension changed
+     * (issue #244), where a launcher reads it. Empty for a game with none.
      */
     @get:OutputDirectory
     public abstract val convertedModels: DirectoryProperty
@@ -368,6 +369,77 @@ public abstract class UdeaPackBundleTask : UdeaAssetTask() {
             option("out", bundle.get().asFile),
             option("diagnostics", diagnostics.get().asFile),
             option("models", convertedModels.get().asFile),
+        )
+    }
+}
+
+/**
+ * Converts every `.fbx` a `model(...)` names and writes its `.glb` beside it, into the asset tree,
+ * to be committed (the follow-up to issue #244).
+ *
+ * The one task that runs Assimp on purpose. The build itself never converts: LWJGL's Assimp is a
+ * different native build on each platform, and they disagree in the last bits of a float, so a
+ * `.glb` made at build time would pack a different asset graph on Windows than on Linux. Run it
+ * after changing an `.fbx` or a texture it names, on Linux x86_64, and commit what it writes.
+ *
+ * It declares no outputs, deliberately: its output is source, and a task Gradle could call up to
+ * date would be one that, asked on purpose, did nothing.
+ */
+public abstract class UdeaWriteConvertedModelsTask : UdeaAssetTask() {
+
+    /** Pass 1's output, which says which models name an `.fbx`. */
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    public abstract val declarations: RegularFileProperty
+
+    /** Converts and writes. */
+    @TaskAction
+    public fun write() {
+        run(
+            "write-models",
+            compilerClasspath,
+            option("declarations", declarations.get().asFile),
+            option("assetRoot", assetRoot.get().asFile),
+        )
+    }
+}
+
+/**
+ * Fails when a committed `.glb` is not what its `.fbx` converts to - an `.fbx` or its texture
+ * edited without re-running [UdeaWriteConvertedModelsTask] - and when an `.fbx` does not convert
+ * at all (`UDEA0039`). On `check`.
+ *
+ * It converts only on Linux x86_64, the platform the committed files are made on. Anywhere else
+ * Assimp's answer differs from the committed bytes whether or not anything is stale, so there the
+ * task says it skipped, and why, in its output rather than passing in silence.
+ *
+ * Not cacheable: its answer is a property of the platform as much as of the files, and the
+ * platform is an [Input] so an up-to-date result from one never stands for another.
+ */
+public abstract class UdeaVerifyConvertedModelsTask : UdeaAssetTask() {
+
+    /** Pass 1's output, which says which models name an `.fbx`. */
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    public abstract val declarations: RegularFileProperty
+
+    /** `os.name` and `os.arch` of the build, the one thing that decides whether this converts. */
+    @get:Input
+    public abstract val platform: Property<String>
+
+    /** One line: what was checked, or why nothing was. */
+    @get:OutputFile
+    public abstract val report: RegularFileProperty
+
+    /** Checks. */
+    @TaskAction
+    public fun verify() {
+        run(
+            "verify-models",
+            compilerClasspath,
+            option("declarations", declarations.get().asFile),
+            option("assetRoot", assetRoot.get().asFile),
+            option("out", report.get().asFile),
         )
     }
 }
@@ -595,6 +667,44 @@ public class UdeaAssetsPlugin : Plugin<Project> {
             },
         )
 
+        val writeModels = project.tasks.register(WRITE_MODELS_TASK,
+            UdeaWriteConvertedModelsTask::class.java,
+            gradleAction { task: UdeaWriteConvertedModelsTask ->
+            task.group = GROUP
+            task.description = "Converts each .fbx model to the .glb committed beside it. Run on Linux x86_64, then commit."
+            task.compilerClasspath.from(compilerClasspath)
+            task.assetRoot.fileProvider(assetRoot)
+            task.repoRoot.set(repoRoot)
+            task.sources.from(sources)
+            task.declarations.set(scan.flatMap { it.declarations })
+            },
+        )
+        // Asked for together, the passes read what the writer wrote rather than what it replaced.
+        val afterWriter = gradleAction { task: Task -> task.mustRunAfter(writeModels) }
+        accessors.configure(afterWriter)
+        validate.configure(afterWriter)
+        pack.configure(afterWriter)
+
+        val verifyModels = project.tasks.register(VERIFY_MODELS_TASK,
+            UdeaVerifyConvertedModelsTask::class.java,
+            gradleAction { task: UdeaVerifyConvertedModelsTask ->
+            task.group = GROUP
+            task.description = "Fails when a committed .glb is not its .fbx's conversion. Converts on Linux x86_64 only."
+            task.compilerClasspath.from(compilerClasspath)
+            task.assetRoot.fileProvider(assetRoot)
+            task.repoRoot.set(repoRoot)
+            task.sources.from(sources)
+            task.declarations.set(scan.flatMap { it.declarations })
+            task.platform.set(
+                project.providers.systemProperty("os.name").zip(project.providers.systemProperty("os.arch")) { name, arch ->
+                    "$name $arch"
+                },
+            )
+            task.report.set(output.map { it.file("converted-models.txt") })
+            task.mustRunAfter(writeModels)
+            },
+        )
+
         val relocatable = project.tasks.register(RELOCATABLE_TASK,
             UdeaVerifyRelocatableTask::class.java,
             gradleAction { task: UdeaVerifyRelocatableTask ->
@@ -618,7 +728,7 @@ public class UdeaAssetsPlugin : Plugin<Project> {
 
         project.tasks.named(
             CHECK_TASK,
-            gradleAction { task: Task -> task.dependsOn(validate, relocatable) },
+            gradleAction { task: Task -> task.dependsOn(validate, relocatable, verifyModels) },
         )
     }
 
@@ -685,6 +795,12 @@ public class UdeaAssetsPlugin : Plugin<Project> {
         /** The relocatability gate. */
         public const val RELOCATABLE_TASK: String = "udeaVerifyRelocatable"
 
+        /** Writes each `.fbx` model's `.glb` into the asset tree. Must match `CommittedModels.WRITE_TASK`. */
+        public const val WRITE_MODELS_TASK: String = "udeaWriteConvertedModels"
+
+        /** Checks each committed `.glb` is current, on `check`. Must match `CommittedModels.VERIFY_TASK`. */
+        public const val VERIFY_MODELS_TASK: String = "udeaVerifyConvertedModels"
+
         /** The configuration the forked pipeline is loaded from. */
         public const val COMPILER_CONFIGURATION: String = "udeaAssetsCompiler"
 
@@ -693,15 +809,17 @@ public class UdeaAssetsPlugin : Plugin<Project> {
 
         /**
          * The model files pass 5 reads typed clips from: `model(...)`'s glTF, binary or JSON, and
-         * the `.fbx` it converts to glTF first (issue #244). The extensions are the asset
+         * an `.fbx`, whose clips come from the `.glb` committed beside it - matched by the first
+         * pattern (issue #244). The extensions are the asset
          * compiler's `ModelSources.EXTENSIONS`, spelled here because this plugin names no type from
          * the asset modules.
          */
         private val MODEL_FILE_PATTERNS: List<String> = listOf("**/*.glb", "**/*.gltf", "**/*.fbx")
 
         /**
-         * Where, under `build/udea`, [PACK_TASK] writes each `.fbx` model's `.glb` (issue #244):
-         * the root a game reads a converted model from, as it reads a `.glb` from the asset root.
+         * Where, under `build/udea`, [PACK_TASK] copies each `.fbx` model's committed `.glb` (issue
+         * #244): the root the launchers read a converted model from. The same bytes are in the
+         * asset root beside the `.fbx`; the copy keeps the launchers' one directory for them.
          */
         private const val CONVERTED_MODELS_DIRECTORY: String = "converted"
 

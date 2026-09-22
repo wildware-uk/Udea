@@ -251,7 +251,7 @@ dependencies {
     // The Compose compiler for this one compilation. The test hosts the window in ComposeGL's
     // `uiTest`, whose content is `@Composable`; compiled without the plugin, that lambda is a
     // `Function0` and the call fails at run time with `NoSuchMethodError` on `uiTest$default`.
-    // Not the `composeCompiler` plugin on the whole project: that would stamp `$stable` into every
+    // Not `dev.wildware.udea.compose-ui` on the whole project: that would stamp `$stable` into every
     // class `main` ships, for a project with no composable in it.
     "kotlinCompilerPluginClasspathEditorTest"("org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:${libs.versions.kotlin.get()}")
 }

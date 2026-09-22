@@ -475,6 +475,59 @@ the game ships on.
 
 ---
 
+## Menus and a HUD
+
+Interface is written with ComposeGL: a `UiScreen` is one `@Composable` function, shown by a
+`UiLayer` (a menu, absent from every screenshot) or a `CapturedUi` (a HUD, in every one).
+`docs/wiki/UI-with-ComposeGL.md` explains the two.
+
+A `@Composable` needs the **Compose compiler**, and that is one more plugin, applied beside the
+Kotlin convention you already have:
+
+```kotlin
+// settings.gradle.kts, in pluginManagement.plugins
+id("dev.wildware.udea.compose-ui") version udeaVersion
+
+// game/build.gradle.kts
+plugins {
+    id("dev.wildware.udea.kotlin-library")   // or dev.wildware.udea.kotlin-multiplatform-render
+    id("dev.wildware.udea.compose-ui")
+}
+
+dependencies {
+    // UiScreen, UiLayer and CapturedUi, and ComposeGL's toolkit (`composegl-ui`) with them.
+    implementation("dev.wildware.udea:udea-render:$udeaVersion")
+}
+```
+
+```kotlin
+class PauseMenu : UiScreen {
+    @Composable
+    override fun content() {
+        Text("Paused", Modifier.testTag("title"))
+    }
+}
+```
+
+It brings the compiler at the Kotlin version the engine was built with, and nothing else. It is a
+plugin of its own rather than part of a Kotlin convention because the compiler rewrites every class
+in the project it is applied to, so it belongs only on a project that has a composable in it.
+
+**Without it, your screen still compiles** - as a plain function - and fails only at run time,
+where it meets the toolkit, with a `NoSuchMethodError`. A green build is therefore no
+evidence that the plugin is there; composing the screen in a test is. ComposeGL's `uiTest`
+composes one with no window:
+
+```kotlin
+uiTest { PauseMenu().content() }.use { ui -> assertEquals("Paused", ui.text("title")) }
+```
+
+The Compose runtime ComposeGL is built on is published to Google's repository, so a game that
+shows a screen needs `google()` among its repositories; the template's `settings.gradle.kts`
+already lists it.
+
+---
+
 ## What the template does not cover yet
 
 Stated rather than implied, because each is a real piece of work and none of it is broken:

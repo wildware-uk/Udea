@@ -259,7 +259,11 @@ The pieces a newcomer meets first, each with the issue that made it so.
 - **Interface is ComposeGL, in two places that answer opposite questions.** A `UiLayer` is a
   menu or an editor panel: it draws into the window after the captured frame, so no screenshot
   sees it. A `CapturedUi` is a HUD: it draws into the captured frame, so an agent's screenshot
-  sees the cooldown a player sees (#188).
+  sees the cooldown a player sees (#188). A screen is `@Composable`, so a project that writes one
+  applies `dev.wildware.udea.compose-ui` beside its Kotlin convention - the Compose compiler at the
+  catalog's Kotlin version, and nothing else. It is published, so a game in its own repository
+  applies the same plugin `udea-render`, `udea-editor` and `moba:game` do (#275). Without it a screen
+  still compiles, as a plain function, and fails only at run time, where it meets the toolkit.
 - **A game can write a screen shader** (#259, #266), and the `.frag` is an asset (#269).
   `shader(name = "scanlines", file = "shaders/scanlines.frag")` in a `.udea.kts` makes the build
   read the file, check it and pack its **text** into the graph, so

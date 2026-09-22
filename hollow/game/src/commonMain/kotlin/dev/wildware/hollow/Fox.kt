@@ -38,6 +38,12 @@ public enum class FoxMode {
 
     /** Hurt, with a player near: running directly away from the nearest one. */
     Flee,
+
+    /**
+     * Killed (issue #252): lying where it fell until `DeathSystem` takes it away. Last, because the
+     * order is the wire's.
+     */
+    Dead,
 }
 
 /**
@@ -46,11 +52,11 @@ public enum class FoxMode {
  *
  * ## What is on the wire, and what is not
  *
- * [mode], [health] and [target] are `@Net`. They are what a fox *is* to anybody watching it - which
- * of its three states it is in, how hurt it is, and whom it is after - and a client that had to
- * re-derive any of them would be running a second copy of the state machine, free to disagree with
- * the server's. Where the fox is, which way it faces and which clip it plays reach a client in
- * `Transform3D` and `Animator`, which replicate already.
+ * [mode] and [target] are `@Net`. They are what a fox *is* to anybody watching it - which of its
+ * states it is in and whom it is after - and a client that had to re-derive either would be running
+ * a second copy of the state machine, free to disagree with the server's. Where the fox is, which
+ * way it faces and which clip it plays reach a client in `Transform3D` and `Animator`, and how hurt
+ * it is in `udea-gas`'s `Attributes` (issue #252), all of which replicate already.
  *
  * [decideAt], [goalX], [goalY] and [heading] are `@Sim`: captured, so a rewind restores a fox that
  * carries on to the same point on the same schedule, and never sent, because they are the working
@@ -80,8 +86,6 @@ public class Fox(
      * undone the moment it stopped.
      */
     @Sim public var heading: Float = 0f,
-    /** Hit points. Nothing hurts a fox before issue #252 adds combat; a test sets it directly. */
-    @Net public var health: Int = FULL_HEALTH,
     /** Which state it is in. See [FoxMode]. */
     @Net public var mode: FoxMode = FoxMode.Wander,
     /** The player it is chasing or fleeing, or [NetId.NONE] while it wanders. */
@@ -91,12 +95,9 @@ public class Fox(
     override fun type(): ComponentType<Fox> = Fox
 
     override fun toString(): String =
-        "Fox($mode target=$target health=$health goal=($goalX, $goalY) decideAt=$decideAt heading=$heading)"
+        "Fox($mode target=$target goal=($goalX, $goalY) decideAt=$decideAt heading=$heading)"
 
     public companion object : ComponentType<Fox>() {
-
-        /** A fox's health when it arrives. */
-        internal const val FULL_HEALTH: Int = 100
 
         /** How wide a fox is on the ground plane: the circle a tree stops. */
         internal const val RADIUS: Float = 0.3f
@@ -124,9 +125,9 @@ public class Fox(
          * `Player.snapshotType()`.
          *
          * The kinds are in the generated replicator's order, which is the field names sorted:
-         * `decideAt`, `goalX`, `goalY`, `heading`, `health`, `mode`, `target`. `ComponentSchema.of`
-         * refuses a list of the wrong length; `FoxReplicationTest` sends every fox through it and
-         * compares the three `@Net` fields on both clients, so one of those typed wrong fails there.
+         * `decideAt`, `goalX`, `goalY`, `heading`, `mode`, `target`. `ComponentSchema.of` refuses a
+         * list of the wrong length; `FoxReplicationTest` sends every fox through it and compares
+         * `mode` and `target` on both clients, so one of those typed wrong fails there.
          */
         internal fun snapshotType(): ReplicatedComponentType<Fox> = fleksComponentType(
             FoxReplicator,
@@ -138,7 +139,6 @@ public class Fox(
                     FieldKind.Float,
                     FieldKind.Float,
                     FieldKind.Float,
-                    FieldKind.Int,
                     FieldKind.Int,
                     FieldKind.NetId,
                 ),

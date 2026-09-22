@@ -71,6 +71,9 @@ public object HollowClientMain {
             },
         )
         val client = HollowClient(PeerId.client(1), socket, started.opened, UdpServing.SESSION_MTU)
+        // Whose HUD, and as of when: this connection's character, on the server's clock
+        // (issue #252). Set before the first frame, so the HUD never draws somebody else's health.
+        started.scene.hudSource = client
         var announced = false
         var frames = 0L
         try {
@@ -80,8 +83,9 @@ public object HollowClientMain {
                 socket.flush()
                 socket.poll { _, buffer, offset, length -> client.onPacket(buffer, offset, length) }
                 // The window's own hands: the axis is world-space, turned by where the camera is
-                // looking, and the run control is Shift. Sampled through the same `IntentSource`
-                // seam a command off the wire uses on the server.
+                // looking, the run control is Shift, and the three ability controls are Space, Q
+                // and E (issue #252) - each a held state, as `PlayerAbilitySystem` says. Sampled
+                // through the same `IntentSource` seam a command off the wire uses on the server.
                 val intent = started.host.ctx[IntentState.KEY].intent
                 client.tick(
                     tick,
@@ -90,6 +94,9 @@ public object HollowClientMain {
                         moveX = intent.axisX(HollowControls.MOVE_AXIS),
                         moveY = intent.axisY(HollowControls.MOVE_AXIS),
                         running = intent.isPressed(HollowControls.RUN_ACTION),
+                        attack = intent.isPressed(HollowControls.ATTACK_ACTION),
+                        dash = intent.isPressed(HollowControls.DASH_ACTION),
+                        heal = intent.isPressed(HollowControls.HEAL_ACTION),
                     ),
                 )
                 if (client.character != NetId.NONE) started.play(client.character)

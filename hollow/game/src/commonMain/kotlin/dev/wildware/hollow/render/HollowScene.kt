@@ -1,5 +1,7 @@
 package dev.wildware.hollow.render
 
+import dev.wildware.hollow.FoxWaves
+import dev.wildware.hollow.HollowCombat
 import dev.wildware.hollow.Prop
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.render.RenderPhase
@@ -11,6 +13,8 @@ import dev.wildware.udea.render.model.ModelLibrary
 import dev.wildware.udea.render.model.ModelLight
 import dev.wildware.udea.render.model.ModelRenderSystem
 import dev.wildware.udea.render.model.ModelSource
+import dev.wildware.udea.render.ui.UiFonts
+import kotlin.concurrent.Volatile
 
 /**
  * What Hollow draws, in order: the [SkySystem], then the camera rig placing this frame's view, then
@@ -35,13 +39,35 @@ import dev.wildware.udea.render.model.ModelSource
  * @param netIds how [rig] resolves the character it follows.
  * @param library what an entity the simulation named a model for with `Drawn` is drawn with - every
  *   fox (issue #251). Null draws no `Drawn` entity at all, which only a test that has no foxes wants.
+ * @param hud the HUD (issue #252): the combat the world was built with, the wave schedule its server
+ *   plays, and a maker of the fonts it sets text in at [HOLLOW_HUD_FONT_SIZES] - called once, on
+ *   the render thread, when the pipeline is built, because a rasteriser is a platform's. Null draws
+ *   no HUD, which is what the clearing's own photograph wants.
  */
 public class HollowScene(
     private val models: (Prop) -> ModelSource,
     private val human: () -> ModelSource,
     private val netIds: NetIdIndex,
     private val library: ModelLibrary? = null,
+    private val hud: Hud? = null,
 ) {
+
+    /** What the HUD is drawn from. See [HollowScene]'s `hud` parameter. */
+    public class Hud(
+        internal val combat: HollowCombat,
+        internal val waves: FoxWaves?,
+        internal val fonts: () -> UiFonts,
+    ) {
+        override fun toString(): String = "HollowScene.Hud($waves)"
+    }
+
+    /**
+     * Whose HUD, as of when: a launcher sets it once it knows, which for a client is once the
+     * server has named its character. Volatile, because it is set off the render thread and read on
+     * it; until it is set the HUD draws only the wave strip.
+     */
+    @Volatile
+    public var hudSource: HollowHudSource? = null
 
     /** Where the clearing is seen from. Moved by [rig] every frame, drawn through by the renderer. */
     public val camera: ModelCamera = ModelCamera(fovYDegrees = FOV_DEGREES, near = NEAR, far = FAR)
@@ -58,7 +84,7 @@ public class HollowScene(
     public var rig: ThirdPersonRig? = null
         private set
 
-    /** Registers the five systems. Before the backend starts: it builds the pipeline from the registry. */
+    /** Registers the five systems, and the HUD when there is one. Before the backend starts: it builds the pipeline from the registry. */
     public fun register(registry: RenderRegistry) {
         registry.register(RenderPhase.PreRender, ::SkySystem)
         registry.register(RenderPhase.PreRender, { resources ->
@@ -71,6 +97,12 @@ public class HollowScene(
         registry.register(RenderPhase.PreRender, { ScenerySystem(models, light) })
         registry.register(RenderPhase.PreRender, { CharacterSystem(human) })
         registry.register(RenderPhase.World, { resources -> ModelRenderSystem(resources, camera, light, models = library) })
+        // Issue #252: `RenderPhase.UI`, sampled after every world pass; it draws into the capture,
+        // on purpose - see `HollowHudSystem`.
+        val hud = hud ?: return
+        registry.register(RenderPhase.UI, { resources ->
+            HollowHudSystem(resources, HollowHudModel(hud.combat, hud.waves), { hudSource }, hud.fonts())
+        })
     }
 
     /**

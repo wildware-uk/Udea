@@ -34,6 +34,15 @@ public object HollowMovement {
      */
     public const val RUN_BUTTON: Int = 1
 
+    /** Bit 1 of [MoveInput.buttons]: attack is held (issue #252). Held, for [RUN_BUTTON]'s reason. */
+    public const val ATTACK_BUTTON: Int = 2
+
+    /** Bit 2: dash is held. */
+    public const val DASH_BUTTON: Int = 4
+
+    /** Bit 3: heal is held. */
+    public const val HEAL_BUTTON: Int = 8
+
     /** The fixed simulation rate this game runs at, and the rate a velocity is integrated over. */
     public const val TICK_RATE: Int = 60
 

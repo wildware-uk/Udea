@@ -99,7 +99,7 @@ class FoxBehaviourTest {
     fun `a fox at the flee threshold runs away from the player`() {
         val player = scene.spawn()
         val fox = still(NEAR)
-        scene.foxOf(fox).health = FoxBrain.FLEE_AT
+        scene.setHealth(fox, FoxBrain.FLEE_AT)
 
         scene.run(OBSERVE)
 
@@ -115,7 +115,7 @@ class FoxBehaviourTest {
     fun `a fox one point above the flee threshold chases instead`() {
         val player = scene.spawn()
         val fox = still(NEAR)
-        scene.foxOf(fox).health = FoxBrain.FLEE_AT + 1
+        scene.setHealth(fox, FoxBrain.FLEE_AT + 1f)
 
         scene.run(OBSERVE)
 

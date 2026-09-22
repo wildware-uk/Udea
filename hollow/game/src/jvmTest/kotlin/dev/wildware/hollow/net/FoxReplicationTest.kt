@@ -5,6 +5,7 @@ import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.hollow.Fox
 import dev.wildware.hollow.FoxMode
 import dev.wildware.hollow.FoxWaves
+import dev.wildware.hollow.HollowCombat
 import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.Ticks
 import dev.wildware.udea.core.identity.NetId
@@ -13,6 +14,7 @@ import dev.wildware.udea.core.module.CoreModule
 import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.core.spatial.Drawn
 import dev.wildware.udea.core.spatial.Transform3D
+import dev.wildware.udea.gas.Attributes
 import dev.wildware.udea.net.transport.NetConditions
 import dev.wildware.udea.net.transport.NetEndpoint
 import dev.wildware.udea.net.transport.NetHarness
@@ -72,7 +74,8 @@ class FoxReplicationTest {
 
                 override fun onTick(tick: Tick) {
                     server.tick()
-                    history[server.tick.value] = foxes(server.host.world, server.host.ctx[CoreModule.NET_IDS])
+                    history[server.tick.value] =
+                        foxes(server.host.world, server.host.ctx[CoreModule.NET_IDS], server.host.ctx[HollowCombat.KEY])
                 }
             },
         )
@@ -115,7 +118,7 @@ class FoxReplicationTest {
                 client.applier.apply(client.replication.world)
                 val told = client.serverTick.value
                 val expected = checkNotNull(history[told]) { "the server never recorded tick $told" }
-                val seen = foxes(client.host.world, client.host.ctx[CoreModule.NET_IDS])
+                val seen = foxes(client.host.world, client.host.ctx[CoreModule.NET_IDS], client.host.ctx[HollowCombat.KEY])
                 assertEquals(expected, seen, "${client.peer} disagrees with the server about the foxes at tick $told")
                 compared += seen.size
                 chasing += seen.values.count { it.mode == FoxMode.Chase }
@@ -135,20 +138,27 @@ class FoxReplicationTest {
         harness.step(UNTIL_CHASING)
 
         val ids = server.host.ctx[CoreModule.NET_IDS]
-        val targets = foxes(server.host.world, ids).values.filter { it.mode == FoxMode.Chase }.map { it.target }
+        val serverCombat = server.host.ctx[HollowCombat.KEY]
+        val targets = foxes(server.host.world, ids, serverCombat).values.filter { it.mode == FoxMode.Chase }.map { it.target }
         assertTrue(targets.isNotEmpty(), "no fox was chasing after $UNTIL_CHASING ticks")
         assertTrue(targets.all { NetId.ofRaw(it) in characters }, "a fox chased something that is not a player: $targets of $characters")
 
         for (client in clients) {
             client.applier.apply(client.replication.world)
             val expected = checkNotNull(history[client.serverTick.value])
-            val seen = foxes(client.host.world, client.host.ctx[CoreModule.NET_IDS])
+            val seen = foxes(client.host.world, client.host.ctx[CoreModule.NET_IDS], client.host.ctx[HollowCombat.KEY])
             assertEquals(expected.mapValues { it.value.target }, seen.mapValues { it.value.target }, "${client.peer}'s foxes chase other players")
         }
     }
 
-    /** Every fox in [world] by raw `NetId`, as every replicated number of it. */
-    private fun foxes(world: World, ids: NetIdIndex): Map<Int, FoxView> {
+    /**
+     * Every fox in [world] by raw `NetId`, as every replicated number of it.
+     *
+     * [combat] is that world's own [HollowCombat], because health is an attribute and an attribute
+     * is read by an id the table hands out - the server's table and each client's are separate
+     * objects built from the same names, so an id read off the wrong one would be a different field.
+     */
+    private fun foxes(world: World, ids: NetIdIndex, combat: HollowCombat): Map<Int, FoxView> {
         val out = HashMap<Int, FoxView>()
         world.family { all(Fox) }.forEach { entity ->
             val fox = entity[Fox]
@@ -157,7 +167,7 @@ class FoxReplicationTest {
             out[ids.netIdOf(entity).raw] = FoxView(
                 mode = fox.mode,
                 target = fox.target.raw,
-                health = fox.health,
+                health = entity.getOrNull(Attributes)?.base(combat.health),
                 place = listOf(at.x, at.y, at.z, at.rotationX, at.rotationY, at.rotationZ, at.scaleX, at.scaleY, at.scaleZ),
                 clip = listOf(animator.current.toString(), animator.previous.toString(), "fade=${animator.fadeLength} from ${animator.fadeStart}"),
                 model = entity.getOrNull(Drawn)?.model,
@@ -170,7 +180,7 @@ class FoxReplicationTest {
     private data class FoxView(
         val mode: FoxMode,
         val target: Int,
-        val health: Int,
+        val health: Float?,
         val place: List<Float>,
         val clip: List<String>,
         val model: Int?,

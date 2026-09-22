@@ -9,6 +9,7 @@ import dev.wildware.udea.core.Ticks
 import dev.wildware.udea.core.identity.NetId
 import dev.wildware.udea.core.identity.NetIdIndex
 import dev.wildware.udea.core.module.CoreModule
+import dev.wildware.udea.gas.Attributes
 import dev.wildware.udea.core.physics.PhysicsBody
 import dev.wildware.udea.core.spatial.AnimationClip
 import dev.wildware.udea.core.spatial.Animator
@@ -35,8 +36,11 @@ internal object FoxBrain {
      */
     const val GIVE_UP_RANGE: Float = 11f
 
-    /** A fox at or below this health runs from a player instead of at one. */
-    const val FLEE_AT: Int = 30
+    /**
+     * A fox at or below this health runs from a player instead of at one. Hit points of the
+     * `hollow.health` attribute, which is a `Float` because `udea-gas` holds every attribute as one.
+     */
+    const val FLEE_AT: Float = 30f
 
     /** A hurt fox runs from any player this close, and stops fleeing once it is further than this. */
     const val FLEE_RANGE: Float = GIVE_UP_RANGE
@@ -45,7 +49,7 @@ internal object FoxBrain {
      * A chasing fox this close to its player stops and stands at it.
      *
      * Two bodies' worth apart, so a fox stands at a player's heels rather than shoving at them for
-     * ever. Biting is issue #252's.
+     * ever, and inside `CombatRules.BITE_REACH`, so one standing there bites (issue #252).
      */
     const val BITE_RANGE: Float = 1.1f
 
@@ -86,6 +90,12 @@ internal object FoxBrain {
 
     /** How long a change of clip takes. The same fifth of a second a player's gait change takes. */
     val FADE: Ticks = Ticks(12L)
+
+    /**
+     * How far a dead fox is rolled about X, in radians: a quarter turn, onto its side (issue #252).
+     * Presentation carried in simulation state because the pose is what replicates.
+     */
+    const val FALLEN: Float = 1.5707964f
 }
 
 /**
@@ -107,6 +117,10 @@ internal object FoxBrain {
  * | [FoxMode.Flee] | health at or below [FoxBrain.FLEE_AT], and a player within [FoxBrain.FLEE_RANGE] | runs straight away from the nearest player |
  * | [FoxMode.Chase] | a player within [FoxBrain.CHASE_RANGE], or already chasing one within [FoxBrain.GIVE_UP_RANGE] | runs at the nearest player, and stands once within [FoxBrain.BITE_RANGE] |
  * | [FoxMode.Wander] | otherwise | walks to a goal it chose, stands there, and chooses again at `decideAt` |
+ *
+ * Before all three, [FoxMode.Dead]: a fox whose health has reached zero stands where it fell, and no
+ * rule takes it out of that state (issue #252). A player whose health has reached zero is nobody's
+ * nearest player, so a fox that has killed the one it was chasing turns to the next, or wanders.
  *
  * ## No trigonometry decides where a fox goes
  *
@@ -136,6 +150,9 @@ internal class FoxBrainSystem : SimSystem() {
 
     private val netIds: NetIdIndex = ctx[CoreModule.NET_IDS]
 
+    /** Whose health is what: a fox's decides whether it flees, a player's whether it is chased. */
+    private val combat: HollowCombat = ctx[HollowCombat.KEY]
+
     /** The nearest player to the fox being decided. Reused, because this is a per-tick path. */
     private val nearest = Nearest()
 
@@ -146,7 +163,7 @@ internal class FoxBrainSystem : SimSystem() {
             val at = entity[Transform3D]
             val body = entity[PhysicsBody]
             findNearest(at.x, at.y)
-            val mode = modeFor(fox)
+            val mode = modeFor(fox, entity.getOrNull(Attributes))
             if (mode != fox.mode && mode == FoxMode.Wander) {
                 // Back to wandering: choose afresh now, rather than walk to a goal chosen before the
                 // chase that may be the other side of the clearing.
@@ -155,8 +172,9 @@ internal class FoxBrainSystem : SimSystem() {
                 fox.goalY = at.y
             }
             fox.mode = mode
-            fox.target = if (mode == FoxMode.Wander) NetId.NONE else nearest.id
+            fox.target = if (mode == FoxMode.Wander || mode == FoxMode.Dead) NetId.NONE else nearest.id
             when (mode) {
+                FoxMode.Dead -> stand(body)
                 FoxMode.Chase -> {
                     if (nearest.distanceSquared <= BITE_SQUARED) {
                         stand(body)
@@ -170,11 +188,15 @@ internal class FoxBrainSystem : SimSystem() {
         }
     }
 
-    /** Which state [fox] is in this tick, given [nearest]. */
-    private fun modeFor(fox: Fox): FoxMode {
+    /**
+     * Which state [fox] is in this tick, given [nearest] and its [attributes] - null only for a fox
+     * spawned since `ArmSystem` last ran, which is at full health by definition.
+     */
+    private fun modeFor(fox: Fox, attributes: Attributes?): FoxMode {
+        if (fox.mode == FoxMode.Dead || (attributes != null && combat.isDead(attributes))) return FoxMode.Dead
         if (nearest.id == NetId.NONE) return FoxMode.Wander
         val squared = nearest.distanceSquared
-        if (fox.health <= FoxBrain.FLEE_AT) {
+        if (attributes != null && attributes.base(combat.health) <= FoxBrain.FLEE_AT) {
             return if (squared <= FLEE_SQUARED) FoxMode.Flee else FoxMode.Wander
         }
         if (squared <= CHASE_SQUARED) return FoxMode.Chase
@@ -235,7 +257,8 @@ internal class FoxBrainSystem : SimSystem() {
     }
 
     /**
-     * Fills [nearest] with the player closest to ([x], [y]), or [NetId.NONE] when there is none.
+     * Fills [nearest] with the living player closest to ([x], [y]), or [NetId.NONE] when there is
+     * none.
      *
      * A tie goes to the player met first in the family, which is the same on every run of the same
      * world: Fleks orders a family by entity id, and ids are allocated in the order the world was
@@ -245,6 +268,8 @@ internal class FoxBrainSystem : SimSystem() {
         nearest.id = NetId.NONE
         nearest.distanceSquared = Float.MAX_VALUE
         players.forEach { player ->
+            val health = player.getOrNull(Attributes)
+            if (health != null && combat.isDead(health)) return@forEach
             val at = player[Transform3D]
             val dx = at.x - x
             val dy = at.y - y
@@ -300,11 +325,22 @@ internal class FoxPoseSystem : SimSystem() {
 
     private fun pose(entity: Entity, now: Tick) {
         val fox = entity[Fox]
-        entity[Transform3D].rotationZ = fox.heading + Fox.MODEL_FACING
+        val transform = entity[Transform3D]
+        transform.rotationZ = fox.heading + Fox.MODEL_FACING
+        val animator = entity[Animator]
+        if (fox.mode == FoxMode.Dead) {
+            // Issue #252. The Khronos fox has no death clip - Survey, Walk and Run are all it has -
+            // so a dead fox is a pose: rolled onto its side, the survey frozen on its first frame.
+            // `Transform3D` and `Animator` both replicate, so a client sees it fall.
+            transform.rotationX = FoxBrain.FALLEN
+            if (!animator.isPlaying(FoxModel.Clips.Survey) || animator.current.speed != 0f) {
+                animator.play(FoxModel.Clips.Survey, now, speed = 0f)
+            }
+            return
+        }
         val body = entity[PhysicsBody]
         val speed = sqrt(body.linearX * body.linearX + body.linearY * body.linearY)
         val wanted = clipFor(fox.mode, speed)
-        val animator = entity[Animator]
         if (!animator.isPlaying(wanted)) animator.crossfade(wanted, now, over = FoxBrain.FADE)
     }
 

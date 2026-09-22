@@ -4,6 +4,7 @@ import dev.wildware.hollow.HollowGame
 import dev.wildware.hollow.HollowHost
 import dev.wildware.hollow.HollowMoveModel
 import dev.wildware.hollow.HollowMovement
+import dev.wildware.hollow.render.HollowHudSource
 import dev.wildware.hollow.Player
 import dev.wildware.hollow.PlayerReplicator
 import dev.wildware.udea.core.NetRole
@@ -64,7 +65,7 @@ public class HollowClient(
     private val transport: Transport,
     private val opened: HollowHost = HollowGame.build(RenderMode.Headless, role = NetRole.Client),
     mtu: Int = LoopbackNetwork.DEFAULT_MTU,
-) : AutoCloseable {
+) : AutoCloseable, HollowHudSource {
 
     /** This client's game. */
     public val host: GameHost get() = opened.host
@@ -96,7 +97,7 @@ public class HollowClient(
     )
 
     /** The character this connection drives, or [NetId.NONE] until a packet names one. */
-    public var character: NetId = NetId.NONE
+    override var character: NetId = NetId.NONE
         private set
 
     /** This client's own character, predicted. Null until the character has been identified. */
@@ -108,6 +109,9 @@ public class HollowClient(
 
     /** The newest server tick this client has a snapshot of. */
     public val serverTick: Tick get() = replication.serverTick
+
+    /** What this client's HUD is as of: [serverTick], the server's clock (issue #252). */
+    override val now: Tick get() = serverTick
 
     /** Commands this client has produced. Also the next sequence number. */
     private var producedSeq: Int = 0
@@ -146,17 +150,26 @@ public class HollowClient(
         return sent
     }
 
-    /** Mints the next command for [tick] from a world-space move axis and the run control. */
+    /**
+     * Mints the next command for [tick] from a world-space move axis, the run control and the three
+     * ability controls (issue #252), each a held state.
+     */
     public fun command(
         tick: Tick,
         moveX: Float = 0f,
         moveY: Float = 0f,
         running: Boolean = false,
         aim: Float = 0f,
+        attack: Boolean = false,
+        dash: Boolean = false,
+        heal: Boolean = false,
     ): MoveInput {
         val seq = producedSeq
         producedSeq = (producedSeq + 1) and SEQ_MASK
-        val buttons = if (running) HollowMovement.RUN_BUTTON else 0
+        val buttons = (if (running) HollowMovement.RUN_BUTTON else 0) or
+            (if (attack) HollowMovement.ATTACK_BUTTON else 0) or
+            (if (dash) HollowMovement.DASH_BUTTON else 0) or
+            (if (heal) HollowMovement.HEAL_BUTTON else 0)
         return MoveInput(seq, tick, moveX, moveY, aim, buttons)
     }
 

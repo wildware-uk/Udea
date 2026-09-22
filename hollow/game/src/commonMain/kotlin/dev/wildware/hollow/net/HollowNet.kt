@@ -1,11 +1,18 @@
 package dev.wildware.hollow.net
 
 import dev.wildware.hollow.Fox
+import dev.wildware.hollow.HollowCombat
 import dev.wildware.hollow.Player
 import dev.wildware.udea.core.snapshot.ComponentRegistry
+import dev.wildware.udea.core.snapshot.ComponentSchema
+import dev.wildware.udea.core.snapshot.FieldKind
+import dev.wildware.udea.core.snapshot.fleksComponentType
 import dev.wildware.udea.core.spatial.Animator
 import dev.wildware.udea.core.spatial.Drawn
 import dev.wildware.udea.core.spatial.Transform3D
+import dev.wildware.udea.gas.AttributeTable
+import dev.wildware.udea.gas.Attributes
+import dev.wildware.udea.gas.AttributesReplicator
 import dev.wildware.udea.net.wire.ProtocolDescriptor
 
 /**
@@ -32,11 +39,18 @@ import dev.wildware.udea.net.wire.ProtocolDescriptor
  * `Animator` is here because a client has to play the clip the server is playing, from the tick the
  * server started it (issue #241); every field of it is `@Net`.
  *
- * [dev.wildware.hollow.Fox] is here for the reason `Player` is (issue #251): its state, health and
- * target are what a client shows, and a fox is spawned by the server at run time, so replication is
+ * [dev.wildware.hollow.Fox] is here for the reason `Player` is (issue #251): its state and target
+ * are what a client shows, and a fox is spawned by the server at run time, so replication is
  * the only way a client hears of one. `Drawn` is here because that fox has to be *drawn* on a client
  * that never spawned it: it names the model, and `ModelRenderSystem` attaches it (issue #270). Both
  * are listed in `net-components.lock`'s sorted order, which is the order this list keeps.
+ *
+ * `udea-gas`'s `Abilities` and `GameplayEffects` are not here either (issue #252), and for a reason
+ * that is theirs rather than Hollow's: both codecs send nothing (`netMask` is empty - the ledger
+ * behind a fighter's stats is server state), and a registry is both what is captured and what a
+ * client applies, where a component the server never filled has no vector to apply. A client learns
+ * each player's cooldowns from `Player`'s three `@Net` ready ticks instead. Leaving them out of the
+ * capture is the same gap the physics components are, below, and closes in the same ticket.
  *
  * The physics components are **not** here, and that is a gap rather than a decision to leave alone.
  * `Physics2DModule`'s own KDoc asks a game to add `PhysicsSnapshotTypes.all()` to its registry "or a
@@ -56,13 +70,21 @@ public object HollowNet {
      * The registry both ends of a session share, and the game's snapshot ring captures: every
      * `@Replicated` component Hollow's world holds.
      */
-    internal fun registry(): ComponentRegistry = ComponentRegistry(
+    internal fun registry(attributes: AttributeTable = HollowCombat.attributeTable()): ComponentRegistry = ComponentRegistry(
         listOf(
             Fox.snapshotType(),
             Player.snapshotType(),
             Animator.snapshotType(),
             Drawn.snapshotType(),
             Transform3D.snapshotType(),
+            // Issue #252: a fighter's health, through `udea-gas`'s own codec, which takes an id above
+            // this build's `@Replicated` space (`net-components.lock` says why). Its `base` is `@Net`,
+            // and it is what a client's HUD and a fox's flight are read from.
+            fleksComponentType(
+                AttributesReplicator(attributes),
+                ComponentSchema.of(AttributesReplicator(attributes), "Attributes", listOf(FieldKind.Object)),
+                Attributes,
+            ) { Attributes(attributes) },
         ),
     )
 

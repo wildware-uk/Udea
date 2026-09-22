@@ -2,11 +2,15 @@ package dev.wildware.hollow
 
 import com.github.quillraven.fleks.Family
 import dev.wildware.udea.core.SimSystem
+import dev.wildware.udea.core.Tick
 import dev.wildware.udea.core.Ticks
 import dev.wildware.udea.core.physics.PhysicsBody
 import dev.wildware.udea.core.spatial.AnimationClip
 import dev.wildware.udea.core.spatial.Animator
+import dev.wildware.udea.core.spatial.Loop
 import dev.wildware.udea.core.spatial.Transform3D
+import dev.wildware.udea.gas.Abilities
+import dev.wildware.udea.gas.Attributes
 import dev.wildware.udea.generated.Human
 import kotlin.math.atan2
 import kotlin.math.sqrt
@@ -55,21 +59,65 @@ public class PlayerPoseSystem : SimSystem() {
 
     private val players: Family = world.family { all(Player, PhysicsBody, Transform3D, Animator) }
 
+    private val combat: HollowCombat = ctx[HollowCombat.KEY]
+
     override fun onTick() {
         val now = tick
         players.forEach { entity ->
             val player = entity[Player]
-            if (player.moveX != 0f || player.moveY != 0f) {
+            val attributes = entity.getOrNull(Attributes)
+            val dead = attributes != null && combat.isDead(attributes)
+            if (!dead && (player.moveX != 0f || player.moveY != 0f)) {
                 player.heading = atan2(player.moveY, player.moveX)
+                // The same direction as a unit vector, for a dash (issue #252). The axis is clamped
+                // to the unit circle but a stick can hold it short of it, so it is made unit length
+                // here, with `sqrt`, which is exact.
+                val length = sqrt(player.moveX * player.moveX + player.moveY * player.moveY)
+                player.faceX = player.moveX / length
+                player.faceY = player.moveY / length
             }
             // Every tick, not only the moving ones: `Transform3DFromBodySystem` has just copied the
             // body's solved angle over `rotationZ`, and a character that stopped would otherwise
             // swing back to whatever torque a contact had put on its circle.
-            entity[Transform3D].rotationZ = player.heading + Player.MODEL_FACING
-            val body = entity[PhysicsBody]
+            val transform = entity[Transform3D]
+            transform.rotationZ = player.heading + Player.MODEL_FACING
             val animator = entity[Animator]
+            if (dead) {
+                fall(transform, animator, now)
+                return@forEach
+            }
+            val abilities = entity.getOrNull(Abilities)
+            if (abilities != null && punch(abilities, animator, now)) return@forEach
+            val body = entity[PhysicsBody]
             val wanted = clipFor(sqrt(body.linearX * body.linearX + body.linearY * body.linearY))
             if (!animator.isPlaying(wanted)) animator.crossfade(wanted, now, over = FADE)
+        }
+    }
+
+    /**
+     * Plays the punch for a swing in flight (issue #252), from the tick it started, and answers
+     * whether one is. A new swing restarts the clip even when the last one's is still playing, which
+     * is what holding the attack key looks like: one punch per swing.
+     */
+    private fun punch(abilities: Abilities, animator: Animator, now: Tick): Boolean {
+        val swing = abilities.instanceAt(CombatRules.ATTACK_SLOT)
+        if (!swing.isActive) return false
+        if (!animator.isPlaying(Human.Clips.Punch) || animator.current.start < swing.activatedTick) {
+            animator.crossfade(Human.Clips.Punch, now, over = PUNCH_FADE, loop = Loop.Once)
+        }
+        return true
+    }
+
+    /**
+     * A dead character's pose (issue #252). The human has no death clip - `relink.py` kept Idle,
+     * Walk, Run and Punch of the pack's nine takes - so a death is a pose: the body rolled flat onto
+     * the ground and the idle frozen on its first frame. `Transform3D` and `Animator` replicate, so
+     * every client sees the same fall.
+     */
+    private fun fall(transform: Transform3D, animator: Animator, now: Tick) {
+        transform.rotationX = FALLEN
+        if (!animator.isPlaying(Human.Clips.Idle) || animator.current.speed != 0f) {
+            animator.play(Human.Clips.Idle, now, speed = 0f)
         }
     }
 
@@ -108,5 +156,11 @@ public class PlayerPoseSystem : SimSystem() {
          * the same way.
          */
         public val FADE: Ticks = Ticks(12L)
+
+        /** How fast a swing's punch cuts in: a fist is quick, so a fifteenth of a second. */
+        internal val PUNCH_FADE: Ticks = Ticks(4L)
+
+        /** How far a dead character is rolled about X, in radians: a quarter turn, flat on the ground. */
+        internal const val FALLEN: Float = 1.5707964f
     }
 }

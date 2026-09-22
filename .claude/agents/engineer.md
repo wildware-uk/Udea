@@ -861,3 +861,12 @@ for many seconds of real frames (at least 15 s; Windowed and Offscreen for rende
 still alive and drawing at the end, and make a failure inside it loud. #275 shipped an overlay hook
 whose only test drew two frames; any game that used it closed itself eight seconds later with nothing
 logged. The reviewer fails a branch without this test.
+
+## A mutation row that did not compile is VOID, not red
+
+2026-09-22: two red rows exited non-zero in ~5s and looked perfect. Neither had run a test - the
+fixture did not compile (a heredoc turned `\n` inside a Kotlin string into real newlines), so
+`BUILD FAILED in 5s` was the whole contribution, indistinguishable from the mutation biting. This is
+the "check that measures nothing" trap arriving as a *confident* result rather than an empty one.
+So: run a **green baseline first**, and mark any row whose log has no `tests completed` line as
+**VOID** rather than scoring it. A red you cannot trace to a named failing test proves nothing.

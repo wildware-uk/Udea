@@ -407,6 +407,16 @@ The pieces a newcomer meets first, each with the issue that made it so.
 
 ## Driving a running game
 
+**To play rather than drive**, `./gradlew playMoba` or `./gradlew playHollow` (`gradlew.bat` on
+Windows) opens the game in a window with a player in it: `:moba:desktop:play` is `runClient`'s
+`local` mode and `:hollow:desktop:play` is Hollow's `run`. Name the game - a bare `play` runs every
+project's `play` at once. The `windows-launch` workflow (`.github/workflows/windows-launch.yml`)
+launches every one of these tasks on a Windows runner over Mesa's software OpenGL and fails when one
+does not draw, connect or exit; `scripts/launch-check.py` is that check, and runs the same under xvfb.
+A launch check asks a running game for a frame through the environment - `UDEA_LAUNCH_PNG`,
+`UDEA_LAUNCH_FRAMES`, `UDEA_LAUNCH_STOP_FILE`, read by `udea-render`'s `LaunchProbe` - and every
+context prints the `GL_RENDERER` and `GL_VERSION` that answered, once, as `[udea-render] ...`.
+
 Every Udea game exposes an MCP tool surface automatically, and there is no IDE plugin. For
 `moba`, `sh gradlew :moba:desktop:run -PdebugPort=<port>` starts it `Offscreen` with the
 surface on that port; the generated `gamebridge.json` launches the same task. The editor

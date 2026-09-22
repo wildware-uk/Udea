@@ -1,5 +1,9 @@
 # The single CI workflow for this repository.
 #
+# One exception, `windows-launch.yml`: every launch task started on a Windows runner over Mesa's
+# software OpenGL. Its own file so that a red run there says "a Windows launch broke" and nothing
+# else, and so that it is not in this workflow's cancel group; its header says the rest.
+#
 # Later epics add *jobs or matrix legs here*; they do not create a second workflow, and they
 # record their numbers in the single `docs/budgets.md` rather than a second budgets document.
 # Gates that have landed and run inside the `build` job, because they are wired into `check`

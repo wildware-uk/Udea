@@ -9,6 +9,7 @@ import de.fabmax.kool.pipeline.backend.gl.RenderBackendGl
 import de.fabmax.kool.platform.Lwjgl3Context
 import de.fabmax.kool.util.Time
 import org.lwjgl.glfw.GLFW
+import org.lwjgl.opengl.GL11
 import org.lwjgl.system.Configuration
 import java.util.concurrent.Callable
 import java.util.concurrent.CancellationException
@@ -64,6 +65,7 @@ internal class KoolThread(private val window: WindowConfig, private val visible:
     private val frames = AtomicReference<Frames>(Frames.Idle)
     private val resizes = AtomicReference<((Int, Int) -> Unit)?>(null)
     private val context = AtomicReference<KoolContext?>(null)
+    private val gl = AtomicReference<GlInfo?>(null)
 
     /**
      * Run once when the loop exits, however it exits.
@@ -91,6 +93,9 @@ internal class KoolThread(private val window: WindowConfig, private val visible:
 
     /** The Kool context, once [start] has returned. Render thread only, like everything on it. */
     val ctx: KoolContext get() = checkNotNull(context.get()) { "the Kool context has not started" }
+
+    /** What the driver said it is, once [start] has returned. Any thread: it is two strings. */
+    val glInfo: GlInfo get() = checkNotNull(gl.get()) { "the Kool context has not started" }
 
     /**
      * Boots the context and returns once it is drawing frames.
@@ -199,6 +204,14 @@ internal class KoolThread(private val window: WindowConfig, private val visible:
             KoolApplication(config()) {
                 val ctx = this.ctx
                 context.set(ctx)
+                // Read here, on the thread the context is current on, and printed once: which
+                // OpenGL a launch got is the first question about any launch that draws wrong.
+                val info = GlInfo(
+                    renderer = GL11.glGetString(GL11.GL_RENDERER).orEmpty(),
+                    version = GL11.glGetString(GL11.GL_VERSION).orEmpty(),
+                )
+                gl.set(info)
+                println("[udea-render] $info")
                 ctx.onRender += { onFrame() }
                 ctx.window.onResize { size -> resizes.get()?.invoke(size.x, size.y) }
                 ready.countDown()

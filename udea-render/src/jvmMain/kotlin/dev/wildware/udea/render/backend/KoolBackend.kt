@@ -9,12 +9,16 @@ import dev.wildware.udea.core.module.UdeaGame
 import dev.wildware.udea.render.RenderPipeline
 import dev.wildware.udea.render.RenderRegistry
 import dev.wildware.udea.render.capture.BlockingFrameCapture
+import dev.wildware.udea.render.capture.CaptureRequest
+import dev.wildware.udea.render.capture.capture
 import dev.wildware.udea.render.kool.KoolSurface
 import dev.wildware.udea.render.ui.UiLayer
 import dev.wildware.udea.render.ui.WorldView
 import dev.wildware.udea.render.view.EditorCamera
 import dev.wildware.udea.render.view.WorldViewport
+import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -157,7 +161,7 @@ public class KoolBackend private constructor(
      * existing, not a degraded mode.
      */
     public fun drive(host: GameHost) {
-        kool.driveWith(host::frame)
+        drive(host::frame)
     }
 
     /**
@@ -168,12 +172,82 @@ public class KoolBackend private constructor(
      * frame with `AgentRuntime.beforeFrame()` and `afterFrame(...)`, or commands reach the bridge
      * queue and are never dispatched.
      *
+     * Either overload honours a launch check's `UDEA_LAUNCH_PNG` from the environment: after the
+     * frames it asks for, the frame is written there and the window closes (see [LaunchProbe]).
+     * Unset, as it is on every ordinary run, nothing is different.
+     *
      * @param frame called with real seconds since the previous frame. It must not block: it is the
      *   render loop.
      */
     public fun drive(frame: (Float) -> Unit) {
-        kool.driveWith(frame)
+        drive(frame, LaunchProbe.fromEnvironment(System::getenv))
     }
+
+    /**
+     * [drive], with a launch check's [probe] counting the frames and, once it has its frame,
+     * closing the window. `null` is an ordinary run. See [LaunchProbe].
+     *
+     * One probe per backend: a second call to [drive] replaces the frame callback and keeps
+     * counting toward the probe the first call started, rather than starting a second one.
+     */
+    internal fun drive(frame: (Float) -> Unit, probe: LaunchProbe?) {
+        kool.driveWith(counted(frame))
+        if (probe != null && probing.compareAndSet(false, true)) {
+            Thread({ watch(probe) }, "udea-launch-probe").apply { isDaemon = true }.start()
+        }
+    }
+
+    /** Frames drawn through [drive] so far, whichever callback drew them. */
+    private val drawn = AtomicLong()
+
+    /** Set once a [LaunchProbe] is watching this backend. */
+    private val probing = AtomicBoolean(false)
+
+    private fun counted(frame: (Float) -> Unit): (Float) -> Unit = { delta ->
+        frame(delta)
+        drawn.incrementAndGet()
+    }
+
+    /**
+     * The probe's side of a launch check, on a thread of its own: capture through the same
+     * blocking path an agent's screenshot takes, write the PNG, then close the window the way a
+     * player quitting does, so the launcher's own shutdown runs.
+     *
+     * A failure is printed and still closes the window: the check reads the missing PNG and the
+     * printed cause, and a launcher left open would hang it instead of failing it.
+     */
+    private fun watch(probe: LaunchProbe) {
+        try {
+            while (drawn.get() < probe.frames) {
+                if (!kool.isRunning) return
+                Thread.sleep(PROBE_POLL_MILLIS)
+            }
+            val slot = checkNotNull(pipeline?.capture) { "$this has no capturable pass to probe" }
+            val shot = slot.capture(CaptureRequest())
+            probe.png.toAbsolutePath().parent?.let { Files.createDirectories(it) }
+            Files.write(probe.png, shot.bytes)
+            println(
+                "[udea.launch] frame ${drawn.get()}: ${shot.width}x${shot.height} written to " +
+                    "${probe.png.toAbsolutePath()}; ${kool.glInfo}",
+            )
+            val stop = probe.stopFile
+            if (stop != null) {
+                println("[udea.launch] waiting for ${stop.toAbsolutePath()} before closing the window")
+                while (!Files.exists(stop)) {
+                    if (!kool.isRunning) return
+                    Thread.sleep(PROBE_POLL_MILLIS)
+                }
+            }
+            println("[udea.launch] closing the window")
+        } catch (failure: Exception) {
+            System.err.println("[udea.launch] the probe failed; closing the window: $failure")
+            failure.printStackTrace()
+        }
+        kool.stop()
+    }
+
+    /** What the driver said it is. Read once, when the context came up. */
+    internal val glInfo: GlInfo get() = kool.glInfo
 
     /**
      * Puts [ui]'s screens on the context, over everything the game draws, and takes ownership.
@@ -258,6 +332,9 @@ public class KoolBackend private constructor(
     override fun toString(): String = "KoolBackend($mode, $window)"
 
     public companion object {
+
+        /** How often the probe looks at the frame count and the stop file. */
+        private const val PROBE_POLL_MILLIS: Long = 50L
 
         /**
          * Boots a context and returns once it is drawing frames.

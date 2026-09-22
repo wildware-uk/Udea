@@ -4,6 +4,17 @@ Udea is a game engine written in Kotlin. It is built so that an AI agent can do 
 
 This wiki explains how the engine works, in detail. Each page starts with a short summary and then goes deeper.
 
+## Play the examples first
+
+One command opens each example game in a window, with you in it. From the repository root:
+
+| Game | Linux and macOS | Windows |
+|---|---|---|
+| `moba` | `./gradlew playMoba` | `gradlew.bat playMoba` |
+| Hollow | `./gradlew playHollow` | `gradlew.bat playHollow` |
+
+You need JDK 21 and a GPU with OpenGL 3.3 or newer. Every other way to start a game - the agent's hidden instance, the dedicated servers, networked clients, the editor - is in [Getting Started](Getting-Started).
+
 ## Who it is for
 
 - **People making a game with Udea.** Start with [Getting Started](Getting-Started), then [Tutorial: Make a Game](Tutorial-Make-a-Game).

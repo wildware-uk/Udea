@@ -503,3 +503,22 @@ subprojects {
         }
     }
 }
+
+// --- playing the games ------------------------------------------------------------------------
+//
+// One command per game that opens it in a window with you in it, the same on every operating
+// system: `./gradlew playMoba`, or `gradlew.bat playMoba` on Windows. Named per game because a bare
+// `./gradlew play` runs *every* project's `play` task at once - Gradle matches a task name across
+// the whole build - and would open both games. `:moba:desktop:play` and `:hollow:desktop:play` are
+// what each of these runs.
+tasks.register("playMoba") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "Plays moba in a window. The same as :moba:desktop:play."
+    dependsOn(":moba:desktop:play")
+}
+
+tasks.register("playHollow") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "Plays hollow in a window. The same as :hollow:desktop:play."
+    dependsOn(":hollow:desktop:play")
+}

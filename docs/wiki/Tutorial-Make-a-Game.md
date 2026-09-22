@@ -425,8 +425,10 @@ A gate nobody has seen fail is indistinguishable from one that cannot. Plant a
 That is what `scripts/outside-game-proof.sh` does for the template, among its other legs: it plants
 a wall-clock read and watches `udeaVerifyDeterminism` fail with `DET001`, and plants a Kotlin
 scripting host and watches `udeaVerifyModuleGraph` fail with `UDEA-MG-005`. It also opens the
-template's window on a virtual display, photographs it, and requires the rover to be in the picture
-- and then takes the rover's model away and requires the same check to fail.
+template's window on a virtual display, leaves it drawing for fifteen seconds, photographs it, and
+requires the rover to be in the picture - then takes the rover's model away and requires the same
+check to fail, and separately makes the window close itself early and requires the fifteen-second
+wait to refuse that too.
 
 ## What this does not cover yet
 

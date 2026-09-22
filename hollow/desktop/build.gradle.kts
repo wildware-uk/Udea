@@ -60,6 +60,13 @@ tasks.register<JavaExec>("run") {
     classpath = sourceSets.main.get().runtimeClasspath
 }
 
+/** `play`: the game in a window, as `run` - named for the person who wants to play it (`./gradlew playHollow`). */
+tasks.register("play") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "Plays hollow in a window, hosting on UDP 27025: the same as run."
+    dependsOn("run")
+}
+
 tasks.register<JavaExec>("runServer") {
     group = ApplicationPlugin.APPLICATION_GROUP
     description = "hollow.server: the headless dedicated server on UDP 27025, or --args=\"<port>\"."

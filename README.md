@@ -10,6 +10,22 @@
 
 A Kotlin+Kool+Fleks game engine for 2D games.
 
+## Play it
+
+Two example games ship in this repository. One command opens each in a window, with you in it:
+
+| Game | Linux and macOS | Windows |
+|---|---|---|
+| `moba`, a 5v5 MOBA in 2D | `./gradlew playMoba` | `gradlew.bat playMoba` |
+| Hollow, a 3D survival arena | `./gradlew playHollow` | `gradlew.bat playHollow` |
+
+You need **JDK 21** (`JAVA_HOME` pointing at it; Gradle 8.13 does not run on 25) and **a GPU with
+OpenGL 3.3 or newer**. The first run builds the engine, which takes a few minutes.
+
+In `moba`, WASD walks and Space swings. In Hollow, WASD walks, Shift runs and the mouse turns the
+camera. Close the window to quit. If `./gradlew` says *Permission denied*, run it as
+`sh gradlew playMoba`.
+
 ## 📖 Documentation
 
 Check out the [Udea wiki](docs/wiki/Home.md) to get started!

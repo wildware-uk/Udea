@@ -323,9 +323,13 @@ tasks.register<JavaExec>("runEditor") {
 
 tasks.register<JavaExec>("runServer") {
     group = ApplicationPlugin.APPLICATION_GROUP
-    description = "moba.server: headless, no GL context, no agent surface."
+    description = "moba.server: headless, no GL context, no agent surface. -Pudea.net.ticks=N stops it after N ticks."
     mainClass.set("dev.wildware.moba.entry.MobaServer")
     classpath = sourceSets.main.get().runtimeClasspath
+    // `MobaServer` stops after `-Dudea.net.ticks` ticks, and `JavaExec` forks, so a `-D` given to
+    // Gradle never reached it: the documented bound was unreachable through this task. A Gradle
+    // property is forwarded instead, read through `providers` so the configuration cache sees it.
+    providers.gradleProperty("udea.net.ticks").orNull?.let { systemProperty("udea.net.ticks", it) }
 }
 
 /**
@@ -545,6 +549,20 @@ tasks.register<JavaExec>("runClient") {
         val value = providers.systemProperty(name)
         if (value.isPresent) systemProperty(name, value.get())
     }
+}
+
+/**
+ * `play`: the game, in a window, with you in it. The command for a person who wants to *play*
+ * `moba` - `./gradlew playMoba` from the root, `gradlew.bat playMoba` on Windows - so nobody has to
+ * learn that `run` is the agent's hidden instance and `runClient` is the window.
+ *
+ * An alias of `runClient` in its default `local` mode rather than a second `JavaExec`, so the two
+ * cannot drift: whatever `runClient` is taught, `play` gets.
+ */
+tasks.register("play") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "Plays moba in a window: WASD to walk, Space to swing. The same as runClient."
+    dependsOn("runClient")
 }
 
 // `runAudio` was here, and it is gone with LibGDX. It ran `MobaAudioProbe`, a second main whose

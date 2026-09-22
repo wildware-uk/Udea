@@ -1,7 +1,43 @@
+# Every way a developer or a player starts a game, launched on Windows and checked to have come up.
+#
+# `ci.yml`'s `build (windows-latest)` leg compiles and tests everything on Windows, and until this
+# workflow nothing *launched* there: `windows-latest` exposes only the GDI generic renderer, OpenGL
+# 1.1, which is below what Kool asks for, so no window could open and no frame could be drawn. A
+# launcher broken on Windows - a path, a native, a socket - was green in CI.
+#
+# ## The driver
+#
+# Mesa's software rasteriser for Windows, llvmpipe, from the mesa-dist-win release named below,
+# pinned by version and by the SHA-256 GitHub records for that asset. It is installed the way
+# mesa-dist-win's own `systemwidedeploy.cmd` option 1 installs it: `libgallium_wgl.dll` copied into
+# System32 as `mesadrv.dll` and registered as the OpenGL ICD, so the system `opengl32.dll` - the one
+# GLFW loads, whichever JVM a Gradle toolchain picked - hands out Mesa's contexts. Done inline
+# rather than by running that script, because the script re-launches itself elevated when it is not
+# already, and its non-elevated branch exits 0 having installed nothing.
+#
+# `GALLIUM_DRIVER=llvmpipe` picks the rasteriser, and `--expect-renderer llvmpipe` is the positive
+# control that it is the one answering: every launch prints the `GL_RENDERER` its context reported,
+# and the check fails a launch whose renderer is anything else.
+#
+# ## What "came up" means
+#
+# `scripts/launch-check.py` holds every launch to it: the task a person types, through
+# `gradlew.bat`; a real frame written by the engine's launch probe and decoded to more than a flat
+# colour; `/health` for a launch with the agent surface; the client's own "connected" line for a
+# client and its server; and exit status 0, by itself, inside a deadline - a process that had to be
+# killed is a failure. One PNG per launch is uploaded as `windows-launch-frames`, with every log.
+#
+# ## Why a workflow of its own
+#
+# A red run here should say "a Windows launch broke" and nothing else, and this job is a slow one
+# that needs a driver installed before it starts. Its own file also keeps it out of `ci.yml`'s
+# cancel group, so pushing a change to `ci.yml` does not cancel a launch run that is half done.
+
 name: Windows launch
 
 on:
   push:
+  pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -12,8 +48,10 @@ jobs:
   windows-launch:
     name: windows-launch
     runs-on: windows-latest
+    timeout-minutes: 90
     env:
       MESA_VERSION: "26.1.8"
+      # sha256 of mesa3d-26.1.8-release-msvc.7z, as GitHub records it for the release asset.
       MESA_SHA256: "4c6d32e653e0ff9ad07796e40c0bcfabf2764d849e3ce4f3b1590112c87e42f9"
       GALLIUM_DRIVER: llvmpipe
     steps:
@@ -26,7 +64,11 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: true
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install Mesa's software OpenGL driver
         shell: pwsh
@@ -36,6 +78,7 @@ jobs:
           Invoke-WebRequest -Uri "https://github.com/pal1000/mesa-dist-win/releases/download/$env:MESA_VERSION/mesa3d-$env:MESA_VERSION-release-msvc.7z" -OutFile $archive
           $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
           if ($actual -ne $env:MESA_SHA256) { throw "mesa archive sha256 $actual, expected $env:MESA_SHA256" }
+          Write-Output "mesa archive sha256 $actual matches the pin"
           7z x $archive "-o$env:RUNNER_TEMP\mesa" x64\libgallium_wgl.dll -y | Out-Null
           Copy-Item "$env:RUNNER_TEMP\mesa\x64\libgallium_wgl.dll" "$env:WINDIR\System32\mesadrv.dll" -Force
           $key = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OpenGLDrivers\MSOGL'
@@ -46,22 +89,86 @@ jobs:
           New-ItemProperty -Path $key -Name Version -Value 2 -PropertyType DWord -Force | Out-Null
           Get-ItemProperty $key
 
-      - name: Spike - hollow shot
+      # The launches compile what they run, but a compile failure reported as "moba-play never
+      # printed its first line" is a worse message than the compiler's own, so it is built first.
+      - name: Build what the launchers run
         shell: cmd
-        run: gradlew.bat :hollow:desktop:runShot --stacktrace --console=plain
+        run: >-
+          gradlew.bat :moba:desktop:classes :moba:desktop:agentClasses :moba:desktop:editorClasses
+          :hollow:desktop:classes :hollow:game:udeaPackBundle
+          --console=plain --stacktrace
 
-      - name: Spike - moba shot
-        if: always()
-        shell: cmd
-        run: gradlew.bat :moba:desktop:runShot --stacktrace --console=plain
+      - name: Launch every game task and check each came up
+        shell: pwsh
+        run: python scripts/launch-check.py --expect-renderer llvmpipe --out build/reports/udea/launch
 
-      - name: Upload frames
+      - name: Upload one frame per launch, and every launch log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-launch-frames
-          path: |
-            hollow/desktop/build/reports/udea/**
-            moba/desktop/build/reports/udea/**
-          if-no-files-found: warn
-          retention-days: 7
+          path: build/reports/udea/launch/**
+          if-no-files-found: error
+          retention-days: 14
+
+  # The new-game template's launches, on Windows. A job of its own because the template builds
+  # against a *published* engine, as a game in its own repository does: this engine and
+  # `build-logic` are published to the runner's local Maven repository first - leg 0 of
+  # `scripts/outside-game-proof.sh`, which stands in for Maven Central - and that is a second full
+  # build of the engine the launches above need not wait for. The template runs headless: it has
+  # no window to open yet.
+  windows-launch-template:
+    name: windows-launch (template)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Publish the engine and its build logic to the local Maven repository
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Select-String -Path templates/new-game/gradle.properties -Pattern '^udeaVersion=(.+)$').Matches[0].Groups[1].Value
+          Write-Output "publishing $version, the version the template asks for"
+          .\gradlew.bat publishToMavenLocal "-PudeaVersion=$version" --console=plain --stacktrace
+          if ($LASTEXITCODE -ne 0) { throw "the engine did not publish" }
+          .\gradlew.bat -p build-logic publishToMavenLocal "-PudeaVersion=$version" --console=plain --stacktrace
+          if ($LASTEXITCODE -ne 0) { throw "build-logic did not publish" }
+
+      # Outside this checkout, with a wrapper of its own, as `docs/new-game.md` says a game starts.
+      - name: Copy the template out of the repository
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $game = "$env:RUNNER_TEMP\my-game"
+          Copy-Item templates/new-game $game -Recurse
+          Copy-Item gradlew.bat, gradlew $game
+          New-Item -ItemType Directory -Path "$game\gradle" -Force | Out-Null
+          Copy-Item gradle/wrapper "$game\gradle\wrapper" -Recurse -Force
+          "GAME_DIR=$game" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Launch the template and check it came up
+        shell: pwsh
+        run: python scripts/launch-check.py --template "$env:GAME_DIR" --only template-run template-agent --out build/reports/udea/launch-template
+
+      - name: Upload the launch logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-launch-template-logs
+          path: build/reports/udea/launch-template/**
+          if-no-files-found: error
+          retention-days: 14

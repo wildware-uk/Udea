@@ -77,10 +77,14 @@ third-person 3D survival arena, and it is younger — see [Example Games](Exampl
 ### A window you can play
 
 ```sh
-./gradlew :moba:desktop:runClient --args=local
+./gradlew playMoba        # gradlew.bat playMoba on Windows
+./gradlew playHollow      # gradlew.bat playHollow on Windows
 ```
 
-That is the one to start with. It opens a visible window, single process, one world, no networking.
+That is the one to start with. `playMoba` opens a visible window, single process, one world, no
+networking: it is `:moba:desktop:play`, which is `runClient` in its default `local` mode.
+`playHollow` is `:hollow:desktop:play`, which is Hollow's `run`. Use the per-game names from the
+root: a bare `./gradlew play` matches the `play` task of *every* project and opens both games.
 
 `runClient` takes a mode as its first argument. With none it is `local`.
 

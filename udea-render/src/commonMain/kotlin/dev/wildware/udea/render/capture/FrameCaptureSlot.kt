@@ -165,12 +165,18 @@ public class FrameCaptureSlot internal constructor(
         settle()
     }
 
-    /** Fails everything queued or claimed, so no caller is left waiting on a pipeline that has gone. */
-    internal fun close() {
+    /**
+     * Fails everything queued or claimed, so no caller is left waiting on a pipeline that has gone.
+     *
+     * @param cause what stopped the render loop, when something threw: every failure carries it as its
+     *   cause and names it, so a caller is told why the frame never came and not only that it did not
+     *   (issue #275). `null` for an orderly close.
+     */
+    internal fun close(cause: Throwable? = null) {
         synchronized(lock) {
             closed = true
-            for (pending in queue) fail(pending, "the render pipeline was closed")
-            for (pending in claimed) fail(pending, "the render pipeline was closed before the frame was read")
+            for (pending in queue) fail(pending, "the render pipeline was closed", cause)
+            for (pending in claimed) fail(pending, "the render pipeline was closed before the frame was read", cause)
             queue.clear()
             claimed.clear()
             queuedCount.value = 0
@@ -178,8 +184,9 @@ public class FrameCaptureSlot internal constructor(
         settle()
     }
 
-    private fun fail(pending: Pending, why: String) {
-        pending.outcome = Outcome.Failed(CaptureStalledException("${pending.request}: $why"))
+    private fun fail(pending: Pending, why: String, cause: Throwable?) {
+        val because = if (cause == null) "" else ", because the render loop threw: $cause"
+        pending.outcome = Outcome.Failed(CaptureStalledException("${pending.request}: $why$because", cause))
         settling += pending
     }
 

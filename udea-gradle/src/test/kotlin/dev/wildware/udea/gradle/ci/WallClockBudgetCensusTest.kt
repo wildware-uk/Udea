@@ -363,6 +363,14 @@ class WallClockBudgetCensusTest {
                 "a deadline: how long to wait for the render thread to reach a frame or a tick",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlOverlayIsolationTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",
+            "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlPointerPositionOverlayTest.kt" to
+                "a deadline: how long to wait for the render thread to reach a frame after the " +
+                    "cursor has been moved. What is asserted is where the crosshair landed, never " +
+                    "how long it took",
+            "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/OverlayLongRun.kt" to
+                "a deadline: how long to wait for the render thread to reach a frame. The sixteen " +
+                    "seconds it runs for are slept, not measured - what is asserted each second is " +
+                    "that the loop is alive, the overlay drew and a capture came back (issue #275)",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlUiLayerTest.kt" to
                 "a deadline: how long to wait for the render thread to reach a frame",
             "udea-render/src/jvmTest/kotlin/dev/wildware/udea/render/gl/GlViewPresentTest.kt" to

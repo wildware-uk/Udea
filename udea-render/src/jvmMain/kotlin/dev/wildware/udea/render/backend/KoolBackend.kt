@@ -147,8 +147,9 @@ public class KoolBackend private constructor(
         kool.onResize { width, height -> pipeline.resize(width, height) }
         // If the render loop dies - a renderer threw, the window was closed, the driver went away -
         // every queued capture must be told, or each one waits out its full deadline and reports a
-        // timeout for something that was an exception seconds earlier.
-        kool.onShutdown { pipeline.closeCaptures() }
+        // timeout for something that was an exception seconds earlier. And told *why*: a capture that
+        // said only "closed" was the whole of what issue #275's owner had to go on.
+        kool.onShutdown { cause -> pipeline.closeCaptures(cause) }
 
         return PresentationBackend(pipeline, pipeline.capture?.let(::BlockingFrameCapture))
     }
@@ -280,7 +281,15 @@ public class KoolBackend private constructor(
      */
     public fun <T> onRenderThread(block: () -> T): T = kool.submit(block)
 
-    /** Blocks until the render loop exits, whether from [close] or the window being closed. */
+    /**
+     * Blocks until the render loop exits, whether from [close], the window being closed, or a frame
+     * throwing.
+     *
+     * @throws GlContextException when the loop exited because something threw - a `RenderSystem`, an
+     *   `OverlaySystem`, a simulation system ticked inside the frame, or Kool - with that exception as
+     *   its cause. A game's `main` that ends in `awaitExit()` therefore exits non-zero with the trace,
+     *   rather than 0 with nothing said (issue #275).
+     */
     public fun awaitExit() {
         kool.awaitExit()
     }
@@ -319,7 +328,15 @@ public class KoolBackend private constructor(
         val pipeline = built.getAndSet(null)
         if (pipeline != null && kool.isRunning) {
             try {
-                kool.submit { pipeline.dispose() }
+                // The frame driver goes first, in the same task. Tasks run at the top of a frame and the
+                // driver after them, so a driver left installed would draw this frame on the pipeline
+                // just disposed and throw. Before issue #275 that throw was swallowed with every other
+                // render-loop failure, so a game closing itself looked clean; now it is reported, and
+                // an orderly close must not be one.
+                kool.submit {
+                    kool.stopDriving()
+                    pipeline.dispose()
+                }
             } catch (stopped: GlContextException) {
                 // The loop ended between the check and the task: the context's objects went with
                 // it, and the shutdown hook has failed the captures. Stopping is still correct.

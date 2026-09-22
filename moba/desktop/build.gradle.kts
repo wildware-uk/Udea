@@ -370,6 +370,27 @@ tasks.register<JavaExec>("runMatchShot") {
     )
 }
 
+// Issue #275's picture. `OverlayProof` opens a visible moba window with an overlay registered and
+// runs it for twenty seconds of real frames, checking every second that the overlay drew and a
+// capture came back; `-Pudea.overlayproof.forgetBegin=true` runs the overlay robot-game shipped,
+// which throws, and the process has to stop saying why. Needs a display, so run by name, for the
+// reason `runMatchShot` gives.
+tasks.register<JavaExec>("runOverlayProof") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "moba.overlayproof: a visible window with an overlay, alive and drawing it for twenty seconds."
+    mainClass.set("dev.wildware.moba.overlay.OverlayProof")
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty(
+        "udea.overlayproof.dir",
+        providers.gradleProperty("udea.overlayproof.dir").orNull
+            ?: layout.buildDirectory.dir("reports/udea/overlay").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "udea.overlayproof.forgetBegin",
+        providers.gradleProperty("udea.overlayproof.forgetBegin").orNull ?: "false",
+    )
+}
+
 // The imported models' evidence task (issue #244). `GameModelShot` lives in the test source set for
 // the reason `MatchShot` does. It draws the game's FBX character from its committed `.glb`, as
 // `:moba:game:udeaPackBundle` copies it under that project's `build/udea/converted` - the

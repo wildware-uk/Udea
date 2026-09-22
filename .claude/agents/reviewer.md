@@ -446,3 +446,10 @@ kind, a callback, a convention plugin), the proof must include:
 - a failure inside it that is **loud**: a thrown or logged error, never a pipeline that quietly ends.
 
 A branch that adds such a hook without that test fails under "an acceptance criterion with no proof".
+
+## Check the reds ran a test at all
+
+A mutation row that fails to compile exits non-zero in seconds and reads exactly like the mutation
+biting (2026-09-22). For every red in a brief's mutation table, require the named failing test and
+its assertion message - a `BUILD FAILED` with no `tests completed` line is VOID, not proof, and a
+table of those is a table of nothing.

@@ -280,6 +280,11 @@ allprojects {
 dependencies {
     implementation(libs.kotlin.gradle.plugin)
 
+    // `dev.wildware.udea.compose-ui` applies the Compose compiler (issue #275). `implementation`, so
+    // the published jar's POM carries it and a game that applies the convention resolves it with
+    // no plugin request of its own.
+    implementation(libs.compose.compiler.gradle.plugin)
+
     // `dev.wildware.udea.kotlin-multiplatform` gives every runtime module an Android target through AGP's
     // multiplatform library plugin (issue #201). Build-logic only, like the Kotlin plugin above.
     implementation(libs.android.gradle.plugin)

@@ -234,8 +234,13 @@ The moment a developer reports finished, spawn a `reviewer` agent named
 a developer's tree is honour-based and it fails. A detached checkout cannot move:
 
 ```
-git worktree add --detach /tmp/review-<issue>-r<N> <SHA>
+git worktree add --detach /srv/ssd1/workspace/udea-review/review-<issue>-r<N> <SHA>
 ```
+
+**Never under `/tmp`, and remove it after the verdict** (`git worktree remove --force <path>`).
+`/tmp`, `~/.gradle` and `~/.m2` share the root disk; old review checkouts under `/tmp` filled it on
+2026-09-21 (17 GB of them, for tickets long merged) and every build on the box failed with
+`No space left on device`. `/srv/ssd1` has the room.
 
 Put the SHA in the prompt, tell the reviewer to review that checkout rather than
 the developer's worktree, and ask it to name the SHA in its verdict. Then a

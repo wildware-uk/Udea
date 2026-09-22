@@ -1,9 +1,17 @@
 # BRIEF.md — issue #252, Hollow H4: combat and abilities through `udea-gas`, plus the ComposeGL HUD
 
 **Review `e67dc701`** — every line of code, every test and every generated file on this branch is
-at that commit. This brief is committed directly on top of it and changes nothing else, so the
-branch tip differs from `e67dc701` by `BRIEF.md` alone. (A brief cannot name the SHA of the commit
-that contains it; the tip is in the handover message.)
+at that commit. Only `BRIEF.md` has changed since, so the branch tip differs from `e67dc701` by
+this file alone. (A brief cannot name the SHA of the commit that contains it; the tip is in the
+handover message.)
+
+**Round 1 correction.** `review-252-r1` found that the previous revision cited mutation rows M1 and
+M2 as proof the evidence command can fail, when neither had ever been run — predicted, never
+executed, cited as if measured. It also found M7 cited but missing from the table. Both are fixed
+here: M1 and M2 are now measured and written up, M7 and its superseded earlier round are in the
+table, and a row of mine that turned out **VOID** is in it too, with what it looked like. Section 6
+also now states which of the evidence command's four conditions each row reaches, including the one
+no row of mine does.
 
 Branch `issue-252-hollow-combat`, worktree
 `/srv/ssd1/workspace/Udea/.claude/worktrees/agent-a642493e1e401401e`, branched from `origin/master`
@@ -38,8 +46,14 @@ It is a check as well as a camera. It exits non-zero, with a message, when:
 - no fox was ever killed (the fight never resolved);
 - no player was ever bitten (the foxes never fought back).
 
-**Proof it goes red when the feature is reverted:** rows M1 and M2 of the mutation table in
-section 6. Each is a `git diff` taken from the run, with the exact stderr the mutated run printed.
+**Proof it goes red when the feature is reverted:** rows **M1** and **M2** of the mutation table
+in section 6, both measured at `e67dc701` in a separate worktree. M1 takes the HUD out and the run
+fails with 48 panel-check lines; M2 makes the swing hurt nothing and it fails with the two fox
+lines. Each row carries the literal `git diff` and the exact stderr that run printed.
+
+The command checks **four** conditions, so that is four claims rather than one. Three of them are
+reached by those two rows; the fourth — "a player was bitten" — is reached by **no row of mine**,
+and section 6 says so plainly, names the row that would close it, and records my prediction for it.
 
 ---
 
@@ -246,8 +260,170 @@ players' views rather than one view twice.
 Every row's diff is the literal `git diff` of the mutation, taken from the run that produced the
 failures beside it, in a **separate worktree** (`/srv/ssd1/workspace/udea-review/dev252c-mut`, a
 `git worktree` at this branch's commit) so that the evidence worktree was never mutated. Every
-prediction was written down before any mutation was applied:
-`scratchpad/dev-252c/mutation-predictions.md`.
+prediction was written down before its mutation was applied: `scratchpad/dev-252c/mutation-predictions.md`
+for M3 to M8, and `scratchpad/dev-252c/m1-m2-predictions.md` for M1 and M2, which supersedes the
+M1/M2 entries in the first file because the fight shot's scenario changed between them. Both files
+are kept unaltered.
+
+A green baseline was run first, at this SHA: 63 tests, 0 failures, `--no-build-cache`, in-XML
+timestamps inside the run. **A row whose log carries no `tests completed` line and no failure line
+is VOID, not red** — see M1-void, which is in this table for exactly that reason.
+
+### What the evidence command's four conditions are reached by
+
+The command fails on four separate conditions, so "it goes red when the feature is reverted" is
+four claims, not one. Stated plainly, including the one no row of mine reaches:
+
+| Condition the run checks | Reached by | Status |
+|---|---|---|
+| every frame carries both HUD panels | **M1** | shown able to fail — 48 lines |
+| a fox lost a hit point | **M2** | shown able to fail |
+| a fox was killed | **M2** | shown able to fail |
+| a player was bitten | **no row of mine** | **not shown able to fail by me** |
+
+The fourth is a gap I had the facts for and did not close. M2's own write-up below says the foxes
+still bite under it, so that check stays silent — which means nothing I ran could make it fire, and
+a condition no row can make fire is a check nobody has watched fail. The missing row is: **delete
+`FoxBiteSystem.onTick`'s body so no fox ever bites**, and my prediction for it, written before
+anybody ran it, is exit 1 with exactly one fight line, `no player was ever bitten: the foxes never
+fought back`, with neither fox line (the players still hunt and kill the wave, so `hurt` and
+`killed` stay true) and no HUD-missing line.
+
+`review-252-r1` is running exactly that row independently as its R3. I have deliberately not run a
+fourth row of my own against it: an independent measurement is worth more than a second of mine,
+and my prediction is on the record with the reviewer in advance of its result.
+
+### M1 — the HUD half of the evidence command
+
+Predicted: exit 1, 24 frames still written, the three fight checks **not** printed, and 48
+HUD-missing lines — two per frame across 24 frames.
+**Measured: exactly that.** `EXIT=1`, `BUILD FAILED in 56s`, 0 compile errors, 24 frames written,
+48 HUD-missing lines (24 `has no wave strip`, 24 `has no player panel`), no fight check printed.
+That the fight checks stayed silent is a checked negative, not an assumed one: the same grep
+returns 2 against M2's log.
+
+```diff
+--- a/hollow/game/src/commonMain/kotlin/dev/wildware/hollow/render/HollowScene.kt
++++ b/hollow/game/src/commonMain/kotlin/dev/wildware/hollow/render/HollowScene.kt
+@@ -100,6 +100,7 @@ public class HollowScene(
+         val hud = hud ?: return
++        if (true) return
+         registry.register(RenderPhase.UI, { resources ->
+             HollowHudSystem(resources, HollowHudModel(hud.combat, hud.waves), { hudSource }, hud.fonts())
+         })
+```
+
+```
+[hollow.fight] HUD missing: fight-client0-00.png has no wave strip: (20, 20) is #4376C2, the panel is #10141A
+[hollow.fight] HUD missing: fight-client0-00.png has no player panel: (20, 700) is #618D33, the panel is #10141A
+```
+```
+[... 44 lines elided: frames 01 through 22, the same two lines per frame ...]
+```
+```
+[hollow.fight] HUD missing: fight-client0-23.png has no wave strip: (20, 20) is #26492D, the panel is #10141A
+[hollow.fight] HUD missing: fight-client0-23.png has no player panel: (20, 700) is #57822F, the panel is #10141A
+```
+
+The colours are incidental but worth reading: `#4376C2` is the sky at the top-left in frame 00,
+`#26492D` the dark forest once the camera has turned, `#57822F` the grass at the bottom-left. With
+no HUD registered, the world is what the panel check finds where the panel should be.
+
+### M1-void — the attempt before it, kept because of what it looked like
+
+**VOID, not red.** My first M1 replaced `val hud = hud ?: return` outright, which killed the smart
+cast that three later uses of `hud` depend on. It did not compile:
+
+```diff
+--- a/hollow/game/src/commonMain/kotlin/dev/wildware/hollow/render/HollowScene.kt
++++ b/hollow/game/src/commonMain/kotlin/dev/wildware/hollow/render/HollowScene.kt
+@@ -99,7 +99,8 @@ public class HollowScene(
+-        val hud = hud ?: return
++        @Suppress("UNUSED_EXPRESSION") hud
++        return
+         registry.register(RenderPhase.UI, { resources ->
+```
+
+```
+> Task :hollow:game:compileKotlinJvm FAILED
+e: .../HollowScene.kt:105:58 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'HollowScene.Hud?'.
+e: .../HollowScene.kt:105:70 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'HollowScene.Hud?'.
+e: .../HollowScene.kt:105:97 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'HollowScene.Hud?'.
+```
+
+`EXIT=1`, `BUILD FAILED in 59s`, **0 frames written, 0 failure lines printed**. This is in the table
+rather than a footnote because of what it looked like: non-zero, fast, and with no output at all it
+is **indistinguishable from the mutation biting** unless you specifically look for evidence that
+something ran. Scored as red it would have been a row proving nothing, written up as if it proved
+the HUD check. The artefacts are kept whole as `scratchpad/dev-252c/m1void.*`.
+
+### M2 — the combat half of the evidence command
+
+Predicted: exit 1 with exactly two fight lines — the two fox ones — and **not** "no player was ever
+bitten", because nothing hurts the foxes so they never drop below `FoxBrain.FLEE_AT`, never flee,
+and keep biting; no HUD-missing line; frames still written.
+**Measured: exactly that.** `EXIT=1`, `BUILD FAILED in 1m`, 0 compile errors, 24 frames, 0
+HUD-missing lines.
+
+```diff
+--- a/hollow/game/src/commonMain/kotlin/dev/wildware/hollow/CombatSystems.kt
++++ b/hollow/game/src/commonMain/kotlin/dev/wildware/hollow/CombatSystems.kt
+@@ -91,6 +91,7 @@ internal class AttackExec(private val arena: Arena) : AbilityExec {
+ 
+     override fun onActivate(context: AbilityContext) {
++        if (true) return
+         val world = arena.world
+         val netIds = arena.ctx[CoreModule.NET_IDS]
+         val me = netIds.resolveOrNull(context.self) ?: return
+```
+
+```
+[hollow.fight] no fox ever lost a hit point: nothing was fought
+[hollow.fight] no fox was ever killed: the fight never resolved
+```
+
+### M7 — the soak, and the round before it that proved only half
+
+This is the #275 row: the HUD throws part way through the soak. Two rounds, both kept.
+
+**M7 (120-frame trigger) — SCORED, both modes.** Predicted two failures, one per mode.
+**Measured: two**, `2 tests completed, 2 failed`.
+
+```diff
+--- a/hollow/game/src/commonMain/kotlin/dev/wildware/hollow/render/HollowHud.kt
++++ b/hollow/game/src/commonMain/kotlin/dev/wildware/hollow/render/HollowHud.kt
+@@ -166,7 +166,10 @@ internal class HollowHudSystem(
+         this.netIds = ctx[CoreModule.NET_IDS]
+     }
+ 
++    private var mutationFrames: Int = 0
++
+     override fun render(target: OffscreenTarget, alpha: Float) {
++        if (++mutationFrames > 120) error("mutation M7: the HUD throws after 120 frames")
+         val world = world ?: return
+```
+
+```
+HollowHudOffscreenSoakTest > the HUD draws for sixteen seconds of offscreen frames and the game is still alive()
+    org.opentest4j.AssertionFailedError: Offscreen: the render loop stopped drawing in second 5 of 16 (still 120 frames); java.lang.IllegalStateException: mutation M7: the HUD throws after 120 frames
+HollowHudWindowedSoakTest > the HUD draws for sixteen seconds of windowed frames and the game is still alive()
+    org.opentest4j.AssertionFailedError: Windowed: the render loop stopped drawing in second 7 of 16 (still 120 frames); java.lang.IllegalStateException: mutation M7: the HUD throws after 120 frames
+TOTAL FAILURES: 2
+```
+
+**M7a (300-frame trigger) — the earlier round, red in one mode only.** Kept rather than replaced,
+because what it shows is about the test rather than the code:
+
+```
+HollowHudOffscreenSoakTest > the HUD draws for sixteen seconds of offscreen frames and the game is still alive()
+    org.opentest4j.AssertionFailedError: Offscreen: the render loop stopped drawing in second 11 of 16 (still 300 frames); java.lang.IllegalStateException: mutation M7: the HUD throws after 300 frames
+TOTAL FAILURES: 1
+```
+
+Windowed **passed** that round: under llvmpipe it runs at somewhere between 10 and 19 frames a
+second (it cleared the soak's 160-frame floor and never reached 300), so a 300-frame trigger does
+not fire inside sixteen seconds. A mutation only one of two modes can detect proves half a test,
+which is why the trigger came down to 120 — a count both modes pass through well inside the soak.
 
 ### M3 — the swing's reach
 

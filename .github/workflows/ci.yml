@@ -603,8 +603,23 @@ jobs:
         shell: bash
         run: chmod +x ./gradlew
 
-      - name: Build, run and break a game that lives outside this repository
+      # Issue #269: the proof opens the game's window and photographs it, so it needs what the GL
+      # job needs - a virtual display and Mesa's software rasteriser, with the X client libraries
+      # GLFW opens a window through - and ffmpeg to take the photograph. The script fails rather
+      # than skipping when one of them is missing.
+      - name: Install a display, a software GL stack and ffmpeg
         shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb ffmpeg
+          sudo apt-get install -y --no-install-recommends libgl1 libgl1-mesa-dri libglx-mesa0 libglu1-mesa
+          sudo apt-get install -y --no-install-recommends libx11-6 libxcursor1 libxrandr2 libxinerama1 libxi6 libxxf86vm1
+
+      - name: Build, run, draw and break a game that lives outside this repository
+        shell: bash
+        env:
+          MESA_GL_VERSION_OVERRIDE: "3.3"
         run: sh scripts/outside-game-proof.sh
 
       - name: Upload the transcripts

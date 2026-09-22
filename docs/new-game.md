@@ -17,7 +17,8 @@ cp -r <udea>/templates/new-game ../my-game
 cd ../my-game
 gradle wrapper --gradle-version 8.13      # a wrapper of your own, once
 ./gradlew build
-./gradlew run
+./gradlew run                             # headless: 600 ticks, and where the rovers ended up
+./gradlew runWindow                       # a window, with the rovers driving across it
 ```
 
 The engine needs **JDK 21** to run Gradle (`JAVA_HOME`), and the Kotlin toolchain it asks for is
@@ -192,9 +193,10 @@ people switch off.
 
 ```kotlin
 plugins {
-    id("dev.wildware.udea.kotlin-library")            // or dev.wildware.udea.kotlin-multiplatform-render, if it draws
-    id("dev.wildware.udea.agent")        // gamebridge.json and the debug-only agent source set
+    id("dev.wildware.udea.kotlin-library")   // or dev.wildware.udea.kotlin-multiplatform-render, for more than one platform
+    id("dev.wildware.udea.agent")            // gamebridge.json and the debug-only agent source set
     id("com.google.devtools.ksp") version libs.versions.ksp.get()
+    id("dev.wildware.udea.assets")           // assets/ compiled into the jar, and the GameAssets accessors
 }
 
 group = "com.example"
@@ -204,8 +206,16 @@ val udeaVersion: String = providers.gradleProperty("udeaVersion").get()
 dependencies {
     implementation("dev.wildware.udea:udea-core:$udeaVersion")
     implementation("dev.wildware.udea:udea-annotations:$udeaVersion")
+    implementation("dev.wildware.udea:udea-assets:$udeaVersion")
+    implementation("dev.wildware.udea:udea-render:$udeaVersion")
+    "udeaAssetsCompiler"("dev.wildware.udea:udea-assets-compiler:$udeaVersion")
     "agentImplementation"("dev.wildware.udea:udea-agent-host:$udeaVersion")
     ksp("dev.wildware.udea:udea-codegen:$udeaVersion")
+}
+
+udea {
+    assetRoots.from("assets")
+    kotlinVersion.set(libs.versions.kotlin.get())
 }
 
 val udeaRegistry = udeaModule("NewGame")
@@ -228,21 +238,32 @@ ksp {
 - The agent surface is on a source set of its own. `jar` packages `main`, `runtimeClasspath` never
   resolves `udea-agent-host`, and `udeaVerifyRelease` checks both - so a debug HTTP surface over
   your live simulation cannot reach a player by being forgotten about.
+- **The asset lines come as a set**, and the first game built outside this repository found each
+  of them by a failed build: the `dev.wildware.udea.assets` plugin, `udea-assets` (the packed graph your code reads), the
+  `udeaAssetsCompiler` configuration (the compiler the plugin runs, in a process of its own -
+  never `implementation`, because it carries the Kotlin compiler and the module-graph gate
+  refuses that on anything you ship), and `udea { assetRoots.from("assets") }`. The template has
+  them all.
+- `udea-render` is the window. A JVM project can depend on it directly, as the template does;
+  the graphics library it draws with stays inside it, so nothing in your code names one of its
+  types.
 
 ### `game/src/main/kotlin/.../NewGame.kt` - the game
 
 A module lists systems; a definition is modules plus the generated registry; a host runs it.
 
 ```kotlin
-public class NewGameModule : UdeaModule {
+public class NewGameModule(private val assets: AssetRegistry) : UdeaModule {
     override fun simulation(registry: SimRegistry) {
-        registry.add(SimPhase.Movement, { RoverSystem() })
+        registry.add(SimPhase.Movement, { RoverSystem(assets) })
     }
 }
 
 public object NewGame {
-    public fun definition(): UdeaGameDef =
-        UdeaGameDef(registry = NewGameUdeaRegistry, modules = listOf(NewGameModule()))
+    public fun definition(assets: AssetRegistry = NewGameAssets.registry): UdeaGameDef = UdeaGameDef(
+        registry = NewGameUdeaRegistry,
+        modules = listOf(NewGameModule(assets), RenderModule()),
+    )
 }
 ```
 
@@ -251,6 +272,68 @@ not in my client" a bug in a renderer rather than a difference between two simul
 extends `SimSystem`, reads `ctx.clock`, and writes component state; presentation is **not** a
 Fleks system - it implements `RenderSystem` in `udea-render`, so `world.update(dt)` is pure
 simulation by construction.
+
+`RenderModule` is in the list in every mode, a server's included. It draws nothing: its one
+simulation system records where each `Transform3D` stood at the end of every tick, which is what a
+window draws *between* two ticks from, and a server that ran a different set of systems from its
+clients would be running a different simulation.
+
+### A window with a model in it
+
+`./gradlew runWindow` opens one: three rovers driving east across a field, under a sky, with a
+scanline effect over the frame. It is `NewGameWindow`, in `game/src/main`, and it is the whole of a
+launcher - nothing in it is copied from inside this repository:
+
+<!-- quoted from templates/new-game/game/src/main/kotlin/com/example/newgame/NewGameWindow.kt -->
+```kotlin
+val registry = RenderRegistry()
+NewGameScene.register(registry, assetRoot, NewGameAssets.registry)
+val backend = KoolBackend.start(RenderMode.Windowed, WindowConfig(title = "new-game"), registry)
+backend.use {
+    val host = GameHost(RenderMode.Windowed, NewGame.definition(), backend)
+```
+
+The order is forced. What is drawn is declared on a `RenderRegistry` first, because
+`KoolBackend.start` builds its drawing pipeline out of it; the `GameHost` is built over the
+backend, which is how the pipeline gets the world; and then `backend.drive` hands the window's
+frame loop the host, and `awaitExit` waits for the player to close it. `run` stays headless and
+opens nothing, and so does a test.
+
+**The model is named by the simulation, not by the renderer.** Each rover is spawned with the
+engine's `Drawn` component, holding the model it is drawn with, and a `Transform3D`, where it
+stands:
+
+<!-- quoted from templates/new-game/game/src/main/kotlin/com/example/newgame/sim/RoverSystem.kt -->
+```kotlin
+world.entity {
+    it += rover
+    it += Transform3D(x = rover.x, y = rover.y)
+    it += Drawn(GameAssets.models.rover, assets)
+}
+```
+
+Both are plain data, so a dedicated server carries them and draws nothing, a client draws what the
+server spawned, and a saved level remembers what each thing looks like. The renderer's half is one
+line in `NewGameScene` - `ModelRenderSystem` with a `FileModelLibrary` over the asset directory -
+and it attaches and loads each model the first time it is drawn.
+
+**Where `GameAssets.models.rover` comes from.** `assets/models/models.udea.kts` declares it:
+
+<!-- quoted from templates/new-game/game/assets/models/models.udea.kts -->
+```kotlin
+model(name = "rover", file = "models/rover.glb")
+```
+
+The build generates `GameAssets.<group>.<name>`, and **the group is the top-level folder under
+`assets/` that the `.udea.kts` sits in - not the folder the model file is in**, and a script
+deeper down still groups by that first folder. So this declaration, in `assets/models/`, is
+`GameAssets.models.rover`. The same line in a script at the top of `assets/` would be
+`GameAssets.root.rover`, and `GameAssets.models.rover` would then be an unresolved reference - the
+mistake the first game built outside this repository made, from an example here that did not say
+so.
+
+`make_rover.py`, beside the model, writes `rover.glb` from nothing but Python's standard library.
+Replace the model with your own `.glb` and keep the name, and no Kotlin changes.
 
 ### A component that travels: `@Replicated` and `net-components.lock`
 
@@ -343,8 +426,9 @@ udeaAgent {
 
 `./gradlew run -PdebugPort=7861` then starts an instance with the MCP tool surface on 7861:
 `/health`, `/state`, `/command` and a generated `/tools`. The template's instance is `Headless`,
-so `world.*`, `time.*` and `events.*` answer and every `render.*` tool answers
-`no_render_context` - which is the contract working. A game that draws gets the render tools by
+so `time.*` and `events.*` answer and a render tool would answer `no_render_context` - which is
+the contract working. It offers no `world.*` tools yet: those read `@Replicated` components through
+an index the template does not build, and `NewGameAgent` says where the worked example is. A game that draws gets the render tools by
 running `Offscreen`; `moba/desktop/src/agent` is the worked example.
 
 ---
@@ -358,36 +442,44 @@ refuses `de.fabmax.kool:*` on your project, so a shader API that took one would 
 could not call.
 
 **A `.frag` is an asset**, like a model or a sound. You declare it, the build reads it, checks it
-and packs it, and you name it in Kotlin by a typed accessor that the build generated:
+and packs it, and you name it in Kotlin by a typed accessor that the build generated. The template
+ships one, and each block below is quoted from it. `assets/shaders/shaders.udea.kts` declares it:
 
+<!-- quoted from templates/new-game/game/assets/shaders/shaders.udea.kts -->
 ```kotlin
-// assets/shaders/shaders.udea.kts
 shader(name = "scanlines", file = "shaders/scanlines.frag")
 ```
 
+`assets/shaders/scanlines.frag` is the body and nothing around it - no version line, because the
+engine writes that one per backend:
+
+<!-- quoted from templates/new-game/game/assets/shaders/scanlines.frag -->
 ```glsl
-// assets/shaders/scanlines.frag - no #version line: the engine writes it, per backend
 uniform float uStrength;
 
 vec4 udeaMain(vec2 uv) {
-    vec3 colour = texture(uColor, uv).rgb;
-    float line = mod(uv.y * uResolution.y, 2.0) < 1.0 ? 1.0 - uStrength : 1.0;
-    return vec4(colour * line, 1.0);
+    float row = floor(uv.y * uResolution.y);
+    float dim = mod(row, 2.0) < 1.0 ? 1.0 : 1.0 - uStrength;
+    return vec4(texture(uColor, uv).rgb * dim, 1.0);
 }
 ```
 
+And `NewGameScene` builds it and puts it over the frame:
+
+<!-- quoted from templates/new-game/game/src/main/kotlin/com/example/newgame/NewGameScene.kt -->
 ```kotlin
 lateinit var strength: FloatUniform
 val scanlines = UdeaShader.fragment(GameAssets.shaders.scanlines, assets) {
-    strength = float("uStrength", 0.25f)
+    strength = float("uStrength", SCANLINE_STRENGTH)
 }
-
-registry.screenPass(scanlines)     // ordered: the first registered runs first
+registry.screenPass(scanlines)
 ```
 
-`GameAssets.shaders.scanlines` is generated from the declaration - `shaders` is the folder,
-`scanlines` is the name - and `assets` is your `AssetRegistry`, the same one your sprites and
-sounds come out of. There is no path in that Kotlin and no file reading anywhere in it, which is
+Effects run in the order they are registered: the first registered runs first.
+
+`GameAssets.shaders.scanlines` is generated from the declaration - `shaders` is the folder the
+`.udea.kts` sits in, `scanlines` is the name - and `assets` is your `AssetRegistry`, the same one
+your models come out of. There is no path in that Kotlin and no file reading anywhere in it, which is
 the point of writing it this way:
 
 - **It compiles in `commonMain`.** The obvious alternative,
@@ -489,12 +581,13 @@ Stated rather than implied, because each is a real piece of work and none of it 
   types with one id - *"two component types share ComponentTypeId(N)"* - and a game builds one of
   those when it wires replication, the way `moba/game/src/commonMain/.../MobaGame.kt` does. A game
   that has not wired replication yet builds none, so nothing would say so.
-- **The asset pipeline.** `dev.wildware.udea.assets` compiles a `.udea.kts` tree into a
-  `.udeapak`. `moba/game/build.gradle.kts` is the worked example; the template has no assets, and
-  whether that plugin needs anything extra outside this repository is untested.
-- **Drawing.** The template is headless. A game that draws applies
-  `dev.wildware.udea.kotlin-multiplatform-render` and opens a `KoolBackend`; `moba` is the example, and the
-  snapshot repository note above is the part that bites first.
+- **More than one platform.** The template's window is a desktop window, from one JVM project.
+  A game that also ships on Android splits into a `game` library on
+  `dev.wildware.udea.kotlin-multiplatform-render` and a launcher per platform; `moba` is that
+  shape.
+- **A shipped model file.** The packed bundle carries each model's record and not its bytes, so
+  `runWindow` hands `FileModelLibrary` the `assets/` directory to read `rover.glb` from. A
+  distribution has to carry that directory beside the jar.
 - **`AGENTS.md` and the frozen contracts.** `udeaVerifyAgentsMd` holds *this* repository's module
   table against *this* repository's `settings.gradle.kts` and requires the nine spec section 5
   contracts to be named; `udeaVerifyContracts` freezes `docs/contracts/`. Both are statements

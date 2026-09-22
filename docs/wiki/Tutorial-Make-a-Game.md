@@ -23,10 +23,12 @@ cd ../my-game
 gradle wrapper --gradle-version 8.13
 ./gradlew build
 ./gradlew run
+./gradlew runWindow
 ```
 
 `run` simulates 600 ticks headless and prints where its three rovers ended up. Deterministic, so two
-runs print the same thing.
+runs print the same thing. `runWindow` is the same game in a window: the three rovers driving east
+across a field, under a sky.
 
 Then rename things. Grep for `new-game`, `NewGame` and `com.example.newgame` and you will find them
 all; the ones that matter are `rootProject.name` in `settings.gradle.kts`, `group` in
@@ -144,6 +146,7 @@ plugins {
     id("dev.wildware.udea.kotlin-library")
     id("dev.wildware.udea.agent")
     id("com.google.devtools.ksp") version libs.versions.ksp.get()
+    id("dev.wildware.udea.assets")
 }
 
 group = "com.example"
@@ -154,8 +157,16 @@ val udeaVersion: String = providers.gradleProperty("udeaVersion").get()
 dependencies {
     implementation("dev.wildware.udea:udea-core:$udeaVersion")
     implementation("dev.wildware.udea:udea-annotations:$udeaVersion")
+    implementation("dev.wildware.udea:udea-assets:$udeaVersion")
+    implementation("dev.wildware.udea:udea-render:$udeaVersion")
+    "udeaAssetsCompiler"("dev.wildware.udea:udea-assets-compiler:$udeaVersion")
     "agentImplementation"("dev.wildware.udea:udea-agent-host:$udeaVersion")
     ksp("dev.wildware.udea:udea-codegen:$udeaVersion")
+}
+
+udea {
+    assetRoots.from("assets")
+    kotlinVersion.set(libs.versions.kotlin.get())
 }
 
 udeaAgent {
@@ -184,8 +195,12 @@ ksp {
   A bridge does not check whose game answered a port, so two games sharing a range means either
   one's bridge can drive and stop the other's instance — and that looks like an instance vanishing
   rather than like a misconfiguration.
-- Apply `dev.wildware.udea.kotlin-multiplatform-render` instead of `dev.wildware.udea.kotlin-library` when the game draws and
-  ships on more than one platform.
+- **The asset lines are a set**: the `dev.wildware.udea.assets` plugin, `udea-assets`, the
+  `udeaAssetsCompiler` configuration (the compiler the plugin runs in a process of its own - never
+  `implementation`, because it carries the Kotlin compiler) and the `udea { assetRoots }` block.
+- **`udea-render` is the window.** A JVM project draws by depending on it. Apply
+  `dev.wildware.udea.kotlin-multiplatform-render` instead of `dev.wildware.udea.kotlin-library`
+  when the game ships on more than one platform.
 
 ### `NewGame.kt` — the game
 
@@ -196,25 +211,29 @@ copied it into, the same path with that `templates/new-game/` prefix dropped.
 A module lists systems; a definition is modules plus the generated registry; a host runs it.
 
 ```kotlin
-public class NewGameModule : UdeaModule {
+public class NewGameModule(private val assets: AssetRegistry) : UdeaModule {
 
     override val name: String get() = "new-game"
 
     override fun simulation(registry: SimRegistry) {
-        registry.add(SimPhase.Movement, { RoverSystem() })
+        registry.add(SimPhase.Movement, { RoverSystem(assets) })
     }
 }
 
 public object NewGame {
 
-    public fun definition(): UdeaGameDef = UdeaGameDef(
+    public fun definition(assets: AssetRegistry = NewGameAssets.registry): UdeaGameDef = UdeaGameDef(
         registry = NewGameUdeaRegistry,
-        modules = listOf(NewGameModule()),
+        modules = listOf(NewGameModule(assets), RenderModule()),
     )
 
     public fun host(mode: RenderMode): GameHost = GameHost(mode, definition())
 }
 ```
+
+`NewGameAssets.registry` is the game's packed assets, read off the classpath; `RenderModule` records
+where each `Transform3D` stood at the end of every tick, which a window draws between ticks from. It
+draws nothing itself, so a server runs it too, and runs the same simulation its clients do.
 
 **Every entry point builds the same definition** — a dedicated server, a player's client, an agent's
 instance, a replay. That is what makes "it happens on the server and not in my client" a bug in a
@@ -250,39 +269,59 @@ is the full account.
 
 ## Step 5: a system
 
+The template's `RoverSystem` spawns three rovers once, then moves each one east by its own speed
+every tick, round a field of a fixed width. Its tick is the shape every rule here has:
+
+<!-- quoted from templates/new-game/game/src/main/kotlin/com/example/newgame/sim/RoverSystem.kt -->
 ```kotlin
-public class RoverSystem : SimSystem() {
-
-    private val rovers = world.family { all(Rover) }
-
-    override fun onInit() {
-        repeat(ROVERS) { index ->
-            world.entity { it += Rover(x = 0f, y = index.toFloat(), speed = 1f + index) }
-        }
-    }
-
-    override fun onTick() {
-        val entities = rovers.entities
-        val dt = ctx.clock.dt
-        var index = 0
-        while (index < entities.size) {
-            val rover = entities[index][Rover]
-            rover.x += rover.speed * dt
-            index++
-        }
+override fun onTick() {
+    val entities = rovers.entities
+    val dt = ctx.clock.dt
+    var index = 0
+    while (index < entities.size) {
+        val entity = entities[index]
+        val rover = entity[Rover]
+        rover.x += rover.speed * dt
+        if (rover.x > FIELD_HALF_WIDTH) rover.x -= 2f * FIELD_HALF_WIDTH
+        val at = entity[Transform3D]
+        at.x = rover.x
+        at.y = rover.y
+        index++
+        updates++
     }
 }
 ```
 
-That is the shape every rule here has: read the tick's delta off the clock, write component state,
-return. It never reads the wall clock and never draws an unseeded random number, because
-`udeaVerifyDeterminism` scans this package and fails the build on either — a simulation that does one
-of those cannot rewind, cannot replay and cannot agree with a server.
+Read the tick's delta off the clock, write component state, return. It never reads the wall clock
+and never draws an unseeded random number, because `udeaVerifyDeterminism` scans this package and
+fails the build on either — a simulation that does one of those cannot rewind, cannot replay and
+cannot agree with a server.
+
+**What a rover looks like is said here too.** Each one is spawned with the engine's `Drawn`, naming
+the model it is drawn with, and a `Transform3D`, where it stands - the `at.x = rover.x` above:
+
+<!-- quoted from templates/new-game/game/src/main/kotlin/com/example/newgame/sim/RoverSystem.kt -->
+```kotlin
+world.entity {
+    it += rover
+    it += Transform3D(x = rover.x, y = rover.y)
+    it += Drawn(GameAssets.models.rover, assets)
+}
+```
+
+`GameAssets.models.rover` is generated from `game/assets/models/models.udea.kts`, which declares
+`model(name = "rover", file = "models/rover.glb")`. The `models` in the accessor is the folder the
+**`.udea.kts`** is in: the same line in a script at the top of `game/assets/` would be
+`GameAssets.root.rover`. Both components are plain data, so a server carries them and draws nothing,
+and a window reads them and draws the model.
 
 `SimPhase` decides ordering. `Movement` is one of them; see [Architecture](Architecture) for the set.
 
 **Presentation is not a Fleks system.** It implements `RenderSystem` (or `OverlaySystem`) in
 `udea-render`, so `world.update(dt)` is pure simulation *by construction* rather than by convention.
+The template's is `NewGameScene`: a camera, a light, `ModelRenderSystem` over the model files, a sky
+and a screen effect, declared on a `RenderRegistry` that `NewGameWindow` opens a window over. See
+[Rendering with Kool](Rendering-with-Kool).
 
 ## Step 6: a test
 
@@ -364,9 +403,9 @@ components, and the template declares none.
 `moba/desktop/src/agent/kotlin/dev/wildware/moba/agent/MobaAgent.kt` is the
 worked example that wires it.
 
-The template's instance is `Headless`, so `world.*`, `time.*` and `events.*` answer and every
-`render.*` tool answers `no_render_context` — **which is the contract working**, not a fault. A game
-that draws gets the render tools by running `Offscreen`.
+The template's instance is `Headless`, so `time.*` and `events.*` answer, and a render tool would
+answer `no_render_context` — **which is the contract working**, not a fault. An agent instance that
+draws gets the render tools by running `Offscreen`; `MobaAgent` is the worked example of that too.
 
 **Why the agent code is in `src/agent` and not `src/main`:** `udea-agent-host` binds an HTTP port
 onto the live simulation and can write any field of any entity. That is a thing a developer wants and
@@ -383,10 +422,11 @@ A gate nobody has seen fail is indistinguishable from one that cannot. Plant a
 `System.currentTimeMillis()` in your simulation package and run `./gradlew build` — it must fail with
 `DET001`. Put it back.
 
-That is exactly what `scripts/outside-game-proof.sh` does for the template, in six legs: publish,
-build, run, check the bridge declaration, plant a wall-clock read and watch `udeaVerifyDeterminism`
-fail with `DET001`, plant a Kotlin scripting host and watch `udeaVerifyModuleGraph` fail with
-`UDEA-MG-005`.
+That is what `scripts/outside-game-proof.sh` does for the template, among its other legs: it plants
+a wall-clock read and watches `udeaVerifyDeterminism` fail with `DET001`, and plants a Kotlin
+scripting host and watches `udeaVerifyModuleGraph` fail with `UDEA-MG-005`. It also opens the
+template's window on a virtual display, photographs it, and requires the rover to be in the picture
+- and then takes the rover's model away and requires the same check to fail.
 
 ## What this does not cover yet
 
@@ -398,16 +438,14 @@ Stated plainly, because each is real work and none of it is broken.
   merged, and a game with more components than the engine's lowest id would eventually mint an id
   the engine has used. Nothing merges them for you today. A collision is caught where a game builds
   a `ComponentRegistry`, which is when it wires replication — before that, nothing would say so.
-- **The asset pipeline.** `dev.wildware.udea.assets` compiles a `.udea.kts` tree into a `.udeapak`.
-  `moba/game/build.gradle.kts` is the worked example; the template has no assets, and whether that
-  plugin needs anything extra outside the engine's repository is untested. See
-  [Assets](Assets).
 - **Levels.** `.udealevel` files and `-Plevel=<path>` work inside the engine's repository; the
   template has none. See [Levels](Levels).
-- **Drawing.** The template is headless. A game that draws applies
-  `dev.wildware.udea.kotlin-multiplatform-render` and opens a `KoolBackend`; `moba` and `hollow` are the examples,
-  and the snapshot repository note in step 2 is the part that bites first. See
-  [Rendering with Kool](Rendering-with-Kool).
+- **More than one platform.** The template's window is a desktop window from one JVM project. A
+  game that also ships on Android splits into a `game` library on
+  `dev.wildware.udea.kotlin-multiplatform-render` and a launcher per platform; `moba` is that shape.
+- **A shipped model file.** The packed bundle carries each model's record, not its bytes, so
+  `runWindow` hands the renderer the `assets/` directory to read `rover.glb` from. A distribution
+  has to carry that directory beside the jar.
 - **`AGENTS.md` and the frozen contracts.** `udeaVerifyAgentsMd` and `udeaVerifyContracts` are
   statements about the *engine's* own documents, so `dev.wildware.udea.game-gates` applies neither to a game. Your
   game's `AGENTS.md` is yours.

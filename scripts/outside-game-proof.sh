@@ -15,6 +15,9 @@
 #               plugin the template applies has one. Central authorises a publisher per namespace
 #               and a local repository does not, so this is the one rule the stand-in above drops
 #               - and the one that took the first real release run down (issue #265).
+#   0a. no-checkout-path  nothing in the copy names a path into this checkout, with a control
+#               beside it that makes the same search find something it should. A game that reached
+#               back into the tree it was copied from would build here and nowhere else.
 #   1. build    `./gradlew build` in the copied game: compiles against the published engine, runs
 #               the game's own tests, and runs udeaVerifyModuleGraph, udeaVerifyDeterminism,
 #               udeaVerifyKotlinPin and udeaVerifyCompilerPlugin over it.
@@ -103,6 +106,23 @@ fail() {
     echo "PROOF FAILED: $1" >&2
     exit 1
 }
+
+# --- 0a. nothing in the copy names a path into this checkout ----------------------------------
+#
+# "Outside this repository" is the whole claim, and a game that reached back into the tree it was
+# copied from would still build here and nowhere else. `-I` skips the model, which is bytes.
+#
+# The control first, and it is not ceremony: a search that finds nothing and a search that is
+# broken print the same thing, so this one is made to find something it certainly should before
+# its silence is believed. An `--include` glob left unquoted, a pattern the shell ate, a directory
+# that was not there - each of those would have gone through as a pass.
+say "no-checkout-path: the copy names no path into $REPO"
+grep -rIlF -- "com.example.newgame" "$GAME" > /dev/null ||
+    fail "the checkout-path search is broken: it cannot find the game's own package in $GAME"
+if grep -rIlF -- "$REPO" "$GAME" > "$REPORT/checkout-references.txt"; then
+    fail "the copied game names this checkout; see $REPORT/checkout-references.txt"
+fi
+echo "  the control found the game's own package, and the search found no path into this checkout"
 
 engine_gradle() {
     leg=$1

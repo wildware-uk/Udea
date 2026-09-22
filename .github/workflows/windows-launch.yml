@@ -1,0 +1,67 @@
+name: Windows launch
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-launch:
+    name: windows-launch
+    runs-on: windows-latest
+    env:
+      MESA_VERSION: "26.1.8"
+      MESA_SHA256: "4c6d32e653e0ff9ad07796e40c0bcfabf2764d849e3ce4f3b1590112c87e42f9"
+      GALLIUM_DRIVER: llvmpipe
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Install Mesa's software OpenGL driver
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = "$env:RUNNER_TEMP\mesa.7z"
+          Invoke-WebRequest -Uri "https://github.com/pal1000/mesa-dist-win/releases/download/$env:MESA_VERSION/mesa3d-$env:MESA_VERSION-release-msvc.7z" -OutFile $archive
+          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $env:MESA_SHA256) { throw "mesa archive sha256 $actual, expected $env:MESA_SHA256" }
+          7z x $archive "-o$env:RUNNER_TEMP\mesa" x64\libgallium_wgl.dll -y | Out-Null
+          Copy-Item "$env:RUNNER_TEMP\mesa\x64\libgallium_wgl.dll" "$env:WINDIR\System32\mesadrv.dll" -Force
+          $key = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OpenGLDrivers\MSOGL'
+          New-Item -Path $key -Force | Out-Null
+          New-ItemProperty -Path $key -Name DLL -Value 'mesadrv.dll' -PropertyType String -Force | Out-Null
+          New-ItemProperty -Path $key -Name DriverVersion -Value 1 -PropertyType DWord -Force | Out-Null
+          New-ItemProperty -Path $key -Name Flags -Value 1 -PropertyType DWord -Force | Out-Null
+          New-ItemProperty -Path $key -Name Version -Value 2 -PropertyType DWord -Force | Out-Null
+          Get-ItemProperty $key
+
+      - name: Spike - hollow shot
+        shell: cmd
+        run: gradlew.bat :hollow:desktop:runShot --stacktrace --console=plain
+
+      - name: Spike - moba shot
+        if: always()
+        shell: cmd
+        run: gradlew.bat :moba:desktop:runShot --stacktrace --console=plain
+
+      - name: Upload frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-launch-frames
+          path: |
+            hollow/desktop/build/reports/udea/**
+            moba/desktop/build/reports/udea/**
+          if-no-files-found: warn
+          retention-days: 7

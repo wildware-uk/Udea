@@ -28,9 +28,12 @@ plugins {
 
     // Level files (issue #191): the clearing's components are `@Serializable`.
     alias(libs.plugins.kotlinSerialization)
-    // The HUD is a ComposeGL screen (issue #252), so this module compiles composables. The toolkit
-    // comes through `udea-render`'s `api` on `composegl-ui`, as it does for `moba:game`.
-    alias(libs.plugins.composeCompiler)
+    // The HUD is a ComposeGL screen (issue #252): `HollowHudScreen.content` is `@Composable`, so
+    // this module compiles composables. The toolkit itself comes through `udea-render`'s `api` on
+    // `composegl-ui`; the compiler comes through the published convention, which is the one a game
+    // outside this repository applies too (issue #275), and which `moba:game` applies for the same
+    // reason. Without it a screen still compiles, as a plain function, and fails at run time.
+    id("dev.wildware.udea.compose-ui")
 
     // The build-time asset pipeline of spec 3.6: the clearing's models are `model(...)` assets.
     id("dev.wildware.udea.assets")

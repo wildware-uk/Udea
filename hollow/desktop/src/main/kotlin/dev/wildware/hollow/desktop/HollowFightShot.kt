@@ -3,6 +3,7 @@ package dev.wildware.hollow.desktop
 import com.github.quillraven.fleks.World
 import com.github.quillraven.fleks.World.Companion.family
 import dev.wildware.hollow.Fox
+import dev.wildware.hollow.FoxMode
 import dev.wildware.hollow.FoxWaves
 import dev.wildware.hollow.HollowCombat
 import dev.wildware.hollow.net.HollowClient
@@ -25,6 +26,7 @@ import dev.wildware.udea.render.capture.capture
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.math.atan2
+import kotlin.math.sqrt
 import kotlin.system.exitProcess
 
 /**
@@ -75,8 +77,9 @@ public object HollowFightShot {
         val started = HollowLaunch.start(RenderMode.Offscreen, NetRole.Client, WAVES)
         val harness = NetHarness(clients = 2, initialConditions = NetConditions(latencyTicks = LATENCY))
         val server = HollowServer(harness.transport(PeerId.SERVER), waves = WAVES, matchSeed = SEED)
+        val characters = ArrayList<NetId>()
         val clients = harness.clientPeers().mapIndexed { index, peer ->
-            server.addClient(peer)
+            characters += server.addClient(peer)
             if (index == drawn) HollowClient(peer, harness.transport(peer), started.opened) else HollowClient(peer, harness.transport(peer))
         }
         val eye = clients[drawn]
@@ -88,7 +91,7 @@ public object HollowFightShot {
         var bitten = false
         var taken = 0
         try {
-            wire(harness, server, clients)
+            wire(harness, server, clients, characters)
             val host = started.host
             // The render thread steps the whole session - server, both clients - one tick a frame,
             // until tick [until] has been simulated and no further, and then draws. Nothing is
@@ -159,7 +162,12 @@ public object HollowFightShot {
     private var until: Tick = Tick(0L)
 
     /** Wires the server and both clients to the harness, as `CombatReplicationTest` does. */
-    private fun wire(harness: NetHarness, server: HollowServer, clients: List<HollowClient>) {
+    private fun wire(
+        harness: NetHarness,
+        server: HollowServer,
+        clients: List<HollowClient>,
+        characters: List<NetId>,
+    ) {
         harness.register(
             object : NetEndpoint {
                 override val peer: PeerId = PeerId.SERVER
@@ -171,7 +179,7 @@ public object HollowFightShot {
                 override fun onTick(tick: Tick) = server.tick()
             },
         )
-        for (client in clients) {
+        for ((index, client) in clients.withIndex()) {
             harness.register(
                 object : NetEndpoint {
                     override val peer: PeerId = client.peer
@@ -180,15 +188,83 @@ public object HollowFightShot {
                         client.onPacket(buffer, offset, length)
                     }
 
-                    // Both players stand where they joined and hold the attack control down: every
-                    // swing the cooldown allows fires, and the foxes come to them.
+                    // Both players hunt: the attack control is held for the whole run, and the
+                    // move axis points at the nearest living fox until the player is inside its
+                    // own reach, when it stands and swings.
+                    //
+                    // Standing still is not enough for a picture of a *resolved* fight. A fox
+                    // below `FoxBrain.FLEE_AT` runs away (issue #251), so two players holding
+                    // their ground wound the whole wave and then never touch it again - measured,
+                    // on the run before this one: five foxes at 18, 2, 16, 7 and 11 hit points and
+                    // fourteen frames with every number frozen. A player runs at 5.4 m/s and a
+                    // fleeing fox at 4.4, so a hunting player closes and finishes one.
                     override fun onTick(tick: Tick) {
-                        client.tick(tick, client.command(tick, attack = true))
+                        val axis = towards(server, characters[index])
+                        client.tick(
+                            tick,
+                            client.command(
+                                tick = tick,
+                                moveX = axis.first,
+                                moveY = axis.second,
+                                running = true,
+                                attack = true,
+                            ),
+                        )
                     }
                 },
             )
         }
     }
+
+    /**
+     * A unit move axis from [character] towards the nearest living fox in [server]'s world, or
+     * `(0, 0)` when there is none or the player is already close enough to swing.
+     *
+     * The server's world because this process holds it and it is the authority on where a fox is;
+     * what the axis becomes is an ordinary `MoveInput`, so it reaches the character through the
+     * same seam a keyboard does. `HollowPlayerShot` scripts a route the same way.
+     */
+    private fun towards(server: HollowServer, character: NetId): Pair<Float, Float> {
+        val host = server.host
+        val me = host.ctx[CoreModule.NET_IDS].resolveOrNull(character) ?: return STILL
+        val world = host.world
+        return with(world) {
+            val at = me[Transform3D]
+            var closestX = 0f
+            var closestY = 0f
+            var closest = Float.MAX_VALUE
+            world.family { all(Fox, Transform3D) }.forEach { fox ->
+                if (fox[Fox].mode == FoxMode.Dead) return@forEach
+                val there = fox[Transform3D]
+                val dx = there.x - at.x
+                val dy = there.y - at.y
+                val away = dx * dx + dy * dy
+                if (away < closest) {
+                    closest = away
+                    closestX = dx
+                    closestY = dy
+                }
+            }
+            if (closest == Float.MAX_VALUE || closest <= HOLD_SQUARED) {
+                STILL
+            } else {
+                val length = sqrt(closest)
+                closestX / length to closestY / length
+            }
+        }
+    }
+
+    /** No axis: stand still. */
+    private val STILL: Pair<Float, Float> = 0f to 0f
+
+    /**
+     * How close a hunting player gets before it stands and swings, in metres, squared.
+     *
+     * Inside the swing's own reach, which `CombatRules.ATTACK_RANGE` fixes at 1.8 metres and this
+     * file cannot name, because `CombatRules` is internal to `hollow:game` and a launcher has no
+     * business knowing a game's damage numbers. 1.4 is comfortably under it either way.
+     */
+    private const val HOLD_SQUARED: Float = 1.4f * 1.4f
 
     /**
      * Points the drawing client's camera at its own character, turned to look out at the fight.

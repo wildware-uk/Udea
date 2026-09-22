@@ -226,7 +226,8 @@ private const val GAP: Float = 6f
 private const val ROW_GAP: Float = 12f
 private const val BAR_WIDTH: Float = 330f
 private const val BAR_HEIGHT: Float = 16f
-private const val SLOT_WIDTH: Float = 106f
+/** Wide enough for the longest slot label on one line: `SPACE  ATTACK` at [SMALL]. */
+private const val SLOT_WIDTH: Float = 132f
 private const val SLOT_HEIGHT: Float = 62f
 private const val BANNER: Float = 88f
 

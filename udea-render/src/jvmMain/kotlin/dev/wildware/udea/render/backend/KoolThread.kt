@@ -305,10 +305,13 @@ internal class KoolThread(private val window: WindowConfig, private val visible:
         numSamples = 1,
     )
 
-    /** Whether a frame callback has been installed yet. */
+    /** Whether the loop has a frame callback to call. */
     private sealed interface Frames {
 
-        /** Before [driveWith]: the loop still serves [submit], it just draws nothing. */
+        /**
+         * No callback: the loop still serves [submit], it just draws nothing. Before [driveWith],
+         * and again after [stopDriving].
+         */
         data object Idle : Frames
 
         class Driven(private val driver: (Float) -> Unit) : Frames {

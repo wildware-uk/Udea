@@ -870,3 +870,13 @@ fixture did not compile (a heredoc turned `\n` inside a Kotlin string into real 
 the "check that measures nothing" trap arriving as a *confident* result rather than an empty one.
 So: run a **green baseline first**, and mark any row whose log has no `tests completed` line as
 **VOID** rather than scoring it. A red you cannot trace to a named failing test proves nothing.
+
+## Check your brief's forward references against the artefacts, not your memory
+
+2026-09-22, #252: BRIEF.md cited "rows M1 and M2" as the proof that the evidence command goes red
+when the feature is reverted. Both rows existed only in the frozen predictions file - predicted,
+never run, cited as if run - and a later row that HAD run was missing from the table because the
+section was written before it. The developer's own pass checked the diff against the reject list and
+the acceptance criteria, but never re-read the brief's own references against what was on disk.
+So, before reporting done: for every `M<n>`, file path and run the brief names, confirm the artefact
+exists (marker, log, diff, failing-test line). A citation is an evidence claim like any other.

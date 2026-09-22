@@ -462,3 +462,9 @@ never run and never printed. On 2026-09-22 master's `build (windows-latest)` con
 too - the evidence that a branch's "known red" claim was true. So: **grep the uploaded test-report
 artefact, not the console log**, whenever you are deciding whether a failure is pre-existing. A red
 absent from a console log may only mean the build never reached it.
+
+## Resolve every citation in the brief
+
+A brief can cite a mutation row, a marker or a log that does not exist - predicted and never run reads
+exactly like measured (2026-09-22, #252). For each one the brief names, open the artefact. A row with
+no marker, log, diff and failing-test line has not been run, whatever the table says.

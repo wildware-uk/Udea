@@ -34,9 +34,19 @@ import kotlin.test.assertTrue
  * render thread on **every** frame, for as long as a game is played, so the same failure would look
  * exactly the same here: a green suite, and a game that closes itself while somebody is playing it.
  *
- * So this runs the real launcher - [HollowLaunch.start], the same public call `:hollow:desktop:run`
- * makes, with the HUD registered the way a launcher registers it - for [SOAK_SECONDS] of wall-clock
- * frames, and asks three things that a dead pipeline cannot answer:
+ * So this runs the real launcher - [HollowLaunch.start], **the same call the launcher makes**, with
+ * the HUD registered the way a launcher registers it - for [SOAK_SECONDS] of wall-clock frames, and
+ * asks three things that a dead pipeline cannot answer:
+ *
+ * Precisely, because a soak's claim rests on this sentence: `:hollow:desktop:run` reaches it as
+ * `HollowDesktop.main` -> `HollowClientMain.host()` -> `HollowLaunch.start(Windowed, Client)`, so
+ * this is one link down that chain rather than the task's own entry point. What it skips is
+ * `HollowClientMain`'s socket and net loop, which is not the hook under test: the hook is the HUD's
+ * registration through `HollowScene.register` into `RenderPhase.UI`, and `HollowLaunch.start` is
+ * what builds the scene and registers it. Nothing here reaches past the launcher to poke
+ * `RenderRegistry` by hand - it gets the launcher's own construction, the real Kool backend and the
+ * real pipeline. It runs `Standalone` rather than `Client`, so it steps the whole authoritative
+ * simulation locally, which is a heavier exercise than `run` gets rather than a lighter one.
  *
  * - **frames kept arriving**, sampled every second, so a loop that stops half way through fails
  *   naming the second it stopped on rather than being averaged away by the seconds before it;

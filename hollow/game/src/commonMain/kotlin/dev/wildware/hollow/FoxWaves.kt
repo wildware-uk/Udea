@@ -52,8 +52,11 @@ public data class FoxWaves(
      * How many waves have arrived by [tick], counting one on it: `0` before [first], `1` from it
      * until the second, and so on. What the HUD calls the wave (issue #252), and a pure function of
      * the tick like [waveAt], so a client asks it of the server's tick and gets the server's answer.
+     *
+     * `internal`, like [waveAt] and [sizeOf] beside it, because the only caller is `HollowHudModel`
+     * in this module. [DEFAULT] is the one thing here a launcher names, and it is public for that.
      */
-    public fun arrivedBy(tick: Tick): Long {
+    internal fun arrivedBy(tick: Tick): Long {
         val since = tick.ticksSince(first)
         return if (since < 0L) 0L else since / every.count + 1
     }

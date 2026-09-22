@@ -453,3 +453,12 @@ A mutation row that fails to compile exits non-zero in seconds and reads exactly
 biting (2026-09-22). For every red in a brief's mutation table, require the named failing test and
 its assertion message - a `BUILD FAILED` with no `tests completed` line is VOID, not proof, and a
 table of those is a table of nothing.
+
+## A console log says where a build stopped, not what else was wrong
+
+Without `--continue`, a Gradle job halts at its first failing task, so everything after it is simply
+never run and never printed. On 2026-09-22 master's `build (windows-latest)` console named only
+`udeaVerifyWiki`, while the uploaded `test-reports-*` artefact showed `MobaShaderAssetTest` failing
+too - the evidence that a branch's "known red" claim was true. So: **grep the uploaded test-report
+artefact, not the console log**, whenever you are deciding whether a failure is pre-existing. A red
+absent from a console log may only mean the build never reached it.

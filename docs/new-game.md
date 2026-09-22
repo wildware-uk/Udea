@@ -280,8 +280,10 @@ clients would be running a different simulation.
 
 ### A window with a model in it
 
-`./gradlew runWindow` opens one: three rovers driving east across a field, under a sky, with a
-scanline effect over the frame. It is `NewGameWindow`, in `game/src/main`, and it is the whole of a
+`./gradlew runWindow` opens one: three rovers driving east under a sky, with a scanline effect
+over the frame. There is no ground: the template draws the three models and the sky and nothing
+else, so the rovers cross an empty backdrop. A floor is the obvious first thing to add, and
+`ModelRenderer`'s built-in meshes are where to start. It is `NewGameWindow`, in `game/src/main`, and it is the whole of a
 launcher - nothing in it is copied from inside this repository:
 
 <!-- quoted from templates/new-game/game/src/main/kotlin/com/example/newgame/NewGameWindow.kt -->

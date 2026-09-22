@@ -249,7 +249,12 @@ for tool in xvfb-run ffmpeg python3; do
     command -v "$tool" > /dev/null || fail "leg 2b needs $tool, and there is none on PATH"
 done
 WINDOW_LEG="$REPO/scripts/outside-game-window.sh"
-# The screen is the window's size, and has no pointer drawn on it: the photograph is the window.
+# The screen is the window's size, so the photograph is the window and nothing else.
+#
+# `-nocursor` is asked for and does NOT take effect here: the X server still draws its root
+# cursor, a black-on-white X, in the middle of the screen, and it is in both photographs. It is
+# left in rather than papered over because neither count can see it - it is nine-ish pixels of
+# black and white, which is neither the rover's orange nor the sky's blue.
 SCREEN="-screen 0 1280x720x24 -nocursor"
 # `LIBGL_ALWAYS_SOFTWARE`: a virtual X server has no GPU, so Mesa's software rasteriser draws.
 say "window: ./gradlew runWindow on a virtual display, drawing for 15s, then photographed"

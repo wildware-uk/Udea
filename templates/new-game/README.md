@@ -10,7 +10,7 @@ cd ../my-game
 gradle wrapper --gradle-version 8.13
 ./gradlew build
 ./gradlew run          # headless: no window, 600 ticks, and where the rovers ended up
-./gradlew runWindow    # a window: three rovers driving across a field
+./gradlew runWindow    # a window: three rovers driving east under a sky
 ```
 
 `udeaVersion` in `gradle.properties` says which engine to build against, and everything else reads

@@ -28,7 +28,7 @@ gradle wrapper --gradle-version 8.13
 
 `run` simulates 600 ticks headless and prints where its three rovers ended up. Deterministic, so two
 runs print the same thing. `runWindow` is the same game in a window: the three rovers driving east
-across a field, under a sky.
+east under a sky. There is no ground drawn yet - the models and the sky are all of it.
 
 Then rename things. Grep for `new-game`, `NewGame` and `com.example.newgame` and you will find them
 all; the ones that matter are `rootProject.name` in `settings.gradle.kts`, `group` in

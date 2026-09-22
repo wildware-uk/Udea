@@ -1,23 +1,26 @@
-# BRIEF.md
+# BRIEF.md — issue #275, parts 1 and 3 (branch `issue-275-overlay-pointer`)
 
-A developer's brief for the ticket currently on a branch. It is the reviewer's second input after
-the diff: what was built, the one evidence command, the mutation table with its diffs, and the
-predictions that were frozen before anything ran.
+<!-- PREDICTIONS COMMITTED BEFORE THE MUTATION RUN. Measured columns are filled in a later commit. -->
 
-**This file is a placeholder on `master` on purpose.** When a ticket merges, its brief is archived
-as `BRIEF-<issue>.md` beside the others and this placeholder returns.
+**SHA at the time predictions were frozen:** see `git log` for this commit.
 
-## Why it is not simply deleted between tickets
+## Predictions, frozen before the mutation run
 
-It was, once, for about an hour on 2026-09-20, and it cost a developer a silent wrong result.
+Each row: a mutation of production code, the tests it is run against, and what I expect **before
+running anything**. `udeaGlTest` under xvfb with `-Pudea.render.requireGl=true --no-build-cache`.
 
-`master` deleting `BRIEF.md` while a branch writes its own is exactly the shape git's **rename
-detection** looks for. Rebasing across the deletion, git concluded the branch's brief *was* the
-archived one moving, applied the developer's text onto `BRIEF-266.md`, and left no `BRIEF.md` at
-all. **A clean rebase, no conflict, and the wrong result** - the developer caught it only by
-listing the files afterwards. The same trap fires on a merge, so it would have reached `master`.
+| # | Mutation | Tests run | Predicted |
+|---|---|---|---|
+| m0 | none (control) | `GlOverlay*`, `GlPointerPosition*` | EXIT=0, 5 tests, 0 failures |
+| m1 | `KoolThread.run` stops calling `report(t)` | `GlOverlayFailure*` | both fail, at check 3: "the render loop's failure did not reach stderr with its stack trace" |
+| m2 | `KoolThread.awaitExit` returns instead of throwing | `GlOverlayFailure*` | both fail, at check 2: "awaitExit() returned normally for a render loop that died of an exception" |
+| m3 | `KoolBackend` passes `null` instead of the cause to `closeCaptures` | `GlOverlayFailure*` | both fail, at check 1: "the capture failed without the exception that stopped the render loop" |
+| m4 | `KoolBackend.close` stops calling `kool.stopDriving()` first | `GlOverlayLongRun*` | both fail at the very end, with `GlContextException: ... RenderPipeline has been disposed and cannot draw` out of `awaitExit()` |
+| m5 | the draw-outside-begin message drops `$OPEN_FIRST` | `GlOverlayFailure*` | both fail: "the draw-outside-begin message does not name the call to make" |
+| m6 | `KoolPointer.onPosition` stops writing `pointerX` | `GlPointerPosition*` | fails: "pointerX after moving the cursor to (60, 50)", expected 60.0, actual 0.0 |
+| m7 | `KoolPointer.isPointerOver` starts `true` | `GlPointerPosition*` | fails: "the pointer reported a position before the cursor was ever over the window" |
+| m8 | **all** production changes reverted to `origin/master` (tests kept) | `GlOverlay*`, `GlPointerPosition*` | the two `GlOverlayFailure` tests fail; **the two `GlOverlayLongRun` tests and `GlPointerPosition` pass** — a correct overlay was never the bug, and the pointer API is #262's, unchanged here |
 
-Keeping a file here means a branch's brief collides with this placeholder instead: an ordinary
-modify/modify conflict, visible, resolved by taking the branch's version. A conflict you can see
-beats a merge that quietly does something else, which is the same rule this repository keeps
-relearning about checks that report success while measuring nothing.
+m8's second half is the honest part: the soak test the reviewer rule asks for does **not** go red on
+`origin/master`, because an overlay that draws correctly always worked. What goes red is the pair of
+failure tests. The evidence command covers both, so the command as a whole goes red.

@@ -427,3 +427,22 @@ another pass over the same diff — call it an hour. A PASS on something imperfe
 line in the lead's report. Weigh those honestly. If the change works, meets the standards and does
 what the ticket asked, **pass it and list the rest as out of scope.** Nobody files an issue for it:
 the owner's rule is no `gh issue create`.
+
+## A public hook is proven by a game living with it, not by it existing
+
+#275 (2026-09-22): registering any `OverlaySystem` through `RenderRegistry.overlay { }` closed the
+render pipeline about eight seconds in - a windowed game shut itself, exit 0, nothing logged - and
+Offscreen capture failed. The only overlay test drew two frames and took one capture, so it passed;
+neither moba nor hollow registered an overlay of its own; the first real user was a game outside the
+repository. The owner found it.
+
+So, for any branch that adds or changes a **public hook a game calls** (a registry entry, a system
+kind, a callback, a convention plugin), the proof must include:
+
+- a test that runs the hook **for many seconds of real frames** (at least 15 s, or several thousand
+  ticks for a simulation hook), in each mode it can run in (Windowed and Offscreen for render), and
+  asserts the game is still alive and still producing frames at the end;
+- the hook exercised through the **same public call a game makes**, not an internal shortcut;
+- a failure inside it that is **loud**: a thrown or logged error, never a pipeline that quietly ends.
+
+A branch that adds such a hook without that test fails under "an acceptance criterion with no proof".

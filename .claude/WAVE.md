@@ -1284,3 +1284,37 @@ a made-up name absent. **This snapshot carries the Windows replay regression** -
   - 40 of 232 screenshots differ between two runs of the same master: Hollow's 30 player shots, moba lane and
     match shots, 3 ui-window-moving. They prove nothing either way until they are stable. (dev-267)
   - Dashboard `list_tasks` answers "Tool list_tasks not found"; one open owner task is unread.
+
+**Wave 25 closed, 08:28Z, with five merges:** #271 (`495efe2e`), windows-green (`11e60b60`), #267
+(`06d97ff1`), #251 (`eef29614`, round 2 after one finding), windows-crlf-shaders (the merge commit
+before `c632f8e3`). Post-merge build at `c632f8e3` (checkout on /srv/ssd1): `EXIT=0`, 1122 of 1122
+executed, 0 from cache. Snapshot release run 35578104572 dispatched at `3e01d4ff`.
+
+- **Windows replay is still red**, for a second cause: `Human.fbx` converts differently under the
+  Linux and Windows lwjgl-assimp natives (revision 0 vs 90d2a697). Decision (option 1, commit the
+  converted `.glb`) is on #244; dispatched in wave 26 as `dev-244glb`.
+- **The root disk filled at 08:14Z** (`/tmp`, `~/.gradle` and `~/.m2` share it). 17 GB of old
+  `/tmp/review-*` checkouts for merged tickets were removed. Review, trial and post-merge checkouts now
+  go under `/srv/ssd1/workspace/udea-review/` (skill updated, `3e01d4ff`).
+- **Three concurrent full builds thrashed the box** (load 230, OOM killer, 91-minute builds). Wave 26
+  runs every full build through `flock scratchpad/lead/fullbuild.lock` (`scratchpad/lead/box-rules.md`).
+
+## Wave 26 — 2026-09-21 morning
+
+| Developer | Branch | Modules | Owns |
+|---|---|---|---|
+| `dev-252` | `issue-252-hollow-combat` | `hollow:game`, `hollow:desktop` | every generated lock and fixture |
+| `dev-269` | `issue-269-template-draws` | `templates/new-game`, `docs/new-game.md`, `scripts/outside-game-proof.sh` | nothing generated |
+| `dev-244glb` | `issue-244-committed-glb` | `udea-assets-compiler`, assets plugin, moba Human model | nothing generated on Linux |
+
+Held for later waves: #268 (screenshot API; its template task needs #269), #261, #277, #263, #258,
+#275, #276, #253-#255 (Hollow, sequential after #252), the `udea-net` relevancy accumulator, and the 40
+unstable master screenshots.
+
+### Owner request, 2026-09-22 16:5xZ (no issue; owner's words are the ticket)
+"Can you make sure everything launches properly on windows, including a way for a developer to start
+the actual game". Dispatched `dev-winlaunch`, branch `windows-launch`: a `windows-launch` CI job on
+windows-latest with Mesa llvmpipe (GDI's GL 1.1 is why Windows never drew in CI), launching moba
+run/runClient/runServer/runEditor, hollow run/runServer/runClient and the template; fixes; and a `play`
+task per game (`gradlew.bat :moba:desktop:play`) documented in README, wiki and AGENTS.md. Template's
+window launch joins once #269 merges.

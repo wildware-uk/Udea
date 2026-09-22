@@ -294,11 +294,14 @@ the writer is on nothing; and a committed `.glb` that is not glTF is `UDEA0038`,
 one stays `UDEA0039`.
 
 **What Windows CI then showed, which I did not predict.** The two moba replay tests this ticket
-names now pass on `windows-latest`, and `replay-equality (windows-latest)` is green. But the
+names now **pass** on `windows-latest` — `MobaReplayEqualityTest` nine tests, all passed, and
+`MobaReplayFixturesCurrentTest` passed — and `replay-equality (windows-latest)` is green. But the
 `build (windows-latest)` job is **still red**, on a third and separate Windows defect that is red on
 `master` as well: `MobaShaderAssetTest` compares the packed GLSL against the `.frag` file as the
-test reads it, and only the packing side was normalised by `windows-crlf-shaders`. §7 names the two
-lines. It is outside this ticket and I have not touched it; it is in my report for the lead.
+test itself reads it, and only the packing side was normalised by `windows-crlf-shaders`. §7 names
+the two lines. It is outside this ticket, I have not touched it, and it is **already fixed on
+`windows-launch`, commit `1d42304b`** — reached independently by that branch's developer — so there
+is nothing here for a reviewer to chase.
 
 **One defect of my own, found by CI and fixed.** I wrote `models/human/Human.fbx` in the wiki — how
 a `.udea.kts` names it, relative to the asset root — and `udeaVerifyWiki` reads a backticked path as
@@ -655,6 +658,27 @@ $ then, for every suite index.html whose failure counter is non-zero, its 'Faile
 `replay-equality (windows-latest, temurin)` tells the same story from the other side: **failure** on
 master's run 35760192642, **success** on both of this branch's runs.
 
+And the two tests are proved **passed**, not merely absent from a list of failures — the whole
+`moba:desktop` suite ran on that Windows runner:
+
+```
+$ from the branch's own test-reports-windows-latest artefact (CI run 35768488160), the moba:desktop
+$ suite index and the two replay classes' own report pages
+moba:desktop suite: tests=114 failures=0 ignored=0
+  MobaReplayEqualityTest:
+    passed   0.004s   a comment naming a fixture is not a job running one()
+    passed   15.273s  a planted one-ulp divergence is caught and names a real moba component and field()
+    passed   0.068s   every fixture the workflow names is one this game has()
+    passed   0.022s   the build script fence reads what the compiler reads, not what is switched off()
+    passed   1.506s   the checked-in gate fixture is regenerable, input for input()
+    passed   0.016s   the digest task tells its entry point which directory the workspace is()
+    passed   0.040s   the gate replays the short recording and the nightly the long one()
+    passed   0.019s   the proof task plants at the tick this game declares()
+    passed   14.855s  two honest legs of the gate fixture agree cell for cell()
+  MobaReplayFixturesCurrentTest:
+    passed   0.087s   every checked-in moba replay fixture can be replayed by this build()
+```
+
 **The one that is left is a third Windows defect, and I can name its line.** It is not the asset
 hash and not a replay: `MobaShaderAssetTest` compares the packed GLSL against the `.frag` file **as
 the test itself reads it**, and the `windows-crlf-shaders` fix normalised only the first of those
@@ -750,8 +774,7 @@ than a whole file, its **first line is the command that produced it**, so the sa
 made again from the log beside it.
 
 I checked that mechanically rather than by eye: a script reads every fenced block out of this file
-and requires it to appear as a **consecutive, in-order run** in one of those artefacts. Thirty-seven
-blocks; the only one it cannot place is §1's evidence command, which is a command to run rather than
-a transcript. The check is only worth anything if it can fail, so I ran the known negative too —
+and requires it to appear as a **consecutive, in-order run** in one of those artefacts. Every block but one is placed; the one it cannot place is §1's evidence command,
+which is a command to run rather than a transcript. The check is only worth anything if it can fail, so I ran the known negative too —
 changing one character of `BUILD SUCCESSFUL in 10m 5s` to `9m 59s` moved the count from one
 unplaceable block to two.

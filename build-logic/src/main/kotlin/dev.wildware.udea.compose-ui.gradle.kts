@@ -11,9 +11,9 @@
  * ## Why this is a plugin of its own
  *
  * `UiScreen.content` is `@Composable`. Without the Compose compiler a game's screen still
- * compiles - as a plain function - and fails only when the toolkit composes it, with a
- * `NoSuchMethodError` or an `AbstractMethodError`, because the toolkit calls
- * `content(Composer, Int)` and the game's class has only `content()`. Before this plugin none of
+ * compiles - as a plain function - and fails only at run time, where it meets the toolkit: a
+ * composable compiled by the Compose compiler takes a `Composer` its caller did not pass, so the
+ * call links to a method that does not exist (`NoSuchMethodError`). Before this plugin none of
  * the published conventions applied the compiler, so a game in its own repository could not write
  * interface at all without knowing that and wiring the Kotlin plugin's Compose subplugin by hand.
  *

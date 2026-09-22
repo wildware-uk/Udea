@@ -263,7 +263,7 @@ The pieces a newcomer meets first, each with the issue that made it so.
   applies `dev.wildware.udea.compose-ui` beside its Kotlin convention - the Compose compiler at the
   catalog's Kotlin version, and nothing else. It is published, so a game in its own repository
   applies the same plugin `udea-render`, `udea-editor` and `moba:game` do (#275). Without it a screen
-  still compiles, as a plain function, and fails only when the toolkit composes it.
+  still compiles, as a plain function, and fails only at run time, where it meets the toolkit.
 - **A game can write a screen shader** (#259, #266), and the `.frag` is an asset (#269).
   `shader(name = "scanlines", file = "shaders/scanlines.frag")` in a `.udea.kts` makes the build
   read the file, check it and pack its **text** into the graph, so

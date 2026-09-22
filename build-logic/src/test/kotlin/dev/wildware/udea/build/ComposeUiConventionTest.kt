@@ -11,8 +11,9 @@ import kotlin.test.assertTrue
  *
  * `UiScreen.content` and `CapturedUi`'s content are `@Composable`. Before this convention none of
  * the published ones applied the Compose compiler, so a game in its own repository compiled its
- * screen as a plain function: that compiles, and it fails when something composes it, because the
- * toolkit calls `content(Composer, Int)` and the game's class has only `content()`. So the
+ * screen as a plain function: that compiles, and it fails at run time where it meets the toolkit,
+ * because a composable the Compose compiler built takes a `Composer` a plain caller never passes
+ * (`NoSuchMethodError`, which the control below asserts). So the
  * property is observed where it lives - by composing the game's screen - not by reading which
  * plugins the project applied, which is a description of the build rather than the build.
  *

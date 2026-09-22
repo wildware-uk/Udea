@@ -513,8 +513,8 @@ It brings the compiler at the Kotlin version the engine was built with, and noth
 plugin of its own rather than part of a Kotlin convention because the compiler rewrites every class
 in the project it is applied to, so it belongs only on a project that has a composable in it.
 
-**Without it, your screen still compiles** - as a plain function - and fails only when the toolkit
-composes it, with a `NoSuchMethodError` or an `AbstractMethodError`. A green build is therefore no
+**Without it, your screen still compiles** - as a plain function - and fails only at run time,
+where it meets the toolkit, with a `NoSuchMethodError`. A green build is therefore no
 evidence that the plugin is there; composing the screen in a test is. ComposeGL's `uiTest`
 composes one with no window:
 

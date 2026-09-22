@@ -66,6 +66,9 @@ public object NewGameWindow {
         )
         val runSeconds = System.getProperty(SECONDS_PROPERTY)?.toFloat()
 
+        // `register` hands back the scanline effect's strength as a live handle. Nothing here
+        // writes it - a settings screen would - and it is handed back rather than kept private so
+        // that a game which grows one does not have to go looking for where the shader was built.
         val registry = RenderRegistry()
         NewGameScene.register(registry, assetRoot, NewGameAssets.registry)
         val backend = KoolBackend.start(RenderMode.Windowed, WindowConfig(title = "new-game"), registry)

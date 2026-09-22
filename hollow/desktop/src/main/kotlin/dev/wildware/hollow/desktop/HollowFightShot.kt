@@ -336,11 +336,18 @@ public object HollowFightShot {
     /** Ticks after the settle to the first frame: the pack is walking in out of the trees. */
     private const val FIRST_SHOT = 150L
 
-    /** Ticks between frames: two fifths of a second. */
-    private const val STEP = 24L
+    /** Ticks between frames: a fifth of a second. */
+    private const val STEP = 12L
 
-    /** Frames: about ten seconds, from the pack walking in to the survivors standing over a body. */
-    private const val SHOTS = 25
+    /**
+     * Frames: about four and a half seconds, which is the whole fight now that the players hunt.
+     *
+     * Measured from the run that set these: the wave arrives, the first bites land by tick 200, the
+     * last fox dies by 320 and its corpse is gone by 410. Twenty-four frames from tick 152 at
+     * [STEP] cover 152 to 428, so the sequence is the fight rather than the fight and then fourteen
+     * identical frames of an empty clearing, which is what the first pass produced.
+     */
+    private const val SHOTS = 24
 
     /** How far the second client's camera is turned from the first's, in degrees. */
     private const val SECOND_CLIENT_TURN = 45f

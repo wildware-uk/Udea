@@ -48,7 +48,7 @@ platform's.
   `TowerRangeGizmo`. See [The Editor](The-Editor) and [Gizmos](Gizmos).
 - **The agent surface**, in `moba/desktop/src/agent/`. See [Agent Tool Surface](Agent-Tool-Surface).
 - **A level**, `.udealevel`, and `-Plevel=<path>` on the launchers.
-- **A 3D model**, drawn from an `.fbx` converted at build time — `moba` is 2D but the engine's model
+- **A 3D model**, drawn from an `.fbx` whose converted `.glb` is committed beside it — `moba` is 2D but the engine's model
   path is exercised here.
 
 Assets live under `moba/game/assets/`: `ability`, `blueprint`, `champion`, `character`, `control`,
@@ -75,7 +75,7 @@ driver, and a gate that skips without one hides the failure it exists to show.
 | `:moba:desktop:runShot` | One frame of the character roster |
 | `:moba:desktop:runMatchShot` | The melee, the HUD, the spin, the item bar and the result |
 | `:moba:desktop:runLaneShot` | A creep wave, the clash under the towers, a champion farming |
-| `:moba:desktop:runModelShot` | The build-time-converted FBX character with its texture |
+| `:moba:desktop:runModelShot` | The FBX character, from its committed `.glb`, with its texture |
 | `:moba:desktop:runLevelShot` | Loads a saved match into a fresh process and checks the picture matches |
 | `:moba:desktop:runLevelShotBoot` | The launch level as it loads |
 | `:moba:desktop:runNetProof` | Server plus two clients: perfect link, 150ms with 5% loss, and a named bad link |
@@ -200,7 +200,7 @@ So a clone builds, `git status` stays clean, and there is **no art step to run b
 licensing.
 
 Hollow's models are CC0 and are checked in: the clearing's props are Kenney's Nature Kit, and the
-player is Quaternius' Animated Human, shipped as an `.fbx` that the asset build converts to glTF.
+player is Quaternius' Animated Human, shipped as an `.fbx` with its converted `.glb` committed beside it.
 `hollow/game/assets/models/human/NOTICE.md` carries its licence and what was changed.
 
 ## See also

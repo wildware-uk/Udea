@@ -201,11 +201,12 @@ animation clips from to generate `Fox.Clips`; git stores the two copies as one o
 
 `moba/game/assets/models/human/Human.fbx` and its texture `ClothedLightSkin.png` are from
 **Quaternius' Animated Man Pack**, CC0 1.0 (issue #244): a rigged, animated, textured character,
-and the FBX the asset build converts to glTF. The FBX is modified - its material linked to the
+and the FBX sample, with the glTF it converts to committed beside it as `Human.glb`. The FBX is modified - its material linked to the
 pack's texture, four of its nine takes kept - by `relink.py` beside it; `NOTICE.md` there has the
 source, the checksums of the published files and the whole change. `udea-assets-compiler`'s own FBX
 test fixture, `src/test/resources/fbx/bender/`, is made by `make_bender.py` beside it, for this
-repository, under its own licence.
+repository, under its own licence; its `Bender.glb` is that fixture's conversion, checked by
+`CommittedModelsTest`.
 
 `hollow/game/assets/models/nature/` holds the trees, stones, logs, fence and ground cover of
 Hollow's forest clearing (issue #249), from **Kenney's Nature Kit (2.1)**, CC0 1.0. The published

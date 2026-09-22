@@ -14,10 +14,11 @@ import kotlin.io.path.isRegularFile
 import kotlin.io.path.readBytes
 
 /**
- * Turns an `.fbx` into one self-contained binary glTF, at asset-build time (issue #244).
+ * Turns an `.fbx` into one self-contained binary glTF (issue #244), for [CommittedModels] to
+ * commit beside it and to check.
  *
  * Kool reads glTF and has no FBX loader, and FBX is a closed format, so a game that drops an
- * `.fbx` into its assets gets the `.glb` this makes: the same typed model asset a `.glb` is
+ * `.fbx` into its assets gets the `.glb` this made: the same typed model asset a `.glb` is
  * (issue #240), with the same generated clips (issue #241). The converter is Assimp, through
  * LWJGL's binding, chosen over FBX2glTF by converting the sample with both; the comparison is on
  * issue #239. It runs in the asset compiler and nowhere else - UDEA-MG-013 keeps Assimp off every
@@ -33,8 +34,9 @@ import kotlin.io.path.readBytes
  *    needs nothing else, and a texture that is not there fails the build rather than drawing a
  *    model with no skin.
  * 2. **The buffer is rewritten compacted.** Assimp leaves uninitialised memory in slack at the end
- *    of the buffer it writes, so two conversions of one file differ there, and the build cache
- *    keys on these bytes. Each buffer view is copied, in order, to a fresh buffer.
+ *    of the buffer it writes, so two conversions of one file differ there, and the check that a
+ *    committed `.glb` is current compares these bytes. Each buffer view is copied, in order, to a
+ *    fresh buffer.
  * 3. **Each clip is named for its action.** Blender's exporter names each take
  *    `<armature>|<action>`, so the generated clip would be `HumanArmatureWalk`; [clipName] keeps
  *    what follows the last `|`, and the clip is `Human.Clips.Walk`.

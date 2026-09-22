@@ -12,7 +12,6 @@ import dev.wildware.udea.assets.reference
 import dev.wildware.udea.diagnostics.Severity
 import dev.wildware.udea.diagnostics.UdeaDiagnostic
 import org.junit.jupiter.api.Test
-import kotlin.io.path.deleteExisting
 import kotlin.io.path.readBytes
 import kotlin.io.path.writeBytes
 import kotlin.test.assertEquals
@@ -23,10 +22,9 @@ import kotlin.test.assertTrue
 /**
  * An `.fbx` declared as a model (issue #244): `model(name = "bender", file = "models/bender/Bender.fbx")`.
  *
- * Real scripts, compiled and validated by the real passes, over a tree holding the FBX fixture. A
- * model that converts is published as the `.glb` it converts to; one that does not fails the whole
- * pipeline's report - what `udeaValidateAssets` fails the build on - with `UDEA0039` naming the
- * file, and the pack writes no `.glb` for it.
+ * Real scripts, compiled and validated by the real passes, over a tree holding the FBX fixture
+ * and the `.glb` committed beside it. The model is published as that `.glb`, byte for byte; the
+ * build never converts (`CommittedModelsTest` has the writer, the check, and a missing `.glb`).
  */
 class FbxModelAssetTest {
 
@@ -35,10 +33,10 @@ class FbxModelAssetTest {
     """
 
     @Test
-    fun `an fbx declared as a model validates clean and packs as the glb it converts to`() {
+    fun `an fbx declared as a model validates clean and packs as the glb committed beside it`() {
         val context = ValidationFixture.withFbx("fbx-clean", script)
 
-        assertEquals(emptyList(), errors(context), "the committed fixture converts")
+        assertEquals(emptyList(), errors(context), "the fixture has its committed glb")
 
         val packed = GraphPacker.pack(context.graph)
         assertFalse(packed.hasErrors, "packing reported ${packed.diagnostics}")
@@ -46,41 +44,41 @@ class FbxModelAssetTest {
             assertEquals(ResPath("models/bender/Bender.glb"), bundle.registry[reference<Model>("models/bender")].file)
         }
 
-        val converted = AssetPipeline.convertModels(context.assetRoot, context.graph)
-        assertEquals(emptyList(), converted.diagnostics)
-        val glb = assertNotNull(converted.files["models/bender/Bender.glb"], "converted: ${converted.files.keys}")
+        val published = AssetPipeline.committedModels(context.assetRoot, context.graph)
+        assertEquals(emptyList(), published.diagnostics)
+        val glb = assertNotNull(published.files["models/bender/Bender.glb"], "published: ${published.files.keys}")
         assertEquals(listOf("Bend", "Twist"), GltfClips.read(glb).getOrThrow().map { it.name })
     }
 
+    /**
+     * The build reads the committed `.glb` and never runs Assimp, so an `.fbx` that no longer
+     * converts is not the validator's to find: `udeaVerifyConvertedModels` finds it, on the one
+     * platform whose Assimp made the `.glb` (`CommittedModelsTest`). What a game is given is the
+     * committed file, and that is still sound.
+     */
     @Test
-    fun `a broken fbx fails the build with UDEA0039 naming the file`() {
+    fun `the validator does not convert, so a broken fbx beside a sound glb validates clean`() {
         val context = ValidationFixture.withFbx("fbx-broken", script) { assets ->
             val fbx = assets.resolve("models/bender/Bender.fbx")
             val whole = fbx.readBytes()
             fbx.writeBytes(whole.copyOfRange(0, whole.size / 3))
         }
 
-        val diagnostic = errorFor(context, AssetValidationRules.MODEL_CONVERSION.id)
-        assertEquals("UDEA0039", diagnostic.ruleId)
-        assertEquals("models/bender", diagnostic.assetId)
-        assertTrue("`models/bender/Bender.fbx`" in diagnostic.message, diagnostic.message)
-        assertTrue("could not be read as FBX" in diagnostic.message, diagnostic.message)
-        assertNotNull(diagnostic.span, "a diagnostic with no location is a grep task")
-
-        val converted = AssetPipeline.convertModels(context.assetRoot, context.graph)
-        assertEquals(emptyMap(), converted.files, "no .glb is written for a model that did not convert")
-        assertEquals(listOf("UDEA0039"), converted.diagnostics.map { it.ruleId })
+        assertEquals(emptyList(), errors(context))
+        val published = AssetPipeline.committedModels(context.assetRoot, context.graph)
+        assertEquals(emptyList(), published.diagnostics)
+        assertEquals(setOf("models/bender/Bender.glb"), published.files.keys)
     }
 
     @Test
-    fun `an fbx whose texture is missing fails the build with UDEA0039 naming the texture`() {
-        val context = ValidationFixture.withFbx("fbx-no-texture", script) { assets ->
-            assets.resolve("models/bender/checker.png").deleteExisting()
+    fun `a committed glb that is not glTF is the model-file rule, naming the glb`() {
+        val context = ValidationFixture.withFbx("fbx-bad-glb", script) { assets ->
+            assets.resolve("models/bender/Bender.glb").writeBytes("not a model".toByteArray())
         }
 
-        val diagnostic = errorFor(context, AssetValidationRules.MODEL_CONVERSION.id)
+        val diagnostic = errorFor(context, AssetValidationRules.MODEL_FILE.id)
         assertTrue("`models/bender/Bender.fbx`" in diagnostic.message, diagnostic.message)
-        assertTrue("`models/bender/checker.png`" in diagnostic.message, diagnostic.message)
+        assertTrue("committed `models/bender/Bender.glb`" in diagnostic.message, diagnostic.message)
     }
 
     @Test

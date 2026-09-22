@@ -84,7 +84,7 @@ For `moba` these are `:moba:game:udeaValidateAssets`, `:moba:game:udeaPackBundle
 A `model` declaration points at a glTF 2.0 file (`.glb` or `.gltf`) or an `.fbx`.
 
 - A glTF file is checked when it is validated: `UDEA0038` if it is not readable glTF 2.0, or if it names files that are not in the asset root.
-- An `.fbx` is converted to `.glb` during the asset build, with Assimp (through LWJGL), textures embedded. A broken one fails with `UDEA0039`. The converter is build-time only, and rule `UDEA-MG-013` keeps it off every runtime classpath.
+- An `.fbx` is published as the `.glb` committed beside it. `udeaWriteConvertedModels` converts it, with Assimp (through LWJGL), textures embedded; run it on Linux x86_64 after changing an `.fbx` or its texture, and commit the `.glb`. The asset build never converts, because Assimp's Windows and Linux builds give floats that differ in their last bits, and so different asset hashes. `udeaVerifyConvertedModels`, on `check`, fails with `UDEA0039` on Linux x86_64 when a `.glb` is stale or an `.fbx` is broken, and prints that it skipped on any other platform. A missing `.glb` is `UDEA0039` everywhere. The converter is build-time only, and rule `UDEA-MG-013` keeps it off every runtime classpath.
 - The build reads each model's animation clips and generates a typed object for them. `moba`'s fox has `Fox.Clips.Survey`, `Fox.Clips.Walk` and `Fox.Clips.Run`. Game code plays a clip by name the compiler checks. If the clips cannot be read, that is `UDEA0027`. A misspelt clip such as `Fox.Clips.Rnu` is `UDEA0016` from the compiler plugin, with the nearest clip name suggested.
 
 [Models and Animation](Models-and-Animation) covers how models are drawn and animated.
@@ -127,7 +127,7 @@ Every problem is a `UdeaDiagnostic` with a rule id, a message, a repo-relative s
 | `UDEA0036` | An asset validator threw: a bug in the tool, not in the assets |
 | `UDEA0037` | An item recipe costs less than its components, or lists itself |
 | `UDEA0038` | A model file is not readable glTF 2.0, or names files outside the asset root |
-| `UDEA0039` | An `.fbx` cannot be converted |
+| `UDEA0039` | An `.fbx` cannot be converted, or the `.glb` committed beside it is missing or stale |
 
 The ids live in `udea-diagnostics/src/commonMain/kotlin/dev/wildware/udea/diagnostics/UdeaRules.kt` (the shared ones), `udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/AssetCompilerRules.kt` and `udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/validate/AssetValidationRules.kt`.
 

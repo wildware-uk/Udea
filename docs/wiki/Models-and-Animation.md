@@ -211,13 +211,26 @@ nodes at run time (above) does not weaken this: naming one in code is still chec
 
 ### FBX
 
-Kool reads only glTF. An `.fbx` in the assets is converted to one self-contained binary glTF at
-asset-build time by `FbxConverter`
+Kool reads only glTF. An `.fbx` in the assets is converted to one self-contained binary glTF by
+`FbxConverter`
 (`udea-assets-compiler/src/main/kotlin/dev/wildware/udea/assets/compiler/model/FbxConverter.kt`),
 using Assimp through LWJGL (issue #244). It embeds every texture, compacts the buffer so the output
 is the same bytes every time, and names each clip after its action: Blender's `HumanArmature|Walk`
 becomes `Human.Clips.Walk`. Assimp runs in the asset compiler only; rule `UDEA-MG-013` keeps it off
 every runtime classpath. See [Assets](Assets).
+
+The conversion runs once, on purpose, and its output is committed beside the `.fbx` it was made
+from - `moba/game/assets/models/human/Human.glb` beside
+`moba/game/assets/models/human/Human.fbx` - and the build packs that committed file and never
+converts. The reason is that LWJGL ships a different Assimp build for each platform, and the
+Windows one turns the same `.fbx` into floats that differ from Linux's in their last bits - enough
+to give Windows a different asset hash and break every recorded replay there. So:
+
+- after changing an `.fbx` or a texture it names, run `./gradlew udeaWriteConvertedModels` on
+  Linux x86_64 and commit the `.glb` it writes;
+- `udeaVerifyConvertedModels` runs on `check`. On Linux x86_64 it converts again and fails with
+  `UDEA0039` when the result is not the committed file, naming the writer; on any other platform
+  it prints that it skipped, and why.
 
 ![The FBX human cycling through Idle, Walk, Run and Punch](images/human-clips-sequence.png)
 

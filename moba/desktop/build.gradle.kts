@@ -367,14 +367,14 @@ tasks.register<JavaExec>("runMatchShot") {
 }
 
 // The imported models' evidence task (issue #244). `GameModelShot` lives in the test source set for
-// the reason `MatchShot` does. It draws the game's FBX character from the `.glb` that
-// `:moba:game:udeaPackBundle` converted it to, under that project's `build/udea/converted` - the
-// directory `UdeaAssetsPlugin` writes each converted model to - and the fox from the asset root.
+// the reason `MatchShot` does. It draws the game's FBX character from its committed `.glb`, as
+// `:moba:game:udeaPackBundle` copies it under that project's `build/udea/converted` - the
+// directory `UdeaAssetsPlugin` publishes each converted model to - and the fox from the asset root.
 val convertedModels: Provider<Directory> = project(":moba:game").layout.buildDirectory.dir("udea/converted")
 
 tasks.register<JavaExec>("runModelShot") {
     group = ApplicationPlugin.APPLICATION_GROUP
-    description = "moba.modelshot: the game's FBX character, converted at build time, drawn with its texture."
+    description = "moba.modelshot: the game's FBX character, from its committed .glb, drawn with its texture."
     mainClass.set("dev.wildware.moba.GameModelShot")
     classpath = sourceSets.test.get().runtimeClasspath
     dependsOn(":moba:game:udeaPackBundle")

@@ -241,9 +241,13 @@ The pieces a newcomer meets first, each with the issue that made it so.
   A skinned model is posed from its entity's `Animator` - clip, time and crossfade, read at the
   tick plus the interpolation alpha - and skinned on the GPU; the pose is the renderer's alone,
   and a clip's time becomes seconds only there (#242).
-  An `.fbx` is a model too: the asset build converts it to `.glb` with Assimp, textures
-  embedded, and a broken one fails with `UDEA0039`; the converter is build-time only
-  (`UDEA-MG-013`) (#244).
+  An `.fbx` is a model too: it is converted to `.glb` with Assimp, textures embedded, by
+  `udeaWriteConvertedModels`, run on Linux x86_64, and the `.glb` is committed beside it; the
+  asset build packs that committed file and never converts, because Assimp's Windows and Linux
+  builds disagree in a float's last bits and would pack different asset hashes.
+  `udeaVerifyConvertedModels`, on `check`, fails with `UDEA0039` on Linux x86_64 when the `.glb`
+  is stale or the `.fbx` is broken, and says it skipped anywhere else; the converter is build-time
+  only (`UDEA-MG-013`) (#244).
   A 3D game's camera is `ThirdPersonRig` (`udea-render`, #248): behind and above a followed
   `Transform3D`, turned by the mouse through `PointerMotion`, eased in seconds, writing nothing
   into the world; it reports its ground-plane facing as plain floats for camera-relative movement.

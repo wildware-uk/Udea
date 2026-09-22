@@ -165,20 +165,23 @@ public object AssetValidationRules {
     )
 
     /**
-     * A `model(...)` names an `.fbx` that does not convert to glTF (issue #244): Assimp cannot
+     * A `model(...)` names an `.fbx` whose conversion to glTF is wrong (issue #244): Assimp cannot
      * read it, it holds no mesh, or a texture its materials name is missing, outside the asset
-     * root, or neither PNG nor JPEG.
+     * root, or neither PNG nor JPEG; or the `.glb` committed beside it is missing, or is no longer
+     * what the `.fbx` converts to.
      *
      * Its own id rather than [MODEL_FILE]'s, because the remedy differs: a bad `.glb` is fixed in
-     * the file, and a bad `.fbx` is fixed in the tool that exported it or the folder beside it.
-     * Raised by the validator, by the clip reader before any typed clip is generated, and by the
-     * pack, which is where the converted `.glb` is written; all three say the same thing.
+     * the file, and a bad `.fbx` is fixed in the tool that exported it, the folder beside it, or
+     * by re-running `udeaWriteConvertedModels`. Raised by the writer and by
+     * `udeaVerifyConvertedModels` for a file that does not convert or a stale `.glb`, and by the
+     * validator, the clip reader and the pack for a missing one; each names what to do.
      */
     public val MODEL_CONVERSION: UdeaRule = UdeaRule(
         id = "UDEA0039",
         defaultSeverity = Severity.Error,
-        description = "a model's .fbx cannot be converted to glTF: it does not read, holds no " +
-            "mesh, or names a texture that is missing or is not PNG or JPEG",
+        description = "a model's .fbx cannot be converted to glTF - it does not read, holds no " +
+            "mesh, or names a texture that is missing or is not PNG or JPEG - or the .glb " +
+            "committed beside it is missing or no longer its conversion",
     )
 
     /** Every rule pass 3 mints locally, in id order. */

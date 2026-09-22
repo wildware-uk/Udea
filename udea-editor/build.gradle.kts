@@ -15,9 +15,9 @@
 plugins {
     id("dev.wildware.udea.kotlin-library")
 
-    // The panels are `@Composable`. `udea-render` is the only other module with this plugin, and for
-    // the same reason: this is a module that writes composables.
-    alias(libs.plugins.composeCompiler)
+    // The panels are `@Composable`, so this module compiles composables: the Compose compiler,
+    // through the same published convention a game applies (issue #275).
+    id("dev.wildware.udea.compose-ui")
 }
 
 dependencies {

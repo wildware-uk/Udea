@@ -10,9 +10,9 @@ plugins {
     id("dev.wildware.udea.kotlin-multiplatform-render")
 
     // The interface is ComposeGL, so this module compiles `@Composable` (spec D5, issue #224).
-    // Applied here and in no convention: this is the only module that hosts a UI backend, and a
-    // convention would put the plugin on every module that has no composable in it.
-    alias(libs.plugins.composeCompiler)
+    // Through `dev.wildware.udea.compose-ui`, a convention of its own rather than part of the
+    // render one, because it belongs only on a project that has a composable in it (issue #275).
+    id("dev.wildware.udea.compose-ui")
 }
 
 kotlin {

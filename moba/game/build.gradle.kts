@@ -41,8 +41,10 @@ plugins {
 
     // The HUD is a ComposeGL screen (issue #188): `MobaHudScreen.content` is `@Composable`, so this
     // module compiles composables. The toolkit itself comes through `udea-render`'s `api` on
-    // `composegl-ui`; no ComposeGL frontend does, which is what UDEA-MG-002 asks of a game.
-    alias(libs.plugins.composeCompiler)
+    // `composegl-ui`; no ComposeGL frontend does, which is what UDEA-MG-002 asks of a game. The
+    // compiler comes through the published convention a game outside this repository applies too
+    // (issue #275).
+    id("dev.wildware.udea.compose-ui")
 
     // The build-time asset pipeline of spec 3.6. It travels with the assets, which are the game's
     // and not a launcher's: an Android build and a desktop build load the same `.udeapak`.

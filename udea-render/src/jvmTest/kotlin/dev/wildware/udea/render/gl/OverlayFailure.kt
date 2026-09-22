@@ -77,6 +77,13 @@ internal object OverlayFailure {
                     thrown is IllegalStateException && "outside begin/end" in thrown.message.orEmpty(),
                     "$mode: the capture's cause is not the overlay's exception: $thrown",
                 )
+                // And the exception says how to fix it. A game author meets this message once and
+                // has to be able to act on it without reading the engine: naming the call is the
+                // whole difference between "it crashed" and "I forgot beginPixels()".
+                assertTrue(
+                    "beginPixels()" in thrown.message.orEmpty(),
+                    "$mode: the draw-outside-begin message does not name the call to make: ${thrown.message}",
+                )
 
                 // 2. The loop has stopped, and waiting for it to stop says why rather than returning.
                 assertFalse(backend.renderLoopRunning, "$mode: the render loop is still running after a frame threw")

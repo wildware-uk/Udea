@@ -82,8 +82,8 @@ robot-game builds against. I fetched that artifact again from Central and read i
 matches the copy the previous developer downloaded, byte for byte:
 
 ```
-$ curl -sS -o dl.jar -w '%{http_code} %{size_download}\n' https://central.sonatype.com/repository/maven-snapshots/dev/wildware/udea/udea-render-jvm/0.1.0-SNAPSHOT/udea-render-jvm-0.1.0-20260921.085204-6.jar
-200 717657
+$ curl -sS -o dl.jar -w 'http=%{http_code} bytes=%{size_download}' https://central.sonatype.com/repository/maven-snapshots/dev/wildware/udea/udea-render-jvm/0.1.0-SNAPSHOT/udea-render-jvm-0.1.0-20260921.085204-6.jar; echo
+http=200 bytes=717657
 $ sha256sum dl.jar
 53eeb24d7f3eecf826f5768eb8b9378d55e54c3ac1750c48de9716f591ce9973  dl.jar
 $ javap -cp dl.jar dev.wildware.udea.render.input.PointerPosition
@@ -101,8 +101,11 @@ $ javap -cp dl.jar dev.wildware.udea.render.kool.KoolPointer | grep 'KoolPointer
   public dev.wildware.udea.render.kool.KoolPointer(dev.wildware.udea.render.ui.UiLayer, int, kotlin.jvm.internal.DefaultConstructorMarker);
 ```
 
-(spliced from `scratchpad/dev-275c/published-pointer-api.txt`, which is the saved output of that
-run.) Three plain accessors, no Kool type in the interface, and the third constructor is the
+(spliced whole from `scratchpad/dev-275c/published-pointer-api2.txt`, the saved output of that run,
+re-taken 22:20 today. The earlier capture said the same thing and gave the same hash, but its
+`curl -w` format string had an escaped newline in it, so its first line arrived wrapped across two
+lines and this brief had silently joined them — a transposition, small but exactly the kind a
+transcript must not have. This block is the bytes of the second file, unjoined.) Three plain accessors, no Kool type in the interface, and the third constructor is the
 default-argument synthetic that makes `KoolPointer()` callable with no `UiLayer` at all.
 
 So the gap was that **nobody could find it and nothing proved it follows a real cursor**. This
@@ -203,6 +206,24 @@ reset**, not by the initialiser I mutated. m6 is the row that shows the test is 
 shows I picked a line that no longer decides anything. A mutation that does not bite is a result,
 not a gap in the table — but it is also not evidence, so I am not claiming it as one.
 
+**And a mutation that cannot fail is a statement about the code, so here is the statement.** The
+line I mutated is the *initialiser* of `isPointerOver`, and Kotlin requires one — the property
+cannot simply lose it. It is not dead: it is the value the property has between
+`KoolPointer(...)` being constructed and the first `beginFrame`, which is a window a game can
+read in (a menu built before the first frame, a system that asks where the cursor is on the tick
+before any frame has run). After that first frame the initialiser decides nothing, because
+`beginFrame` assigns `isPointerOver = false` at the top of every frame
+(`KoolPointer.kt:231`) and each valid pointer sets it back to `true` in `onPosition`.
+
+So: **reachable, and uncovered.** No test on this branch or on master asserts what a freshly
+constructed `KoolPointer` reports before its first frame, which is exactly why m7 went green. The
+assertion that would cover it is one line — read `isPointerOver` on the pointer the moment
+`GlPointerPositionOverlayTest` builds it, before the loop starts, and require `false`. I did not
+add it at this tip: the clean full build below was already queued against this tree, and changing
+a test source underneath a running build would have made its green mean nothing. It is a
+one-line follow-up and I am naming it rather than leaving the green row to look like coverage.
+
+
 ## The moba overlay proof, in a real window
 
 `:moba:desktop:runOverlayProof` opens a **visible** moba window with a heads-up panel registered
@@ -249,41 +270,52 @@ and Gradle's own verdict, from the same log:
 Note `OverlayProof$Panel.render(OverlayProof.kt:104)` in that trace: the frame that threw is named,
 and for a real game it is the game's own line, which is the whole point of the change.
 
-## `sh gradlew build`, no exclusions
+## `sh gradlew build`, no exclusions — clean, at the branch tip
 
-Run under the shared box lock, at head `b8c15ce2`, spliced from
-`scratchpad/dev-275c/build3.marker` and the tail of `build3.log`:
-
-```
-START 2026-09-22T21:39:27+00:00 head=b8c15ce2 dirty=1
-EXIT=0 END 2026-09-22T22:11:04+00:00 head=b8c15ce2 dirty=1
-```
+The first green I reported was **28 executed / 1094 up-to-date**, and those up-to-date results came
+from a run that had been **red** on `WallClockBudgetCensusTest`. That is not a clean green, and the
+lead was right to send it back. This one is: `clean` first, then the build, both inside one hold of
+the shared lane, head read inside the hold. Spliced from `scratchpad/dev-275c/build4.marker`:
 
 ```
-BUILD SUCCESSFUL in 1m 59s
-1122 actionable tasks: 28 executed, 1094 up-to-date
+QUEUED 2026-09-22T22:16:56+00:00 clean-build
+START 2026-09-22T22:24:17+00:00 head=01d25a00 dirty=1
+CLEAN=0 2026-09-22T22:24:33+00:00
+EXIT=0 2026-09-22T22:33:53+00:00 head=01d25a00 dirty=1
 ```
 
-(The twenty-nine minutes between START and EXIT are the queue for the lock plus the build; the
-build itself is the 1m 59s Gradle reports. `dirty=1` is `BRIEF.md`, which no task reads.)
-
-**Read that honestly: 1094 tasks were up-to-date**, from the earlier full run in the same worktree
-(`build2`, 19:28-20:34, head `db6f6328`). That run was **red**, on one test — my two new test
-sources read the clock without a `WallClockBudgetCensusTest` row — and `b8c15ce2` is the commit
-that adds the two `NOT_A_BUDGET` rows. So the only source difference between the red run and this
-green one is that census fixture, and the task that proves it re-ran here:
+The command, exactly as run after `sh gradlew clean`:
 
 ```
-> Task :udea-gradle:test
+cd /srv/ssd1/workspace/Udea/.claude/worktrees/agent-a6a4ecb5d5dfadeee && \
+ANDROID_HOME=$HOME/Android/Sdk JAVA_HOME=$HOME/.sdkman/candidates/java/21.0.11-tem \
+sh gradlew build --continue --no-daemon --max-workers=4 -Dorg.gradle.workers.max=8 \
+  --no-configuration-cache --no-build-cache
 ```
 
-`udea-gradle/build/test-results/test`: **63 tests, 0 failures**, in-XML timestamps
-`2026-09-22T22:09:28Z`-`22:09:47Z` — inside this build's window, not restored.
+and its verdict, from `scratchpad/dev-275c/build4.log`:
 
-`:udea-render:jvmTest` is `UP-TO-DATE` here, and its results are **393 tests, 0 failures** stamped
-`2026-09-22T20:32:41Z`, from build2 at `db6f6328`. That is the same source: nothing in
-`udea-render` changed between the two commits. I am reporting it as an up-to-date result rather
-than claiming it ran again, because those are different claims.
+```
+BUILD SUCCESSFUL in 9m 19s
+1122 actionable tasks: 1013 executed, 109 up-to-date
+```
+
+**1013 of 1122 executed**, against 28 last time. `dirty=1` is `BRIEF.md`, which no task reads;
+`git status --porcelain` at the same head prints one line, ` M BRIEF.md`. The 109 still up-to-date
+are `build-logic`'s own script-plugin generation tasks and their like — an included build whose
+outputs the outer `clean` does not remove — and `:build-logic:test` itself **executed**, 401 tests.
+
+Counted out of the JUnit XML that this run wrote (every directory had just been deleted by
+`clean`, and in-XML timestamps run 22:24:49 to 22:33:49, inside the hold):
+
+**5883 tests, 0 failures, 53 skipped — 5830 executed.** The largest are `udea-core:jvmTest` 524,
+`build-logic:test` 401, `udea-render:jvmTest` 393, `udea-fleks` 298 per target, `udea-net:jvmTest`
+276, `udea-codegen:test` 295, `udea-assets-compiler:test` 289.
+
+**43 of those 53 skips are the GL tasks**, and that is the trap this repository warns about:
+`udeaGlTest` 35 of 36 skipped, `udeaAgentGlTest` 2 of 2, `udeaEditorGlTest` 6 of 6, because
+`$DISPLAY` is empty and `udea.render.requireGl` defaults to `false`. **A green `build` is therefore
+not evidence about GL at all** — which is why the next section exists and was run separately.
 
 ## The GL suites, run for real under xvfb
 
@@ -324,6 +356,29 @@ Forty-four GL tests, none skipped — which is the check that the run was real, 
 exactly what a missing `DISPLAY` produces. The five this branch adds are in the `udeaGlTest` list:
 `GlOverlayFailureOffscreenTest`, `GlOverlayFailureWindowedTest`, `GlOverlayLongRunOffscreenTest`,
 `GlOverlayLongRunWindowedTest` and `GlPointerPositionOverlayTest`.
+
+## Every citation in this brief, checked against disk
+
+Prompted by the team rule in `.claude/agents/engineer.md` (ed07e820) and by #252's brief, which
+cited two mutation rows that had been predicted and never run. Run today, mechanically:
+
+- **Saved artefacts named here**: `proofG.log`, `proofR.log`, `published-pointer-api2.txt`,
+  `build4.marker`, `build4.log`, `gl2.marker`, `gl2.log` and `m0..m8.{diff,log}` — all present in
+  `scratchpad/dev-275c/`, non-empty, **except `m0.diff`, which is empty by design**: m0 is the
+  unmutated baseline row, so its diff has nothing in it. (`build3.*`, the earlier incremental run
+  this brief no longer quotes, and `build2.*`, the red one, are still in that directory.)
+- **Every fenced transcript block** was tested for *contiguity*, not membership: each segment
+  between elision markers must appear as a consecutive, in-order run of its source file. All of
+  them do. The blocks that are not transcripts — the evidence command, the GL command, the
+  mutation table, and the empty-output `git diff --stat` — are commands or tables, and are
+  reproducible now rather than spliced.
+- **That check found one defect, and it is fixed above**: the published-jar block had its first
+  line joined from two lines of the artefact. Re-captured and spliced whole.
+- **Every test class named here** resolves in the tree at this head, and **every short SHA**
+  (`b8c15ce2`, `db6f6328`, `a4d16a4c`, `0ddfe008`, `480369b2`, `483cb10e`, `ed07e820`) resolves to
+  a commit with `git cat-file -t`.
+- **Every image named here** exists in `/srv/ssd1/workspace/Udea/build/debug-screenshots/` at the
+  size given by `stat`.
 
 ## The images
 

@@ -27,6 +27,11 @@ That is the whole of what a game implements. Inside `content()` you use the tool
 `moba`'s HUD (`moba/game/src/commonMain/kotlin/dev/wildware/moba/MobaHudScreen.kt`) is a plain
 composition of those.
 
+A project that writes a screen applies `dev.wildware.udea.compose-ui` beside its Kotlin convention:
+that is the Compose compiler, and without it a screen compiles as a plain function and fails only
+when the toolkit composes it. `udea-render`, `udea-editor` and `moba:game` apply it, and so does a
+game in its own repository (issue #275, `docs/new-game.md` under "Menus and a HUD").
+
 A game may depend on `composegl-ui`, the toolkit with no backend in it, and on nothing else from
 ComposeGL. The frontend that turns the tree into triangles — `composegl-kool` — is `udea-render`'s
 alone, and `UDEA-MG-002` fails the build if a game reaches for it.

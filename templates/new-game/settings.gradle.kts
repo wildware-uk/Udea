@@ -45,6 +45,7 @@ pluginManagement {
         id("dev.wildware.udea.kotlin-library") version udeaVersion
         id("dev.wildware.udea.kotlin-multiplatform") version udeaVersion
         id("dev.wildware.udea.kotlin-multiplatform-render") version udeaVersion
+        id("dev.wildware.udea.compose-ui") version udeaVersion
         id("dev.wildware.udea.game-gates") version udeaVersion
         id("dev.wildware.udea.agent") version udeaVersion
         id("dev.wildware.udea.assets") version udeaVersion

@@ -113,6 +113,11 @@ kotlinxIo = "0.9.1"
 
 [libraries]
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+# The Compose compiler's Gradle plugin, as a library, for `build-logic`: `dev.wildware.udea.compose-ui`
+# applies it, so it has to be on the convention jar's own classpath - and so in that jar's POM, which
+# is how a game in its own repository gets it (issue #275). `version.ref = "kotlin"` for the reason
+# given on the `composeCompiler` plugin entry below.
+compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
@@ -176,7 +181,9 @@ cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-pr
 [plugins]
 # The Compose compiler plugin. `version.ref = "kotlin"` is not a convenience: since Kotlin 2.0
 # this plugin ships out of the Kotlin repository and is released in lockstep with the compiler,
-# so any other version is a version that cannot load. Applied to `udea-render` only.
+# so any other version is a version that cannot load. No project applies it by this alias any
+# more: `dev.wildware.udea.compose-ui` applies it, for the engine's modules and for a game
+# (issue #275). Kept because this catalog is published and an entry in it is public.
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 # The kotlinx.serialization compiler plugin. Like `composeCompiler` it ships out of the Kotlin
 # repository in lockstep with the compiler, so `version.ref = "kotlin"` is the only version that

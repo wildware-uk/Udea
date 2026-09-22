@@ -852,3 +852,12 @@ branch off `origin/master`.
 Report the actual output. If something is broken, say so — never report done on a red build.
 
 **Then stop committing** until the lead comes back to you.
+
+## A public hook needs a soak test (#275)
+
+If your branch adds or changes a public hook a game calls - a registry entry, a system kind, a
+callback, a convention plugin - prove a game can **live** with it: run it through the same public call
+for many seconds of real frames (at least 15 s; Windowed and Offscreen for render), assert the game is
+still alive and drawing at the end, and make a failure inside it loud. #275 shipped an overlay hook
+whose only test drew two frames; any game that used it closed itself eight seconds later with nothing
+logged. The reviewer fails a branch without this test.

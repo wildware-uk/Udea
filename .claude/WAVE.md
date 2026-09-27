@@ -1318,3 +1318,40 @@ windows-latest with Mesa llvmpipe (GDI's GL 1.1 is why Windows never drew in CI)
 run/runClient/runServer/runEditor, hollow run/runServer/runClient and the template; fixes; and a `play`
 task per game (`gradlew.bat :moba:desktop:play`) documented in README, wiki and AGENTS.md. Template's
 window launch joins once #269 merges.
+
+## Wave 26 closed, 2026-09-27 — six merges, all reviewed, snapshot released
+
+| What | Merge | Reviewer |
+|---|---|---|
+| #275 part 2, the published `dev.wildware.udea.compose-ui` convention | `480369b2` | PASS, 0 findings |
+| #244 follow-up, the committed `.glb` | `88e42279` | PASS, 0 findings |
+| #269, the template that draws | `df5402f2` | PASS, 0 findings |
+| `windows-launch` (owner's request, no issue) | `13a5bdd1` | PASS, 0 findings |
+| #252, Hollow combat and its HUD | `ebe795ee` | FAIL then PASS |
+| #275 parts 1 and 3, the silent render-loop death | `47854b70` | PASS, 0 findings |
+
+Post-merge at `50fd55c6`: `build` EXIT=0, 1126 of 1126 executed, no build cache; GL under xvfb with
+`requireGl=true` EXIT=0. Snapshot released from `644b5706`, run 36331103650, verified inside the
+published jars: `GlContextException` in udea-render-jvm, `CommittedModels` in udea-assets-compiler,
+the `compose-ui` plugin marker answering 200, and a made-up class answering 0 hits as the control.
+
+**The Windows story is closed.** `build (windows-latest)` was red on three tests: the two Assimp
+replay tests (#244's committed `.glb`) and `MobaShaderAssetTest` (windows-launch's LF fix). Both are
+in, and every launch of moba, hollow and the template now starts, draws and exits on Windows through
+Mesa llvmpipe, with a PNG per launch as CI evidence, plus `playMoba`/`playHollow` as one command per
+game.
+
+**What this wave taught, all now binding in `.claude/agents/`:** a public hook needs a soak test
+(483cb10e); a mutation row that did not compile is VOID, not red (ed07e820); read the test-report
+artefact, not the console, for a known red (0ddd3d42); resolve every citation in a brief against the
+artefact on disk (4dfab106); a fast red proves nothing unless the subject's own output shows it ran
+(17a12012); a revert row names the SHA it reverts to, never `origin/master` (644b5706). And in
+`AGENTS.md` (a7cc2db7): a hollow shot run twice is byte-identical, which is what makes "two clients
+agree" mean anything.
+
+Outstanding, deliberately unticketed (owner: no new issues): twelve Windows PNGs still unposted (the
+dashboard MCP was ECONNREFUSED all session); the template's launch job saves no PNG, one row named in
+`BRIEF-windows-launch.md` 3.7, now that #269 has merged; and the one-line assertion on
+`isPointerOver`'s pre-first-frame value, to land as KDoc-plus-test on the next `udea-render` branch.
+Held backlog unchanged: #253-#255, #258, #261, #263, #268, #276, #277, the udea-net relevancy
+accumulator, and the 40 unstable master screenshots. #223/#226 stay shelved (Kool has no wasmJs).
